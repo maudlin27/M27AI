@@ -1099,29 +1099,35 @@ end
 
 function GetMexPatrolLocations(aiBrain)
     --Returns a table of mexes on our side of the map near middle of map to patrol
+    local sFunctionRef = 'GetMexPatrolLocations'
+    local bDebugMessages = true
     if M27Utilities.IsTableEmpty(aiBrain[reftMexPatrolLocations]) then
         --Cycle through mexes on our side of the map:
         aiBrain[reftMexPatrolLocations] = {}
+        local tStartPosition = PlayerStartPoints[aiBrain.M27StartPositionNumber]
         local oACU = M27Utilities.GetACU(aiBrain)
         local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
-        local iSegmentGroup = GetUnitSegmentGroup(oACU)
+        local iSegmentGroup = GetSegmentGroupOfLocation(sPathing, tStartPosition)
         local iCurDistanceToEnemy, iCurDistanceToStart
-        local tStartPosition = PlayerStartPoints[aiBrain.M27StartPositionNumber]
+
         local tEnemyPosition = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
         local iDistanceFromStartToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyPosition, tStartPosition)
-        local iMaxTotalDistance = iDistanceFromStartToEnemy * 1.25
+        local iMaxTotalDistance = iDistanceFromStartToEnemy * 1.3
         local iPossibleMexCount = 0
         local tPossibleMexDetails = {}
         local reftPossibleMexLocation = 'M27GetMexPatrolMexLocation'
         local refiMexDistanceToEnemy = 'M27GetMexPatrolMexDistanceToEnemy'
         local iMinDistanceFromBase = 50
         local iValidMexCount = 0
-
+        if bDebugMessages == true then LOG(sFunctionRef..': Before loop through mexes; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup) end
         if M27Utilities.IsTableEmpty(tMexByPathingAndGrouping[sPathing]) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': tMexByPathingAndGrouping[sPathing] isnt empty; table='..repr(tMexByPathingAndGrouping[sPathing])) end
             if M27Utilities.IsTableEmpty(tMexByPathingAndGrouping[sPathing][iSegmentGroup]) == false then
+                if bDebugMessages == true then LOG(sFunctionRef..': List of mexes that are considering='..repr(tMexByPathingAndGrouping[sPathing][iSegmentGroup])) end
                 for iMex, tMexLocation in tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
                     iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tMexLocation)
                     iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyPosition, tMexLocation)
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurDistanceToStart='..iCurDistanceToStart..'; iCurDistanceToEnemy='..iCurDistanceToEnemy..'; iMaxTotalDistance='..iMaxTotalDistance) end
                     if iCurDistanceToStart <= iCurDistanceToEnemy then
                         if iCurDistanceToStart + iCurDistanceToEnemy <= iMaxTotalDistance then --Want to be along midpoint of path from our base to enemy base
                             if iCurDistanceToStart >= iMinDistanceFromBase then
@@ -1137,6 +1143,7 @@ function GetMexPatrolLocations(aiBrain)
         end
         if iPossibleMexCount > 0 then
             --Filter to choose the 4 mexes closest to enemy (s.t. previous requirements that theyre closer to our base than enemy base)
+            if bDebugMessages == true then LOG(sFunctionRef..': iPossibleMexCount='..iPossibleMexCount..'; tPossibleMexDetails='..repr(tPossibleMexDetails)) end
             for iEntry, tValue in M27Utilities.SortTableBySubtable(tPossibleMexDetails, refiMexDistanceToEnemy, true) do
                 iValidMexCount = iValidMexCount + 1
                 aiBrain[reftMexPatrolLocations][iValidMexCount] = tValue[reftPossibleMexLocation]
