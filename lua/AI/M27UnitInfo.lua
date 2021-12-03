@@ -60,6 +60,7 @@ refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * c
 refCategoryAirScout = categories.AIR * categories.SCOUT
 refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - categories.GROUNDATTACK
 refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - categories.CANNOTUSEAIRSTAGING --excludes mercies
+refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3
 refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
@@ -67,6 +68,7 @@ refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
 refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE
 refCategoryAllNavy = categories.NAVAL
+refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER
 
 function GetUnitLifetimeCount(oUnit)
     local sCount = oUnit.M27LifetimeUnitCount

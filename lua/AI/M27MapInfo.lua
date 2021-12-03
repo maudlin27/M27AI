@@ -59,6 +59,8 @@ tPathingSegmentGroupBySegment = {} --[a][b][c]: a = pathing type; b = segment x,
 iMaxBaseSegmentX = 1 --Will be set by pathing, sets the maximum possible base segment X
 iMaxBaseSegmentZ = 1
 
+iMapWaterHeight = 0 --Surface height of water on the map
+
 
 function GetPathingSegmentFromPosition(tPosition)
     --Base level segment numbers
@@ -838,22 +840,20 @@ end
 function IsUnderwater(tPosition, bReturnSurfaceHeightInstead)
     --Returns true if tPosition underwater, otherwise returns false
     --bReturnSurfaceHeightInstead:: Return the actual height at which underwater, instead of true/false
-    local bUnderwater = false
-    if M27Utilities.IsTableEmpty(tPosition) == true then
-        M27Utilities.ErrorHandler('tPosition is empty')
+    if bReturnSurfaceHeightInstead then return iMapWaterHeight
     else
-        local iSurfaceHeight = GetSurfaceHeight(tPosition[1], tPosition[3])
-        if bReturnSurfaceHeightInstead == true then bUnderwater = iSurfaceHeight
+        if M27Utilities.IsTableEmpty(tPosition) == true then
+            M27Utilities.ErrorHandler('tPosition is empty')
         else
-            if iSurfaceHeight > tPosition[2] then
+            if iMapWaterHeight > tPosition[2] then
                 --Check we're not just under an arch but are actually underwater
                 if not(GetTerrainHeight(tPosition[1], tPosition[3]) == iSurfaceHeight) then
-                    bUnderwater = true
+                    return true
                 end
             end
         end
+        return false
     end
-    return bUnderwater
 end
 
 function GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchRange)
@@ -1702,6 +1702,7 @@ function RecordBaseLevelPathability()
                                         elseif bNavyPathfinding then
                                             if IsNavyPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3]) then
                                                 bHaveSubsequentPath = true
+                                                if iMapWaterHeight == 0 then iMapWaterHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3]) end
                                             end
                                         end
                                         if bHaveSubsequentPath then

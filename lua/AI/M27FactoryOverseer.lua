@@ -616,21 +616,26 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             iTotalWanted = 100
                         end
                     elseif iCurrentConditionToTry == 12 then
+                        if aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 then
+                            iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
+                            iTotalWanted = aiBrain[M27AirOverseer.refiTorpBombersWanted]
+                        end
+                    elseif iCurrentConditionToTry == 13 then
                         if bHavePowerForAir and aiBrain[M27AirOverseer.refiBombersWanted] > 0 then
                             iCategoryToBuild = refCategoryBomber
                             iTotalWanted = aiBrain[M27AirOverseer.refiBombersWanted]
                         end
-                    elseif iCurrentConditionToTry == 13 then
+                    elseif iCurrentConditionToTry == 14 then
                         if aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] > 0 then
                             iCategoryToBuild = refCategoryEngineer
                             iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
                         end
-                    elseif iCurrentConditionToTry == 14 then
+                    elseif iCurrentConditionToTry == 15 then
                         if aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 2 then
                             iCategoryToBuild = refCategoryEngineer
                             iTotalWanted = 2 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
                         end
-                    elseif iCurrentConditionToTry == 15 then
+                    elseif iCurrentConditionToTry == 16 then
                         if bHavePowerForAir and aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel] == true then
                             local iSpareBombers = 0
                             if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then iSpareBombers = table.getn(aiBrain[M27AirOverseer.reftAvailableBombers]) end

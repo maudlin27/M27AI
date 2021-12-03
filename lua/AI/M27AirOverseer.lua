@@ -74,6 +74,7 @@ local refiStrikeDamageAssigned = 'M27AirStrikeDamageAssigned'
 --Build order related
 refiExtraAirScoutsWanted = 'M27AirExtraAirScoutsWanted'
 refiBombersWanted = 'M27AirBombersWanted'
+refiTorpBombersWanted = 'M27TorpBombersWanted'
 refiAirStagingWanted = 'M27AirStagingWanted'
 local iMinScoutsForMap
 local iMaxScoutsForMap
@@ -101,16 +102,18 @@ refbWantMoreAirAA = 'M27WantMoreAirAA'
 --Available air units
 local reftAvailableScouts = 'M27AirScoutsWithFuel'
 reftAvailableBombers = 'M27AirAvailableBombers'
+reftAvailableTorpBombers = 'M27AirAvailableTorpBombers' --Determined by threat overseer
 local reftAvailableAirAA = 'M27AirAvailableAirAA'
 --local reftLowFuelAir = 'M27AirScoutsWithLowFuel'
 local reftLowFuelAir = 'M27AirLowFuelAir'
 
-local refbOnAssignment = 'M27AirOnAssignment'
+refbOnAssignment = 'M27AirOnAssignment'
 local refbWillBeRefueling = 'M27AirWillBeRefueling'
 
 --Other
 local refCategoryAirScout = M27UnitInfo.refCategoryAirScout
 local refCategoryBomber = M27UnitInfo.refCategoryBomber
+local refCategoryTorpBomber = M27UnitInfo.refCategoryTorpBomber
 local refCategoryAirAA = M27UnitInfo.refCategoryAirAA
 local refCategoryAirNonScout = M27UnitInfo.refCategoryAirNonScout
 
@@ -178,18 +181,20 @@ function ClearPreviousMovementEntries(aiBrain, oAirUnit)
     end
 end
 
-function ClearTrackersOnUnitsTargets(oAirUnit)
+function ClearTrackersOnUnitsTargets(oAirUnit, iAirUnitMassCost)
     if M27Utilities.IsTableEmpty(oAirUnit[reftTargetList]) == false then
         --local iTotalTargets = table.getn(oAirUnit[reftTargetList])
         --local oCurTarget
         local iStrikeDamage = M27UnitInfo.GetUnitStrikeDamage(oAirUnit)
-
+        local iMassCost = oAirUnit:GetBlueprint().Economy.BuildCostMass --Not perfect because if a bomber is assigned a target when at 50% health the target unit's assigned threat will be reduced when the bomber dies by more than it should
+        local iArmyIndex = oAirUnit:GetAIBrain():GetArmyIndex()
         for iUnit, oUnit in oAirUnit[reftTargetList] do
             if not(oUnit.Dead) then
                 if oUnit[refiCurBombersAssigned] == nil then oUnit[refiCurBombersAssigned] = 0
                 else oUnit[refiCurBombersAssigned] = oUnit[refiCurBombersAssigned] - 1 end
                 if oUnit[refiStrikeDamageAssigned] == nil then oUnit[refiStrikeDamageAssigned] = 0
                 else oUnit[refiStrikeDamageAssigned] = math.max(0, oUnit[refiStrikeDamageAssigned] - iStrikeDamage) end
+                if oUnit[iArmyIndex][M27Overseer.refiAssignedThreat] then oUnit[iArmyIndex][M27Overseer.refiAssignedThreat] = math.max(0, oUnit[iArmyIndex][M27Overseer.refiAssignedThreat] - iMassCost) end
             end
         end
     end
@@ -214,6 +219,7 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit)
     oAirUnit[reftMovementPath] = {}
     oAirUnit[reftTargetList] = {}
     oAirUnit[refiCurTargetNumber] = 0
+
 
     ClearTrackersOnUnitsTargets(oAirUnit)
 
@@ -286,41 +292,43 @@ function OnBomberDeath(aiBrain, oDeadBomber)
     if oDeadBomber.GetUnitId then
         local oBomberBP = oDeadBomber:GetBlueprint()
         local iBomberMassCost = oBomberBP.Economy.BuildCostMass
-        local iMassKilled = oDeadBomber.Sync.totalMassKilled
-        if iMassKilled == nil then iMassKilled = 0 end
-        local iExistingEntries
-        local tNewEntry = {}
-        local iTechLevel = M27UnitInfo.GetUnitTechLevel(oDeadBomber)
-        if M27Utilities.IsTableEmpty(aiBrain[reftBomberEffectiveness]) == true then
-            aiBrain[reftBomberEffectiveness] = {}
-            for iTech = 1, 4 do
-                aiBrain[reftBomberEffectiveness][iTech] = {}
-            end
-            iExistingEntries = 0
-        else
-            iExistingEntries = table.getn(aiBrain[reftBomberEffectiveness][iTechLevel])
-        end
-        tNewEntry[refiBomberMassCost] = iBomberMassCost
-        tNewEntry[refiBomberMassKilled] = iMassKilled
-        table.insert(aiBrain[reftBomberEffectiveness][iTechLevel], 1, tNewEntry)
-        iExistingEntries = iExistingEntries + 1
-        if iExistingEntries > iBombersToTrackEffectiveness then table.remove(aiBrain[reftBomberEffectiveness][iTechLevel], iExistingEntries) end
-
-        --Do we still want to build bombers?
-        local bNoEffectiveBombers = true
-        local iEffectiveMinRatio = 0.5
-        if iExistingEntries >= 3 then
-            for iLastBomber, tSubtable in aiBrain[reftBomberEffectiveness][iTechLevel] do
-                if tSubtable[refiBomberMassKilled] / tSubtable[refiBomberMassCost] >= iEffectiveMinRatio then
-                    bNoEffectiveBombers = false
-                    break
+        if not(EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oBomberBP.BlueprintId)) then
+            local iMassKilled = oDeadBomber.Sync.totalMassKilled
+            if iMassKilled == nil then iMassKilled = 0 end
+            local iExistingEntries
+            local tNewEntry = {}
+            local iTechLevel = M27UnitInfo.GetUnitTechLevel(oDeadBomber)
+            if M27Utilities.IsTableEmpty(aiBrain[reftBomberEffectiveness]) == true then
+                aiBrain[reftBomberEffectiveness] = {}
+                for iTech = 1, 4 do
+                    aiBrain[reftBomberEffectiveness][iTech] = {}
                 end
+                iExistingEntries = 0
+            else
+                iExistingEntries = table.getn(aiBrain[reftBomberEffectiveness][iTechLevel])
             end
-        else
-            bNoEffectiveBombers = false
+            tNewEntry[refiBomberMassCost] = iBomberMassCost
+            tNewEntry[refiBomberMassKilled] = iMassKilled
+            table.insert(aiBrain[reftBomberEffectiveness][iTechLevel], 1, tNewEntry)
+            iExistingEntries = iExistingEntries + 1
+            if iExistingEntries > iBombersToTrackEffectiveness then table.remove(aiBrain[reftBomberEffectiveness][iTechLevel], iExistingEntries) end
+
+            --Do we still want to build bombers?
+            local bNoEffectiveBombers = true
+            local iEffectiveMinRatio = 0.5
+            if iExistingEntries >= 3 then
+                for iLastBomber, tSubtable in aiBrain[reftBomberEffectiveness][iTechLevel] do
+                    if tSubtable[refiBomberMassKilled] / tSubtable[refiBomberMassCost] >= iEffectiveMinRatio then
+                        bNoEffectiveBombers = false
+                        break
+                    end
+                end
+            else
+                bNoEffectiveBombers = false
+            end
+            aiBrain[refbBombersAreEffective][iTechLevel] = not(bNoEffectiveBombers)
+            if bDebugMessages == true then LOG(sFunctionRef..': Bomber died; iBomberMassCost='..iBomberMassCost..'; iMassKilled='..iMassKilled..'; bNoEffectiveBombers='..tostring(bNoEffectiveBombers)) end
         end
-        aiBrain[refbBombersAreEffective][iTechLevel] = not(bNoEffectiveBombers)
-        if bDebugMessages == true then LOG(sFunctionRef..': Bomber died; iBomberMassCost='..iBomberMassCost..'; iMassKilled='..iMassKilled..'; bNoEffectiveBombers='..tostring(bNoEffectiveBombers)) end
     end
 
     --Update units it was targetting to show them as no longer having bomber strike damage assigned
@@ -382,9 +390,11 @@ function TrackBomberTarget(oBomber, oTarget)
     if M27Config.M27ShowUnitNames == true and oBomber.GetUnitId then M27PlatoonUtilities.UpdateUnitNames({oBomber}, oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..':Attack:'..oTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTarget)) end
 end
 
-function UpdateBomberTargets(oBomber)
+function UpdateBomberTargets(oBomber, bRemoveIfOnLand)
     local bDebugMessages = false
     local sFunctionRef = 'UpdateBomberTargets'
+    local bRemoveCurTarget
+    local tTargetPos
     if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
         local oBomberCurTarget
         local bBomberHasDeadTarget = true
@@ -396,7 +406,13 @@ function UpdateBomberTargets(oBomber)
             if iDeadLoopCount > iMaxDeadLoopCount then M27Utilities.ErrorHandler('Infinite loop, will abort') break end
             oBomberCurTarget = oBomber[reftTargetList][oBomber[refiCurTargetNumber]]
             if bDebugMessages == true then LOG(sFunctionRef..': iDeadLoopCount='..iDeadLoopCount..'; iMaxDeadLoopCount='..iMaxDeadLoopCount) end
-            if oBomberCurTarget == nil or oBomberCurTarget.Dead or not(oBomberCurTarget.GetPosition) then
+            bRemoveCurTarget = false
+            if oBomberCurTarget == nil or oBomberCurTarget.Dead or not(oBomberCurTarget.GetPosition) then bRemoveCurTarget = true
+            elseif bRemoveIfOnLand then
+                tTargetPos = oBomberTarget:GetPosition()
+                if GetTerrainHeight(tTargetPos[1], tTargetPos[2]) >= M27MapInfo.iMapWaterHeight then bRemoveCurTarget = true end
+            end
+            if bRemoveCurTarget == true then
                 if oBomber[refiCurTargetNumber] == nil then
                     M27Utilities.ErrorHandler('Bomber cur target number is nil; reftTargetList size='..table.getn(oBomber[reftTargetList]))
                 end
@@ -495,12 +511,14 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
     local tAllScouts = aiBrain:GetListOfUnits(refCategoryAirScout, false, true)
     local tAllBombers = aiBrain:GetListOfUnits(refCategoryBomber, false, true)
     local tAllAirAA = aiBrain:GetListOfUnits(refCategoryAirAA, false, true)
+    local tTorpBombers = aiBrain:GetListOfUnits(refCategoryTorpBomber, false, true)
     local iCurUnitsWithFuel, iCurUnitsWithLowFuel
-    local tAllAirUnits = {tAllScouts, tAllBombers, tAllAirAA}
-    local tAvailableUnitRef = {reftAvailableScouts, reftAvailableBombers, reftAvailableAirAA}
+    local tAllAirUnits = {tAllScouts, tAllBombers, tAllAirAA, tTorpBombers}
+    local tAvailableUnitRef = {reftAvailableScouts, reftAvailableBombers, reftAvailableAirAA, reftAvailableTorpBombers}
     local iTypeScout = 1
     local iTypeBomber = 2
     local iTypeAirAA = 3
+    local iTypeTorpBomber = 4
     local sAvailableUnitRef
     local bUnitIsUnassigned
     local iTimeStamp = GetGameTimeSeconds()
@@ -510,6 +528,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
     iCurUnitsWithLowFuel = 0
 
     for iUnitType, tAllAirOfType in tAllAirUnits do
+        --if iUnitType == iTypeTorpBomber then bDebugMessages = true end
         sAvailableUnitRef = tAvailableUnitRef[iUnitType]
         aiBrain[sAvailableUnitRef] = {}
         iCurUnitsWithFuel = 0
@@ -619,9 +638,11 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                     ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
                                     bUnitIsUnassigned = true
                                 end
-                            elseif iUnitType == iTypeBomber then
+                            elseif iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have a bomber or torp bomber, will check its targets; refbOnAssignment pre check='..tostring(oUnit[refbOnAssignment])) end
                                 UpdateBomberTargets(oUnit)
                                 if oUnit[refbOnAssignment] == false then bUnitIsUnassigned = true end
+                                if bDebugMessages == true then LOG(sFunctionRef..': refbOnAssignment post check='..tostring(oUnit[refbOnAssignment])) end
                             elseif iUnitType == iTypeAirAA then
                                 bClearAirAATargets = false
                                 bReturnToBase = false
@@ -665,9 +686,12 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                     if bReturnToBase == true then
                                         IssueClearCommands({oUnit})
                                         IssueMove({oUnit}, tStartPosition)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Cleared commants for unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                                     end
                                     --oUnit[refbOnAssignment] = false
                                 end
+                            elseif iUnitType == M27UnitInfo.refCategoryTorpBomber then
+
                             else
                                 M27Utilities.ErrorHandler('To add code')
                             end
@@ -687,7 +711,8 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                         end
                         if bUnitIsUnassigned == true then
                             --Bomber specific - treat low health bombers as unavailable
-                            if iUnitType == iTypeBomber and oUnit:GetHealthPercent() <= 0.25 then
+                            if (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber) and oUnit:GetHealthPercent() <= 0.25 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Bomber has low health or fuel so wont make it available') end
                                 iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
                                 aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
                             else
@@ -1921,6 +1946,7 @@ function SetupAirOverseer(aiBrain)
     --Sets default/starting values for everything so dont have to worry about checking if is nil or not
     aiBrain[refiExtraAirScoutsWanted] = 0
     aiBrain[refiAirStagingWanted] = 0
+    aiBrain[refiTorpBombersWanted] = 0
 
     aiBrain[refbBombersAreEffective] = {}
     for iTech = 1, 4 do

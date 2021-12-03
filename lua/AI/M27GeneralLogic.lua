@@ -1392,15 +1392,17 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     end
 end
 
-function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride)
+function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
     --Threat value depends on inputs:
     --bIncludeAntiAir - will include anti-air on ground units
     --bIncludeNonCombatAir - adds threat value for transports and scouts
+    --bIncludeAirTorpedo - Adds threat for torpedo bombers
     local bDebugMessages = false
     local sFunctionRef = 'GetCombatThreatRating'
     local iSoloBlipThreat = 10 -- assumes a single unit as a blip is more likely a scout or engineer
     local iStructureBlipThreat = 0 --Assumes an unrevealed structure has no threat rating
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
+    if bIncludeAirTorpedo == nil then bIncludeAirTorpedo = bIncludeAirToGround end
     if bDebugMessages == true then LOG(sFunctionRef..': About to check if table is empty') end
     --Decide blip threat values:
     if iAirBlipThreatOverride == nil then
@@ -1433,6 +1435,8 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     tBlipThreatByPathingType[M27UnitInfo.refPathingTypeLand] = iMobileLandBlipThreatOverride
     tBlipThreatByPathingType[M27UnitInfo.refPathingTypeAmphibious] = iMobileLandBlipThreatOverride
     tBlipThreatByPathingType[M27UnitInfo.refPathingTypeNone] = iStructureBlipThreat
+
+    if bDebugMessages == true then LOG(sFunctionRef..': tBlipThreatByPathingType='..repr(tBlipThreatByPathingType)) end
 
     --Determine the amount that health impacts on threat
     local iHealthFactor = 1 --if unit has 40% health, then threat reduced by (1-40%)*iHealthFactor
@@ -1489,6 +1493,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                         bCalcActualThreat = true
                                     else
                                         iCurThreat = tBlipThreatByPathingType[sCurUnitPathing]
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Setting cur threat equal to blip threat; iCurThreat='..iCurThreat) end
                                     end
                                 end
                             end
@@ -1510,11 +1515,13 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                     if sCurUnitPathing == M27UnitInfo.refPathingTypeAir then
                         if bIncludeAirToAir == true then bUnitFitsDesiredCategory = true
                         elseif bIncludeAirToGround == true then bUnitFitsDesiredCategory = true
+                        elseif bIncludeAirTorpedo == true then bUnitFitsDesiredCategory = true
                         elseif bIncludeNonCombatAir == true then bUnitFitsDesiredCategory = true
                         end
                     elseif bIncludeGroundToAir == true then bUnitFitsDesiredCategory = true end
 
                     --Is unit still valid? If so then consider its weapons/categories more precisely:
+                    if bDebugMessages == true then LOG(sFunctionRef..': bUnitFitsDesiredCategory='..tostring(bUnitFitsDesiredCategory)) end
                     if bUnitFitsDesiredCategory == true then
                         oCurUnitBlueprint = oUnit:GetBlueprint()
                         sCurUnitBP = oCurUnitBlueprint.BlueprintId
@@ -1527,7 +1534,10 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                 if bIncludeAirToGround == true then
                                     if EntityCategoryContains(categories.BOMBER + categories.GROUNDATTACK + categories.OVERLAYDIRECTFIRE, sCurUnitBP) == true then iMassMod = 1 end
                                 end
-                                if bIncludeAirToAir == true then
+                                if bIncludeAirTorpedo == true and EntityCategoryContains(categories.ANTINAVY, sCurUnitBP) == true then iMassMod = 1 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': bIncludeAirTorpedo='..tostring(bIncludeAirTorpedo)..'; iMassMod='..iMassMod) end
+
+                                if bIncludeAirToAir == true and iMassMod < 1 then
                                     if EntityCategoryContains(categories.ANTIAIR * categories.AIR, sCurUnitBP) == true then
                                         iMassMod = 1
                                         if bDebugMessages == true then LOG(sFunctionRef..': sCurUnitBP='..sCurUnitBP..': about to see if unit doesnt contain onlyantiair category') end
@@ -1545,23 +1555,19 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                             end
                         else
                             --Non-air pathing type
+                            if bDebugMessages == true then LOG(sFunctionRef..': Unit doesnt have air pathing. bIncludeGroundToAir='..tostring(bIncludeGroundToAir)) end
                             if bIncludeGroundToAir == true then
                                 if EntityCategoryContains(categories.ANTIAIR, sCurUnitBP) == true then
-                                    iMassMod = 1
-                                    --Naval units - work on basis only cruisers, carriers and seraphim subs have good AA:
-                                    if EntityCategoryContains(categories.NAVAL, sCurUnitBP) == true then
-                                        iMassMod = 0.05
-                                        if EntityCategoryContains(categories.CRUISER + categories.CARRIER, sCurUnitBP) then iMassMod = 1
-                                        elseif sCurUnitBP == 'XSS0304' then iMassMod = 1
-                                        end
-                                    else
-                                        --Land unit that has some AA ability - only land units with AA that can think of which arent dedicated AA are experimentals, and one of the ACUs/SACUs that can get an upgrade (which wont worry about since almost no-one does)
-                                        if EntityCategoryContains(categories.EXPERIMENTAL, sCurUnitBP) == true then iMassMod = 0.05 end
-                                    end
+                                    iMassMod = 1 --Cruisers and T3 aircraft carriers have antiair as well as overlay antiair
+                                    if sCurUnitBP == 'urs0103' then iMassMod = 0.05 end --Cybran frigate misclassified as anti-air
+                                elseif EntityCategoryContains(categories.OVERLAYANTIAIR, sCurUnitBP) == true then
+                                    iMassMod = 0.05
+                                    if sCurUnitBP == 'ues0401' then iMassMod = 1 end --atlantis misclassifiefd as not anti-air
                                 end
                             end
                         end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iMassMod='..iMassMod) end
                     if iMassMod > 0 then
                         --Onlyantiair - use to weight results when calculating AA threat
                         if iHealthFactor > 0 then

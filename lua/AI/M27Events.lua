@@ -59,7 +59,7 @@ function OnUnitDeath(oUnit)
                     M27AirOverseer.OnScoutDeath(aiBrain, oUnit)
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryAirAA, sUnitBP) then
                     M27AirOverseer.OnAirAADeath(oUnit)
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryBomber, sUnitBP) then
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryBomber, sUnitBP) or EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, sUnitBP) then
                     M27AirOverseer.OnBomberDeath(aiBrain, oUnit)
                 end
             end
