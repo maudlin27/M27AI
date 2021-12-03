@@ -55,7 +55,7 @@ local refCategoryBomber = M27UnitInfo.refCategoryBomber
 local refCategoryFrigate = M27UnitInfo.refCategoryFrigate
 
 function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFactory)--, bGetSlowest, bGetFastest)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetBlueprintsThatCanBuildOfCategory'
     local tBlueprints = EntityCategoryGetUnitList(iCategoryCondition)
     local tValidBlueprints = {}
@@ -193,7 +193,7 @@ end
 
 function DetermineWhatToBuild(aiBrain, oFactory)
     --Returns unit BP ID to be built
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DetermineWhatToBuild'
     local sBPIDToBuild
     if not(oFactory.GetBlueprint) then M27Utilities.ErrorHandler('Factory doesnt have a blueprint')
@@ -574,9 +574,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             iTotalWanted = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted]
                         end
                     elseif iCurrentConditionToTry == 4 then
-                        if bHavePowerForAir and aiBrain[M27AirOverseer.refbNeedMoreAirAA] == true then --will be set to true if we have an existing air target that we want to attack (e.g. its on our side of the map) but we can't crush with our airforce
+                        if bHavePowerForAir and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then --will be set to >0 if we have an existing air target that we want to attack (e.g. its on our side of the map) but we can't crush with our airforce
                             iCategoryToBuild = refCategoryAirAA
-                            iTotalWanted = 100
+                            iTotalWanted = aiBrain[M27AirOverseer.refiAirAANeeded]
                         end
                     elseif iCurrentConditionToTry == 5 then
                         if bHavePowerForAir and aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] > 0 then
@@ -611,11 +611,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
                         end
                     elseif iCurrentConditionToTry == 11 then
-                        if bHavePowerForAir and aiBrain[M27AirOverseer.refbWantMoreAirAA] == true then
-                            iCategoryToBuild = refCategoryAirAA
-                            iTotalWanted = 100
-                        end
-                    elseif iCurrentConditionToTry == 12 then
                         if aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 then
                             iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                             iTotalWanted = aiBrain[M27AirOverseer.refiTorpBombersWanted]
@@ -782,7 +777,7 @@ function RemoveTemporaryFactoryPause(aiBrain, oFactory)
 end
 
 function FactoryOverseer(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'FactoryOverseer'
     local tAllFactories = {}
     local iFactoryCategory = categories.CONSTRUCTION * categories.FACTORY * categories.STRUCTURE

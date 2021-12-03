@@ -4,10 +4,11 @@
 --- DateTime: 21/11/2021 19:41
 ---
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
+local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 
 local M27OnCreateArmyBrain = OnCreateArmyBrain
 function OnCreateArmyBrain(index, brain, name, nickname)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'OnCreateArmyBrain'
     if bDebugMessages == true then LOG(sFunctionRef..': name='..name..'; nickname='..nickname..'; index='..index) end
     M27Overseer.AllAIBrainsBackup[index] = brain

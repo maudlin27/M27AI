@@ -38,7 +38,7 @@ end
 
 function OnUnitDeath(oUnit)
     --NOTE: This is called by the death of any unit of any player, so careful with what commands are given
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'OnUnitDeath'
     if bDebugMessages == true then LOG(sFunctionRef..'Hook successful') end
     --Is it an ACU?
@@ -68,7 +68,7 @@ function OnUnitDeath(oUnit)
 end
 
 function OnWorkEnd(self, work)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'OnWorkEnd'
     if bDebugMessages == true then LOG(sFunctionRef..': Hook successful') end
 end
@@ -79,7 +79,7 @@ function OnDamaged(self, instigator)
         if self.GetAIBrain and not(self.Dead) then
             local aiBrain = self:GetAIBrain()
             if aiBrain.M27AI and self == M27Utilities.GetACU(aiBrain) then
-                local bDebugMessages = false
+                local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
                 local sFunctionRef = 'OnDamage'
                 if bDebugMessages == true then LOG(sFunctionRef..': ACU has just taken damage, checking if can see the unit that damaged it') end
                 --Do we have a unit that damaged us?

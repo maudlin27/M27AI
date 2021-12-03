@@ -3,6 +3,7 @@
 tTEMPTEST = {}
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
+local M27MiscProfiling = import('/mods/M27AI/lua/MiscProfiling.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
@@ -90,6 +91,13 @@ local iScoutLargePlatoonThreshold = 8 --Platoons >= this size are considered lar
 local iSmallPlatoonMinSizeForScout = 3 --Wont try and assign scouts to platoons that have fewer than 3 units in them
 local iMAALargePlatoonThresholdAirThreat = 10
 local iMAALargePlatoonThresholdNoThreat = 20
+
+--Factories wanted
+reftiMaxFactoryByType = 'M27OverseerMaxFactoryByType' -- table {land, air, navy} with the max no. wanted
+refiMinLandFactoryBeforeOtherTypes = 'M27OverseerMinLandFactoryFirst'
+refFactoryTypeLand = 1
+refFactoryTypeAir = 2
+refFactoryTypeNavy = 3
 
 --Other ACU related
 refiACULastTakenUnseenDamage = 'M27OverseerACULastTakenUnseenDamage' --Used to determine if ACU should run or not
@@ -206,7 +214,7 @@ function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocationTarget
 end
 
 function RecordIntelPaths(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordIntelPaths'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local refCategoryLandScout = M27UnitInfo.refCategoryLandScout
@@ -445,7 +453,7 @@ function GetNearestMAAOrScout(aiBrain, tPosition, bScoutNotMAA, bDontTakeFromIni
     --if bOnlyConsiderAvailableHelpers is true then won't consider units in any other existing platoons (unless they're a helper platoon with no helper)
     --returns nil if no such scout/MAA
     --oRelatedUnitOrPlatoon - use to check that aren't dealing with a support unit already assigned to the unit/platoon that are getting this for
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNearestMAAOrScout'
     if bOnlyConsiderAvailableHelpers == nil then bOnlyConsiderAvailableHelpers = false end
     if bDontTakeFromInitialRaiders == nil then bDontTakeFromInitialRaiders = true end
@@ -570,7 +578,7 @@ end
 function AssignHelperToPlatoonOrUnit(oHelperToAssign, oPlatoonOrUnitNeedingHelp, bScoutNotMAA)
     --Checks if the platoon/unit already has a helper, in which case adds to that, otherwise creates a new helper platoon
     --bScoutNotMAA - true if scout, false if MAA
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AssignHelperToPlatoonOrUnit'
     local aiBrain = oHelperToAssign:GetAIBrain()
     local sPlanWanted = 'M27ScoutAssister'
@@ -632,7 +640,7 @@ end
 function AssignMAAToPreferredPlatoons(aiBrain)
     --Similar to assigning scouts, but for MAA - for now just focus on having MAA helping ACU and any platoon of >20 size that doesnt contain MAA
     --===========ACU MAA helper--------------------------
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AssignMAAToPreferredPlatoons'
     local iACUMinMAAThreatWantedWithAirThreat = 84 --Equivalent to 3 T1 MAA
     if aiBrain[refiOurHighestFactoryTechLevel] > 1 then
@@ -823,7 +831,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
     --Goes through all scouts we have, and assigns them to highest priority tasks
     --Tries to form an intel line (and manages the location of this), and requests more scouts are built if dont have enough to form an intel line platoon;
     --Also records the number of scouts needed to complete things
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AssignScoutsToPreferredPlatoons'
 
     --Rare error - AI mass produces scouts - logs enabled for if this happens
@@ -1418,7 +1426,7 @@ end
 function RemoveSpareNonCombatUnits(oPlatoon)
 
     --Removes surplus scouts/MAA from oPlatoon
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RemoveSpareTypeOfUnit'
     local tAllUnits = oPlatoon:GetPlatoonUnits()
     local tCombatUnits = EntityCategoryFilterDown(categories.DIRECTFIRE + categories.INDIRECTFIRE - categories.SCOUT - categories.ANTIAIR, tAllUnits)
@@ -1511,7 +1519,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
     --also updates previous threat group references so they know to refer to this threat group
     --if iRadius is 0 then will only add oEnemyUnit to the threat group
     --Add oEnemyUnit to sThreatGroup:
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AddNearbyUnitsToThreatGroup'
     local iArmyIndex = aiBrain:GetArmyIndex()
 
@@ -1599,7 +1607,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
 end
 
 function UpdatePreviousPlatoonThreatReferences(aiBrain, tEnemyThreatGroup)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'UpdatePreviousPlatoonThreatReferences'
     local sPlatoonCurTarget
     for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
@@ -1629,7 +1637,7 @@ function RemoveSpareUnits(oPlatoon, iThreatNeeded, iMinScouts, iMinMAA, oPlatoon
     --bIgnoreIfNearbyEnemies (default is yes) is true then won't remove units if have nearby enemies (based on the localised platoon enemy detection)
     --if oPlatoon is army pool then wont remove any of the units
 
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RemoveSpareUnits'
     local iCurUnitThreat = 0
     local iRemainingThreatNeeded = iThreatNeeded
@@ -1773,7 +1781,7 @@ end
 
 function RecordAvailablePlatoonAndReturnValues(aiBrain, oPlatoon, iAvailableThreat, iCurAvailablePlatoons, tCurPos, iDistFromEnemy, iDistToOurBase, tAvailablePlatoons, tNilDefenderPlatoons, bIndirectThreatOnly)
     --Used by ThreatAssessAndRespond - Split out into this function as used in 2 places so want to make sure any changes are reflected in both
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordAvailablePlatoonAndReturnValues'
     local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
     local oRecordedPlatoon
@@ -1818,7 +1826,7 @@ end
 function ThreatAssessAndRespond(aiBrain)
     --Identifies enemy threats, and organises platoons which are sent to deal with them
     --NOTE: Doesnt handle naval units
-    local bDebugMessages = false
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ThreatAssessAndRespond'
 
     --Key config variables:
@@ -2494,6 +2502,8 @@ function ThreatAssessAndRespond(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': About to consider if we have any available torp bombers and if so assign them to enemy naval threat') end
                     --tAvailablePlatoons, refiActualDistanceFromEnemy
 
+
+
                     if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': Number of available torp bombers='..table.getn(aiBrain[M27AirOverseer.reftAvailableTorpBombers])) end
                         --Determine closest available torpedo bombers:
@@ -2513,7 +2523,9 @@ function ThreatAssessAndRespond(aiBrain)
                     if iAvailableThreat >= iThreatNeeded then
                         for iEntry, tTorpSubtable in M27Utilities.SortTableBySubtable(tTorpBombersByDistance, refiActualDistanceFromEnemy, true) do
                             --Cycle through each enemy unit in the threat group
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering torp bomber '..tTorpSubtable[refoTorpUnit]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..'; tTorpSubtable[refiCurThreat]='..(tTorpSubtable[refiCurThreat] or 0)..'; about to cycle through every enemy unit in threat group to see if should attack one of them') end
                             for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
+                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy Unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iAssignedThreat='..(oUnit[iArmyIndex][refiAssignedThreat] or 0)..'; oUnit[iArmyIndex][refiUnitNavalAAThreat]='..(oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0)..'; iNavalThreatMaxFactor='..iNavalThreatMaxFactor) end
                                 if oUnit[iArmyIndex][refiAssignedThreat] <= iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat] then
                                     oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
                                     IssueClearCommands(tTorpSubtable[refoTorpUnit])
@@ -2528,8 +2540,6 @@ function ThreatAssessAndRespond(aiBrain)
                                     break
                                 end
                             end
-                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have any remaining torp bombers to allocate') end
-                            break --Failed to find a unit to allocate to
                         end
                     else
                         iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall + iThreatNeeded
@@ -2594,13 +2604,15 @@ function ThreatAssessAndRespond(aiBrain)
     --Record how many torp bombers we want
     if iCumulativeTorpBomberThreatShortfall > 0 then
         aiBrain[M27AirOverseer.refiTorpBombersWanted] = iCumulativeTorpBomberThreatShortfall / 240
+    else
+        aiBrain[M27AirOverseer.refiTorpBombersWanted] = 0
     end
 
     --if bDebugMessages == true then LOG(sFunctionRef..': End of code, getting ACU debug plan and action') DebugPrintACUPlatoon(aiBrain) end
 end
 
 function ACUManager(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ACUManager'
 
     local oACU = M27Utilities.GetACU(aiBrain)
@@ -2869,7 +2881,7 @@ end
 
 function PlatoonNameUpdater(aiBrain, bUpdateCustomPlatoons)
     --Every second cycles through every platoon and updates its name to reflect its plan and platoon count
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'PlatoonNameUpdater'
     if bDebugMessages == true then LOG(sFunctionRef..': checking if want to update platoon names') end
     if M27Config.M27ShowUnitNames == true then
@@ -2932,7 +2944,7 @@ end
 
 function EnemyThreatRangeUpdater(aiBrain)
     --Updates range to look for enemies based on if any T2 PD detected
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'EnemyThreatRangeUpdater'
     if aiBrain[refbEnemyHasTech2PD] == false then
         local tEnemyTech2 = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH2, M27Utilities.GetACU(aiBrain):GetPosition(), 1000, 'Enemy')
@@ -2942,6 +2954,33 @@ function EnemyThreatRangeUpdater(aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': Enemy T2 PD detected - increasing range to look for nearby enemies on platoons') end
         end
     end
+end
+
+function SetMaximumFactoryLevels(aiBrain)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'SetMaximumFactoryLevels'
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+    local iAirFactoriesOwned = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory)
+    local iPrimaryFactoriesWanted
+    local iPrimaryFactoryType = refFactoryTypeLand
+    --local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
+    local iMexesOnOurSideOfMap = M27EconomyOverseer.GetMexCountOnOurSideOfMap(aiBrain)
+    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then iPrimaryFactoriesWanted = math.max(3, math.ceil(iMexesOnOurSideOfMap * 0.25))
+    else iPrimaryFactoriesWanted = math.max(5, math.ceil(iMexesOnOurSideOfMap * 0.7)) end
+
+    aiBrain[reftiMaxFactoryByType][iPrimaryFactoryType] = iPrimaryFactoriesWanted
+    local iAirFactoryMin = 1
+    if iPrimaryFactoryType == refFactoryTypeAir then iAirFactoryMin = iPrimaryFactoriesWanted end
+    local iTorpBomberShortfall = aiBrain[M27AirOverseer.refiTorpBombersWanted]
+    if aiBrain[refiOurHighestFactoryTechLevel] < 2 then
+        if iTorpBomberShortfall > 0 then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
+        iTorpBomberShortfall = 0
+    end
+    if bDebugMessages== true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]='..aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]..'; aiBrain[M27AirOverseer.refiBombersWanted]='..aiBrain[M27AirOverseer.refiBombersWanted]..'; iTorpBomberShortfall='..iTorpBomberShortfall) end
+
+    local iAirUnitsWanted = aiBrain[M27AirOverseer.refiAirAANeeded] + math.min(1, aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]) + aiBrain[M27AirOverseer.refiBombersWanted] + iTorpBomberShortfall
+    aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4) / 5))
+    if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 end
 
 function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of game' logs
@@ -2999,11 +3038,14 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
         ForkThread(M27AirOverseer.UpdateMexScoutingPriorities, aiBrain)
 
+        SetMaximumFactoryLevels(aiBrain)
+
         --STATE OF GAME LOG BELOW------------------
 
         --Check if we need to refresh our mass income
         local bTimeForLongRefresh = false
         local iCurTime = math.floor(GetGameTimeSeconds())
+        --if iCurTime >= 913 then M27Utilities.bGlobalDebugOverride = true end --use this if e.g. come across a hard crash and want to figure out what's causing it; will cause every log to be enabled so will take a long time to just run 1s of game time
         if aiBrain[refiTimeOfLastMexIncomeCheck] == nil then bTimeForLongRefresh = true
         elseif iCurTime - aiBrain[refiTimeOfLastMexIncomeCheck] >= iLongTermMassIncomeChangeInterval then bTimeForLongRefresh = true end
         local iMassAtLeast3mAgo = aiBrain[reftiMexIncomePrevCheck][2]
@@ -3148,7 +3190,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             tsGameState['ScoutShortfallAllPlatoons'] = aiBrain[refiScoutShortfallAllPlatoons]
 
             --Air:
-            tsGameState['AirAANeeded'] = aiBrain[M27AirOverseer.refbNeedMoreAirAA]
+            tsGameState['AirAANeeded'] = aiBrain[M27AirOverseer.refiAirAANeeded]
             tsGameState['AvailableBombers'] = 0
             if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then tsGameState['AvailableBombers'] = table.getn(aiBrain[M27AirOverseer.reftAvailableBombers]) end
             tsGameState['RemainingBomberTargets'] = 0
@@ -3235,7 +3277,7 @@ function SwitchSoMexesAreNeverIgnored(aiBrain, iDelayInSeconds)
 end
 
 function RecordAllEnemies(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordAllEnemies'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of attempt to get backup list of enemies, will wait 5 seconds first') end
     WaitSeconds(5)
@@ -3269,7 +3311,7 @@ function RefreshMexPositions(aiBrain)
 end
 
 function ACUInitialisation(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ACUInitialisation'
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -3316,6 +3358,9 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refiMAAShortfallACUCore] = 0
     aiBrain[refiMAAShortfallLargePlatoons] = 0
     aiBrain[refiMAAShortfallBase] = 0
+    aiBrain[reftiMaxFactoryByType] = {1,1,0}
+    aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
+
 
     aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 4
     aiBrain[M27FactoryOverseer.refiEngineerCap] = 70 --Max engis of any 1 tech level even if have spare mass
@@ -3441,7 +3486,7 @@ end
 
 
 function OverseerManager(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'OverseerManager'
 
 
@@ -3484,6 +3529,7 @@ function OverseerManager(aiBrain)
     local iSlowerCycleThreshold = 10
     local iSlowerCycleCount = 0
 
+    --ForkThread(M27MiscProfiling.ListCategoriesUsedByCount)
 
     while(not(aiBrain:IsDefeated())) do
         if bDebugMessages == true then

@@ -4,6 +4,7 @@
 --- DateTime: 09/10/2021 07:26
 local BuildingTemplates = import('/lua/BuildingTemplates.lua').BuildingTemplates
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
+local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 
 refPathingTypeAmphibious = 'Amphibious'
 refPathingTypeNavy = 'Water'
@@ -42,11 +43,11 @@ refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFI
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - categories.ANTIAIR --NOTE: Need to specify slowest (so dont pick LAB)
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR
-refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE
+refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE
 refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.ENGINEER -categories.SCOUT -categories.ANTIAIR
 refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
-refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1
+refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
 refCategoryT2PlusPD = categories.STRUCTURE * categories.DIRECTFIRE - categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH1
 refCategoryTMD = categories.ANTIMISSILE - categories.SILO * categories.TECH3 --Not perfect but should pick up most TMD without picking up SMD
 refCategoryFixedShield = categories.SHIELD * categories.STRUCTURE
@@ -104,7 +105,7 @@ function GetBlueprintIDFromBuildingTypeAndFaction(buildingType, iFactionNumber)
     --To get iFactionNumber use e.g. factionIndex = aiBrain:GetFactionIndex()
     --1: UEF, 2: Aeon, 3: Cybran, 4: Seraphim, 5: Nomads
     --Alternatively could get faction of a unit, using the FactionName = 'Aeon' property
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if bDebugMessages == true then LOG('About to print out entire building template:'..repr(BuildingTemplates)) end
     local tBuildingTemplateForFaction = BuildingTemplates[iFactionNumber]
     return GetBlueprintIDFromBuildingType(buildingType, tBuildingTemplateForFaction)
@@ -159,7 +160,7 @@ end
 
 function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     --Returns support factory ID if it can be built, otherwise returns normal upgrade unit (works for any unit, not just factory)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetUnitUpgradeBlueprint'
     if bGetSupportFactory == nil then bGetSupportFactory = true end
     --Gets the support factory blueprint, and checks if it can be built; if not then returns the normal UpgradesTo blueprint

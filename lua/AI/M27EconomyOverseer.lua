@@ -7,6 +7,7 @@ local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
+local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 
 --Tracking variables:
 refbWantMoreFactories = 'M27UpgraderWantMoreFactories'
@@ -52,7 +53,7 @@ function IsUnitValid(oUnit)
 end
 
 function GetMexCountOnOurSideOfMap(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetMexCountOnOurSideOfMap'
     local iCount = 0
     if aiBrain[reftMexOnOurSideOfMap] then iCount = table.getn(aiBrain[reftMexOnOurSideOfMap]) end
@@ -90,7 +91,7 @@ function GetMexCountOnOurSideOfMap(aiBrain)
 end
 
 function GetMassStorageTargets(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetMassStorageTargets'
     --Goes through all mexes and records any available locations for mass storage
     local iDistanceModForEachAdjacentMex = -60
@@ -168,7 +169,7 @@ end
 
 function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCategory)
     --Doesnt factor in if a unit is paused
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade'
     local iUpgradingCount = 0
     local iAvailableToUpgradeCount = 0
@@ -195,7 +196,7 @@ end
 
 function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
     --Work out the upgrade ID wanted; if bUpdateUpgradeTracker is true then records upgrade against unit's aiBrain
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'UpgradeUnit'
 
     --Do we have any HQs of the same factory type of a higher tech level?
@@ -224,7 +225,7 @@ end
 function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     --Looks for the nearest non-upgrading unit of iunitcategory to tStartPoint
     --Returns nil if cant find one
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
 
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
@@ -298,7 +299,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
 end
 
 function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
     --iMexesUpgrading, iMexesAvailableForUpgrade = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex + refCategoryT2Mex, true)
     local iT2Mexes = aiBrain:GetCurrentUnits(refCategoryT2Mex)
@@ -322,14 +323,21 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
             --Just stick with upgrading a mex, no change
         else
             if bDebugMessages == true then LOG(sFunctionRef..': Have enough available units to upgrade; have started by setting upgrade to mex as default') end
-            --Do we want to improve build power instead?
-            if (iLandFactoryUpgrading + iT2LandFactories + iAirFactoryUpgrading + iT2AirFactories) + (iT3LandFactories + iT3AirFactories) * 1.5 < ((aiBrain[refiMexesUpgrading] + iT2Mexes) + iT3Mexes * 3)*iRatioOfMexToFactory then
-                --Choose land fac unless already upgrading one and have no factories of the higher tech level; if none available then choose air fac
-                if iLandFactoryAvailable > 0 and (iLandFactoryUpgrading == 0 or iT3LandFactories > 0) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have available land factories and fewer land facs upgrading than mexes, so want to upgrade land fac') end
-                    iCategoryToUpgrade = refCategoryLandFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH2
-                else
-                    if iAirFactoryAvailable > 0 and (iAirFactoryUpgrading == 0 or iT3AirFactories > 0) then iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH2 end
+            --Do we need torpedo bombers and cant build them fast enough?
+            if iT2AirFactories + iT3AirFactories + iAirFactoryUpgrading == 0 and aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 then
+                iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH2
+            elseif aiBrain[M27AirOverseer.refiTorpBombersWanted] > 5 and iAirFactoryUpgrading == 0 and (iAirFactoryAvailable - iT2AirFactories) > 0 then iCategoryToUpgrade = refCategoryAirFactory
+            else
+                --Do we want to improve build power instead of getting mexes?
+                if (iLandFactoryUpgrading + iT2LandFactories + iAirFactoryUpgrading + iT2AirFactories) + (iT3LandFactories + iT3AirFactories) * 1.5 < ((aiBrain[refiMexesUpgrading] + iT2Mexes) + iT3Mexes * 3)*iRatioOfMexToFactory then
+                    --Want to upgrade build power
+                    local iFactoryToAirRatio = (iLandFactoryUpgrading + iLandFactoryAvailable + iT3LandFactories) / math.max(1, iAirFactoryUpgrading + iAirFactoryAvailable + iT3AirFactories)
+                    local iDesiredFactoryToAirRatio = aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir])
+                    if iFactoryToAirRatio > iDesiredFactoryToAirRatio and aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] > (iAirFactoryUpgrading + iAirFactoryAvailable) then
+                        iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH2
+                    else
+                        iCategoryToUpgrade = refCategoryLandFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH2
+                    end
                 end
             end
         end
@@ -347,7 +355,7 @@ end
 
 function ClearOldRecords(aiBrain, iOldRecordsExpected)
     --iOldRecordsExpected - optional - allows optimisation by having this called from loops which can already determine this for minimal extra cost
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ClearOldRecords'
     local iLoopCount = 0
     local iLoopMax = 100
@@ -396,7 +404,7 @@ end
 
 function UnpauseUpgrades(aiBrain, iMaxToUnpause)
     --Note - this will try and unpause any units that have been paused previously.  However, in some cases there may not be a unit to unpause e.g. if engineers have assisted it while its paused
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'UnpauseUpgrades'
 
     local iAmountToUnpause = math.min(iMaxToUnpause, aiBrain[refiPausedUpgradeCount])
@@ -445,7 +453,7 @@ function UnpauseUpgrades(aiBrain, iMaxToUnpause)
 end
 
 function PauseLastUpgrade(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'PauseLastUpgrade'
     local oLastUnpausedUpgrade
     local oLastUnpausedNonMex
@@ -497,7 +505,7 @@ end
 
 function DecideMaxAmountToBeUpgrading(aiBrain)
     --Returns max number to upgrade
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
 
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
@@ -522,16 +530,22 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
     local iMexesOnOurSideOfMap = GetMexCountOnOurSideOfMap(aiBrain)
     local iLandFactoryCount = aiBrain:GetCurrentUnits(refCategoryLandFactory)
+    local iAirFactoryCount = aiBrain:GetCurrentUnits(refCategoryAirFactory)
     if iLandFactoryCount >= 10 then bHaveLotsOfFactories = true end
-    local bWantMoreLandFactories = false
+    local bWantMoreFactories = false
+    if iLandFactoryCount < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] then bWantMoreFactories = true
+    elseif iAirFactoryCount < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then bWantMoreFactories = true end
+
     local iFactoriesWanted
     local iMexesToBaseFactoryCalcOn = math.min(iMexesOnOurSideOfMap, iMexCount)
+
+
     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iFactoriesWanted = math.max(2, math.ceil(iMexesToBaseFactoryCalcOn * 0.25))
     else iFactoriesWanted = math.max(4, 10, iMexesToBaseFactoryCalcOn * 0.7) end
     if iLandFactoryCount < iFactoriesWanted then
         if bDebugMessages == true then LOG(sFunctionRef..': We want more land factories; iLandFactoryCount='..iLandFactoryCount..'; iFactoriesWanted='..iFactoriesWanted) end
-        bWantMoreLandFactories = true
-        -- if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then bWantMoreLandFactories = false end
+        bWantMoreFactories = true
+        -- if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then bWantMoreFactories = false end
     end
 
     local tMassThresholds = {}
@@ -553,7 +567,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
         tMassThresholds[5] = {3000, -2.5}
         tMassThresholds[6] = {4000, -5}
     else
-        if bHaveLotsOfFactories == false and bWantMoreLandFactories == true then
+        if bHaveLotsOfFactories == false and bWantMoreFactories == true then
             tMassThresholds[1] = {300, 0.3}
             tMassThresholds[2] = {700, 0}
             tMassThresholds[3] = {1500, -0.4}
@@ -561,7 +575,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             tMassThresholds[5] = {3000, -2.5}
             tMassThresholds[6] = {4000, -5}
         else
-            if bHaveLotsOfFactories == true and bWantMoreLandFactories == false then
+            if bHaveLotsOfFactories == true and bWantMoreFactories == false then
                 tMassThresholds[1] = {100, 0.2}
                 tMassThresholds[2] = {200, 0}
                 tMassThresholds[3] = {800, -0.5}
@@ -578,12 +592,12 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             end
         end
     end
-    aiBrain[refbWantMoreFactories] = bWantMoreLandFactories
+    aiBrain[refbWantMoreFactories] = bWantMoreFactories
 
     for _, tThreshold in tMassThresholds do
         if iMassStored >= tThreshold[1] and iMassNetIncome >= tThreshold[2] then bHaveHighMass = true break end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': bWantMoreLandFactories='..tostring(bWantMoreLandFactories)..'; iLandFactoryCount='..iLandFactoryCount..'; iMexesOnOurSideOfMap='..iMexesOnOurSideOfMap..'; bHaveHighMass='..tostring(bHaveHighMass)..'; iMassStored='..iMassStored..'; iMassNetIncome='..iMassNetIncome) end
+    if bDebugMessages == true then LOG(sFunctionRef..': bWantMoreFactories='..tostring(bWantMoreFactories)..'; iLandFactoryCount='..iLandFactoryCount..'; iMexesOnOurSideOfMap='..iMexesOnOurSideOfMap..'; bHaveHighMass='..tostring(bHaveHighMass)..'; iMassStored='..iMassStored..'; iMassNetIncome='..iMassNetIncome) end
 
     if bHaveHighMass == true then
         if  iEnergyChangeFromLastCycle > 0 then
@@ -674,7 +688,7 @@ function RefreshEconomyData(aiBrain)
 end
 
 function UpgradeManager(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
 
     local iCycleWaitTime = 40

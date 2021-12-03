@@ -79,7 +79,7 @@ function GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
 end
 
 function RecordResourceLocations(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordResourceLocations'
     MassCount = 0
     HydroCount = 0
@@ -146,7 +146,7 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
 
     -- Returns a table containing positions of any mex meeting the criteria, unless bCountOnly is true in which case returns the no. of such mexes
 
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if iMaxDistance == nil then iMaxDistance = 12 end --NOTE: As currently only run the actual code to locate nearby mexes once, the first iMaxDistance will determine what to use, and any subsequent uses it wont matter
     if bMexNotHydro == nil then bMexNotHydro = true end
     if bCountOnly == nil then bCountOnly = false end
@@ -204,7 +204,7 @@ end
 
 function RecordPlayerStartLocations()
     -- Updates PlayerStartPoints to Record all the possible player start points
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local iMarkerType = 3
     for i = 1, 16 do
         local tempPos = ScenarioUtils.GetMarker('ARMY_'..i).position
@@ -224,7 +224,7 @@ function GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
     --Returns a table of locations of the chosen resource within iMaxDistance of tTargetPos
     --returns nil if no matches
 
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if iMaxDistance == nil then iMaxDistance = 7 end
     if bMexNotHydro == nil then bMexNotHydro = true end
     local iResourceCount = 0
@@ -337,7 +337,7 @@ function GetUnitSegmentGroup(oUnit)
 end
 
 function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetReclaimablesMassValue'
     if bAlsoReturnLargestReclaimPosition == nil then bAlsoReturnLargestReclaimPosition = false end
     if iIgnoreReclaimIfNotMoreThanThis == nil then iIgnoreReclaimIfNotMoreThanThis = 0 end
@@ -388,7 +388,7 @@ end
 function GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
     --Returns the object/wreck of the nearest reclaim that is more than iMinReclaimValue and within iSearchRadius of tLocation
     --returns nil if no valid locations
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNearestReclaim'
     if iMinReclaimValue == nil then iMinReclaimValue = 1 end
     if iSearchRadius == nil then iSearchRadius = 5 end
@@ -471,7 +471,7 @@ function UpdateReclaimMarkers()
     --Updates the global variable tReclaimAreas{}
     --Config settings:
     --Note: iMaxSegmentInterval defined at the top as a global variable
-    local bDebugMessages = false --set to true for certain positions where want logs to print
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'UpdateReclaimMarkers'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
@@ -547,7 +547,7 @@ end
 function GetHydroLocationsForPathingGroup(oPathingUnit, sPathingType, iPathingGroup)
     --Return table of hydro locations for iPathingGroup
     --Return {} if no such table
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetHydroLocationsForPathingGroup'
     local tHydroForPathingGroup = {}
     local bNeedToRecord = false
@@ -587,7 +587,7 @@ end
 function RecordMexForPathingGroup(oPathingUnit, bForceRefresh)
     --Updates tMexByPathingAndGrouping to record the mex that are in the same pathing group as oPathingUnit
     --bForceRefresh - issue where not all mexes register as being pathable at start of game, so overseer will call this again after a short delay
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
 
     local sFunctionRef = 'RecordMexForPathingGroup'
     if oPathingUnit and not(oPathingUnit.Dead) then
@@ -664,7 +664,7 @@ end
 function GetNumberOfResource (aiBrain, bMexNotHydro, bUnclaimedOnly, bVisibleOnly, iType)
     --iType: 1 = mexes nearer to aiBrain than nearest enemy (in future can add more, e.g. entire map; mexes closer to us than ally, etc.)
     --bUnclaimedOnly - true if mex can't have an extractor on it
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNumberOfResource'
     if aiBrain then
         if bVisibleOnly == nil then bVisibleOnly = true end
@@ -760,7 +760,7 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
     --tStartPositionOverride - use this instead of the builder start position if its specified
     --tMexesToIgnore - a table of locations to ignore if they're the nearest mex
 
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNearestMexToUnit'
 
     if bCanBeBuiltOnByAlly == nil then bCanBeBuiltOnByAlly = false end
@@ -918,7 +918,7 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
 
     --tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
     --Can also be used for general movement
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'FindEmptyPathableAreaNearTarget'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local rPlayableArea = rMapPlayableArea
@@ -1033,7 +1033,7 @@ function RecordMexesInPathingGroupFilteredByEnemyDistance(aiBrain, sPathing, iPa
 end
 
 function RecordSortedMexesInOriginalPathingGroup(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordSortedMexesInOriginalPathingGroup'
     local tUnsortedMexDetails = {}
     local refiMexLocation = 1
@@ -1100,7 +1100,7 @@ end
 function GetMexPatrolLocations(aiBrain)
     --Returns a table of mexes on our side of the map near middle of map to patrol
     local sFunctionRef = 'GetMexPatrolLocations'
-    local bDebugMessages = true
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if M27Utilities.IsTableEmpty(aiBrain[reftMexPatrolLocations]) then
         --Cycle through mexes on our side of the map:
         aiBrain[reftMexPatrolLocations] = {}
@@ -1169,7 +1169,7 @@ end
 
 --[[function RecordSegmentGroup(iSegmentX, iSegmentZ, sPathingType, iSegmentGroup)
     --Cycle through all adjacent cells, and then call this function on them as well
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordSegmentGroup'
     if bDebugMessages == true then LOG(sFunctionRef..': About to record iSegmentX='..iSegmentX..'; iSegmentZ='..iSegmentZ..'; iSegmentGroup='..iSegmentGroup..'; and then check if can path to adjacent segments') end
     tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] = iSegmentGroup
@@ -1215,7 +1215,7 @@ end
 end--]]
 
 function RecordBaseLevelPathability()
-    local bDebugMessages = false --Manually uncomment out logs that want - disabled for performance reasons for the most part
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end --Manually uncomment out logs that want - disabled for performance reasons for the most part
     local sFunctionRef = 'RecordBaseLevelPathability'
 
     --Setup some common logic used to see if it makes things faster
@@ -1319,7 +1319,7 @@ function RecordBaseLevelPathability()
 
     function IsAmphibiousPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)--, bForceDebug)
         --This is mostly a copy of land pathing but with changes for water
-        --local bDebugMessages = false
+        --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
         --local sFunctionRef = 'IsAmphibiousPathableAlongLine'
         --if bForceDebug then bDebugMessages = true end
 
@@ -1409,7 +1409,7 @@ function RecordBaseLevelPathability()
     function IsLandPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)
         --Assumes will call for positions in a straight line from each other
         --Can handle diagonals, but x and z differences must be identical (error handler re this can be uncommented out if come across issues)
-        --local bDebugMessages = false
+        --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
         --if bForceDebug == true then bDebugMessages = true end
         --local sFunctionRef = 'IsLandPathableAlongLine'
         --if bDebugMessages == true then LOG(sFunctionRef..': Start of code, X Start-End='..xStartInteger..'-'..xEndInteger..'; Z='..zStartInteger..'-'..zEndInteger..'; iMaxDifInHeight='..iMaxDifInHeight) end
@@ -1746,7 +1746,7 @@ end
 function MappingInitialisation(aiBrain)
     --aiBrain needed for waterpercent function
     local bProfiling = true
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'MappingInitialisation'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if bPathfindingAlreadyCommenced == false then
@@ -1792,7 +1792,7 @@ end
 
 function LogMapTerrainTypes()
     --Outputs to log the terrain types used and how often theyre used
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'LogMapTerrainTypes'
     WaitTicks(150)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
@@ -1848,7 +1848,7 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
             else bDontDrawWaterIfPathingLand = true end
         end
         --Draw core pathing group
-        local bDebugMessages = false
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
         local sFunctionRef = 'DrawMapPathing'
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
         local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -1960,7 +1960,7 @@ end
 
 --[[function DrawHeightMapAstro()
     --Temp for astro craters to help figure out why amphibious pathing doesnt work
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DrawHeightMapAstro'
     local iCurSurfaceHeight, iCurTerrainHeight, tCurPosition
     local iCurHeight

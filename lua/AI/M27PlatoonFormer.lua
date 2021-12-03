@@ -65,7 +65,7 @@ function RefreshUnitsWaitingForAssignment(aiBrain)
 end
 
 function PlatoonOrUnitNeedingEscortIsStillValid(aiBrain, oPlatoonOrUnit)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'PlatoonOrUnitNeedingEscortIsStillValid'
     local bStillValid = true
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -92,7 +92,7 @@ function PlatoonOrUnitNeedingEscortIsStillValid(aiBrain, oPlatoonOrUnit)
 end
 
 function GetPlatoonOrUnitToEscort(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetPlatoonOrUnitToEscort'
     local oPlatoonOrUnitToEscort = nil
     --Returns the platoon handle if we have one that needs an escort, otherwise returns nil
@@ -145,7 +145,7 @@ end
 
 
 function CombatPlatoonFormer(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'CombatPlatoonFormer'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, about to refresh units waiting for assignment') end
     RefreshUnitsWaitingForAssignment(aiBrain)
@@ -421,7 +421,7 @@ function CombatPlatoonFormer(aiBrain)
 end
 
 function AddIdleUnitsToPlatoon(aiBrain, tUnits, oPlatoonToAddTo)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AddIdleUnitsToPlatoon'
     local sPlatoonName = 'None'
     if oPlatoonToAddTo.GetPlan then
@@ -447,7 +447,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
     --See platoon templates for platoons that are idle
     --Assumes units all have the same aiBrain
 
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AllocateUnitsToIdlePlatoons'
 
     if M27Utilities.IsTableEmpty(tNewUnits) == true then M27Utilities.ErrorHandler('tNewUnits is empty')
@@ -525,7 +525,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
     --Called when a factory finishes constructing a unit, or a platoon is disbanded with combat units in it
     --if called from a factory, tNewUnits should be a single unit in a table
     --if bNoDelay is true then wont do normal waiting for the unit to move away from the factory (nb: should only set this to true if we're not talking about a newly produced unit from a factory as it will bypass the workaround for factory error where factories stop building)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AllocateNewUnitToPlatoonBase'
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
@@ -744,10 +744,10 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                 --local refCategoryAttackBot = M27UnitInfo.refCategoryDFTank
                 --local refCategoryIndirect = M27UnitInfo.refCategoryIndirect
                 local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat, tNewUnits)
-                local tEngineerUnits = EntityCategoryFilterDown(refCategoryEngineer, tNewUnits)
-                local tAirUnits = EntityCategoryFilterDown(categories.AIR, tNewUnits)
-                local tNavalUnits = EntityCategoryFilterDown(categories.NAVAL, tNewUnits)
-                local tIndirectT2Plus = EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus, tNewUnits)
+                local tEngineerUnits = EntityCategoryFilterDown(refCategoryEngineer - M27UnitInfo.refCategoryLandCombat, tNewUnits)
+                local tAirUnits = EntityCategoryFilterDown(categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat, tNewUnits)
+                local tNavalUnits = EntityCategoryFilterDown(categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat, tNewUnits)
+                local tIndirectT2Plus = EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat, tNewUnits)
                 local tNeedingAssigningCombatUnits = {}
                 local iValidCombatUnitCount = 0
 
@@ -826,7 +826,7 @@ end
 
 
 function AllocateNewUnitToPlatoonFromFactory(oNewUnit)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if bDebugMessages == true then LOG('AllocateNewUnitToPlatoonFromFactory About to fork thread') end
     if not(oNewUnit.Dead) and not(oNewUnit.GetUnitId) then M27Utilities.ErrorHandler('oNewUnit doesnt have a unit ID so likely isnt a unit') end
     ForkThread(AllocateNewUnitToPlatoonBase, {oNewUnit}, false)
@@ -858,7 +858,7 @@ end
 
 function CheckForIdleMobileLandUnits(aiBrain)
     --Assigns any units without a platoon to the relevant platoon handle
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'CheckForIdleMobileLandUnits'
     local tAllUnits = aiBrain:GetListOfUnits(categories.MOBILE * categories.LAND, false, true)
     local oPlatoon
@@ -883,7 +883,7 @@ function SetupIdlePlatoon(aiBrain, sPlan)
 end
 
 function UpdateIdlePlatoonActions(aiBrain, iCycleCount)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'UpdateIdlePlatoonActions'
     --Indirect fire platoon - assign to temporary attack platoon every other cycle
     if (math.mod(iCycleCount, 2) == 0) then
@@ -901,7 +901,7 @@ function UpdateIdlePlatoonActions(aiBrain, iCycleCount)
 end
 
 function PlatoonIdleUnitOverseer(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'PlatoonIdleUnitOverseer'
     local iCycleCount = 0
     local iIdleUnitSearchThreshold = 10

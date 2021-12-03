@@ -11,7 +11,7 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 
 function SafeToGetACUUpgrade(aiBrain)
     --Determines if its safe for the ACU to get an upgrade - considers ACU health and whether ACU is in a platoon set to heal
-    local bDebugMessages = false
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'SafeToGetACUUpgrade'
 
     local bIsSafe = false
@@ -30,6 +30,8 @@ function SafeToGetACUUpgrade(aiBrain)
         local oACU = M27Utilities.GetACU(aiBrain)
         local iCurrentHealth = oACU:GetHealth()
         local bACUNearBase = false
+        if bDebugMessages == true then LOG(sFunctionRef..': M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]='..repr(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; M27Overseer.iDistanceFromBaseToBeSafe='..M27Overseer.iDistanceFromBaseToBeSafe..'; tACUPos='..repr(tACUPos)) end
+
         if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= M27Overseer.iDistanceFromBaseToBeSafe then bACUNearBase = true end
         if iCurrentHealth <= aiBrain[M27Overseer.refiACUHealthToRunOn] and bACUNearBase == false then
             if bDebugMessages == true then LOG(sFunctionRef..': ACU health is '..iCurrentHealth..'; Health to run on='..aiBrain[M27Overseer.refiACUHealthToRunOn]) end
@@ -55,7 +57,7 @@ function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
 end
 
 function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'WantToGetGunUpgrade'
     --Returns true if meet all the conditions that mean will want gun upgrade
     if bIgnoreEnemies == nil then bIgnoreEnemies = false end
@@ -77,7 +79,7 @@ function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
 end
 
 function WantMoreMAA(aiBrain, iMassOnMAAVsEnemyAir)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'WantMoreMAA'
     local iMAAMaxUnitCount = 50
     local bWantMoreMAA = false
@@ -118,7 +120,7 @@ function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
     --UCBC includes simialr code but for some reason referencing it (or using a direct copy) causes error
     --oAltACU - can pass an ACU that's not aiBrain's ACU
     --e.g. need to specify 1 of aiBrain and oAltACU (no need to specify both)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DoesACUHaveGun'
     if bROFAndRange == nil then bROFAndRange = true end
     local oACU = oAltACU
@@ -249,7 +251,7 @@ end
 
 function ExcessMassIncome(aiBrain, iExcessResource)
     --returns true if have at least iExcessMass; note that the economy trend will be 10% of what is displayed (so 0.8 excess mass income is displayed in-game as 8 excess mass income) - i.e. presumably it's the 'per tick' excess
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sResource = 'MASS'
     local bHaveExcess = false
     if bDebugMessages == true then LOG('M27ExcessMassIncome='..aiBrain:GetEconomyTrend(sResource)..'; iExcessCondition='..iExcessResource) end
@@ -266,7 +268,7 @@ function AtLeastXMassStored(aiBrain, iResourceStored)
 end
 
 function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'LifetimeBuildCountLessThan'
     local iTotalBuilt = 0
     if bDebugMessages == true then LOG(sFunctionRef..' - start') end
@@ -299,7 +301,7 @@ end
 
 function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatEnemyBuildingAsUnclaimed, bTreatOurOrAllyBuildingAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
     --bTreatQueuedBuildingsAsUnclaimed: If set to false, then consideres all planned mex buidlings for engineers and treats them as being claimed
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'IsMexOrHydroUnclaimed'
     if bTreatEnemyBuildingAsUnclaimed == nil then bTreatEnemyBuildingAsUnclaimed = false end
     if bTreatOurOrAllyBuildingAsUnclaimed == nil then bTreatOurOrAllyBuildingAsUnclaimed = false end
@@ -389,7 +391,7 @@ function IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreat
     return IsMexOrHydroUnclaimed(aiBrain, tMexPosition, true, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
     --[[
     --bTreatQueuedBuildingsAsUnclaimed: If set to true, then consideres all planned mex buidlings for engineers and treats them as being claimed
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'IsMexUnclaimed'
     if bTreatEnemyMexAsUnclaimed == nil then bTreatEnemyMexAsUnclaimed = false end
     if bTreatAllyMexAsUnclaimed == nil then bTreatAllyMexAsUnclaimed = false end
@@ -460,7 +462,7 @@ end
 
 function IsLocationWithinIntelPathLine(aiBrain, tLocation)
     --Returns true if tLocation is closer to our start than the intel line
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'IsLocationWithinIntelPathLine'
     local bWithinIntelLine = false
     if aiBrain[M27Overseer.refbIntelPathsGenerated] == true then

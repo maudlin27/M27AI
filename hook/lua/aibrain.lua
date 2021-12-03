@@ -10,7 +10,7 @@ AIBrain = Class(M27AIBrainClass) {
     -- Hook m27AI and record it as being used
 
     OnCreateAI = function(self, planName)
-        local bDebugMessages = false
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
         if bDebugMessages == true then LOG('* M27AI: aibrain.lua: OnCreateAI function - before recorded if m27AI') end
 
         --Set aiBrain attribute on all AIs:
@@ -61,7 +61,7 @@ AIBrain = Class(M27AIBrainClass) {
     InitializeSkirmishSystems = function(self)
         if not(self.M27AI) then M27AIBrainClass.InitializeSkirmishSystems(self)
         else
-            local bDebugMessages = false
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
             if bDebugMessages == true then LOG('InitializeSkirmishSystems: Hook successful - will icnrease base range from 100 to 1000') end
             --Copy of base code, only change is to expand the range on managers from 100 to 1000
             -- Make sure we don't do anything for the human player!!!
@@ -140,7 +140,7 @@ AIBrain = Class(M27AIBrainClass) {
         if not(self.M27AI) then
             M27AIBrainClass.PBMCheckBusyFactories(self)
         else
-            local bDebugMessages = false
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
             local sFunctionRef = 'PBMCheckBusyFactories'
             if bDebugMessages == true then LOG(sFunctionRef..': Code start') end
             local busyPlat = self:GetPlatoonUniquelyNamed('BusyFactories')

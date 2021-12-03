@@ -70,7 +70,7 @@ function GetUnitState(oUnit)
 end
 
 function ReturnUnitsInTargetSegmentGroup(tUnits, iTargetGroup)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ReturnUnitsInTargetSegmentGroup'
     local tCurPosition = {}
     local iCurSegmentX, iCurSegmentZ
@@ -103,7 +103,7 @@ end
 function ChooseReclaimTarget(oEngineer)
     --Returns a table containing the target position to attack move to based on reclaimsegments
     --If are no reclaim positions then returns the current segment
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ChooseReclaimTarget'
     if bDebugMessages == true then LOG(sFunctionRef..':Started ChooseReclaimTarget') end
     local tEngPosition = oEngineer:GetPosition()
@@ -229,7 +229,7 @@ end
 
 function GetNearestEnemyIndex(aiBrain, bForceDebug)
     --Returns the ai brain index of the enemy who's got the nearest start location to aiBrain's start location and is still alive
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if bForceDebug == true then bDebugMessages = true end --for error control
     local sFunctionRef = 'GetNearestEnemyIndex'
     local iPlayerArmyIndex = aiBrain:GetArmyIndex()
@@ -373,7 +373,7 @@ end
 
 --[[function GetNearestEnemyStartNumber(aiBrain)
     --Returns the start position number of the enemy nearest aiBrain (note - start position number isn't the same as armyindex)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNearestEnemyStartNumber'
     local iEnemyIndex = GetNearestEnemyIndex(aiBrain)
     local iOurIndex = aiBrain:GetArmyIndex()
@@ -427,7 +427,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
     --bOnlyTargetEndDestination: optional, will default to false; if true then will just choose an end mex poitn and not stop at mexes on the way
 
     --if are no mexes that can path to then will return the enemy base
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetMexRaidingPath'
     if iIgnoreDistanceFromOwnStart == nil then iIgnoreDistanceFromOwnStart = iIgnoreDistanceFromStartLocation end
     if bOnlyTargetEndDestination == nil then bOnlyTargetEndDestination = false end
@@ -925,7 +925,7 @@ end
 
 function SetFactoryRallyPoint(oFactory)
     --Sets the rally point on oFactory
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
 
     local iDistFromFactory = 5 --Factories are 8x8, midpoint is middle of it so 4 to end of factory
     local oBrain = oFactory:GetAIBrain()
@@ -1024,7 +1024,7 @@ end
 
 function GetACUCombatMassRating(oACU)
     --Returns the combat adjusted mass value (ignoring current health percentage) of oACU, factoring in any upgrades
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local tPossibleUpgrades = {}
     local tPossibleUpgrades = oACU:GetBlueprint().Enhancements
     local aiBrain = oACU:GetAIBrain()
@@ -1048,7 +1048,7 @@ function GetACUCombatMassRating(oACU)
 end
 
 function GetACUMaxDFRange(oACU)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetACUMaxDFRange'
     local oBP = oACU:GetBlueprint()
     local tPossibleUpgrades = oBP.Enhancements
@@ -1128,7 +1128,7 @@ end
 function GetUnitSpeedData(tUnits, aiBrain, bNeedToHaveBlipOrVisual, iReturnType, iOptionalSpeedThreshold)
     --iReturnType: 1 = min speed; 2 = max speed; 3 = average speed; 4 = return a table of the units that we know are <= iOptionalSpeedThreshold
     --bNeedToHaveBlipOrVisual: if true, then will check if aiBrain can see the tUnits; defaults to false
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if bNeedToHaveBlipOrVisual == nil then bNeedToHaveBlipOrVisual = false end
     local tUnitBPs = {}
     local oBlip
@@ -1255,7 +1255,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     --Threat method: based on mass value * multiplier; 1 if are direct fire, 0.2 if are indirect (0.75 for t1 arti), *2 if are a direct fire structure, *1.5 if are a shield or wall
     --iMassValueOfBlipsOverride - if not nil then will use this instead of coded value for blip threats
     --iSoloBlipMassOverride - similar to massvalue of blips override
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetCombatThreatRating'
     local iBlipThreat = 54 --assumes blip is t1 tank
     local iSoloBlipThreat = 10 -- assumes a single unit as a blip is more likely a scout or engineer
@@ -1397,7 +1397,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     --bIncludeAntiAir - will include anti-air on ground units
     --bIncludeNonCombatAir - adds threat value for transports and scouts
     --bIncludeAirTorpedo - Adds threat for torpedo bombers
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetCombatThreatRating'
     local iSoloBlipThreat = 10 -- assumes a single unit as a blip is more likely a scout or engineer
     local iStructureBlipThreat = 0 --Assumes an unrevealed structure has no threat rating
@@ -1593,7 +1593,7 @@ function CategoriesInVisibleUnits(aiBrain, tEnemyUnits, category, iReturnType)
     --iReturnType1 - returns true if contains category;
     --2 = no. of units meeting the conditions
     --3 = table of units meeting the conditions
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local tIndirectUnits = EntityCategoryFilterDown(category, tEnemyUnits)
     local bIsSeen
     local iValidCount = 0
@@ -1620,7 +1620,7 @@ end
 function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdle, bMovingUnassignedEngiIsIdle)
     --Cycles through various unit states that could indicate the unit is idle
     --if bGuardIsIdle == true then will treat a unit that is guarding/assisting as being idle
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'IsUnitIdle'
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
@@ -1750,7 +1750,7 @@ function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPass
     local iMinReclaimToConsider = 29 --Will consider a detour if reclaim is more than this
 
     --Other variables:
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AddMexesAndReclaimToMovementPath'
     local oUnitBP = oPathingUnit:GetBlueprint()
     local iBuildDistance = oUnitBP.Economy.MaxBuildDistance
@@ -1912,7 +1912,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
     --Determiens a high priority location e.g. to send ACU to, and then identifies any places of interest on the way
     --Intended for oPathingUnit to be the ACU, but in theory can be used by any unit
     --Returns nil if no locations can be found
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetPriorityExpansionMovementPath'
   --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
     --if oPathingUnit == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
@@ -2374,7 +2374,7 @@ end
 function GetPositionToFollowTargets(tUnitsToFollow, oFollowingUnit, iFollowDistance)
     --If following single unit, then do {oSingleUnit} for tUnitsToFollow
     --returns the units to follow average position if cant find anywhere at iFollowDistance from it
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetPositionToFollowTargets'
     local tTargetPosition = M27Utilities.GetAveragePosition(tUnitsToFollow)
     local tPossibleMovePosition = {}
@@ -2405,7 +2405,7 @@ end
 function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted)
     --Look for the nearest intel coverage for tTargetPosition, or (if nil) then the visual range of the nearest unit to the position that is friendly
     --if iMinCoverageWanted isn't specified then will return the highest amount, otherwise returns true/false
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetIntelCoverageOfPosition'
     local tCategoryList = {categories.SCOUT, categories.RADAR*categories.TECH1, categories.RADAR*categories.TECH2, categories.RADAR * categories.TECH3}
     local iCurIntelRange, iCurDistanceToPosition, iCurIntelCoverage
@@ -2455,7 +2455,7 @@ end
 function GetDirectFireWeaponPosition(oFiringUnit)
     --Returns position of oFiringUnit's first DF weapon; nil if oFiringUnit doesnt have a DF weapon; Unit position if no weapon bone
     --for ACU, returns this for the overcharge weapon
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetDirectFireWeaponPosition'
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local tShotStartPosition
@@ -2504,7 +2504,7 @@ end
 function IsShotBlocked(oFiringUnit, oTargetUnit)
     --Returns true or false depending on if oFiringUnit can hit oTargetUnit in a straight line
     --intended for direct fire units only
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'IsShotBlocked'
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local bShotIsBlocked = false
