@@ -4,6 +4,7 @@ local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
+local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
 tMexPointsByLocationRef = {} --As per mass points, but the key is the locationref value, and it returns the position
@@ -47,7 +48,8 @@ rMapPlayableArea = 2 --Set at start of the game, use instead of the scenarioinfo
 iPathingIntervalSize = 0.5
 iLowHeightDifThreshold = 0.007 --Used to trigger check for max height dif in an area
 iHeightDifAreaSize = 0.2 --T1 engineer is 0.6 x 0.9, so this results in a 1x1 size box by searching +- iHeightDifAreaSize if this is set to 0.5; however given are using a 0.25 interval size dont want this to be too large or destroys the purpose of the interval size and makes the threshold unrealistic
-iMaxHeightDif = 0.115 --Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119
+iMaxHeightDif = 0.115 --NOTE: Map specific code should be added below in DetermineMaxTerrainHeightDif (hardcoded table with overrides by map name); Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119
+local iChangeInHeightThreshold = 0.04 --Amount by which to change iMaxHeightDif if we have pathing inconsistencies
 iMinWaterDepth = 1 --Ships cant move right up to shore, this is a guess at how much clearance is needed (testing on Africa, depth of 2 leads to some pathable areas being considered unpathable)
 iWaterPathingIntervalSize = 1
 tWaterAreaAroundTargetAdjustments = {} --Defined in map initialisation
@@ -60,6 +62,19 @@ iMaxBaseSegmentX = 1 --Will be set by pathing, sets the maximum possible base se
 iMaxBaseSegmentZ = 1
 
 iMapWaterHeight = 0 --Surface height of water on the map
+
+function DetermineMaxTerrainHeightDif()
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if M27Config.M27ShowPathingGraphically then bDebugMessages = true end
+    local sFunctionRef = 'DetermineMaxTerrainHeightDif'
+
+    local tMapHeightOverride = {
+    ['serenity desert'] = 0.15
+    }
+    local sMapName = ScenarioInfo.name
+    iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
+    if bDebugMessages == true then LOG(sFunctionRef..': sMapName='..sMapName..'; tMapHeightOverride='..(tMapHeightOverride[sMapName] or 'No override')) end
+end
 
 
 function GetPathingSegmentFromPosition(tPosition)
@@ -138,6 +153,7 @@ function RecordResourceLocations(aiBrain)
         LOG(sFunctionRef..': Finished recording mass markers, total mass marker count='..MassCount..'; list of all mass points='..repr(MassPoints)) end
 
     -- MapMexCount = MassCount
+
 end
 
 function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNotHydro)
@@ -1225,6 +1241,9 @@ function RecordBaseLevelPathability()
     --local Floor = math.floor
     local Abs = math.abs
 
+    --First determine the maximum height adjustment to use
+    DetermineMaxTerrainHeightDif()
+
 
     local iSegmentBaseLevelCap = iBaseLevelSegmentCap --i.e. want up to this x this segments at base level
     local rPlayableArea = rMapPlayableArea
@@ -1958,6 +1977,17 @@ function DrawWater()
     end
 end
 
+function TempCanPathToEveryMex(oUnit)
+    local sFunctionRef = 'TempCanPathToEveryMex'
+
+    local iCurTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef..': Start', nil)
+    local bCanPath
+    for iMex, tMex in MassPoints do
+        bCanPath = oUnit:CanPathTo(tMex)
+    end
+    iCurTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef..': End', nil)
+end
+
 --[[function DrawHeightMapAstro()
     --Temp for astro craters to help figure out why amphibious pathing doesnt work
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
@@ -1988,3 +2018,190 @@ end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': tCountByThreshold='..repr(tCountByThreshold)) end
 end--]]
+
+function RedoPathingForGroup(iPathingGroupToRedo, iNewPathingHeightThreshold)
+    M27Utilities.ErrorHandler('Need to add code')
+end
+
+function RecheckPathingToMexes(aiBrain)
+    --[[
+    local bDebugMessages = true
+    local sFunctionRef = 'RecheckPathingToMexes'
+    local oACU = M27Utilities.GetACU(aiBrain)
+    local bInconsistentPathing
+    local bHaveChangedPathingGroups = false
+    local iTimeWaitedForACU = 0
+    while not(oACU) do
+        WaitTicks(1)
+        oACU = M27Utilities.GetACU(aiBrain)
+        iTimeWaitedForACU = iTimeWaitedForACU + 1
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Now have an ACU; iTimeWaitedForACU='..iTimeWaitedForACU) end
+
+    local tACUPosition = oACU:GetPosition()
+    local iACUPathingGroup = GetUnitSegmentGroup(oACU)
+    local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
+    local iCurResourceGroup
+    local bExpectedPathingResult
+    local bActualPathingResult
+    local iPathingGroupToRedo
+    local iNewPathingHeightThreshold
+    --local iHeightThresholdForLastRefresh = iMaxHeightDif
+    local iLastHeightAdjustmentTotal = 0
+    local iLastHeightAdjustmentChange = 0
+    local iAdjToLastHeightAdjustment = 0
+    local iCurHeightAdjustment = 0
+    local iNewPathingHeightThreshold = iMaxHeightDif
+    local iReworkCount = 0
+    local iMaxReworkCount = 5 --Means will re-do pathing up to this nubmer of times
+    --Reduce max rework count based on map size to avoid massive delays on larger maps
+    local iMapSizeX, iMapSizeZ = GetMapSize()
+    if iMapSizeX >= 2000 then iMaxReworkCount = 1
+    elseif iMapSizeX >= 1000 then iMaxReworkCount = 3
+    elseif iMapSizeX >= 500 then iMaxReworkCount = 4
+    end
+
+    local iWaitNeeded = 0
+
+    for iType = 1, 2 do
+        iReworkCount = 0
+        local tAllMapResourceLocations
+        if iType == 1 then tAllMapResourceLocations = MassPoints
+        else tAllMapResourceLocations = HydroPoints
+        end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': tAllMapResourceLocations for iType '..iType..'='..repr(tAllMapResourceLocations)) end
+
+        if M27Utilities.IsTableEmpty(tAllMapResourceLocations) == false then
+            bInconsistentPathing = true
+            while bInconsistentPathing == true do
+                iReworkCount = iReworkCount + 1
+                if iReworkCount > iMaxReworkCount then
+                    M27Utilities.ErrorHandler('Failed to determine correct mex pathing despite re-doing '..iReworkCount..' times - likely that will have suboptimal behaviour from AI')
+                    break
+                end
+                iACUPathingGroup = GetUnitSegmentGroup(oACU)
+                if bDebugMessages == true then LOG(sFunctionRef..': iType='..iType..'; iReworkCount='..iReworkCount..'; About to cycle through every mex to check its pathing group; iACUPathingGroup='..iACUPathingGroup) end
+                bInconsistentPathing = false
+                iLastHeightAdjustmentTotal = iCurHeightAdjustment
+                iLastHeightAdjustmentChange = iAdjToLastHeightAdjustment
+                
+                for iResource, tLocation in tAllMapResourceLocations do
+                    --Should we be able to path to ACU position?
+                    iCurResourceGroup = GetSegmentGroupOfLocation(sPathing, tLocation)
+                    if iCurResourceGroup == iACUPathingGroup then bExpectedPathingResult = true else bExpectedPathingResult = false end
+                    bActualPathingResult = oACU:CanPathTo(tLocation)
+                    --below is temp for testing to see how long of a delay we need - initially canpathto returned false but restarting application it was correctly true (on a map where could be pathed to) so commented out for now
+                    while bActualPathingResult == false do
+                        if bDebugMessages == true then LOG(sFunctionRef..': CanPathTo is false so will wait 1 tick to see if result changes') end
+                        WaitTicks(1)
+                        iWaitNeeded = iWaitNeeded + 1
+                        if iWaitNeeded > 100 then break end
+                        bActualPathingResult = oACU:CanPathTo(tLocation)
+                    end
+                    LOG(sFunctionRef..': iWaitNeeded='..iWaitNeeded)
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to check if pathing for iResource='..iResource..'; tLocation='..repr(tLocation)..' is consistent. iCurResourceGroup='..iCurResourceGroup..'; iACUPathingGroup='..iACUPathingGroup..'; bActualPathingResult='..tostring(bActualPathingResult)) end
+                    if not(bActualPathingResult == bExpectedPathingResult) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing is inconsistent, will determine adjustment to apply to height and rerun pathing groupings') end
+
+                        bInconsistentPathing = true
+
+                        if iCurResourceGroup == iACUPathingGroup then
+                            --Pathing groups are expected to be equal but they shouldnt be, so we need to lower the threshold for detecting cliffs
+                            --if iLastHeightAdjustmentTotal > 0 then
+                            
+                            --We were increasing the height adj from the time before but we presumably went too far so want to decrease, but by half of last adjustment
+                            if iLastHeightAdjustmentChange > 0 then
+                                iAdjToLastHeightAdjustment = -iLastHeightAdjustmentChange * 0.5
+                            elseif iLastHeightAdjustmentChange < 0 then
+                                --We tried going back slightly but still have gone too far
+                                
+                                iAdjToLastHeightAdjustment = iLastHeightAdjustmentChange
+                            else --0, i.e. we havent run this yet
+                                iAdjToLastHeightAdjustment = -iChangeInHeightThreshold
+                            end
+                            iCurHeightAdjustment = iLastHeightAdjustmentTotal + iAdjToLastHeightAdjustment
+                            iNewPathingHeightThreshold = iMaxHeightDif + iCurHeightAdjustment
+                        else
+                            --Pathing groups aren't equal but they should be, so we need to raise the threshold for detecting cliffs
+                            if iLastHeightAdjustmentChange < 0 then
+                                --Were decreasing the height adj from the time before but we presumably went too far so want to increase
+                                iAdjToLastHeightAdjustment = iLastHeightAdjustmentChange * 0.5
+                            elseif iLastHeightAdjustmentChange > 0 then
+                                --We tried increasing the threshold slightly but still not enough
+                                iAdjToLastHeightAdjustment = iLastHeightAdjustmentChange
+                            else
+                                iAdjToLastHeightAdjustment = iChangeInHeightThreshold
+                            end
+                        end
+                        M27Utilities.ErrorHandler('Actual pathing is different, will redo with iNewPathingHeightThreshold='..iNewPathingHeightThreshold, nil, true)
+                        RedoPathingForGroup(iPathingGroupToRedo, iNewPathingHeightThreshold)
+                        break
+                    end
+
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Finished checking pathing for iType='..iType..'; bInconsistentPathing='..tostring(bInconsistentPathing)) end
+            end
+        end
+    end
+    if bDebugMessages == true then
+        local iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 7, 200)
+                LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation))
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after first wait='..iUnpathableMexCount)
+        WaitTicks(200)
+        iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 6, 200)
+                LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation))
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after 2nd wait='..iUnpathableMexCount)
+        WaitTicks(200)
+        iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 5, 200)
+                LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation))
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after 3rd wait='..iUnpathableMexCount)
+        WaitTicks(600)
+        iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 4, 200)
+                if bDebugMessages == true then LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation)) end
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after 4th wait='..iUnpathableMexCount)
+        WaitTicks(2000)
+        iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 3, 200)
+                if bDebugMessages == true then LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation)) end
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after 5th wait='..iUnpathableMexCount)
+    end
+
+
+
+
+    if bHaveChangedPathingGroups == true then
+        RecordMexForPathingGroup(oACU, true)
+        RecordSortedMexesInOriginalPathingGroup(aiBrain)
+    end --]]
+
+end

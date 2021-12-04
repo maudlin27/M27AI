@@ -3304,6 +3304,7 @@ end
 function RefreshMexPositions(aiBrain)
     WaitTicks(80)
     --Force refresh of mexes to try and fix bug where not all mexes recorded as being pathable
+    M27MapInfo.RecheckPathingToMexes(aiBrain)
     ForkThread(M27MapInfo.RecordMexForPathingGroup, M27Utilities.GetACU(aiBrain), true)
 
     --Create sorted listing of mexes
@@ -3375,11 +3376,10 @@ function OverseerInitialisation(aiBrain)
 
     aiBrain[refiIgnoreMexesUntilThisManyUnits] = 3 --Platoons wont attack lone structures if fewer than this many units (initially)
 
-    for _, oACU in aiBrain:GetListOfUnits(categories.COMMAND, false, true) do
-        aiBrain[refoStartingACU] = oACU
-        M27Utilities.GetACU(aiBrain)[refbACUHelpWanted] = false
-        break
-    end
+    --ACU specific
+    local oACU = M27Utilities.GetACU(aiBrain)
+    oACU[refbACUHelpWanted] = false
+
 
     --Grand strategy:
     aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandEarly
@@ -3483,8 +3483,6 @@ function TEMPUNITPOSITIONLOG(aiBrain)
     end
 end
 
-
-
 function OverseerManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'OverseerManager'
@@ -3514,6 +3512,11 @@ function OverseerManager(aiBrain)
     if bDebugMessages == true then LOG(sFunctionRef..': Pre wait 10 ticks') end
 
     WaitTicks(10)
+
+    --Hopefully have ACU now so can re-check pathing
+    if bDebugMessages == true then LOG(sFunctionRef..': About to check pathing to mexes') end
+    ForkThread(M27MapInfo.RecheckPathingToMexes, aiBrain) --Note that this includes waitticks, so dont make any big decisions on the map until it has finished
+
     if bDebugMessages == true then LOG(sFunctionRef..': Post wait 10 ticks') end
     OverseerInitialisation(aiBrain) --sets default values for variables, and starts the factory construction manager
 
@@ -3524,6 +3527,7 @@ function OverseerManager(aiBrain)
 
     --ForkThread(M27MiscProfiling.ListCategoriesUsedByCount)
 
+    if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
     while(not(aiBrain:IsDefeated())) do
         if bDebugMessages == true then
             LOG(sFunctionRef..': Start of cycle')

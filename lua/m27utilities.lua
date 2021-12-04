@@ -476,12 +476,19 @@ function GetACU(aiBrain)
     if oACU == nil then
         if aiBrain == nil then
             ErrorHandler('aiBrain not specified - update function call')
-
         else
-            ErrorHandler('ACU hasnt been set')
+            local tACUUnits = aiBrain:GetListOfUnits(categories.COMMAND, false, true)
+            if IsTableEmpty(tACUUnits) == false then
+                for _, oCurACU in aiBrain:GetListOfUnits(categories.COMMAND, false, true) do
+                    oACU = oCurACU
+                    aiBrain[M27Overseer.refoStartingACU] = oACU
+                    break
+                end
+            else
+                ErrorHandler('ACU hasnt been set')
             --WaitSeconds(30)
             --ErrorHandler('ACU hasnt been set - finished waiting 30 seconds to try and avoid crash, then will return nil')
-
+            end
         end
     else
         if oACU.Dead then
