@@ -141,8 +141,17 @@ end
 
 function UpdatePlatoonName(oPlatoon, sNewName)
     if oPlatoon.GetPlan then
-        if oPlatoon:GetPlan() == M27PlatoonTemplates.refoAllEngineers then
+        local sPlan = oPlatoon:GetPlan()
+        if sPlan == M27PlatoonTemplates.refoAllEngineers then
             --Do nothing - handled via engineer overseer
+        elseif oPlatoon[M27PlatoonTemplates.refbIdlePlatoon] then
+            --Update each name individually instead to note the Unit ref
+            local tPlatoonUnits = oPlatoon:GetPlatoonUnits()
+            if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
+                for iUnit, oUnit in tPlatoonUnits do
+                    if not(oUnit.Dead) then UpdateUnitNames({oUnit}, sNewName..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                end
+            end
         else
             UpdateUnitNames(GetPlatoonUnits(oPlatoon), sNewName)
         end

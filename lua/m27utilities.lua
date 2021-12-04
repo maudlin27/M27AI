@@ -209,13 +209,13 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
     local sColour
     if iColour == nil then sColour = 'c00000FF' --dark blue
     elseif iColour == 1 then sColour = 'c00000FF' --dark blue
-    elseif iColour == 2 then sColour = 'ffFF4040' --orange
-    elseif iColour == 3 then sColour = 'c0000000'
-    elseif iColour == 4 then sColour = 'fff4a460'
-    elseif iColour == 5 then sColour = 'ff27408b'
-    elseif iColour == 6 then sColour = 'ff1e90ff'
-    elseif iColour == 7 then sColour = 'ffffffff'
-    else sColour = 'ffFF6060'
+    elseif iColour == 2 then sColour = 'ffFF4040' --Red
+    elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
+    elseif iColour == 4 then sColour = 'fff4a460' --Gold
+    elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
+    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan
+    elseif iColour == 7 then sColour = 'ffffffff' --white
+    else sColour = 'ffFF6060' --Orangy pink
     end
 
 

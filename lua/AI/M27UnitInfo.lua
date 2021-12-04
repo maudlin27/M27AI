@@ -31,6 +31,9 @@ refCategoryEnergyStorage = categories.STRUCTURE * categories.ENERGYSTORAGE
 
 refCategoryAirStaging = categories.STRUCTURE * categories.AIRSTAGINGPLATFORM
 refCategoryRadar = categories.STRUCTURE * categories.RADAR
+refCategoryT1Radar = refCategoryRadar * categories.TECH1
+refCategoryT2Radar = refCategoryRadar * categories.TECH2
+refCategoryT3Radar = refCategoryRadar * categories.TECH3
 
 refCategoryLandFactory = categories.LAND * categories.FACTORY * categories.STRUCTURE
 refCategoryAirFactory = categories.AIR * categories.FACTORY * categories.STRUCTURE
@@ -165,7 +168,7 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     if bGetSupportFactory == nil then bGetSupportFactory = true end
     --Gets the support factory blueprint, and checks if it can be built; if not then returns the normal UpgradesTo blueprint
     local sUpgradeBP
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, UnitToUpgrade='..oUnitToUpgrade:GetUnitId()) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, UnitToUpgrade='..oUnitToUpgrade:GetUnitId()..GetUnitLifetimeCount(oUnitToUpgrade)) end
     if bGetSupportFactory == true and oUnitToUpgrade.CanBuild then
         local tsSupportFactoryBP = {
 
@@ -206,6 +209,7 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
         if tsSupportFactoryBP[sFactoryBP] then
             if bDebugMessages == true then LOG(sFunctionRef..': Support factoryBP='..tsSupportFactoryBP[sFactoryBP]) end
             sUpgradeBP = tsSupportFactoryBP[sFactoryBP]
+            if bDebugMessages == true then LOG(sFunctionRef..': oUnitToUpgrade='..sFactoryBP..GetUnitLifetimeCount(oUnitToUpgrade)..'; Checking if can upgrade to sUpgradeBP='..sUpgradeBP..'; oUnitToUpgrade:CanBuild(sUpgradeBP)='..tostring(oUnitToUpgrade:CanBuild(sUpgradeBP))) end
             if not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Cant build '..sUpgradeBP) end
                 sUpgradeBP = nil
@@ -215,6 +219,8 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     if not(sUpgradeBP) then
         local oFactoryBP = oUnitToUpgrade:GetBlueprint()
         sUpgradeBP = oFactoryBP.General.UpgradesTo
+        if not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then sUpgradeBP = nil end
+        if bDebugMessages == true then LOG(sFunctionRef..': Didnt have valid support factory to upgrade to; blueprint UpgradesTo='..(sUpgradeBP or 'nil')) end
     end
     if sUpgradeBP == '' then
         sUpgradeBP = nil

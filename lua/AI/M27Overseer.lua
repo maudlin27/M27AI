@@ -1826,7 +1826,7 @@ end
 function ThreatAssessAndRespond(aiBrain)
     --Identifies enemy threats, and organises platoons which are sent to deal with them
     --NOTE: Doesnt handle naval units
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ThreatAssessAndRespond'
 
     --Key config variables:
@@ -3497,13 +3497,6 @@ function OverseerManager(aiBrain)
     WaitTicks(10)
     LOG('TEMPTEST REPR after 10 ticks='..repr(tTEMPTEST))--]]
     ForkThread(M27MapInfo.MappingInitialisation, aiBrain)
-
-    --TODO Temp for testing: Moved the map initialisation code that causes a crash here so can more easily test
-    --[[if ScenarioInfo.MapData.PlayableRect then
-        M27MapInfo.rMapPlayableArea = ScenarioInfo.MapData.PlayableRect
-    else
-        M27MapInfo.rMapPlayableArea = {0, 0, ScenarioInfo.size[1], ScenarioInfo.size[2]}
-    end--]]
 
     if bDebugMessages == true then LOG(sFunctionRef..': Pre fork thread of player start locations') end
     ForkThread(M27MapInfo.RecordPlayerStartLocations)
