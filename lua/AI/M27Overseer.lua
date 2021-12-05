@@ -2961,7 +2961,7 @@ function EnemyThreatRangeUpdater(aiBrain)
         local tEnemyTech2 = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH2, M27Utilities.GetACU(aiBrain):GetPosition(), 1000, 'Enemy')
         if M27Utilities.IsTableEmpty(tEnemyTech2) == false then
             aiBrain[refbEnemyHasTech2PD] = true
-            aiBrain[refiSearchRangeForEnemyStructures] = 80 --Tech 2 is 50, ravager 70, so will go for 80 range; want to factor it into decisions on whether to attack if are near it
+            aiBrain[refiSearchRangeForEnemyStructures] = 85 --Tech 2 is 50, ravager 70, so will go for 80 range; want to factor it into decisions on whether to attack if are near it
             if bDebugMessages == true then LOG(sFunctionRef..': Enemy T2 PD detected - increasing range to look for nearby enemies on platoons') end
         end
     end
