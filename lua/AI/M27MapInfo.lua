@@ -6,6 +6,7 @@ local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 
+
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
 tMexPointsByLocationRef = {} --As per mass points, but the key is the locationref value, and it returns the position
 tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
@@ -37,12 +38,14 @@ reftMexesInPathingGroupFilteredByDistanceToEnemy = 'M27MexesInPathingGroupFilter
 reftHighPriorityMexes = 'M27HighPriorityMexes' --Local to aiBrain, list of mex locations
 
 reftMexPatrolLocations = 'M27MapMexPatrolLocations' --aiBrain variable, [x] = nth mex will be the locations e.g. top 3 locations to patrol between
+refbCanPathToEnemyBaseWithLand = 'M27MapCanPathToEnemyWithLand' --True if can path to enemy base, false otherwise
+refbCanPathToEnemyBaseWithAmphibious = 'M27MapCanPathToEnemyWithAmphibious'
 
 --v3 Pathfinding specific
 local iLandPathingGroupForWater = 1
 bMapHasWater = true --true or false based on water % of map
 bPathfindingAlreadyCommenced = false
-bMapDrawingAlreadyCommenced = false
+bMapDrawingAlreadyCommenced = {}
 bPathfindingComplete = false
 rMapPlayableArea = 2 --Set at start of the game, use instead of the scenarioinfo method
 iPathingIntervalSize = 0.5
@@ -93,21 +96,42 @@ function GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
     return {x, GetTerrainHeight(x, z), z}
 end
 
+function RecordResourcePoint(t,x,y,z,size)
+    --called by hook into simInit, more reliable method of figuring out if have adaptive map
+    local bDebugMessages = true
+    local sFunctionRef = 'RecordResourcePoint'
+    if bDebugMessages == true then LOG(sFunctionRef..': t='..t..'; x='..x..'; y='..y..'; z='..z..'; size='..repr(size)) end
+
+    if t == 'Mass' then
+        MassCount = MassCount + 1
+        MassPoints[MassCount] = {x,y,z}
+    elseif t == 'Hydrocarbon' then
+        HydroCount = HydroCount + 1
+        HydroPoints[HydroCount] = {x,y,z}
+    end
+end
+
 function RecordResourceLocations(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordResourceLocations'
+    M27Utilities.ErrorHandler('Deprecated, covered by RecordResourcePoint now')
     MassCount = 0
     HydroCount = 0
     local iMarkerType
     local iResourceCount, sPathingType, sLocationRef
     if bDebugMessages == true then LOG(sFunctionRef..': About to record resource locations') end
+    local bHaveAdaptiveMap = ScenarioInfo.AdaptiveMap
 
     --local CanBuildStructureAt = moho.aibrain_methods.CanBuildStructureAt
+    local bCanBuildOnResourcePoint
     for _, v in ScenarioUtils.GetMarkers() do
         iMarkerType = 0
         if v.type == "Mass" then
             --Note: CanBuildStructureAt only works after 1 tick has passed following aiBrain creation for some reason
-            if aiBrain:CanBuildStructureAt('uab1103', v.position) then -- or aiBrain:CanBuildStructureAt('URB1103', v.position) == true or moho.aibrain_methods.CanBuildStructureAt(aiBrain, 'ueb1103', v.position) then
+            if bHaveAdaptiveMap then bCanBuildOnResourcePoint = aiBrain:CanBuildStructureAt('uab1103', v.position)
+            else bCanBuildOnResourcePoint = true end
+            if bDebugMessages == true then LOG(sFunctionRef..': v.position='..repr(v.position)..'; bCanBuildMexOnmassPoint='..tostring(bCanBuildOnResourcePoint)) end
+            if bCanBuildOnResourcePoint then -- or aiBrain:CanBuildStructureAt('URB1103', v.position) == true or moho.aibrain_methods.CanBuildStructureAt(aiBrain, 'ueb1103', v.position) then
                 MassCount = MassCount + 1
                 MassPoints[MassCount] = v.position
                 if bDebugMessages == true then
@@ -123,7 +147,10 @@ function RecordResourceLocations(aiBrain)
             end
         end -- Mass
         if v.type == "Hydrocarbon" then
-            if aiBrain:CanBuildStructureAt('uab1102', v.position) then
+            if bHaveAdaptiveMap then bCanBuildOnResourcePoint = aiBrain:CanBuildStructureAt('uab1102', v.position)
+            else bCanBuildOnResourcePoint = true end
+            if bDebugMessages == true then LOG(sFunctionRef..': v.position='..repr(v.position)..'; bCanBuildMexOnmassPoint='..tostring(bCanBuildOnResourcePoint)) end
+            if bCanBuildOnResourcePoint then
                 HydroCount = HydroCount + 1
                 HydroPoints[HydroCount] = v.position
                 iMarkerType = 2
@@ -626,6 +653,7 @@ function RecordMexForPathingGroup(oPathingUnit, bForceRefresh)
                 iOriginalCount = iValidCount
             end
             local bIncludeMex = false
+            if bDebugMessages == true then LOG(sFunctionRef..': ScenarioInfo='..repr(ScenarioInfo)..'; MassPoints='..repr(MassPoints)) end
             for iCurMex, tMexLocation in MassPoints do
                 if bDebugMessages == true then LOG(sFunctionRef..': About to consider tMexLocation='..repr(tMexLocation)) end
                 iCurSegmentX, iCurSegmentZ = GetPathingSegmentFromPosition(tMexLocation)
@@ -809,10 +837,13 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
     end
     --local iSegmentX, iSegmentZ --for the mex
     local bValidMex
+    if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through all mexes for sPathing='..sPathing..' and iUnitPathGroup='..iUnitPathGroup) end
     if M27Utilities.IsTableEmpty(tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
+        if bDebugMessages == true then LOG(sFunctionRef..': List of mexes in pathing group='..repr(tMexByPathingAndGrouping[sPathing][iUnitPathGroup])) end
         for iCurMex, tMexLocation in tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
             bValidMex = false
             iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tLocationToSearchFrom)
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..'; iCurDistanceFromUnit='..iCurDistanceFromUnit..'; iMaxDistanceFromUnit='..iMaxDistanceFromUnit..'; iMinDistanceFromUnit='..iMinDistanceFromUnit) end
             if iCurDistanceFromUnit <= iMaxDistanceFromUnit then
                 if iCurDistanceFromUnit < iMinDistanceFromUnit then
                     --Is it valid (i.e. no-one has built on it)?
@@ -863,7 +894,7 @@ function IsUnderwater(tPosition, bReturnSurfaceHeightInstead)
         else
             if iMapWaterHeight > tPosition[2] then
                 --Check we're not just under an arch but are actually underwater
-                if not(GetTerrainHeight(tPosition[1], tPosition[3]) == iSurfaceHeight) then
+                if not(GetTerrainHeight(tPosition[1], tPosition[3]) == iMapWaterHeight) then
                     return true
                 end
             end
@@ -972,7 +1003,7 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
             iGroupCycleCount = iGroupCycleCount + 1
             if bDebugMessages == true then LOG(sFunctionRef..': Start of main loop grouping, iGroupCycleCount='..iGroupCycleCount..'; iCycleSize='..iCycleSize) end
             if iGroupCycleCount > iMaxCycles then
-                M27Utilities.ErrorHandler('Possible infinite loop - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax)
+                M27Utilities.ErrorHandler('Possible infinite loop - unable to find empty pathable area despite iSearchSizeMax='..iSearchSizeMax)
                 break
             end
             iRandomDistance = iSearchSize
@@ -1005,7 +1036,7 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
                     end
                 end
                 if iCurSizeCycleCount == iCycleSize then
-                    iSearchSize = math.max(iSearchSize * 1.5, iSearchSize + 10)
+                    iSearchSize = math.max(iSearchSize * 1.25, iSearchSize + 10)
                 end
                 if bDebugMessages == true then M27Utilities.DrawLocation(tTargetLocation) end
             end
@@ -1710,15 +1741,15 @@ function RecordBaseLevelPathability()
                                                 local bMoveFromLandToWater = false
                                                 local iTerrainHeightCur = GetTerrainHeight(tCurPosition[1], tCurPosition[3])
                                                 local iTerrainHeightTarget = GetTerrainHeight(tTargetPosition[1], tTargetPosition[3])
-                                                local iSurfaceHeightCur = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
-                                                local iSurfaceHeightTarget = GetSurfaceHeight(tTargetPosition[1], tTargetPosition[3])
+                                                local iMapWaterHeightCur = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
+                                                local iMapWaterHeightTarget = GetSurfaceHeight(tTargetPosition[1], tTargetPosition[3])
 
-                                                if iTerrainHeightCur == iSurfaceHeightCur then bCurPositionUnderwater = false end
-                                                if iTerrainHeightTarget == iSurfaceHeightTarget then bTargetPositionUnderwater = false end
+                                                if iTerrainHeightCur == iMapWaterHeightCur then bCurPositionUnderwater = false end
+                                                if iTerrainHeightTarget == iMapWaterHeightTarget then bTargetPositionUnderwater = false end
                                                 if bCurPositionUnderwater == true and bTargetPositionUnderwater == false then bMoveFromLandToWater = true
                                                 elseif bCurPositionUnderwater == false and bTargetPositionUnderwater == true then bMoveFromLandToWater = true end
                                                 if bMoveFromLandToWater == true then
-                                                    LOG(sFunctionRef..': Moving from land to water, tCurPosition='..repr(tCurPosition)..'; tTargetPosition='..repr(tTargetPosition)..'; iTerrainHeightCur='..iTerrainHeightCur..'; iSurfaceHeightCur='..iSurfaceHeightCur..'; iTerrainHeightTarget='..iTerrainHeightTarget..'; iSurfaceHeightTarget='..iSurfaceHeightTarget..'; will redo the logic with logs enabled')
+                                                    LOG(sFunctionRef..': Moving from land to water, tCurPosition='..repr(tCurPosition)..'; tTargetPosition='..repr(tTargetPosition)..'; iTerrainHeightCur='..iTerrainHeightCur..'; iMapWaterHeightCur='..iMapWaterHeightCur..'; iTerrainHeightTarget='..iTerrainHeightTarget..'; iMapWaterHeightTarget='..iMapWaterHeightTarget..'; will redo the logic with logs enabled')
                                                     M27Utilities.DrawLocations({tCurPosition, tTargetPosition}, nil, 1, 500)
                                                     IsAmphibiousPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3], true)
                                                 end--]]
@@ -1809,6 +1840,22 @@ function MappingInitialisation(aiBrain)
     end
 end
 
+function SetWhetherCanPathToEnemy(aiBrain)
+    --Set flag for whether AI can path to enemy base
+    local tEnemyBase = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+    local tOurBase = PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    local sPathing = M27UnitInfo.refPathingTypeLand
+    local iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
+    local iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyBase)
+    if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithLand] = true
+    else aiBrain[refbCanPathToEnemyBaseWithLand] = false end
+    sPathing = M27UnitInfo.refPathingTypeAmphibious
+    iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
+    iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyBase)
+    if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithAmphibious] = true
+    else aiBrain[refbCanPathToEnemyBaseWithAmphibious] = false end
+end
+
 function LogMapTerrainTypes()
     --Outputs to log the terrain types used and how often theyre used
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
@@ -1846,22 +1893,24 @@ function DrawAllMapPathing(aiBrain)
     while bPathfindingComplete == false do
         WaitTicks(10)
     end
-    DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeLand, true)
-    while bMapDrawingAlreadyCommenced == true do
-        WaitTicks(10)
+    if not(bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeLand] == true) then
+        DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeLand, true)
+        while bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeLand] == true do
+            WaitTicks(10)
+        end
+        WaitTicks(50)
+        DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeAmphibious)
+        while bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeAmphibious] == true do
+            WaitTicks(10)
+        end
+        WaitTicks(50)
+        DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeNavy, true)
     end
-    WaitTicks(50)
-    DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeAmphibious)
-    while bMapDrawingAlreadyCommenced == true do
-        WaitTicks(10)
-    end
-    WaitTicks(50)
-    DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeNavy, true)
 end
 
 function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
-    if bMapDrawingAlreadyCommenced == false then
-        bMapDrawingAlreadyCommenced = true
+    if M27Utilities.IsTableEmpty(bMapDrawingAlreadyCommenced[sPathingType]) == true then
+        bMapDrawingAlreadyCommenced[sPathingType] = true
         if bDontDrawWaterIfPathingLand == nil then
             if sPathingType == M27UnitInfo.refPathingTypeAmphibious then bDontDrawWaterIfPathingLand = false
             else bDontDrawWaterIfPathingLand = true end
@@ -1895,7 +1944,7 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
             else iSegmentInterval = 2 end
         end
 
-        local iTimeToWait = iMaxBaseSegmentX / 10 + 40
+        local iTimeToWait = (iMaxBaseSegmentX / 10 + 40)
 
         local iCurIntervalCount = 0
         if bDebugMessages == true then
@@ -1958,7 +2007,7 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
             end
         end
     end
-    bMapDrawingAlreadyCommenced = false
+    bMapDrawingAlreadyCommenced[sPathingType] = false
 end
 
 function DrawWater()
@@ -2025,7 +2074,7 @@ end
 
 function RecheckPathingToMexes(aiBrain)
     --[[
-    local bDebugMessages = true
+    local bDebugMessages = false
     local sFunctionRef = 'RecheckPathingToMexes'
     local oACU = M27Utilities.GetACU(aiBrain)
     local bInconsistentPathing

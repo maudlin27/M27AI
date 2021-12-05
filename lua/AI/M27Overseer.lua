@@ -91,6 +91,7 @@ local iScoutLargePlatoonThreshold = 8 --Platoons >= this size are considered lar
 local iSmallPlatoonMinSizeForScout = 3 --Wont try and assign scouts to platoons that have fewer than 3 units in them
 local iMAALargePlatoonThresholdAirThreat = 10
 local iMAALargePlatoonThresholdNoThreat = 20
+refsLastScoutPathingType = 'M27OverseerLastScoutPathingType'
 
 --Factories wanted
 reftiMaxFactoryByType = 'M27OverseerMaxFactoryByType' -- table {land, air, navy} with the max no. wanted
@@ -453,7 +454,7 @@ function GetNearestMAAOrScout(aiBrain, tPosition, bScoutNotMAA, bDontTakeFromIni
     --if bOnlyConsiderAvailableHelpers is true then won't consider units in any other existing platoons (unless they're a helper platoon with no helper)
     --returns nil if no such scout/MAA
     --oRelatedUnitOrPlatoon - use to check that aren't dealing with a support unit already assigned to the unit/platoon that are getting this for
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNearestMAAOrScout'
     if bOnlyConsiderAvailableHelpers == nil then bOnlyConsiderAvailableHelpers = false end
     if bDontTakeFromInitialRaiders == nil then bDontTakeFromInitialRaiders = true end
@@ -640,7 +641,7 @@ end
 function AssignMAAToPreferredPlatoons(aiBrain)
     --Similar to assigning scouts, but for MAA - for now just focus on having MAA helping ACU and any platoon of >20 size that doesnt contain MAA
     --===========ACU MAA helper--------------------------
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AssignMAAToPreferredPlatoons'
     local iACUMinMAAThreatWantedWithAirThreat = 84 --Equivalent to 3 T1 MAA
     if aiBrain[refiOurHighestFactoryTechLevel] > 1 then
@@ -722,7 +723,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
     if bACUNeedsMAAHelper == true then
         local iCurMAAUnitThreat = 0
         --Assign MAA if we have any available; as its the ACU we want the nearest MAA of any platoon
-        if bDebugMessages == true then LOG(sFunctionRef..': Checking for nearest mobileMAA') end
+        if bDebugMessages == true then LOG(sFunctionRef..': Checking for nearest mobileMAA; iMAAThreatWanted='..iMAAThreatWanted) end
         local oMAAToGive
         local iCurLoopCount = 0
         local iMaxLoopCount = 100
@@ -753,6 +754,10 @@ function AssignMAAToPreferredPlatoons(aiBrain)
             if iMinACUMAAThreatWanted <= 0 then aiBrain[refiMAAShortfallACUCore] = 0 else aiBrain[refiMAAShortfallACUCore] = iMaxMAAWantedForACUAtOnce end
             aiBrain[refiMAAShortfallACUPrecaution] = iMaxMAAWantedForACUAtOnce
         end
+    else
+        --ACU doesnt need more MAA
+        aiBrain[refiMAAShortfallACUPrecaution] = 0
+        aiBrain[refiMAAShortfallACUCore] = 0
     end
 
     if iMAAThreatWanted <= 0 then --Have more than enough MAA to cover ACU, move on to considering if large platoons can get MAA support
@@ -766,53 +771,55 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         local iMAAAlreadyHave
         local iCurLoopCount
         local iMaxLoopCount = 50
-        for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-            if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
-                tPlatoonUnits = oPlatoon:GetPlatoonUnits()
-                if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
-                    iPlatoonUnits = table.getn(tPlatoonUnits)
-                    if iPlatoonUnits >= iThresholdForAMAA then
-                        iMAAWanted = math.floor(iPlatoonUnits / iThresholdForAMAA)
-                        tPlatoonCurrentMAAs = EntityCategoryFilterDown(refCategoryMAA, tPlatoonUnits)
-                        if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == true then iMAAAlreadyHave = 0
-                            else iMAAAlreadyHave = table.getn(tPlatoonCurrentMAAs) end
-                        if oPlatoon[refoUnitsMAAHelper] then
-                            tPlatoonCurrentMAAs = oPlatoon[refoUnitsMAAHelper]:GetPlatoonUnits()
-                            if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == false then
-                                iMAAAlreadyHave = iMAAAlreadyHave + table.getn(tPlatoonCurrentMAAs)
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
+            for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
+                if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
+                    tPlatoonUnits = oPlatoon:GetPlatoonUnits()
+                    if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
+                        iPlatoonUnits = table.getn(tPlatoonUnits)
+                        if iPlatoonUnits >= iThresholdForAMAA then
+                            iMAAWanted = math.floor(iPlatoonUnits / iThresholdForAMAA)
+                            tPlatoonCurrentMAAs = EntityCategoryFilterDown(refCategoryMAA, tPlatoonUnits)
+                            if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == true then iMAAAlreadyHave = 0
+                                else iMAAAlreadyHave = table.getn(tPlatoonCurrentMAAs) end
+                            if oPlatoon[refoUnitsMAAHelper] then
+                                tPlatoonCurrentMAAs = oPlatoon[refoUnitsMAAHelper]:GetPlatoonUnits()
+                                if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == false then
+                                    iMAAAlreadyHave = iMAAAlreadyHave + table.getn(tPlatoonCurrentMAAs)
+                                end
                             end
-                        end
-                        iCurLoopCount = 0
-                        while iMAAWanted > iMAAAlreadyHave do
-                            iCurLoopCount = iCurLoopCount + 1
-                            if iCurLoopCount > iMaxLoopCount then
-                                M27Utilities.ErrorHandler('likely infinite loop')
-                                break
-                            end
-                            --Need MAAs in the platoon
-                            oMAAToAdd = GetNearestMAAOrScout(aiBrain, tPlatoonUnits[1]:GetPosition(), false, true, true, oPlatoon)
-                            if oMAAToAdd == nil then
-                                bNeedMoreMAA = true
-                                break
-                            else
-                                --Have a valid MAA - add it to the platoon
-                                iMAAAlreadyHave = iMAAAlreadyHave + 1
-
-                                AssignHelperToPlatoonOrUnit(oMAAToAdd, oPlatoon, false)
-                                --[[oMAAOldPlatoon = oMAAToAdd.PlatoonHandle
-                                if oMAAOldPlatoon then
-                                    --RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo)
-                                    M27PlatoonUtilities.RemoveUnitsFromPlatoon(oMAAOldPlatoon, { oMAAToAdd}, false, oPlatoon)
+                            iCurLoopCount = 0
+                            while iMAAWanted > iMAAAlreadyHave do
+                                iCurLoopCount = iCurLoopCount + 1
+                                if iCurLoopCount > iMaxLoopCount then
+                                    M27Utilities.ErrorHandler('likely infinite loop')
+                                    break
+                                end
+                                --Need MAAs in the platoon
+                                oMAAToAdd = GetNearestMAAOrScout(aiBrain, tPlatoonUnits[1]:GetPosition(), false, true, true, oPlatoon)
+                                if oMAAToAdd == nil then
+                                    bNeedMoreMAA = true
+                                    break
                                 else
-                                    --Dont have platoon for the MAA so add manually (backup for unexpected scenarios)
-                                    aiBrain:AssignUnitsToPlatoon(oPlatoon, { oMAAToAdd}, 'Unassigned', 'None')
-                                end--]]
+                                    --Have a valid MAA - add it to the platoon
+                                    iMAAAlreadyHave = iMAAAlreadyHave + 1
 
+                                    AssignHelperToPlatoonOrUnit(oMAAToAdd, oPlatoon, false)
+                                    --[[oMAAOldPlatoon = oMAAToAdd.PlatoonHandle
+                                    if oMAAOldPlatoon then
+                                        --RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo)
+                                        M27PlatoonUtilities.RemoveUnitsFromPlatoon(oMAAOldPlatoon, { oMAAToAdd}, false, oPlatoon)
+                                    else
+                                        --Dont have platoon for the MAA so add manually (backup for unexpected scenarios)
+                                        aiBrain:AssignUnitsToPlatoon(oPlatoon, { oMAAToAdd}, 'Unassigned', 'None')
+                                    end--]]
+
+                                end
                             end
-                        end
-                        if iMAAWanted > iMAAAlreadyHave then
-                            iTotalMAAWanted = iMAAWanted - iMAAAlreadyHave
-                            break
+                            if iMAAWanted > iMAAAlreadyHave then
+                                iTotalMAAWanted = iMAAWanted - iMAAAlreadyHave
+                                break
+                            end
                         end
                     end
                 end
@@ -822,9 +829,11 @@ function AssignMAAToPreferredPlatoons(aiBrain)
     end
 
 
-    --========Build order related (should be superceded by above, left in for now)
+    --========Build order related TODO longer term - update the current true/false flag in the factory overseer to differentiate between the MAA wanted
+    if aiBrain[refiMAAShortfallACUPrecaution] + aiBrain[refiMAAShortfallACUCore] + aiBrain[refiMAAShortfallLargePlatoons] > 0 then bNeedMoreMAA = true
+    else bNeedMoreMAA = false end
     aiBrain[refbNeedMAABuilt] = bNeedMoreMAA
-    if bDebugMessages == true then LOG(sFunctionRef..': End of MAA assignment logic') end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of MAA assignment logic; aiBrain[refiMAAShortfallACUPrecaution]='..aiBrain[refiMAAShortfallACUPrecaution]..'; aiBrain[refiMAAShortfallACUCore]='..aiBrain[refiMAAShortfallACUCore]..'; aiBrain[refiMAAShortfallLargePlatoons]='..aiBrain[refiMAAShortfallLargePlatoons]) end
 end
 
 function AssignScoutsToPreferredPlatoons(aiBrain)
@@ -843,6 +852,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
+    local sScoutPathing = (aiBrain[refsLastScoutPathingType] or M27UnitInfo.refPathingTypeLand)
 
     if M27Utilities.IsTableEmpty(tAllScouts) == false then iScouts = table.getn(tAllScouts) end
     if iScouts >= 25 then
@@ -1355,61 +1365,62 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
 
                 local tPlatoonUnits, iPlatoonUnits, tPlatoonCurrentScouts, oScoutToAdd, oScoutOldPlatoon
                 local iPlatoonSizeMin, iPlatoonSizeMissingScouts
+                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true or (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and sScoutPathing == M27UnitInfo.refPathingTypeAmphibious) then
+                    for iPlatoonCurSize = 1, 2 do
+                        if iPlatoonCurSize == 1 then
+                            iPlatoonSizeMin = iScoutLargePlatoonThreshold
+                        else
+                            iPlatoonSizeMin = iSmallPlatoonMinSizeForScout
+                        end
+                        iPlatoonSizeMissingScouts = 0
 
-                for iPlatoonCurSize = 1, 2 do
-                    if iPlatoonCurSize == 1 then
-                        iPlatoonSizeMin = iScoutLargePlatoonThreshold
-                    else
-                        iPlatoonSizeMin = iSmallPlatoonMinSizeForScout
-                    end
-                    iPlatoonSizeMissingScouts = 0
-
-                    for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-                        if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
-                            tPlatoonUnits = oPlatoon:GetPlatoonUnits()
-                            if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
-                                iPlatoonUnits = table.getn(tPlatoonUnits)
-                                if iPlatoonUnits >= iPlatoonSizeMin and aiBrain:PlatoonExists(oPlatoon) then
-                                    local bPlatoonHasScouts = false
-                                    tPlatoonCurrentScouts = EntityCategoryFilterDown(refCategoryLandScout, tPlatoonUnits)
-                                    if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then bPlatoonHasScouts = true
-                                    elseif oPlatoon[refoUnitsScoutHelper] and oPlatoon[refoUnitsScoutHelper].GetPlatoonUnits then
-                                        tPlatoonCurrentScouts = oPlatoon[refoUnitsScoutHelper]:GetPlatoonUnits()
-                                        if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then bPlatoonHasScouts = true end
-                                    end
-                                    if bPlatoonHasScouts == false then
-                                        --Need scouts in the platoon
-                                        if iPlatoonSizeMissingScouts > 0 or iAvailableScouts <= 0 then
-                                            --Wont find any more scouts, so just increase
-                                            iPlatoonSizeMissingScouts = iPlatoonSizeMissingScouts + 1
-                                        else
-                                            if bDebugMessages == true then LOG(sFunctionRef..': About to get a scout to assign to a large platoon.  Large platoon count='..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]) end
-                                            oScoutToAdd = GetNearestMAAOrScout(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), true, true, true)
-                                            if oScoutToAdd == nil then
+                        for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
+                            if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
+                                tPlatoonUnits = oPlatoon:GetPlatoonUnits()
+                                if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
+                                    iPlatoonUnits = table.getn(tPlatoonUnits)
+                                    if iPlatoonUnits >= iPlatoonSizeMin and aiBrain:PlatoonExists(oPlatoon) then
+                                        local bPlatoonHasScouts = false
+                                        tPlatoonCurrentScouts = EntityCategoryFilterDown(refCategoryLandScout, tPlatoonUnits)
+                                        if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then bPlatoonHasScouts = true
+                                        elseif oPlatoon[refoUnitsScoutHelper] and oPlatoon[refoUnitsScoutHelper].GetPlatoonUnits then
+                                            tPlatoonCurrentScouts = oPlatoon[refoUnitsScoutHelper]:GetPlatoonUnits()
+                                            if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then bPlatoonHasScouts = true end
+                                        end
+                                        if bPlatoonHasScouts == false then
+                                            --Need scouts in the platoon
+                                            if iPlatoonSizeMissingScouts > 0 or iAvailableScouts <= 0 then
+                                                --Wont find any more scouts, so just increase
                                                 iPlatoonSizeMissingScouts = iPlatoonSizeMissingScouts + 1
                                             else
-                                                iAvailableScouts = iAvailableScouts - 1
-
-                                                AssignHelperToPlatoonOrUnit(oScoutToAdd, oPlatoon, true)
-                                                --[[--Have a valid scout - add it to the platoon
-                                                oScoutOldPlatoon = oScoutToAdd.PlatoonHandle
-                                                if oScoutOldPlatoon then
-                                                    --RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo)
-                                                    M27PlatoonUtilities.RemoveUnitsFromPlatoon(oScoutOldPlatoon, { oScoutToAdd}, false, oPlatoon)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': About to get a scout to assign to a large platoon.  Large platoon count='..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]) end
+                                                oScoutToAdd = GetNearestMAAOrScout(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), true, true, true)
+                                                if oScoutToAdd == nil then
+                                                    iPlatoonSizeMissingScouts = iPlatoonSizeMissingScouts + 1
                                                 else
-                                                    --Dont have platoon for the scout so add manually (backup for unexpected scenarios)
-                                                    aiBrain:AssignUnitsToPlatoon(oPlatoon, { oScoutToAdd}, 'Unassigned', 'None')
-                                                end--]]
+                                                    iAvailableScouts = iAvailableScouts - 1
+
+                                                    AssignHelperToPlatoonOrUnit(oScoutToAdd, oPlatoon, true)
+                                                    --[[--Have a valid scout - add it to the platoon
+                                                    oScoutOldPlatoon = oScoutToAdd.PlatoonHandle
+                                                    if oScoutOldPlatoon then
+                                                        --RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo)
+                                                        M27PlatoonUtilities.RemoveUnitsFromPlatoon(oScoutOldPlatoon, { oScoutToAdd}, false, oPlatoon)
+                                                    else
+                                                        --Dont have platoon for the scout so add manually (backup for unexpected scenarios)
+                                                        aiBrain:AssignUnitsToPlatoon(oPlatoon, { oScoutToAdd}, 'Unassigned', 'None')
+                                                    end--]]
+                                                end
                                             end
                                         end
                                     end
                                 end
                             end
                         end
+                        if iPlatoonCurSize == 1 then
+                            iLargePlatoonsMissingScouts = iPlatoonSizeMissingScouts
+                        else iSmallPlatoonMissingScouts = iPlatoonSizeMissingScouts end
                     end
-                    if iPlatoonCurSize == 1 then
-                        iLargePlatoonsMissingScouts = iPlatoonSizeMissingScouts
-                    else iSmallPlatoonMissingScouts = iPlatoonSizeMissingScouts end
                 end
                 aiBrain[refiScoutShortfallLargePlatoons] = iLargePlatoonsMissingScouts
                 aiBrain[refiScoutShortfallAllPlatoons] = iSmallPlatoonMissingScouts
@@ -2963,6 +2974,7 @@ function SetMaximumFactoryLevels(aiBrain)
     local iAirFactoriesOwned = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory)
     local iPrimaryFactoriesWanted
     local iPrimaryFactoryType = refFactoryTypeLand
+    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then iPrimaryFactoryType = refFactoryTypeAir end
     --local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
     local iMexesOnOurSideOfMap = M27EconomyOverseer.GetMexCountOnOurSideOfMap(aiBrain)
     if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then iPrimaryFactoriesWanted = math.max(3, math.ceil(iMexesOnOurSideOfMap * 0.25))
@@ -2976,11 +2988,22 @@ function SetMaximumFactoryLevels(aiBrain)
         if iTorpBomberShortfall > 0 then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
         iTorpBomberShortfall = 0
     end
+    if iPrimaryFactoryType == refFactoryTypeAir then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
     if bDebugMessages== true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]='..aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]..'; aiBrain[M27AirOverseer.refiBombersWanted]='..aiBrain[M27AirOverseer.refiBombersWanted]..'; iTorpBomberShortfall='..iTorpBomberShortfall) end
 
     local iAirUnitsWanted = aiBrain[M27AirOverseer.refiAirAANeeded] + math.min(1, aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]) + aiBrain[M27AirOverseer.refiBombersWanted] + iTorpBomberShortfall
     aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4) / 5))
     if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
+end
+
+function DetermineInitialBuildOrder(aiBrain)
+    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true then
+        aiBrain[refiInitialRaiderPlatoonsWanted] = 2
+        aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
+    else
+        aiBrain[refiInitialRaiderPlatoonsWanted] = 0
+        aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
+    end
 end
 
 function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of game' logs
@@ -3059,7 +3082,12 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         --Values which want to know even if logs not enabled
         --Get unclaimed mex figures
         local oACU = M27Utilities.GetACU(aiBrain)
-        local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
+        local sPathing = M27UnitInfo.refPathingTypeAmphibious
+        local iFaction = aiBrain:GetFactionIndex()
+
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and not(iFaction == M27UnitInfo.refFactionSeraphim or iFaction == M27UnitInfo.refFactionAeon) then sPathing = M27UnitInfo.refPathingTypeLand end
+
+
         --GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
         local iPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
         local iAllMexesInPathingGroup = 0
@@ -3124,6 +3152,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
         else
             aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryDFTank
+            if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryAmphibiousCombat end
             aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandEarly
         end
         --Max target defence coverage for strategy
@@ -3309,6 +3338,9 @@ function RefreshMexPositions(aiBrain)
 
     --Create sorted listing of mexes
     ForkThread(M27MapInfo.RecordSortedMexesInOriginalPathingGroup, aiBrain)
+    --[[WaitTicks(400)
+    ForkThread(M27MapInfo.RecordMexForPathingGroup, M27Utilities.GetACU(aiBrain), true)
+    ForkThread(M27MapInfo.RecordSortedMexesInOriginalPathingGroup, aiBrain)--]]
 end
 
 function ACUInitialisation(aiBrain)
@@ -3391,6 +3423,8 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refiPercentageOutstandingThreat] = 0.5
     aiBrain[refiNearestOutstandingThreat] = 1000
     aiBrain[refiEnemyHighestTechLevel] = 1
+
+    M27MapInfo.SetWhetherCanPathToEnemy(aiBrain)
 
     InitiateLandFactoryConstructionManager(aiBrain)
 
@@ -3498,7 +3532,7 @@ function OverseerManager(aiBrain)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Pre fork thread of player start locations') end
     ForkThread(M27MapInfo.RecordPlayerStartLocations)
-    ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps
+    --ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps - superceded by hook into siminit
     ForkThread(M27MapInfo.RecordMexNearStartPosition, aiBrain.M27StartPositionNumber, 26) --similar to the range of T1 PD
 
 
@@ -3528,6 +3562,8 @@ function OverseerManager(aiBrain)
     --ForkThread(M27MiscProfiling.ListCategoriesUsedByCount)
 
     if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
+
+    DetermineInitialBuildOrder(aiBrain)
     while(not(aiBrain:IsDefeated())) do
         if bDebugMessages == true then
             LOG(sFunctionRef..': Start of cycle')

@@ -2803,56 +2803,59 @@ function DetermineIfACUShouldBuildLandFactory(oPlatoon)
         end
     end
     if bAlreadyBuilding == false then
-        --Are we closer to enemy than base?
-        local tCurPosition = GetPlatoonFrontPosition(oPlatoon)
-        local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-        local iDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPosition])
-        local iDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-        if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToEnemy='..iDistanceToEnemy..'; iDistanceToStart='..iDistanceToStart) end
-        if iDistanceToEnemy >= iDistanceToStart then
-            local iStoredEnergy = aiBrain:GetEconomyStored('ENERGY')
-            if bAlreadyTryingToBuild and iStoredEnergy >= 250 and oPlatoon[refbMovingToBuild] == true then
-                oPlatoon[refiCurrentAction] = refActionBuildLandFactory
-            else
-                if iFactoryCount < 2 then
-                    if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 10 then --Have at least 100 gross energy income per second
-                        if aiBrain:GetEconomyTrend('MASS') >= 0.2 then --At least 2 net mass income per second
-                            if iStoredEnergy >= 250 then
-                                if aiBrain:GetEconomyStored('MASS') >= 20 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': We have the resources to build a land factory so will try to') end
-                                    oPlatoon[refiCurrentAction] = refActionBuildLandFactory
-                                end
-                            end
-                        end
-                    end
-                elseif iFactoryCount < 4 then
-                    if M27Conditions.DoesACUHaveGun(aiBrain, false, nil) == false then
-                        if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
-                            if aiBrain:GetEconomyStored('MASS') >= 400 then
-                                if iStoredEnergy >= 750 then
-                                    if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
+        --do we want more factories than we already have?
+        if iFactoryCount < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] then
+            --Are we closer to enemy than base?
+            local tCurPosition = GetPlatoonFrontPosition(oPlatoon)
+            local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
+            local iDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPosition])
+            local iDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToEnemy='..iDistanceToEnemy..'; iDistanceToStart='..iDistanceToStart) end
+            if iDistanceToEnemy >= iDistanceToStart then
+                local iStoredEnergy = aiBrain:GetEconomyStored('ENERGY')
+                if bAlreadyTryingToBuild and iStoredEnergy >= 250 and oPlatoon[refbMovingToBuild] == true then
+                    oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                else
+                    if iFactoryCount < 2 then
+                        if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 10 then --Have at least 100 gross energy income per second
+                            if aiBrain:GetEconomyTrend('MASS') >= 0.2 then --At least 2 net mass income per second
+                                if iStoredEnergy >= 250 then
+                                    if aiBrain:GetEconomyStored('MASS') >= 20 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': We have the resources to build a land factory so will try to') end
                                         oPlatoon[refiCurrentAction] = refActionBuildLandFactory
                                     end
                                 end
                             end
                         end
-                    end
-                elseif iFactoryCount < 6 then
-                    if M27Conditions.DoesACUHaveGun(aiBrain, false, nil) == false then
-                        if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
-                            if aiBrain:GetEconomyStored('MASS') >= 600 then
-                                if iStoredEnergy >= 1000 then
-                                    if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
-                                        oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                    elseif iFactoryCount < 4 then
+                        if M27Conditions.DoesACUHaveGun(aiBrain, false, nil) == false then
+                            if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
+                                if aiBrain:GetEconomyStored('MASS') >= 400 then
+                                    if iStoredEnergy >= 750 then
+                                        if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
+                                            oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    elseif iFactoryCount < 6 then
+                        if M27Conditions.DoesACUHaveGun(aiBrain, false, nil) == false then
+                            if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
+                                if aiBrain:GetEconomyStored('MASS') >= 600 then
+                                    if iStoredEnergy >= 1000 then
+                                        if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
+                                            oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                                        end
                                     end
                                 end
                             end
                         end
                     end
+                    if oPlatoon[refiCurrentAction] then oPlatoon[refbMovingToBuild] = true end
                 end
-                if oPlatoon[refiCurrentAction] then oPlatoon[refbMovingToBuild] = true end
             end
         end
     end
@@ -4918,7 +4921,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -5445,6 +5448,7 @@ function ProcessPlatoonAction(oPlatoon)
                     for _, oBuilder in oPlatoon[reftBuilders] do
                         if not(oBuilder.Dead) then
                             --AIBuildStructures.M27BuildStructureAtLocation(oBuilder, 'T1Resource', oPlatoon[reftNearbyMexToBuildOn])
+                            if bDebugMessages == true then LOG(sFunctionRef..': Issuing build command to '..oBuilder:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBuilder)..'; to build mex at '..repr(oPlatoon[reftNearbyMexToBuildOn])) end
                             AIBuildStructures.M27BuildStructureDirectAtLocation(oBuilder, 'T1Resource', oPlatoon[reftNearbyMexToBuildOn])
                         end
                     end

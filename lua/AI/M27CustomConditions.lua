@@ -316,12 +316,14 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
         if bTreatOurOrAllyBuildingAsUnclaimed == false then
             --Check if mex is part-built
             for iBuilding, oBuilding in tNearbyAllyUnits do
-                if oBuilding.GetFractionComplete then
-                    if oBuilding:GetFractionComplete() >= 1 then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Fraction complete>=1 so building marked as complete') end
-                        bResourceIsUnclaimed = false break end
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Fractioncomplete='..oBuilding.GetFractionComplete()) end
+                if not(oBuilding.Dead) then
+                    if oBuilding.GetFractionComplete then
+                        if oBuilding:GetFractionComplete() >= 1 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Fraction complete>=1 so building marked as complete') end
+                            bResourceIsUnclaimed = false break end
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Fractioncomplete='..oBuilding.GetFractionComplete()) end
+                    end
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': 1 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
             end
@@ -330,7 +332,13 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
             if bTreatEnemyBuildingAsUnclaimed == true then bResourceIsUnclaimed = true
             else
                 local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tResourcePosition, iBuildingSizeRadius, 'Enemy')
-                bResourceIsUnclaimed = M27Utilities.IsTableEmpty(tNearbyEnemyUnits)
+                if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
+                    for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
+                        if not(oBuilding.Dead) then
+                            bResourceIsUnclaimed = false break
+                        end
+                    end
+                end
             end
             if bDebugMessages == true then LOG(sFunctionRef..': 3 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
         end
@@ -342,7 +350,13 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
             if bDebugMessages == true then LOG(sFunctionRef..': 3c bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
         else
             local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tResourcePosition, iBuildingSizeRadius, 'Enemy')
-            bResourceIsUnclaimed = M27Utilities.IsTableEmpty(tNearbyEnemyUnits)
+            if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
+                for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
+                    if not(oEnemyBuilding.Dead) then
+                        bResourceIsUnclaimed = false break
+                    end
+                end
+            end
             if bDebugMessages == true then LOG(sFunctionRef..': 3d bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': 4 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end

@@ -554,7 +554,7 @@ function ProcessingActionForEnemiesNearEngineer(aiBrain, oEngineer)
         local bNearbyMobileEnemies = not(M27Utilities.IsTableEmpty(tNearbyEnemiesLong))
         local bNearbyPD, tNearbyPD
         if bNearbyMobileEnemies == false and aiBrain[M27Overseer.refiSearchRangeForEnemyStructures] > iSearchRangeLong then
-            tNearbyPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, tEngPosition, math.min(aiBrain[M27Overseer.refiSearchRangeForEnemyStructures], 60), 'Enemy')
+            tNearbyPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, tEngPosition, math.min(aiBrain[M27Overseer.refiSearchRangeForEnemyStructures], 73), 'Enemy')
             bNearbyPD = not(M27Utilities.IsTableEmpty(tNearbyPD))
         end
         if bDebugMessages == true then
@@ -980,7 +980,7 @@ function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprint
         iGroupCycleCount = iGroupCycleCount + 1
         if bDebugMessages == true then LOG(sFunctionRef..': Start of main loop grouping, iGroupCycleCount='..iGroupCycleCount..'; iCycleSize='..iCycleSize) end
         if iGroupCycleCount > iMaxCycles then
-            M27Utilities.ErrorHandler('Possible infinite loop - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax)
+            M27Utilities.ErrorHandler('Possible infinite loop - Old findrandom place - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax)
             break
         end
         for iCurSizeCycleCount = 1, iCycleSize do
@@ -1155,7 +1155,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
             end
             if iCurSizeCycleCount == iCycleSize then
                 iSearchSizeMin = iSearchSizeMax
-                iSearchSizeMax = math.min(iSearchSizeMax * 1.5, iSearchSizeMax + 10)
+                iSearchSizeMax = math.min(iSearchSizeMax * 1.25, iSearchSizeMax + 10)
             end
             if bDebugMessages == true then M27Utilities.DrawLocation(tTargetLocation) end
         end

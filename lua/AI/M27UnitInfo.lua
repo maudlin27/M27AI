@@ -13,6 +13,13 @@ refPathingTypeLand = 'Land'
 refPathingTypeNone = 'None'
 refPathingTypeAll = {refPathingTypeAmphibious, refPathingTypeNavy, refPathingTypeAir, refPathingTypeLand}
 
+--Factions
+refFactionUEF = 1
+refFactionAeon = 2
+refFactionCybran = 3
+refFactionSeraphim = 4
+refFactionNomads = 5
+
 --Categories:
 
 refCategoryT1Mex = categories.STRUCTURE * categories.TECH1 * categories.MASSEXTRACTION
@@ -48,6 +55,7 @@ refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR
 refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE
 refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.ENGINEER -categories.SCOUT -categories.ANTIAIR
+refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS
 refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
 refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
