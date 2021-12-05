@@ -216,7 +216,7 @@ end
 
 function DetermineWhatToBuild(aiBrain, oFactory)
     --Returns unit BP ID to be built
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DetermineWhatToBuild'
     local sBPIDToBuild
     if not(oFactory.GetBlueprint) then M27Utilities.ErrorHandler('Factory doesnt have a blueprint')

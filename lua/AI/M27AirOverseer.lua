@@ -1327,11 +1327,11 @@ function GetBomberTargetShortlist(aiBrain)
 
     if bDebugMessages == true then
         LOG('tStartPosition='..repr(tStartPosition))
-        local tIntelAndPower = aiBrain:GetUnitsAroundPoint(categories.RADAR * categories.STRUCTURE + categories.ENERGYPRODUCTION * categories.STRUCTURE, tStartPosition, 1000, 'Enemy')
+        local tIntelAndPower = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryRadar + categories.ENERGYPRODUCTION * categories.STRUCTURE, tStartPosition, 1000, 'Enemy')
         LOG('Size of tIntelAndPower='..table.getn(tIntelAndPower))
-        local tRadar = aiBrain:GetUnitsAroundPoint(categories.RADAR * categories.STRUCTURE, tStartPosition, 1000, 'Enemy')
+        local tRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryRadar, tStartPosition, 1000, 'Enemy')
         LOG('Size of tRadar='..table.getn(tRadar))
-        local tRectRadar = EntityCategoryFilterDown(categories.RADAR * categories.STRUCTURE, GetUnitsInRect(Rect(0, 0, 1000, 1000)))
+        local tRectRadar = EntityCategoryFilterDown(M27UnitInfo.refCategoryRadar, GetUnitsInRect(Rect(0, 0, 1000, 1000)))
         LOG('Size of tRectRadar='..table.getn(tRectRadar))
     end
 

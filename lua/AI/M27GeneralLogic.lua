@@ -493,7 +493,6 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                     end
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': iActivePlayerCount='..iActivePlayerCount..'; size of tMexByPathingAndGrouping='..table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup])..'; sPathingType='..sPathingType..'; iUnitSegmentGroup='..iUnitSegmentGroup) end
 
             local iMinDistanceFromStart
             local iCurDistanceFromStart
@@ -514,7 +513,12 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             if M27Utilities.IsTableEmpty(tMexesInGroup) == true then iTotalMexesInGroup = 0
                 else iTotalMexesInGroup = table.getn(tMexesInGroup) end
             if iTotalMexesInGroup == nil then iTotalMexesInGroup = 0 end
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': MexesByPathingAndGrouping='..repr(M27MapInfo.tMexByPathingAndGrouping))
+                --M27Utilities.DrawLocations(tMexesInGroup, nil, 7, 1000)
+            end
             local bNoBetterTargets
+            if bDebugMessages == true then LOG(sFunctionRef..': iActivePlayerCount='..iActivePlayerCount..'; size of tMexByPathingAndGrouping='..iTotalMexesInGroup..'; sPathingType='..sPathingType..'; iUnitSegmentGroup='..iUnitSegmentGroup) end
             if iTotalMexesInGroup == 0 then
                 bNoBetterTargets = true
                 --No mexes in group; check if are in the base group (as if a platoon is spread out some units may be on other segments):
@@ -614,8 +618,8 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             --Next step: Prepare a new table with just the mexes that have the min. no. of raids sent to them that are also close enough to the enemy base (if specified a max distasnce from base)
             local tRevisedMexTargets = {}
             local iRevisedPossibleMex = 0
-            if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through possible targets, iPossibleTargetCount='..iPossibleTargetCount) end
-            local bErrorControl = false
+            if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through possible targets, iPossibleTargetCount='..iPossibleTargetCount..'; iEndPointMaxDistFromEnemyStart='..(iEndPointMaxDistFromEnemyStart or 'nil')..'; platoon='..oPlatoonHandle:GetPlan()..oPlatoonHandle[M27PlatoonUtilities.refiPlatoonCount]..'; Platoon location='..repr(oPlatoonHandle:GetPlatoonPosition())) end
+              local bErrorControl = false
             local iFinalMex
             local tFinalWaypoints = {}
             tFinalWaypoints[1] = {}
@@ -639,8 +643,6 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                 end
                 --Now have a table of possible mex targets where no platoon/the min. number of platoons has been sent.  Pick one of them randomly:
 
-                local tFinalWaypoints = {}
-                tFinalWaypoints[1] = {}
 
                 if iRevisedPossibleMex == nil then iRevisedPossibleMex = 0
                     bErrorControl = true
@@ -657,7 +659,8 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                     return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
                 else
                     M27Utilities.ErrorHandler('iRevisedPossibleMex is nil or 0 but iPossibleTargetCount > 0 so reverting to that')
-                    iFinalMex = tPossibleMexTargets[math.random(1, iPossibleTargetCount)]
+                    iFinalMex = math.random(1, iPossibleTargetCount)
+                    tFinalWaypoints[1] = tPossibleMexTargets[iFinalMex]
                 end
             else
                 iFinalMex = math.random(1, iRevisedPossibleMex)
@@ -666,7 +669,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             local iFinalWaypoints = 1
             local tUnitPosition = oUnit:GetPosition()
             bNoBetterTargets = false
-            if oUnit == nil then M27Utilities.ErrorHandler('oUnit is nil, returning nil')
+            if oUnit == nil then M27Utilities.ErrorHandler('oUnit is nil')
                 bNoBetterTargets = true
             elseif iFinalMex == nil then
                 M27Utilities.ErrorHandler('iFinalMex is nil. iRevisedPossibleMex='..iRevisedPossibleMex)
@@ -677,7 +680,8 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             end
             if bNoBetterTargets == true then
                 M27Utilities.ErrorHandler('bNoBetterTargets is true, returning player start point')
-                return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]} end
+                return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
+            end
 
             if bDebugMessages == true then LOG(sFunctionRef..': iRevisedPossibleMex='..iRevisedPossibleMex..'; iFinalMex='..iFinalMex) end
             if tFinalWaypoints[1][1] == nil then
@@ -2193,7 +2197,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
         local iClaimedMexesInArea = 0
         local bIsCurMexUnclaimed
       --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to record mex for pathing group') end
-        M27MapInfo.RecordMexForPathingGroup(oPathingUnit)
+        --M27MapInfo.RecordMexForPathingGroup(oPathingUnit)
         if bDebugMessages == true then LOG(sFunctionRef..': table of MexByPathingAndGrouping='..table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup])..'; sPathing='..sPathing..'; iUnitPathGroup='..iUnitPathGroup) end
       --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to cycle through mexes in pathing group') end
         for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
@@ -2407,7 +2411,7 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
     --if iMinCoverageWanted isn't specified then will return the highest amount, otherwise returns true/false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetIntelCoverageOfPosition'
-    local tCategoryList = {categories.SCOUT, categories.RADAR*categories.TECH1, categories.RADAR*categories.TECH2, categories.RADAR * categories.TECH3}
+    local tCategoryList = {categories.SCOUT, M27UnitInfo.refCategoryRadar}
     local iCurIntelRange, iCurDistanceToPosition, iCurIntelCoverage
     local tCurUnits = {}
     local iMaxIntelCoverage = 0

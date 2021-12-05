@@ -539,10 +539,10 @@ function UpdateActionsForACUMovementPath(tMovementPath, aiBrain, oEngineer, iPat
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
 end
 
-function ProcessingActionForEnemiesNearEngineer(aiBrain, oEngineer)
+function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     --Returns true if are enemies near the engineer such that it's been given an override action (and should be ignored)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    local sFunctionRef = 'ProcessingActionForEnemiesNearEngineer'
+    local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
     local bAreNearbyEnemies = false
     if oEngineer and not(oEngineer.Dead) then
         local iSearchRangeLong = iEngineerEnemySearchRange
@@ -591,14 +591,25 @@ function ProcessingActionForEnemiesNearEngineer(aiBrain, oEngineer)
                 end
                 if bKeepBuilding == false then
                     --otherwise, run unless it's an enemy engineer in which case try to reclaim
+                    local bOnlyNearbyEngis = true
                     if bNearbyMobileEnemies == true then
-                        local tPossibleEngineers = M27Logic.GetVisibleUnitsOnly(aiBrain, tNearbyEnemiesLong)
+                        oReclaimTarget = nil
+                        local sCurEnemyID
+                        for iUnit, oUnit in tNearbyEnemiesLong do
+                            if M27UnitInfo.IsEnemyUnitAnEngineer(aiBrain, oUnit) == false then
+                                bOnlyNearbyEngis = false
+                                break
+                            end
+                        end
+
+                        if bOnlyNearbyEngis then oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesLong, tEngPosition, aiBrain, true) end
+                        --[[local tPossibleEngineers = M27Logic.GetVisibleUnitsOnly(aiBrain, tNearbyEnemiesLong)
                         if M27Utilities.IsTableEmpty(tPossibleEngineers) == false and tNearbyEnemiesLong == tNearbyEnemiesLong then
                             tPossibleEngineers = EntityCategoryFilterDown(refCategoryEngineer, tPossibleEngineers)
                             if M27Utilities.IsTableEmpty(tPossibleEngineers) == false and tPossibleEngineers == tNearbyEnemiesLong then
                                 oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesShort, oEngineer:GetPosition(), aiBrain, true)
                             end
-                        end
+                        end--]]
                     end
                 end
             end
@@ -1212,11 +1223,15 @@ function WillBuildingBlockMex(sNewBuildingBPID, tPositionOfNewBuilding)
     --If instead dealing with 4x4 building, then is up to +/-3
     --If instead dealing with 1x1 building, then is up to +/- 1
     --so formula for the max +/- is the floor of the radius + 1
+
     local tBuildingSize = M27UnitInfo.GetBuildingSize(sNewBuildingBPID)
-    local iSizeX = math.floor(tBuildingSize[1] * 0.5 + 1)
-    local iSizeZ = math.floor(tBuildingSize[2] * 0.5 + 1)
-    local sLocationRef
-    if bDebugMessages == true then LOG(sFunctionRef..': tMexPointsByLocationRef='..repr(M27MapInfo.tMexPointsByLocationRef)..'; tBuildingSize='..repr(tBuildingSize)..'; sNewBuildingBPID='..sNewBuildingBPID..'; tPositionOfNewBuilding='..repr(tPositionOfNewBuilding)) end
+    local iSizeX = math.floor(tBuildingSize[1] * 0.5 + 3) --if were to build a T1 power right by a mex, then it woudl show as 2 away; 1 being the power's radius, 1 being the mexes' radius.  We want at least 4 away, to allow space for mass storage; building size*0.5 returns radius of the building we're considering
+    local iSizeZ = math.floor(tBuildingSize[2] * 0.5 + 3)
+    local iBuildingSizeRadius = math.max(iSizeX, iSizeZ)
+    --local sLocationRef
+    return not(M27Utilities.IsTableEmpty(M27MapInfo.GetResourcesNearTargetLocation(tPositionOfNewBuilding, iBuildingSizeRadius, true)))
+
+    --[[if bDebugMessages == true then LOG(sFunctionRef..': tMexPointsByLocationRef='..repr(M27MapInfo.tMexPointsByLocationRef)..'; tBuildingSize='..repr(tBuildingSize)..'; sNewBuildingBPID='..sNewBuildingBPID..'; tPositionOfNewBuilding='..repr(tPositionOfNewBuilding)) end
     for iModX = -iSizeX, iSizeX, 1 do
         for iModZ = -iSizeZ, iSizeZ, 1 do
             if iModZ <= -iSizeZ or iModZ >= iSizeZ or iModX <= -iSizeX or iModX >= iSizeX then
@@ -1236,7 +1251,7 @@ function WillBuildingBlockMex(sNewBuildingBPID, tPositionOfNewBuilding)
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': No mexes identified around target building') end
-    return false
+    return false--]]
 end
 
 function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
@@ -1476,6 +1491,7 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
 
                     if bIgnore == false then
                         --Check not blocking a mex
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to check whether we will block a mex by building '..sNewBuildingBPID..' and CurPosition='..repr(CurPosition)) end
                         if bDontBuildByMex and WillBuildingBlockMex(sNewBuildingBPID, CurPosition) then bIgnore = true end
                         if bIgnore == false then
                             iValidPosCount = iValidPosCount + 1
@@ -1543,6 +1559,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     --iCatToBuildBy: Optional, specify if want to look for adjacency locations
     --bLookForQueuedBuildings: Optional, if true, then doesnt choose a target if another engineer already has that target function ref assigned to build something
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 1279 then bDebugMessages = true end
     if iCategoryToBuild == M27UnitInfo.refCategoryT2Radar then bDebugMessages = true end
     local sFunctionRef = 'BuildStructureAtLocation'
     local bAbortConstruction = false
@@ -1553,9 +1570,11 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     local oEngineerPosition = oEngineer:GetPosition()
     if not(tTargetLocation) then tTargetLocation = oEngineerPosition end
     local bFoundEnemyInstead = false
+    local iBuildingSizeRadius = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)[1] * 0.5
 
     if sBlueprintToBuild == nil then
-        M27Utilities.ErrorHandler('sBlueprintToBuild is nil, could happen e.g. if try and get sparky to build sxomething it cant')
+        M27Utilities.ErrorHandler('sBlueprintToBuild is nil, could happen e.g. if try and get sparky to build sxomething it cant - refer to log for more details')
+        LOG('oEngineer='..oEngineer:GetUnitId()..GetEngineerUniqueCount(oEngineer))
     else
 
         --Check if is an existing building of the type wanted first:
@@ -1584,8 +1603,14 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                         if not(oBuilding.Dead) and oBuilding.GetPosition then
                             tBuildingPosition = oBuilding:GetPosition()
                             if M27Utilities.GetDistanceBetweenPositions(tBuildingPosition, tTargetLocation) <= iMaxAreaToSearch then
-                                iBuildingCount = iBuildingCount + 1
-                                tPossibleTargets[iBuildingCount] = oBuilding:GetPosition()
+                                --Check we're not building by a mex
+                                --if M27Utilities.IsTableEmpty(M27MapInfo.GetResourcesNearTargetLocation(tBuildingPosition, iBuildingSizeRadius, true)) == true then
+                                    --if bDebugMessages == true then LOG(sFunctionRef..': No resources near the target build position') end
+                                    iBuildingCount = iBuildingCount + 1
+                                    tPossibleTargets[iBuildingCount] = tBuildingPosition
+                                --else
+                                    --if bDebugMessages == true then LOG(sFunctionRef..': Have resources near the target build position') end
+                                --end
                             end
                         end
                     end
@@ -1640,9 +1665,9 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                     LOG(sFunctionRef..' Cant build '..sBlueprintToBuild..' and '..repr(tTargetLocation))
                     if iCategoryToBuild == nil then LOG(sFunctionRef..' iCategoryToBuild is nil somehow') end
                 end
-                if EntityCategoryContains(refCategoryMex, sBlueprintToBuild) or EntityCategoryContains(refCategoryHydro, sBlueprintToBuild) then
+                if EntityCategoryContains(refCategoryMex, sBlueprintToBuild) or EntityCategoryContains(refCategoryHydro, sBlueprintToBuild) or EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, sBlueprintToBuild) then
                     --Cant build at location, is that because of enemy building blocking it, or we have a part-built building?
-                    if bDebugMessages == true then LOG(sFunctionRef..': Are trying to build a mex or hydro so cant get a random location') end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Are trying to build a mex or hydro or mass storage so cant get a random location') end
                     local tEnemyBuildingAtTarget = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tTargetLocation, 1, 'Enemy')
                     if M27Utilities.IsTableEmpty(tEnemyBuildingAtTarget) == false then
                         M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
@@ -1654,11 +1679,35 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                     else
                         local tAllyBuildingAtTarget = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tTargetLocation, 1, 'Ally')
                         if M27Utilities.IsTableEmpty(tAllyBuildingAtTarget) == false then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will target the ally building as its part complete') end
                             oPartCompleteBuilding = tAllyBuildingAtTarget[1]
                         else
-                            LOG('Warning: Cant build at resource location but no enemy or ally units on it, will just try moving near the target instead')
-                            M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
-                            bAbortConstruction = true
+                            --Are we stopped from building due to reclaim?
+
+                            local tNewBuildingSize = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)
+                            local fSizeMod = 0.5
+
+                            local rTargetRect = M27Utilities.GetRectAroundLocation(tTargetLocation, tNewBuildingSize[1] * fSizeMod)
+                            if bDebugMessages == true then LOG(sFunctionRef..': tTargetLocation='..repr(tTargetLocation)..'; tNewBuildingSize='..repr(tNewBuildingSize)..'; rTargetRect='..repr(rTargetRect)) end
+                            --GetReclaimInRectangle(iReturnType, rRectangleToSearch)
+                            --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass, 4 = valid wrecks
+                            local tReclaimables = M27MapInfo.GetReclaimInRectangle(4, rTargetRect)
+
+                            if M27Utilities.IsTableEmpty(tReclaimables) == false then
+                                for iReclaim, oReclaim in tReclaimables do
+                                    --oEngineer:IssueReclaim(oReclaim)
+                                    IssueReclaim({oEngineer}, oReclaim)
+                                end
+                                IssueBuildMobile({oEngineer}, tTargetLocation, sBlueprintToBuild, {})
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef..': Reclaim found that is blocking mex or hydro so will reclaim all wrecks in rectangle='..repr(rTargetRect))
+                                    M27Utilities.DrawRectangle(rTargetRect, 7, 100)
+                                end
+                            else
+                                LOG('Warning: Cant build at resource location but no enemy or ally units on it, will just try moving near the target instead')
+                                M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
+                                bAbortConstruction = true
+                            end
                         end
                     end
                 else
@@ -1788,6 +1837,7 @@ end
 function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iConditionNumber, sBuildingBPRef)
     --If oActionTargetObject is specified, then will assist this, otherwise will try and construct a new building
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 1279 then bDebugMessages = true end
     local sFunctionRef = 'AssignActionToEngineer'
 
     if oEngineer then
@@ -2435,7 +2485,12 @@ end
 
 function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     --tEngineersToReassign - optional - if specified, then will only consider these engineers for reassignment
+
+    --DEBUGGING: Key log below to look for: LOG(sFunctionRef..': Game time='..GetGameTimeSeconds()..': About to assign action '..iActionToAssign..' to engineer number '..GetEngineerUniqueCount(oEngineerToAssign)..' with lifetime count='..sEngineerName..'; Eng unitId='..oEngineerToAssign:GetUnitId()..'; ActionTargetLocation='..repr(tActionTargetLocation))
+
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+
+    if GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     local sFunctionRef = 'ReassignEngineers'
     local tEngineers
     local bOnlyLookingAtSomeEngineers = false
@@ -2476,7 +2531,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             if not(oEngineer.Dead) and oEngineer.GetFractionComplete and oEngineer:GetFractionComplete() >= 1 then
                 sEngineerID = oEngineer:GetUnitId()
                 if M27UnitInfo.GetUnitLifetimeCount(oEngineer) <= iInitialCountThreshold then bStillHaveEarlyEngis = true end
-                bEngineerIsBusy = ProcessingActionForEnemiesNearEngineer(aiBrain, oEngineer)
+                bEngineerIsBusy = ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 if bDebugMessages == true then
                     local sUniqueRef = GetEngineerUniqueCount(oEngineer)
                     LOG(sFunctionRef..': Cycling through all engineers. Engineer Unique ref='..sUniqueRef..' Lifetimecount='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' iEngineer in loop of current engineers being considered='..iEngineer..'; Engineer state='..M27Logic.GetUnitState(oEngineer)..'; bOnlyReassignIdle='..tostring(bOnlyReassignIdle)..'; M27Logic.IsUnitIdle(oEngineer, not(bOnlyReassignIdle))='..tostring(M27Logic.IsUnitIdle(oEngineer, not(bOnlyReassignIdle), not(bOnlyReassignIdle), true)))
@@ -3257,7 +3312,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             if bWillBeAssigning == true then
                 if bDebugMessages == true then
                     local sEngineerName = M27UnitInfo.GetUnitLifetimeCount(oEngineerToAssign)
-                    LOG(sFunctionRef..': About to assign action '..iActionToAssign..' to engineer with lifetime count='..sEngineerName..'; Eng unitId='..oEngineerToAssign:GetUnitId()..'; ActionTargetLocation='..repr(tActionTargetLocation))
+                    LOG(sFunctionRef..': Game time='..GetGameTimeSeconds()..': About to assign action '..iActionToAssign..' to engineer number '..GetEngineerUniqueCount(oEngineerToAssign)..' with lifetime count='..sEngineerName..'; Eng unitId='..oEngineerToAssign:GetUnitId()..'; ActionTargetLocation='..repr(tActionTargetLocation))
                     if iAllUnclaimedMexesInPathingGroup then LOG('iAllUnclaimedMexesInPathingGroup='..iAllUnclaimedMexesInPathingGroup) end
                     if iUnclaimedMexesOnOurSideOfMap then LOG('iUnclaimedMexesOnOurSideOfMap='..iUnclaimedMexesOnOurSideOfMap) end
                     if iUnclaimedMexesWithinDefenceCoverage then LOG('iUnclaimedMexesWithinDefenceCoverage='..iUnclaimedMexesWithinDefenceCoverage) end

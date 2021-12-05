@@ -454,7 +454,7 @@ function GetNearestMAAOrScout(aiBrain, tPosition, bScoutNotMAA, bDontTakeFromIni
     --if bOnlyConsiderAvailableHelpers is true then won't consider units in any other existing platoons (unless they're a helper platoon with no helper)
     --returns nil if no such scout/MAA
     --oRelatedUnitOrPlatoon - use to check that aren't dealing with a support unit already assigned to the unit/platoon that are getting this for
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNearestMAAOrScout'
     if bOnlyConsiderAvailableHelpers == nil then bOnlyConsiderAvailableHelpers = false end
     if bDontTakeFromInitialRaiders == nil then bDontTakeFromInitialRaiders = true end
@@ -641,7 +641,7 @@ end
 function AssignMAAToPreferredPlatoons(aiBrain)
     --Similar to assigning scouts, but for MAA - for now just focus on having MAA helping ACU and any platoon of >20 size that doesnt contain MAA
     --===========ACU MAA helper--------------------------
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'AssignMAAToPreferredPlatoons'
     local iACUMinMAAThreatWantedWithAirThreat = 84 --Equivalent to 3 T1 MAA
     if aiBrain[refiOurHighestFactoryTechLevel] > 1 then
@@ -2819,7 +2819,7 @@ function ACUManager(aiBrain)
             local iACUSegmentX, iACUSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tACUPos)
             local iSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iACUSegmentX, iACUSegmentZ)
             local tNearbyUnits = {}
-            M27MapInfo.RecordMexForPathingGroup(oACU) --Makes sure we can reference tMexByPathingAndGrouping
+            --M27MapInfo.RecordMexForPathingGroup(oACU) --Makes sure we can reference tMexByPathingAndGrouping
             local iCurDistToACU
             local iBuildingSizeRadius = 0.5
             local bNearbyUnclaimedMex = false
@@ -3147,6 +3147,12 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             end
         end
 
+        --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
+        --local iNearestFriendlyCombatUnitToEnemyBase =
+        --if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true then
+
+
+
         if bWantToEco == true then --Land factory units to build for 'else' condition
             aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = nil
             aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
@@ -3334,7 +3340,7 @@ function RefreshMexPositions(aiBrain)
     WaitTicks(80)
     --Force refresh of mexes to try and fix bug where not all mexes recorded as being pathable
     M27MapInfo.RecheckPathingToMexes(aiBrain)
-    ForkThread(M27MapInfo.RecordMexForPathingGroup, M27Utilities.GetACU(aiBrain), true)
+    ForkThread(M27MapInfo.RecordMexForPathingGroup)
 
     --Create sorted listing of mexes
     ForkThread(M27MapInfo.RecordSortedMexesInOriginalPathingGroup, aiBrain)

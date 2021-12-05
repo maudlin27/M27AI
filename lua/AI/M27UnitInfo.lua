@@ -37,10 +37,10 @@ refCategoryEnergyStorage = categories.STRUCTURE * categories.ENERGYSTORAGE
 
 
 refCategoryAirStaging = categories.STRUCTURE * categories.AIRSTAGINGPLATFORM
-refCategoryRadar = categories.STRUCTURE * categories.RADAR
+refCategoryRadar = categories.STRUCTURE * categories.RADAR + categories.STRUCTURE * categories.OMNI
 refCategoryT1Radar = refCategoryRadar * categories.TECH1
 refCategoryT2Radar = refCategoryRadar * categories.TECH2
-refCategoryT3Radar = refCategoryRadar * categories.TECH3
+refCategoryT3Radar = refCategoryRadar * categories.TECH3 --+ categories.OMNI * categories.TECH3
 
 refCategoryLandFactory = categories.LAND * categories.FACTORY * categories.STRUCTURE
 refCategoryAirFactory = categories.AIR * categories.FACTORY * categories.STRUCTURE
@@ -293,4 +293,31 @@ end
 
 function IsUnitUnderwater(oUnit)
     return M27MapInfo.IsUnderwater(oUnit:GetPosition(), false)
+end
+
+function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'IsEnemyUnitAnEngineer'
+    local bIsEngineer = true
+    local iEnemySpeed
+    if oEnemyUnit.GetUnitId then
+
+        local sEnemyID = oEnemyUnit:GetUnitId()
+
+        if EntityCategoryContains(categories.STRUCTURE, sEnemyID) then bIsEngineer = false
+        else
+            --function CanSeeUnit(aiBrain, oUnit, bTrueIfOnlySeeBlip)
+            if M27Utilities.CanSeeUnit(aiBrain, oEnemyUnit, false) then
+                if not(EntityCategoryContains(refCategoryEngineer, sEnemyID)) then bIsEngineer = false end
+            else
+                local oEnemyBP = oEnemyUnit:GetBlueprint()
+                if oEnemyBP.Physics then
+                    iEnemySpeed = oEnemyBP.Physics.MaxSpeed
+                    if not(iEnemySpeed == 1.9) then bIsEngineer = false end
+                end
+             end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Checking if oEnemyUnit with ID='..sEnemyID..' is an engineer; bIsEngineer='..tostring(bIsEngineer)..'; iEnemySpeed if we have calculated it='..(iEnemySpeed or 'nil')) end
+    end
+    return bIsEngineer
 end

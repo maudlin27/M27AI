@@ -98,7 +98,7 @@ end
 
 function RecordResourcePoint(t,x,y,z,size)
     --called by hook into simInit, more reliable method of figuring out if have adaptive map
-    local bDebugMessages = true
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordResourcePoint'
     if bDebugMessages == true then LOG(sFunctionRef..': t='..t..'; x='..x..'; y='..y..'; z='..z..'; size='..repr(size)) end
 
@@ -268,6 +268,7 @@ function GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
     --returns nil if no matches
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'GetResourcesNearTargetLocation'
     if iMaxDistance == nil then iMaxDistance = 7 end
     if bMexNotHydro == nil then bMexNotHydro = true end
     local iResourceCount = 0
@@ -282,12 +283,15 @@ function GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
 
     if not(tAllResourcePoints == nil) then
         for key,pResourcePos in tAllResourcePoints do
-            iDistance = M27Utilities.GetDistanceBetweenPositions(tTargetPos, pResourcePos)
-            if iDistance <= iMaxDistance then
-                if bDebugMessages == true then LOG('GetResourcesNearTarget: Found position near to target location; iDistance='..iDistance..'; imaxDistance='..iMaxDistance..'; tTargetPos[1][3]='..tTargetPos[1]..'-'..tTargetPos[3]..'; pResourcePos='..pResourcePos[1]..'-'..pResourcePos[3]..'; bMexNotHydro='..tostring(bMexNotHydro)) end
-                iResourceCount = iResourceCount + 1
-                tNearbyResources[iResourceCount] = {}
-                tNearbyResources[iResourceCount] = pResourcePos
+            if math.abs(pResourcePos[1]-tTargetPos[1]) <= iMaxDistance and math.abs(pResourcePos[3]-tTargetPos[3]) <= iMaxDistance then
+                iDistance = M27Utilities.GetDistanceBetweenPositions(tTargetPos, pResourcePos)
+                if bDebugMessages == true then LOG(sFunctionRef..': iDistance='..iDistance..'; pResourcePos='..repr(pResourcePos)) end
+                if iDistance <= iMaxDistance then
+                    if bDebugMessages == true then LOG('GetResourcesNearTarget: Found position near to target location; iDistance='..iDistance..'; imaxDistance='..iMaxDistance..'; tTargetPos[1][3]='..tTargetPos[1]..'-'..tTargetPos[3]..'; pResourcePos='..pResourcePos[1]..'-'..pResourcePos[3]..'; bMexNotHydro='..tostring(bMexNotHydro)) end
+                    iResourceCount = iResourceCount + 1
+                    tNearbyResources[iResourceCount] = {}
+                    tNearbyResources[iResourceCount] = pResourcePos
+                end
             end
         end
     end
@@ -475,12 +479,13 @@ function GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
 end
 
 function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
-    --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass
+    --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass, 4 = valid wrecks
     local tReclaimables = GetReclaimablesInRect(rRectangleToSearch)
     local iCurMassValue = 0
     local iWreckCount = 0
     local iTotalMassValue
     local bHaveReclaim = false
+    local tValidWrecks = {}
     if M27Utilities.IsTableEmpty(tReclaimables) == false then
         if iReturnType == 3 then
             iTotalMassValue = GetReclaimablesMassValue(tReclaimables, false, 0)
@@ -493,7 +498,8 @@ function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
                         if not(v:BeenDestroyed()) then
                             iWreckCount = iWreckCount + 1
                             bHaveReclaim = true
-                            if iReturnType == 1 then break end
+                            if iReturnType == 1 then break
+                            elseif iReturnType == 4 then tValidWrecks[iWreckCount] = v end
                             --bIsProp = IsProp(v) --only used for log/testing
                             --if bDebugMessages == true then LOG('Reclaim position '..iWreckCount..'='..WreckPos[1]..'-'..WreckPos[2]..'-'..WreckPos[3]..'; iMassValue='..iMassValue) end
                             --DrawLocations(WreckPos, nil, 1, 20, true)
@@ -505,7 +511,10 @@ function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
     end
     if iReturnType == 1 then return bHaveReclaim
         elseif iReturnType == 2 then return iWreckCount
-        else return iTotalMassValue end
+        elseif iReturnType == 3 then return iTotalMassValue
+        elseif iReturnType == 4 then return tValidWrecks
+        else M27Utilities.ErrorHandler('Invalid return type')
+    end
 end
 
 function UpdateReclaimMarkers()
@@ -627,12 +636,37 @@ function GetHydroLocationsForPathingGroup(oPathingUnit, sPathingType, iPathingGr
     return tHydroForPathingGroup
 end
 
-function RecordMexForPathingGroup(oPathingUnit, bForceRefresh)
+function RecordMexForPathingGroup()
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'RecordMexForPathingGroup'
+    local tsPathingTypes = {M27UnitInfo.refPathingTypeAmphibious, M27UnitInfo.refPathingTypeNavy, M27UnitInfo.refPathingTypeLand}
+    local iCurResourceGroup
+    local iValidCount = 0
+    tMexByPathingAndGrouping = {}
+    for iPathingType, sPathingType in tsPathingTypes do
+        tMexByPathingAndGrouping[sPathingType] = {}
+        iValidCount = 0
+
+        for iCurMex, tMexLocation in MassPoints do
+            iValidCount = iValidCount + 1
+            iCurResourceGroup = GetSegmentGroupOfLocation(sPathingType, tMexLocation)
+            if tMexByPathingAndGrouping[sPathingType][iCurResourceGroup] == nil then
+                tMexByPathingAndGrouping[sPathingType][iCurResourceGroup] = {}
+                iValidCount = 1
+            else iValidCount = table.getn(tMexByPathingAndGrouping[sPathingType][iCurResourceGroup]) + 1
+            end
+            tMexByPathingAndGrouping[sPathingType][iCurResourceGroup][iValidCount] = tMexLocation
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..'; tMexByPathingAndGrouping='..repr(tMexByPathingAndGrouping)) end
+end
+
+function RecordMexForPathingGroupOld(oPathingUnit, bForceRefresh)
     --Updates tMexByPathingAndGrouping to record the mex that are in the same pathing group as oPathingUnit
     --bForceRefresh - issue where not all mexes register as being pathable at start of game, so overseer will call this again after a short delay
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
 
-    local sFunctionRef = 'RecordMexForPathingGroup'
+    local sFunctionRef = 'RecordMexForPathingGroupOld'
     if oPathingUnit and not(oPathingUnit.Dead) then
         local sPathingType = M27UnitInfo.GetUnitPathingType(oPathingUnit)
         local tUnitPosition = oPathingUnit:GetPosition()
@@ -1829,6 +1863,9 @@ function MappingInitialisation(aiBrain)
         end
         if bProfiling == true then iProfileStartTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef..': End of pathing logic for base pathing', iProfileStartTime) end
 
+        --Record mexes by pathing group
+        RecordMexForPathingGroup()
+
         if bDebugMessages == true then
             local iMapSizeX, iMapSizeZ = GetMapSize()
             LOG(sFunctionRef..': iMapSizeX='..iMapSizeX..'; iMapSizeZ='..iMapSizeZ..'; iMaxBaseSegmentX-Z='..iMaxBaseSegmentX..'-'..iMaxBaseSegmentZ)
@@ -2249,7 +2286,7 @@ function RecheckPathingToMexes(aiBrain)
 
 
     if bHaveChangedPathingGroups == true then
-        RecordMexForPathingGroup(oACU, true)
+        RecordMexForPathingGroup()
         RecordSortedMexesInOriginalPathingGroup(aiBrain)
     end --]]
 

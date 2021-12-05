@@ -8,9 +8,11 @@ bGlobalDebugOverride = false
 
 function ErrorHandler(sErrorMessage, iOptionalWaitInSeconds, bWarningNotError)
     --Intended to be put in code wherever a condition isn't met that should be, so can debug it without the code crashing
+    --Search for "error " in the log to find both these errors and normal lua errors, while not bringing up warnings
     if sErrorMessage == nil then sErrorMessage = 'Not specified' end
-    local sErrorBase = 'M27ERROR: '
+    local sErrorBase = 'M27ERROR '
     if bWarningNotError then sErrorBase = 'M27WARNING: ' end
+    sErrorBase = sErrorBase..' GameTime '..math.floor(GetGameTimeSeconds())..': '
     sErrorMessage = sErrorBase..sErrorMessage
     local a, s = pcall(assert, false, sErrorMessage)
     WARN(a, s)
@@ -142,6 +144,11 @@ function SortTableByValue(tTableToSort, bLowToHigh)
     if bLowToHigh then return spairs(tTableToSort, function(t,a,b) return t[b] < t[a] end)
     else return spairs(tTableToSort, function(t,a,b) return t[b] > t[a] end)
     end
+end
+
+function GetRectAroundLocation(tLocation, iRadius)
+    --Looks iRadius left/right and up/down (e.g. if want 1x1 square centred on tLocation, iRadius should be 0.5)
+    return Rect(tLocation[1] - iRadius, tLocation[3] - iRadius, tLocation[1] + iRadius, tLocation[3] + iRadius)
 end
 
 
