@@ -2200,100 +2200,102 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
         --M27MapInfo.RecordMexForPathingGroup(oPathingUnit)
         if bDebugMessages == true then LOG(sFunctionRef..': table of MexByPathingAndGrouping='..table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup])..'; sPathing='..sPathing..'; iUnitPathGroup='..iUnitPathGroup) end
       --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to cycle through mexes in pathing group') end
-        for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
-          --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': Start of loop') end
-            iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering mex position='..repr(tMexLocation)..'; iSegmentX,Z='..iSegmentX..'-'..iSegmentZ..'; iACUSegmentX-Z='..iACUSegmentX..'-'..iACUSegmentZ..'; iMaxSegmentDistanceX,Z='..iMaxSegmentDistanceX..'-'..iMaxSegmentDistanceZ) end
-            if math.abs(iSegmentX - iACUSegmentX) <= iMaxSegmentDistanceX then
-                if math.abs(iSegmentZ - iACUSegmentZ) <= iMaxSegmentDistanceZ then
-                    --Is the location close enough to warrant consideration?
-                    iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
-                    if iCurDistanceFromEnemy <= iMaxDistanceFromEnemy then
-                        if iCurDistanceFromEnemy >= iMinDistanceFromEnemy then
-                            iCurDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.PlayerStartPoints[iPlayerStartPoint])
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering distance from start; iCurDistanceFromEnemy='..iCurDistanceFromEnemy..'; iCurDistanceFromStart='..iCurDistanceFromStart) end
-                            if iCurDistanceFromStart <= iMaxDistanceAbsolute then
-                                if iCurDistanceFromStart <= iMaxDistanceFromStart then
-                                    if iCurDistanceFromStart >= iMinDistanceFromStart then
-                                        iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tUnitPos)
-                                        if iCurDistanceFromUnit <= iMaxDistanceAbsolute then
-                                            --Check its far enough away from unit's current position, if unit has already been assigned such a movement path
-                                            bIsFarEnoughFromStart = false
-                                            if oPathingUnit.GetPriorityExpansionMovementPath == nil then
-                                                bIsFarEnoughFromStart = true
-                                            else
-                                                if oPathingUnit.GetPriorityExpansionMovementPath == false then
+        if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
+            for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
+              --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': Start of loop') end
+                iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering mex position='..repr(tMexLocation)..'; iSegmentX,Z='..iSegmentX..'-'..iSegmentZ..'; iACUSegmentX-Z='..iACUSegmentX..'-'..iACUSegmentZ..'; iMaxSegmentDistanceX,Z='..iMaxSegmentDistanceX..'-'..iMaxSegmentDistanceZ) end
+                if math.abs(iSegmentX - iACUSegmentX) <= iMaxSegmentDistanceX then
+                    if math.abs(iSegmentZ - iACUSegmentZ) <= iMaxSegmentDistanceZ then
+                        --Is the location close enough to warrant consideration?
+                        iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
+                        if iCurDistanceFromEnemy <= iMaxDistanceFromEnemy then
+                            if iCurDistanceFromEnemy >= iMinDistanceFromEnemy then
+                                iCurDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.PlayerStartPoints[iPlayerStartPoint])
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering distance from start; iCurDistanceFromEnemy='..iCurDistanceFromEnemy..'; iCurDistanceFromStart='..iCurDistanceFromStart) end
+                                if iCurDistanceFromStart <= iMaxDistanceAbsolute then
+                                    if iCurDistanceFromStart <= iMaxDistanceFromStart then
+                                        if iCurDistanceFromStart >= iMinDistanceFromStart then
+                                            iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tUnitPos)
+                                            if iCurDistanceFromUnit <= iMaxDistanceAbsolute then
+                                                --Check its far enough away from unit's current position, if unit has already been assigned such a movement path
+                                                bIsFarEnoughFromStart = false
+                                                if oPathingUnit.GetPriorityExpansionMovementPath == nil then
                                                     bIsFarEnoughFromStart = true
                                                 else
-                                                    iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tUnitPos)
-                                                    if iCurDistanceFromUnit >= iMinDistanceAwayFromUnit then
-                                                        if bDebugMessages == true then LOG(sFunctionRef..': tMexLocation='..repr(tMexLocation)..'; iCurDistanceFromUnit='..iCurDistanceFromUnit..'; far enough away that can consider as final destination') end
+                                                    if oPathingUnit.GetPriorityExpansionMovementPath == false then
                                                         bIsFarEnoughFromStart = true
+                                                    else
+                                                        iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tUnitPos)
+                                                        if iCurDistanceFromUnit >= iMinDistanceAwayFromUnit then
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': tMexLocation='..repr(tMexLocation)..'; iCurDistanceFromUnit='..iCurDistanceFromUnit..'; far enough away that can consider as final destination') end
+                                                            bIsFarEnoughFromStart = true
+                                                        end
                                                     end
                                                 end
-                                            end
-                                            if bIsFarEnoughFromStart == true then
-                                                --The mex is close enough to us and enemy for consideration - determine how many mexes are nearby that we havent got mexes on
-                                                --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
-                                              --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just before checking if mex is unclaimed') end
-                                                if M27Conditions.IsMexUnclaimed(aiBrain, tMexLocation, true, false, false) == true then
-                                                  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just after checking if mex is unclaimed - it is unclaimed') end
-                                                    iMexesInCurArea = 1
-                                                    iPossibleMexLocations = iPossibleMexLocations + 1
+                                                if bIsFarEnoughFromStart == true then
+                                                    --The mex is close enough to us and enemy for consideration - determine how many mexes are nearby that we havent got mexes on
+                                                    --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
+                                                  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just before checking if mex is unclaimed') end
+                                                    if M27Conditions.IsMexUnclaimed(aiBrain, tMexLocation, true, false, false) == true then
+                                                      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just after checking if mex is unclaimed - it is unclaimed') end
+                                                        iMexesInCurArea = 1
+                                                        iPossibleMexLocations = iPossibleMexLocations + 1
 
-                                                    --Record other mexes in the area: First unclaimed mexes:
+                                                        --Record other mexes in the area: First unclaimed mexes:
 
-                                                    for iAltMex, tAltMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
-                                                        if not(iAltMex == iCurMex) then
-                                                            if M27Utilities.GetDistanceBetweenPositions(tAltMexLocation, tMexLocation) <= iSearchRadius then
-                                                                --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
-                                                                if M27Conditions.IsMexUnclaimed(aiBrain, tAltMexLocation, true, false, false) == true then
-                                                                    iMexesInCurArea = iMexesInCurArea + 1
+                                                        for iAltMex, tAltMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
+                                                            if not(iAltMex == iCurMex) then
+                                                                if M27Utilities.GetDistanceBetweenPositions(tAltMexLocation, tMexLocation) <= iSearchRadius then
+                                                                    --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
+                                                                    if M27Conditions.IsMexUnclaimed(aiBrain, tAltMexLocation, true, false, false) == true then
+                                                                        iMexesInCurArea = iMexesInCurArea + 1
+                                                                    end
                                                                 end
                                                             end
                                                         end
-                                                    end
 
-                                                    --Next claimed mexes:
-                                                    iClaimedMexesInArea = 0
-                                                    for iAltMex, tAltMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
-                                                        --if not(iAltMex == iCurMex) then
-                                                            if M27Utilities.GetDistanceBetweenPositions(tAltMexLocation, tMexLocation) <= iSearchRadius then
-                                                                --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
-                                                                if M27Conditions.IsMexUnclaimed(aiBrain, tAltMexLocation, true, true, true) == true then
-                                                                    iClaimedMexesInArea = iClaimedMexesInArea + 1
+                                                        --Next claimed mexes:
+                                                        iClaimedMexesInArea = 0
+                                                        for iAltMex, tAltMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
+                                                            --if not(iAltMex == iCurMex) then
+                                                                if M27Utilities.GetDistanceBetweenPositions(tAltMexLocation, tMexLocation) <= iSearchRadius then
+                                                                    --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
+                                                                    if M27Conditions.IsMexUnclaimed(aiBrain, tAltMexLocation, true, true, true) == true then
+                                                                        iClaimedMexesInArea = iClaimedMexesInArea + 1
+                                                                    end
                                                                 end
-                                                            end
-                                                        --end
+                                                            --end
+                                                        end
+                                                        iClaimedMexesInArea = iClaimedMexesInArea - iMexesInCurArea
+                                                        if iClaimedMexesInArea < 0 then iClaimedMexesInArea = 0 LOG(sFunctionRef..': ERROR - shouldnt be possible for claimed mexes to be negative') end
+
+                                                        --Now get reclaim in the area:
+                                                        ReclaimRectangle = Rect(tMexLocation[1] - iSearchRadius,tMexLocation[3] - iSearchRadius, tMexLocation[1] + iSearchRadius, tMexLocation[3] + iSearchRadius)
+                                                        tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
+                                                        iReclaimInCurrentArea = M27MapInfo.GetReclaimablesMassValue(tReclaimables, false, iSmallestReclaimSizeToConsider)
+
+                                                        iCurDistanceFromMiddle = math.abs(iCurDistanceFromEnemy - iCurDistanceFromStart)
+
+                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations] = {}
+                                                        --tPossibleMexLocationsAndNumber[iPossibleMexLocations][iMexesInCurArea] = {}
+                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] = iMexesInCurArea * iMassValueOfUnclaimedMex + iClaimedMexesInArea * iMassValueOfClaimedMex + iReclaimInCurrentArea
+                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {}
+                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {tMexLocation[1], tMexLocation[2], tMexLocation[3]} --Need this rather than table reference or mess up engineer tracking
+                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromStart] = iCurDistanceFromStart
+                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromEnemy] = iCurDistanceFromEnemy
+                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromACU] = iCurDistanceFromUnit
+                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromMiddle] = iCurDistanceFromMiddle
+                                                        --if iMexesInCurArea > iMaxMexesInArea then iMaxMexesInArea = iMexesInCurArea end
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': iPossibleMexLocations='..iPossibleMexLocations..'; tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue]='..tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue]..'; iMaxMassInArea='..iMaxMassInArea..'; Location='..repr(tMexLocation)) end
+                                                        if tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] > iMaxMassInArea then iMaxMassInArea = tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] end
+                                                        if iCurDistanceFromMiddle > iMaxDistanceFromMiddle then iMaxDistanceFromMiddle = iCurDistanceFromMiddle end
+                                                        if iCurDistanceFromUnit > iMaxDistanceToACU then iMaxDistanceToACU = iCurDistanceFromUnit end
+                                                      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': End of recording possible mex locations main section') end
+                                                    else
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Mex is claimed so ignoring this location') end
+                                                      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just after checking if mex is unclaimed - it was already claimed') end
                                                     end
-                                                    iClaimedMexesInArea = iClaimedMexesInArea - iMexesInCurArea
-                                                    if iClaimedMexesInArea < 0 then iClaimedMexesInArea = 0 LOG(sFunctionRef..': ERROR - shouldnt be possible for claimed mexes to be negative') end
-
-                                                    --Now get reclaim in the area:
-                                                    ReclaimRectangle = Rect(tMexLocation[1] - iSearchRadius,tMexLocation[3] - iSearchRadius, tMexLocation[1] + iSearchRadius, tMexLocation[3] + iSearchRadius)
-                                                    tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
-                                                    iReclaimInCurrentArea = M27MapInfo.GetReclaimablesMassValue(tReclaimables, false, iSmallestReclaimSizeToConsider)
-
-                                                    iCurDistanceFromMiddle = math.abs(iCurDistanceFromEnemy - iCurDistanceFromStart)
-
-                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations] = {}
-                                                    --tPossibleMexLocationsAndNumber[iPossibleMexLocations][iMexesInCurArea] = {}
-                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] = iMexesInCurArea * iMassValueOfUnclaimedMex + iClaimedMexesInArea * iMassValueOfClaimedMex + iReclaimInCurrentArea
-                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {}
-                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {tMexLocation[1], tMexLocation[2], tMexLocation[3]} --Need this rather than table reference or mess up engineer tracking
-                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromStart] = iCurDistanceFromStart
-                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromEnemy] = iCurDistanceFromEnemy
-                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromACU] = iCurDistanceFromUnit
-                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromMiddle] = iCurDistanceFromMiddle
-                                                    --if iMexesInCurArea > iMaxMexesInArea then iMaxMexesInArea = iMexesInCurArea end
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': iPossibleMexLocations='..iPossibleMexLocations..'; tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue]='..tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue]..'; iMaxMassInArea='..iMaxMassInArea..'; Location='..repr(tMexLocation)) end
-                                                    if tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] > iMaxMassInArea then iMaxMassInArea = tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] end
-                                                    if iCurDistanceFromMiddle > iMaxDistanceFromMiddle then iMaxDistanceFromMiddle = iCurDistanceFromMiddle end
-                                                    if iCurDistanceFromUnit > iMaxDistanceToACU then iMaxDistanceToACU = iCurDistanceFromUnit end
-                                                  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': End of recording possible mex locations main section') end
-                                                else
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': Mex is claimed so ignoring this location') end
-                                                  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just after checking if mex is unclaimed - it was already claimed') end
                                                 end
                                             end
                                         end
@@ -2303,8 +2305,8 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                         end
                     end
                 end
+              --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': End of loop') end
             end
-          --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': End of loop') end
         end
       --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to consider possible locations to pass through') end
         if table.getn(tPossibleMexLocationsAndNumber) > 0 then
@@ -2347,8 +2349,8 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
         if bDebugMessages == true then LOG(sFunctionRef..': Near end of code, will return value based on specifics') end
         if bHaveFinalDestination == false then
           --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Failed to get final destination, repeating again') end
-            if bDebugMessages == true then LOG(sFunctionRef..': Failed to find a final destination, will retry with higher bounds unless already done that') end
-            if iMaxDistancePercentage > iStopCyclingMaxThreshold then return nil
+            if bDebugMessages == true then LOG(sFunctionRef..': Failed to find a final destination, will retry with higher bounds unless already done that or no mexes in pathing group') end
+            if iMaxDistancePercentage > iStopCyclingMaxThreshold or M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == true then return nil
             else
                 local iNewMaxDistance = iMaxDistancePercentage + 0.2
                 return GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOverride, iNewMaxDistance)

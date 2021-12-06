@@ -541,7 +541,7 @@ end
 
 function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     --Returns true if are enemies near the engineer such that it's been given an override action (and should be ignored)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
     local bAreNearbyEnemies = false
     if oEngineer and not(oEngineer.Dead) then
@@ -625,7 +625,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
 
                     if bOnlyNearbyEngisOrStructure then
                         oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesLong, tEngPosition, aiBrain, true)
-                        if EntityCategoryContains(M27UnitInfo.refCategoryMex, oReclaimTarget:GetUnitId()) then bCaptureNotReclaim = true end
+                        if oReclaimTarget and oReclaimTarget.GetUnitId and EntityCategoryContains(M27UnitInfo.refCategoryMex, oReclaimTarget:GetUnitId()) then bCaptureNotReclaim = true end
                     end
                 end
             end
@@ -1581,7 +1581,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     --iCatToBuildBy: Optional, specify if want to look for adjacency locations
     --bLookForQueuedBuildings: Optional, if true, then doesnt choose a target if another engineer already has that target function ref assigned to build something
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 1279 then bDebugMessages = true end
+
     if iCategoryToBuild == M27UnitInfo.refCategoryT2Radar then bDebugMessages = true end
     local sFunctionRef = 'BuildStructureAtLocation'
     local bAbortConstruction = false
@@ -1859,7 +1859,7 @@ end
 function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iConditionNumber, sBuildingBPRef)
     --If oActionTargetObject is specified, then will assist this, otherwise will try and construct a new building
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 1279 then bDebugMessages = true end
+
     local sFunctionRef = 'AssignActionToEngineer'
 
     if oEngineer then
@@ -1938,7 +1938,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 --HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable)
                                 if M27Conditions.HydroNearACUAndBase(aiBrain, true, false) == true then
                                     bConsiderAdjacency = true
-                                    iCatToBuildBy = refCategoryHydro + refCategoryT2Power + refCategoryT3Power
+                                    iCatToBuildBy = refCategoryHydro + M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power
                                     sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
                                 end
                             elseif iActionToAssign == refActionBuildEnergyStorage then
@@ -2517,7 +2517,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
 
-    if GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     local sFunctionRef = 'ReassignEngineers'
     local tEngineers
     local bOnlyLookingAtSomeEngineers = false
