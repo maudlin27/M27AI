@@ -3299,6 +3299,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         end
 
         aiBrain[refiACUHealthToRunOn] = 5250
+        if iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.5 then aiBrain[refiACUHealthToRunOn] = 8000 end --We have majority of mexes so play safe with ACU
     end
 end
 

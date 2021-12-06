@@ -1551,7 +1551,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
         local iHealthToRunOn = aiBrain[M27Overseer.refiACUHealthToRunOn]
         if iHealthToRunOn == nil then iHealthToRunOn = 5250 end
         local iCurrentHealth = M27Utilities.GetACU(aiBrain):GetHealth()
-        if oPlatoon[refbNeedToHeal] == true then iHealthToRunOn = 6250 end
+        if oPlatoon[refbNeedToHeal] == true then iHealthToRunOn = math.max(6250, iHealthToRunOn + 750) end
         if iCurrentHealth <= iHealthToRunOn then
             oPlatoon[refbNeedToHeal] = true
             --Check if we're already near our base - use iDistanceFromBaseToBeSafe for below, and then m27overseer has a lower threshold for if <30% health
