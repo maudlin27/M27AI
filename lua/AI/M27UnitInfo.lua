@@ -296,7 +296,7 @@ function IsUnitUnderwater(oUnit)
 end
 
 function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'IsEnemyUnitAnEngineer'
     local bIsEngineer = true
     local iEnemySpeed

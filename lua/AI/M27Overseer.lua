@@ -54,6 +54,7 @@ refiUnitNavalAAThreat = 'M27OverseerUnitThreat' --Recored against individual oEn
 local reftUnitGroupPreviousReferences = 'M27UnitGroupPreviousReferences'
 refiNearestOutstandingThreat = 'M27NearestOutstandingThreat' --Mod distance of the closest enemy threat (using GetDistanceFromStartAdjustedForDistanceFromMid)
 refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddistance
+refiPercentageClosestFriendlyToEnemyBase = 'M27OverseerPercentageClosestFriendly'
 refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
 
 --Big enemy threats (impact on strategy and/or engineer build order)
@@ -1492,6 +1493,8 @@ function ResetEnemyThreatGroups(aiBrain, iSearchRange, tCategoriesToSearch)
         when enemy units are combined into a threat group, any recent platoon group references should be checked, and then any aiBrain defender platoons targetting those enemy groups should have their references updated
     This Reset function therefore sets the current target to nil, and updates the previous target reference - updates both enemy unit references, and own platoon target references
     ]]
+
+    local iThreatGroupMemory = 30
     local iArmyIndex = aiBrain:GetArmyIndex()
     aiBrain[reftEnemyThreatGroup] = {}
     --Reset platoon and aiBrain details:
@@ -1518,7 +1521,7 @@ function ResetEnemyThreatGroups(aiBrain, iSearchRange, tCategoriesToSearch)
         if sOldRef == nil then oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] = {} end
         if oEnemyUnit[iArmyIndex][refstPrevEnemyThreatGroup] == nil then oEnemyUnit[iArmyIndex][refstPrevEnemyThreatGroup] = {} end
         table.insert(oEnemyUnit[iArmyIndex][refstPrevEnemyThreatGroup], 1, sOldRef)
-        if table.getn(oEnemyUnit[iArmyIndex][refstPrevEnemyThreatGroup]) > 10 then table.remove(oEnemyUnit[iArmyIndex][refstPrevEnemyThreatGroup], 11) end
+        if table.getn(oEnemyUnit[iArmyIndex][refstPrevEnemyThreatGroup]) > iThreatGroupMemory then table.remove(oEnemyUnit[iArmyIndex][refstPrevEnemyThreatGroup], iThreatGroupMemory + 1) end
         oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] = nil
         oEnemyUnit[iArmyIndex][refbUnitAlreadyConsidered] = nil
         if oEnemyUnit[iArmyIndex][refiAssignedThreat] == nil then oEnemyUnit[iArmyIndex][refiAssignedThreat] = 0 end --Used for torp bombers; not reset since torp bombers are assigned once
@@ -3148,8 +3151,16 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         end
 
         --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
-        --local iNearestFriendlyCombatUnitToEnemyBase =
-        --if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true then
+        local tFriendlyLandCombat = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandCombat + categories.COMMAND, false, true)
+        --M27Utilities.GetNearestUnit(tUnits, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], aiBrain, false)
+        local oNearestFriendlyCombatUnitToEnemyBase = M27Utilities.GetNearestUnit(tFriendlyLandCombat, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], aiBrain, false)
+        local tFurthestFriendlyPosition = oNearestFriendlyCombatUnitToEnemyBase:GetPosition()
+        local iFurthestFriendlyDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local iFurthestFriendlyDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+
+        aiBrain[refiPercentageClosestFriendlyToEnemyBase] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyToEnemyBase] < 0.4 then bWantToEco = false end
+        if oACU:GetHealthPercent() < 0.45 then bWantToEco = false end
 
 
 
@@ -3251,6 +3262,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             end
             if aiBrain[refiNearestOutstandingThreat] then tsGameState['NearestOutstandingThreat'] = aiBrain[refiNearestOutstandingThreat] end
             if aiBrain[refiPercentageOutstandingThreat] then tsGameState['PercentageOutstandingThreat'] = aiBrain[refiPercentageOutstandingThreat] end
+            tsGameState['PercentDistOfOurUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyToEnemyBase] or 'nil')
 
             if aiBrain[M27AirOverseer.refiOurMassInMAA] then tsGameState['OurMAAThreat'] = aiBrain[M27AirOverseer.refiOurMassInMAA] end
             if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] then tsGameState['EnemyAirThreat'] = aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] end
@@ -3427,6 +3439,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[reftEnemyGroundExperimentals] = {}
 
     aiBrain[refiPercentageOutstandingThreat] = 0.5
+    aiBrain[refiPercentageClosestFriendlyToEnemyBase] = 0.5
     aiBrain[refiNearestOutstandingThreat] = 1000
     aiBrain[refiEnemyHighestTechLevel] = 1
 

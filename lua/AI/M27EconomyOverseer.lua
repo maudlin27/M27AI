@@ -175,10 +175,17 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
     local iAvailableToUpgradeCount = 0
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
     local oUnitBP
+    local bAreAlreadyUpgradingToHQ = false
+    local iHighestTech = 1
+    local iHighestFactoryBeingUpgraded = 0
+    local iCurTech
     for iUnit, oUnit in tAllUnits do
         if not(oUnit.Dead) and oUnit.GetFractionComplete and oUnit:GetFractionComplete() == 1 then
+            iCurTech = M27UnitInfo.GetUnitTechLevel(oUnit)
+            if iCurTech > iHighestTech then iHighestTech = iCurTech end
             if oUnit:IsUnitState('Upgrading') then
                 iUpgradingCount = iUpgradingCount + 1
+                if iCurTech > iHighestFactoryBeingUpgraded then iHighestFactoryBeingUpgraded = iCurTech end
             else
                 --Can the unit be upgraded?
                 oUnitBP = oUnit:GetBlueprint()
@@ -190,8 +197,9 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
             end
         end
     end
+    if iHighestFactoryBeingUpgraded >= iHighestTech then bAreAlreadyUpgradingToHQ = true end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, iUpgradingCount='..iUpgradingCount..'; iAvailableToUpgradeCount='..iAvailableToUpgradeCount) end
-    return iUpgradingCount, iAvailableToUpgradeCount
+    return iUpgradingCount, iAvailableToUpgradeCount, bAreAlreadyUpgradingToHQ
 end
 
 function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
@@ -304,8 +312,8 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
     --iMexesUpgrading, iMexesAvailableForUpgrade = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex + refCategoryT2Mex, true)
     local iT2Mexes = aiBrain:GetCurrentUnits(refCategoryT2Mex)
     local iT3Mexes = aiBrain:GetCurrentUnits(refCategoryT3Mex)
-    local iLandFactoryUpgrading, iLandFactoryAvailable = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory, true)
-    local iAirFactoryUpgrading, iAirFactoryAvailable = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryAirFactory, true)
+    local iLandFactoryUpgrading, iLandFactoryAvailable, bAlreadyUpgradingLandHQ = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory, true)
+    local iAirFactoryUpgrading, iAirFactoryAvailable, bAlreadyUpgradingAirHQ = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryAirFactory, true)
     local iT2LandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory * categories.TECH2)
     local iT3LandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory * categories.TECH3)
     local iT2AirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH2)
@@ -330,12 +338,15 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
             else
                 --Do we want to improve build power instead of getting mexes?
                 if (iLandFactoryUpgrading + iT2LandFactories + iAirFactoryUpgrading + iT2AirFactories) + (iT3LandFactories + iT3AirFactories) * 1.5 < ((aiBrain[refiMexesUpgrading] + iT2Mexes) + iT3Mexes * 3)*iRatioOfMexToFactory then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade build power if we have factories available. bAlreadyUpgradingLandHQ='..tostring(bAlreadyUpgradingLandHQ)..'; bAlreadyUpgradingAirHQ='..tostring(bAlreadyUpgradingAirHQ)) end
                     --Want to upgrade build power
                     local iFactoryToAirRatio = (iLandFactoryUpgrading + iLandFactoryAvailable + iT3LandFactories) / math.max(1, iAirFactoryUpgrading + iAirFactoryAvailable + iT3AirFactories)
                     local iDesiredFactoryToAirRatio = aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir])
-                    if iFactoryToAirRatio > iDesiredFactoryToAirRatio and aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] > (iAirFactoryUpgrading + iAirFactoryAvailable) then
-                        iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH2
-                    else
+                    if iAirFactoryAvailable > 0 and iFactoryToAirRatio > iDesiredFactoryToAirRatio and aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] > (iAirFactoryUpgrading + iAirFactoryAvailable) and not(bAlreadyUpgradingAirHQ) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade air factory') end
+                        iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1 + refCategoryAirFactory * categories.TECH2
+                    elseif iLandFactoryAvailable > 0 and not(bAlreadyUpgradingLandHQ) and (iLandFactoryAvailable + iT3LandFactories + iT3AirFactories + iAirFactoryAvailable) > 1 then --Dont want to upgrade our only land factory taht can produce units if we have no other available factories (including air, to allow for maps where we go for only 1 land fac)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade land factory') end
                         iCategoryToUpgrade = refCategoryLandFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH2
                     end
                 end

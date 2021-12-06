@@ -82,6 +82,7 @@ refiScoutUnits = 'M27ScoutUnitsCount'
 refiBuilders = 'M27BuilderUnitsCount'
 refiReclaimers = 'M27ReclaimerUnitsCount'
 refbACUInPlatoon = 'M27ACUInPlatoon'
+refbCombatHoverInPlatoon = 'M27HoverInPlatoon'
 refbPlatoonHasUnderwaterLand = 'M27PlatoonHasUnderwaterLand'
 refbPlatoonHasOverwaterLand = 'M27PlatoonHasOverwaterLand'
 
@@ -2587,12 +2588,14 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
         if oPlatoon[reftCurrentUnits] == nil then
             oPlatoon[refiCurrentUnits] = 0
             oPlatoon[refbACUInPlatoon] = false
+            oPlatoon[refbCombatHoverInPlatoon] = false
             oPlatoon[refiCurrentAction] = refActionDisband
             if bDebugMessages == true then LOG(sFunctionRef..': Platoon with plan='..sPlatoonName..' has no units in it so disbanding') end
         else
             if M27Utilities.IsTableEmpty(oPlatoon[reftCurrentUnits]) == true then
                 oPlatoon[refiCurrentUnits] = 0
                 oPlatoon[refbACUInPlatoon] = false
+                oPlatoon[refbCombatHoverInPlatoon] = false
                 oPlatoon[refiCurrentAction] = refActionDisband
                 if bDebugMessages == true then LOG(sFunctionRef..': Platoon with name='..sPlatoonName..': units is an empty table so disbanding') end
             else
@@ -2625,8 +2628,13 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                     oPlatoon[reftIndirectUnits] = EntityCategoryFilterDown(categories.INDIRECTFIRE, oPlatoon[reftCurrentUnits])
                     oPlatoon[reftBuilders] = EntityCategoryFilterDown(categories.CONSTRUCTION, oPlatoon[reftCurrentUnits])
                     oPlatoon[reftReclaimers] = EntityCategoryFilterDown(categories.RECLAIM, oPlatoon[reftCurrentUnits])
-                    if oPlatoon[reftDFUnits] == nil then oPlatoon[refiDFUnits] = 0
-                    else oPlatoon[refiDFUnits] = table.getn(oPlatoon[reftDFUnits]) end
+                    if oPlatoon[reftDFUnits] == nil then
+                        oPlatoon[refiDFUnits] = 0
+                        oPlatoon[refbCombatHoverInPlatoon] = false
+                    else
+                        oPlatoon[refiDFUnits] = table.getn(oPlatoon[reftDFUnits])
+                        oPlatoon[refbCombatHoverInPlatoon] = not(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.HOVER, oPlatoon[reftDFUnits])))
+                    end
                     if oPlatoon[reftScoutUnits] == nil then oPlatoon[refiScoutUnits] = 0
                     else oPlatoon[refiScoutUnits] = table.getn(oPlatoon[reftScoutUnits]) end
                     if oPlatoon[reftIndirectUnits] == nil then oPlatoon[refiIndirectUnits] = 0
@@ -3355,6 +3363,7 @@ function DeterminePlatoonAction(oPlatoon)
 
             local bRefreshAction = true
             local iRefreshActionThreshold = 1 --If < this then won't refresh (subject to specific logic that might make this to always have a refresh); resets to 0 meaning will be this number + 1 cycles
+            if oPlatoon[refbCombatHoverInPlatoon] then iRefreshActionThreshold = 5 end
             local bConsideredRefreshAlready = false
             --=======Ignore action in certain cases (e.g. we only just gave that action)
 
@@ -3368,7 +3377,11 @@ function DeterminePlatoonAction(oPlatoon)
                         LOG(sFunctionRef..': Prev action was new movement path or refresh so only refresh on a much slower basis; oPlatoon[refiRefreshActionCount]='..iCurCycle)
                     end
                     iRefreshActionThreshold = 5
-                    if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true then iRefreshActionThreshold = 0 end
+                    if oPlatoon[refbCombatHoverInPlatoon] then iRefreshActionThreshold = 10 end
+                    if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true then
+                        iRefreshActionThreshold = 1
+                        if oPlatoon[refbCombatHoverInPlatoon] then iRefreshActionThreshold = 5 end
+                    end
                     if oPlatoon[refiRefreshActionCount] < iRefreshActionThreshold then bRefreshAction = false end
                 end
             end
@@ -3376,6 +3389,7 @@ function DeterminePlatoonAction(oPlatoon)
                 if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true then
                     if oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionTemporaryRetreat then
                        iRefreshActionThreshold = 1
+                        if oPlatoon[refbCombatHoverInPlatoon] then iRefreshActionThreshold = 5 end
                     else
                         bRefreshAction = true
                     end

@@ -541,16 +541,16 @@ end
 
 function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     --Returns true if are enemies near the engineer such that it's been given an override action (and should be ignored)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
     local bAreNearbyEnemies = false
     if oEngineer and not(oEngineer.Dead) then
         local iSearchRangeLong = iEngineerEnemySearchRange
-        local iSearchRangeShort = 10
+        local iSearchRangeShort = 13
         local tEngPosition = oEngineer:GetPosition()
         local bKeepBuilding = true
 
-        local tNearbyEnemiesLong = aiBrain:GetUnitsAroundPoint(categories.LAND - categories.BENIGN, tEngPosition, iSearchRangeLong, 'Enemy')
+        local tNearbyEnemiesLong = aiBrain:GetUnitsAroundPoint(categories.LAND + categories.STRUCTURE - categories.BENIGN, tEngPosition, iSearchRangeLong, 'Enemy')
         local bNearbyMobileEnemies = not(M27Utilities.IsTableEmpty(tNearbyEnemiesLong))
         local bNearbyPD, tNearbyPD
         if bNearbyMobileEnemies == false and aiBrain[M27Overseer.refiSearchRangeForEnemyStructures] > iSearchRangeLong then
@@ -571,9 +571,12 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             local tNearbyEnemiesShort
             if bNearbyMobileEnemies == true then tNearbyEnemiesShort = aiBrain:GetUnitsAroundPoint(categories.LAND - categories.BENIGN, tEngPosition, iSearchRangeShort, 'Enemy') end
             local oReclaimTarget
+            local bCaptureNotReclaim = false
             if M27Utilities.IsTableEmpty(tNearbyEnemiesShort) == false then
-                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyEnemiesShort)..' nearby enemies') end
+
                 oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesShort, tEngPosition, aiBrain, true)
+                if oReclaimTarget.GetFractionComplete and EntityCategoryContains(categories.STRUCTURE, oReclaimTarget:GetUnitId()) and oReclaimTarget:GetFractionComplete() == 1 and oReclaimTarget:GetHealthPercent() >= 0.8 then bCaptureNotReclaim = true end
+                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyEnemiesShort)..' nearby enemies; bCaptureNotReclaim='..tostring(bCaptureNotReclaim)..'; contains structure='..tostring(EntityCategoryContains(categories.STRUCTURE, oReclaimTarget:GetUnitId()))..'; fraction complete='..oReclaimTarget:GetHealthPercent()) end
             else
                 --Have nearby enemies but they're not close - ignore if we're almost done building
                 local oBeingBuilt, iFractionComplete
@@ -589,20 +592,23 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 elseif oEngineer:IsUnitState('Reclaiming') then
                     bKeepBuilding = true
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': Have far away enemies that arent close, bKeepBuilding='..tostring(bKeepBuilding)) end
                 if bKeepBuilding == false then
-                    --otherwise, run unless it's an enemy engineer in which case try to reclaim
-                    local bOnlyNearbyEngis = true
+                    --otherwise, run unless it's an enemy engineer in which case try to reclaim, or a mex in which case capture
+                    local bOnlyNearbyEngisOrStructure = true
                     if bNearbyMobileEnemies == true then
                         oReclaimTarget = nil
                         local sCurEnemyID
                         for iUnit, oUnit in tNearbyEnemiesLong do
                             if M27UnitInfo.IsEnemyUnitAnEngineer(aiBrain, oUnit) == false then
-                                bOnlyNearbyEngis = false
-                                break
+                                --Dont need to know if unit visible to know if its a mex since mex only built on mass deposits
+                                if not(EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit:GetUnitId())) then
+                                    bOnlyNearbyEngisOrStructure = false
+                                    break
+                                end
                             end
                         end
 
-                        if bOnlyNearbyEngis then oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesLong, tEngPosition, aiBrain, true) end
                         --[[local tPossibleEngineers = M27Logic.GetVisibleUnitsOnly(aiBrain, tNearbyEnemiesLong)
                         if M27Utilities.IsTableEmpty(tPossibleEngineers) == false and tNearbyEnemiesLong == tNearbyEnemiesLong then
                             tPossibleEngineers = EntityCategoryFilterDown(refCategoryEngineer, tPossibleEngineers)
@@ -610,13 +616,29 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                                 oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesShort, oEngineer:GetPosition(), aiBrain, true)
                             end
                         end--]]
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Only structures nearby, will capture if theyre only mexes') end
+                        for iUnit, oUnit in tNearbyEnemiesLong do
+                            if not(EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit:GetUnitId())) then bOnlyNearbyEngisOrStructure = false break end
+                        end
+                    end
+
+                    if bOnlyNearbyEngisOrStructure then
+                        oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesLong, tEngPosition, aiBrain, true)
+                        if EntityCategoryContains(M27UnitInfo.refCategoryMex, oReclaimTarget:GetUnitId()) then bCaptureNotReclaim = true end
                     end
                 end
             end
             if oReclaimTarget then
-                if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for engi with count='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' and unique ref='..GetEngineerUniqueCount(oEngineer)) end
-                IssueClearCommands({oEngineer})
-                IssueReclaim({oEngineer}, oReclaimTarget)
+                if oEngineer:IsUnitState('Capturing') == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for engi with count='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' and unique ref='..GetEngineerUniqueCount(oEngineer)) end
+                    IssueClearCommands({oEngineer})
+                    if bCaptureNotReclaim then
+                        IssueCapture({oEngineer}, oReclaimTarget)
+                    else
+                        IssueReclaim({oEngineer}, oReclaimTarget)
+                    end
+                end
             else
                 if bKeepBuilding == false then
                     --Nearby enemy but we dont know if its an engineer so we want to run back towards base
@@ -1901,7 +1923,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             elseif iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower then
                                 --iCategoryToBuild = refCategoryPower
                                 bConsiderAdjacency = true
-                                iCatToBuildBy = refCategoryLandFactory
+                                iCatToBuildBy = refCategoryLandFactory + refCategoryAirFactory
                                 sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
                                 bQueueUpMultiple = true
                                 iMaxAreaToSearch = 20
@@ -1916,7 +1938,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 --HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable)
                                 if M27Conditions.HydroNearACUAndBase(aiBrain, true, false) == true then
                                     bConsiderAdjacency = true
-                                    iCatToBuildBy = refCategoryHydro
+                                    iCatToBuildBy = refCategoryHydro + refCategoryT2Power + refCategoryT3Power
                                     sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
                                 end
                             elseif iActionToAssign == refActionBuildEnergyStorage then
@@ -2387,49 +2409,54 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                 bLocationAlreadyAssigned = false
                 local sLocationRef = M27Utilities.ConvertLocationToReference(tLocation)
                 if not(aiBrain[reftEngineerAssignmentsByLocation] == nil) then
-                    --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location
-                    tCurAssignments = aiBrain[reftEngineerAssignmentsByLocation][sLocationRef]
-                    if M27Utilities.IsTableEmpty(tCurAssignments) == false then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Checking if the location has been assigned already, sLocationRef='..sLocationRef) end
-                        if M27Utilities.IsTableEmpty(tCurAssignments[iActionRefToAssign]) == false then
-                            oEngiAlreadyAssigned = nil
-                            for iUniqueEngiRef, oEngi in tCurAssignments[iActionRefToAssign] do
-                                if not(oEngi.Dead) and oEngi.GetPosition then
-                                    oEngiAlreadyAssigned = oEngi
-                                    break
-                                end
-                            end
-                            if oEngiAlreadyAssigned == nil then
-                                if bDebugMessages == true then LOG(sFunctionRef..': sLocationRef='..sLocationRef..': No alive engineer has been assigned this action yet') end
-                            else
-                                if bDebugMessages == true then LOG(sFunctionRef..': iLocation='..iLocation..' is already assigned to an engineer so will ignore unless building hydro. iActionRefToAssign='..iActionRefToAssign) end
-                                bLocationAlreadyAssigned = true
-                                if iActionRefToAssign == refActionBuildHydro or iActionRefToAssign == refActionBuildMassStorage then --If we're building a mex dont need to assist it.  If we're building a hydro or mass storage then do want to assist it
-                                    oActionObject = oEngiAlreadyAssigned
-                                    tActionLocation = oActionObject:GetPosition()
-                                    if bDebugMessages == true then LOG(sFunctionRef..': iLocation='..iLocation..'; Location of engineer that will be assisting='..repr(tActionLocation)) end
-                                    if M27Utilities.IsTableEmpty(tActionLocation) == true then
-                                        if not(oActionObject.GetUnitId) then
-                                            M27Utilities.ErrorHandler('Action object doesnt have a unit ID; iActionRefToAssign='..iActionRefToAssign..'; previously had a workaround, have commented out for new appraoch, revisit')
-                                            --[[LOG('Strange issue for iActionRefToAssign='..iActionRefToAssign..' where oEngineer has somehow become the table above it, will try a workaround')
-                                            if M27Utilities.IsTableEmpty(oActionObject[1]) == false and oActionObject[1][1] and oActionObject[1][3] then
-                                                LOG(sFunctionRef..': Replacing the location')
-                                                tActionLocation = {oActionObject[1][1], oActionObject[1][2], oActionObject[1][3]}
-                                                if oActionObject[2].GetUnitId then oActionObject = oActionObject[2] end
-                                            else
-                                                LOG(sFunctionRef..': oActionObject subtable doesnt have a location, so will use current location instead')
-                                                tActionLocation = tLocation
-                                            end--]]
-                                        else
-                                            M27Utilities.ErrorHandler('tActionLocation is nil')
-                                        end
+                    if not(iActionRefToAssign == refActionBuildMassStorage) or aiBrain:CanBuildStructureAt('uab1106', tLocation) then
+                        --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location
+                        tCurAssignments = aiBrain[reftEngineerAssignmentsByLocation][sLocationRef]
+                        if M27Utilities.IsTableEmpty(tCurAssignments) == false then
+                            --Could we build the building we want to at this location
+                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if the location has been assigned already, sLocationRef='..sLocationRef) end
+                            if M27Utilities.IsTableEmpty(tCurAssignments[iActionRefToAssign]) == false then
+                                oEngiAlreadyAssigned = nil
+                                for iUniqueEngiRef, oEngi in tCurAssignments[iActionRefToAssign] do
+                                    if not(oEngi.Dead) and oEngi.GetPosition then
+                                        oEngiAlreadyAssigned = oEngi
+                                        break
                                     end
-                                    break
+                                end
+                                if oEngiAlreadyAssigned == nil then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': sLocationRef='..sLocationRef..': No alive engineer has been assigned this action yet') end
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iLocation='..iLocation..' is already assigned to an engineer so will ignore unless building hydro. iActionRefToAssign='..iActionRefToAssign) end
+                                    bLocationAlreadyAssigned = true
+                                    if iActionRefToAssign == refActionBuildHydro or iActionRefToAssign == refActionBuildMassStorage then --If we're building a mex dont need to assist it.  If we're building a hydro or mass storage then do want to assist it
+                                        oActionObject = oEngiAlreadyAssigned
+                                        tActionLocation = oActionObject:GetPosition()
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iLocation='..iLocation..'; Location of engineer that will be assisting='..repr(tActionLocation)) end
+                                        if M27Utilities.IsTableEmpty(tActionLocation) == true then
+                                            if not(oActionObject.GetUnitId) then
+                                                M27Utilities.ErrorHandler('Action object doesnt have a unit ID; iActionRefToAssign='..iActionRefToAssign..'; previously had a workaround, have commented out for new appraoch, revisit')
+                                                --[[LOG('Strange issue for iActionRefToAssign='..iActionRefToAssign..' where oEngineer has somehow become the table above it, will try a workaround')
+                                                if M27Utilities.IsTableEmpty(oActionObject[1]) == false and oActionObject[1][1] and oActionObject[1][3] then
+                                                    LOG(sFunctionRef..': Replacing the location')
+                                                    tActionLocation = {oActionObject[1][1], oActionObject[1][2], oActionObject[1][3]}
+                                                    if oActionObject[2].GetUnitId then oActionObject = oActionObject[2] end
+                                                else
+                                                    LOG(sFunctionRef..': oActionObject subtable doesnt have a location, so will use current location instead')
+                                                    tActionLocation = tLocation
+                                                end--]]
+                                            else
+                                                M27Utilities.ErrorHandler('tActionLocation is nil')
+                                            end
+                                        end
+                                        break
+                                    end
                                 end
                             end
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': table for sLocationRef='..sLocationRef..' is empty') end
                         end
                     else
-                        if bDebugMessages == true then LOG(sFunctionRef..': table for sLocationRef='..sLocationRef..' is empty') end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Mass storage location is blocked') end
                     end
                 end
                 if bLocationAlreadyAssigned == false then
@@ -3312,7 +3339,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             if bWillBeAssigning == true then
                 if bDebugMessages == true then
                     local sEngineerName = M27UnitInfo.GetUnitLifetimeCount(oEngineerToAssign)
-                    LOG(sFunctionRef..': Game time='..GetGameTimeSeconds()..': About to assign action '..iActionToAssign..' to engineer number '..GetEngineerUniqueCount(oEngineerToAssign)..' with lifetime count='..sEngineerName..'; Eng unitId='..oEngineerToAssign:GetUnitId()..'; ActionTargetLocation='..repr(tActionTargetLocation))
+                    LOG(sFunctionRef..': Game time='..GetGameTimeSeconds()..': About to assign action '..iActionToAssign..' to engineer number '..GetEngineerUniqueCount(oEngineerToAssign)..' with lifetime count='..sEngineerName..' due to iCurrentConditionToTry='..iCurrentConditionToTry..'; Eng unitId='..oEngineerToAssign:GetUnitId()..'; ActionTargetLocation='..repr(tActionTargetLocation))
                     if iAllUnclaimedMexesInPathingGroup then LOG('iAllUnclaimedMexesInPathingGroup='..iAllUnclaimedMexesInPathingGroup) end
                     if iUnclaimedMexesOnOurSideOfMap then LOG('iUnclaimedMexesOnOurSideOfMap='..iUnclaimedMexesOnOurSideOfMap) end
                     if iUnclaimedMexesWithinDefenceCoverage then LOG('iUnclaimedMexesWithinDefenceCoverage='..iUnclaimedMexesWithinDefenceCoverage) end
