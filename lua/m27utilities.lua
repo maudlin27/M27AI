@@ -12,7 +12,7 @@ function ErrorHandler(sErrorMessage, iOptionalWaitInSeconds, bWarningNotError)
     if sErrorMessage == nil then sErrorMessage = 'Not specified' end
     local sErrorBase = 'M27ERROR '
     if bWarningNotError then sErrorBase = 'M27WARNING: ' end
-    sErrorBase = sErrorBase..' GameTime '..math.floor(GetGameTimeSeconds())..': '
+    sErrorBase = sErrorBase..'GameTime '..math.floor(GetGameTimeSeconds())..': '
     sErrorMessage = sErrorBase..sErrorMessage
     local a, s = pcall(assert, false, sErrorMessage)
     WARN(a, s)

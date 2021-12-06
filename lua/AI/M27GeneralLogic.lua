@@ -2662,3 +2662,65 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
     end
     return bUnderShield
 end
+
+function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoint, iMaxDistance, iMinDistance)
+    --Tries to find a random location in a square around tMidpoint that can path to; returns nil if couldnt find anywhere
+
+
+    local iLoopCount = 0
+    local iMaxLoop = 20
+    local tEndDestination
+
+    local iMidSegmentX, iMidSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMidpoint)
+    local iSegmentMaxRange = iMaxDistance / M27MapInfo.iPathingIntervalSize
+    local iSegmentMinRange = iMinDistance / M27MapInfo.iPathingIntervalSize
+
+    local iMinSegmentX = math.max(1, iMidSegmentX - iSegmentMaxRange)
+    local iMaxSegmentX = math.min(M27MapInfo.iMaxBaseSegmentX, iMidSegmentX + iSegmentMaxRange)
+    local iMinSegmentZ = math.max(1, iMidSegmentZ - iSegmentMaxRange)
+    local iMaxSegmentZ = math.min(M27MapInfo.iMaxBaseSegmentZ, iMidSegmentZ + iSegmentMaxRange)
+
+    local iConstraintMinX = math.max(1, iMidSegmentX - iSegmentMinRange)
+    local iConstraintMaxX = math.min(M27MapInfo.iMaxBaseSegmentX, iMidSegmentX + iSegmentMinRange)
+    local iConstraintMinZ = math.max(1, iMidSegmentZ - iSegmentMinRange)
+    local iConstraintMaxZ = math.min(M27MapInfo.iMaxBaseSegmentZ, iMidSegmentZ + iSegmentMinRange)
+
+    local iCurMinSegmentZ, iCurMaxSegmentZ
+    local iRandX, iRandZ
+    local iRandFlag
+    local iPathingTarget
+    while not(iPathingTarget == iSegmentGroup) do
+        iLoopCount = iLoopCount + 1
+        if iLoopCount > iMaxLoop then
+            M27Utilities.ErrorHandler('Couldnt find random point in area, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathingType='..sPathingType..'; iSegmentGroup='..iSegmentGroup, nil, true)
+            break
+        end
+
+        --Get random position in the X range first
+        iRandX = math.random(iMinSegmentX, iMaxSegmentX)
+        --Set the revised Z range to look from
+        if iRandX <= iConstraintMinX or iRandX >= iConstraintMaxX then
+            --Wherever we are we're outside the X range cosntraint so will be far enough away
+            iCurMinSegmentZ = iMinSegmentZ
+            iCurMaxSegmentZ = iMaxSegmentZ
+        else
+            --We're within range of the X constraints so our Z value must be outside the range
+            iRandFlag = math.random(0, 1)
+            if iRandFlag == 0 then
+                iCurMinSegmentZ = iMinSegmentZ
+                iCurMaxSegmentZ = iConstraintMinZ
+            else
+                iCurMinSegmentZ = iConstraintMaxZ
+                iCurMaxSegmentZ = iMaxSegmentZ
+            end
+        end
+        iRandZ = math.random(iCurMinSegmentZ, iCurMaxSegmentZ)
+
+        --Can we path here?
+        iPathingTarget = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iRandX, iRandZ)
+    end
+    if iPathingTarget == iSegmentGroup then
+        tEndDestination = M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ)
+    end
+    return tEndDestination
+end

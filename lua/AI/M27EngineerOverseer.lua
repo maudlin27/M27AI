@@ -851,7 +851,13 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
             if bDebugMessages == true then LOG(sFunctionRef..': Have nearby reclaim, at location '..repr(tTempTarget)) end
         end
     end
+    local iDistToStart = M27Utilities.GetDistanceBetweenPositions(tEngineerPosition,M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+
     if bHaveAction == false then
+
+        local tLocationToSearchFrom
+        if iDistToStart <= 30 then tLocationToSearchFrom = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] else tLocationToSearchFrom = tEngineerPosition end
+
         --Check if we have a reasonable amount of power
         local iNetCurEnergyIncome = aiBrain:GetEconomyTrend('ENERGY')
         local iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
@@ -862,7 +868,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
 
         if bHaveLowPower == false then
 
-            tNearbyBuildings = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tEngineerPosition, iCurSearchDistance, 'Ally')
+            tNearbyBuildings = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tLocationToSearchFrom, iCurSearchDistance, 'Ally')
             if M27Utilities.IsTableEmpty(tNearbyBuildings) == false then
                 for iBuilding, oBuilding in tNearbyBuildings do
                     if oBuilding.GetFractionComplete and oBuilding.GetFractionComplete < 1 then
@@ -907,8 +913,15 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
     --end
     local iTimeToWaitInSecondsBeforeRefresh = 20
     if bHaveAction == false then
-        if bDebugMessages == true then LOG(sFunctionRef..': Dont have any action so will attack-move to start point') end
-        IssueAggressiveMove({oEngineer}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] )
+        --Are we within 50 of the base? If not then attack-move to random point within 30 of start position
+        local tPlaceToMoveTo
+        if iDistToStart > 50 then
+            tPlaceToMoveTo = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oEngineer), M27MapInfo.GetUnitSegmentGroup(oEngineer), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 30, 20)
+        else
+            --Already near base - have checked above to upgrade within a 40 range, so presumably we are power stalling; attack-move further away from base
+            tPlaceToMoveTo = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oEngineer), M27MapInfo.GetUnitSegmentGroup(oEngineer), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 50, 30)
+        end
+        IssueAggressiveMove({oEngineer}, tPlaceToMoveTo)
         iTimeToWaitInSecondsBeforeRefresh = 5
     end
     ForkThread(DelayedSpareEngineerClearAction, aiBrain, oEngineer, iTimeToWaitInSecondsBeforeRefresh)
