@@ -72,7 +72,12 @@ function DetermineMaxTerrainHeightDif()
     local sFunctionRef = 'DetermineMaxTerrainHeightDif'
 
     local tMapHeightOverride = {
-    ['serenity desert'] = 0.15
+    ['serenity desert'] = 0.15,
+    ['serenity desert small'] = 0.15,
+    ['serenity desert small - FAF version'] = 0.15,
+    ['Adaptive Corona'] = 0.15,
+    ['Corona'] = 0.15,
+    ['Adaptive Flooded Corona'] = 0.15,
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
