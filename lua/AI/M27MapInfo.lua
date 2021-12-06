@@ -4,6 +4,8 @@ local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
+local M27Config = import('/mods/M27AI/lua/M27Config.lua')
+
 
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
 tMexPointsByLocationRef = {} --As per mass points, but the key is the locationref value, and it returns the position
@@ -36,18 +38,21 @@ reftMexesInPathingGroupFilteredByDistanceToEnemy = 'M27MexesInPathingGroupFilter
 reftHighPriorityMexes = 'M27HighPriorityMexes' --Local to aiBrain, list of mex locations
 
 reftMexPatrolLocations = 'M27MapMexPatrolLocations' --aiBrain variable, [x] = nth mex will be the locations e.g. top 3 locations to patrol between
+refbCanPathToEnemyBaseWithLand = 'M27MapCanPathToEnemyWithLand' --True if can path to enemy base, false otherwise
+refbCanPathToEnemyBaseWithAmphibious = 'M27MapCanPathToEnemyWithAmphibious'
 
 --v3 Pathfinding specific
 local iLandPathingGroupForWater = 1
 bMapHasWater = true --true or false based on water % of map
 bPathfindingAlreadyCommenced = false
-bMapDrawingAlreadyCommenced = false
+bMapDrawingAlreadyCommenced = {}
 bPathfindingComplete = false
 rMapPlayableArea = 2 --Set at start of the game, use instead of the scenarioinfo method
 iPathingIntervalSize = 0.5
 iLowHeightDifThreshold = 0.007 --Used to trigger check for max height dif in an area
 iHeightDifAreaSize = 0.2 --T1 engineer is 0.6 x 0.9, so this results in a 1x1 size box by searching +- iHeightDifAreaSize if this is set to 0.5; however given are using a 0.25 interval size dont want this to be too large or destroys the purpose of the interval size and makes the threshold unrealistic
-iMaxHeightDif = 0.115 --Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119
+iMaxHeightDif = 0.115 --NOTE: Map specific code should be added below in DetermineMaxTerrainHeightDif (hardcoded table with overrides by map name); Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119
+local iChangeInHeightThreshold = 0.04 --Amount by which to change iMaxHeightDif if we have pathing inconsistencies
 iMinWaterDepth = 1 --Ships cant move right up to shore, this is a guess at how much clearance is needed (testing on Africa, depth of 2 leads to some pathable areas being considered unpathable)
 iWaterPathingIntervalSize = 1
 tWaterAreaAroundTargetAdjustments = {} --Defined in map initialisation
@@ -58,6 +63,26 @@ iSizeOfBaseLevelSegment = 1 --Is updated by pathfinding code
 tPathingSegmentGroupBySegment = {} --[a][b][c]: a = pathing type; b = segment x, c = segment z
 iMaxBaseSegmentX = 1 --Will be set by pathing, sets the maximum possible base segment X
 iMaxBaseSegmentZ = 1
+
+iMapWaterHeight = 0 --Surface height of water on the map
+
+function DetermineMaxTerrainHeightDif()
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if M27Config.M27ShowPathingGraphically then bDebugMessages = true end
+    local sFunctionRef = 'DetermineMaxTerrainHeightDif'
+
+    local tMapHeightOverride = {
+    ['serenity desert'] = 0.15,
+    ['serenity desert small'] = 0.15,
+    ['serenity desert small - FAF version'] = 0.15,
+    ['Adaptive Corona'] = 0.15,
+    ['Corona'] = 0.15,
+    ['Adaptive Flooded Corona'] = 0.15,
+    }
+    local sMapName = ScenarioInfo.name
+    iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
+    if bDebugMessages == true then LOG(sFunctionRef..': sMapName='..sMapName..'; tMapHeightOverride='..(tMapHeightOverride[sMapName] or 'No override')) end
+end
 
 
 function GetPathingSegmentFromPosition(tPosition)
@@ -76,21 +101,42 @@ function GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
     return {x, GetTerrainHeight(x, z), z}
 end
 
+function RecordResourcePoint(t,x,y,z,size)
+    --called by hook into simInit, more reliable method of figuring out if have adaptive map
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'RecordResourcePoint'
+    if bDebugMessages == true then LOG(sFunctionRef..': t='..t..'; x='..x..'; y='..y..'; z='..z..'; size='..repr(size)) end
+
+    if t == 'Mass' then
+        MassCount = MassCount + 1
+        MassPoints[MassCount] = {x,y,z}
+    elseif t == 'Hydrocarbon' then
+        HydroCount = HydroCount + 1
+        HydroPoints[HydroCount] = {x,y,z}
+    end
+end
+
 function RecordResourceLocations(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordResourceLocations'
+    M27Utilities.ErrorHandler('Deprecated, covered by RecordResourcePoint now')
     MassCount = 0
     HydroCount = 0
     local iMarkerType
     local iResourceCount, sPathingType, sLocationRef
     if bDebugMessages == true then LOG(sFunctionRef..': About to record resource locations') end
+    local bHaveAdaptiveMap = ScenarioInfo.AdaptiveMap
 
     --local CanBuildStructureAt = moho.aibrain_methods.CanBuildStructureAt
+    local bCanBuildOnResourcePoint
     for _, v in ScenarioUtils.GetMarkers() do
         iMarkerType = 0
         if v.type == "Mass" then
             --Note: CanBuildStructureAt only works after 1 tick has passed following aiBrain creation for some reason
-            if aiBrain:CanBuildStructureAt('uab1103', v.position) then -- or aiBrain:CanBuildStructureAt('URB1103', v.position) == true or moho.aibrain_methods.CanBuildStructureAt(aiBrain, 'ueb1103', v.position) then
+            if bHaveAdaptiveMap then bCanBuildOnResourcePoint = aiBrain:CanBuildStructureAt('uab1103', v.position)
+            else bCanBuildOnResourcePoint = true end
+            if bDebugMessages == true then LOG(sFunctionRef..': v.position='..repr(v.position)..'; bCanBuildMexOnmassPoint='..tostring(bCanBuildOnResourcePoint)) end
+            if bCanBuildOnResourcePoint then -- or aiBrain:CanBuildStructureAt('URB1103', v.position) == true or moho.aibrain_methods.CanBuildStructureAt(aiBrain, 'ueb1103', v.position) then
                 MassCount = MassCount + 1
                 MassPoints[MassCount] = v.position
                 if bDebugMessages == true then
@@ -106,7 +152,10 @@ function RecordResourceLocations(aiBrain)
             end
         end -- Mass
         if v.type == "Hydrocarbon" then
-            if aiBrain:CanBuildStructureAt('uab1102', v.position) then
+            if bHaveAdaptiveMap then bCanBuildOnResourcePoint = aiBrain:CanBuildStructureAt('uab1102', v.position)
+            else bCanBuildOnResourcePoint = true end
+            if bDebugMessages == true then LOG(sFunctionRef..': v.position='..repr(v.position)..'; bCanBuildMexOnmassPoint='..tostring(bCanBuildOnResourcePoint)) end
+            if bCanBuildOnResourcePoint then
                 HydroCount = HydroCount + 1
                 HydroPoints[HydroCount] = v.position
                 iMarkerType = 2
@@ -136,6 +185,7 @@ function RecordResourceLocations(aiBrain)
         LOG(sFunctionRef..': Finished recording mass markers, total mass marker count='..MassCount..'; list of all mass points='..repr(MassPoints)) end
 
     -- MapMexCount = MassCount
+
 end
 
 function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNotHydro)
@@ -144,7 +194,7 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
 
     -- Returns a table containing positions of any mex meeting the criteria, unless bCountOnly is true in which case returns the no. of such mexes
 
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if iMaxDistance == nil then iMaxDistance = 12 end --NOTE: As currently only run the actual code to locate nearby mexes once, the first iMaxDistance will determine what to use, and any subsequent uses it wont matter
     if bMexNotHydro == nil then bMexNotHydro = true end
     if bCountOnly == nil then bCountOnly = false end
@@ -202,7 +252,7 @@ end
 
 function RecordPlayerStartLocations()
     -- Updates PlayerStartPoints to Record all the possible player start points
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local iMarkerType = 3
     for i = 1, 16 do
         local tempPos = ScenarioUtils.GetMarker('ARMY_'..i).position
@@ -222,7 +272,8 @@ function GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
     --Returns a table of locations of the chosen resource within iMaxDistance of tTargetPos
     --returns nil if no matches
 
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'GetResourcesNearTargetLocation'
     if iMaxDistance == nil then iMaxDistance = 7 end
     if bMexNotHydro == nil then bMexNotHydro = true end
     local iResourceCount = 0
@@ -237,12 +288,15 @@ function GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
 
     if not(tAllResourcePoints == nil) then
         for key,pResourcePos in tAllResourcePoints do
-            iDistance = M27Utilities.GetDistanceBetweenPositions(tTargetPos, pResourcePos)
-            if iDistance <= iMaxDistance then
-                if bDebugMessages == true then LOG('GetResourcesNearTarget: Found position near to target location; iDistance='..iDistance..'; imaxDistance='..iMaxDistance..'; tTargetPos[1][3]='..tTargetPos[1]..'-'..tTargetPos[3]..'; pResourcePos='..pResourcePos[1]..'-'..pResourcePos[3]..'; bMexNotHydro='..tostring(bMexNotHydro)) end
-                iResourceCount = iResourceCount + 1
-                tNearbyResources[iResourceCount] = {}
-                tNearbyResources[iResourceCount] = pResourcePos
+            if math.abs(pResourcePos[1]-tTargetPos[1]) <= iMaxDistance and math.abs(pResourcePos[3]-tTargetPos[3]) <= iMaxDistance then
+                iDistance = M27Utilities.GetDistanceBetweenPositions(tTargetPos, pResourcePos)
+                if bDebugMessages == true then LOG(sFunctionRef..': iDistance='..iDistance..'; pResourcePos='..repr(pResourcePos)) end
+                if iDistance <= iMaxDistance then
+                    if bDebugMessages == true then LOG('GetResourcesNearTarget: Found position near to target location; iDistance='..iDistance..'; imaxDistance='..iMaxDistance..'; tTargetPos[1][3]='..tTargetPos[1]..'-'..tTargetPos[3]..'; pResourcePos='..pResourcePos[1]..'-'..pResourcePos[3]..'; bMexNotHydro='..tostring(bMexNotHydro)) end
+                    iResourceCount = iResourceCount + 1
+                    tNearbyResources[iResourceCount] = {}
+                    tNearbyResources[iResourceCount] = pResourcePos
+                end
             end
         end
     end
@@ -335,7 +389,7 @@ function GetUnitSegmentGroup(oUnit)
 end
 
 function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetReclaimablesMassValue'
     if bAlsoReturnLargestReclaimPosition == nil then bAlsoReturnLargestReclaimPosition = false end
     if iIgnoreReclaimIfNotMoreThanThis == nil then iIgnoreReclaimIfNotMoreThanThis = 0 end
@@ -386,7 +440,7 @@ end
 function GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
     --Returns the object/wreck of the nearest reclaim that is more than iMinReclaimValue and within iSearchRadius of tLocation
     --returns nil if no valid locations
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNearestReclaim'
     if iMinReclaimValue == nil then iMinReclaimValue = 1 end
     if iSearchRadius == nil then iSearchRadius = 5 end
@@ -430,12 +484,13 @@ function GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
 end
 
 function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
-    --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass
+    --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass, 4 = valid wrecks
     local tReclaimables = GetReclaimablesInRect(rRectangleToSearch)
     local iCurMassValue = 0
     local iWreckCount = 0
     local iTotalMassValue
     local bHaveReclaim = false
+    local tValidWrecks = {}
     if M27Utilities.IsTableEmpty(tReclaimables) == false then
         if iReturnType == 3 then
             iTotalMassValue = GetReclaimablesMassValue(tReclaimables, false, 0)
@@ -448,7 +503,8 @@ function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
                         if not(v:BeenDestroyed()) then
                             iWreckCount = iWreckCount + 1
                             bHaveReclaim = true
-                            if iReturnType == 1 then break end
+                            if iReturnType == 1 then break
+                            elseif iReturnType == 4 then tValidWrecks[iWreckCount] = v end
                             --bIsProp = IsProp(v) --only used for log/testing
                             --if bDebugMessages == true then LOG('Reclaim position '..iWreckCount..'='..WreckPos[1]..'-'..WreckPos[2]..'-'..WreckPos[3]..'; iMassValue='..iMassValue) end
                             --DrawLocations(WreckPos, nil, 1, 20, true)
@@ -460,7 +516,10 @@ function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
     end
     if iReturnType == 1 then return bHaveReclaim
         elseif iReturnType == 2 then return iWreckCount
-        else return iTotalMassValue end
+        elseif iReturnType == 3 then return iTotalMassValue
+        elseif iReturnType == 4 then return tValidWrecks
+        else M27Utilities.ErrorHandler('Invalid return type')
+    end
 end
 
 function UpdateReclaimMarkers()
@@ -469,7 +528,7 @@ function UpdateReclaimMarkers()
     --Updates the global variable tReclaimAreas{}
     --Config settings:
     --Note: iMaxSegmentInterval defined at the top as a global variable
-    local bDebugMessages = false --set to true for certain positions where want logs to print
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'UpdateReclaimMarkers'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
@@ -545,7 +604,7 @@ end
 function GetHydroLocationsForPathingGroup(oPathingUnit, sPathingType, iPathingGroup)
     --Return table of hydro locations for iPathingGroup
     --Return {} if no such table
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetHydroLocationsForPathingGroup'
     local tHydroForPathingGroup = {}
     local bNeedToRecord = false
@@ -582,12 +641,37 @@ function GetHydroLocationsForPathingGroup(oPathingUnit, sPathingType, iPathingGr
     return tHydroForPathingGroup
 end
 
-function RecordMexForPathingGroup(oPathingUnit, bForceRefresh)
+function RecordMexForPathingGroup()
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'RecordMexForPathingGroup'
+    local tsPathingTypes = {M27UnitInfo.refPathingTypeAmphibious, M27UnitInfo.refPathingTypeNavy, M27UnitInfo.refPathingTypeLand}
+    local iCurResourceGroup
+    local iValidCount = 0
+    tMexByPathingAndGrouping = {}
+    for iPathingType, sPathingType in tsPathingTypes do
+        tMexByPathingAndGrouping[sPathingType] = {}
+        iValidCount = 0
+
+        for iCurMex, tMexLocation in MassPoints do
+            iValidCount = iValidCount + 1
+            iCurResourceGroup = GetSegmentGroupOfLocation(sPathingType, tMexLocation)
+            if tMexByPathingAndGrouping[sPathingType][iCurResourceGroup] == nil then
+                tMexByPathingAndGrouping[sPathingType][iCurResourceGroup] = {}
+                iValidCount = 1
+            else iValidCount = table.getn(tMexByPathingAndGrouping[sPathingType][iCurResourceGroup]) + 1
+            end
+            tMexByPathingAndGrouping[sPathingType][iCurResourceGroup][iValidCount] = tMexLocation
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..'; tMexByPathingAndGrouping='..repr(tMexByPathingAndGrouping)) end
+end
+
+function RecordMexForPathingGroupOld(oPathingUnit, bForceRefresh)
     --Updates tMexByPathingAndGrouping to record the mex that are in the same pathing group as oPathingUnit
     --bForceRefresh - issue where not all mexes register as being pathable at start of game, so overseer will call this again after a short delay
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
 
-    local sFunctionRef = 'RecordMexForPathingGroup'
+    local sFunctionRef = 'RecordMexForPathingGroupOld'
     if oPathingUnit and not(oPathingUnit.Dead) then
         local sPathingType = M27UnitInfo.GetUnitPathingType(oPathingUnit)
         local tUnitPosition = oPathingUnit:GetPosition()
@@ -608,6 +692,7 @@ function RecordMexForPathingGroup(oPathingUnit, bForceRefresh)
                 iOriginalCount = iValidCount
             end
             local bIncludeMex = false
+            if bDebugMessages == true then LOG(sFunctionRef..': ScenarioInfo='..repr(ScenarioInfo)..'; MassPoints='..repr(MassPoints)) end
             for iCurMex, tMexLocation in MassPoints do
                 if bDebugMessages == true then LOG(sFunctionRef..': About to consider tMexLocation='..repr(tMexLocation)) end
                 iCurSegmentX, iCurSegmentZ = GetPathingSegmentFromPosition(tMexLocation)
@@ -662,7 +747,7 @@ end
 function GetNumberOfResource (aiBrain, bMexNotHydro, bUnclaimedOnly, bVisibleOnly, iType)
     --iType: 1 = mexes nearer to aiBrain than nearest enemy (in future can add more, e.g. entire map; mexes closer to us than ally, etc.)
     --bUnclaimedOnly - true if mex can't have an extractor on it
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNumberOfResource'
     if aiBrain then
         if bVisibleOnly == nil then bVisibleOnly = true end
@@ -758,7 +843,7 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
     --tStartPositionOverride - use this instead of the builder start position if its specified
     --tMexesToIgnore - a table of locations to ignore if they're the nearest mex
 
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNearestMexToUnit'
 
     if bCanBeBuiltOnByAlly == nil then bCanBeBuiltOnByAlly = false end
@@ -791,10 +876,13 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
     end
     --local iSegmentX, iSegmentZ --for the mex
     local bValidMex
+    if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through all mexes for sPathing='..sPathing..' and iUnitPathGroup='..iUnitPathGroup) end
     if M27Utilities.IsTableEmpty(tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
+        if bDebugMessages == true then LOG(sFunctionRef..': List of mexes in pathing group='..repr(tMexByPathingAndGrouping[sPathing][iUnitPathGroup])) end
         for iCurMex, tMexLocation in tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
             bValidMex = false
             iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tLocationToSearchFrom)
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..'; iCurDistanceFromUnit='..iCurDistanceFromUnit..'; iMaxDistanceFromUnit='..iMaxDistanceFromUnit..'; iMinDistanceFromUnit='..iMinDistanceFromUnit) end
             if iCurDistanceFromUnit <= iMaxDistanceFromUnit then
                 if iCurDistanceFromUnit < iMinDistanceFromUnit then
                     --Is it valid (i.e. no-one has built on it)?
@@ -838,22 +926,20 @@ end
 function IsUnderwater(tPosition, bReturnSurfaceHeightInstead)
     --Returns true if tPosition underwater, otherwise returns false
     --bReturnSurfaceHeightInstead:: Return the actual height at which underwater, instead of true/false
-    local bUnderwater = false
-    if M27Utilities.IsTableEmpty(tPosition) == true then
-        M27Utilities.ErrorHandler('tPosition is empty')
+    if bReturnSurfaceHeightInstead then return iMapWaterHeight
     else
-        local iSurfaceHeight = GetSurfaceHeight(tPosition[1], tPosition[3])
-        if bReturnSurfaceHeightInstead == true then bUnderwater = iSurfaceHeight
+        if M27Utilities.IsTableEmpty(tPosition) == true then
+            M27Utilities.ErrorHandler('tPosition is empty')
         else
-            if iSurfaceHeight > tPosition[2] then
+            if iMapWaterHeight > tPosition[2] then
                 --Check we're not just under an arch but are actually underwater
-                if not(GetTerrainHeight(tPosition[1], tPosition[3]) == iSurfaceHeight) then
-                    bUnderwater = true
+                if not(GetTerrainHeight(tPosition[1], tPosition[3]) == iMapWaterHeight) then
+                    return true
                 end
             end
         end
+        return false
     end
-    return bUnderwater
 end
 
 function GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchRange)
@@ -918,7 +1004,7 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
 
     --tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
     --Can also be used for general movement
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'FindEmptyPathableAreaNearTarget'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local rPlayableArea = rMapPlayableArea
@@ -956,7 +1042,7 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
             iGroupCycleCount = iGroupCycleCount + 1
             if bDebugMessages == true then LOG(sFunctionRef..': Start of main loop grouping, iGroupCycleCount='..iGroupCycleCount..'; iCycleSize='..iCycleSize) end
             if iGroupCycleCount > iMaxCycles then
-                M27Utilities.ErrorHandler('Possible infinite loop - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax)
+                M27Utilities.ErrorHandler('Possible infinite loop - unable to find empty pathable area despite iSearchSizeMax='..iSearchSizeMax)
                 break
             end
             iRandomDistance = iSearchSize
@@ -989,7 +1075,7 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
                     end
                 end
                 if iCurSizeCycleCount == iCycleSize then
-                    iSearchSize = math.max(iSearchSize * 1.5, iSearchSize + 10)
+                    iSearchSize = math.max(iSearchSize * 1.25, iSearchSize + 10)
                 end
                 if bDebugMessages == true then M27Utilities.DrawLocation(tTargetLocation) end
             end
@@ -1033,7 +1119,7 @@ function RecordMexesInPathingGroupFilteredByEnemyDistance(aiBrain, sPathing, iPa
 end
 
 function RecordSortedMexesInOriginalPathingGroup(aiBrain)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordSortedMexesInOriginalPathingGroup'
     local tUnsortedMexDetails = {}
     local refiMexLocation = 1
@@ -1099,29 +1185,35 @@ end
 
 function GetMexPatrolLocations(aiBrain)
     --Returns a table of mexes on our side of the map near middle of map to patrol
+    local sFunctionRef = 'GetMexPatrolLocations'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if M27Utilities.IsTableEmpty(aiBrain[reftMexPatrolLocations]) then
         --Cycle through mexes on our side of the map:
         aiBrain[reftMexPatrolLocations] = {}
+        local tStartPosition = PlayerStartPoints[aiBrain.M27StartPositionNumber]
         local oACU = M27Utilities.GetACU(aiBrain)
         local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
-        local iSegmentGroup = GetUnitSegmentGroup(oACU)
+        local iSegmentGroup = GetSegmentGroupOfLocation(sPathing, tStartPosition)
         local iCurDistanceToEnemy, iCurDistanceToStart
-        local tStartPosition = PlayerStartPoints[aiBrain.M27StartPositionNumber]
+
         local tEnemyPosition = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
         local iDistanceFromStartToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyPosition, tStartPosition)
-        local iMaxTotalDistance = iDistanceFromStartToEnemy * 1.25
+        local iMaxTotalDistance = iDistanceFromStartToEnemy * 1.3
         local iPossibleMexCount = 0
         local tPossibleMexDetails = {}
         local reftPossibleMexLocation = 'M27GetMexPatrolMexLocation'
         local refiMexDistanceToEnemy = 'M27GetMexPatrolMexDistanceToEnemy'
         local iMinDistanceFromBase = 50
         local iValidMexCount = 0
-
+        if bDebugMessages == true then LOG(sFunctionRef..': Before loop through mexes; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup) end
         if M27Utilities.IsTableEmpty(tMexByPathingAndGrouping[sPathing]) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': tMexByPathingAndGrouping[sPathing] isnt empty; table='..repr(tMexByPathingAndGrouping[sPathing])) end
             if M27Utilities.IsTableEmpty(tMexByPathingAndGrouping[sPathing][iSegmentGroup]) == false then
+                if bDebugMessages == true then LOG(sFunctionRef..': List of mexes that are considering='..repr(tMexByPathingAndGrouping[sPathing][iSegmentGroup])) end
                 for iMex, tMexLocation in tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
                     iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tMexLocation)
                     iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyPosition, tMexLocation)
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurDistanceToStart='..iCurDistanceToStart..'; iCurDistanceToEnemy='..iCurDistanceToEnemy..'; iMaxTotalDistance='..iMaxTotalDistance) end
                     if iCurDistanceToStart <= iCurDistanceToEnemy then
                         if iCurDistanceToStart + iCurDistanceToEnemy <= iMaxTotalDistance then --Want to be along midpoint of path from our base to enemy base
                             if iCurDistanceToStart >= iMinDistanceFromBase then
@@ -1137,6 +1229,7 @@ function GetMexPatrolLocations(aiBrain)
         end
         if iPossibleMexCount > 0 then
             --Filter to choose the 4 mexes closest to enemy (s.t. previous requirements that theyre closer to our base than enemy base)
+            if bDebugMessages == true then LOG(sFunctionRef..': iPossibleMexCount='..iPossibleMexCount..'; tPossibleMexDetails='..repr(tPossibleMexDetails)) end
             for iEntry, tValue in M27Utilities.SortTableBySubtable(tPossibleMexDetails, refiMexDistanceToEnemy, true) do
                 iValidMexCount = iValidMexCount + 1
                 aiBrain[reftMexPatrolLocations][iValidMexCount] = tValue[reftPossibleMexLocation]
@@ -1162,7 +1255,7 @@ end
 
 --[[function RecordSegmentGroup(iSegmentX, iSegmentZ, sPathingType, iSegmentGroup)
     --Cycle through all adjacent cells, and then call this function on them as well
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordSegmentGroup'
     if bDebugMessages == true then LOG(sFunctionRef..': About to record iSegmentX='..iSegmentX..'; iSegmentZ='..iSegmentZ..'; iSegmentGroup='..iSegmentGroup..'; and then check if can path to adjacent segments') end
     tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] = iSegmentGroup
@@ -1208,7 +1301,7 @@ end
 end--]]
 
 function RecordBaseLevelPathability()
-    local bDebugMessages = false --Manually uncomment out logs that want - disabled for performance reasons for the most part
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end --Manually uncomment out logs that want - disabled for performance reasons for the most part
     local sFunctionRef = 'RecordBaseLevelPathability'
 
     --Setup some common logic used to see if it makes things faster
@@ -1217,6 +1310,9 @@ function RecordBaseLevelPathability()
     local Ceil = math.ceil
     --local Floor = math.floor
     local Abs = math.abs
+
+    --First determine the maximum height adjustment to use
+    DetermineMaxTerrainHeightDif()
 
 
     local iSegmentBaseLevelCap = iBaseLevelSegmentCap --i.e. want up to this x this segments at base level
@@ -1312,7 +1408,7 @@ function RecordBaseLevelPathability()
 
     function IsAmphibiousPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)--, bForceDebug)
         --This is mostly a copy of land pathing but with changes for water
-        --local bDebugMessages = false
+        --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
         --local sFunctionRef = 'IsAmphibiousPathableAlongLine'
         --if bForceDebug then bDebugMessages = true end
 
@@ -1402,7 +1498,7 @@ function RecordBaseLevelPathability()
     function IsLandPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)
         --Assumes will call for positions in a straight line from each other
         --Can handle diagonals, but x and z differences must be identical (error handler re this can be uncommented out if come across issues)
-        --local bDebugMessages = false
+        --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
         --if bForceDebug == true then bDebugMessages = true end
         --local sFunctionRef = 'IsLandPathableAlongLine'
         --if bDebugMessages == true then LOG(sFunctionRef..': Start of code, X Start-End='..xStartInteger..'-'..xEndInteger..'; Z='..zStartInteger..'-'..zEndInteger..'; iMaxDifInHeight='..iMaxDifInHeight) end
@@ -1684,15 +1780,15 @@ function RecordBaseLevelPathability()
                                                 local bMoveFromLandToWater = false
                                                 local iTerrainHeightCur = GetTerrainHeight(tCurPosition[1], tCurPosition[3])
                                                 local iTerrainHeightTarget = GetTerrainHeight(tTargetPosition[1], tTargetPosition[3])
-                                                local iSurfaceHeightCur = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
-                                                local iSurfaceHeightTarget = GetSurfaceHeight(tTargetPosition[1], tTargetPosition[3])
+                                                local iMapWaterHeightCur = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
+                                                local iMapWaterHeightTarget = GetSurfaceHeight(tTargetPosition[1], tTargetPosition[3])
 
-                                                if iTerrainHeightCur == iSurfaceHeightCur then bCurPositionUnderwater = false end
-                                                if iTerrainHeightTarget == iSurfaceHeightTarget then bTargetPositionUnderwater = false end
+                                                if iTerrainHeightCur == iMapWaterHeightCur then bCurPositionUnderwater = false end
+                                                if iTerrainHeightTarget == iMapWaterHeightTarget then bTargetPositionUnderwater = false end
                                                 if bCurPositionUnderwater == true and bTargetPositionUnderwater == false then bMoveFromLandToWater = true
                                                 elseif bCurPositionUnderwater == false and bTargetPositionUnderwater == true then bMoveFromLandToWater = true end
                                                 if bMoveFromLandToWater == true then
-                                                    LOG(sFunctionRef..': Moving from land to water, tCurPosition='..repr(tCurPosition)..'; tTargetPosition='..repr(tTargetPosition)..'; iTerrainHeightCur='..iTerrainHeightCur..'; iSurfaceHeightCur='..iSurfaceHeightCur..'; iTerrainHeightTarget='..iTerrainHeightTarget..'; iSurfaceHeightTarget='..iSurfaceHeightTarget..'; will redo the logic with logs enabled')
+                                                    LOG(sFunctionRef..': Moving from land to water, tCurPosition='..repr(tCurPosition)..'; tTargetPosition='..repr(tTargetPosition)..'; iTerrainHeightCur='..iTerrainHeightCur..'; iMapWaterHeightCur='..iMapWaterHeightCur..'; iTerrainHeightTarget='..iTerrainHeightTarget..'; iMapWaterHeightTarget='..iMapWaterHeightTarget..'; will redo the logic with logs enabled')
                                                     M27Utilities.DrawLocations({tCurPosition, tTargetPosition}, nil, 1, 500)
                                                     IsAmphibiousPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3], true)
                                                 end--]]
@@ -1702,6 +1798,7 @@ function RecordBaseLevelPathability()
                                         elseif bNavyPathfinding then
                                             if IsNavyPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3]) then
                                                 bHaveSubsequentPath = true
+                                                if iMapWaterHeight == 0 then iMapWaterHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3]) end
                                             end
                                         end
                                         if bHaveSubsequentPath then
@@ -1738,7 +1835,7 @@ end
 function MappingInitialisation(aiBrain)
     --aiBrain needed for waterpercent function
     local bProfiling = true
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'MappingInitialisation'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if bPathfindingAlreadyCommenced == false then
@@ -1771,6 +1868,9 @@ function MappingInitialisation(aiBrain)
         end
         if bProfiling == true then iProfileStartTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef..': End of pathing logic for base pathing', iProfileStartTime) end
 
+        --Record mexes by pathing group
+        RecordMexForPathingGroup()
+
         if bDebugMessages == true then
             local iMapSizeX, iMapSizeZ = GetMapSize()
             LOG(sFunctionRef..': iMapSizeX='..iMapSizeX..'; iMapSizeZ='..iMapSizeZ..'; iMaxBaseSegmentX-Z='..iMaxBaseSegmentX..'-'..iMaxBaseSegmentZ)
@@ -1782,9 +1882,25 @@ function MappingInitialisation(aiBrain)
     end
 end
 
+function SetWhetherCanPathToEnemy(aiBrain)
+    --Set flag for whether AI can path to enemy base
+    local tEnemyBase = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+    local tOurBase = PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    local sPathing = M27UnitInfo.refPathingTypeLand
+    local iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
+    local iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyBase)
+    if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithLand] = true
+    else aiBrain[refbCanPathToEnemyBaseWithLand] = false end
+    sPathing = M27UnitInfo.refPathingTypeAmphibious
+    iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
+    iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyBase)
+    if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithAmphibious] = true
+    else aiBrain[refbCanPathToEnemyBaseWithAmphibious] = false end
+end
+
 function LogMapTerrainTypes()
     --Outputs to log the terrain types used and how often theyre used
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'LogMapTerrainTypes'
     WaitTicks(150)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
@@ -1819,28 +1935,30 @@ function DrawAllMapPathing(aiBrain)
     while bPathfindingComplete == false do
         WaitTicks(10)
     end
-    DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeLand, true)
-    while bMapDrawingAlreadyCommenced == true do
-        WaitTicks(10)
+    if not(bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeLand] == true) then
+        DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeLand, true)
+        while bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeLand] == true do
+            WaitTicks(10)
+        end
+        WaitTicks(50)
+        DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeAmphibious)
+        while bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeAmphibious] == true do
+            WaitTicks(10)
+        end
+        WaitTicks(50)
+        DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeNavy, true)
     end
-    WaitTicks(50)
-    DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeAmphibious)
-    while bMapDrawingAlreadyCommenced == true do
-        WaitTicks(10)
-    end
-    WaitTicks(50)
-    DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeNavy, true)
 end
 
 function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
-    if bMapDrawingAlreadyCommenced == false then
-        bMapDrawingAlreadyCommenced = true
+    if M27Utilities.IsTableEmpty(bMapDrawingAlreadyCommenced[sPathingType]) == true then
+        bMapDrawingAlreadyCommenced[sPathingType] = true
         if bDontDrawWaterIfPathingLand == nil then
             if sPathingType == M27UnitInfo.refPathingTypeAmphibious then bDontDrawWaterIfPathingLand = false
             else bDontDrawWaterIfPathingLand = true end
         end
         --Draw core pathing group
-        local bDebugMessages = false
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
         local sFunctionRef = 'DrawMapPathing'
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
         local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -1868,7 +1986,7 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
             else iSegmentInterval = 2 end
         end
 
-        local iTimeToWait = iMaxBaseSegmentX / 10 + 40
+        local iTimeToWait = (iMaxBaseSegmentX / 10 + 40)
 
         local iCurIntervalCount = 0
         if bDebugMessages == true then
@@ -1931,7 +2049,7 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
             end
         end
     end
-    bMapDrawingAlreadyCommenced = false
+    bMapDrawingAlreadyCommenced[sPathingType] = false
 end
 
 function DrawWater()
@@ -1950,9 +2068,20 @@ function DrawWater()
     end
 end
 
+function TempCanPathToEveryMex(oUnit)
+    local sFunctionRef = 'TempCanPathToEveryMex'
+
+    local iCurTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef..': Start', nil)
+    local bCanPath
+    for iMex, tMex in MassPoints do
+        bCanPath = oUnit:CanPathTo(tMex)
+    end
+    iCurTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef..': End', nil)
+end
+
 --[[function DrawHeightMapAstro()
     --Temp for astro craters to help figure out why amphibious pathing doesnt work
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DrawHeightMapAstro'
     local iCurSurfaceHeight, iCurTerrainHeight, tCurPosition
     local iCurHeight
@@ -1980,3 +2109,190 @@ end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': tCountByThreshold='..repr(tCountByThreshold)) end
 end--]]
+
+function RedoPathingForGroup(iPathingGroupToRedo, iNewPathingHeightThreshold)
+    M27Utilities.ErrorHandler('Need to add code')
+end
+
+function RecheckPathingToMexes(aiBrain)
+    --[[
+    local bDebugMessages = false
+    local sFunctionRef = 'RecheckPathingToMexes'
+    local oACU = M27Utilities.GetACU(aiBrain)
+    local bInconsistentPathing
+    local bHaveChangedPathingGroups = false
+    local iTimeWaitedForACU = 0
+    while not(oACU) do
+        WaitTicks(1)
+        oACU = M27Utilities.GetACU(aiBrain)
+        iTimeWaitedForACU = iTimeWaitedForACU + 1
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Now have an ACU; iTimeWaitedForACU='..iTimeWaitedForACU) end
+
+    local tACUPosition = oACU:GetPosition()
+    local iACUPathingGroup = GetUnitSegmentGroup(oACU)
+    local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
+    local iCurResourceGroup
+    local bExpectedPathingResult
+    local bActualPathingResult
+    local iPathingGroupToRedo
+    local iNewPathingHeightThreshold
+    --local iHeightThresholdForLastRefresh = iMaxHeightDif
+    local iLastHeightAdjustmentTotal = 0
+    local iLastHeightAdjustmentChange = 0
+    local iAdjToLastHeightAdjustment = 0
+    local iCurHeightAdjustment = 0
+    local iNewPathingHeightThreshold = iMaxHeightDif
+    local iReworkCount = 0
+    local iMaxReworkCount = 5 --Means will re-do pathing up to this nubmer of times
+    --Reduce max rework count based on map size to avoid massive delays on larger maps
+    local iMapSizeX, iMapSizeZ = GetMapSize()
+    if iMapSizeX >= 2000 then iMaxReworkCount = 1
+    elseif iMapSizeX >= 1000 then iMaxReworkCount = 3
+    elseif iMapSizeX >= 500 then iMaxReworkCount = 4
+    end
+
+    local iWaitNeeded = 0
+
+    for iType = 1, 2 do
+        iReworkCount = 0
+        local tAllMapResourceLocations
+        if iType == 1 then tAllMapResourceLocations = MassPoints
+        else tAllMapResourceLocations = HydroPoints
+        end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': tAllMapResourceLocations for iType '..iType..'='..repr(tAllMapResourceLocations)) end
+
+        if M27Utilities.IsTableEmpty(tAllMapResourceLocations) == false then
+            bInconsistentPathing = true
+            while bInconsistentPathing == true do
+                iReworkCount = iReworkCount + 1
+                if iReworkCount > iMaxReworkCount then
+                    M27Utilities.ErrorHandler('Failed to determine correct mex pathing despite re-doing '..iReworkCount..' times - likely that will have suboptimal behaviour from AI')
+                    break
+                end
+                iACUPathingGroup = GetUnitSegmentGroup(oACU)
+                if bDebugMessages == true then LOG(sFunctionRef..': iType='..iType..'; iReworkCount='..iReworkCount..'; About to cycle through every mex to check its pathing group; iACUPathingGroup='..iACUPathingGroup) end
+                bInconsistentPathing = false
+                iLastHeightAdjustmentTotal = iCurHeightAdjustment
+                iLastHeightAdjustmentChange = iAdjToLastHeightAdjustment
+                
+                for iResource, tLocation in tAllMapResourceLocations do
+                    --Should we be able to path to ACU position?
+                    iCurResourceGroup = GetSegmentGroupOfLocation(sPathing, tLocation)
+                    if iCurResourceGroup == iACUPathingGroup then bExpectedPathingResult = true else bExpectedPathingResult = false end
+                    bActualPathingResult = oACU:CanPathTo(tLocation)
+                    --below is temp for testing to see how long of a delay we need - initially canpathto returned false but restarting application it was correctly true (on a map where could be pathed to) so commented out for now
+                    while bActualPathingResult == false do
+                        if bDebugMessages == true then LOG(sFunctionRef..': CanPathTo is false so will wait 1 tick to see if result changes') end
+                        WaitTicks(1)
+                        iWaitNeeded = iWaitNeeded + 1
+                        if iWaitNeeded > 100 then break end
+                        bActualPathingResult = oACU:CanPathTo(tLocation)
+                    end
+                    LOG(sFunctionRef..': iWaitNeeded='..iWaitNeeded)
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to check if pathing for iResource='..iResource..'; tLocation='..repr(tLocation)..' is consistent. iCurResourceGroup='..iCurResourceGroup..'; iACUPathingGroup='..iACUPathingGroup..'; bActualPathingResult='..tostring(bActualPathingResult)) end
+                    if not(bActualPathingResult == bExpectedPathingResult) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing is inconsistent, will determine adjustment to apply to height and rerun pathing groupings') end
+
+                        bInconsistentPathing = true
+
+                        if iCurResourceGroup == iACUPathingGroup then
+                            --Pathing groups are expected to be equal but they shouldnt be, so we need to lower the threshold for detecting cliffs
+                            --if iLastHeightAdjustmentTotal > 0 then
+                            
+                            --We were increasing the height adj from the time before but we presumably went too far so want to decrease, but by half of last adjustment
+                            if iLastHeightAdjustmentChange > 0 then
+                                iAdjToLastHeightAdjustment = -iLastHeightAdjustmentChange * 0.5
+                            elseif iLastHeightAdjustmentChange < 0 then
+                                --We tried going back slightly but still have gone too far
+                                
+                                iAdjToLastHeightAdjustment = iLastHeightAdjustmentChange
+                            else --0, i.e. we havent run this yet
+                                iAdjToLastHeightAdjustment = -iChangeInHeightThreshold
+                            end
+                            iCurHeightAdjustment = iLastHeightAdjustmentTotal + iAdjToLastHeightAdjustment
+                            iNewPathingHeightThreshold = iMaxHeightDif + iCurHeightAdjustment
+                        else
+                            --Pathing groups aren't equal but they should be, so we need to raise the threshold for detecting cliffs
+                            if iLastHeightAdjustmentChange < 0 then
+                                --Were decreasing the height adj from the time before but we presumably went too far so want to increase
+                                iAdjToLastHeightAdjustment = iLastHeightAdjustmentChange * 0.5
+                            elseif iLastHeightAdjustmentChange > 0 then
+                                --We tried increasing the threshold slightly but still not enough
+                                iAdjToLastHeightAdjustment = iLastHeightAdjustmentChange
+                            else
+                                iAdjToLastHeightAdjustment = iChangeInHeightThreshold
+                            end
+                        end
+                        M27Utilities.ErrorHandler('Actual pathing is different, will redo with iNewPathingHeightThreshold='..iNewPathingHeightThreshold, nil, true)
+                        RedoPathingForGroup(iPathingGroupToRedo, iNewPathingHeightThreshold)
+                        break
+                    end
+
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Finished checking pathing for iType='..iType..'; bInconsistentPathing='..tostring(bInconsistentPathing)) end
+            end
+        end
+    end
+    if bDebugMessages == true then
+        local iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 7, 200)
+                LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation))
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after first wait='..iUnpathableMexCount)
+        WaitTicks(200)
+        iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 6, 200)
+                LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation))
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after 2nd wait='..iUnpathableMexCount)
+        WaitTicks(200)
+        iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 5, 200)
+                LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation))
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after 3rd wait='..iUnpathableMexCount)
+        WaitTicks(600)
+        iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 4, 200)
+                if bDebugMessages == true then LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation)) end
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after 4th wait='..iUnpathableMexCount)
+        WaitTicks(2000)
+        iUnpathableMexCount = 0
+        for iResource, tLocation in MassPoints do
+            if oACU:CanPathTo(tLocation) == false then
+                M27Utilities.DrawLocation(tLocation, nil, 3, 200)
+                if bDebugMessages == true then LOG(sFunctionRef..': CanPathTo is false for location='..repr(tLocation)) end
+                iUnpathableMexCount = iUnpathableMexCount + 1
+            end
+        end
+        LOG('iUnpathableMexCount after 5th wait='..iUnpathableMexCount)
+    end
+
+
+
+
+    if bHaveChangedPathingGroups == true then
+        RecordMexForPathingGroup()
+        RecordSortedMexesInOriginalPathingGroup(aiBrain)
+    end --]]
+
+end

@@ -4,11 +4,15 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 
+bGlobalDebugOverride = false
+
 function ErrorHandler(sErrorMessage, iOptionalWaitInSeconds, bWarningNotError)
     --Intended to be put in code wherever a condition isn't met that should be, so can debug it without the code crashing
+    --Search for "error " in the log to find both these errors and normal lua errors, while not bringing up warnings
     if sErrorMessage == nil then sErrorMessage = 'Not specified' end
-    local sErrorBase = 'M27ERROR: '
+    local sErrorBase = 'M27ERROR '
     if bWarningNotError then sErrorBase = 'M27WARNING: ' end
+    sErrorBase = sErrorBase..'GameTime '..math.floor(GetGameTimeSeconds())..': '
     sErrorMessage = sErrorBase..sErrorMessage
     local a, s = pcall(assert, false, sErrorMessage)
     WARN(a, s)
@@ -136,6 +140,17 @@ function SortTableBySubtable(tTableToSort, sSortByRef, bLowToHigh)
     end
 end
 
+function SortTableByValue(tTableToSort, bLowToHigh)
+    if bLowToHigh then return spairs(tTableToSort, function(t,a,b) return t[b] < t[a] end)
+    else return spairs(tTableToSort, function(t,a,b) return t[b] > t[a] end)
+    end
+end
+
+function GetRectAroundLocation(tLocation, iRadius)
+    --Looks iRadius left/right and up/down (e.g. if want 1x1 square centred on tLocation, iRadius should be 0.5)
+    return Rect(tLocation[1] - iRadius, tLocation[3] - iRadius, tLocation[1] + iRadius, tLocation[3] + iRadius)
+end
+
 
 function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
     --Draw circles around a table of locations to help with debugging - note that as this doesnt use ForkThread (might need to have global variables and no function pulled variables for forkthread to work beyond the first few seconds) this will pause all the AI code
@@ -146,7 +161,7 @@ function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCo
     -- iColour: integer to allow easy selection of different colours (see below code)
     -- iDisplayCount - No. of times to cycle through drawing; limit of 500 (10s) for performance reasons
     --bSingleLocation - true if tableLocations is just 1 position
-    local bDebugMessages = false
+    local bDebugMessages = false if bGlobalDebugOverride == true then bDebugMessages = true end
     if iCircleSize == nil then iCircleSize = 2 end
     if iDisplayCount == nil then iDisplayCount = 500
     elseif iDisplayCount <= 0 then iDisplayCount = 1
@@ -174,7 +189,7 @@ function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCo
     local tPrevLocation = {}
     local iCount = 0
     while true do
-        iCount = iCount + 1 if iCount > 10000 then M27Utilities.ErrorHandler('Infinite loop') break end
+        iCount = iCount + 1 if iCount > 10000 then ErrorHandler('Infinite loop') break end
         if bSingleLocation then DrawCircle(tableLocations, iCircleSize, sColour)
         else
             for i, tCurLocation in ipairs(tableLocations) do
@@ -195,19 +210,19 @@ end
 
 function DrawRectBase(rRect, iColour, iDisplayCount)
     --Draws lines around rRect; rRect should be a rect table, with keys x0, x1, y0, y1
-    local bDebugMessages = false
+    local bDebugMessages = false if bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DrawRectBase'
     if bDebugMessages == true then LOG(sFunctionRef..': rRect='..repr(rRect)) end
     local sColour
     if iColour == nil then sColour = 'c00000FF' --dark blue
     elseif iColour == 1 then sColour = 'c00000FF' --dark blue
-    elseif iColour == 2 then sColour = 'ffFF4040' --orange
-    elseif iColour == 3 then sColour = 'c0000000'
-    elseif iColour == 4 then sColour = 'fff4a460'
-    elseif iColour == 5 then sColour = 'ff27408b'
-    elseif iColour == 6 then sColour = 'ff1e90ff'
-    elseif iColour == 7 then sColour = 'ffffffff'
-    else sColour = 'ffFF6060'
+    elseif iColour == 2 then sColour = 'ffFF4040' --Red
+    elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
+    elseif iColour == 4 then sColour = 'fff4a460' --Gold
+    elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
+    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan
+    elseif iColour == 7 then sColour = 'ffffffff' --white
+    else sColour = 'ffFF6060' --Orangy pink
     end
 
 
@@ -232,7 +247,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
 
     local iCount = 0
     while true do
-        iCount = iCount + 1 if iCount > 200 then M27Utilities.ErrorHandler('Infinite loop') break end
+        iCount = iCount + 1 if iCount > 200 then ErrorHandler('Infinite loop') break end
         for iValX = 1, 2 do
             for iValZ = 1, 2 do
                 if iValX == 1 then
@@ -372,7 +387,7 @@ function MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
 
     --local rad = math.atan2(tLocation[1] - tBuilderLocation[1], tLocation[3] - tBuilderLocation[3])
     --local iBaseAngle = math.atan((tStartPos[1] - tTargetPos[1])/ (tStartPos[3] - tTargetPos[3]))
-    local bDebugMessages = false
+    local bDebugMessages = false if bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'MoveTowardsTarget'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if iAngle == nil then iAngle = 0 end
@@ -439,7 +454,7 @@ end
 
 function GetAIBrainArmyNumber(aiBrain)
     --note - this is different to aiBrain:GetArmyIndex() which returns the army index; e.g. if 2 players, will have army index 1 and 2; however if 4 start positions, then might have ARMY_2 and ARMY_4 for those 2 players
-    local bDebugMessages = false
+    local bDebugMessages = false if bGlobalDebugOverride == true then bDebugMessages = true end
     if aiBrain then
         if bDebugMessages == true then LOG('GetAIBrainArmyNumber: aiBrain.Name='..aiBrain.Name) end
         return tonumber(string.sub(aiBrain.Name, (string.len(aiBrain.Name)-7)))
@@ -468,12 +483,19 @@ function GetACU(aiBrain)
     if oACU == nil then
         if aiBrain == nil then
             ErrorHandler('aiBrain not specified - update function call')
-
         else
-            ErrorHandler('ACU hasnt been set')
+            local tACUUnits = aiBrain:GetListOfUnits(categories.COMMAND, false, true)
+            if IsTableEmpty(tACUUnits) == false then
+                for _, oCurACU in aiBrain:GetListOfUnits(categories.COMMAND, false, true) do
+                    oACU = oCurACU
+                    aiBrain[M27Overseer.refoStartingACU] = oACU
+                    break
+                end
+            else
+                ErrorHandler('ACU hasnt been set')
             --WaitSeconds(30)
             --ErrorHandler('ACU hasnt been set - finished waiting 30 seconds to try and avoid crash, then will return nil')
-
+            end
         end
     else
         if oACU.Dead then
@@ -597,7 +619,7 @@ function GetUnitsInFactionCategory(aiBrain, category)
     --Category is e.g. categories.LAND * categories.DIRECTFIRE (i.e. based on the categories {} data of unit blueprints)
 
     --local FactionIndexToCategory = {[1] = categories.UEF, [2] = categories.AEON, [3] = categories.CYBRAN, [4] = categories.SERAPHIM, [5] = categories.NOMADS, [6] = categories.ARM, [7] = categories.CORE }
-    --[[local bDebugMessages = false
+    --[[local bDebugMessages = false if bGlobalDebugOverride == true then bDebugMessages = true end
     if bDebugMessages == true then
         LOG('FactionIndex='..aiBrain:GetFactionIndex())
         if FactionIndexToCategory[aiBrain:GetFactionIndex()] == nil then LOG('FactionIndexToCategory is nil') end
@@ -621,7 +643,7 @@ function GetNearestUnit(tUnits, tCurPos, aiBrain, bHostileOnly)
     --returns the nearest unit in tUnits from tCurPos
     --bHostile defaults to false; if true then unit must be hostile
     --aiBrain: Optional unless are setting bHostileOnly to true
-    local bDebugMessages = false
+    local bDebugMessages = false if bGlobalDebugOverride == true then bDebugMessages = true end
     local iMinDist = 1000000
     local iCurDist
     local iNearestUnit

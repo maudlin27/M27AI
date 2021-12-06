@@ -3,6 +3,7 @@ local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 local M27FactoryOverseer = import('/mods/M27AI/lua/AI/M27FactoryOverseer.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
+local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 
 M27FactoryBuilderManager = FactoryBuilderManager
 FactoryBuilderManager = Class(M27FactoryBuilderManager) {

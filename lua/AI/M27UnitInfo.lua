@@ -4,6 +4,7 @@
 --- DateTime: 09/10/2021 07:26
 local BuildingTemplates = import('/lua/BuildingTemplates.lua').BuildingTemplates
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
+local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 
 refPathingTypeAmphibious = 'Amphibious'
 refPathingTypeNavy = 'Water'
@@ -11,6 +12,13 @@ refPathingTypeAir = 'Air'
 refPathingTypeLand = 'Land'
 refPathingTypeNone = 'None'
 refPathingTypeAll = {refPathingTypeAmphibious, refPathingTypeNavy, refPathingTypeAir, refPathingTypeLand}
+
+--Factions
+refFactionUEF = 1
+refFactionAeon = 2
+refFactionCybran = 3
+refFactionSeraphim = 4
+refFactionNomads = 5
 
 --Categories:
 
@@ -29,7 +37,10 @@ refCategoryEnergyStorage = categories.STRUCTURE * categories.ENERGYSTORAGE
 
 
 refCategoryAirStaging = categories.STRUCTURE * categories.AIRSTAGINGPLATFORM
-refCategoryRadar = categories.STRUCTURE * categories.RADAR
+refCategoryRadar = categories.STRUCTURE * categories.RADAR + categories.STRUCTURE * categories.OMNI
+refCategoryT1Radar = refCategoryRadar * categories.TECH1
+refCategoryT2Radar = refCategoryRadar * categories.TECH2
+refCategoryT3Radar = refCategoryRadar * categories.TECH3 --+ categories.OMNI * categories.TECH3
 
 refCategoryLandFactory = categories.LAND * categories.FACTORY * categories.STRUCTURE
 refCategoryAirFactory = categories.AIR * categories.FACTORY * categories.STRUCTURE
@@ -42,11 +53,12 @@ refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFI
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - categories.ANTIAIR --NOTE: Need to specify slowest (so dont pick LAB)
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR
-refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE
+refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE
 refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.ENGINEER -categories.SCOUT -categories.ANTIAIR
+refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS
 refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
-refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1
+refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
 refCategoryT2PlusPD = categories.STRUCTURE * categories.DIRECTFIRE - categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH1
 refCategoryTMD = categories.ANTIMISSILE - categories.SILO * categories.TECH3 --Not perfect but should pick up most TMD without picking up SMD
 refCategoryFixedShield = categories.SHIELD * categories.STRUCTURE
@@ -60,6 +72,7 @@ refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * c
 refCategoryAirScout = categories.AIR * categories.SCOUT
 refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - categories.GROUNDATTACK
 refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - categories.CANNOTUSEAIRSTAGING --excludes mercies
+refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3
 refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
@@ -67,6 +80,7 @@ refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
 refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE
 refCategoryAllNavy = categories.NAVAL
+refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER
 
 function GetUnitLifetimeCount(oUnit)
     local sCount = oUnit.M27LifetimeUnitCount
@@ -102,7 +116,7 @@ function GetBlueprintIDFromBuildingTypeAndFaction(buildingType, iFactionNumber)
     --To get iFactionNumber use e.g. factionIndex = aiBrain:GetFactionIndex()
     --1: UEF, 2: Aeon, 3: Cybran, 4: Seraphim, 5: Nomads
     --Alternatively could get faction of a unit, using the FactionName = 'Aeon' property
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if bDebugMessages == true then LOG('About to print out entire building template:'..repr(BuildingTemplates)) end
     local tBuildingTemplateForFaction = BuildingTemplates[iFactionNumber]
     return GetBlueprintIDFromBuildingType(buildingType, tBuildingTemplateForFaction)
@@ -157,66 +171,71 @@ end
 
 function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     --Returns support factory ID if it can be built, otherwise returns normal upgrade unit (works for any unit, not just factory)
-    local bDebugMessages = false
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetUnitUpgradeBlueprint'
     if bGetSupportFactory == nil then bGetSupportFactory = true end
     --Gets the support factory blueprint, and checks if it can be built; if not then returns the normal UpgradesTo blueprint
     local sUpgradeBP
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, UnitToUpgrade='..oUnitToUpgrade:GetUnitId()) end
-    if bGetSupportFactory == true and oUnitToUpgrade.CanBuild then
-        local tsSupportFactoryBP = {
+    if not(oUnitToUpgrade.Dead) then
+        if bDebugMessages == true then LOG(sFunctionRef..': Start of code, UnitToUpgrade='..oUnitToUpgrade:GetUnitId()..GetUnitLifetimeCount(oUnitToUpgrade)) end
+        if bGetSupportFactory == true and oUnitToUpgrade.CanBuild then
+            local tsSupportFactoryBP = {
 
-            -- Aeon
-            ['uab0101']  = 'zab9501',
-            ['uab0102']  = 'zab9502',
-            ['uab0103']  = 'zab9503',
-            ['uab0201'] = 'zab9601',
-            ['uab0202'] = 'zab9602',
-            ['uab0203'] = 'zab9603',
+                -- Aeon
+                ['uab0101']  = 'zab9501',
+                ['uab0102']  = 'zab9502',
+                ['uab0103']  = 'zab9503',
+                ['uab0201'] = 'zab9601',
+                ['uab0202'] = 'zab9602',
+                ['uab0203'] = 'zab9603',
 
-            -- UEF
-            ['ueb0101']  = 'zeb9501',
-            ['ueb0102']  = 'zeb9502',
-            ['ueb0103']  = 'zeb9503',
-            ['ueb0201'] = 'zeb9601',
-            ['ueb0202'] = 'zeb9602',
-            ['ueb0203'] = 'zeb9603',
+                -- UEF
+                ['ueb0101']  = 'zeb9501',
+                ['ueb0102']  = 'zeb9502',
+                ['ueb0103']  = 'zeb9503',
+                ['ueb0201'] = 'zeb9601',
+                ['ueb0202'] = 'zeb9602',
+                ['ueb0203'] = 'zeb9603',
 
-            -- Cybran
-            ['urb0101']  = 'zrb9501',
-            ['urb0102']  = 'zrb9502',
-            ['urb0103']  = 'zrb9503',
-            ['urb0201'] = 'zrb9601',
-            ['urb0202'] = 'zrb9602',
-            ['urb0203'] = 'zrb9603',
+                -- Cybran
+                ['urb0101']  = 'zrb9501',
+                ['urb0102']  = 'zrb9502',
+                ['urb0103']  = 'zrb9503',
+                ['urb0201'] = 'zrb9601',
+                ['urb0202'] = 'zrb9602',
+                ['urb0203'] = 'zrb9603',
 
-            -- Seraphim
-            ['xsb0101']  = 'zsb9501',
-            ['xsb0102']  = 'zsb9502',
-            ['xsb0103']  = 'zsb9503',
-            ['xsb0201'] = 'zsb9601',
-            ['xsb0202'] = 'zsb9602',
-            ['xsb0203'] = 'zsb9603',
-        }
+                -- Seraphim
+                ['xsb0101']  = 'zsb9501',
+                ['xsb0102']  = 'zsb9502',
+                ['xsb0103']  = 'zsb9503',
+                ['xsb0201'] = 'zsb9601',
+                ['xsb0202'] = 'zsb9602',
+                ['xsb0203'] = 'zsb9603',
+            }
 
-        local sFactoryBP = oUnitToUpgrade:GetUnitId()
-        if tsSupportFactoryBP[sFactoryBP] then
-            if bDebugMessages == true then LOG(sFunctionRef..': Support factoryBP='..tsSupportFactoryBP[sFactoryBP]) end
-            sUpgradeBP = tsSupportFactoryBP[sFactoryBP]
-            if not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then
-                if bDebugMessages == true then LOG(sFunctionRef..': Cant build '..sUpgradeBP) end
-                sUpgradeBP = nil
+            local sFactoryBP = oUnitToUpgrade:GetUnitId()
+            if tsSupportFactoryBP[sFactoryBP] then
+                if bDebugMessages == true then LOG(sFunctionRef..': Support factoryBP='..tsSupportFactoryBP[sFactoryBP]) end
+                sUpgradeBP = tsSupportFactoryBP[sFactoryBP]
+                if bDebugMessages == true then LOG(sFunctionRef..': oUnitToUpgrade='..sFactoryBP..GetUnitLifetimeCount(oUnitToUpgrade)..'; Checking if can upgrade to sUpgradeBP='..sUpgradeBP..'; oUnitToUpgrade:CanBuild(sUpgradeBP)='..tostring(oUnitToUpgrade:CanBuild(sUpgradeBP))) end
+                if not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Cant build '..sUpgradeBP) end
+                    sUpgradeBP = nil
+                end
             end
         end
-    end
-    if not(sUpgradeBP) then
-        local oFactoryBP = oUnitToUpgrade:GetBlueprint()
-        sUpgradeBP = oFactoryBP.General.UpgradesTo
-    end
-    if sUpgradeBP == '' then
-        sUpgradeBP = nil
-        if bDebugMessages == true then LOG(sFunctionRef..': Have no blueprint to upgrade to') end
-    elseif bDebugMessages == true then LOG(sFunctionRef..': Returning sUpgradeBP'..sUpgradeBP)
+        if not(sUpgradeBP) then
+            local oFactoryBP = oUnitToUpgrade:GetBlueprint()
+            sUpgradeBP = oFactoryBP.General.UpgradesTo
+            if not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then sUpgradeBP = nil end
+            if bDebugMessages == true then LOG(sFunctionRef..': Didnt have valid support factory to upgrade to; blueprint UpgradesTo='..(sUpgradeBP or 'nil')) end
+        end
+        if sUpgradeBP == '' then
+            sUpgradeBP = nil
+            if bDebugMessages == true then LOG(sFunctionRef..': Have no blueprint to upgrade to') end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': Returning sUpgradeBP'..sUpgradeBP)
+        end
     end
 
     return sUpgradeBP
@@ -276,4 +295,31 @@ end
 
 function IsUnitUnderwater(oUnit)
     return M27MapInfo.IsUnderwater(oUnit:GetPosition(), false)
+end
+
+function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'IsEnemyUnitAnEngineer'
+    local bIsEngineer = true
+    local iEnemySpeed
+    if oEnemyUnit.GetUnitId then
+
+        local sEnemyID = oEnemyUnit:GetUnitId()
+
+        if EntityCategoryContains(categories.STRUCTURE, sEnemyID) then bIsEngineer = false
+        else
+            --function CanSeeUnit(aiBrain, oUnit, bTrueIfOnlySeeBlip)
+            if M27Utilities.CanSeeUnit(aiBrain, oEnemyUnit, false) then
+                if not(EntityCategoryContains(refCategoryEngineer, sEnemyID)) then bIsEngineer = false end
+            else
+                local oEnemyBP = oEnemyUnit:GetBlueprint()
+                if oEnemyBP.Physics then
+                    iEnemySpeed = oEnemyBP.Physics.MaxSpeed
+                    if not(iEnemySpeed == 1.9) then bIsEngineer = false end
+                end
+             end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Checking if oEnemyUnit with ID='..sEnemyID..' is an engineer; bIsEngineer='..tostring(bIsEngineer)..'; iEnemySpeed if we have calculated it='..(iEnemySpeed or 'nil')) end
+    end
+    return bIsEngineer
 end
