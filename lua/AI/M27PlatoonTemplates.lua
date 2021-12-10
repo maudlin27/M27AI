@@ -1,6 +1,8 @@
 refiMinimumPlatoonSize = 'M27MinPlatoonSize'
 refbIgnoreStuckAction = 'M27IgnoreStuckAction'
 refsDefaultFormation = 'M27DefaultFormation'
+refbFormMoveIfCloseTogetherAndNoEnemies = 'M27FormMoveIfCloseTogetherAndNoEnemies'
+refiFormMoveCloseDistanceThreshold = 'M27DistanceForFormMoveFlag' --i.e. if this is 50, then will use formmove if front and rear platoons are within this distance of each other
 --Reaching destination alternative actions (default will be new movement path):
 refbIdlePlatoon = 'M27IdlePlatoon' --true if platoon not meant to use normal platoon functionality
 refbDisbandIfReachDestination = 'M27DisbandAtDestination'
@@ -15,6 +17,7 @@ refiPlatoonAmalgamationRange = 'M27PlatoonAmalgamationRange'
 refiPlatoonAmalgamationMaxSize = 'M27PlatoonAmalgamationMaxSize' --Optional - required only if are amalgmating; If exceed this then will stop looking to amalgamate
 refbDontDisplayName = 'M27PlatoonDontDisplayName' --Used for idle platoons so dont overwrite name when arent really using the platoon and are assigning names via separate method (e.g. for engis and air)
 refbUsedByThreatDefender = 'M27PlatoonUsedByThreatDefender' --Overseer's threat assess and respond will consider this platoon if this is set to true
+refbWantsShieldEscort = 'M27PlatoonWantsShieldEscort' --true if should be considered when assigning mobile shields
 
 --AI global idle platoon references (i.e. only have 1 of these per aibrain):
 refoIdleScouts = 'M27IdleScouts'
@@ -38,6 +41,8 @@ PlatoonTemplate = {
             [refbIgnoreStuckAction] = false,
             [refiMinimumPlatoonSize] = 1,
             [refsDefaultFormation] = 'GrowthFormation',
+            [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+            [refiFormMoveCloseDistanceThreshold] = 30,
             [refbDisbandIfReachDestination] = false,
             [refbDisbandAfterRunningAway] = false,
             [refbSwitchToAttackIfReachDestination] = false,
@@ -48,6 +53,7 @@ PlatoonTemplate = {
             [refiPlatoonAmalgamationRange] = 20,
             [refiPlatoonAmalgamationMaxSize] = 20,
             [refbUsedByThreatDefender] = true,
+            [refbWantsShieldEscort] = true,
         },
     ['M27MexRaiderAI'] =
     {
@@ -56,6 +62,8 @@ PlatoonTemplate = {
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'AttackFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = false,
         [refbSwitchToAttackIfReachDestination] = false,
@@ -64,6 +72,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = true,
     },
     ['M27MexLargerRaiderAI'] =
     {
@@ -72,6 +81,8 @@ PlatoonTemplate = {
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 3,
         [refsDefaultFormation] = 'AttackFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = false,
         [refbSwitchToAttackIfReachDestination] = false,
@@ -80,6 +91,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = true,
     },
     ['M27CombatPatrolAI'] =
     {
@@ -88,6 +100,8 @@ PlatoonTemplate = {
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'AttackFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = false,
         [refbSwitchToAttackIfReachDestination] = false,
@@ -98,6 +112,7 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = 50,
         [refbUsedByThreatDefender] = true,
         [refiPlatoonAmalgamationMaxSize] = 50,
+        [refbWantsShieldEscort] = true,
     },
     ['M27LargeAttackForce'] =
     {
@@ -106,6 +121,8 @@ PlatoonTemplate = {
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 25,
         [refsDefaultFormation] = 'AttackFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = true,
         [refbSwitchToAttackIfReachDestination] = true,
@@ -115,6 +132,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = { 'M27MexLargerRaiderAI', 'M27MexRaiderAI', 'M27AttackNearestUnits' },
         [refiPlatoonAmalgamationRange] = 28,
         [refiPlatoonAmalgamationMaxSize] = 65,
+        [refbWantsShieldEscort] = true,
     },
     ['M27DefenderAI'] =
     {
@@ -123,6 +141,8 @@ PlatoonTemplate = {
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = false,
         [refbSwitchToAttackIfReachDestination] = false,
@@ -132,6 +152,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = true,
+        [refbWantsShieldEscort] = true,
     },
     ['M27IndirectDefender'] =
     {
@@ -140,6 +161,8 @@ PlatoonTemplate = {
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = false,
         [refbSwitchToAttackIfReachDestination] = false,
@@ -149,6 +172,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = true,
+        [refbWantsShieldEscort] = true,
     },
     ['M27IndirectSpareAttacker'] =
     {
@@ -157,6 +181,8 @@ PlatoonTemplate = {
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = false,
         [refbSwitchToAttackIfReachDestination] = false,
@@ -166,6 +192,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = true,
+        [refbWantsShieldEscort] = true,
     },
     ['M27EscortAI'] =
     {
@@ -174,6 +201,8 @@ PlatoonTemplate = {
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = false,  --Dont want on assister platoons as they refresh too often and cause wierd results
+        [refiFormMoveCloseDistanceThreshold] = 30,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = false,
         [refbSwitchToAttackIfReachDestination] = false,
@@ -182,6 +211,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = true,
     },
     ['M27MAAAssister'] =
     {
@@ -190,6 +220,8 @@ PlatoonTemplate = {
         [refbIgnoreStuckAction] = true,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = false, --Dont want on assister platoons as they refresh too often and cause wierd results
+        [refiFormMoveCloseDistanceThreshold] = 30,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = false,
         [refbSwitchToAttackIfReachDestination] = false,
@@ -198,6 +230,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = true,
     },
     ['M27ScoutAssister'] =
     {
@@ -214,6 +247,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = false,
     },
     ['M27IntelPathAI'] =
     {
@@ -230,6 +264,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = false,
     },
     ['M27ACUMain'] =
     {
@@ -247,8 +282,9 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = false, --Some of functionality in platoon utilities such as building factory is turned off if this is true
+        [refbWantsShieldEscort] = true,
     },
-    ['M27AssistHydroEngi'] =
+    ['M27AssistHydroEngi'] = --Dont think this is used any more
     {
         [refbIdlePlatoon] = false,
         [refbRequiresUnitToFollow] = false,
@@ -263,6 +299,44 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = false,
+    },
+
+    ['M27MobileShield'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = true,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = false, --Dont want on assister platoons as they refresh too often and cause wierd results
+        [refiFormMoveCloseDistanceThreshold] = 30,
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbUsedByThreatDefender] = false,
+    },
+    ['M27RetreatingShieldUnits'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = true,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbDisbandIfReachDestination] = true,
+        [refbDisbandAfterRunningAway] = true,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = true,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbUsedByThreatDefender] = false,
     },
 
 

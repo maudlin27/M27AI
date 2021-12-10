@@ -5,6 +5,7 @@
 local BuildingTemplates = import('/lua/BuildingTemplates.lua').BuildingTemplates
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
+local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 
 refPathingTypeAmphibious = 'Amphibious'
 refPathingTypeNavy = 'Water'
@@ -12,6 +13,14 @@ refPathingTypeAir = 'Air'
 refPathingTypeLand = 'Land'
 refPathingTypeNone = 'None'
 refPathingTypeAll = {refPathingTypeAmphibious, refPathingTypeNavy, refPathingTypeAir, refPathingTypeLand}
+
+--Special information
+--[[refiLastTimeGotDistanceToStart = 'M27UnitDistToStartTime'
+refiDistanceToStart = 'M27UnitDistToStartDist'
+refiLastTimeGotDistanceToEnemy = 'M27UnitDistToEnemyTime'
+refiDistanceToEnemyt = 'M27UnitDistToENemyDist'--]]
+refbShieldIsDisabled = 'M27UnitShieldDisabled'
+
 
 --Factions
 refFactionUEF = 1
@@ -21,7 +30,7 @@ refFactionSeraphim = 4
 refFactionNomads = 5
 
 --Categories:
-
+--Buildings - eco
 refCategoryT1Mex = categories.STRUCTURE * categories.TECH1 * categories.MASSEXTRACTION
 refCategoryT2Mex = categories.STRUCTURE * categories.TECH2 * categories.MASSEXTRACTION
 refCategoryT3Mex = categories.STRUCTURE * categories.TECH3 * categories.MASSEXTRACTION
@@ -35,19 +44,29 @@ refCategoryMassStorage = categories.STRUCTURE * categories.MASSSTORAGE * categor
 
 refCategoryEnergyStorage = categories.STRUCTURE * categories.ENERGYSTORAGE
 
-
+--Building - intel and misc
 refCategoryAirStaging = categories.STRUCTURE * categories.AIRSTAGINGPLATFORM
 refCategoryRadar = categories.STRUCTURE * categories.RADAR + categories.STRUCTURE * categories.OMNI
 refCategoryT1Radar = refCategoryRadar * categories.TECH1
 refCategoryT2Radar = refCategoryRadar * categories.TECH2
 refCategoryT3Radar = refCategoryRadar * categories.TECH3 --+ categories.OMNI * categories.TECH3
 
+--Building - factory
 refCategoryLandFactory = categories.LAND * categories.FACTORY * categories.STRUCTURE
 refCategoryAirFactory = categories.AIR * categories.FACTORY * categories.STRUCTURE
 refCategoryNavalFactory = categories.NAVAL * categories.FACTORY * categories.STRUCTURE
 refCategoryAllFactories = refCategoryLandFactory + refCategoryAirFactory + refCategoryNavalFactory
 
+--Building - defensive
+refCategoryT2PlusPD = categories.STRUCTURE * categories.DIRECTFIRE - categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH1
+refCategoryTMD = categories.ANTIMISSILE - categories.SILO * categories.TECH3 --Not perfect but should pick up most TMD without picking up SMD
+refCategoryFixedShield = categories.SHIELD * categories.STRUCTURE
+refCategoryFixedT2Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH2
+refCategoryFixedT3Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH3
+refCategorySML = categories.NUKE * categories.SILO
+refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * categories.STRUCTURE
 
+--Land units
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND
 refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT - categories.ANTIAIR --NOTE: Need to specify fastest (for cybran who have mantis and LAB)
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - categories.ANTIAIR --NOTE: Need to specify slowest (so dont pick LAB)
@@ -59,16 +78,11 @@ refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCate
 refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
 refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
-refCategoryT2PlusPD = categories.STRUCTURE * categories.DIRECTFIRE - categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH1
-refCategoryTMD = categories.ANTIMISSILE - categories.SILO * categories.TECH3 --Not perfect but should pick up most TMD without picking up SMD
-refCategoryFixedShield = categories.SHIELD * categories.STRUCTURE
-refCategoryFixedT2Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH2
 refCategoryGroundExperimental = categories.LAND * categories.EXPERIMENTAL + categories.STRUCTURE * categories.EXPERIMENTAL
-refCategoryFixedT3Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH3
-refCategorySML = categories.NUKE * categories.SILO
-refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * categories.STRUCTURE
+refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD
+refCategoryPersonalShield = categories.PERSONALSHIELD
 
-
+--Air units
 refCategoryAirScout = categories.AIR * categories.SCOUT
 refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - categories.GROUNDATTACK
 refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - categories.CANNOTUSEAIRSTAGING --excludes mercies
@@ -77,6 +91,7 @@ refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3
 refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
 
+--Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
 refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE
 refCategoryAllNavy = categories.NAVAL
@@ -322,4 +337,50 @@ function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
         if bDebugMessages == true then LOG(sFunctionRef..': Checking if oEnemyUnit with ID='..sEnemyID..' is an engineer; bIsEngineer='..tostring(bIsEngineer)..'; iEnemySpeed if we have calculated it='..(iEnemySpeed or 'nil')) end
     end
     return bIsEngineer
+end
+
+function GetCurrentAndMaximumShield(oUnit)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'GetCurrentAndMaximumShield'
+    local iCurShield = 0
+    local iMaxShield = 0
+    if oUnit.MyShield then
+        iCurShield = oUnit.MyShield:GetHealth()
+        iMaxShield = oUnit.MyShield:GetMaxHealth()
+    else
+        local tShield = oUnit:GetBlueprint().Defense
+        if tShield then
+            local iCurShield = (oUnit:GetShieldRatio(false) or 0) * iMaxShield
+        end
+    end
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': iCurShield='..iCurShield..'; iMaxShield='..iMaxShield..'; ShieldRatio False='..oUnit:GetShieldRatio(false)..'; ShieldRatio true='..oUnit:GetShieldRatio(true)..' iCurShield='..iCurShield)
+        if oUnit.MyShield then LOG('Unit has MyShield; IsUp='..tostring(oUnit.MyShield:IsUp())..'; shield health='..oUnit.MyShield:GetHealth()) end
+    end
+    return iCurShield, iMaxShield
+end
+
+--Below commented out because after profiling, the time savings are negligible so doesnt justify the loss of accuracy
+--[[function GetUnitDistanceFromOurStart(aiBrain, oUnitOrPlatoon)
+    --Intended to only be called once every cycle
+    local iCurTime = math.floor(GetGameTimeSeconds())
+    if oUnitOrPlatoon[refiLastTimeGotDistanceToStart] == iCurTime then return oUnitOrPlatoon[refiDistanceToStart]
+    else
+        oUnitOrPlatoon[refiLastTimeGotDistanceToStart] = iCurTime
+        local tPosition = M27PlatoonUtilities.GetPlatoonFrontPosition(oUnitOrPlatoon)
+        return M27Utilities.GetDistanceBetweenPositions(tPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+    end
+end
+
+function GetUnitDistanceFromOurEnemy(aiBrain, oUnit)  end--]]
+function IsUnitShieldEnabled(oUnit)
+    return not(oUnit[refbShieldIsDisabled])
+end
+function DisableUnitShield(oUnit)
+    oUnit[refbShieldIsDisabled] = true
+    oUnit:DisableShield()
+end
+function EnableUnitShield(oUnit)
+    oUnit:EnableShield()
+    oUnit[refbShieldIsDisabled] = false
 end

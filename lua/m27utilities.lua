@@ -400,10 +400,10 @@ function MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
     local iZChangeBase = math.cos(iBaseAngle) * iDistanceToTravel
     local iXMod = 1
     local iZMod = 1
-    if iDistanceToTravel < 0 then
+    --[[if iDistanceToTravel < 0 then
         if iAngle < 180 then iAngle = iAngle + 180
         else iAngle = iAngle - 180 end
-    end
+    end--]]
 
     if tTargetPos[1] <= tStartPos[1] and tTargetPos[3] <= tStartPos[3] then
         iXMod = -1

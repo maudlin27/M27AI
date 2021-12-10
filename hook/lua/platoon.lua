@@ -666,7 +666,7 @@ Platoon = Class(M27PlatoonClass) {
     end,
 
 
---START OF ACTUAL PLATOON CODE - we just list out every platoon here for now, long term want to just remove use of platoon.lua entirely
+--START OF ACTUAL PLATOON CODE - we just list out every platoon here for now, long term might want to just remove use of platoon.lua entirely
     M27AttackNearestUnits = function(self)
         --Has platoon attack nearby structures and (if there are none) nearby land units forever; if no known units then will attack enemy base and then go back to our base and repeat
         M27PlatoonUtilities.PlatoonCycler(self)
@@ -712,6 +712,12 @@ Platoon = Class(M27PlatoonClass) {
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27CombatPatrolAI = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27MobileShield = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27RetreatingShieldUnits = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27IdleScouts = function(self)

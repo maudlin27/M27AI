@@ -3418,9 +3418,11 @@ function OverseerInitialisation(aiBrain)
     aiBrain[M27FactoryOverseer.refiEngineerCap] = 70 --Max engis of any 1 tech level even if have spare mass
     aiBrain[M27FactoryOverseer.reftiEngineerLowMassCap] = {35, 20, 20, 20} --Max engis to get if have low mass
     aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5
+    aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
     aiBrain[refiCyclesThatACUHasNoPlatoon] = 0
     aiBrain[refiCyclesThatACUInArmyPool] = 0
     aiBrain[reftUnitGroupPreviousReferences] = {}
+
     aiBrain[refiOurHighestFactoryTechLevel] = 1
 
     aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] = true
@@ -3584,7 +3586,11 @@ function OverseerManager(aiBrain)
     if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
 
     DetermineInitialBuildOrder(aiBrain)
+    local iTempProfiling
+
     while(not(aiBrain:IsDefeated())) do
+        --M27MiscProfiling.OptimisationComparisonDistanceToStart(aiBrain)
+
         if bDebugMessages == true then
             LOG(sFunctionRef..': Start of cycle')
             --ForkThread(TEMPUNITPOSITIONLOG, aiBrain)
@@ -3668,5 +3674,6 @@ function OverseerManager(aiBrain)
             LOG(sFunctionRef..': End of overseer cycle code (about to start new cycle) ACU platoon=')
             DebugPrintACUPlatoon(aiBrain)
         end
+        iTempProfiling = M27Utilities.ProfilerTimeSinceLastCall('End of overseer', iTempProfiling)
     end
 end
