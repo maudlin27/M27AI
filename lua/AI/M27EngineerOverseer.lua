@@ -38,7 +38,7 @@ local refActionBuildSecondPower = 10
 local refActionBuildAirStaging = 11
 local refActionBuildAirFactory = 12
 local refActionBuildSMD = 13
-local refActionBuildMassStorage = 14
+refActionBuildMassStorage = 14
 local refActionBuildT1Radar = 15
 local refActionBuildT2Radar = 16
 local refActionBuildT3Radar = 17
@@ -2422,7 +2422,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                 bLocationAlreadyAssigned = false
                 local sLocationRef = M27Utilities.ConvertLocationToReference(tLocation)
                 if not(aiBrain[reftEngineerAssignmentsByLocation] == nil) then
-                    if not(iActionRefToAssign == refActionBuildMassStorage) or aiBrain:CanBuildStructureAt('uab1106', tLocation) then
+                    if not(iActionRefToAssign == refActionBuildMassStorage) or (aiBrain:CanBuildStructureAt('uab1106', tLocation) or (aiBrain[reftEngineerAssignmentsByLocation][sLocationRef] and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByLocation][sLocationRef][iActionRefToAssign]) == false)) then
                         --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location
                         tCurAssignments = aiBrain[reftEngineerAssignmentsByLocation][sLocationRef]
                         if M27Utilities.IsTableEmpty(tCurAssignments) == false then
@@ -2475,7 +2475,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                 if bLocationAlreadyAssigned == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': iLocation='..iLocation..': No other engineer has target location ref '..sLocationRef..', so if its the closest one to us will pick it') end
                     tPositionToLookFrom = tStartPosition
-                    if iActionRefToAssign == refActionBuildMex then
+                    if iActionRefToAssign == refActionBuildMex or iActionRefToAssign == refActionBuildMassStorage then
                         --Find the nearest unassigned engineer
                         --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore, iMaxRangeForPrevEngi, iMaxRangeForNearestEngi, bOnlyGetIdleEngis, bGetInitialEngineer)
                         oNearestEngineer = GetNearestEngineerWithLowerPriority(aiBrain, tIdleEngineers, iActionPriority, tLocation, iActionRefToAssign, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer)
@@ -3031,19 +3031,29 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 if bHaveLowPower == false and M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftMassStorageLocations]) == false and iNetCurEnergyIncome > 8 then
                     iActionToAssign = refActionBuildMassStorage
                     iMaxEngisWanted = 5
-                    --Pick the best location as the target for storage
-                    local iClosestSubtableRef
+                    --Pick the best 3 locations as the target for storage
+                    local tClosestSubtableRef = {}
                     local iClosestModDistance = 100000
-                    for iSubtable, tSubtable in aiBrain[M27EconomyOverseer.reftMassStorageLocations] do
+                    local iClosestCount = 0
+                    for iSubtable, tSubtable in M27Utilities.SortTableBySubtable(aiBrain[M27EconomyOverseer.reftMassStorageLocations], M27EconomyOverseer.refiStorageSubtableModDistance, true) do
+                        iClosestCount = iClosestCount + 1
+                        tClosestSubtableRef[iClosestCount] = iSubtable
+                        if iClosestCount >= 3 then break end
+                    end
+
+                    --[[for iSubtable, tSubtable in aiBrain[M27EconomyOverseer.reftMassStorageLocations] do
                         if tSubtable[M27EconomyOverseer.refiStorageSubtableModDistance] < iClosestModDistance then
                             iClosestModDistance = tSubtable[M27EconomyOverseer.refiStorageSubtableModDistance]
                             iClosestSubtableRef = iSubtable
                         end
+                    end--]]
+                    tExistingLocationsToPickFrom = {}
+                    for iEntry, vEntry in tClosestSubtableRef do
+                        tExistingLocationsToPickFrom[iEntry] = {}
+                        tExistingLocationsToPickFrom[iEntry][1] = aiBrain[M27EconomyOverseer.reftMassStorageLocations][vEntry][M27EconomyOverseer.reftStorageSubtableLocation][1]
+                        tExistingLocationsToPickFrom[iEntry][2] = aiBrain[M27EconomyOverseer.reftMassStorageLocations][vEntry][M27EconomyOverseer.reftStorageSubtableLocation][2]
+                        tExistingLocationsToPickFrom[iEntry][3] = aiBrain[M27EconomyOverseer.reftMassStorageLocations][vEntry][M27EconomyOverseer.reftStorageSubtableLocation][3]
                     end
-                    tExistingLocationsToPickFrom = {{}}
-                    tExistingLocationsToPickFrom[1][1] = aiBrain[M27EconomyOverseer.reftMassStorageLocations][iClosestSubtableRef][M27EconomyOverseer.reftStorageSubtableLocation][1]
-                    tExistingLocationsToPickFrom[1][2] = aiBrain[M27EconomyOverseer.reftMassStorageLocations][iClosestSubtableRef][M27EconomyOverseer.reftStorageSubtableLocation][2]
-                    tExistingLocationsToPickFrom[1][3] = aiBrain[M27EconomyOverseer.reftMassStorageLocations][iClosestSubtableRef][M27EconomyOverseer.reftStorageSubtableLocation][3]
                     if bDebugMessages == true then
                         LOG(sFunctionRef..': tExistingLocationsToPickFrom='..repr(tExistingLocationsToPickFrom))
                         M27Utilities.DrawLocation(tExistingLocationsToPickFrom[1], nil, 1, 100)

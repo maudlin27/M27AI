@@ -223,7 +223,7 @@ function MoveAlongPath(oPlatoon, tMovementPath, bAttackMove, iPathStartPoint, bD
     --iPathStartPoint - defaults to 1 (first entry in tMovementPath); otherwise will ignore earlier entries in tMovementPath
     if iPathStartPoint == nil then iPathStartPoint = 1 end
     if bAttackMove == nil then bAttackMove = false end
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
 
     --if oPlatoon:GetPlan() == 'M27ACUMain' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27MAAAssister' then bDebugMessages = true end
@@ -2601,7 +2601,7 @@ end
 function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
     --Update oPlatoon's unittable and count variables
 
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordPlatoonUnitsByType'
 
     local sPlatoonName, aiBrain
@@ -3263,7 +3263,7 @@ end
 
 function DeterminePlatoonAction(oPlatoon)
     --Record current action as previous action
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DeterminePlatoonAction'
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     if oPlatoon and oPlatoon.GetBrain then
@@ -3284,7 +3284,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+            if sPlatoonName == 'M27MobileShield' then bDebugMessages = false end
 
             if bDebugMessages == true then
                 LOG(sFunctionRef..': Start of code')
@@ -3809,7 +3809,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-    if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+    if sPlatoonName == 'M27MobileShield' then bDebugMessages = false end
 
     local aiBrain = oPlatoon:GetBrain()
   --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
@@ -4949,7 +4949,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
-    if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+    if sPlatoonName == 'M27MobileShield' then bDebugMessages = false end
     --If no unit assigned default to first intel path midpoint
     local bHaveUnitToFollow = false
     if oPlatoon then
@@ -5198,7 +5198,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+            if sPlatoonName == 'M27MobileShield' then bDebugMessages = false end
 
             if bDebugMessages == true then
                 if oPlatoon[refiCurrentAction] == nil then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': '..sFunctionRef..': refiCurrentAction is nil')

@@ -110,7 +110,7 @@ function GetMassStorageTargets(aiBrain)
     }
 
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    local iDistanceFromOurBase, iCurPositionTechAdjust
+    local iDistanceFromOurBase, iCurPositionTechAdjust, iCurPositionStartedConstructionAdjust
     local sStorageBP = 'ueb1106'
     local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
     if M27Utilities.IsTableEmpty(tAllMexes) == false then
@@ -128,17 +128,21 @@ function GetMassStorageTargets(aiBrain)
                     for _, tModPosition in tPositionAdjustments do
                         tAdjustedPosition = {tCurLocation[1] + tModPosition[1], GetSurfaceHeight(tCurLocation[1] + tModPosition[1], tCurLocation[3] + tModPosition[2]), tCurLocation[3] + tModPosition[2]}
                         if bDebugMessages == true then LOG(sFunctionRef..': tCurLocation='..repr(tCurLocation)..'; tModPosition='..repr(tModPosition)..'; adjusted position='..repr(tAdjustedPosition)) end
-                        if aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition) then
-                            sLocationRef = M27Utilities.ConvertLocationToReference(tAdjustedPosition)
+                        sLocationRef = M27Utilities.ConvertLocationToReference(tAdjustedPosition)
+                        if aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition) or (aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMassStorage]) == false) then
+                            --sLocationRef = M27Utilities.ConvertLocationToReference(tAdjustedPosition)
                             iDistanceFromOurBase = M27Utilities.GetDistanceBetweenPositions(tAdjustedPosition, tStartPosition)
                             iCurPositionTechAdjust = 0
+                            iCurPositionStartedConstructionAdjust = 0
+                            --Reduce distance by 100 if already have it assigned to an engineer (as want to continue existing structure)
+                            if aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition) == false then iCurPositionStartedConstructionAdjust = -100 end
                             if EntityCategoryContains(categories.TECH2, oMex:GetUnitId()) then iCurPositionTechAdjust = iDistanceModForTech2 end
                             if bDebugMessages == true then LOG(sFunctionRef..': Can build storage at the position, so will record; sLocationRef='..sLocationRef..'; iDistanceFromOurBase='..iDistanceFromOurBase..'; iCurPositionTechAdjust='..iCurPositionTechAdjust..'; iDistanceModForEachAdjacentMex='..iDistanceModForEachAdjacentMex) end
                             if aiBrain[reftMassStorageLocations][sLocationRef] then
                                 --Already have a position, so choose the lower of it reduced by 50, or the current value reduced by 50
                                 if bDebugMessages == true then LOG(sFunctionRef..': Already have a position so will reduce current distance by iDistanceModForEachAdjacentMex='..iDistanceModForEachAdjacentMex..'; current distance='..aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance]) end
 
-                                aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] = math.min(aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] + iDistanceModForEachAdjacentMex, iDistanceFromOurBase + iCurPositionTechAdjust + iDistanceModForEachAdjacentMex)
+                                aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] = math.min(aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] + iDistanceModForEachAdjacentMex, iDistanceFromOurBase + iCurPositionTechAdjust + iDistanceModForEachAdjacentMex + iCurPositionStartedConstructionAdjust)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Distance after modification='..aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance]) end
                             else
                                 aiBrain[reftMassStorageLocations][sLocationRef] = {}
@@ -464,12 +468,12 @@ function UnpauseUpgrades(aiBrain, iMaxToUnpause)
 end
 
 function PauseLastUpgrade(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'PauseLastUpgrade'
     local oLastUnpausedUpgrade
     local oLastUnpausedNonMex
     local iOldRecordCount = 0
-    local iMexThresholdToIgnorePausing = 0.98
+    local iMexThresholdToIgnorePausing = 0.95
     local sUnitId
     if aiBrain[refbPauseForPowerStall] == true then iMexThresholdToIgnorePausing = 0.6 end
     if M27Utilities.IsTableEmpty(aiBrain[reftUpgrading]) == false then
@@ -484,7 +488,19 @@ function PauseLastUpgrade(aiBrain)
                             oLastUnpausedUpgrade = oUnit
                             oLastUnpausedNonMex = oLastUnpausedUpgrade
                         else
-                            if not(oUnit.unitBeingBuilt) or not(oUnit.unitBeingBuilt.GetFractionComplete) or not(oUnit.unitBeingBuilt.GetFractionComplete() >= iMexThresholdToIgnorePausing) then
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': oUnit='..sUnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                if oUnit.UnitBeingBuilt then
+                                    LOG(sFunctionRef..': Have a unit being built')
+                                    if oUnit.UnitBeingBuilt.GetUnitId then LOG(sFunctionRef..': ID of unit being built='..oUnit.UnitBeingBuilt:GetUnitId()) end
+                                    if oUnit.UnitBeingBuilt.GetFractionComplete then LOG(sFunctionRef..': Fraction complete='..oUnit.UnitBeingBuilt:GetFractionComplete()) else LOG('Fraction complete is nil') end
+                                elseif oUnit.unitBeingBuilt then
+                                    M27Utilities.ErrorHandler('UnitBeingBuilt sometimes is lower case so need to revise code')
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': unitBeingBuilt is nil') end
+                                end
+                            end
+                            if not(oUnit.UnitBeingBuilt) or not(oUnit.UnitBeingBuilt.GetFractionComplete) or not(oUnit.UnitBeingBuilt:GetFractionComplete() >= iMexThresholdToIgnorePausing) then
                                 oLastUnpausedUpgrade = oUnit
                             end
                         end
@@ -496,6 +512,7 @@ function PauseLastUpgrade(aiBrain)
             end
         end
         if oLastUnpausedUpgrade then
+
             if oLastUnpausedNonMex then
                 oLastUnpausedNonMex:SetPaused(true)
             else
