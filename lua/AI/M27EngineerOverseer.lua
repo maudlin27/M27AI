@@ -217,6 +217,7 @@ end
 function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGuarding)
     --Assumes the unit will have been given a clearcommands() action if it needs one prior to calling this since sometimes will want to sometimes wont
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'ClearEngineerActionTrackers'
     --if oEngineer == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
 
@@ -355,6 +356,7 @@ end
 
 function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'UpdateEngineerActionTrackers'
 
     if iActionToAssign == nil then M27Utilities.ErrorHandler('iActionToAssign is nil') end
@@ -542,6 +544,7 @@ end
 function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     --Returns true if are enemies near the engineer such that it's been given an override action (and should be ignored)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
     local bAreNearbyEnemies = false
     if oEngineer and not(oEngineer.Dead) then
@@ -672,6 +675,7 @@ function GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentAction
     --bGetInitialEngineer - if true then will just look for the first idle engineer, ignoring everything else
     --iMinTechLevelWanted - will ignore engis lower than this tech level
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'GetNearestEngineerWithLowerPriority'
     --if iMinTechLevelWanted > 1 then bDebugMessages = true end
     local oNearestEngineer
@@ -806,6 +810,7 @@ end
 function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
     --Will wait iDelay seconds, before clearing engineer's actions if it's guarding a unit and its action is still spare
     local bDebugMessages = false
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'DelayedSpareEngineerClearAction'
     WaitSeconds(iDelaySeconds)
     if oEngineer[refiEngineerCurrentAction] == refActionSpare then
@@ -818,6 +823,7 @@ end
 
 function IssueSpareEngineerAction(aiBrain, oEngineer)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'IssueSpareEngineerAction'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --Action already cleared in previous code
@@ -873,7 +879,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
                 for iBuilding, oBuilding in tNearbyBuildings do
                     if oBuilding.GetFractionComplete and oBuilding.GetFractionComplete < 1 then
                         bHaveAction = true
-                        IssueGuard({ oEngineer}, oBuilding)
+                        IssueRepair({ oEngineer}, oBuilding)
                         if bDebugMessages == true then LOG(sFunctionRef..': Have a part-complete building that will assist') end
                     elseif oBuilding.IsUnitState then
                         if bDebugMessages == true then LOG(sFunctionRef..': Have a building with unit state='..M27Logic.GetUnitState(oEngineer)) end
@@ -930,6 +936,7 @@ end
 
 function AreMobileUnitsInRect(rRectangleToSearch, bOnlyLookForMobileLand)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'AreMobileUnitsInRect'
     local bAreUnits
     local tBlockingUnits = GetUnitsInRect(rRectangleToSearch)
@@ -1762,7 +1769,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
             if M27Utilities.IsTableEmpty(tTargetLocation) == false and sBlueprintToBuild then
                 M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
                 if oPartCompleteBuilding then
-                    IssueGuard({ oEngineer}, oPartCompleteBuilding)
+                    IssueRepair({ oEngineer}, oPartCompleteBuilding)
                 else
                     IssueBuildMobile({oEngineer}, tTargetLocation, sBlueprintToBuild, {})
                 end
@@ -1820,7 +1827,7 @@ function GetPartCompleteBuilding(aiBrain, oBuilder, iCategoryToBuild, iBuildingS
     return oNearestPartCompleteBuilding
 end
 
-function GetCategoryToBuildFromAction(iActionToAssign)
+function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel)
     local iCategoryToBuild
     if iActionToAssign == refActionBuildMex then
         iCategoryToBuild = refCategoryT1Mex
@@ -1851,11 +1858,17 @@ function GetCategoryToBuildFromAction(iActionToAssign)
     else
         M27Utilities.ErrorHandler('Need to add code for action='..iActionToAssign)
     end
+    if iMinTechLevel > 1 then
+        if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
+        else iCategoryToBuild = iCategoryToBuild * categories.TECH2 + iCategoryToBuild * categories.TECH3
+        end
+    end
     return iCategoryToBuild
 end
 
 function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpgrade)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'UpgradeBuildingActionCompleteChecker'
     local bContinue = true
     while bContinue == true do
@@ -1872,7 +1885,7 @@ end
 function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iConditionNumber, sBuildingBPRef)
     --If oActionTargetObject is specified, then will assist this, otherwise will try and construct a new building
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'AssignActionToEngineer'
 
     if oEngineer then
@@ -1897,7 +1910,11 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             bAreAssisting = true
                             if oActionTargetObject.GetUnitId then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Telling engineer '..GetEngineerUniqueCount(oEngineer)..'to assist enginner '..GetEngineerUniqueCount(oActionTargetObject)..'; ID='..oActionTargetObject:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oActionTargetObject)) end
-                                IssueGuard({ oEngineer}, oActionTargetObject)
+                                if oActionTargetObject.GetFractionComplete and oActionTargetObject:GetFractionComplete() < 1 then
+                                    IssueRepair({ oEngineer}, oActionTargetObject)
+                                else
+                                    IssueGuard({ oEngineer}, oActionTargetObject)
+                                end
                                 --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
                                 UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, nil, true, iConditionNumber, oActionTargetObject)
                             else
@@ -2249,11 +2266,40 @@ function GetUnclaimedMexOrHydro(bMexNotHydro, aiBrain, oPathingUnit, sPathing, i
     return tUnclaimedLocations
 end
 
+function GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSearchRange)
+    local bDebugMessages = false
+    local sFunctionRef = 'GetNearestPartBuiltUnit'
+
+    local oNearestPartBuilt
+    --Check if any nearby part-built units (that have abandoned) near tStartPosition
+    if iCategoryToBuild then
+        local tNearbyUnitsOfType = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tStartPosition, iSearchRange, 'Ally')
+        local sPartBuiltLocationRef
+        if M27Utilities.IsTableEmpty(tNearbyUnitsOfType) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyUnitsOfType)..' units of the target type, will see if any are part-complete') end
+            for iUnit, oUnit in tNearbyUnitsOfType do
+                if oUnit.GetFractionComplete and oUnit:GetFractionComplete() < 1 then
+                    --Check not already assigned to an existing unit
+                    sPartBuiltLocationRef = M27Utilities.ConvertLocationToReference(oUnit:GetPosition())
+                    if bDebugMessages == true then LOG(sFunctionRef..': Unit is part complete, checking if its location is already assigned to an engineer') end
+                    --reftEngineerAssignmentsByLocation = 'M27EngineerAssignmentsByLoc'     --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location; returns the engineer object
+                    if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByLocation][sPartBuiltLocationRef]) == true then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Location not assigned to an engineer, so will assist this') end
+                        oNearestPartBuilt = oUnit
+                    end
+                end
+            end
+        end
+    end
+    return oNearestPartBuilt
+end
+
 function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocationsToPickFrom, tIdleEngineers, iActionPriority, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinTechLevelWanted)
     --Returns both the location of the target, and (if relevant) the object (either the first engineer assigned the action, or the building its constructing if it exists yet); will return nil for object if there is none
     --if tExistingLocationsToPickFrom isn't nil then will only refer to here
     --Variables from tIdleEngineers onwards are only used by the mex functionality which will use the existing function to get the nearest idle engineer, and see hwo far it is from the mex
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'GetActionTargetAndObject'
     local tLocationsToGoThrough = tExistingLocationsToPickFrom
     local tNearbyUnitsOfType, iCategoryToBuild
@@ -2370,38 +2416,13 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                         end
                     else
                         --Check if any nearby part-built units (that have abandoned) near the start position
-                        local iCategoryToBuild = GetCategoryToBuildFromAction(iActionRefToAssign)
-                        if iCategoryToBuild then
-                            if iMinTechLevelWanted > 1 then
-                                if iMinTechLevelWanted == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3
-                                else iCategoryToBuild = iCategoryToBuild * categories.TECH2 + iCategoryToBuild * categories.TECH3
-                                end
-                            end
-
-                            local tNearbyUnitsOfType = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tStartPosition, math.max(iSearchRangeForNearestEngi, 30), 'Ally')
-                            local oNearestPartBuilt
-                            local sPartBuiltLocationRef
-                            if M27Utilities.IsTableEmpty(tNearbyUnitsOfType) == false then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyUnitsOfType)..' units of the target type, will see if any are part-complete') end
-                                for iUnit, oUnit in tNearbyUnitsOfType do
-                                    if oUnit.GetFractionComplete and oUnit:GetFractionComplete() < 1 then
-                                        --Check not already assigned to an existing unit
-                                        sPartBuiltLocationRef = M27Utilities.ConvertLocationToReference(oUnit:GetPosition())
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Unit is part complete, checking if its location is already assigned to an engineer') end
-                                        --reftEngineerAssignmentsByLocation = 'M27EngineerAssignmentsByLoc'     --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location; returns the engineer object
-                                        if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByLocation][sPartBuiltLocationRef]) == true then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Location not assigned to an engineer, so will assist this') end
-                                            oNearestPartBuilt = oUnit
-                                        end
-                                    end
-                                end
-                            end
-                           if oNearestPartBuilt then
-                               if bDebugMessages == true then LOG(sFunctionRef..': Are assisting part built building') end
-                               bAssistBuildingOrEngineer = true
-                               oAssistTarget = oNearestPartBuilt
-                           end
-                        end
+                        local iCategoryToBuild = GetCategoryToBuildFromAction(iActionRefToAssign, iMinTechLevelWanted)
+                        local oNearestPartBuilt = GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, math.max(iSearchRangeForNearestEngi, 30))
+                        if oNearestPartBuilt then
+                           if bDebugMessages == true then LOG(sFunctionRef..': Are assisting part built building') end
+                           bAssistBuildingOrEngineer = true
+                           oAssistTarget = oNearestPartBuilt
+                       end
                     end
                 end
                 if bAssistBuildingOrEngineer == true then
@@ -2419,6 +2440,18 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
             --Pick target from existing locations, and check if already been assigned to an engineer (e.g. would expect this to be done for actions to buidl mex and hydro)
             local oNearestEngineer, tPositionToLookFrom
             for iLocation, tLocation in tExistingLocationsToPickFrom do
+                if not(iActionRefToAssign == refActionBuildMex) then
+                    --Check if any nearby part-built units (that have abandoned) near the start position
+                    local iCategoryToBuild = GetCategoryToBuildFromAction(iActionRefToAssign, iMinTechLevelWanted)
+                    local oNearestPartBuilt = GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tLocation, math.max(iSearchRangeForNearestEngi, 30))
+                    if oNearestPartBuilt then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Are assisting part built building') end
+                        bAssistBuildingOrEngineer = true
+                        oActionObject = oNearestPartBuilt
+                        tActionLocation = oActionObject:GetPosition()
+                        break
+                    end
+                end
                 bLocationAlreadyAssigned = false
                 local sLocationRef = M27Utilities.ConvertLocationToReference(tLocation)
                 if not(aiBrain[reftEngineerAssignmentsByLocation] == nil) then
@@ -2529,6 +2562,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     --DEBUGGING: Key log below to look for: LOG(sFunctionRef..': Game time='..GetGameTimeSeconds()..': About to assign action '..iActionToAssign..' to engineer number '..GetEngineerUniqueCount(oEngineerToAssign)..' with lifetime count='..sEngineerName..'; Eng unitId='..oEngineerToAssign:GetUnitId()..'; ActionTargetLocation='..repr(tActionTargetLocation))
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
 
     local sFunctionRef = 'ReassignEngineers'
     local tEngineers
@@ -3031,14 +3065,21 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 if bHaveLowPower == false and M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftMassStorageLocations]) == false and iNetCurEnergyIncome > 8 then
                     iActionToAssign = refActionBuildMassStorage
                     iMaxEngisWanted = 5
-                    --Pick the best 3 locations as the target for storage
+                    --Pick the best 3 locations as the target for storage, provided they're reasonably comparable in preference
                     local tClosestSubtableRef = {}
-                    local iClosestModDistance = 100000
+                    local iLastModDistance = 100000
+                    local iCurModDistance
                     local iClosestCount = 0
+                    local iMaxModDistanceIncrease = 30
+                    local bInclude
                     for iSubtable, tSubtable in M27Utilities.SortTableBySubtable(aiBrain[M27EconomyOverseer.reftMassStorageLocations], M27EconomyOverseer.refiStorageSubtableModDistance, true) do
-                        iClosestCount = iClosestCount + 1
-                        tClosestSubtableRef[iClosestCount] = iSubtable
-                        if iClosestCount >= 3 then break end
+                        iCurModDistance = tSubtable[M27EconomyOverseer.refiStorageSubtableModDistance]
+                        if iCurModDistance - iLastModDistance <= iMaxModDistanceIncrease then
+                            iClosestCount = iClosestCount + 1
+                            tClosestSubtableRef[iClosestCount] = iSubtable
+                            iLastModDistance = iCurModDistance
+                            if iClosestCount >= 3 then break end
+                        end
                     end
 
                     --[[for iSubtable, tSubtable in aiBrain[M27EconomyOverseer.reftMassStorageLocations] do
@@ -3420,6 +3461,7 @@ end
 
 function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'DelayedEngiReassignment'
     WaitTicks(1)
     if bDebugMessages == true then LOG(sFunctionRef..': Reassigning '..table.getn(tEngineersToReassign)..'engineers') end

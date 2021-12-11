@@ -95,12 +95,16 @@ function GetMassStorageTargets(aiBrain)
     local sFunctionRef = 'GetMassStorageTargets'
     --Goes through all mexes and records any available locations for mass storage
     local iDistanceModForEachAdjacentMex = -60
+    local iDistanceModForEachT1AdjacentMex = -35 --NOTE: If changing this value, then also update engineer overseer's threshold for ignoring a location based on difference in distance
     local iDistanceModForTech2 = 120
     local sLocationRef, tCurLocation
     local tAdjustedPosition = {}
 
-    local tAllMexes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex, false, true)
+    local tAllMexes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMex, false, true)
+    local tAllT2PlusMexes = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex, tAllMexes)
+    local tAllT1Mexes = EntityCategoryFilterDown(M27UnitInfo.refCategoryT1Mex, tAllMexes)
     aiBrain[reftMassStorageLocations] = {}
+    local tStorageLocationsForTech1 = {} --[sLocationRef]; true if the location is by a t1 mex
     local iValidCount = 0
     local tPositionAdjustments = {
         {-2, 0},
@@ -109,19 +113,35 @@ function GetMassStorageTargets(aiBrain)
         {0, 2},
     }
 
+    for iT1Mex, oT1Mex in tAllT1Mexes do
+        for _, tModPosition in tPositionAdjustments do
+            tCurLocation = oT1Mex:GetPosition()
+            tAdjustedPosition = {tCurLocation[1] + tModPosition[1], GetSurfaceHeight(tCurLocation[1] + tModPosition[1], tCurLocation[3] + tModPosition[2]), tCurLocation[3] + tModPosition[2]}
+            if bDebugMessages == true then LOG(sFunctionRef..': Storage by T1Mex: tCurLocation='..repr(tCurLocation)..'; tModPosition='..repr(tModPosition)..'; adjusted position='..repr(tAdjustedPosition)) end
+            sLocationRef = M27Utilities.ConvertLocationToReference(tAdjustedPosition)
+            if tStorageLocationsForTech1[sLocationRef] == nil then
+                tStorageLocationsForTech1[sLocationRef] = true
+            end
+        end
+    end
+
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    local iDistanceFromOurBase, iCurPositionTechAdjust, iCurPositionStartedConstructionAdjust
+    local iDistanceFromOurBase, iCurPositionTechAdjust, iCurPositionStartedConstructionAdjust, iCurPositionAdjacencyAdjust
     local sStorageBP = 'ueb1106'
     local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
-    if M27Utilities.IsTableEmpty(tAllMexes) == false then
+    if M27Utilities.IsTableEmpty(tAllT2PlusMexes) == false then
         --Only want to consider storage if have already upgraded easy T1 mexes to T2
         local iMinSingleMexForStorage = math.min(iMexesNearStart, 6)
         local iMinDoubleMexForStorage = math.min(iMexesNearStart, 2)
         local bOnlyConsiderDoubleOrT3 = false
-        local iMexesForStorage = table.getn(tAllMexes)
+        local iMexesForStorage = table.getn(tAllT2PlusMexes)
+        local tStorageAtLocation
+        local iStorageRadius = 1
+        local bStorageFinishedConstruction
+        local iCurAdjustedDistance
         if iMexesForStorage >= iMinDoubleMexForStorage then
             if iMexesForStorage < iMinSingleMexForStorage then bOnlyConsiderDoubleOrT3 = true end
-            for iMex, oMex in tAllMexes do
+            for iMex, oMex in tAllT2PlusMexes do
                 if not(oMex.Dead) and oMex:GetFractionComplete() >= 1 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering mex with unique ref='..oMex:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oMex)) end
                     tCurLocation = oMex:GetPosition()
@@ -130,24 +150,48 @@ function GetMassStorageTargets(aiBrain)
                         if bDebugMessages == true then LOG(sFunctionRef..': tCurLocation='..repr(tCurLocation)..'; tModPosition='..repr(tModPosition)..'; adjusted position='..repr(tAdjustedPosition)) end
                         sLocationRef = M27Utilities.ConvertLocationToReference(tAdjustedPosition)
                         if aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition) or (aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMassStorage]) == false) then
-                            --sLocationRef = M27Utilities.ConvertLocationToReference(tAdjustedPosition)
-                            iDistanceFromOurBase = M27Utilities.GetDistanceBetweenPositions(tAdjustedPosition, tStartPosition)
-                            iCurPositionTechAdjust = 0
-                            iCurPositionStartedConstructionAdjust = 0
-                            --Reduce distance by 100 if already have it assigned to an engineer (as want to continue existing structure)
-                            if aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition) == false then iCurPositionStartedConstructionAdjust = -100 end
-                            if EntityCategoryContains(categories.TECH2, oMex:GetUnitId()) then iCurPositionTechAdjust = iDistanceModForTech2 end
-                            if bDebugMessages == true then LOG(sFunctionRef..': Can build storage at the position, so will record; sLocationRef='..sLocationRef..'; iDistanceFromOurBase='..iDistanceFromOurBase..'; iCurPositionTechAdjust='..iCurPositionTechAdjust..'; iDistanceModForEachAdjacentMex='..iDistanceModForEachAdjacentMex) end
-                            if aiBrain[reftMassStorageLocations][sLocationRef] then
-                                --Already have a position, so choose the lower of it reduced by 50, or the current value reduced by 50
-                                if bDebugMessages == true then LOG(sFunctionRef..': Already have a position so will reduce current distance by iDistanceModForEachAdjacentMex='..iDistanceModForEachAdjacentMex..'; current distance='..aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance]) end
+                            --Check the building hasnt finished construction
+                            bStorageFinishedConstruction = false
+                            if not(aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition)) then
+                                tStorageAtLocation = GetUnitsInRect(Rect(tAdjustedPosition[1]-iStorageRadius, tAdjustedPosition[3]-iStorageRadius, tAdjustedPosition[1]+iStorageRadius, tAdjustedPosition[3]+iStorageRadius))
+                                if M27Utilities.IsTableEmpty(tStorageAtLocation) == false then
+                                    tStorageAtLocation = EntityCategoryFilterDown(M27UnitInfo.refCategoryMassStorage, tStorageAtLocation)
+                                    if M27Utilities.IsTableEmpty(tStorageAtLocation) == false then
+                                        for iUnit, oUnit in tStorageAtLocation do
+                                            if oUnit:GetFractionComplete() >= 1 then bStorageFinishedConstruction = true break end
+                                        end
+                                    end
+                                end
+                            end
+                            if bStorageFinishedConstruction == false then
 
-                                aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] = math.min(aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] + iDistanceModForEachAdjacentMex, iDistanceFromOurBase + iCurPositionTechAdjust + iDistanceModForEachAdjacentMex + iCurPositionStartedConstructionAdjust)
-                                if bDebugMessages == true then LOG(sFunctionRef..': Distance after modification='..aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance]) end
-                            else
-                                aiBrain[reftMassStorageLocations][sLocationRef] = {}
-                                aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] = iDistanceFromOurBase + iCurPositionTechAdjust - iDistanceModForEachAdjacentMex
-                                aiBrain[reftMassStorageLocations][sLocationRef][reftStorageSubtableLocation] = tAdjustedPosition
+                                --sLocationRef = M27Utilities.ConvertLocationToReference(tAdjustedPosition)
+                                iDistanceFromOurBase = M27Utilities.GetDistanceBetweenPositions(tAdjustedPosition, tStartPosition)
+                                iCurPositionTechAdjust = 0
+                                iCurPositionStartedConstructionAdjust = 0
+                                iCurPositionAdjacencyAdjust = 0
+                                --Reduce distance by 100 if already have it assigned to an engineer (as want to continue existing structure)
+                                if aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition) == false then iCurPositionStartedConstructionAdjust = -100 end
+                                if EntityCategoryContains(categories.TECH2, oMex:GetUnitId()) then iCurPositionTechAdjust = iDistanceModForTech2 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Can build storage at the position, so will record; sLocationRef='..sLocationRef..'; iDistanceFromOurBase='..iDistanceFromOurBase..'; iCurPositionTechAdjust='..iCurPositionTechAdjust..'; iDistanceModForEachAdjacentMex='..iDistanceModForEachAdjacentMex) end
+                                if aiBrain[reftMassStorageLocations][sLocationRef] then
+                                    iCurPositionAdjacencyAdjust = iDistanceModForEachAdjacentMex
+                                    --[[--Already have a position, so choose the lower of it reduced by 50, or the current value reduced by 50
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Already have a position so will reduce current distance by iDistanceModForEachAdjacentMex='..iDistanceModForEachAdjacentMex..'; current distance='..aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance]) end
+
+                                    aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] = math.min(aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] + iDistanceModForEachAdjacentMex, iDistanceFromOurBase + iCurPositionTechAdjust + iDistanceModForEachAdjacentMex + iCurPositionStartedConstructionAdjust)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Distance after modification='..aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance]) end--]]
+                                elseif tStorageLocationsForTech1[sLocationRef] then
+                                    iCurPositionAdjacencyAdjust = iDistanceModForEachT1AdjacentMex
+                                end
+                                iCurAdjustedDistance = iDistanceFromOurBase + iCurPositionTechAdjust + iCurPositionAdjacencyAdjust + iCurPositionStartedConstructionAdjust
+                                if aiBrain[reftMassStorageLocations][sLocationRef] then
+                                    aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] = math.min(iCurAdjustedDistance, aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] + iCurPositionAdjacencyAdjust)
+                                else
+                                    aiBrain[reftMassStorageLocations][sLocationRef] = {}
+                                    aiBrain[reftMassStorageLocations][sLocationRef][refiStorageSubtableModDistance] = iCurAdjustedDistance
+                                    aiBrain[reftMassStorageLocations][sLocationRef][reftStorageSubtableLocation] = tAdjustedPosition
+                                end
                             end
                         else
                             if bDebugMessages == true then
@@ -155,14 +199,13 @@ function GetMassStorageTargets(aiBrain)
                                 M27Utilities.DrawLocation(tAdjustedPosition, nil, 3, 200)
                             end
                         end
-                    end
+                                        end
                 end
             end
             --Now go through again and remove entries that are too far away so that we're not getting storage when we still have t1 nearby mexes to upgrade
             if bOnlyConsiderDoubleOrT3 and M27Utilities.IsTableEmpty(aiBrain[reftMassStorageLocations]) == false then
                 local iMaxDistance = iDistanceModForTech2 - 1
-                local bRemove = true
-                for iEntry, tSubtable in aiBrain[reftMassStorageLocations][sLocationRef] do
+                for iEntry, tSubtable in aiBrain[reftMassStorageLocations] do
                     if tSubtable[refiStorageSubtableModDistance] > iMaxDistance then aiBrain[reftMassStorageLocations][sLocationRef] = nil end
                 end
             end
@@ -468,7 +511,7 @@ function UnpauseUpgrades(aiBrain, iMaxToUnpause)
 end
 
 function PauseLastUpgrade(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'PauseLastUpgrade'
     local oLastUnpausedUpgrade
     local oLastUnpausedNonMex
