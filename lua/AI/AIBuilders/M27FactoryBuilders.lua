@@ -21,10 +21,10 @@ BuilderGroup {
         InstanceCount = 3, --dont want to build too many at once
         BuilderConditions = {
             { MIBC, 'M27TestReturnFalse', {true} },
-            { TBC, 'EnemyThreatGreaterThanValueAtBase', { 'LocationType', 0, 'Air', 1 } }, -- Build AA if the enemy is threatening our base with air units.
+            --[[{ TBC, 'EnemyThreatGreaterThanValueAtBase', { 'LocationType', 0, 'Air', 1 } }, -- Build AA if the enemy is threatening our base with air units.
             { UCBC, 'HaveUnitRatio', { 0.15, categories.LAND * categories.ANTIAIR * categories.MOBILE,
                                        '<', categories.LAND  * categories.MOBILE - categories.ENGINEER } },
-            { UCBC, 'HaveLessThanUnitsWithCategory', { 6, categories.LAND  * categories.ANTIAIR } },
+            { UCBC, 'HaveLessThanUnitsWithCategory', { 6, categories.LAND  * categories.ANTIAIR } },--]]
              --for testing
         },
         BuilderType = 'All',

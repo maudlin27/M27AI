@@ -217,7 +217,7 @@ end
 function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGuarding)
     --Assumes the unit will have been given a clearcommands() action if it needs one prior to calling this since sometimes will want to sometimes wont
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'ClearEngineerActionTrackers'
     --if oEngineer == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
 
@@ -356,7 +356,7 @@ end
 
 function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'UpdateEngineerActionTrackers'
 
     if iActionToAssign == nil then M27Utilities.ErrorHandler('iActionToAssign is nil') end
@@ -382,7 +382,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
     local sName = ''
     if M27Config.M27ShowUnitNames == true or M27Config.M27ShowUnitNames == true then bUpdateName = true end
     if bUpdateName == true then
-        sName = 'Eng'..iUniqueRef..':Action='..iActionToAssign
+        sName = 'E'..iUniqueRef..':UID='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; Action='..iActionToAssign
         if bAreAssisting then sName = sName..': AssistObject' end
         if oEngineer.SetCustomName then oEngineer:SetCustomName(sName) end
     end
@@ -544,7 +544,7 @@ end
 function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     --Returns true if are enemies near the engineer such that it's been given an override action (and should be ignored)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
     local bAreNearbyEnemies = false
     if oEngineer and not(oEngineer.Dead) then
@@ -675,7 +675,7 @@ function GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentAction
     --bGetInitialEngineer - if true then will just look for the first idle engineer, ignoring everything else
     --iMinTechLevelWanted - will ignore engis lower than this tech level
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'GetNearestEngineerWithLowerPriority'
     --if iMinTechLevelWanted > 1 then bDebugMessages = true end
     local oNearestEngineer
@@ -810,7 +810,7 @@ end
 function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
     --Will wait iDelay seconds, before clearing engineer's actions if it's guarding a unit and its action is still spare
     local bDebugMessages = false
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'DelayedSpareEngineerClearAction'
     WaitSeconds(iDelaySeconds)
     if oEngineer[refiEngineerCurrentAction] == refActionSpare then
@@ -823,7 +823,7 @@ end
 
 function IssueSpareEngineerAction(aiBrain, oEngineer)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'IssueSpareEngineerAction'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --Action already cleared in previous code
@@ -936,7 +936,7 @@ end
 
 function AreMobileUnitsInRect(rRectangleToSearch, bOnlyLookForMobileLand)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'AreMobileUnitsInRect'
     local bAreUnits
     local tBlockingUnits = GetUnitsInRect(rRectangleToSearch)
@@ -1868,7 +1868,7 @@ end
 
 function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpgrade)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'UpgradeBuildingActionCompleteChecker'
     local bContinue = true
     while bContinue == true do
@@ -1885,7 +1885,7 @@ end
 function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iConditionNumber, sBuildingBPRef)
     --If oActionTargetObject is specified, then will assist this, otherwise will try and construct a new building
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'AssignActionToEngineer'
 
     if oEngineer then
@@ -2299,7 +2299,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     --if tExistingLocationsToPickFrom isn't nil then will only refer to here
     --Variables from tIdleEngineers onwards are only used by the mex functionality which will use the existing function to get the nearest idle engineer, and see hwo far it is from the mex
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'GetActionTargetAndObject'
     local tLocationsToGoThrough = tExistingLocationsToPickFrom
     local tNearbyUnitsOfType, iCategoryToBuild
@@ -2562,7 +2562,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     --DEBUGGING: Key log below to look for: LOG(sFunctionRef..': Game time='..GetGameTimeSeconds()..': About to assign action '..iActionToAssign..' to engineer number '..GetEngineerUniqueCount(oEngineerToAssign)..' with lifetime count='..sEngineerName..'; Eng unitId='..oEngineerToAssign:GetUnitId()..'; ActionTargetLocation='..repr(tActionTargetLocation))
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
 
     local sFunctionRef = 'ReassignEngineers'
     local tEngineers
@@ -3461,7 +3461,7 @@ end
 
 function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
-    if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'DelayedEngiReassignment'
     WaitTicks(1)
     if bDebugMessages == true then LOG(sFunctionRef..': Reassigning '..table.getn(tEngineersToReassign)..'engineers') end

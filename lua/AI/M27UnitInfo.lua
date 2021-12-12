@@ -49,7 +49,8 @@ refCategoryAirStaging = categories.STRUCTURE * categories.AIRSTAGINGPLATFORM
 refCategoryRadar = categories.STRUCTURE * categories.RADAR + categories.STRUCTURE * categories.OMNI
 refCategoryT1Radar = refCategoryRadar * categories.TECH1
 refCategoryT2Radar = refCategoryRadar * categories.TECH2
-refCategoryT3Radar = refCategoryRadar * categories.TECH3 --+ categories.OMNI * categories.TECH3
+refCategoryT3Radar = refCategoryRadar * categories.TECH3 --+ categories.OMNI * categories.TECH3 (dont need this as refcategoryradar already includes omni)
+
 
 --Building - factory
 refCategoryLandFactory = categories.LAND * categories.FACTORY * categories.STRUCTURE
@@ -154,6 +155,10 @@ end
 function GetBlueprintFromID(sBlueprintID)
     --returns blueprint based on the blueprintID
     return __blueprints[string.lower(sBlueprintID)]
+end
+
+function GetUnitFaction(oUnit)
+    return GetFactionFromBP(oUnit:GetBlueprint())
 end
 
 function GetBuildingSize(BlueprintID)

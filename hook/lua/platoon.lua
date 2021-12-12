@@ -705,6 +705,9 @@ Platoon = Class(M27PlatoonClass) {
         --Scout that will follow a target and provide it with intel
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27LocationAssister = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
     M27MAAAssister = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,

@@ -36,6 +36,7 @@ refiStartingSegmentGroup = 'M27StartingSegmentGroup' --[sPathingType]  - returns
 reftSortedMexesInOriginalGroup = 'M27SortedMexesInOriginalGroup' --Local to AI Brain, [iPathingGroup][iMexCount], returns mex location; ordered based on how close the mex is to our base and enemy (early entries are closest to our base)
 reftMexesInPathingGroupFilteredByDistanceToEnemy = 'M27MexesInPathingGroupFilteredByDistanceToEnemy' --local to aiBrain; [sPathing][iPathingGroup][iMinRangeFromEnemy][iMaxRangeFromEnemy][iMexCount] returns Mex Location
 reftHighPriorityMexes = 'M27HighPriorityMexes' --Local to aiBrain, list of mex locations
+reftMexesToKeepScoutsBy = 'M27MapMexesToKeepScoutsBy'
 
 reftMexPatrolLocations = 'M27MapMexPatrolLocations' --aiBrain variable, [x] = nth mex will be the locations e.g. top 3 locations to patrol between
 refbCanPathToEnemyBaseWithLand = 'M27MapCanPathToEnemyWithLand' --True if can path to enemy base, false otherwise
@@ -1119,7 +1120,7 @@ function RecordMexesInPathingGroupFilteredByEnemyDistance(aiBrain, sPathing, iPa
 end
 
 function RecordSortedMexesInOriginalPathingGroup(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordSortedMexesInOriginalPathingGroup'
     local tUnsortedMexDetails = {}
     local refiMexLocation = 1
@@ -1175,6 +1176,54 @@ function RecordSortedMexesInOriginalPathingGroup(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': iEntry='..iEntry..'; Distance='..tValue[refiMexDistance]..'; Location='..repr(tValue[refiMexLocation])) end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tMexByPathingAndGrouping[sPathing][iPathingGroup])..' mexes in MexByPathingAndGrouping, and iSortedCount='..iSortedCount) end
+
+    --Now record mexes that we want to maintain scouts for
+    if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy]) == true then
+        aiBrain[reftMexesToKeepScoutsBy] = {}
+        local sPathingType = M27UnitInfo.refPathingTypeLand
+        local iStartPathingGroup = GetSegmentGroupOfLocation(sPathingType, PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local sLocationRef
+        local iMinDistanceFromBase = 40
+        local tNearbyMexes
+        local iNearbyMexSearchRange = 15 --Wont assign a scout to a mex if it's already covered by another mex within this range
+        local bHaveNearbyAssignedMex
+        local sNearbyLocationRef
+        local iCurDistanceToEnemy, iCurDistanceToStart
+        if bDebugMessages == true then LOG(sFunctionRef..': sPathingType='..sPathingType..'; iStartPathingGroup='..iStartPathingGroup..'; tMexByPathingAndGrouping='..repr(aiBrain[tMexByPathingAndGrouping])) end
+
+        for iMex, tMex in tMexByPathingAndGrouping[sPathingType][iStartPathingGroup] do
+            iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tMex, tOurStartPos)
+            if iCurDistanceToStart > iMinDistanceFromBase then
+                --Are we closer to us than enemy?
+                iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tMex, tEnemyStartPos)
+                if iCurDistanceToStart <= iCurDistanceToEnemy then
+                    sLocationRef = M27Utilities.ConvertLocationToReference(tMex)
+                    bHaveNearbyAssignedMex = false
+                    for iNearbyMex, tNearbyMex in tMexByPathingAndGrouping[sPathingType][iStartPathingGroup] do
+                        sNearbyLocationRef = M27Utilities.ConvertLocationToReference(tNearbyMex)
+                        if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy][sNearbyLocationRef]) == false then
+                            bHaveNearbyAssignedMex = true
+                            break
+                        end
+                    end
+                    if bHaveNearbyAssignedMex == false then
+                        aiBrain[reftMexesToKeepScoutsBy][sLocationRef] = {}
+                        aiBrain[reftMexesToKeepScoutsBy][sLocationRef][1] = tMex[1]
+                        aiBrain[reftMexesToKeepScoutsBy][sLocationRef][2] = tMex[2]
+                        aiBrain[reftMexesToKeepScoutsBy][sLocationRef][3] = tMex[3]
+                    end
+                end
+            end
+        end
+    end
+
+    if bDebugMessages == true then
+        if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy]) == true then
+            M27Utilities.ErrorHandler('No mexes on our side of map in pathing group outside core mexes - likely error unless unusual map setup', nil, true)
+        else
+            LOG(sFunctionRef..': Finished recording mexes to keep scouts by='..repr(aiBrain[reftMexesToKeepScoutsBy])..'; count='..table.getn(aiBrain[reftMexesToKeepScoutsBy]))
+        end
+    end
 end
 
 function RecordStartingPathingGroups(aiBrain)

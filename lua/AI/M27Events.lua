@@ -11,6 +11,8 @@ local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
+local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
+local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
 local refCategoryAirScout = M27UnitInfo.refCategoryAirScout
@@ -107,6 +109,15 @@ function OnDamaged(self, instigator)
                                 self[M27Overseer.refoUnitDealingUnseenDamage] = oUnitCausingDamage
                                 --Flag that we want the location (and +- 2 segments around it) the shot came from scouted asap
                                 M27AirOverseer.MakeSegmentsAroundPositionHighPriority(aiBrain, oUnitCausingDamage:GetPosition(), 2)
+
+                            end
+                            --If we're upgrading consider cancelling
+                            if self:IsUnitState('Upgrading') and self:GetWorkProgress() <= 0.3 and oUnitCausingDamage:EntityCategoryContains(categories.INDIRECT, oUnitCausingDamage:GetUnitId()) and M27Conditions.DoesACUHaveGun(aiBrain, false, self) then
+                                --Do we have nearby friendly units?
+                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
+                                    IssueClearCommands({self})
+                                    IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                end
                             end
                         end
                     end

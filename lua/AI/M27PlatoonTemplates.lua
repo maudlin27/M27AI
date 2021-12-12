@@ -12,9 +12,11 @@ refbRunFromAllEnemies = 'M27RunFromAllEnemies' --Only cases where wont run are i
 refbAlwaysAttack = 'M27AlwaysAttack' --will attack and not run away
 refbAttackMove = 'M27PlatTempAttackMove'
 refbRequiresUnitToFollow = 'M27PlatTempRequiresUnitToFollow'
+refbRequiresSingleLocationToGuard = 'M27PlatTempRequiresSingleLocationToGuard'
 reftPlatoonsToAmalgamate = 'M27PlatoonsToAmalgamate'
 refiPlatoonAmalgamationRange = 'M27PlatoonAmalgamationRange'
 refiPlatoonAmalgamationMaxSize = 'M27PlatoonAmalgamationMaxSize' --Optional - required only if are amalgmating; If exceed this then will stop looking to amalgamate
+refbAmalgamateIntoEscort = 'M27PlatoonAmalgamateIntoEscort' --true if any amalgamation shoudl be done to the escort platoon (but based on the position of the platoon its escorting)
 refbDontDisplayName = 'M27PlatoonDontDisplayName' --Used for idle platoons so dont overwrite name when arent really using the platoon and are assigning names via separate method (e.g. for engis and air)
 refbUsedByThreatDefender = 'M27PlatoonUsedByThreatDefender' --Overseer's threat assess and respond will consider this platoon if this is set to true
 refbWantsShieldEscort = 'M27PlatoonWantsShieldEscort' --true if should be considered when assigning mobile shields
@@ -249,6 +251,21 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = false,
     },
+    ['M27LocationAssister'] = --used for scouts to stay near mexes
+    {
+        [refbIdlePlatoon] = false,
+        [refbIgnoreStuckAction] = true,
+        [refbRequiresSingleLocationToGuard] = true,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = true,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [refbWantsShieldEscort] = false,
+    },
     ['M27IntelPathAI'] =
     {
         [refbIdlePlatoon] = false,
@@ -281,6 +298,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
+        [refbAmalgamateIntoEscort] = true, --E.g. overseer will in some cases set amalgamation to happen in which case want it to be into escort
         [refbUsedByThreatDefender] = false, --Some of functionality in platoon utilities such as building factory is turned off if this is true
         [refbWantsShieldEscort] = true,
     },

@@ -447,7 +447,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 iCategoryToBuild = refCategoryLandScout
                                 iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallAllPlatoons]
                             end
-                        elseif iCurrentConditionToTry == 25 then --Spare engis
+                        elseif iCurrentConditionToTry == 25 then --Scouts for mexes
+                            if aiBrain[M27Overseer.refiScoutShortfallMexes] > 0 then
+                                iCategoryToBuild = refCategoryLandScout
+                                iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallMexes]
+                            end
+                        elseif iCurrentConditionToTry == 26 then --Spare engis
                             if aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 5 then
                                 iCategoryToBuild = refCategoryEngineer
                                 iTotalWanted = 5 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
@@ -579,7 +584,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 iCategoryToBuild = refCategoryLandScout
                                 iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallAllPlatoons]
                             end
-                        elseif iCurrentConditionToTry == 20 then --Spare engis
+                        elseif iCurrentConditionToTry == 20 then --Scouts for mexes
+                            if aiBrain[M27Overseer.refiScoutShortfallMexes] > 0 then
+                                iCategoryToBuild = refCategoryLandScout
+                                iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallMexes]
+                            end
+                        elseif iCurrentConditionToTry == 21 then --Spare engis
                             if aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 5 then
                                 iCategoryToBuild = refCategoryEngineer
                                 iTotalWanted = 5 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]

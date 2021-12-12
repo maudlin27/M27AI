@@ -3,6 +3,7 @@
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27FactoryOverseer = import('/mods/M27AI/lua/AI/M27FactoryOverseer.lua')
+local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
@@ -226,6 +227,7 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
     local iHighestTech = 1
     local iHighestFactoryBeingUpgraded = 0
     local iCurTech
+
     for iUnit, oUnit in tAllUnits do
         if not(oUnit.Dead) and oUnit.GetFractionComplete and oUnit:GetFractionComplete() == 1 then
             iCurTech = M27UnitInfo.GetUnitTechLevel(oUnit)
@@ -234,10 +236,7 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
                 iUpgradingCount = iUpgradingCount + 1
                 if iCurTech > iHighestFactoryBeingUpgraded then iHighestFactoryBeingUpgraded = iCurTech end
             else
-                --Can the unit be upgraded?
-                oUnitBP = oUnit:GetBlueprint()
-                local sUpgradesTo = oUnitBP.General.UpgradesTo
-                if sUpgradesTo and not(sUpgradesTo == '') then
+                if M27Conditions.SafeToUpgradeUnit(oUnit) then
                     iAvailableToUpgradeCount = iAvailableToUpgradeCount + 1
                     if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; iAvailableToUpgradeCount='..iAvailableToUpgradeCount..'; Have unit available to upgrading whose unit state isnt upgrading.  UnitId='..oUnit:GetUnitId()..'; Unit State='..M27Logic.GetUnitState(oUnit)..': Upgradesto='..oUnitBP.General.UpgradesTo) end
                 end
@@ -305,26 +304,10 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
             if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; checking if its valid') end
             if IsUnitValid(oUnit) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a unit that is available for upgrading; iUnit='..iUnit..'; Unit ref='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
-                if not(oUnit:IsUnitState('Upgrading')) then
-                    --Check we can upgrade
-                    if bDebugMessages == true then LOG(sFunctionRef..': oUnit isnt upgrading, seeing if it has a blueprint to upgrade to') end
-                    if M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, false) then
-                        tCurPosition = oUnit:GetPosition()
-                        iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tCurPosition)
-                        iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tOurStartPosition, tCurPosition)
-                        if bDebugMessages == true then LOG(sFunctionRef..': oUnit can be upgraded, iCurDistanceToEnemey='..iCurDistanceToEnemy..'; iCurDistanceToStart='..iCurDistanceToStart..'; iDistanceBufferToEnemy='..iDistanceBufferToEnemy) end
-                        if iCurDistanceToEnemy - iDistanceBufferToEnemy > iCurDistanceToStart then
-                            --Check no nearby enemies:
-                            tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.DIRECTFIRE + categories.LAND * categories.INDIRECTFIRE + categories.NAVAL * categories.DIRECTFIRE + categories.NAVAL * categories.INDIRECTFIRE, tCurPosition, iEnemySearchRange, 'Enemy')
-                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if are nearby enemies to oUnit with position='..repr(tCurPosition)..' and search range='..iEnemySearchRange) end
-                            if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then
-                                iPotentialUnits = iPotentialUnits + 1
-                                tPotentialUnits[iPotentialUnits] = oUnit
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have a potential unit to upgrade, iPotentialUnits='..iPotentialUnits) end
-                            elseif bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyEnemies)..' enemies nearby so wont upgrade')
-                            end
-                        end
-                    end
+                if M27Conditions.SafeToUpgradeUnit(oUnit) then
+                    iPotentialUnits = iPotentialUnits + 1
+                    tPotentialUnits[iPotentialUnits] = oUnit
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a potential unit to upgrade, iPotentialUnits='..iPotentialUnits) end
                 end
             end
         end
@@ -357,12 +340,16 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
     --iMexesUpgrading, iMexesAvailableForUpgrade = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex + refCategoryT2Mex, true)
+    local iT1Mexes = aiBrain:GetCurrentUnits(refCategoryT1Mex)
     local iT2Mexes = aiBrain:GetCurrentUnits(refCategoryT2Mex)
     local iT3Mexes = aiBrain:GetCurrentUnits(refCategoryT3Mex)
     local iLandFactoryUpgrading, iLandFactoryAvailable, bAlreadyUpgradingLandHQ = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory, true)
     local iAirFactoryUpgrading, iAirFactoryAvailable, bAlreadyUpgradingAirHQ = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryAirFactory, true)
+
+    local iT1LandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory * categories.TECH1)
     local iT2LandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory * categories.TECH2)
     local iT3LandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory * categories.TECH3)
+    local iT1AirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH1)
     local iT2AirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH2)
     local iT3AirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH3)
     local iUnitUpgrading, iUnitAvailable
@@ -387,7 +374,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                 if (iLandFactoryUpgrading + iT2LandFactories + iAirFactoryUpgrading + iT2AirFactories) + (iT3LandFactories + iT3AirFactories) * 1.5 < ((aiBrain[refiMexesUpgrading] + iT2Mexes) + iT3Mexes * 3)*iRatioOfMexToFactory then
                     if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade build power if we have factories available. bAlreadyUpgradingLandHQ='..tostring(bAlreadyUpgradingLandHQ)..'; bAlreadyUpgradingAirHQ='..tostring(bAlreadyUpgradingAirHQ)) end
                     --Want to upgrade build power
-                    local iFactoryToAirRatio = (iLandFactoryUpgrading + iLandFactoryAvailable + iT3LandFactories) / math.max(1, iAirFactoryUpgrading + iAirFactoryAvailable + iT3AirFactories)
+                    local iFactoryToAirRatio = (iLandFactoryUpgrading * 2 + iT1LandFactories + iT2LandFactories * 2 + iT3LandFactories * 3) / math.max(1, iAirFactoryUpgrading * 2 + iT1AirFactories + iT2AirFactories * 2 + iT3AirFactories * 3)
                     local iDesiredFactoryToAirRatio = aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir])
                     if iAirFactoryAvailable > 0 and iFactoryToAirRatio > iDesiredFactoryToAirRatio and aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] > (iAirFactoryUpgrading + iAirFactoryAvailable) and not(bAlreadyUpgradingAirHQ) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade air factory') end
