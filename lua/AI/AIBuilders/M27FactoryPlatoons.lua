@@ -1,3 +1,4 @@
+--OBSOLETE - below isnt united by M27AI
 local UCBC = '/lua/editor/UnitCountBuildConditions.lua'
 local EBC = '/lua/editor/EconomyBuildConditions.lua'
 local IBC = '/lua/editor/InstantBuildConditions.lua'
@@ -9,7 +10,7 @@ local MIBC = '/lua/editor/MiscBuildConditions.lua'
 local MABC = '/lua/editor/MarkerBuildConditions.lua'
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 
-BuilderGroup {
+--[[BuilderGroup {
     BuilderGroupName = 'M27AIPlatoonBuilder',
     BuildersType = 'PlatoonFormBuilder', -- A PlatoonFormBuilder is for builder groups of units.
     Builder {
@@ -26,7 +27,8 @@ BuilderGroup {
         BuilderConditions = {
             { MIBC, 'M27TestReturnFalse', {true} }, --for testing
         },
-    },--[[
+    },--]]
+    --[[
     Builder {
         BuilderName = 'M27AI Land Attack1OffRaider',
         PlatoonTemplate = 'M27SmallRaider', -- The platoon template tells the AI what units to include, and how to use them.
@@ -247,4 +249,4 @@ BuilderGroup {
         BuilderType = 'Any',
         BuilderConditions = { },
     },--]]
-}
+--}
