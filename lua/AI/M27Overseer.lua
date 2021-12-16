@@ -61,6 +61,8 @@ refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
 --Big enemy threats (impact on strategy and/or engineer build order)
 reftEnemyGroundExperimentals = 'M27OverseerEnemyGroundExperimentals'
 reftEnemyNukeLaunchers = 'M27OverseerEnemyNukeLaunchers'
+reftEnemyTML = 'M27OverseerEnemyTML'
+refbEnemyTMLSightedBefore = 'M27OverseerEnemyTMLSightedBefore'
 refiEnemyHighestTechLevel = 'M27OverseerEnemyHighestTech'
 
 --Platoon references
@@ -2697,7 +2699,7 @@ end
 function ACUManager(aiBrain)
     --A lot of the below code is a hangover from when the ACU would use the built in AIBuilders and platoons;
     --Almost all the functionality has now been integrated into the M27ACUMain platoon logic, with a few exceptions (such as calling for help), although these could probably be moved over as well
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ACUManager'
 
     local oACU = M27Utilities.GetACU(aiBrain)
@@ -2744,12 +2746,16 @@ function ACUManager(aiBrain)
         local iIdleCount = 0
         local iIdleThreshold = 3
         if M27Logic.IsUnitIdle(oACU, false, true) == true then
+            if bDebugMessages == true then LOG(sFunctionRef..': ACU is idle, iIdleCount='..iIdleCount) end
             iIdleCount = iIdleCount + 1
             if iIdleCount > iIdleThreshold then
                 local oNewPlatoon = aiBrain:MakePlatoon('', '')
                 aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU},'Attack', 'None')
                 oNewPlatoon:SetAIPlan('M27ACUMain')
-                if oACUPlatoon and not(oACUPlatoon == oArmyPoolPlatoon) and oACUPlatoon.PlatoonDisband then oACUPlatoon:PlatoonDisband() end
+                if oACUPlatoon and not(oACUPlatoon == oArmyPoolPlatoon) and oACUPlatoon.PlatoonDisband then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Disbanding ACU current platoon') end
+                    oACUPlatoon:PlatoonDisband()
+                end
                 if bDebugMessages == true then
                     local iPlatoonCount = oNewPlatoon[M27PlatoonUtilities.refiPlatoonCount]
                     if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27ACUMain']
@@ -3116,7 +3122,7 @@ function SetMaximumFactoryLevels(aiBrain)
     if iPrimaryFactoryType == refFactoryTypeAir then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
     if bDebugMessages== true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]='..aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]..'; aiBrain[M27AirOverseer.refiBombersWanted]='..aiBrain[M27AirOverseer.refiBombersWanted]..'; iTorpBomberShortfall='..iTorpBomberShortfall) end
 
-    local iAirUnitsWanted = aiBrain[M27AirOverseer.refiAirAANeeded] + math.min(1, aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]) + aiBrain[M27AirOverseer.refiBombersWanted] + iTorpBomberShortfall
+    local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(1, aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]) + aiBrain[M27AirOverseer.refiBombersWanted] + iTorpBomberShortfall
     aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4) / 5))
     if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 end
@@ -3139,7 +3145,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
     --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
     local iBigThreatSearchRange = 10000
 
-    local tEnemyBigThreatCategories = {M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySML}
+    local tEnemyBigThreatCategories = {M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryTML}
     local tCurCategoryUnits
     local tReferenceTable, bRemovedUnit
     local sUnitUniqueRef
@@ -3148,6 +3154,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         tCurCategoryUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
         if iCategory == M27UnitInfo.refCategoryGroundExperimental or iCategory == M27UnitInfo.refCategoryFixedT3Arti then tReferenceTable = aiBrain[reftEnemyGroundExperimentals]
         elseif iCategory == M27UnitInfo.refCategorySML then tReferenceTable = aiBrain[reftEnemyNukeLaunchers]
+        elseif iCategory == M27UnitInfo.refCategoryTML then tReferenceTable = aiBrain[reftEnemyTML]
         else
             M27Utilities.ErrorHandler('Unrecognised enemy super threat category, wont be recorded')
             break
@@ -3179,6 +3186,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 end
             end
         end
+    end
+    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false and aiBrain[refbEnemyTMLSightedBefore] == false then
+        aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
+        aiBrain[refbEnemyTMLSightedBefore] = true
     end
 
     if iCurCycleCount <= 0 then
@@ -3254,7 +3265,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         if M27Utilities.IsTableEmpty(aiBrain[reftEnemyGroundExperimentals]) == false then bBigEnemyThreat = true end
 
         if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 then
-            if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.5 or iDistanceFromEnemyToUs >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
+            if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.42 or iDistanceFromEnemyToUs >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
                 if bDebugMessages == true then LOG(sFunctionRef..': No big enemy threats and good defence and mex coverage so will eco') end
                 bWantToEco = true
             else
@@ -3371,6 +3382,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
                 --Factories wanted
             tsGameState['WantMoreLandFactories'] = tostring(aiBrain[M27EconomyOverseer.refbWantMoreFactories])
+
+            --Mobile shields
+            tsGameState['WantMoreMobileSHields'] = tostring(aiBrain[refbUsingMobileShieldsForPlatoons])
 
             --Threat values:
             --Intel path % to enemy
@@ -3569,6 +3583,8 @@ function OverseerInitialisation(aiBrain)
     aiBrain[reftiMexIncomePrevCheck][1] = 0
     aiBrain[reftEnemyNukeLaunchers] = {}
     aiBrain[reftEnemyGroundExperimentals] = {}
+    aiBrain[reftEnemyTML] = {}
+    aiBrain[refbEnemyTMLSightedBefore] = false
 
     aiBrain[refiPercentageOutstandingThreat] = 0.5
     aiBrain[refiPercentageClosestFriendlyToEnemyBase] = 0.5
@@ -3668,10 +3684,41 @@ function TEMPUNITPOSITIONLOG(aiBrain)
     end
 end
 
+function TempEnemyACUDirection(aiBrain)
+    while aiBrain do
+        WaitTicks(1)
+        local tAllACUs = EntityCategoryFilterDown(categories.COMMAND, GetUnitsInRect(Rect(0, 0, 1000, 1000)))
+        local oEnemyACU
+        for iACU, oACU in tAllACUs do
+            if IsEnemy(aiBrain:GetArmyIndex(), oACU:GetAIBrain():GetArmyIndex()) then
+                oEnemyACU = oACU
+            end
+        end
+        local sBone = 'Left_Foot'
+        --LOG('Position of Left foot='..repr(oEnemyACU:GetPosition(sBone)))
+        LOG('ACU orientation='..repr(oEnemyACU:GetOrientation()))
+        LOG('ACU Heading='..repr(oEnemyACU:GetHeading()))
+        LOG('ACU Angle direction='..M27UnitInfo.GetUnitFacingAngle(oEnemyACU))
+        LOG('ACU position='..repr(oEnemyACU:GetPosition()))
+    end
+end
+
+function TestNewMovementCommands(aiBrain)
+    local tOurStart = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    local tEnemyStart = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+    local iDistBetweenBases = M27Utilities.GetDistanceBetweenPositions(tOurStart, tEnemyStart)
+    LOG('Our start pos='..repr(tOurStart)..'; Enemy start pos='..repr(tEnemyStart)..'; OurACUPos='..repr(M27Utilities.GetACU(aiBrain):GetPosition())..'; Distance between start points='..iDistBetweenBases)
+    local tMapMidPointMethod1 = M27Utilities.MoveTowardsTarget(tOurStart, tEnemyStart, iDistBetweenBases * 0.5, 0)
+    local iAngle = M27Utilities.GetAngleFromAToB(tOurStart, tEnemyStart)
+    local tMapMidPointMethod2 = M27Utilities.MoveInDirection(tOurStart, iAngle, iDistBetweenBases * 0.5)
+
+    LOG('tMapMidPointMethod1='..repr(tMapMidPointMethod1)..'; tMapMidPointMethod2='..repr(tMapMidPointMethod2))
+end
+
 
 
 function OverseerManager(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'OverseerManager'
 
 
@@ -3713,13 +3760,15 @@ function OverseerManager(aiBrain)
     local iSlowerCycleCount = 0
 
     --ForkThread(M27MiscProfiling.ListCategoriesUsedByCount)
-
+    --ForkThread(TempEnemyACUDirection, aiBrain)
     if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
-
     DetermineInitialBuildOrder(aiBrain)
     local iTempProfiling
 
+
+
     while(not(aiBrain:IsDefeated())) do
+        ForkThread(TestNewMovementCommands, aiBrain)
         --M27MiscProfiling.OptimisationComparisonDistanceToStart(aiBrain)
 
         if bDebugMessages == true then

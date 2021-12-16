@@ -5,6 +5,7 @@
 ---
 
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
+local M27UnitMicro = import('/mods/M27AI/lua/AI/M27UnitMicro.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
@@ -14,8 +15,10 @@ local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 
+
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
 local refCategoryAirScout = M27UnitInfo.refCategoryAirScout
+
 
 function OnKilled(self, instigator, type, overkillRatio)
     --NOTE: Called by any unit of any player being killed; also note that OnUnitDeath triggers as well as this
@@ -131,3 +134,46 @@ function OnDamaged(self, instigator)
         end
     end
 end
+
+function OnBombFired(oWeapon, projectile)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'OnBombFired'
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+    local oUnit = oWeapon.unit
+    if oUnit and oUnit.GetUnitId then
+        local sUnitID = oUnit:GetUnitId()
+        if EntityCategoryContains(M27UnitInfo.refCategoryBomber - categories.EXPERIMENTAL, sUnitID) then
+            M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
+        end
+    end
+end
+
+--WARNING: OnWeaponFired and/or OnProjectilfeFired - one of these (probably the latter) resulted in error messages when t1 arti fired, disabled both of them as dont use now
+--[[
+function OnWeaponFired(oWeapon)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'OnWeaponFired'
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+    --NOTE: Have used hook on calcballisticacceleration instead of below now
+    --if oWeapon.GetBlueprint then LOG('OnWeaponFired hook for blueprint='..repr(oWeapon:GetBlueprint())) end
+    local oUnit = oWeapon.unit
+    if oUnit and oUnit.GetUnitId then
+        local sUnitID = oUnit:GetUnitId()
+        if EntityCategoryContains(M27UnitInfo.refCategoryBomber - categories.EXPERIMENTAL, sUnitID) then
+            M27UnitMicro.DodgeBombsFiredByUnit(oWeapon, oUnit)
+        end
+    end
+end--]]
+
+--[[
+function OnProjectileFired(oWeapon, oMuzzle)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'OnProjectileFired'
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+    if oWeapon.GetBlueprint then
+        LOG('OnWeaponFired hook for blueprint='..repr(oWeapon:GetBlueprint()))
+    end
+    if oWeapon.unit then
+        LOG('Have a unit; unit position='..repr(oWeapon.unit:GetPosition()))
+    end
+end--]]

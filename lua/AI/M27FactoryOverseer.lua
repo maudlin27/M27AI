@@ -267,6 +267,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
             local bTemporaryPause = false
             local bSeraphimT1LandFactory = EntityCategoryContains(M27UnitInfo.refCategoryLandFactory * categories.TECH1 * categories.SERAPHIM, sFactoryBP)
 
+
             local iCount = 0
             while sBPIDToBuild == nil do
                 iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
@@ -374,9 +375,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                             end
                         elseif iCurrentConditionToTry == 14 then--Mobile shields
-                            local iPowerWanted = 20
-                            if iFactoryTechLevel > 2 then iPowerWanted = 100 end
-                            if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iPowerWanted and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] then
+                            local iPowerWanted = 25
+                            if iFactoryTechLevel > 2 then iPowerWanted = 120 end
+                            if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iPowerWanted and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.9 then
                                 iCategoryToBuild = M27UnitInfo.refCategoryMobileLandShield
                                 iTotalWanted = 2
                             end
@@ -532,9 +533,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                             end
                         elseif iCurrentConditionToTry == 11 then--Mobile shields but just for ACU
-                            local iPowerWanted = 20
-                            if iFactoryTechLevel > 2 then iPowerWanted = 100 end
-                            if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iPowerWanted and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] then
+                            local iPowerWanted = 25
+                            if iFactoryTechLevel > 2 then iPowerWanted = 120 end
+                            if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iPowerWanted and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.9 then
                                 local oPlatoonWithACU = M27Utilities.GetACU(aiBrain).PlatoonHandle
                                 if oPlatoonWithACU and M27PlatoonFormer.DoesPlatoonWantAnotherMobileShield(oPlatoonWithACU, 200) then
                                     iCategoryToBuild = M27UnitInfo.refCategoryMobileLandShield
@@ -579,10 +580,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 iCategoryToBuild = refCategoryEngineer
                                 iTotalWanted = 2 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
                             end
-                        elseif iCurrentConditionToTry == 19 then --Scouts for small platoons
-                            if aiBrain[M27Overseer.refiScoutShortfallAllPlatoons] > 0 then
-                                iCategoryToBuild = refCategoryLandScout
-                                iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallAllPlatoons]
+                        elseif iCurrentConditionToTry == 19 then --Mobile shields
+                            local iPowerWanted = 25
+                            if iFactoryTechLevel > 2 then iPowerWanted = 120 end
+                            if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iPowerWanted and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.9 then
+                                iCategoryToBuild = M27UnitInfo.refCategoryMobileLandShield
+                                iTotalWanted = 1
                             end
                         elseif iCurrentConditionToTry == 20 then --Scouts for mexes
                             if aiBrain[M27Overseer.refiScoutShortfallMexes] > 0 then
@@ -645,7 +648,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             end
                         end
                     elseif iCurrentConditionToTry == 6 then
-                        if bHavePowerForAir and aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 then
+                        if aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 then
                             iCategoryToBuild = refCategoryEngineer
                             iTotalWanted = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted]
                         end
@@ -655,9 +658,14 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             iTotalWanted = 1
                         end
                     elseif iCurrentConditionToTry == 8 then
-                        if bHavePowerForAir and aiBrain:GetCurrentUnits(refCategoryAirAA) < 2 then
-                            iCategoryToBuild = refCategoryAirAA
-                            iTotalWanted = 2
+                        if bHavePowerForAir then
+                            if aiBrain:GetCurrentUnits(refCategoryAirAA) < 2 then
+                                iCategoryToBuild = refCategoryAirAA
+                                iTotalWanted = 2
+                            elseif aiBrain[M27AirOverseer.refiAirAAWanted] > 0 then
+                                iCategoryToBuild = refCategoryAirAA
+                                iTotalWanted = aiBrain[M27AirOverseer.refiAirAAWanted]
+                            end
                         end
                     elseif iCurrentConditionToTry == 9 then
                         if bHavePowerForAir and aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] > 0 then

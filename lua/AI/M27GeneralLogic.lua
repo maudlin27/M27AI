@@ -1629,89 +1629,93 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
     local refiIdleCount = 'M27UnitIdleCount'
-    if bGuardWithFocusUnitIsIdle == nil then bGuardWithFocusUnitIsIdle = false end
-    if bGuardWithNoFocusUnitIsIdle == nil then bGuardWithNoFocusUnitIsIdle = true end
-    if bMovingUnassignedEngiIsIdle == nil then bMovingUnassignedEngiIsIdle = false end
-    if oUnit:IsUnitState('Building') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Building') end
-        bIsIdle = false
-    elseif oUnit:IsUnitState('Moving') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Moving') end
-        if bMovingUnassignedEngiIsIdle == true and not(oUnit[M27EngineerOverseer.refiEngineerCurrentAction]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit:GetUnitId()) then
-            bIsIdle = true
-        else
-            bIsIdle = false
-        end
-    elseif oUnit:IsUnitState('Attacking') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Attacking') end
-        bIsIdle = false
-    elseif oUnit:IsUnitState('Upgrading') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Upgrading') end
-        bIsIdle = false
-    elseif oUnit:IsUnitState('Teleporting') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Teleporting') end
-        bIsIdle = false
-    elseif oUnit:IsUnitState('Enhancing') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Enhancing') end
-        bIsIdle = false
-    elseif oUnit:IsUnitState('Attached') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Attached') end
-        bIsIdle = false
-    elseif oUnit:IsUnitState('Guarding') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is guarding; bGuardIsIdle='..tostring(bGuardWithFocusUnitIsIdle)) end
-        local bHaveValidFocusUnit = false
-        if oUnit.GetFocusUnit then
-            local oGuardedUnit = oUnit:GetFocusUnit()
-            if oGuardedUnit and not(oGuardedUnit.Dead) and oGuardedUnit.GetUnitId then
-                bHaveValidFocusUnit = true
-            end
-        end
-        if bHaveValidFocusUnit == true then
-            return bGuardWithFocusUnitIsIdle
-        else return bGuardWithNoFocusUnitIsIdle
-        end
-    elseif oUnit:IsUnitState('Repairing') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Repairing') end
-        bIsIdle = false
-    elseif oUnit:IsUnitState('Busy') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Busy') end
-        bIsIdle = false
-    elseif oUnit:IsUnitState('Patrolling') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Patrolling') end
-        bIsIdle = false
-    elseif oUnit:IsUnitState('Reclaiming') then
-        if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Reclaiming') end
-        bIsIdle = false
+    if oUnit[M27UnitInfo.refbSpecialMicroActive] then bIsIdle = false
     else
-        iIdleCountThreshold = 2 --i.e. need to have been idle at least this-1 times before
-        --Sometimes e.g. for an engi if it finishes its current construction there's a period where unit state is nil, but it still has queued up actions
-        --However, when its finished everything it can still have a position close to it (but not identical) in its navigator
-        --Below attempts to distinguish between the two
-        if oUnit.GetNavigator then
-            local oNavigator = oUnit:GetNavigator()
-            local tUnitPos = oUnit:GetPosition()
-            local iDistanceToNotBeIdle = 3
-            if oNavigator.GetCurrentTargetPos then
-                local tCurTargetPos = oNavigator:GetCurrentTargetPos()
-                if bDebugMessages == true then LOG(sFunctionRef..': UnitPos='..repr(tUnitPos)..'; targetpos='..repr(tCurTargetPos)) end
-                if M27Utilities.IsTableEmpty(oNavigator:GetCurrentTargetPos()) == false then
-                    if math.abs(tCurTargetPos[1] - tUnitPos[1]) >= iDistanceToNotBeIdle or math.abs(tCurTargetPos[3] - tUnitPos[3]) >= iDistanceToNotBeIdle then
-                        bIsIdle = false
-                    end
+
+        if bGuardWithFocusUnitIsIdle == nil then bGuardWithFocusUnitIsIdle = false end
+        if bGuardWithNoFocusUnitIsIdle == nil then bGuardWithNoFocusUnitIsIdle = true end
+        if bMovingUnassignedEngiIsIdle == nil then bMovingUnassignedEngiIsIdle = false end
+        if oUnit:IsUnitState('Building') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Building') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Moving') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Moving') end
+            if bMovingUnassignedEngiIsIdle == true and not(oUnit[M27EngineerOverseer.refiEngineerCurrentAction]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit:GetUnitId()) then
+                bIsIdle = true
+            else
+                bIsIdle = false
+            end
+        elseif oUnit:IsUnitState('Attacking') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Attacking') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Upgrading') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Upgrading') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Teleporting') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Teleporting') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Enhancing') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Enhancing') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Attached') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Attached') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Guarding') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is guarding; bGuardIsIdle='..tostring(bGuardWithFocusUnitIsIdle)) end
+            local bHaveValidFocusUnit = false
+            if oUnit.GetFocusUnit then
+                local oGuardedUnit = oUnit:GetFocusUnit()
+                if oGuardedUnit and not(oGuardedUnit.Dead) and oGuardedUnit.GetUnitId then
+                    bHaveValidFocusUnit = true
                 end
-                if oNavigator.GetGoalPos then
-                    local tCurGoalPos = oNavigator:GetGoalPos()
-                    if bDebugMessages == true then LOG(sFunctionRef..': UnitPos='..repr(tUnitPos)..'; GoalPos='..repr(tCurGoalPos)) end
-                    if M27Utilities.IsTableEmpty(oNavigator:GetGoalPos()) == false then
-                        if math.abs(tCurGoalPos[1] - tUnitPos[1]) >= iDistanceToNotBeIdle or math.abs(tCurGoalPos[3] - tUnitPos[3]) >= iDistanceToNotBeIdle then
+            end
+            if bHaveValidFocusUnit == true then
+                return bGuardWithFocusUnitIsIdle
+            else return bGuardWithNoFocusUnitIsIdle
+            end
+        elseif oUnit:IsUnitState('Repairing') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Repairing') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Busy') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Busy') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Patrolling') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Patrolling') end
+            bIsIdle = false
+        elseif oUnit:IsUnitState('Reclaiming') then
+            if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Reclaiming') end
+            bIsIdle = false
+        else
+            iIdleCountThreshold = 2 --i.e. need to have been idle at least this-1 times before
+            --Sometimes e.g. for an engi if it finishes its current construction there's a period where unit state is nil, but it still has queued up actions
+            --However, when its finished everything it can still have a position close to it (but not identical) in its navigator
+            --Below attempts to distinguish between the two
+            if oUnit.GetNavigator then
+                local oNavigator = oUnit:GetNavigator()
+                local tUnitPos = oUnit:GetPosition()
+                local iDistanceToNotBeIdle = 3
+                if oNavigator.GetCurrentTargetPos then
+                    local tCurTargetPos = oNavigator:GetCurrentTargetPos()
+                    if bDebugMessages == true then LOG(sFunctionRef..': UnitPos='..repr(tUnitPos)..'; targetpos='..repr(tCurTargetPos)) end
+                    if M27Utilities.IsTableEmpty(oNavigator:GetCurrentTargetPos()) == false then
+                        if math.abs(tCurTargetPos[1] - tUnitPos[1]) >= iDistanceToNotBeIdle or math.abs(tCurTargetPos[3] - tUnitPos[3]) >= iDistanceToNotBeIdle then
                             bIsIdle = false
                         end
                     end
+                    if oNavigator.GetGoalPos then
+                        local tCurGoalPos = oNavigator:GetGoalPos()
+                        if bDebugMessages == true then LOG(sFunctionRef..': UnitPos='..repr(tUnitPos)..'; GoalPos='..repr(tCurGoalPos)) end
+                        if M27Utilities.IsTableEmpty(oNavigator:GetGoalPos()) == false then
+                            if math.abs(tCurGoalPos[1] - tUnitPos[1]) >= iDistanceToNotBeIdle or math.abs(tCurGoalPos[3] - tUnitPos[3]) >= iDistanceToNotBeIdle then
+                                bIsIdle = false
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': After checking navigator and goal positions theyre not far enough away so unit treated as being idle') end
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': After checking navigator and goal positions theyre not far enough away so unit treated as being idle') end
             end
+            bIsIdle = true
         end
-        bIsIdle = true
     end
     if bIsIdle == false then
         oUnit[refiIdleCount] = 0
@@ -2692,8 +2696,8 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
     while not(iPathingTarget == iSegmentGroup) do
         iLoopCount = iLoopCount + 1
         if iLoopCount > iMaxLoop then
-            M27Utilities.ErrorHandler('Couldnt find random point in area, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathingType='..sPathingType..'; iSegmentGroup='..iSegmentGroup, nil, true)
-            break
+            M27Utilities.ErrorHandler('Couldnt find random point in area, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathingType='..sPathingType..'; iSegmentGroup='..iSegmentGroup..'; will return midpoint instead')
+            return tMidpoint
         end
 
         --Get random position in the X range first

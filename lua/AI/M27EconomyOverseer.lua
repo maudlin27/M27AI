@@ -9,6 +9,7 @@ local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
+local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 
 --Tracking variables:
 refbWantMoreFactories = 'M27UpgraderWantMoreFactories'
@@ -50,12 +51,13 @@ local refbPauseForPowerStall = 'M27PauseForPowerStall'
 
 function IsUnitValid(oUnit)
     --Returns true if unit is constructed and not dead
-    if not(oUnit.GetUnitId) or oUnit.Dead or not(oUnit.GetFractionComplete) or oUnit:GetFractionComplete() < 1 then return false else return true end
+    if not(oUnit.GetUnitId) or oUnit.Dead or not(oUnit.GetFractionComplete) or oUnit:GetFractionComplete() < 1 or not(oUnit.GetBlueprint) then return false else return true end
 end
 
 function GetMexCountOnOurSideOfMap(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetMexCountOnOurSideOfMap'
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local iCount = 0
     if aiBrain[reftMexOnOurSideOfMap] then iCount = table.getn(aiBrain[reftMexOnOurSideOfMap]) end
     if iCount == 0 then
@@ -94,6 +96,7 @@ end
 function GetMassStorageTargets(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetMassStorageTargets'
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     --Goes through all mexes and records any available locations for mass storage
     local iDistanceModForEachAdjacentMex = -60
     local iDistanceModForEachT1AdjacentMex = -35 --NOTE: If changing this value, then also update engineer overseer's threshold for ignoring a location based on difference in distance
@@ -219,6 +222,7 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
     --Doesnt factor in if a unit is paused
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade'
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local iUpgradingCount = 0
     local iAvailableToUpgradeCount = 0
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
@@ -238,7 +242,7 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
             else
                 if M27Conditions.SafeToUpgradeUnit(oUnit) then
                     iAvailableToUpgradeCount = iAvailableToUpgradeCount + 1
-                    if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; iAvailableToUpgradeCount='..iAvailableToUpgradeCount..'; Have unit available to upgrading whose unit state isnt upgrading.  UnitId='..oUnit:GetUnitId()..'; Unit State='..M27Logic.GetUnitState(oUnit)..': Upgradesto='..oUnitBP.General.UpgradesTo) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; iAvailableToUpgradeCount='..iAvailableToUpgradeCount..'; Have unit available to upgrading whose unit state isnt upgrading.  UnitId='..oUnit:GetUnitId()..'; Unit State='..M27Logic.GetUnitState(oUnit)..': Upgradesto='..(oUnitBP.General.UpgradesTo or 'nil')) end
                 end
             end
         end
@@ -252,7 +256,7 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
     --Work out the upgrade ID wanted; if bUpdateUpgradeTracker is true then records upgrade against unit's aiBrain
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'UpgradeUnit'
-
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     --Do we have any HQs of the same factory type of a higher tech level?
     local sUpgradeID = M27UnitInfo.GetUnitUpgradeBlueprint(oUnitToUpgrade, true) --If not a factory or dont recognise the faction then just returns the normal unit ID
     --local oUnitBP = oUnitToUpgrade:GetBlueprint()
@@ -272,7 +276,7 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
             table.insert(aiBrain[reftUpgrading], oUnitToUpgrade)
             if bDebugMessages == true then LOG(sFunctionRef..': Have issued upgrade to unit and recorded it') end
         end
-    else M27Utilities.ErrorHandler('Dont have a valid upgrade ID')
+    else M27Utilities.ErrorHandler('Dont have a valid upgrade ID; UnitID='..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade))
     end
 end
 
@@ -281,7 +285,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     --Returns nil if cant find one
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
-
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
     local oUnitToUpgrade, tCurPosition, iCurDistanceToStart, iCurDistanceToEnemy, iCurCombinedDist
     local iMaxCombinedDist = -100000
@@ -302,7 +306,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
         if bDebugMessages == true then LOG(sFunctionRef..': Have shortlist of potential units, size='..table.getn(tAllUnits)) end
         for iUnit, oUnit in tAllUnits do
             if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; checking if its valid') end
-            if IsUnitValid(oUnit) then
+            if IsUnitValid(oUnit) and not(M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, true) == nil) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a unit that is available for upgrading; iUnit='..iUnit..'; Unit ref='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                 if M27Conditions.SafeToUpgradeUnit(oUnit) then
                     iPotentialUnits = iPotentialUnits + 1
@@ -333,12 +337,17 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
         if bDebugMessages == true then LOG(sFunctionRef..': Dont have any units of the desired category') end
     end
 
+    if oUnitToUpgrade and EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnitToUpgrade:GetUnitId()) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
+        aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
+    end
+
     return oUnitToUpgrade
 end
 
 function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     --iMexesUpgrading, iMexesAvailableForUpgrade = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex + refCategoryT2Mex, true)
     local iT1Mexes = aiBrain:GetCurrentUnits(refCategoryT1Mex)
     local iT2Mexes = aiBrain:GetCurrentUnits(refCategoryT2Mex)
@@ -402,6 +411,7 @@ function ClearOldRecords(aiBrain, iOldRecordsExpected)
     --iOldRecordsExpected - optional - allows optimisation by having this called from loops which can already determine this for minimal extra cost
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'ClearOldRecords'
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local iLoopCount = 0
     local iLoopMax = 100
     local sUnitReasonForClear, sUnitState
@@ -451,6 +461,7 @@ function UnpauseUpgrades(aiBrain, iMaxToUnpause)
     --Note - this will try and unpause any units that have been paused previously.  However, in some cases there may not be a unit to unpause e.g. if engineers have assisted it while its paused
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'UnpauseUpgrades'
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
 
     local iAmountToUnpause = math.min(iMaxToUnpause, aiBrain[refiPausedUpgradeCount])
     local iOldRecordCount = 0
@@ -500,6 +511,7 @@ end
 function PauseLastUpgrade(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'PauseLastUpgrade'
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local oLastUnpausedUpgrade
     local oLastUnpausedNonMex
     local iOldRecordCount = 0
@@ -565,6 +577,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     --Returns max number to upgrade
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
 
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
     local bHaveHighMass, bHaveEnoughEnergy
@@ -713,6 +726,7 @@ end
 
 function RefreshEconomyData(aiBrain)
     --Yes, hardcoding resource values will make it really hard to support mods or patches that change these values
+
     local iACUMass = 1
     local iACUEnergy = 20
     local iEnergyT3Power = 2500
@@ -748,6 +762,7 @@ end
 function UpgradeManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
+    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
 
     local iCycleWaitTime = 40
     local iCategoryToUpgrade, oUnitToUpgrade
@@ -781,14 +796,16 @@ function UpgradeManager(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Got category to upgrade') end
                     oUnitToUpgrade = GetUnitToUpgrade(aiBrain, iCategoryToUpgrade, tStartPosition)
                     if oUnitToUpgrade == nil then
+                        M27Utilities.ErrorHandler('Couldnt find unit to upgrade, will try searching for other options as backup',nil, true)
                         if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find unit to upgrade, will revert to default categories') end
                         oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT1Mex, tStartPosition)
                         if oUnitToUpgrade == nil then
-                            oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory, tStartPosition)
+                            oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory * categories.TECH1, tStartPosition)
                             if oUnitToUpgrade == nil then
-                                oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryAirFactory, tStartPosition)
+                                oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryAirFactory * categories.TECH1, tStartPosition)
                                 if oUnitToUpgrade == nil then
                                     oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT2Mex, tStartPosition)
+                                    if oUnitToUpgrade == nil then oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory + refCategoryAirFactory, tStartPosition) end
                                 end
                             end
                         end

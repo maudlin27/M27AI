@@ -452,6 +452,40 @@ function MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
     return { iXPos, GetTerrainHeight(iXPos, iZPos), iZPos }
 end
 
+
+function GetAngleFromAToB(tLocA, tLocB)
+    --Returns an angle 0 = north, 90 = east, etc. based on direction of tLocB from tLocA
+    local iTheta = math.atan(math.abs(tLocA[3] - tLocB[3]) / math.abs(tLocA[1] - tLocB[1])) * 180 / math.pi
+    if tLocB[1] > tLocA[1] then
+        if tLocB[3] > tLocA[3] then
+            return 90 + iTheta
+        else return 90 - iTheta
+        end
+    else
+        if tLocB[3] > tLocA[3] then
+            return 270 - iTheta
+        else return 270 + iTheta
+        end
+    end
+end
+
+function MoveInDirection(tStart, iAngle, iDistance)
+    --iAngle: 0 = north, 90 = east, etc.; use GetAngleFromAToB if need angle from 2 positions
+    --tStart = {x,y,z} (y isnt used)
+    local iTheta
+    local iFactor
+    if iAngle >= 270 then iTheta = iAngle - 270 iFactor = {-1,-1}
+    elseif iAngle >= 180 then iTheta = 270 - iAngle iFactor = {-1, 1}
+    elseif iAngle >= 90 then iTheta = iAngle - 90 iFactor = {1, 1}
+    else iTheta = 90 - iAngle iFactor = {1, -1}
+    end
+    iTheta = iTheta * math.pi / 180
+    local iXAdj = math.cos(iTheta) * iDistance * iFactor[1]
+    local iZAdj = math.sin(iTheta) * iDistance * iFactor[2]
+
+    return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+end
+
 function GetAIBrainArmyNumber(aiBrain)
     --note - this is different to aiBrain:GetArmyIndex() which returns the army index; e.g. if 2 players, will have army index 1 and 2; however if 4 start positions, then might have ARMY_2 and ARMY_4 for those 2 players
     local bDebugMessages = false if bGlobalDebugOverride == true then bDebugMessages = true end
@@ -742,3 +776,19 @@ function ProfilerTimeSinceLastCall(sReference, iStartTime)
     return iTimeNow
 end
 
+function ForkedDelayedChangedVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerTimeRef, iMustBeLessThanThisTimeValue)
+    WaitSeconds(iDelayInSeconds)
+    if oVariableOwner then
+        local bReset = true
+        if sOptionalOwnerTimeRef then
+            if oVariableOwner[sOptionalOwnerTimeRef] > iMustBeLessThanThisTimeValue then bReset = false end
+        end
+        if bReset then oVariableOwner[sVariableName] = vVariableValue end
+    end
+end
+
+function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerTimeRef, iMustBeLessThanThisTimeValue)
+    --sOptionalOwnerTimeRef - can specify a variable for oVariableOwner; if so then the value of this variable must be <= iMustBeLessThanThisTimeValue
+    --e.g. if delay reset a variable, but are claling multiple times so want to only reset on the latest value, then this allows for that
+    ForkThread(ForkedDelayedChangedVariable, oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerTimeRef, iMustBeLessThanThisTimeValue)
+end

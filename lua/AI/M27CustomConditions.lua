@@ -145,35 +145,40 @@ function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
 end
 
 function WantToGetAnotherACUUpgrade(aiBrain)
+    --Returns 2 variables: true/false if we have eco+safety to get upgrade; also returns true/false if safe to get upgrade
     local sFunctionRef = 'WantToGetAnotherACUUpgrade'
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local bWantUpgrade = false
+    local bSafeToGetUpgrade = true
     if GetGameTimeSeconds() > 60 then
-        local oACU = M27Utilities.GetACU(aiBrain)
-        local sUpgradeRef = M27PlatoonUtilities.GetACUUpgradeWanted(aiBrain, oACU)
-        if sUpgradeRef then
-            local iACUBuildRate = oACU:GetBuildRate()
-            local oBP = oACU:GetBlueprint()
-            if bDebugMessages == true then LOG(sFunctionRef..': oBP.Enhancements[sUpgradeRef]='..repr(oBP.Enhancements[sUpgradeRef])) end
-            local iUpgradeBuildTime = oBP.Enhancements[sUpgradeRef].BuildTime
-            local iUpgradeEnergyCost = oBP.Enhancements[sUpgradeRef].BuildCostEnergy
-            local iEnergyWanted = (iUpgradeEnergyCost / (iUpgradeBuildTime / iACUBuildRate)) * 0.1
-            local iNetEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]
-            if bDebugMessages == true then LOG(sFunctionRef..': iNetEnergyIncome='..iNetEnergyIncome..'; iEnergyWanted='..iEnergyWanted) end
-            if iNetEnergyIncome > iEnergyWanted then
-                --Have enough energy, check if safe to get upgrade
-                if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy, check its safe to get upgrade') end
-                if SafeToGetACUUpgrade(aiBrain) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Its safe to get upgrade') end
-                    bWantUpgrade = true
+        if aiBrain:GetEconomyStoredRatio('ENERGY') > 0.8 then
+            local oACU = M27Utilities.GetACU(aiBrain)
+            local sUpgradeRef = M27PlatoonUtilities.GetACUUpgradeWanted(aiBrain, oACU)
+            if sUpgradeRef then
+                local iACUBuildRate = oACU:GetBuildRate()
+                local oBP = oACU:GetBlueprint()
+                if bDebugMessages == true then LOG(sFunctionRef..': oBP.Enhancements[sUpgradeRef]='..repr(oBP.Enhancements[sUpgradeRef])) end
+                local iUpgradeBuildTime = oBP.Enhancements[sUpgradeRef].BuildTime
+                local iUpgradeEnergyCost = oBP.Enhancements[sUpgradeRef].BuildCostEnergy
+                local iEnergyWanted = (iUpgradeEnergyCost / (iUpgradeBuildTime / iACUBuildRate)) * 0.1
+                local iNetEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]
+                if bDebugMessages == true then LOG(sFunctionRef..': iNetEnergyIncome='..iNetEnergyIncome..'; iEnergyWanted='..iEnergyWanted) end
+                if iNetEnergyIncome > iEnergyWanted then
+                    --Have enough energy, check if safe to get upgrade
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy, check its safe to get upgrade') end
+                    bSafeToGetUpgrade = SafeToGetACUUpgrade(aiBrain)
+                    if bSafeToGetUpgrade then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Its safe to get upgrade') end
+                        bWantUpgrade = true
+                    end
                 end
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..': sUpgradeRef is nil so no more upgrades that we want') end
             end
-        else
-            if bDebugMessages == true then LOG(sFunctionRef..': sUpgradeRef is nil so no more upgrades that we want') end
         end
     end
-    return bWantUpgrade
+    return bWantUpgrade, bSafeToGetUpgrade
 end
 
 function WantMoreMAA(aiBrain, iMassOnMAAVsEnemyAir)

@@ -441,7 +441,7 @@ end
 function GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
     --Returns the object/wreck of the nearest reclaim that is more than iMinReclaimValue and within iSearchRadius of tLocation
     --returns nil if no valid locations
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'GetNearestReclaim'
     if iMinReclaimValue == nil then iMinReclaimValue = 1 end
     if iSearchRadius == nil then iSearchRadius = 5 end
@@ -1120,7 +1120,7 @@ function RecordMexesInPathingGroupFilteredByEnemyDistance(aiBrain, sPathing, iPa
 end
 
 function RecordSortedMexesInOriginalPathingGroup(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local sFunctionRef = 'RecordSortedMexesInOriginalPathingGroup'
     local tUnsortedMexDetails = {}
     local refiMexLocation = 1

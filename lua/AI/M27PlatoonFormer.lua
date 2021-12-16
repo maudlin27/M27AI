@@ -26,6 +26,7 @@ refbProcessedForPlatoon = 'M27ProcessedForPlatoon' --Used to flag that platoon f
 refbWaitingForAssignment = 'M27UnitIsWaitingForAssignment' --Used if are building up to a larger platoon size
 refbUsingTanksForPlatoons = 'M27PlatoonFormerUsingTanksForPlatoons' --false if have no use for tanks so are putting them into attacknearest platoon
 refbUsingMobileShieldsForPlatoons = 'M27PlatoonFormerUsingMobileShields' --false if dont ahve any platoons to assign mobile shields to
+refiTimeLastCheckedForIdleShields = 'M27PlatoonFormerTimeCheckedIdleShields' --Gametime that last checked for idle shields
 
 function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
@@ -611,9 +612,10 @@ end
 
 function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
     local sFunctionRef = 'MobileShieldPlatoonFormer'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
     local tStartPosition
     local bHaveUnitsToAssign = true
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
     local oPlatoonToHelp, oShieldPlatoon
     local iCurCount = 0
@@ -625,6 +627,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
     aiBrain[refbUsingMobileShieldsForPlatoons] = true
     local iPlatoonRefreshCount = 0
     local iShieldMass
+    local bNoMorePlatoonsToHelp = false
 
     while bHaveUnitsToAssign == true do
         iCurCount = iCurCount + 1
@@ -657,38 +660,67 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                 oShieldPlatoon = CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', {oCurUnitToAssign}, true)
             else
                 --Get the platoon to help
-                if iPlatoonRefreshCount == 0 then
-                    oPlatoonToHelp = GetClosestPlatoonWantingMobileShield(aiBrain, tStartPosition, oCurUnitToAssign)
-                    iPlatoonRefreshCount = 1
+                if bNoMorePlatoonsToHelp == false then
+                    if iPlatoonRefreshCount == 0 then
+                        oPlatoonToHelp = GetClosestPlatoonWantingMobileShield(aiBrain, tStartPosition, oCurUnitToAssign)
+                        iPlatoonRefreshCount = 1
+                    end
                 end
                 iShieldMass = oCurUnitToAssign:GetBlueprint().Economy.BuildCostMass
                 if oPlatoonToHelp and DoesPlatoonWantAnotherMobileShield(oPlatoonToHelp, iShieldMass) == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': Cur platoon no longer wants a mobile shield so getting a new one') end
-                    oPlatoonToHelp = GetClosestPlatoonWantingMobileShield(aiBrain, tStartPosition, oCurUnitToAssign) end
-                if oPlatoonToHelp then
-                    if bDebugMessages == true then LOG(sFunctionRef..': oPlatoonToHelp='..oPlatoonToHelp:GetPlan()..oPlatoonToHelp[M27PlatoonUtilities.refiPlatoonCount]..'; checking if already have a platoon that should add to') end
+                    oPlatoonToHelp = GetClosestPlatoonWantingMobileShield(aiBrain, tStartPosition, oCurUnitToAssign)
+                end
+                local oMexToHelp
+                if not(oPlatoonToHelp) then
+                    bNoMorePlatoonsToHelp = true
+                    --No platoon to help; do we have any mexes to shield instead?
+                    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
+                        --Search for nearest mex without a shield assigned
+                        local tMexesWantingShield = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex, false, false)
+                        if M27Utilities.IsTableEmpty(tMexesWantingShield) == false then
+                            for iMex, oMex in tMexesWantingShield do
+                                if DoesPlatoonWantAnotherMobileShield(oMex, iShieldMass) == true then
+                                    oMexToHelp = oMex
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+                local oUnitOrPlatoonToHelp = oPlatoonToHelp
+                if oUnitOrPlatoonToHelp == nil then oUnitOrPlatoonToHelp = oMexToHelp end
+                if not(oUnitOrPlatoonToHelp) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': No platoons or TML threatened mexes to help') end
+                    aiBrain[refbUsingMobileShieldsForPlatoons] = false
+                else
+                    if bDebugMessages == true then
+                        local sPlan = 'nil'
+                        if oUnitOrPlatoonToHelp.GetPlan then sPlan = oUnitOrPlatoonToHelp:GetPlan() end
+                        LOG(sFunctionRef..': oPlatoonToHelp='..sPlan..(oPlatoonToHelp[M27PlatoonUtilities.refiPlatoonCount] or '0')..'; checking if already have a platoon that should add to')
+                    end
                     --Does the platoon already have a shield helper assigned?
-                    if oPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon] and aiBrain:PlatoonExists(oPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon]) then
+                    if oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon] and aiBrain:PlatoonExists(oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon]) then
                         --Add to existing platoon
-                        aiBrain:AssignUnitsToPlatoon(oPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], { oCurUnitToAssign }, 'Attack', 'GrowthFormation')
-                        M27PlatoonUtilities.RecordPlatoonUnitsByType(oPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], false)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Added shield unit to existing platoon='..oPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon]:GetPlan()..oPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonCount]) end
+                        aiBrain:AssignUnitsToPlatoon(oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], { oCurUnitToAssign }, 'Attack', 'GrowthFormation')
+                        M27PlatoonUtilities.RecordPlatoonUnitsByType(oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], false)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Added shield unit to existing platoon='..oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon]:GetPlan()..oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonCount]) end
                     else
                         --Create new platoon
                         oShieldPlatoon = CreatePlatoon(aiBrain, 'M27MobileShield', {oCurUnitToAssign})
-                        oPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon] = oShieldPlatoon
-                        oShieldPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oPlatoonToHelp
+                        oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon] = oShieldPlatoon
+                        oShieldPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oUnitOrPlatoonToHelp
                         if bDebugMessages == true then LOG(sFunctionRef..': Just created a new platoon for the mobile shield') end
                     end
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have any platoons for mobile shields to help') end
-                    aiBrain[refbUsingMobileShieldsForPlatoons] = false
                 end
             end
             oCurUnitToAssign = nil
         else
             bHaveUnitsToAssign = false
         end
+    end
+    if aiBrain[refbUsingMobileShieldsForPlatoons] == true and (GetGameTimeSeconds() - aiBrain[refiTimeLastCheckedForIdleShields]) >= 1 then
+        CheckForIdleMobileLandUnits(aiBrain)
     end
 end
 
@@ -1042,15 +1074,22 @@ function CheckForIdleMobileLandUnits(aiBrain)
     local tAllUnits = aiBrain:GetListOfUnits(categories.MOBILE * categories.LAND, false, true)
     local oPlatoon
     local oArmyPool = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
+    --Update flag for mobile shields if we have none idle (as suggests we're using them all)
+    local bHaveIdleMobileShield = false
+    aiBrain[refiTimeLastCheckedForIdleShields] = GetGameTimeSeconds()
+
+
     for iUnit, oUnit in tAllUnits do
         oPlatoon = oUnit.PlatoonHandle
-        if not(oPlatoon) or oPlatoon == oArmyPool then
+        if not(oUnit.Dead) and oUnit:GetFractionComplete() == 1 and (not(oPlatoon) or oPlatoon == oArmyPool or oPlatoon:GetPlan() == M27PlatoonTemplates.refoUnderConstruction) then
             if bDebugMessages == true then
                 LOG(sFunctionRef..': Assigning unit to relevant idle platoon as it either has no platoon or is in army pool')
             end
+            if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit:GetUnitId()) then bHaveIdleMobileShield = true end
             AllocateUnitsToIdlePlatoons(aiBrain, {oUnit})
         end
     end
+    aiBrain[refbUsingMobileShieldsForPlatoons] = not(bHaveIdleMobileShield)
 end
 
 function SetupIdlePlatoon(aiBrain, sPlan)

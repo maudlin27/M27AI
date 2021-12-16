@@ -20,6 +20,9 @@ refiDistanceToStart = 'M27UnitDistToStartDist'
 refiLastTimeGotDistanceToEnemy = 'M27UnitDistToEnemyTime'
 refiDistanceToEnemyt = 'M27UnitDistToENemyDist'--]]
 refbShieldIsDisabled = 'M27UnitShieldDisabled'
+refbSpecialMicroActive = 'M27UnitSpecialMicroActive' --e.g. if dodging bombers
+refiGameTimeToResetMicroActive = 'M27UnitGameTimeToResetMicro'
+refiGameTimeMicroStarted = 'M27UnitGameTimeMicroStarted'
 
 
 --Factions
@@ -66,8 +69,10 @@ refCategoryFixedT2Arti = categories.STRUCTURE * categories.INDIRECTFIRE * catego
 refCategoryFixedT3Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH3
 refCategorySML = categories.NUKE * categories.SILO
 refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * categories.STRUCTURE
+refCategoryTML = categories.SILO * categories.STRUCTURE * categories.TECH2 - categories.ANTIMISSILE
 
 --Land units
+refCategoryMobileLand = categories.LAND * categories.MOBILE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND
 refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT - categories.ANTIAIR --NOTE: Need to specify fastest (for cybran who have mantis and LAB)
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - categories.ANTIAIR --NOTE: Need to specify slowest (so dont pick LAB)
@@ -388,4 +393,9 @@ end
 function EnableUnitShield(oUnit)
     oUnit:EnableShield()
     oUnit[refbShieldIsDisabled] = false
+end
+
+function GetUnitFacingAngle(oUnit)
+    --0/360 = north, 90 = west, 180 = south, 270 = east
+    return 180 - oUnit:GetHeading() / math.pi * 180
 end

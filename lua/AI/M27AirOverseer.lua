@@ -80,6 +80,7 @@ local iMinScoutsForMap
 local iMaxScoutsForMap
 local iLongScoutDelayThreshold = 60 --Only locations where we're overdue by this much will be taken into account when deciding how many scouts we want
 refiAirAANeeded = 'M27AirNeedMoreAirAA'
+refiAirAAWanted = 'M27AirWantedMoreAirAA'
 refbBombersAreEffective = 'M27AirBombersAreEffective' --[x] = tech level, returns true/false
 
 refiLargeBomberAttackThreshold = 'M27AirLargeBomberAttackThreshold' --How many bombers are needed before launching a large attack
@@ -95,7 +96,6 @@ refiHighestEnemyAirThreat = 'M27HighestEnemyAirThreat' --highest ever value the 
 refiOurMassInMAA = 'M27OurMassInMAA'
 refiOurMAAUnitCount = 'M27OurMAAUnitCount'
 refiOurMassInAirAA = 'M27OurMassInAirAA'
-refbWantMoreAirAA = 'M27WantMoreAirAA'
 
 
 
@@ -469,11 +469,11 @@ function AirThreatChecker(aiBrain)
     local tAirAAUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirAA, false, true)
     if M27Utilities.IsTableEmpty(tAirAAUnits) == true then
         aiBrain[refiOurMassInAirAA] = 0
-        aiBrain[refbWantMoreAirAA] = true
+        aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 2)
     else
         aiBrain[refiOurMassInAirAA] = M27Logic.GetAirThreatLevel(aiBrain, tAirAAUnits, false, true, false, false, false)
-        if aiBrain[refiOurMassInAirAA] < aiBrain[refiHighestEnemyAirThreat] then aiBrain[refbWantMoreAirAA] = true
-        else aiBrain[refbWantMoreAirAA] = false end
+        if aiBrain[refiOurMassInAirAA] < aiBrain[refiHighestEnemyAirThreat] then aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 2)
+        else aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 0) end
     end
     --Emergency MAA checker
     local bEmergencyAA = false
@@ -1965,6 +1965,7 @@ function SetupAirOverseer(aiBrain)
     aiBrain[refiAirStagingWanted] = 0
     aiBrain[refiTorpBombersWanted] = 0
     aiBrain[refiAirAANeeded] = 0
+    aiBrain[refiAirAAWanted] = 1
     aiBrain[refiBombersWanted] = 1
 
     aiBrain[refbBombersAreEffective] = {}
