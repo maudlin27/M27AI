@@ -120,7 +120,7 @@ local refCategoryAirNonScout = M27UnitInfo.refCategoryAirNonScout
 
 function GetAirSegmentFromPosition(tPosition)
     --returns x and z values of the segment that tPosition is in
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetAirSegmentFromPosition'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local rPlayableArea = M27MapInfo.rMapPlayableArea
@@ -131,7 +131,7 @@ function GetAirSegmentFromPosition(tPosition)
 end
 
 function GetAirPositionFromSegment(iSegmentX, iSegmentZ)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetAirPositionFromSegment'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
@@ -143,7 +143,7 @@ function GetAirPositionFromSegment(iSegmentX, iSegmentZ)
 end
 
 function RecordAirScoutDyingInNearbySegments(aiBrain, iBaseSegmentX, iBaseSegmentZ)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnScoutDeath'
     local iStartX, iEndX, iStartZ, iEndZ
     iStartX = math.max(iBaseSegmentX - 1, 1)
@@ -159,7 +159,7 @@ function RecordAirScoutDyingInNearbySegments(aiBrain, iBaseSegmentX, iBaseSegmen
 end
 
 function ClearPreviousMovementEntries(aiBrain, oAirUnit)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearPreviousMovementEntries'
     local iMaxMovementPaths = 0
     if oAirUnit[reftMovementPath] and oAirUnit[refiCurMovementPath] and oAirUnit[refiCurMovementPath] > 1 then iMaxMovementPaths = table.getn(oAirUnit[reftMovementPath]) end
@@ -202,7 +202,7 @@ function ClearTrackersOnUnitsTargets(oAirUnit, iAirUnitMassCost)
 end
 
 function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearAirUnitAssignmentTrackers'
     local iMaxMovementPaths = 0
     if oAirUnit[reftMovementPath] then iMaxMovementPaths = table.getn(oAirUnit[reftMovementPath]) end
@@ -226,7 +226,7 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit)
 end
 
 function MakeSegmentsAroundPositionHighPriority(aiBrain, tPosition, iSegmentSize)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MakeSegmentsAroundPositionHighPriority'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local iBaseAirSegmentX, iBaseAirSegmentZ = GetAirSegmentFromPosition(tPosition)
@@ -249,7 +249,7 @@ end
 
 
 function CheckForUnseenKiller(aiBrain, oKilled, oKiller)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CheckForUnseenKiller'
 
     --Air scout specific - if air scout died then also update the area around the killer to flag an air scout as being killed
@@ -286,7 +286,7 @@ end
 
 function OnBomberDeath(aiBrain, oDeadBomber)
     --Track how effective the bomber was
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnBomberDeath'
     if bDebugMessages == true then LOG(sFunctionRef..': Checking if have a unitID for dead bomber') end
     if oDeadBomber.GetUnitId then
@@ -391,7 +391,7 @@ function TrackBomberTarget(oBomber, oTarget)
 end
 
 function UpdateBomberTargets(oBomber, bRemoveIfOnLand)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateBomberTargets'
     local bRemoveCurTarget
     local tTargetPos
@@ -450,7 +450,7 @@ end
 
 function AirThreatChecker(aiBrain)
     --Get enemy total air threat level
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirThreatChecker'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of cycle') end
     local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(categories.AIR, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
@@ -505,7 +505,7 @@ function AirThreatChecker(aiBrain)
 end
 
 function RecordAvailableAndLowFuelAirUnits(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAvailableAndLowFuelAirUnits'
     --Updates aiBrain trackers to record units with and without enough fuel
     local tAllScouts = aiBrain:GetListOfUnits(refCategoryAirScout, false, true)
@@ -736,7 +736,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
 end
 
 function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OrderUnitsToRefuel'
     --Sends low fuel units to air staging
     if M27Utilities.IsTableEmpty(tUnitsToRefuel) == false then
@@ -833,7 +833,7 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
 end
 
 function RefuelIdleAirUnits(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefuelIdleAirUnits'
     --Checks for any idle air units near start that could do with a slight refuel
     local iSearchRange = 50
@@ -875,7 +875,7 @@ end
 
 function UnloadUnit(oTransport)
     --Unfortunately couldnt get this to work by issuing transportunload command to the unit docked in the transport, so having to have transport release all its units
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UnloadUnit'
     if bDebugMessages == true then LOG(sFunctionRef..': Issuing unload command to transport/air staging unit') end
     local tTransportPosition = oTransport:GetPosition()
@@ -891,7 +891,7 @@ end
 
 function ReleaseRefueledUnits(aiBrain)
     --Only want to call this periodically as doesnt seem an easy way of telling it to only release some of the units, instead it releases all
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReleaseRefueledUnits'
     local tStagingPosition = {}
     local bReadyToLeave
@@ -927,7 +927,7 @@ end
 function UpdateScoutingSegmentRequirements(aiBrain)
     --Updates trackers for when we last had visual of an area, and updates table containing list of targets that we want to scout
     --returns the number of scouts we want
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateScoutingSegmentRequirements'
 
     local iCurIntervalWanted, iLastScoutedTime, tCurPosition
@@ -1003,7 +1003,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
 end
 
 function GetEndDestinationForScout(aiBrain, oScout)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetEndDestinationForScout'
 
     local tEndDestination
@@ -1050,7 +1050,7 @@ function GetEndDestinationForScout(aiBrain, oScout)
 end
 
 function CreateMovementPathFromDestination(aiBrain, tEndDestination, oScout)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CreateMovementPathFromDestination'
     local tMovementPath = {}
     tMovementPath[1] = tEndDestination
@@ -1176,7 +1176,7 @@ function CreateMovementPathFromDestination(aiBrain, tEndDestination, oScout)
 end
 
 function AirScoutManager(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirScoutManager'
     --Determine how many scouts we want and what locations need scouting:
     UpdateScoutingSegmentRequirements(aiBrain)
@@ -1263,7 +1263,7 @@ end
 
 function RecordSegmentsThatHaveVisualOf(aiBrain)
     local sFunctionRef = 'RecordSegmentsThatHaveVisualOf'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local iTimeStamp = GetGameTimeSeconds()
 
@@ -1298,7 +1298,7 @@ function RecordSegmentsThatHaveVisualOf(aiBrain)
 end
 
 function GetBomberTargetShortlist(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBomberTargetShortlist'
     local reftPriorityTargetCategories = {M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryGroundExperimental}
     local iTypePower = 4
@@ -1404,7 +1404,7 @@ end
 
 function IssueLargeBomberAttack(aiBrain, tBombers)
     --Call via forkthread; will assign targets to tBombers until they're all dead
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IssueLargeBomberAttack'
 
     local iAliveBombers, iBombersNeedingTargets
@@ -1546,7 +1546,7 @@ function IssueLargeBomberAttack(aiBrain, tBombers)
 end
 
 function AirBomberManager(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirBomberManager'
     local iMaxJourneyDistanceForBomber = aiBrain[refiMaxScoutRadius] --Dont want a single bomber to have queued up actions which will make it go more than this
     local iMaxTargetsForBomber = 4 --Dont want a bomber to have more than this queued as likely it will die so we want other bombers to try and target beyond this number
@@ -1683,7 +1683,7 @@ function AirBomberManager(aiBrain)
 end
 
 function AirAAManager(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirAAManager'
     local iNearToACUThreshold = 80
     local iMAANearACURange = 40
@@ -1911,7 +1911,7 @@ end
 
 
 function AirLogicOverseer(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirLogicOverseer'
     local bProfiling = false
     local iProfileStartTime = 0
@@ -1957,7 +1957,7 @@ end
 
 function Initialise()  end --Done so can find air overseer setup more easily
 function SetupAirOverseer(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetupAirOverseer'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --Sets default/starting values for everything so dont have to worry about checking if is nil or not
@@ -2065,7 +2065,7 @@ end
 --Decide on mex targets and update air scouting for these
 function UpdateMexScoutingPriorities(aiBrain)
     --called from strategic overseer
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateMexScoutingPriorities'
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end

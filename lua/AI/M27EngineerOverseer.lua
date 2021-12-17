@@ -216,7 +216,7 @@ end
 
 function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGuarding)
     --Assumes the unit will have been given a clearcommands() action if it needs one prior to calling this since sometimes will want to sometimes wont
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'ClearEngineerActionTrackers'
     --if oEngineer == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
@@ -355,7 +355,7 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
 end
 
 function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'UpdateEngineerActionTrackers'
 
@@ -494,7 +494,7 @@ end
 
 function UpdateActionsForACUMovementPath(tMovementPath, aiBrain, oEngineer, iPathStartPoint)
     --Assumes oEngineer (e.g. the ACU) will build mexes anywhere near tMovementPath locations
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateActionsForACUMovementPath'
     local iUniqueRef = GetEngineerUniqueCount(oEngineer)
 
@@ -543,7 +543,7 @@ end
 
 function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     --Returns true if are enemies near the engineer such that it's been given an override action (and should be ignored)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
     local bAreNearbyEnemies = false
@@ -674,7 +674,7 @@ function GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentAction
     --iMaxRangeForPrevEngi -- will only consider prev engineer if its within this range
     --bGetInitialEngineer - if true then will just look for the first idle engineer, ignoring everything else
     --iMinTechLevelWanted - will ignore engis lower than this tech level
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'GetNearestEngineerWithLowerPriority'
     --if iMinTechLevelWanted > 1 then bDebugMessages = true end
@@ -822,7 +822,7 @@ function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
 end
 
 function IssueSpareEngineerAction(aiBrain, oEngineer)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'IssueSpareEngineerAction'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -935,7 +935,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
 end
 
 function AreMobileUnitsInRect(rRectangleToSearch, bOnlyLookForMobileLand)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'AreMobileUnitsInRect'
     local bAreUnits
@@ -974,7 +974,7 @@ function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprint
     --This hasnt been updated for getmapsizechange
     --tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
     --Can also be used for general movement
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FindRandomPlaceToBuildOld'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local iMapSizeX, iMapSizeZ = GetMapSize()
@@ -1107,7 +1107,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     --tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
     --Can also be used for general movement
     --very similar to FindEmptyPathableAreaNearTarget, but now with added code to ignore if blocking mex
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bForcedDebug then bDebugMessages = true end --for error handling
     local sFunctionRef = 'FindRandomPlaceToBuild'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -1254,7 +1254,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
 end
 
 function WillBuildingBlockMex(sNewBuildingBPID, tPositionOfNewBuilding)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'WillBuildingBlockMex'
     --returns true if building will build by a mex; will only check outer border of the buildingID, i.e. assumes mex location wont be inside this since hten we couldnt build anyway
     --MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
@@ -1306,9 +1306,10 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     --bPreferCloseToEnemy, bPreferFarFromEnemy - optional variables, if either is set then will give +0.5 priority to locations that are closer/further to enemy
     --bLookForQueuedBuildings - optional, defaults to true, if true then check if any engineer has been assigned to buidl to that location already
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end --True if want most log messages to print
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --True if want most log messages to print
     local sFunctionRef = 'GetAdjacencyLocationForTarget'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+
 
     if bCheckValid == nil then bCheckValid = false end
     if aiBrain == nil then bCheckValid = false end
@@ -1600,9 +1601,8 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     --Determines the blueprint and location for oEngineer to build at; also returns the location
     --iCatToBuildBy: Optional, specify if want to look for adjacency locations
     --bLookForQueuedBuildings: Optional, if true, then doesnt choose a target if another engineer already has that target function ref assigned to build something
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
-    if iCategoryToBuild == M27UnitInfo.refCategoryT2Radar then bDebugMessages = true end
     local sFunctionRef = 'BuildStructureAtLocation'
     local bAbortConstruction = false
     local sBlueprintToBuild = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oEngineer)--, false, false)
@@ -1664,7 +1664,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                 local tResourceLocations
                 if EntityCategoryContains(M27UnitInfo.refCategoryMex, sBlueprintBuildBy) then
                     tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, true)
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryPower, sBlueprintBuildBy) then
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryHydro, sBlueprintBuildBy) or EntityCategoryContains(M27UnitInfo.refCategoryT2Power, sBlueprintBuildBy) then --Dont want to make this all power, because the adjacency code requires a building size, and only works for a single building size; i.e. if try and get adjacency for t1 power and include hydro locations, then it will think it needs to build within the hydro for adjacency
                     tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, false)
                 end
                 if M27Utilities.IsTableEmpty(tResourceLocations) == false then
@@ -1867,7 +1867,7 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel)
 end
 
 function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpgrade)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'UpgradeBuildingActionCompleteChecker'
     local bContinue = true
@@ -1884,7 +1884,7 @@ end
 
 function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iConditionNumber, sBuildingBPRef)
     --If oActionTargetObject is specified, then will assist this, otherwise will try and construct a new building
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'AssignActionToEngineer'
 
@@ -1968,8 +1968,19 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 --HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable)
                                 if M27Conditions.HydroNearACUAndBase(aiBrain, true, false) == true then
                                     bConsiderAdjacency = true
-                                    iCatToBuildBy = refCategoryHydro + M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power
+                                    --Need to decide what power to build by, as adjacency code requires a fixed building size (whereas T2+Hydro is dif to T3 power)
+                                        --for now simple check - if have t3 power, then build by t3 power; otherwise build by hydro+t2 power (which have the same size)
+                                    if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power) > 0 then
+                                        iCatToBuildBy = M27UnitInfo.refCategoryT3Power
+                                    else iCatToBuildBy = refCategoryHydro + M27UnitInfo.refCategoryT2Power end
                                     sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
+                                else
+                                    if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power) > 0 then
+                                        iCatToBuildBy = M27UnitInfo.refCategoryT3Power
+                                    elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power) > 0 then
+                                        iCatToBuildBy = M27UnitInfo.refCategoryT2Power
+                                    else iCatToBuildBy = M27UnitInfo.refCategoryT1Power
+                                    end
                                 end
                             elseif iActionToAssign == refActionBuildEnergyStorage then
                                 --iCategoryToBuild = refCategoryEnergyStorage
@@ -1981,6 +1992,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             elseif iActionToAssign == refActionBuildSMD then
                                 bConsiderAdjacency = true
                                 iCatToBuildBy = M27UnitInfo.refCategoryT3Power
+                                iMaxAreaToSearch = 120
                             elseif iActionToAssign == refActionBuildT1Radar then
                                 bConsiderAdjacency = true
                                 iCatToBuildBy = M27UnitInfo.refCategoryT1Power
@@ -1990,6 +2002,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             elseif iActionToAssign == refActionBuildT3Radar then
                                 bConsiderAdjacency = true
                                 iCatToBuildBy = M27UnitInfo.refCategoryT3Power
+                                iMaxAreaToSearch = 120
 
                             elseif iActionToAssign == refActionBuildMassStorage then
                                 bConsiderAdjacency = false
@@ -2098,7 +2111,7 @@ end
 
 function FilterLocationsBasedOnDistanceToEnemy(aiBrain, tLocationsToFilter, iMaxPercentageOfWayTowardsEnemy, bSortTable)
     --Returns {} if cant find any
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FilterLocationsBasedOnDistanceToEnemy'
 
 
@@ -2134,7 +2147,7 @@ function FilterLocationsBasedOnDistanceToEnemy(aiBrain, tLocationsToFilter, iMax
 end
 
 function FilterLocationsBasedOnIntelPathCoverage(aiBrain, tLocationsToFilter, bNOTYETCODEDAlsoReturnClosest, bTableOfObjectsNotLocations)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FilterLocationsBasedOnIntelPathCoverage'
     local tFilteredLocations = {}
     if bTableOfObjectsNotLocations == nil then bTableOfObjectsNotLocations = false end
@@ -2163,7 +2176,7 @@ end
 function FilterLocationsBasedOnDefenceCoverage(aiBrain, tLocationsToFilter, bAlsoNeedIntelCoverage, bNOTYETCODEDAlsoReturnClosest, bTableOfObjectsNotLocations)
     --Intel coverage - achieved if either have intel coverage of the target, or intel path line is closer to enemy base than it
     --Returns nil if cant find anywhere
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FilterLocationsBasedOnDefenceCoverage'
     if bTableOfObjectsNotLocations == nil then bTableOfObjectsNotLocations = false end
     local tFilteredLocations = {}
@@ -2203,7 +2216,7 @@ function FilterLocationsBasedOnIfUnclaimed(aiBrain, tLocationsToFilter, bMexNotH
     if M27Utilities.IsTableEmpty(tLocationsToFilter) == true then
         M27Utilities.ErrorHandler('tLocationsToFilter doesnt contain values')
     else
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'FilterLocationsBasedOnIfUnclaimed'
         if bDebugMessages == true then LOG(sFunctionRef..': Start - have valid table of locations, with size='..table.getn(tLocationsToFilter)) end
         local iValidLocationCount = 0
@@ -2224,7 +2237,7 @@ end
 function GetUnclaimedMexOrHydro(bMexNotHydro, aiBrain, oPathingUnit, sPathing, iPathingGroup, bTreatEnemyMexAsUnclaimed, bTreatOurOrAllyMexAsUnclaimed, bTreatQueuedBuildingAsUnclaimed)
     --Returns a table of mexes/hydros that are within the sPathing iPathingGroup which are unclaimed
     --returns {} if no such table
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnclaimedMexOrHydro'
     local tAllLocationsInGroup
     if bTreatQueuedBuildingAsUnclaimed == nil then bTreatQueuedBuildingAsUnclaimed = bTreatOurOrAllyMexAsUnclaimed end
@@ -2298,7 +2311,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     --Returns both the location of the target, and (if relevant) the object (either the first engineer assigned the action, or the building its constructing if it exists yet); will return nil for object if there is none
     --if tExistingLocationsToPickFrom isn't nil then will only refer to here
     --Variables from tIdleEngineers onwards are only used by the mex functionality which will use the existing function to get the nearest idle engineer, and see hwo far it is from the mex
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'GetActionTargetAndObject'
     local tLocationsToGoThrough = tExistingLocationsToPickFrom
@@ -2544,7 +2557,7 @@ end
 
 function GetUnclaimedMexes(aiBrain, oPathingUnitBackup, sPathing, iPathingGroup, bTreatEnemyMexAsUnclaimed, bTreatOurOrAllyMexAsUnclaimed, bTreatQueuedBuildingAsUnclaimed)
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnclaimedMexes'
     if bDebugMessages == true then LOG(sFunctionRef..': bTreatEnemyMexAsUnclaimed='..tostring(bTreatEnemyMexAsUnclaimed)..'; bTreatOurOrAllyMexAsUnclaimed='..tostring(bTreatOurOrAllyMexAsUnclaimed)..'; bTreatQueuedBuildingAsUnclaimed='..tostring(bTreatQueuedBuildingAsUnclaimed)) end
     --GetUnclaimedMexOrHydro(bMexNotHydro, aiBrain, oPathingUnit, sPathing, iPathingGroup, bTreatEnemyMexAsUnclaimed, bTreatOurOrAllyMexAsUnclaimed, bTreatQueuedBuildingAsUnclaimed)
@@ -2561,7 +2574,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
     --DEBUGGING: Key log below to look for: LOG(sFunctionRef..': Game time='..GetGameTimeSeconds()..': About to assign action '..iActionToAssign..' to engineer number '..GetEngineerUniqueCount(oEngineerToAssign)..' with lifetime count='..sEngineerName..'; Eng unitId='..oEngineerToAssign:GetUnitId()..'; ActionTargetLocation='..repr(tActionTargetLocation))
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
 
     local sFunctionRef = 'ReassignEngineers'
@@ -3460,7 +3473,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 end
 
 function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if GetGameTimeSeconds() >= 485 then bDebugMessages = true end
     local sFunctionRef = 'DelayedEngiReassignment'
     WaitTicks(1)
@@ -3469,7 +3482,7 @@ function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassig
 end
 
 function EngineerManager(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'EngineerManager'
     local iLongLoopCount = 0
     local iLongLoopThreshold = 5

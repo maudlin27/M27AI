@@ -55,9 +55,9 @@ function IsUnitValid(oUnit)
 end
 
 function GetMexCountOnOurSideOfMap(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetMexCountOnOurSideOfMap'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local iCount = 0
     if aiBrain[reftMexOnOurSideOfMap] then iCount = table.getn(aiBrain[reftMexOnOurSideOfMap]) end
     if iCount == 0 then
@@ -94,9 +94,9 @@ function GetMexCountOnOurSideOfMap(aiBrain)
 end
 
 function GetMassStorageTargets(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetMassStorageTargets'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     --Goes through all mexes and records any available locations for mass storage
     local iDistanceModForEachAdjacentMex = -60
     local iDistanceModForEachT1AdjacentMex = -35 --NOTE: If changing this value, then also update engineer overseer's threshold for ignoring a location based on difference in distance
@@ -220,9 +220,9 @@ end
 
 function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCategory)
     --Doesnt factor in if a unit is paused
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local iUpgradingCount = 0
     local iAvailableToUpgradeCount = 0
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
@@ -254,9 +254,9 @@ end
 
 function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
     --Work out the upgrade ID wanted; if bUpdateUpgradeTracker is true then records upgrade against unit's aiBrain
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeUnit'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     --Do we have any HQs of the same factory type of a higher tech level?
     local sUpgradeID = M27UnitInfo.GetUnitUpgradeBlueprint(oUnitToUpgrade, true) --If not a factory or dont recognise the faction then just returns the normal unit ID
     --local oUnitBP = oUnitToUpgrade:GetBlueprint()
@@ -283,9 +283,9 @@ end
 function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     --Looks for the nearest non-upgrading unit of iunitcategory to tStartPoint
     --Returns nil if cant find one
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
     local oUnitToUpgrade, tCurPosition, iCurDistanceToStart, iCurDistanceToEnemy, iCurCombinedDist
     local iMaxCombinedDist = -100000
@@ -345,9 +345,9 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
 end
 
 function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     --iMexesUpgrading, iMexesAvailableForUpgrade = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex + refCategoryT2Mex, true)
     local iT1Mexes = aiBrain:GetCurrentUnits(refCategoryT1Mex)
     local iT2Mexes = aiBrain:GetCurrentUnits(refCategoryT2Mex)
@@ -409,9 +409,9 @@ end
 
 function ClearOldRecords(aiBrain, iOldRecordsExpected)
     --iOldRecordsExpected - optional - allows optimisation by having this called from loops which can already determine this for minimal extra cost
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearOldRecords'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local iLoopCount = 0
     local iLoopMax = 100
     local sUnitReasonForClear, sUnitState
@@ -459,9 +459,9 @@ end
 
 function UnpauseUpgrades(aiBrain, iMaxToUnpause)
     --Note - this will try and unpause any units that have been paused previously.  However, in some cases there may not be a unit to unpause e.g. if engineers have assisted it while its paused
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UnpauseUpgrades'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
 
     local iAmountToUnpause = math.min(iMaxToUnpause, aiBrain[refiPausedUpgradeCount])
     local iOldRecordCount = 0
@@ -509,9 +509,9 @@ function UnpauseUpgrades(aiBrain, iMaxToUnpause)
 end
 
 function PauseLastUpgrade(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PauseLastUpgrade'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local oLastUnpausedUpgrade
     local oLastUnpausedNonMex
     local iOldRecordCount = 0
@@ -575,9 +575,9 @@ end
 
 function DecideMaxAmountToBeUpgrading(aiBrain)
     --Returns max number to upgrade
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
 
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
     local bHaveHighMass, bHaveEnoughEnergy
@@ -760,9 +760,9 @@ function RefreshEconomyData(aiBrain)
 end
 
 function UpgradeManager(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
-    if GetGameTimeSeconds() > 837 then bDebugMessages = true end
+    --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
 
     local iCycleWaitTime = 40
     local iCategoryToUpgrade, oUnitToUpgrade

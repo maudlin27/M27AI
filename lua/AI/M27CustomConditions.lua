@@ -17,7 +17,7 @@ tGunUpgrades = { 'HeavyAntiMatterCannon',
 
 function SafeToUpgradeUnit(oUnit)
     --Intended e.g. for mexes to decide whether to upgrade
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     --Can the unit be upgraded?
     local bNoNearbyEnemies = false
@@ -62,9 +62,20 @@ function SafeToUpgradeUnit(oUnit)
     return bNoNearbyEnemies
 end
 
+function HaveNearbyMobileShield(oPlatoon)
+    local bHaveNearbyShield = false
+    if oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon] then
+        local iShieldValueHave = oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonMassValue]
+        if iShieldValueHave >= 100 and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon])) <= 20 then
+            bHaveNearbyShield = true
+        end
+    end
+    return bHaveNearbyShield
+end
+
 function SafeToGetACUUpgrade(aiBrain)
     --Determines if its safe for the ACU to get an upgrade - considers ACU health and whether ACU is in a platoon set to heal
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SafeToGetACUUpgrade'
 
     local bIsSafe = false
@@ -99,7 +110,13 @@ function SafeToGetACUUpgrade(aiBrain)
                     bIsSafe = false
                 elseif oACU.PlatoonHandle and oACU.PlatoonHandle[M27PlatoonUtilities.refbNeedToHeal] and bACUNearBase == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU platoon is flagged that it needs to heal so not safe to get gun') end
-                    bIsSafe = false end
+                    bIsSafe = false
+                end
+                if bIsSafe == false then --Check if we have mobile shields nearby and are on our side of the map
+                    if oACU.PlatoonHandle and HaveNearbyMobileShield(oACU.PlatoonHandle) and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) then
+                        bIsSafe = true
+                    end
+                end
             end
         end
     end
@@ -120,7 +137,7 @@ function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
 end
 
 function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'WantToGetGunUpgrade'
     --Returns true if meet all the conditions that mean will want gun upgrade
     if bIgnoreEnemies == nil then bIgnoreEnemies = false end
@@ -147,7 +164,7 @@ end
 function WantToGetAnotherACUUpgrade(aiBrain)
     --Returns 2 variables: true/false if we have eco+safety to get upgrade; also returns true/false if safe to get upgrade
     local sFunctionRef = 'WantToGetAnotherACUUpgrade'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local bWantUpgrade = false
     local bSafeToGetUpgrade = true
@@ -182,7 +199,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
 end
 
 function WantMoreMAA(aiBrain, iMassOnMAAVsEnemyAir)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'WantMoreMAA'
     local iMAAMaxUnitCount = 50
     local bWantMoreMAA = false
@@ -223,7 +240,7 @@ function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
     --UCBC includes simialr code but for some reason referencing it (or using a direct copy) causes error
     --oAltACU - can pass an ACU that's not aiBrain's ACU
     --e.g. need to specify 1 of aiBrain and oAltACU (no need to specify both)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DoesACUHaveGun'
     if bROFAndRange == nil then bROFAndRange = true end
     local oACU = oAltACU
@@ -349,7 +366,7 @@ end
 
 function ExcessMassIncome(aiBrain, iExcessResource)
     --returns true if have at least iExcessMass; note that the economy trend will be 10% of what is displayed (so 0.8 excess mass income is displayed in-game as 8 excess mass income) - i.e. presumably it's the 'per tick' excess
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sResource = 'MASS'
     local bHaveExcess = false
     if bDebugMessages == true then LOG('M27ExcessMassIncome='..aiBrain:GetEconomyTrend(sResource)..'; iExcessCondition='..iExcessResource) end
@@ -366,7 +383,7 @@ function AtLeastXMassStored(aiBrain, iResourceStored)
 end
 
 function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'LifetimeBuildCountLessThan'
     local iTotalBuilt = 0
     if bDebugMessages == true then LOG(sFunctionRef..' - start') end
@@ -399,7 +416,7 @@ end
 
 function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatEnemyBuildingAsUnclaimed, bTreatOurOrAllyBuildingAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
     --bTreatQueuedBuildingsAsUnclaimed: If set to false, then consideres all planned mex buidlings for engineers and treats them as being claimed
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsMexOrHydroUnclaimed'
     if bTreatEnemyBuildingAsUnclaimed == nil then bTreatEnemyBuildingAsUnclaimed = false end
     if bTreatOurOrAllyBuildingAsUnclaimed == nil then bTreatOurOrAllyBuildingAsUnclaimed = false end
@@ -503,7 +520,7 @@ function IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreat
     return IsMexOrHydroUnclaimed(aiBrain, tMexPosition, true, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
     --[[
     --bTreatQueuedBuildingsAsUnclaimed: If set to true, then consideres all planned mex buidlings for engineers and treats them as being claimed
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsMexUnclaimed'
     if bTreatEnemyMexAsUnclaimed == nil then bTreatEnemyMexAsUnclaimed = false end
     if bTreatAllyMexAsUnclaimed == nil then bTreatAllyMexAsUnclaimed = false end
@@ -574,7 +591,7 @@ end
 
 function IsLocationWithinIntelPathLine(aiBrain, tLocation)
     --Returns true if tLocation is closer to our start than the intel line
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLocationWithinIntelPathLine'
     local bWithinIntelLine = false
     if aiBrain[M27Overseer.refbIntelPathsGenerated] == true then

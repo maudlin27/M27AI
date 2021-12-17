@@ -137,7 +137,7 @@ function GetBlueprintIDFromBuildingTypeAndFaction(buildingType, iFactionNumber)
     --To get iFactionNumber use e.g. factionIndex = aiBrain:GetFactionIndex()
     --1: UEF, 2: Aeon, 3: Cybran, 4: Seraphim, 5: Nomads
     --Alternatively could get faction of a unit, using the FactionName = 'Aeon' property
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG('About to print out entire building template:'..repr(BuildingTemplates)) end
     local tBuildingTemplateForFaction = BuildingTemplates[iFactionNumber]
     return GetBlueprintIDFromBuildingType(buildingType, tBuildingTemplateForFaction)
@@ -196,7 +196,7 @@ end
 
 function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     --Returns support factory ID if it can be built, otherwise returns normal upgrade unit (works for any unit, not just factory)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitUpgradeBlueprint'
     if bGetSupportFactory == nil then bGetSupportFactory = true end
     --Gets the support factory blueprint, and checks if it can be built; if not then returns the normal UpgradesTo blueprint
@@ -323,7 +323,7 @@ function IsUnitUnderwater(oUnit)
 end
 
 function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsEnemyUnitAnEngineer'
     local bIsEngineer = true
     local iEnemySpeed
@@ -350,7 +350,7 @@ function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
 end
 
 function GetCurrentAndMaximumShield(oUnit)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCurrentAndMaximumShield'
     local iCurShield = 0
     local iMaxShield = 0

@@ -45,7 +45,7 @@ end
 
 function OnUnitDeath(oUnit)
     --NOTE: This is called by the death of any unit of any player, so careful with what commands are given
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnUnitDeath'
     if bDebugMessages == true then LOG(sFunctionRef..'Hook successful') end
     --Is it an ACU?
@@ -77,7 +77,7 @@ function OnUnitDeath(oUnit)
 end
 
 function OnWorkEnd(self, work)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnWorkEnd'
     if bDebugMessages == true then LOG(sFunctionRef..': Hook successful') end
 end
@@ -90,7 +90,7 @@ function OnDamaged(self, instigator)
             if aiBrain.M27AI then
                 --Has our ACU been hit by an enemy we have no sight of?
                 if self == M27Utilities.GetACU(aiBrain) then
-                    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+                    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
                     local sFunctionRef = 'OnDamage'
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU has just taken damage, checking if can see the unit that damaged it') end
                     --Do we have a unit that damaged us?
@@ -136,7 +136,7 @@ function OnDamaged(self, instigator)
 end
 
 function OnBombFired(oWeapon, projectile)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnBombFired'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local oUnit = oWeapon.unit
@@ -151,7 +151,7 @@ end
 --WARNING: OnWeaponFired and/or OnProjectilfeFired - one of these (probably the latter) resulted in error messages when t1 arti fired, disabled both of them as dont use now
 --[[
 function OnWeaponFired(oWeapon)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnWeaponFired'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --NOTE: Have used hook on calcballisticacceleration instead of below now
@@ -167,7 +167,7 @@ end--]]
 
 --[[
 function OnProjectileFired(oWeapon, oMuzzle)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnProjectileFired'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if oWeapon.GetBlueprint then

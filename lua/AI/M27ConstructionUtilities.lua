@@ -2,7 +2,7 @@ local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 tHydroBuilder = {} --[x][y] returns the yth engineer for x army number that is constructing a hydro
 
 function RecordHydroConstructor(aiBrain, oEng)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local iArmy = M27Utilities.GetAIBrainArmyNumber(aiBrain)
     local iExistingEngineers = 0
     if tHydroBuilder[iArmy] == nil then tHydroBuilder[iArmy] = {}

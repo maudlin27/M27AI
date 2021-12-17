@@ -7,7 +7,7 @@ local XZDist = import('/lua/utilities.lua').XZDistanceTwoVectors
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 
 function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveAwayFromTargetTemporarily'
 
     local tUnitPosition = oUnit:GetPosition()
@@ -41,7 +41,7 @@ end
 
 function ForkedMoveInHalfCircle(oUnit, iTimeToRun, tPositionToRunFrom)
     --More intensive version of MoveAwayFromTargetTemporarily, intended e.g. for ACUs
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ForkedMoveInHalfCircle'
 
     --KEY CONFIG SETTINGS:
@@ -127,7 +127,7 @@ end
 
 function ForkedMoveInCircle(oUnit, iTimeToRun)
     --More intensive version of MoveAwayFromTargetTemporarily, intended e.g. for ACUs
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ForkedMoveInCircle'
 
     --KEY CONFIG SETTINGS: (these will work sometimes but not always against an aeon strat)
@@ -213,7 +213,7 @@ end
 function MoveInOppositeDirectionTemporarily(oUnit, iTimeToMove)
     --OBSOLETE
     --e.g. so can dodge a bomb
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveInOppositeDirectionTemporarily'
 
     if oUnit.GetNavigator then
@@ -272,24 +272,26 @@ function GetBombTarget(weapon, projectile)
             end
 
             -- calculate flat(exclude y-axis) distance and velocity between projectile and target
-            local dist = {pos=XZDist(proj.pos, target.pos), vel=XZDist(proj.vel, target.vel)}
+            if M27Utilities.IsTableEmpty(target) == false and M27Utilities.IsTableEmpty(proj.pos) == false then
+                local dist = {pos=XZDist(proj.pos, target.pos), vel=XZDist(proj.vel, target.vel)}
 
-            -- how many seconds until the bomb hits the target in xz-space
-            local time = dist.pos / dist.vel
-            if time == 0 then return acc end
+                -- how many seconds until the bomb hits the target in xz-space
+                local time = dist.pos / dist.vel
+                if time == 0 then return acc end
 
-            -- find out where the target will be at that point in time (it could be moving)
-            target.tpos = {target.pos[1] + time * target.vel[1], 0, target.pos[3] + time * target.vel[3]}
-            -- what is the height at that future position
-            target.tpos[2] = GetSurfaceHeight(target.tpos[1], target.tpos[3])
-            return target.tpos
+                -- find out where the target will be at that point in time (it could be moving)
+                target.tpos = {target.pos[1] + time * target.vel[1], 0, target.pos[3] + time * target.vel[3]}
+                -- what is the height at that future position
+                target.tpos[2] = GetSurfaceHeight(target.tpos[1], target.tpos[3])
+                return target.tpos
+            end
         end
     end
     return nil
 end
 
 function DodgeBomb(oBomber, oWeapon, projectile)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DodgeBombsFiredByUnit'
     local tBombTarget = GetBombTarget(oWeapon, projectile)
     if tBombTarget then
@@ -341,7 +343,7 @@ end
 function DodgeBombsFiredByUnit(oWeapon, oBomber)
     --NOTE: BELOW IS SUPERCEDED
     --Should have already checked we have a bomber before calling this
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DodgeBombsFiredByUnit'
     local tBombTarget = oWeapon:GetCurrentTargetPos()
     local iRadiusSize = 1.5
@@ -394,7 +396,7 @@ end
 
 function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     --should have already confirmed overcharge action is available using CanUnitUseOvercharge
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetOverchargeExtraAction'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --Do we have positive energy income? If not, then only overcharge if ACU is low on health as an emergency

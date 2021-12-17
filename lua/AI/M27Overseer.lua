@@ -220,7 +220,7 @@ function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocationTarget
 end
 
 function RecordIntelPaths(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordIntelPaths'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local refCategoryLandScout = M27UnitInfo.refCategoryLandScout
@@ -459,7 +459,7 @@ function GetNearestMAAOrScout(aiBrain, tPosition, bScoutNotMAA, bDontTakeFromIni
     --if bOnlyConsiderAvailableHelpers is true then won't consider units in any other existing platoons (unless they're a helper platoon with no helper)
     --returns nil if no such scout/MAA
     --oRelatedUnitOrPlatoon - use to check that aren't dealing with a support unit already assigned to the unit/platoon that are getting this for
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNearestMAAOrScout'
     if bOnlyConsiderAvailableHelpers == nil then bOnlyConsiderAvailableHelpers = false end
     if bDontTakeFromInitialRaiders == nil then bDontTakeFromInitialRaiders = true end
@@ -591,7 +591,7 @@ end
 function AssignHelperToPlatoonOrUnit(oHelperToAssign, oPlatoonOrUnitNeedingHelp, bScoutNotMAA)
     --Checks if the platoon/unit already has a helper, in which case adds to that, otherwise creates a new helper platoon
     --bScoutNotMAA - true if scout, false if MAA
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AssignHelperToPlatoonOrUnit'
     local aiBrain = oHelperToAssign:GetAIBrain()
     local sPlanWanted = 'M27ScoutAssister'
@@ -653,7 +653,7 @@ end
 function AssignMAAToPreferredPlatoons(aiBrain)
     --Similar to assigning scouts, but for MAA - for now just focus on having MAA helping ACU and any platoon of >20 size that doesnt contain MAA
     --===========ACU MAA helper--------------------------
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AssignMAAToPreferredPlatoons'
     local iACUMinMAAThreatWantedWithAirThreat = 84 --Equivalent to 3 T1 MAA
     if aiBrain[refiOurHighestFactoryTechLevel] > 1 then
@@ -852,7 +852,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
     --Goes through all scouts we have, and assigns them to highest priority tasks
     --Tries to form an intel line (and manages the location of this), and requests more scouts are built if dont have enough to form an intel line platoon;
     --Also records the number of scouts needed to complete things
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AssignScoutsToPreferredPlatoons'
 
     --Rare error - AI mass produces scouts - logs enabled for if this happens
@@ -1509,7 +1509,7 @@ end
 function RemoveSpareNonCombatUnits(oPlatoon)
 
     --Removes surplus scouts/MAA from oPlatoon
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RemoveSpareTypeOfUnit'
     local tAllUnits = oPlatoon:GetPlatoonUnits()
     local tCombatUnits = EntityCategoryFilterDown(categories.DIRECTFIRE + categories.INDIRECTFIRE - categories.SCOUT - categories.ANTIAIR, tAllUnits)
@@ -1604,7 +1604,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
     --also updates previous threat group references so they know to refer to this threat group
     --if iRadius is 0 then will only add oEnemyUnit to the threat group
     --Add oEnemyUnit to sThreatGroup:
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddNearbyUnitsToThreatGroup'
     local iArmyIndex = aiBrain:GetArmyIndex()
 
@@ -1692,7 +1692,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
 end
 
 function UpdatePreviousPlatoonThreatReferences(aiBrain, tEnemyThreatGroup)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdatePreviousPlatoonThreatReferences'
     local sPlatoonCurTarget
     for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
@@ -1722,7 +1722,7 @@ function RemoveSpareUnits(oPlatoon, iThreatNeeded, iMinScouts, iMinMAA, oPlatoon
     --bIgnoreIfNearbyEnemies (default is yes) is true then won't remove units if have nearby enemies (based on the localised platoon enemy detection)
     --if oPlatoon is army pool then wont remove any of the units
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RemoveSpareUnits'
     local iCurUnitThreat = 0
     local iRemainingThreatNeeded = iThreatNeeded
@@ -1866,7 +1866,7 @@ end
 
 function RecordAvailablePlatoonAndReturnValues(aiBrain, oPlatoon, iAvailableThreat, iCurAvailablePlatoons, tCurPos, iDistFromEnemy, iDistToOurBase, tAvailablePlatoons, tNilDefenderPlatoons, bIndirectThreatOnly)
     --Used by ThreatAssessAndRespond - Split out into this function as used in 2 places so want to make sure any changes are reflected in both
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAvailablePlatoonAndReturnValues'
     local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
     local oRecordedPlatoon
@@ -1911,7 +1911,7 @@ end
 function ThreatAssessAndRespond(aiBrain)
     --Identifies enemy threats, and organises platoons which are sent to deal with them
     --NOTE: Doesnt handle naval units
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ThreatAssessAndRespond'
 
     --Key config variables:
@@ -2699,7 +2699,7 @@ end
 function ACUManager(aiBrain)
     --A lot of the below code is a hangover from when the ACU would use the built in AIBuilders and platoons;
     --Almost all the functionality has now been integrated into the M27ACUMain platoon logic, with a few exceptions (such as calling for help), although these could probably be moved over as well
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ACUManager'
 
     local oACU = M27Utilities.GetACU(aiBrain)
@@ -3023,7 +3023,7 @@ end
 
 function PlatoonNameUpdater(aiBrain, bUpdateCustomPlatoons)
     --Every second cycles through every platoon and updates its name to reflect its plan and platoon count
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonNameUpdater'
     if bDebugMessages == true then LOG(sFunctionRef..': checking if want to update platoon names') end
     if M27Config.M27ShowUnitNames == true then
@@ -3086,7 +3086,7 @@ end
 
 function EnemyThreatRangeUpdater(aiBrain)
     --Updates range to look for enemies based on if any T2 PD detected
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'EnemyThreatRangeUpdater'
     if aiBrain[refbEnemyHasTech2PD] == false then
         local tEnemyTech2 = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH2, M27Utilities.GetACU(aiBrain):GetPosition(), 1000, 'Enemy')
@@ -3099,7 +3099,7 @@ function EnemyThreatRangeUpdater(aiBrain)
 end
 
 function SetMaximumFactoryLevels(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetMaximumFactoryLevels'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local iAirFactoriesOwned = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory)
@@ -3265,10 +3265,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         if M27Utilities.IsTableEmpty(aiBrain[reftEnemyGroundExperimentals]) == false then bBigEnemyThreat = true end
 
         if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 then
-            if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.42 or iDistanceFromEnemyToUs >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
+            if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.58 or iDistanceFromEnemyToUs >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
                 if bDebugMessages == true then LOG(sFunctionRef..': No big enemy threats and good defence and mex coverage so will eco') end
                 bWantToEco = true
             else
+                if bDebugMessages == true then LOG(sFunctionRef..': Dont want to eco based on initial tests: bBigEnemyThreat='..tostring(bBigEnemyThreat)..'; %threat='..aiBrain[refiPercentageOutstandingThreat]..'; UnclaimedMex%='..iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup..'; EnemyDist='..iDistanceFromEnemyToUs) end
                 --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
                 if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Ok defence coverage and income not changed in a while so will eco') end
@@ -3384,7 +3385,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             tsGameState['WantMoreLandFactories'] = tostring(aiBrain[M27EconomyOverseer.refbWantMoreFactories])
 
             --Mobile shields
-            tsGameState['WantMoreMobileSHields'] = tostring(aiBrain[refbUsingMobileShieldsForPlatoons])
+            tsGameState['WantMoreMobileSHields'] = tostring(aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons])
 
             --Threat values:
             --Intel path % to enemy
@@ -3465,7 +3466,7 @@ function SwitchSoMexesAreNeverIgnored(aiBrain, iDelayInSeconds)
 end
 
 function RecordAllEnemies(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAllEnemies'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of attempt to get backup list of enemies, will wait 5 seconds first') end
     WaitSeconds(5)
@@ -3503,7 +3504,7 @@ function RefreshMexPositions(aiBrain)
 end
 
 function ACUInitialisation(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ACUInitialisation'
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -3718,7 +3719,7 @@ end
 
 
 function OverseerManager(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OverseerManager'
 
 
@@ -3768,7 +3769,7 @@ function OverseerManager(aiBrain)
 
 
     while(not(aiBrain:IsDefeated())) do
-        ForkThread(TestNewMovementCommands, aiBrain)
+        --ForkThread(TestNewMovementCommands, aiBrain)
         --M27MiscProfiling.OptimisationComparisonDistanceToStart(aiBrain)
 
         if bDebugMessages == true then

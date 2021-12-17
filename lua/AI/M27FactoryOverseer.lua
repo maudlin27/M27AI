@@ -55,7 +55,7 @@ local refCategoryBomber = M27UnitInfo.refCategoryBomber
 local refCategoryFrigate = M27UnitInfo.refCategoryFrigate
 
 function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFactory)--, bGetSlowest, bGetFastest)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBlueprintsThatCanBuildOfCategory'
     local tBlueprints = EntityCategoryGetUnitList(iCategoryCondition)
     local tValidBlueprints = {}
@@ -216,7 +216,7 @@ end
 
 function DetermineWhatToBuild(aiBrain, oFactory)
     --Returns unit BP ID to be built
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineWhatToBuild'
     local sBPIDToBuild
     if not(oFactory.GetBlueprint) then M27Utilities.ErrorHandler('Factory doesnt have a blueprint')
@@ -846,7 +846,7 @@ function RemoveTemporaryFactoryPause(aiBrain, oFactory)
 end
 
 function FactoryOverseer(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FactoryOverseer'
     local tAllFactories = {}
     local iFactoryCategory = categories.CONSTRUCTION * categories.FACTORY * categories.STRUCTURE
