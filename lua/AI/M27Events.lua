@@ -68,8 +68,8 @@ function OnUnitDeath(oUnit)
                     M27AirOverseer.OnAirAADeath(oUnit)
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryBomber, sUnitBP) or EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, sUnitBP) then
                     M27AirOverseer.OnBomberDeath(aiBrain, oUnit)
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sUnitBP) then
-                    aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
+                --elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sUnitBP) then
+                    --aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
                 end
             end
         end

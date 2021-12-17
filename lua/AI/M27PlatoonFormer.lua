@@ -539,7 +539,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
     end
 end
 
-function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass)
+function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemoveExistingShield)
     local sFunctionRef = 'DoesPlatoonWantAnotherMobileShield'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
@@ -549,8 +549,15 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass)
         if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] then
             --bDebugMessages = true
             iPlatoonValueToShieldRatio = 2.5 end
+        if bCheckIfRemoveExistingShield then
+            iPlatoonValueToShieldRatio = 1.5
+        end
         --Do we have enough shields already assigned and/or enough threat value to be worth assigning?
-        local iShieldValueWanted = oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] / iPlatoonValueToShieldRatio
+        local iPlatoonMass = oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue]
+        --If not dealing with a platoon but instead a unit then cap the mass value (as e.g. we're dealing with a mex)
+
+        if oPlatoon.GetUnitId then iPlatoonMass = math.min(iPlatoonMass, iPlatoonValueToShieldRatio * iShieldMass + 50) end
+        local iShieldValueWanted = iPlatoonMass / iPlatoonValueToShieldRatio
         local iShieldValueHave = 0
         local iShieldUnitsHave = 0
         if oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon] and oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon].GetPlan then
@@ -702,9 +709,10 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                     --No platoon to help; do we have any mexes to shield instead?
                     if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
                         --Search for nearest mex without a shield assigned
-                        local tMexesWantingShield = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex, false, false)
-                        if M27Utilities.IsTableEmpty(tMexesWantingShield) == false then
-                            for iMex, oMex in tMexesWantingShield do
+                        local tBuildingsWantingShield = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Radar, false, false)
+                        if M27Utilities.IsTableEmpty(tBuildingsWantingShield) == false then
+                            for iMex, oMex in tBuildingsWantingShield do
+                                M27PlatoonUtilities.RecordPlatoonUnitsByType(oMex, true)
                                 if DoesPlatoonWantAnotherMobileShield(oMex, iShieldMass) == true then
                                     oMexToHelp = oMex
                                     break

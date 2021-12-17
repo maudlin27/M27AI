@@ -2511,6 +2511,33 @@ function GetDirectFireWeaponPosition(oFiringUnit)
     return tShotStartPosition
 end
 
+function IsLineBlocked(tShotStartPosition, tShotEndPosition)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'IsLineBlocked'
+    local bShotIsBlocked = false
+    local iFlatDistance = M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition)
+    local tTerrainPositionAtPoint = {}
+    if iFlatDistance > 1 then
+        local iAngle = math.atan((tShotEndPosition[2] - tShotStartPosition[2]) / iFlatDistance)
+        local iShotHeightAtPoint
+        if bDebugMessages == true then LOG(sFunctionRef..': About to check if at any point on path shot will be lower than terrain; iAngle='..iAngle..'; startshot height='..tShotStartPosition[2]..'; target height='..tShotEndPosition[2]..'; iFlatDistance='..iFlatDistance) end
+        for iPointToTarget = 1, math.floor(iFlatDistance) do
+            --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
+            tTerrainPositionAtPoint = M27Utilities.MoveTowardsTarget(tShotStartPosition, tShotEndPosition, iPointToTarget, 0)
+            iShotHeightAtPoint = math.tan(iAngle) * iPointToTarget + tShotStartPosition[2]
+            if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
+                if bDebugMessages == true then LOG(sFunctionRef..': Shot blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
+                bShotIsBlocked = true
+                break
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..': Shot not blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
+            end
+        end
+    else bShotIsBlocked = false
+    end
+end
+
+--NOTE: Use IsLineBlocked if have positions instead of units
 function IsShotBlocked(oFiringUnit, oTargetUnit)
     --Returns true or false depending on if oFiringUnit can hit oTargetUnit in a straight line
     --intended for direct fire units only
@@ -2586,26 +2613,7 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
                 bShotIsBlocked = true
             else
                 --Have the shot end and start positions; now want to move along a line between the two and work out if terrain will block the shot
-                local iFlatDistance = M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition)
-                local tTerrainPositionAtPoint = {}
-                if iFlatDistance > 1 then
-                    local iAngle = math.atan((tShotEndPosition[2] - tShotStartPosition[2]) / iFlatDistance)
-                    local iShotHeightAtPoint
-                    if bDebugMessages == true then LOG(sFunctionRef..': About to check if at any point on path shot will be lower than terrain; iAngle='..iAngle..'; startshot height='..tShotStartPosition[2]..'; target height='..tShotEndPosition[2]..'; iFlatDistance='..iFlatDistance) end
-                    for iPointToTarget = 1, math.floor(iFlatDistance) do
-                        --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
-                        tTerrainPositionAtPoint = M27Utilities.MoveTowardsTarget(tShotStartPosition, tShotEndPosition, iPointToTarget, 0)
-                        iShotHeightAtPoint = math.tan(iAngle) * iPointToTarget + tShotStartPosition[2]
-                        if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Shot blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
-                            bShotIsBlocked = true
-                            break
-                        else
-                            if bDebugMessages == true then LOG(sFunctionRef..': Shot not blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
-                        end
-                    end
-                else bShotIsBlocked = false
-                end
+                bShotIsBlocked = IsLineBlocked(tShotStartPosition, tShotEndPosition)
             end
         end
     end

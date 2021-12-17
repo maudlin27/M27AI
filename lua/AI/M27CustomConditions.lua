@@ -75,7 +75,7 @@ end
 
 function SafeToGetACUUpgrade(aiBrain)
     --Determines if its safe for the ACU to get an upgrade - considers ACU health and whether ACU is in a platoon set to heal
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SafeToGetACUUpgrade'
 
     local bIsSafe = false
@@ -117,6 +117,47 @@ function SafeToGetACUUpgrade(aiBrain)
                         bIsSafe = true
                     end
                 end
+                if bIsSafe == true then --Check are either underwater or our shots wont be blocked if we upgrade
+                    if bDebugMessages == true then LOG(sFunctionRef..': CHecking if ACU is underwater or (if not) if its shot is blocked') end
+                    if not(M27UnitInfo.IsUnitUnderwater(oACU)) then
+                        local iIntervalDegrees = 30
+                        local iMaxInterval = 180
+                        local iChecks = math.ceil(iMaxInterval / iIntervalDegrees)
+                        local iAngleToEnemy = M27Utilities.GetAngleFromAToB(tACUPos, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                        local iBaseAngle = -iMaxInterval / 2 + iAngleToEnemy
+                        local iCurAngle
+
+                        local iDistanceFromACU = 22
+
+                        if DoesACUHaveGun(aiBrain, false, oACU) then iDistanceFromACU = 30 end
+                        local tCurPositionToCheck
+                        local iHeightFromGround = 0.3
+                        local bShotBlocked = false
+                        --function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': Checking if any shots are blocked by ACU before decide whether to upgrade')
+                            M27Utilities.DrawLocation(tACUPos, nil, 1)
+                        end
+
+                        for iCurCheck = 0, iChecks do
+                            iCurAngle = iBaseAngle + iIntervalDegrees * iCurCheck
+                            if iCurAngle > 360 then iCurAngle = iCurAngle - 360 elseif iCurAngle < 0 then iCurAngle = iCurAngle + 360 end
+                            --MoveInDirection(tStart, iAngle, iDistance)
+                            tCurPositionToCheck = M27Utilities.MoveInDirection(tACUPos, iCurAngle, iDistanceFromACU) --uses surfaceheight for y
+                            tCurPositionToCheck[2] = tCurPositionToCheck[2] + iHeightFromGround
+                            if bDebugMessages == true then
+                                M27Utilities.DrawLocation(tCurPositionToCheck, nil, 2)
+                                LOG(sFunctionRef..': tCurPositionToCheck='..repr(tCurPositionToCheck)..'; iCurCheck='..iCurCheck)
+                            end
+
+                            if M27Logic.IsLineBlocked(tACUPos, tCurPositionToCheck) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': expect a shot is blocked so dont want to upgrade here') end
+                                bIsSafe = false
+                                break
+                            end
+                        end
+                    end
+                end
             end
         end
     end
@@ -137,7 +178,7 @@ function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
 end
 
 function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'WantToGetGunUpgrade'
     --Returns true if meet all the conditions that mean will want gun upgrade
     if bIgnoreEnemies == nil then bIgnoreEnemies = false end
