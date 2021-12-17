@@ -1193,20 +1193,27 @@ function RecordSortedMexesInOriginalPathingGroup(aiBrain)
 
         for iMex, tMex in tMexByPathingAndGrouping[sPathingType][iStartPathingGroup] do
             iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tMex, tOurStartPos)
+            if bDebugMessages == true then LOG(sFunctionRef..': iMex='..iMex..'; tMex='..repr(tMex)..'; iCurDistanceToStart='..iCurDistanceToStart) end
             if iCurDistanceToStart > iMinDistanceFromBase then
                 --Are we closer to us than enemy?
                 iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tMex, tEnemyStartPos)
+                if bDebugMessages == true then LOG(sFunctionRef..': iCurDistanceToEnemy='..iCurDistanceToEnemy) end
                 if iCurDistanceToStart <= iCurDistanceToEnemy then
                     sLocationRef = M27Utilities.ConvertLocationToReference(tMex)
                     bHaveNearbyAssignedMex = false
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to check if near another mex that have already assigned') end
                     for iNearbyMex, tNearbyMex in tMexByPathingAndGrouping[sPathingType][iStartPathingGroup] do
                         sNearbyLocationRef = M27Utilities.ConvertLocationToReference(tNearbyMex)
                         if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy][sNearbyLocationRef]) == false then
-                            bHaveNearbyAssignedMex = true
-                            break
+                            if M27Utilities.GetDistanceBetweenPositions(tNearbyMex, tMex) <= iNearbyMexSearchRange then
+                                if bDebugMessages == true then LOG(sFunctionRef..': sLocationRef='..sLocationRef..'; sNearbyLocationRef='..sNearbyLocationRef..'; tNearbyMex='..repr(tNearbyMex)..'; already have an entry for this in reftMexesToKeepScoutsBy='..repr(aiBrain[reftMexesToKeepScoutsBy][sNearbyLocationRef])) end
+                                bHaveNearbyAssignedMex = true
+                                break
+                            end
                         end
                     end
                     if bHaveNearbyAssignedMex == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have nearby mex so will record this one, sLocationRef='..sLocationRef) end
                         aiBrain[reftMexesToKeepScoutsBy][sLocationRef] = {}
                         aiBrain[reftMexesToKeepScoutsBy][sLocationRef][1] = tMex[1]
                         aiBrain[reftMexesToKeepScoutsBy][sLocationRef][2] = tMex[2]

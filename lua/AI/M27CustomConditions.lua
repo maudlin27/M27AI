@@ -55,7 +55,17 @@ function SafeToUpgradeUnit(oUnit)
             end
             if bHaveIntelCoverage then
                 --Check for nearby enemies
+
                 bNoNearbyEnemies = M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - M27UnitInfo.refCategoryAirScout, tUnitLocation, iEnemySearchRange, 'Enemy'))
+                if bNoNearbyEnemies == false then
+                    --Exception - Unit is ACU with gun with low enemy threat and have shield coverage and high health
+                    if oUnit.PlatoonHandle and M27Utilities.IsACU(oUnit) then
+                        local oPlatoon = oUnit.PlatoonHandle
+                        if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] and oUnit:GetHealthPercent() > 0.8 and DoesACUHaveGun(aiBrain, false, oUnit) and DoesPlatoonWantAnotherMobileShield(oPlatoon, 200, false) == false then
+                            bNoNearbyEnemies = true
+                        end
+                    end
+                end
             end
         end
     end
@@ -75,7 +85,7 @@ end
 
 function SafeToGetACUUpgrade(aiBrain)
     --Determines if its safe for the ACU to get an upgrade - considers ACU health and whether ACU is in a platoon set to heal
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SafeToGetACUUpgrade'
 
     local bIsSafe = false
@@ -178,7 +188,7 @@ function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
 end
 
 function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'WantToGetGunUpgrade'
     --Returns true if meet all the conditions that mean will want gun upgrade
     if bIgnoreEnemies == nil then bIgnoreEnemies = false end

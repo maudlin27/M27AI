@@ -1454,45 +1454,54 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                     local iCurOmniRange
                     local iDistanceWithinOmniWanted = 30
                     local oCurBlueprint
+                    local sLocationRef
 
-                    for iMex, tMex in aiBrain[M27MapInfo.reftMexesToKeepScoutsBy] do
-                        if M27Utilities.GetDistanceBetweenPositions(tMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > 40 then
-                            sLocationRef = iMex --M27Utilities.ConvertLocationToReference(tMex)
-                            --Do we have a scout assigned that is still alive?
-                            oCurScout = aiBrain[tScoutAssignedToMexLocation][sLocationRef]
-                            if oCurScout and not(oCurScout.Dead) and oCurScout.GetUnitId then
-                                --Do nothing
-                            else
-                                aiBrain[tScoutAssignedToMexLocation][sLocationRef] = nil
-                                --Do we have omni coverage?
-                                bCurPositionInOmniRange = false
-                                if not(bConsiderOmni) then bCurPositionInOmniRange = true
+                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftMexesToKeepScoutsBy]) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': have some mexes in the table of mexes that want scouts (tablegetn wont work for this variable)') end
+                        for iMex, tMex in aiBrain[M27MapInfo.reftMexesToKeepScoutsBy] do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering tMex='..repr(tMex)..'; iMex='..iMex) end
+                            if M27Utilities.GetDistanceBetweenPositions(tMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > 40 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Mex is at least 40 away from start') end
+                                sLocationRef = iMex --M27Utilities.ConvertLocationToReference(tMex)
+                                --Do we have a scout assigned that is still alive?
+                                oCurScout = aiBrain[tScoutAssignedToMexLocation][sLocationRef]
+                                if oCurScout and not(oCurScout.Dead) and oCurScout.GetUnitId then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Already have a scout assigned to the mex') end
+                                    --Do nothing
                                 else
-                                    for iOmni, oOmni in tFriendlyOmni do
-                                        iCurOmniRange = 0
-                                        if oOmni.GetBlueprint and not(oOmni.Dead) and oOmni.GetFractionComplete and oOmni:GetFractionComplete() == 1 then
-                                            oCurBlueprint = oOmni:GetBlueprint()
-                                            if oCurBlueprint.Intel and oCurBlueprint.Intel.OmniRadius then iCurOmniRange = oCurBlueprint.Intel.OmniRadius end
+                                    aiBrain[tScoutAssignedToMexLocation][sLocationRef] = nil
+                                    --Do we have omni coverage?
+                                    bCurPositionInOmniRange = false
+                                    if bConsiderOmni then
+                                        for iOmni, oOmni in tFriendlyOmni do
+                                            iCurOmniRange = 0
+                                            if oOmni.GetBlueprint and not(oOmni.Dead) and oOmni.GetFractionComplete and oOmni:GetFractionComplete() == 1 then
+                                                oCurBlueprint = oOmni:GetBlueprint()
+                                                if oCurBlueprint.Intel and oCurBlueprint.Intel.OmniRadius then iCurOmniRange = oCurBlueprint.Intel.OmniRadius end
+                                            end
+                                            if iCurOmniRange > 0 then
+                                                 if M27Utilities.GetDistanceBetweenPositions(oOmni:GetPosition(), tMex) - iCurOmniRange <= iDistanceWithinOmniWanted then bCurPositionInOmniRange = true break end
+                                            end
                                         end
-                                        if iCurOmniRange > 0 then
-                                             if M27Utilities.GetDistanceBetweenPositions(oOmni:GetPosition(), tMex) - iCurOmniRange <= iDistanceWithinOmniWanted then bCurPositionInOmniRange = true break end
+                                    end
+                                    if not(bCurPositionInOmniRange) then
+                                        --Try to find a scout to assign
+                                        if bNoMoreScouts == false then oCurScout = GetNearestMAAOrScout(aiBrain, tMex, true, true, true)
+                                        else oCurScout = nil end
+                                        if oCurScout then
+                                            aiBrain[tScoutAssignedToMexLocation][sLocationRef] = oCurScout
+                                            AssignHelperToLocation(aiBrain, oCurScout, tMex)
+                                        else
+                                            bNoMoreScouts = true
+                                            iScoutShortfall = iScoutShortfall + 1
                                         end
                                     end
                                 end
-                                if not(bCurPositionInOmniRange) then
-                                    --Try to find a scout to assign
-                                    if bNoMoreScouts == false then oCurScout = GetNearestMAAOrScout(aiBrain, tMex, true, true, true)
-                                    else oCurScout = nil end
-                                    if oCurScout then
-                                        aiBrain[tScoutAssignedToMexLocation][sLocationRef] = oCurScout
-                                        AssignHelperToLocation(aiBrain, oCurScout, tMex)
-                                    else
-                                        bNoMoreScouts = true
-                                        iScoutShortfall = iScoutShortfall + 1
-                                    end
-                                end
+                            elseif bDebugMessages == true then LOG(sFunctionRef..': Mex is within 40 of start so dont want a scout')
                             end
                         end
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': No mexes that want scouts by') end
                     end
                     aiBrain[refiScoutShortfallMexes] = iScoutShortfall
                 end

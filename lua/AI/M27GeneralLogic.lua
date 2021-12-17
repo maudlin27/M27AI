@@ -2630,6 +2630,8 @@ function IssueDelayedMove(tUnits, tTarget, iDelay)
 end
 
 function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'IsTargetUnderShield'
     --Determines if target is under a shield
     if bIgnoreMobileShield == nil then bIgnoreMobileShield = false end
     local bUnderShield = false
@@ -2653,24 +2655,35 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
     local iShieldCategory = categories.SHIELD
     if bIgnoreMobileShield == true then iShieldCategory = categories.SHIELD * categories.STRUCTURE end
     local tNearbyShields = aiBrain:GetUnitsAroundPoint(iShieldCategory, tTargetPos, iShieldSearchRange, sSearchType)
+    if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repr(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
     if M27Utilities.IsTableEmpty(tNearbyShields) == false then
+        if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
         local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
         for iUnit, oUnit in tNearbyShields do
             if not(oUnit.Dead) then
                 oCurUnitBP = oUnit:GetBlueprint()
                 iCurShieldRadius = 0
-                if oCurUnitBP.Defence and oCurUnitBP.Defence.Shield then
-                    iCurShieldRadius = oCurUnitBP.Defence.Shield.ShieldSize
+                if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Target has a shield, will check its shield size and how close that is to the target') end
+                    iCurShieldRadius = oCurUnitBP.Defense.Shield.ShieldSize
                     if iCurShieldRadius > 0 then
                         iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
+                        if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius) end
                         if iCurDistanceFromTarget <= iCurShieldRadius then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target') end
                             bUnderShield = true
                             break
                         end
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
                     end
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit:GetUnitId()) end
                 end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is dead')
             end
         end
+    else
+        if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
     end
     return bUnderShield
 end

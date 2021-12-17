@@ -59,6 +59,7 @@ local refbShortlistContainsLowPriorityTargets = 'M27AirShortlistContainsLowPrior
 --Unit local variables
 local refiCurBombersAssigned = 'M27AirCurBombersAssigned' --Currently assigned to a particular unit, so know how many bombers have already been assigned
 local refiLifetimeBombersAssigned = 'M27AirLifetimeBombersAssigned' --All bombers ever sent against the unit in question
+refiBomberTargetLastAssessed = 'M27AirBomberTargetLastAssessed'
 
 
 --localised values
@@ -391,48 +392,72 @@ function TrackBomberTarget(oBomber, oTarget)
 end
 
 function UpdateBomberTargets(oBomber, bRemoveIfOnLand)
+    --Checks if target dead; or (if not part of a large attack) if its shielded
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateBomberTargets'
     local bRemoveCurTarget
     local tTargetPos
     if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
         local oBomberCurTarget
-        local bBomberHasDeadTarget = true
+        local bBomberHasDeadOrShieldedTarget = true
         local iDeadLoopCount = 0
         local iMaxDeadLoopCount = table.getn(oBomber[reftTargetList]) + 1
         if bDebugMessages == true then LOG(sFunctionRef..': iMaxDeadLoopCount='..iMaxDeadLoopCount..': About to check if bomber has any dead targets') end
-        while bBomberHasDeadTarget == true do
-            iDeadLoopCount = iDeadLoopCount + 1
-            if iDeadLoopCount > iMaxDeadLoopCount then M27Utilities.ErrorHandler('Infinite loop, will abort') break end
-            oBomberCurTarget = oBomber[reftTargetList][oBomber[refiCurTargetNumber]]
-            if bDebugMessages == true then LOG(sFunctionRef..': iDeadLoopCount='..iDeadLoopCount..'; iMaxDeadLoopCount='..iMaxDeadLoopCount) end
-            bRemoveCurTarget = false
-            if oBomberCurTarget == nil or oBomberCurTarget.Dead or not(oBomberCurTarget.GetPosition) then bRemoveCurTarget = true
-            elseif bRemoveIfOnLand then
-                tTargetPos = oBomberTarget:GetPosition()
-                if GetTerrainHeight(tTargetPos[1], tTargetPos[2]) >= M27MapInfo.iMapWaterHeight then bRemoveCurTarget = true end
-            end
-            if bRemoveCurTarget == true then
-                if oBomber[refiCurTargetNumber] == nil then
-                    M27Utilities.ErrorHandler('Bomber cur target number is nil; reftTargetList size='..table.getn(oBomber[reftTargetList]))
+        local bIgnoreMobileShield = true
+        if oBomber.GetUnitId and oBomber.GetAIBrain then
+            local sBomberID = oBomber:GetUnitId()
+            if EntityCategoryContains(categories.TECH1, sBomberID) or EntityCategoryContains(categories.TECH2, sBomberID) then bIgnoreMobileShield = false end
+            local aiBrain = oBomber:GetAIBrain()
+
+            while bBomberHasDeadOrShieldedTarget == true do
+                iDeadLoopCount = iDeadLoopCount + 1
+                if iDeadLoopCount > iMaxDeadLoopCount then M27Utilities.ErrorHandler('Infinite loop, will abort') break end
+                oBomberCurTarget = oBomber[reftTargetList][oBomber[refiCurTargetNumber]]
+                if bDebugMessages == true then LOG(sFunctionRef..': iDeadLoopCount='..iDeadLoopCount..'; iMaxDeadLoopCount='..iMaxDeadLoopCount) end
+                bRemoveCurTarget = false
+                if oBomberCurTarget == nil or oBomberCurTarget.Dead or not(oBomberCurTarget.GetPosition) then bRemoveCurTarget = true
+                elseif bRemoveIfOnLand then
+                    tTargetPos = oBomberCurTarget:GetPosition()
+                    if GetTerrainHeight(tTargetPos[1], tTargetPos[2]) >= M27MapInfo.iMapWaterHeight then bRemoveCurTarget = true end
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': Removing bombers current target as it is nil or dead, iCurTargetNumber='..oBomber[refiCurTargetNumber]) end
-                --Dont want to use the normal clearairunitassignmenttrackers, as are only clearing the current entry
-                oBomber[refbOnAssignment] = false
-                table.remove(oBomber[reftTargetList], oBomber[refiCurTargetNumber])
-                if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == true then
-                    oBomber[refiCurTargetNumber] = 0
-                    bBomberHasDeadTarget = false
+                if bRemoveCurTarget == false and not(oBomber[refbPartOfLargeAttack]) then
+                    --Check if shielded unless part of large attack
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Checking if current target is shielded')
+                        if oBomber[refiCurTargetNumber] == 1 then
+                            LOG(sFunctionRef..': Position of first target is '..repr(oBomberCurTarget:GetPosition()))
+                            M27Utilities.DrawLocation(oBomberCurTarget:GetPosition(), nil, 3)
+                        end --draw black circle around target
+                    end
+
+                    if M27Logic.IsTargetUnderShield(aiBrain, oBomberCurTarget, bIgnoreMobileShield) == true then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Current target is shielded so will remove') end
+                        bRemoveCurTarget = true
+                    end
+                end
+
+                if bRemoveCurTarget == true then
+                    if oBomber[refiCurTargetNumber] == nil then
+                        M27Utilities.ErrorHandler('Bomber cur target number is nil; reftTargetList size='..table.getn(oBomber[reftTargetList]))
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Removing bombers current target as it is nil or dead, iCurTargetNumber='..oBomber[refiCurTargetNumber]) end
+                    --Dont want to use the normal clearairunitassignmenttrackers, as are only clearing the current entry
+                    oBomber[refbOnAssignment] = false
+                    table.remove(oBomber[reftTargetList], oBomber[refiCurTargetNumber])
+                    if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == true then
+                        oBomber[refiCurTargetNumber] = 0
+                        bBomberHasDeadOrShieldedTarget = false
+                        break
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Bomber target list size='..table.getn(oBomber[reftTargetList])) end
+                else
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Bomber current target isnt dead, UnitId='..oBomberCurTarget:GetUnitId()..'; will draw circle around target position '..repr(oBomberCurTarget:GetPosition()))
+                        M27Utilities.DrawLocation(oBomberCurTarget:GetPosition(), nil, 4, 100)
+                    end
+                    bBomberHasDeadOrShieldedTarget = false
                     break
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': Bomber target list size='..table.getn(oBomber[reftTargetList])) end
-            else
-                if bDebugMessages == true then
-                    LOG(sFunctionRef..': Bomber current target isnt dead, UnitId='..oBomberCurTarget:GetUnitId()..'; will draw circle around target position '..repr(oBomberCurTarget:GetPosition()))
-                    M27Utilities.DrawLocation(oBomberCurTarget:GetPosition(), nil, 4, 100)
-                end
-                bBomberHasDeadTarget = false
-                break
             end
         end
     else
@@ -446,6 +471,14 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand)
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Bomer cur target='..oBomber[refiCurTargetNumber]) end
     if oBomber[refbPartOfLargeAttack] == true then oBomber[refbOnAssignment] = true end
+    oBomber[refiBomberTargetLastAssessed] = GetGameTimeSeconds()
+end
+
+function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
+    WaitSeconds(iDelayInSeconds)
+    if oBomber and GetGameTimeSeconds() - oBomber[refiBomberTargetLastAssessed] >= 1 then
+        UpdateBomberTargets(oBomber)
+    end
 end
 
 function AirThreatChecker(aiBrain)
@@ -1570,7 +1603,7 @@ function AirBomberManager(aiBrain)
         local oClosestNewTarget, iClosestNewTargetDistance, iNewTargetDistance, iClosestTargetShortlistKey
         local tClosestNewTargetPos = {}
         local oBomberCurTarget
-        local bBomberHasDeadTarget
+        local bBomberHasDeadOrShieldedTarget
 
 
         --Assign any bomber targets to any available bombers
@@ -1895,14 +1928,14 @@ function AirAAManager(aiBrain)
             local iExpectedThreatPerCount = 50
             if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then iExpectedThreatPerCount = 350 end
             if iAirThreatShortfall > 0 then
-                aiBrain[refiAirAANeeded] = math.ceil(iAirThreatShortfall / iExpectedThreatPerCount)
+                aiBrain[refiAirAANeeded] = math.max(5, math.ceil(iAirThreatShortfall / iExpectedThreatPerCount))
                 if bDebugMessages == true then LOG(sFunctionRef..': End of calculating threat required; iAirThreatShortfall='..iAirThreatShortfall..'; iExpectedThreatPerCount='..iExpectedThreatPerCount..'; aiBrain[refiAirAANeeded]='..aiBrain[refiAirAANeeded]) end
             else
                 aiBrain[refiAirAANeeded] = 0
                 if bDebugMessages == true then LOG(sFunctionRef..': iAirThreatShortfall is 0 so airAA needed is 0') end
             end
         else
-            aiBrain[refiAirAANeeded] = 1
+            aiBrain[refiAirAANeeded] = 2
             if bDebugMessages == true then LOG(sFunctionRef..': Have no inties, will flag we need more AirAA if any enemy air threats are detected; aiBrain[refiAirAANeeded]='..tostring(aiBrain[refiAirAANeeded])) end
         end
     end

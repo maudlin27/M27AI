@@ -144,6 +144,9 @@ function OnBombFired(oWeapon, projectile)
         local sUnitID = oUnit:GetUnitId()
         if EntityCategoryContains(M27UnitInfo.refCategoryBomber - categories.EXPERIMENTAL, sUnitID) then
             M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
+            if oUnit.GetAIBrain and oUnit:GetAIBrain().M27AI then
+                ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, 1)
+            end
         end
     end
 end

@@ -218,6 +218,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
     --Returns unit BP ID to be built
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineWhatToBuild'
+    if GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     local sBPIDToBuild
     if not(oFactory.GetBlueprint) then M27Utilities.ErrorHandler('Factory doesnt have a blueprint')
     else
@@ -377,6 +378,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         elseif iCurrentConditionToTry == 14 then--Mobile shields
                             local iPowerWanted = 25
                             if iFactoryTechLevel > 2 then iPowerWanted = 120 end
+                            if not(M27Conditions.DoesACUHaveGun(aiBrain, true)) then iPowerWanted = math.max(iPowerWanted, 40) end
                             if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iPowerWanted and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.9 then
                                 iCategoryToBuild = M27UnitInfo.refCategoryMobileLandShield
                                 iTotalWanted = 2
@@ -535,6 +537,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         elseif iCurrentConditionToTry == 11 then--Mobile shields but just for ACU
                             local iPowerWanted = 25
                             if iFactoryTechLevel > 2 then iPowerWanted = 120 end
+                            if not(M27Conditions.DoesACUHaveGun(aiBrain, true)) then iPowerWanted = math.max(iPowerWanted, 40) end
                             if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iPowerWanted and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.9 then
                                 local oPlatoonWithACU = M27Utilities.GetACU(aiBrain).PlatoonHandle
                                 if oPlatoonWithACU and M27PlatoonFormer.DoesPlatoonWantAnotherMobileShield(oPlatoonWithACU, 200) then
@@ -583,11 +586,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         elseif iCurrentConditionToTry == 19 then --Mobile shields
                             local iPowerWanted = 25
                             if iFactoryTechLevel > 2 then iPowerWanted = 120 end
+                            if not(M27Conditions.DoesACUHaveGun(aiBrain, true)) then iPowerWanted = math.max(iPowerWanted, 40) end
                             if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iPowerWanted and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.9 then
                                 iCategoryToBuild = M27UnitInfo.refCategoryMobileLandShield
                                 iTotalWanted = 1
                             end
                         elseif iCurrentConditionToTry == 20 then --Scouts for mexes
+                            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiScoutShortfallMexes]='..aiBrain[M27Overseer.refiScoutShortfallMexes]) end
                             if aiBrain[M27Overseer.refiScoutShortfallMexes] > 0 then
                                 iCategoryToBuild = refCategoryLandScout
                                 iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallMexes]
@@ -740,8 +745,11 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
 
                 if bDebugMessages == true then
-                    if iCategoryToBuild == M27UnitInfo.refCategoryAmphibiousCombat then LOG(sFunctionRef..': Are going to try and build amphibious units')
-                    else LOG(sFunctionRef..': Category to build isnt amphibious combat') end
+
+                    if iCategoryToBuild == M27UnitInfo.refCategoryAmphibiousCombat then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; Are going to try and build amphibious units')
+                    elseif iCategoryToBuild then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; Have a category to build that isnt amphibious combat')
+                    else LOG(sFunctionRef..': iCategoryToBuild is nil; iCurrentConditionToTry='..iCurrentConditionToTry)
+                    end
                 end
         --=======================Check this is a factory where we want to build engineers and we're not over the cap
                 if iCategoryToBuild == refCategoryEngineer then
