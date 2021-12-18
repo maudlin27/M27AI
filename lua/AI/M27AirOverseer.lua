@@ -476,7 +476,7 @@ end
 
 function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
     WaitSeconds(iDelayInSeconds)
-    if oBomber and GetGameTimeSeconds() - oBomber[refiBomberTargetLastAssessed] >= 1 then
+    if oBomber and GetGameTimeSeconds() - (oBomber[refiBomberTargetLastAssessed] or 0) >= 1 then
         UpdateBomberTargets(oBomber)
     end
 end
