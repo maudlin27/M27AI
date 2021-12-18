@@ -1563,10 +1563,11 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                             if bIncludeGroundToAir == true then
                                 if EntityCategoryContains(categories.ANTIAIR, sCurUnitBP) == true then
                                     iMassMod = 1 --Cruisers and T3 aircraft carriers have antiair as well as overlay antiair
-                                    if sCurUnitBP == 'urs0103' then iMassMod = 0.05 end --Cybran frigate misclassified as anti-air
+                                    if sCurUnitBP == 'urs0103' then iMassMod = 0.1 end --Cybran frigate misclassified as anti-air
                                 elseif EntityCategoryContains(categories.OVERLAYANTIAIR, sCurUnitBP) == true then
                                     iMassMod = 0.05
                                     if sCurUnitBP == 'ues0401' then iMassMod = 1 end --atlantis misclassifiefd as not anti-air
+                                    if EntityCategoryContains(categories.FRIGATE, sCurUnitBP) then iMassMod = 0.1 end
                                 end
                             end
                         end

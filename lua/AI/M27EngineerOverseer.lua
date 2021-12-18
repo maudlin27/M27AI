@@ -1075,7 +1075,7 @@ function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprint
 
         local rBuildAreaRect
         for iCurLocation, tLocation in tValidLocations do
-            rBuildAreaRect = Rect(tLocation[1] - tNewBuildingSize[1]*fSizeMod, tLocation[3] - tNewBuildingSize[2]*fSizeMod, tLocation[1] + tNewBuildingSize[1]*fSizeMod, tLocation[3] + tNewBuildingSize[2]*fSizeMod)
+            rBuildAreaRect = Rect(tLocation[1] - iNewBuildingRadius, tLocation[3] - iNewBuildingRadius, tLocation[1] + iNewBuildingRadius, tLocation[3] + iNewBuildingRadius)
             if M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
             if AreMobileUnitsInRect(rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
             if tValidDistanceToEnemy[iCurLocation] >= iMaxDistanceToEnemy then iCurPriority = iCurPriority + 1 end
@@ -1225,7 +1225,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
 
         local rBuildAreaRect
         for iCurLocation, tLocation in tValidLocations do
-            rBuildAreaRect = Rect(tLocation[1] - iBuildingSizeRadius, tLocation[3] - tNewBuildingSize[2]*fSizeMod, tLocation[1] + iBuildingSizeRadius, tLocation[3] + tNewBuildingSize[2]*fSizeMod)
+            rBuildAreaRect = Rect(tLocation[1] - iBuildingSizeRadius, tLocation[3] - iNewBuildingRadius, tLocation[1] + iBuildingSizeRadius, tLocation[3] + iNewBuildingRadius)
             if M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
             if AreMobileUnitsInRect(rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
             if tValidDistanceToEnemy[iCurLocation] >= iMaxDistanceToEnemy then iCurPriority = iCurPriority + 1 end
@@ -1312,6 +1312,7 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
 
+
     if bCheckValid == nil then bCheckValid = false end
     if aiBrain == nil then bCheckValid = false end
     if bReturnOnlyBestMatch == nil then bReturnOnlyBestMatch = false end
@@ -1347,8 +1348,9 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     local tNewBuildingSize = M27UnitInfo.GetBuildingSize(sNewBuildingBPID)
     local fSizeMod = 0.5
     local iRectangleSizeReduction = 0
+    local iNewBuildingRadius = tNewBuildingSize[1] * fSizeMod
     if bDebugMessages == true then LOG(sFunctionRef..': TargetSize='..repr(TargetSize)..'; NewBuildingSize='..repr(tNewBuildingSize)) end
-    local iBuildRangeExtension = tNewBuildingSize[1] * fSizeMod
+    local iBuildRangeExtension = iNewBuildingRadius
     if bDebugMessages == true then LOG(sFunctionRef..': Increasing builder distance from '..iBuilderRange..' by '..iBuildRangeExtension) end
     iBuilderRange = iBuilderRange + iBuildRangeExtension
     iMaxAreaToSearch = math.max(iMaxAreaToSearch, iBuilderRange + tNewBuildingSize[1])
@@ -1387,14 +1389,14 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
         --LOG('PosTarget[1]='..PosTarget[1])
         --LOG('TargetSize[1]='..TargetSize[1])
         --LOG('tNewBuildingSize[1]='..tNewBuildingSize[1])
-        iMaxX = PosTarget[1] + TargetSize[1] * fSizeMod + tNewBuildingSize[1]*fSizeMod
-        if iMaxX > iMaxMapX then iMaxX = iMaxMapX end
+        iMaxX = PosTarget[1] + TargetSize[1] * fSizeMod + iNewBuildingRadius
+        if iMaxX > (iMaxMapX - iNewBuildingRadius) then iMaxX = iMaxMapX - iNewBuildingRadius end
         iMinX = PosTarget[1] - TargetSize[1] * fSizeMod - tNewBuildingSize[1]* fSizeMod
-        if iMinX < rPlayableArea[1] + iMapBoundarySize then iMinX = rPlayableArea[1] + iMapBoundarySize end
+        if iMinX < (rPlayableArea[1] + iMapBoundarySize + iNewBuildingRadius) then iMinX = rPlayableArea[1] + iMapBoundarySize + iNewBuildingRadius end
         iMaxZ = PosTarget[3] + TargetSize[2] * fSizeMod + tNewBuildingSize[2]* fSizeMod
-        if iMaxZ > iMaxMapZ then iMaxZ = iMaxMapZ end
+        if iMaxZ > (iMaxMapZ - iNewBuildingRadius) then iMaxZ = iMaxMapZ - iNewBuildingRadius end
         iMinZ = PosTarget[3] - TargetSize[2] * fSizeMod - tNewBuildingSize[2]* fSizeMod
-        if iMinZ < rPlayableArea[2] + iMapBoundarySize then iMinZ = rPlayableArea[2] + iMapBoundarySize end
+        if iMinZ < (rPlayableArea[2] + iMapBoundarySize + iNewBuildingRadius) then iMinZ = rPlayableArea[2] + iMapBoundarySize + iNewBuildingRadius end
         iTargetMaxX = PosTarget[1] + TargetSize[1] * fSizeMod
         iTargetMinX = PosTarget[1] - TargetSize[1] * fSizeMod
         iTargetMaxZ = PosTarget[3] + TargetSize[2] * fSizeMod
@@ -1404,7 +1406,7 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
         if bDebugMessages == true then LOG(sFunctionRef..':About to cycle through potential adjacency locations for iCurTarget='..iCurTarget..'; iTotalTargets='..iTotalTargets..'; iMinX-iMaxX='..iMinX..'-'..iMaxX..'; iMinZ-iMaxZ='..iMinZ..'-'..iMaxZ..'; OptionsX='..OptionsX..'; OptionsZ='..OptionsZ)end
         for xi = 0, OptionsX do
             iNewX = iMinX + xi
-            --if iNewX >= (iMinX + TargetSize[1]*fSizeMod) or iNewX >= (iTargetMaxX - tNewBuildingSize[1]*fSizeMod) then
+            --if iNewX >= (iMinX + TargetSize[1]*fSizeMod) or iNewX >= (iTargetMaxX - iNewBuildingRadius) then
             for zi = 0, OptionsZ do
                 iPriority = 0
                 iNewZ = iMinZ + zi
@@ -1413,8 +1415,8 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                 --ignore corner results (new building larger than target):
                 local bIgnore = false
                 if bNewBuildingLargerThanNewTarget == true then
-                    if iNewX - tNewBuildingSize[1] * fSizeMod > iTargetMinX or iNewX + tNewBuildingSize[1] * fSizeMod < iTargetMaxX then
-                        if iNewZ - tNewBuildingSize[2] * fSizeMod > iTargetMinZ or iNewZ + tNewBuildingSize[2] * fSizeMod < iTargetMaxZ then
+                    if iNewX - iNewBuildingRadius > iTargetMinX or iNewX + iNewBuildingRadius < iTargetMaxX then
+                        if iNewZ - iNewBuildingRadius > iTargetMinZ or iNewZ + iNewBuildingRadius < iTargetMaxZ then
                             iPriority = iPriority - 4
                             --bIgnore = true
                             if bDebugMessages == true then LOG(sFunctionRef..': Corner position so no adjacency - priority decreased; iNewX='..iNewX..'; iNewZ='..iNewZ) end
@@ -1422,33 +1424,36 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                     end
                 else
                     if iNewX >= iTargetMinX and iNewX <= iTargetMaxX then
+                        if bDebugMessages == true then LOG(sFunctionRef..': x value is within the required range for adjacency, now checking if z values are') end
                         --z value needs to be right by the min or max values:
-                        if iNewZ == (iTargetMinZ - tNewBuildingSize[2]*fSizeMod) or iNewZ == (iTargetMaxZ + tNewBuildingSize[2]*fSizeMod) then
+                        if iNewZ == (iTargetMinZ - iNewBuildingRadius) or iNewZ == (iTargetMaxZ + iNewBuildingRadius) then
                             --valid co-ordinate
+                                if bDebugMessages == true then LOG(sFunctionRef..': Should benefit from adjacency') end
                         else
                             --If it's within the target building area then ignore, otherwise record with lower priority as no adjacency:
-                            if iNewZ < (iTargetMinZ - tNewBuildingSize[2]*fSizeMod) or iNewZ > (iTargetMaxZ + tNewBuildingSize[2]*fSizeMod) then
+                            if iNewZ < (iTargetMinZ - iNewBuildingRadius) or iNewZ > (iTargetMaxZ + iNewBuildingRadius) then
                                 iPriority = iPriority - 4
                             else bIgnore = true end
-                            if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 1 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 1 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ..'; iTargetMinX='..iTargetMinX..'; iTargetMaxX='..iTargetMaxX..'; iTargetMinZ='..iTargetMinZ..'; iTargetMaxZ='..iTargetMaxZ..'; iNewBuildingRadius='..iNewBuildingRadius..'; tNewBuildingSize[1] * fSizeMod='..tNewBuildingSize[1] * fSizeMod) end
                         end
                     else
                         if iNewZ >= iTargetMinZ and iNewZ <= iTargetMaxZ then
-                            if iNewX == (iTargetMinX - tNewBuildingSize[1]*fSizeMod) or iNewX == (iTargetMaxX + tNewBuildingSize[1]*fSizeMod) then
+                            if iNewX == (iTargetMinX - iNewBuildingRadius) or iNewX == (iTargetMaxX + iNewBuildingRadius) then
                                 --Valid match
+                                if bDebugMessages == true then LOG(sFunctionRef..': Should benefit from adjacency') end
                             else
                                 --If it's within the target building area then ignore, otherwise record with lower priority as no adjacency:
-                                if iNewX < (iTargetMinX - tNewBuildingSize[1]*fSizeMod) or iNewX > (iTargetMaxX + tNewBuildingSize[1]*fSizeMod) then
+                                if iNewX < (iTargetMinX - iNewBuildingRadius) or iNewX > (iTargetMaxX + iNewBuildingRadius) then
                                     iPriority = iPriority - 4
                                 else bIgnore = true end
-                                if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 2 - failed to find match; iNewX='..iNewX..'; iNewZ='..iNewZ) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 2 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ..'; iTargetMinX='..iTargetMinX..'; iTargetMaxX='..iTargetMaxX..'; iTargetMinZ='..iTargetMinZ..'; iTargetMaxZ='..iTargetMaxZ..'; iNewBuildingRadius='..iNewBuildingRadius..'; tNewBuildingSize[1] * fSizeMod='..tNewBuildingSize[1] * fSizeMod) end
                             end
                         else
-                            if (iNewX < (iTargetMinX - tNewBuildingSize[1]*fSizeMod) or iNewX > (iTargetMaxX + tNewBuildingSize[1]*fSizeMod)) and (iNewZ < (iTargetMinZ - tNewBuildingSize[2]*fSizeMod) or iNewZ > (iTargetMaxZ + tNewBuildingSize[2]*fSizeMod)) then
+                            if (iNewX < (iTargetMinX - iNewBuildingRadius) or iNewX > (iTargetMaxX + iNewBuildingRadius)) and (iNewZ < (iTargetMinZ - iNewBuildingRadius) or iNewZ > (iTargetMaxZ + iNewBuildingRadius)) then
                                 --should be valid just no adjacency
                                 iPriority = iPriority - 4
                             else bIgnore = true end
-                            if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 3 - failed to find match; iNewX='..iNewX..'; iNewZ='..iNewZ) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 3 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ..'; iTargetMinX='..iTargetMinX..'; iTargetMaxX='..iTargetMaxX..'; iTargetMinZ='..iTargetMinZ..'; iTargetMaxZ='..iTargetMaxZ..'; iNewBuildingRadius='..iNewBuildingRadius..'; tNewBuildingSize[1] * fSizeMod='..tNewBuildingSize[1] * fSizeMod) end
                         end
                     end
                     -- If bCheckValid then see if aiBrain can build the desired structure at the location
@@ -1467,7 +1472,7 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                     --Check for reclaim:
                     if bBetterIfNoReclaim == true then
 
-                        rBuildAreaRect = Rect(iNewX - tNewBuildingSize[1]*fSizeMod + iRectangleSizeReduction, iNewZ - tNewBuildingSize[2]*fSizeMod + iRectangleSizeReduction, iNewX + tNewBuildingSize[1]*fSizeMod - iRectangleSizeReduction, iNewZ + tNewBuildingSize[2]*fSizeMod - iRectangleSizeReduction)
+                        rBuildAreaRect = Rect(iNewX - iNewBuildingRadius + iRectangleSizeReduction, iNewZ - iNewBuildingRadius + iRectangleSizeReduction, iNewX + iNewBuildingRadius - iRectangleSizeReduction, iNewZ + iNewBuildingRadius - iRectangleSizeReduction)
                         --ReturnType: 1 = true/false: GetReclaimInRectangle(iReturnType, rRectangleToSearch)
                         if M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect) == true then iPriority = iPriority - 4 end
                     end
@@ -1481,7 +1486,6 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                             if bDebugMessages == true then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef..': aiBrain cant build at iNewX='..iNewX..'; iNewZ='..iNewZ..'; CurPosition='..CurPosition[1]..'-'..CurPosition[2]..'-'..CurPosition[3])
-                                    LOG('aiBrain:CanBuildStructureAt(UEB0101, CurPosition)='..tostring(aiBrain:CanBuildStructureAt('UEB0101', CurPosition)))
                                 end
                             end
                         end
@@ -1494,9 +1498,10 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
 
                 if bIgnore == false then
                     -- We now have a co-ordinate that should result in newbuilding being built adjacent to target building (unless negative priority); check other conditions/priorities
+                    iPriority = iPriority + 1
 
                     if bDebugMessages == true then LOG(sFunctionRef..': Have valid build location, iPriority pre considering build distance='..iPriority..'; CurPosition[1]='..CurPosition[1]..'-'..CurPosition[2]..'-'..CurPosition[3]) end
-                    if bIgnoreOutsideBuildArea == true or bReturnOnlyBestMatch == true then iDistanceBetween = M27Utilities.GetDistanceBetweenPositions(pBuilderPos, CurPosition, tNewBuildingSize[1]*fSizeMod) end
+                    if bIgnoreOutsideBuildArea == true or bReturnOnlyBestMatch == true then iDistanceBetween = M27Utilities.GetDistanceBetweenPositions(pBuilderPos, CurPosition, iNewBuildingRadius) end
                     --if bIgnoreOutsideBuildArea == true or bReturnOnlyBestMatch == true then iDistanceBetween = GetDistanceBetweenPositions(pBuilderPos, PosTarget) end
                     if bReturnOnlyBestMatch == true then
                         --Check if within build area:
@@ -1515,10 +1520,10 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                         --end
                         --end
                         --Check if level with target (makes it easier for other buildings to get adjacency):
-                        if CurPosition[1] - tNewBuildingSize[1]*fSizeMod == iTargetMinX then iPriority = iPriority + 1 end
-                        if CurPosition[1] + tNewBuildingSize[1]*fSizeMod == iTargetMaxX then iPriority = iPriority + 1 end
-                        if CurPosition[3] - tNewBuildingSize[2]*fSizeMod == iTargetMinZ then iPriority = iPriority + 1 end
-                        if CurPosition[3] + tNewBuildingSize[2]*fSizeMod == iTargetMaxZ then iPriority = iPriority + 1 end
+                        if CurPosition[1] - iNewBuildingRadius == iTargetMinX then iPriority = iPriority + 1 end
+                        if CurPosition[1] + iNewBuildingRadius == iTargetMaxX then iPriority = iPriority + 1 end
+                        if CurPosition[3] - iNewBuildingRadius == iTargetMinZ then iPriority = iPriority + 1 end
+                        if CurPosition[3] + iNewBuildingRadius == iTargetMaxZ then iPriority = iPriority + 1 end
                     end
                     if bIgnoreOutsideBuildArea == true then
                         if iDistanceBetween > iMaxAreaToSearch then
@@ -1529,7 +1534,12 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                     end
 
                     --Check if any units in the area (if not then icnrease priority)
-                    if AreMobileUnitsInRect(rBuildAreaRect) == false then iPriority = iPriority + 1 end
+                    if AreMobileUnitsInRect(rBuildAreaRect) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': No mobile units are in the build area rectangle='..repr(rBuildAreaRect)) end
+                        iPriority = iPriority + 1
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': mobile units are in the build area rectangle='..repr(rBuildAreaRect)) end
+                    end
 
                     --Check if want to weight for if its closer or further from start (jsut enough that it affects equal priority locations)
                     if bPreferCloseToEnemy or bPreferFarFromEnemy then
@@ -1558,6 +1568,7 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                         end
                     end
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': End of considering this option, bIgnore='..tostring(bIgnore)..'; iPriority='..iPriority) end
                 --end
             end
             --end
@@ -1587,9 +1598,9 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
         if bReturnOnlyBestMatch then
             if bDebugMessages == true then
                 LOG(sFunctionRef..': Returning best possible position; tBestPosition[1]='..tBestPosition[1]..'-'..tBestPosition[2]..'-'..tBestPosition[3]..'; iMaxPriority='..iMaxPriority)
-                LOG(sFunctionRef..': iMaxMapX='..iMaxMapX..'; iMaxMapZ='..iMaxMapZ..'tBestPosition='..repr(tBestPosition))
-                M27Utilities.DrawLocations({tBestPosition})
-                M27Utilities.DrawLocations(PossiblePositions, nil, 3)
+                LOG(sFunctionRef..': iMaxMapX='..iMaxMapX..'; iMaxMapZ='..iMaxMapZ..'tBestPosition='..repr(tBestPosition)..'; our start position='..repr(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+                M27Utilities.DrawLocations(PossiblePositions, nil, 3, 10)
+                M27Utilities.DrawLocation(tBestPosition, nil, 7, 100) --draws best position in white
             end
             return tBestPosition
         else
@@ -1624,6 +1635,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
         M27Utilities.ErrorHandler('sBlueprintToBuild is nil, could happen e.g. if try and get sparky to build sxomething it cant - refer to log for more details')
         LOG('oEngineer='..oEngineer:GetUnitId()..GetEngineerUniqueCount(oEngineer))
     else
+
 
         --Check if is an existing building of the type wanted first:
         local oPartCompleteBuilding
@@ -1694,7 +1706,9 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                             bFindRandomLocation = true
                         else
                             --Check we're within mapBoundary
-                            if tTargetLocation[1] - iBuildingSizeRadius < M27MapInfo.rMapPlayableArea[1] or tTargetLocation[3] - iBuildingSizeRadius < M27MapInfo.rMapPlayableArea[3] or tTargetLocation[1] + iBuildingSizeRadius > M27MapInfo.rMapPlayableArea[1] or tTargetLocation[3] + iBuildingSizeRadius > M27MapInfo.rMapPlayableArea then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if tTargetLocation '..repr(tTargetLocation)..' is in the playable area '..repr(M27MapInfo.rMapPlayableArea)..' based on building size radius='..iBuildingSizeRadius) end
+                            if (tTargetLocation[1] - iBuildingSizeRadius) < M27MapInfo.rMapPlayableArea[1] or (tTargetLocation[3] - iBuildingSizeRadius) < M27MapInfo.rMapPlayableArea[2] or (tTargetLocation[1] + iBuildingSizeRadius) > M27MapInfo.rMapPlayableArea[3] or (tTargetLocation[3] + iBuildingSizeRadius) > M27MapInfo.rMapPlayableArea[4] then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Target location isnt in playable area so will find random place to build instead') end
                                 bFindRandomLocation = true
                                 tTargetLocation = tEngineerPosition
                             end

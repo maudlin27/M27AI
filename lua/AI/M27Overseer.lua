@@ -132,6 +132,7 @@ refiSearchRangeForEnemyStructures = 'M27EnemyStructureSearchRange'
 refbEnemyHasTech2PD = 'M27EnemyHasTech2PD'
 
 refiOurHighestFactoryTechLevel = 'M27OverseerOurHighestFactoryTech'
+refiOurHighestAirFactoryTech = 'M27OverseerOurHighestAirFactoryTech'
 
 
 
@@ -3133,7 +3134,7 @@ function SetMaximumFactoryLevels(aiBrain)
     local iAirFactoryMin = 1
     if iPrimaryFactoryType == refFactoryTypeAir then iAirFactoryMin = iPrimaryFactoriesWanted end
     local iTorpBomberShortfall = aiBrain[M27AirOverseer.refiTorpBombersWanted]
-    if aiBrain[refiOurHighestFactoryTechLevel] < 2 then
+    if aiBrain[refiOurHighestAirFactoryTech] < 2 then
         if iTorpBomberShortfall > 0 then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
         iTorpBomberShortfall = 0
     end
@@ -3270,6 +3271,15 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3) > 0 then iHighestTechLevel = 3
         elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2) > 0 then iHighestTechLevel = 2 end
         aiBrain[refiOurHighestFactoryTechLevel] = iHighestTechLevel
+        if iHighestTechLevel > 1 then
+            if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH3) > 0 then aiBrain[refiOurHighestAirFactoryTech] = 3
+            elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH2) > 0 then aiBrain[refiOurHighestAirFactoryTech] = 2
+            else
+                aiBrain[refiOurHighestAirFactoryTech] = 1
+            end
+        else
+            aiBrain[refiOurHighestAirFactoryTech] = 1
+        end
 
         --Should we switch to eco?
             --How far away is the enemy?
@@ -3586,6 +3596,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[reftUnitGroupPreviousReferences] = {}
 
     aiBrain[refiOurHighestFactoryTechLevel] = 1
+    aiBrain[refiOurHighestAirFactoryTech] = 1
 
     aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] = true
 

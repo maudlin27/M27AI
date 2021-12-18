@@ -1333,9 +1333,7 @@ end
 function GetBomberTargetShortlist(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBomberTargetShortlist'
-    local reftPriorityTargetCategories = {M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryGroundExperimental}
-    local iTypePower = 4
-    local iTypeMex = 5
+
 
     local tEnemyUnitsOfType
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
@@ -1351,7 +1349,17 @@ function GetBomberTargetShortlist(aiBrain)
     local bProceed
     local bAAAroundTarget, iEnemyGroundAAThreat
     local bIgnoreMobileShield = false
-    if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then bIgnoreMobileShield = true end
+    local reftPriorityTargetCategories = {M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryGroundExperimental}
+    local iTypeLowPriority = 4 --table number at which its a low priority (>= this)
+    if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then
+        bIgnoreMobileShield = true
+        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage}
+        iTypeLowPriority = 4
+    elseif aiBrain[M27Overseer.refiOurHighestFactoryTech] == 2 then
+        --Currently same as for a t3 bomber
+        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryEngineer}
+        iTypeLowPriority = 4
+    end
 
 
     aiBrain[reftBomberTargetShortlist] = {}
@@ -1370,17 +1378,15 @@ function GetBomberTargetShortlist(aiBrain)
 
     for iTypeCount, iCategory in reftPriorityTargetCategories do
         bProceed = true
-        if iTypeCount == iTypePower or iTypeCount == iTypeMex then
+        if iTypeCount >= iTypeLowPriority then
             if iTargetShortlistCount > 0 then
                 aiBrain[refbShortlistContainsLowPriorityTargets] = false
                 bProceed = false
             else
                 aiBrain[refbShortlistContainsLowPriorityTargets] = true
-                if iTypeCount == iTypeMex then bProceed = true
-                else
-                    local iCurX, iCurZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
-                    if GetGameTimeSeconds() - aiBrain[reftAirSegmentTracker][iCurX][iCurZ][refiLastScouted] > 30 then bProceed = false end
-                end
+                bProceed = true
+                local iCurX, iCurZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                if GetGameTimeSeconds() - aiBrain[reftAirSegmentTracker][iCurX][iCurZ][refiLastScouted] > 30 then bProceed = false end
             end
         end
         if bProceed == true then
@@ -1397,36 +1403,49 @@ function GetBomberTargetShortlist(aiBrain)
                             --Is there any ground AA around the target? If so ignore unless have T3
                             tUnitPosition = oUnit:GetPosition()
                             tEnemyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tUnitPosition, iEnemyAASearchRange, 'Enemy')
-                            if bDebugMessages == true then LOG(sFunctionRef..': iTypeCount='..iTypeCount..'; iUnit='..iUnit..'; size of tEnemyGroundAA='..table.getn(tEnemyGroundAA)) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iTypeCount='..iTypeCount..'; iUnit='..iUnit..'; size of tEnemyGroundAA='..table.getn(tEnemyGroundAA)..'; iEnemyAASearchRange='..iEnemyAASearchRange) end
                             if M27Utilities.IsTableEmpty(tEnemyGroundAA) == true then bAAAroundTarget = false
                             else
                                 bAAAroundTarget = true
-                                if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then
-                                    --Still include in shortlist if low level of AA
+                                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiOurHighestAirFactoryTech]='..aiBrain[M27Overseer.refiOurHighestAirFactoryTech]..'; if this is >=3 then will ignore low level ground AA') end
+                                if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then
+                                    --Still include in shortlist if low level of AA/no AA that can easily counter a strat bomber
                                     --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride)
-                                    iEnemyGroundAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyGroundAA, false, false, true, false, false)
-                                    if iEnemyGroundAAThreat < 600 then bAAAroundTarget = false end
+                                    local tEnemyT3OrCruiserGroundAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier + categories.TECH3 * categories.ANTIAIR, tEnemyGroundAA)
+                                    if M27Utilities.IsTableEmpty(tEnemyT3OrCruiserGroundAA) == true then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': T3 anti air not near target') end
+                                        bAAAroundTarget = false
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': T3 anti air near target') end
+                                    end
+                                        --[[iEnemyGroundAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyGroundAA, false, false, true, false, false)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iEnemyGroundAAThreat='..iEnemyGroundAAThreat..'; if this is <700 then will ignore') end
+                                        if iEnemyGroundAAThreat < 700 then bAAAroundTarget = false end --]]
                                 end
                             end
                             if bAAAroundTarget == false then
                                 --Is the target shielded?
                                 if M27Logic.IsTargetUnderShield(aiBrain, oUnit, bIgnoreMobileShield) == false then
-                                    if iTypeCount == iTypeMex then
+                                    --if iTypeCount == iTypeMex then
                                         --Do we already have direct or indirect fire units near this location? If so then ignore as good chance our units will kill it
-                                        local tFriendlyUnitsNearMex = aiBrain:GetUnitsAroundPoint(categories.DIRECTFIRE + categories.INDIRECTFIRE, tUnitPosition, iFriendlyMexUnitSearchRange, 'Ally')
-                                        if M27Utilities.IsTableEmpty(tFriendlyUnitsNearMex) == false then bIncludeInShortlist = false end
-                                    end
+                                        local tFriendlyUnitsNearMex = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tUnitPosition, iFriendlyMexUnitSearchRange, 'Ally')
+                                        if M27Utilities.IsTableEmpty(tFriendlyUnitsNearMex) == false then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have units near target already') end
+                                            bIncludeInShortlist = false
+                                        end
+                                    --end
 
                                     if bIncludeInShortlist == true then
                                         if bDebugMessages == true then LOG(sFunctionRef..': iTypeCount='..iTypeCount..'; iUnit='..iUnit..': Including in target shortlist') end
                                         iTargetShortlistCount = iTargetShortlistCount + 1
                                         aiBrain[reftBomberTargetShortlist][iTargetShortlistCount] = oUnit
-                                        if iTypeCount == iTypePower or iTypeCount == iTypeMex then break end
                                     end
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': Target is under shield')
                                 end
                             end
                         end
                     end
+                    if iTargetShortlistCount > 0 and aiBrain[refbShortlistContainsLowPriorityTargets] then break end
                 end
             end
         end
@@ -1926,7 +1945,7 @@ function AirAAManager(aiBrain)
             end
             local iAirAACountWanted
             local iExpectedThreatPerCount = 50
-            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then iExpectedThreatPerCount = 350 end
+            if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then iExpectedThreatPerCount = 350 end
             if iAirThreatShortfall > 0 then
                 aiBrain[refiAirAANeeded] = math.max(5, math.ceil(iAirThreatShortfall / iExpectedThreatPerCount))
                 if bDebugMessages == true then LOG(sFunctionRef..': End of calculating threat required; iAirThreatShortfall='..iAirThreatShortfall..'; iExpectedThreatPerCount='..iExpectedThreatPerCount..'; aiBrain[refiAirAANeeded]='..aiBrain[refiAirAANeeded]) end
@@ -2040,7 +2059,7 @@ function SetupAirOverseer(aiBrain)
     if bDebugMessages == true then LOG(sFunctionRef..': iMapMaxSegmentX='..iMapMaxSegmentX..'; iMapMaxSegmentZ='..iMapMaxSegmentZ..'; rPlayableArea='..repr(rPlayableArea)..'; iAirSegmentSize='..iAirSegmentSize) end
     --For large maps want to limit the segments that we consider
     local iDistanceToEnemyFromStart = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
-    aiBrain[refiMaxScoutRadius] = math.max(750, iDistanceToEnemyFromStart * 1.25)
+    aiBrain[refiMaxScoutRadius] = math.max(1250, iDistanceToEnemyFromStart * 1.5)
     local iStartSegmentX, iStartSegmentZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
     local iSegmentSizeX = iMapSizeX / iAirSegmentSize
     local iSegmentSizeZ = iMapSizeZ / iAirSegmentSize
