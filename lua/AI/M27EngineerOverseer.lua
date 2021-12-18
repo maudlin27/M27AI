@@ -1157,8 +1157,8 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
         tNewBuildingSize = {0,0}
     end
     local fSizeMod = 0.5
-    local iBuildingSizeRadius = tNewBuildingSize[1] * fSizeMod
-    local iMaxDistanceToBuildWithoutMoving = iBuilderRange + iBuildingSizeRadius
+    local iNewBuildingRadius = tNewBuildingSize[1] * fSizeMod
+    local iMaxDistanceToBuildWithoutMoving = iBuilderRange + iNewBuildingRadius
     local sPathing
     local iBuilderSegmentX, iBuilderSegmentZ
     local iBuilderPathingGroup, iCurPathingGroup
@@ -1187,10 +1187,10 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
             iSignageZ = tSignageZ[iCurSizeCycleCount]
             iRandomX = iRandomDistance * iSignageX + tStartPosition[1]
             iRandomZ = iRandomDistance * iSignageZ + tStartPosition[3]
-            if iRandomX < (iMapBoundMinX + iBuildingSizeRadius) then iRandomX = iMapBoundMinX + iBuildingSizeRadius
-            elseif iRandomX > (iMapBoundMaxX - iBuildingSizeRadius) then iRandomX = iMapBoundMaxX - iBuildingSizeRadius end
-            if iRandomZ < (iMapBoundMinZ + iBuildingSizeRadius) then iRandomZ = iMapBoundMinZ + iBuildingSizeRadius
-            elseif iRandomZ > (iMapBoundMaxZ - iBuildingSizeRadius) then iRandomZ = iMapBoundMaxZ - iBuildingSizeRadius end
+            if iRandomX < (iMapBoundMinX + iNewBuildingRadius) then iRandomX = iMapBoundMinX + iNewBuildingRadius
+            elseif iRandomX > (iMapBoundMaxX - iNewBuildingRadius) then iRandomX = iMapBoundMaxX - iNewBuildingRadius end
+            if iRandomZ < (iMapBoundMinZ + iNewBuildingRadius) then iRandomZ = iMapBoundMinZ + iNewBuildingRadius
+            elseif iRandomZ > (iMapBoundMaxZ - iNewBuildingRadius) then iRandomZ = iMapBoundMaxZ - iNewBuildingRadius end
 
             tTargetLocation = {iRandomX, GetTerrainHeight(iRandomX, iRandomZ), iRandomZ}
             if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) == true then
@@ -1225,7 +1225,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
 
         local rBuildAreaRect
         for iCurLocation, tLocation in tValidLocations do
-            rBuildAreaRect = Rect(tLocation[1] - iBuildingSizeRadius, tLocation[3] - iNewBuildingRadius, tLocation[1] + iBuildingSizeRadius, tLocation[3] + iNewBuildingRadius)
+            rBuildAreaRect = Rect(tLocation[1] - iNewBuildingRadius, tLocation[3] - iNewBuildingRadius, tLocation[1] + iNewBuildingRadius, tLocation[3] + iNewBuildingRadius)
             if M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
             if AreMobileUnitsInRect(rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
             if tValidDistanceToEnemy[iCurLocation] >= iMaxDistanceToEnemy then iCurPriority = iCurPriority + 1 end
@@ -1629,7 +1629,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     local tEngineerPosition = oEngineer:GetPosition()
     if not(tTargetLocation) then tTargetLocation = tEngineerPosition end
     local bFoundEnemyInstead = false
-    local iBuildingSizeRadius = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)[1] * 0.5
+    local iNewBuildingRadius = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)[1] * 0.5
 
     if sBlueprintToBuild == nil then
         M27Utilities.ErrorHandler('sBlueprintToBuild is nil, could happen e.g. if try and get sparky to build sxomething it cant - refer to log for more details')
@@ -1664,7 +1664,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                             tBuildingPosition = oBuilding:GetPosition()
                             if M27Utilities.GetDistanceBetweenPositions(tBuildingPosition, tTargetLocation) <= iMaxAreaToSearch then
                                 --Check we're not building by a mex
-                                --if M27Utilities.IsTableEmpty(M27MapInfo.GetResourcesNearTargetLocation(tBuildingPosition, iBuildingSizeRadius, true)) == true then
+                                --if M27Utilities.IsTableEmpty(M27MapInfo.GetResourcesNearTargetLocation(tBuildingPosition, iNewBuildingRadius, true)) == true then
                                     --if bDebugMessages == true then LOG(sFunctionRef..': No resources near the target build position') end
                                     iBuildingCount = iBuildingCount + 1
                                     tPossibleTargets[iBuildingCount] = tBuildingPosition
@@ -1706,8 +1706,8 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                             bFindRandomLocation = true
                         else
                             --Check we're within mapBoundary
-                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if tTargetLocation '..repr(tTargetLocation)..' is in the playable area '..repr(M27MapInfo.rMapPlayableArea)..' based on building size radius='..iBuildingSizeRadius) end
-                            if (tTargetLocation[1] - iBuildingSizeRadius) < M27MapInfo.rMapPlayableArea[1] or (tTargetLocation[3] - iBuildingSizeRadius) < M27MapInfo.rMapPlayableArea[2] or (tTargetLocation[1] + iBuildingSizeRadius) > M27MapInfo.rMapPlayableArea[3] or (tTargetLocation[3] + iBuildingSizeRadius) > M27MapInfo.rMapPlayableArea[4] then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if tTargetLocation '..repr(tTargetLocation)..' is in the playable area '..repr(M27MapInfo.rMapPlayableArea)..' based on building size radius='..iNewBuildingRadius) end
+                            if (tTargetLocation[1] - iNewBuildingRadius) < M27MapInfo.rMapPlayableArea[1] or (tTargetLocation[3] - iNewBuildingRadius) < M27MapInfo.rMapPlayableArea[2] or (tTargetLocation[1] + iNewBuildingRadius) > M27MapInfo.rMapPlayableArea[3] or (tTargetLocation[3] + iNewBuildingRadius) > M27MapInfo.rMapPlayableArea[4] then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Target location isnt in playable area so will find random place to build instead') end
                                 bFindRandomLocation = true
                                 tTargetLocation = tEngineerPosition
@@ -3330,6 +3330,22 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 iMaxEngisWanted = 15
                             end
                         end
+                    end
+                elseif iCurrentConditionToTry == 20 then
+                    if bHaveLowPower == false then
+                        iActionToAssign = refActionBuildSecondPower
+                        iSearchRangeForNearestEngi = 100
+                        iMaxEngisWanted = 10
+                    end
+                elseif iCurrentConditionToTry == 21 then
+                   if (iMassStoredRatio > 0.6 or iMassStored > 3500) then --About to overflow so try to build something
+                       local iFactoryToAirRatio = iLandFactories / math.max(1, iAirFactories)
+                       local iDesiredFactoryToAirRatio = aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir])
+                       if iFactoryToAirRatio > iDesiredFactoryToAirRatio then
+                           if bDebugMessages == true then LOG(sFunctionRef..': iFactoryToAirRatio='..iFactoryToAirRatio..'; iDesiredFactoryToAirRatio='..iDesiredFactoryToAirRatio..'; iLandFactories='..iLandFactories..'; iAirFactories='..iAirFactories..'; aiBrain[M27Overseer.reftiMaxFactoryByType]='..repr(aiBrain[M27Overseer.reftiMaxFactoryByType])) end
+                           iActionToAssign = refActionBuildAirFactory
+                       else iActionToAssign = refActionBuildLandFactory
+                       end
                     end
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': No priority actions so will assign any remaining engineers to spare action') end

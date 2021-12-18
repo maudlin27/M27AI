@@ -58,6 +58,8 @@ refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddis
 refiPercentageClosestFriendlyToEnemyBase = 'M27OverseerPercentageClosestFriendly'
 refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
 
+local iMaxACUEmergencyThreatRange = 150 --If ACU is more than this distance from our base then won't help even if an emergency threat
+
 --Big enemy threats (impact on strategy and/or engineer build order)
 reftEnemyGroundExperimentals = 'M27OverseerEnemyGroundExperimentals'
 reftEnemyNukeLaunchers = 'M27OverseerEnemyNukeLaunchers'
@@ -1932,7 +1934,6 @@ function ThreatAssessAndRespond(aiBrain)
     local iACUDistanceToConsider = 30 --If enemy within this distance of ACU, and within iACUEnemyDistanceFromBase distance of our base, ACU will consider helping (subject to also helping in emergency situation)
     local iACUEnemyDistanceFromBase = 80
     local iEmergencyExcessEnemyThreatNearBase = 200 --If >this much threat near our base ACU will consider helping from a much further distance away
-    local iMaxACUEmergencyThreatRange = 150 --If ACU is more than this distance from our base then won't help even if an emergency threat
     local iThreatMaxFactor = 1.35 --i.e. will send up to iThreatMaxFactor * enemy threat to deal with the platoon
     local iNavalThreatMaxFactor = 1.2
     local iThresholdToRemoveSpareUnitsPercent = 1.35 --When cycling through platoons, will reduce the threat wanted by the closest platoon threat; if then come to a platoon that has more threat than remaining balance, spare units get removed.  This % means this only happens if that platoons threat exceeds the remaining threat wanted by this percent
@@ -2221,7 +2222,7 @@ function ThreatAssessAndRespond(aiBrain)
 
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering action based on our threat vs enemy; EnemyThreat='..tEnemyThreatGroup[refiTotalThreat]..'; iAvailableThreat='..iAvailableThreat) end
 
-                    if iAvailableThreat < iThreatNeeded and not(bIndirectThreatOnly) then
+                    if iAvailableThreat < iThreatNeeded and not(bIndirectThreatOnly) and not(bConsideringNavy) then
                         --Check if should add ACU to help fight - is enemy relatively close to ACU, relatively close to our start, and ACU is closer to start than enemy?
                         bGetACUHelp = false
                         iDistFromEnemy = M27Utilities.GetDistanceBetweenPositions(tACUPos, tEnemyThreatGroup[reftAveragePosition])
@@ -2756,6 +2757,18 @@ function ACUManager(aiBrain)
                         end
                     end
                 end
+            elseif sPlatoonName == sDefenderPlatoonRef then
+                --ACU should only be in defender platoon if there are land enemies near base
+                local tEnemiesNearBase = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxACUEmergencyThreatRange, 'Enemy')
+                if M27Utilities.IsTableEmpty(tEnemiesNearBase) then
+                    --Check we're not upgrading
+                    if not(oACU:IsUnitState('Upgrading')) then
+                        oACU.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
+                        local oNewPlatoon = aiBrain:MakePlatoon('','')
+                        aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU}, 'Attack', 'None')
+                        oNewPlatoon:SetAIPlan('M27ACUMain')
+                    end
+                end
             end
         else
             aiBrain[refiCyclesThatACUHasNoPlatoon] = aiBrain[refiCyclesThatACUHasNoPlatoon] + 1
@@ -3026,7 +3039,7 @@ function ACUManager(aiBrain)
             oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = bWantEscort
             local oEscortingPlatoon = oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon]
             if oEscortingPlatoon then
-                if bEmergencyRequisition then
+                if bEmergencyRequisition and oEscortingPlatoon:GetPlan() == 'M27EscortAI' then
                     oEscortingPlatoon[M27PlatoonTemplates.reftPlatoonsToAmalgamate] = { 'M27MexLargerRaiderAI', 'M27MexRaiderAI', 'M27AttackNearestUnits', 'M27CombatPatrolAI', 'M27LargeAttackForce', 'M27DefenderAI', 'M27EscortAI'}
                     oEscortingPlatoon[M27PlatoonTemplates.refiPlatoonAmalgamationRange] = 100
                     oEscortingPlatoon[M27PlatoonTemplates.refiPlatoonAmalgamationMaxSize] = 50

@@ -281,7 +281,7 @@ function MoveAlongPath(oPlatoon, tMovementPath, bAttackMove, iPathStartPoint, bD
     if bAttackMove == nil then bAttackMove = false end
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27MAAAssister' then bDebugMessages = true end
     local sFunctionRef = 'MoveAlongPath'
     local tCurrentUnits = {}
@@ -969,7 +969,7 @@ function HasPlatoonReachedDestination(oPlatoon)
     local sFunctionRef = 'HasPlatoonReachedDestination'
 
     local sPlatoonName = oPlatoon:GetPlan()
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     local iCurrentUnits = oPlatoon[refiCurrentUnits]
     if iCurrentUnits == nil then
@@ -1044,7 +1044,7 @@ function DeterminePlatoonCompletionAction(oPlatoon)
 
     local aiBrain = oPlatoon:GetBrain()
     local sPlatoonName = oPlatoon:GetPlan()
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1092,7 +1092,7 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
         aiBrain = oPlatoon:GetBrain()
         sPlatoonName = oPlatoon:GetPlan()
     end
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -1160,7 +1160,7 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true LOG('UpdatePlatoonActionIfStuck: Start') end
     local sPlatoonName = oPlatoon:GetPlan()
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1541,7 +1541,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     --Checks if platoon is underwater, and if so decides on action
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(tPlatoonPosition, true)
     local iMaxDistanceForLandSearch = 20
@@ -1646,7 +1646,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local sPlatoonName = oPlatoon:GetPlan()
     local aiBrain = oPlatoon:GetBrain()
     local bProceed = true
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -2732,7 +2732,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     local oPathingUnit
     if bAbort == false then
         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..':bAbort isnt true, so starting to RecordPlatoonUnitsByType') end
@@ -3183,7 +3183,7 @@ function DetermineActionForNearbyReclaim(oPlatoon)
                     oFirstReclaimer = oReclaimer break
                 end
             end
-            if not(oFirstReclaimer==nil) then
+            if not(oFirstReclaimer==nil) and not(oFirstReclaimer:IsUnitState('Building')) and not(oFirstReclaimer:IsUnitState('Repairing')) then
                 --If ACU then will ahve called this before checking for nearby enemies, so check if any within 30
                 local bHaveNearbyEnemies = false
                 if oPlatoon[refiEnemyStructuresInRange] > 0 then bHaveNearbyEnemies = true
@@ -3330,11 +3330,11 @@ function GetACUUpgradeWanted(aiBrain, oACU)
             --Want t2 and then personal shield
             tUpgradesWanted = {'AdvancedEngineering', 'Shield'}
         elseif iFactionRef == M27UnitInfo.refFactionCybran then
-            tUpgradesWanted = {'StealthGenerator'}
+            tUpgradesWanted = {'StealthGenerator', 'MicrowaveLaserGenerator'}
         elseif iFactionRef == M27UnitInfo.refFactionAeon then
             tUpgradesWanted = {'Shield'}
         elseif iFactionRef == M27UnitInfo.refFactionSeraphim then
-            tUpgradesWanted = {'AdvancedEngineering', 'DamageStabilization'}
+            tUpgradesWanted = {'AdvancedEngineering', 'DamageStabilization', 'DamageStabilizationAdvanced', 'BlastAttack'}
         else M27Utilities.ErrorHandler('Dont recognise the ACU faction so wont be getting any further upgrades', nil, true)
         end
 
@@ -3354,6 +3354,8 @@ end
 function RetreatLowHealthShields(oPlatoon)
     --Called by onunitdamage as well as every second on platoon cycle
     --Will retreat either if low health collectively, or if the platoon we're escorting is almost dead
+
+    --Will check that the platoon has prev actions to reduce risk of infinite loop occurring
 
     --Mobile shield bubbles - will assign to retreating platoon based on collective shield %
     --Units with personal shield - will assign to retreating platoon based on individual unit health and shield %
@@ -3385,103 +3387,107 @@ function RetreatLowHealthShields(oPlatoon)
     local bConsiderLowShieldIndividually = false
 
     if M27Utilities.IsTableEmpty(oPlatoon[reftUnitsWithShields]) == false then
-        if oPlatoon[refbACUInPlatoon] then
-            if M27Utilities.IsACU(oPlatoon[refoFrontUnit]) then
-                iCurShieldHealth, iMaxShieldHealth = M27UnitInfo.GetCurrentAndMaximumShield(oPlatoon[refoFrontUnit])
-                if iCurShieldHealth == 0 and iMaxShieldHealth > 0 then
-                    oPlatoon[refiCurrentAction] = refActionRun
+        if oPlatoon[reftPrevAction] and oPlatoon[reftPrevAction][2] then
+            if oPlatoon[refbACUInPlatoon] then
+                if M27Utilities.IsACU(oPlatoon[refoFrontUnit]) then
+                    iCurShieldHealth, iMaxShieldHealth = M27UnitInfo.GetCurrentAndMaximumShield(oPlatoon[refoFrontUnit])
+                    if iCurShieldHealth == 0 and iMaxShieldHealth > 0 then
+                        oPlatoon[refiCurrentAction] = refActionRun
+                    end
                 end
-            end
-        else
+            else
 
-            for iUnit, oUnit in oPlatoon[reftUnitsWithShields] do
-                if not(oUnit.Dead) and oUnit.MyShield then
-                    bConsiderLowShieldIndividually = true
-                    oBP = oUnit:GetBlueprint()
-                    sBP = oUnit:GetUnitId()
-                    iCurShieldHealth, iMaxShieldHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                for iUnit, oUnit in oPlatoon[reftUnitsWithShields] do
+                    if not(oUnit.Dead) and oUnit.MyShield then
+                        bConsiderLowShieldIndividually = true
+                        oBP = oUnit:GetBlueprint()
+                        sBP = oUnit:GetUnitId()
+                        iCurShieldHealth, iMaxShieldHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
 
-                    if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sBP) == true then
-                        bConsiderLowShieldIndividually = false
-                        iMobileShieldCount = iMobileShieldCount + 1
-                        tMobileShields[iMobileShieldCount] = oUnit
-                        tBasePosition = oUnit:GetPosition()
-                        iCurDistanceToPlatoonFront = M27Utilities.GetDistanceBetweenPositions(tBasePosition, GetPlatoonFrontPosition(oPlatoon))
-                        if iCurDistanceToPlatoonFront <= iMaxDistanceToPlatoonFront then
-                            iFrontlineMobileShieldCount = iFrontlineMobileShieldCount + 1
-                            iTotalMobileShieldCurHealth = iTotalMobileShieldCurHealth + iCurShieldHealth
-                            iTotalMobileShieldMaxHealth = iTotalMobileShieldMaxHealth + iMaxShieldHealth
-                            --Go through remaining units in platoon and see if they're near this one, have their shield enabled, and have high health on their shield
+                        if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sBP) == true and not(oPlatoon:GetPlan() == sRetreatingShieldPlatoon) then
+                            bConsiderLowShieldIndividually = false
+                            iMobileShieldCount = iMobileShieldCount + 1
+                            tMobileShields[iMobileShieldCount] = oUnit
+                            tBasePosition = oUnit:GetPosition()
+                            iCurDistanceToPlatoonFront = M27Utilities.GetDistanceBetweenPositions(tBasePosition, GetPlatoonFrontPosition(oPlatoon))
+                            if iCurDistanceToPlatoonFront <= iMaxDistanceToPlatoonFront then
+                                iFrontlineMobileShieldCount = iFrontlineMobileShieldCount + 1
+                                iTotalMobileShieldCurHealth = iTotalMobileShieldCurHealth + iCurShieldHealth
+                                iTotalMobileShieldMaxHealth = iTotalMobileShieldMaxHealth + iMaxShieldHealth
+                                --Go through remaining units in platoon and see if they're near this one, have their shield enabled, and have high health on their shield
 
-                            iOverlappingShield = 0
-                            for iNearbyUnit, oNearbyUnit in oPlatoon[reftUnitsWithShields] do
-                                if not(oNearbyUnit == oUnit) and not(oNearbyUnit.Dead) then
-                                    oNearbyBP = oNearbyUnit:GetBlueprint()
-                                    sNearbyBP = oNearbyUnit:GetUnitId()
-                                    if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sBP) then
-                                        if oNearbyUnit:GetShieldRatio(true) >= iLowShieldPercent and M27UnitInfo.IsUnitShieldEnabled(oNearbyUnit) and oNearbyUnit.MyShield:GetHealth() >= 1000 then
-                                            iOverlappingShieldRangeThreshold = oNearbyBP.Defense.Shield.ShieldSize - 6
-                                            if M27Utilities.GetDistanceBetweenPositions(oNearbyUnit:GetPosition(), tBasePosition) < iOverlappingShieldRangeThreshold then
-                                                iOverlappingShield = iOverlappingShield + 1
+                                iOverlappingShield = 0
+                                for iNearbyUnit, oNearbyUnit in oPlatoon[reftUnitsWithShields] do
+                                    if not(oNearbyUnit == oUnit) and not(oNearbyUnit.Dead) then
+                                        oNearbyBP = oNearbyUnit:GetBlueprint()
+                                        sNearbyBP = oNearbyUnit:GetUnitId()
+                                        if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sBP) then
+                                            if oNearbyUnit:GetShieldRatio(true) >= iLowShieldPercent and M27UnitInfo.IsUnitShieldEnabled(oNearbyUnit) and oNearbyUnit.MyShield:GetHealth() >= 1000 then
+                                                iOverlappingShieldRangeThreshold = oNearbyBP.Defense.Shield.ShieldSize - 6
+                                                if M27Utilities.GetDistanceBetweenPositions(oNearbyUnit:GetPosition(), tBasePosition) < iOverlappingShieldRangeThreshold then
+                                                    iOverlappingShield = iOverlappingShield + 1
+                                                end
                                             end
                                         end
                                     end
                                 end
+                                if iOverlappingShield > iMaxShieldsBeforeStartCycling then
+                                    M27UnitInfo.DisableUnitShield(oUnit)
+                                elseif iOverlappingShield < iMaxShieldsBeforeStartCycling and M27UnitInfo.IsUnitShieldEnabled(oUnit) == false then M27UnitInfo.EnableUnitShield(oUnit)
+                                end
+                            else
+                                --Are we due to get to the front soon?
+                                if iCurDistanceToPlatoonFront >= iMaxDistanceToPlatoonFront * 1.5 then bConsiderLowShieldIndividually = true end
                             end
-                            if iOverlappingShield > iMaxShieldsBeforeStartCycling then
-                                M27UnitInfo.DisableUnitShield(oUnit)
-                            elseif iOverlappingShield < iMaxShieldsBeforeStartCycling and M27UnitInfo.IsUnitShieldEnabled(oUnit) == false then M27UnitInfo.EnableUnitShield(oUnit)
+                        end
+                        if bConsiderLowShieldIndividually == true then
+                            if iCurShieldHealth <= math.min(100, iMaxShieldHealth * 0.1) and M27UnitInfo.IsUnitShieldEnabled(oUnit) == true then
+                                iUnitsToRun = iUnitsToRun + 1
+                                tUnitsToRun[iUnitsToRun] = oUnit
+                            elseif iCurShieldHealth >= iMaxShieldHealth * 0.9 then --WARNING: Careful when changing this -
+                                iUnitsToFight = iUnitsToFight + 1
+                                tUnitsToFight[iUnitsToFight] = oUnit
                             end
-                        else
-                            --Are we due to get to the front soon?
-                            if iCurDistanceToPlatoonFront >= iMaxDistanceToPlatoonFront * 1.5 then bConsiderLowShieldIndividually = true end
-                        end
-                    end
-                    if bConsiderLowShieldIndividually == true then
-                        if iCurShieldHealth <= math.min(100, iMaxShieldHealth * 0.1) and M27UnitInfo.IsUnitShieldEnabled(oUnit) == true then
-                            iUnitsToRun = iUnitsToRun + 1
-                            tUnitsToRun[iUnitsToRun] = oUnit
-                        elseif iCurShieldHealth >= iMaxShieldHealth * 0.9 then
-                            iUnitsToFight = iUnitsToFight + 1
-                            tUnitsToFight[iUnitsToFight] = oUnit
-                        end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has personal shield; iUnitsToRun='..iUnitsToRun..'; iUnitsToFight='..iUnitsToFight..'; iCurShieldHealth='..iCurShieldHealth..'; iMaxShieldHealth='..iMaxShieldHealth) end
-                    end
-                end
-            end
-            if iMobileShieldCount > 0 then
-                --Are we assisting something that should no longer be assisted?
-                local bStopAssistingPlatoon = false
-                if oPlatoon and oPlatoon[refoPlatoonOrUnitToEscort] then
-                    if not(oPlatoon[refoPlatoonOrUnitToEscort][refbACUInPlatoon]) and M27PlatoonFormer.DoesPlatoonWantAnotherMobileShield(oPlatoon[refoPlatoonOrUnitToEscort], 0, true) == false then bStopAssistingPlatoon = true end
-                end
-                if bStopAssistingPlatoon then
-                    M27PlatoonFormer.CreatePlatoon(aiBrain, sRetreatingShieldPlatoon, tMobileShields, true)
-                    oPlatoon[refiCurrentAction] = refActionDisband
-                else
-                    if iFrontlineMobileShieldCount > 0 then
-                        if iTotalMobileShieldCurHealth < iTotalMobileShieldMaxHealth * iLowShieldPercent and not(sPlan==sRetreatingShieldPlatoon) then
-                            bHaveChangedPlatoonComposition = true
-                            M27PlatoonFormer.CreatePlatoon(aiBrain, sRetreatingShieldPlatoon, tMobileShields, true)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Created new retreating shield platoon') end
-                        elseif sPlan == sRetreatingShieldPlatoon and iTotalMobileShieldCurHealth > iTotalMobileShieldMaxHealth * 0.95 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Platoon has mobile shields that have recovered so reassigning by disbanding platoon') end
-                            oPlatoon[refiCurrentAction] = refActionDisband
+                            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has personal shield; iUnitsToRun='..iUnitsToRun..'; iUnitsToFight='..iUnitsToFight..'; iCurShieldHealth='..iCurShieldHealth..'; iMaxShieldHealth='..iMaxShieldHealth) end
                         end
                     end
                 end
-            end
-            if iUnitsToRun > 0 and not(sPlan == sRetreatingShieldPlatoon) then
-                bHaveChangedPlatoonComposition = true
-                M27PlatoonFormer.CreatePlatoon(aiBrain, sRetreatingShieldPlatoon, tUnitsToRun, true)
-                if bDebugMessages == true then LOG(sFunctionRef..': Created new platoon '..sRetreatingShieldPlatoon..'; for tUnitsToRun which have a size of'..table.getn(tUnitsToRun)) end
-            elseif sPlan == sRetreatingShieldPlatoon and iUnitsToFight > 0 then
-                bHaveChangedPlatoonComposition = true
-                RemoveUnitsFromPlatoon(oPlatoon, tUnitsToFight, false, nil)
-                if bDebugMessages == true then LOG(sFunctionRef..': Have units to fight that are in a retreating platoon so removing them from that platoon') end
-            end
+                if iMobileShieldCount > 0 then
+                    --Are we assisting something that should no longer be assisted?
+                    local bStopAssistingPlatoon = false
+                    if oPlatoon and oPlatoon[refoPlatoonOrUnitToEscort] then
+                        if not(oPlatoon[refoPlatoonOrUnitToEscort][refbACUInPlatoon]) and M27PlatoonFormer.DoesPlatoonWantAnotherMobileShield(oPlatoon[refoPlatoonOrUnitToEscort], 0, true) == false then bStopAssistingPlatoon = true end
+                    end
+                    if bStopAssistingPlatoon then
+                        M27PlatoonFormer.CreatePlatoon(aiBrain, sRetreatingShieldPlatoon, tMobileShields, true)
+                        oPlatoon[refiCurrentAction] = refActionDisband
+                    else
+                        if iFrontlineMobileShieldCount > 0 then
+                            if iTotalMobileShieldCurHealth < iTotalMobileShieldMaxHealth * iLowShieldPercent and not(sPlan==sRetreatingShieldPlatoon) then
+                                bHaveChangedPlatoonComposition = true
+                                M27PlatoonFormer.CreatePlatoon(aiBrain, sRetreatingShieldPlatoon, tMobileShields, true)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Created new retreating shield platoon') end
+                            elseif sPlan == sRetreatingShieldPlatoon and iTotalMobileShieldCurHealth > iTotalMobileShieldMaxHealth * 0.95 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Platoon has mobile shields that have recovered so reassigning by disbanding platoon') end
+                                oPlatoon[refiCurrentAction] = refActionDisband
+                            end
+                        end
+                    end
+                end
+                if iUnitsToRun > 0 and not(sPlan == sRetreatingShieldPlatoon) then
+                    bHaveChangedPlatoonComposition = true
+                    M27PlatoonFormer.CreatePlatoon(aiBrain, sRetreatingShieldPlatoon, tUnitsToRun, true)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Created new platoon '..sRetreatingShieldPlatoon..'; for tUnitsToRun which have a size of'..table.getn(tUnitsToRun)) end
+                elseif sPlan == sRetreatingShieldPlatoon and iUnitsToFight > 0 then
+                    bHaveChangedPlatoonComposition = true
+                    RemoveUnitsFromPlatoon(oPlatoon, tUnitsToFight, false, nil)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have units to fight that are in a retreating platoon so removing them from that platoon') end
+                end
 
-            if bHaveChangedPlatoonComposition then RecordPlatoonUnitsByType(oPlatoon) end
+                if bHaveChangedPlatoonComposition then RecordPlatoonUnitsByType(oPlatoon) end
+            end
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..':'..sPlan..(oPlatoon[refiPlatoonCount] or 'nil')..': Platoon doesnt have 2+ prev actions so not considering mobile shields due to infinite loop risk') end
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code for platoon '..sPlan..(oPlatoon[refiPlatoonCount] or 'nil')..'; iUnitsToFight='..iUnitsToFight..'; iUnitsToRun='..iUnitsToRun..'; iMobileShieldCount='..iMobileShieldCount) end
@@ -3507,7 +3513,7 @@ function DeterminePlatoonAction(oPlatoon)
         local aiBrain = oPlatoon[refoBrain]
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
             local sPlatoonName = oPlatoon:GetPlan()
-            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -4075,7 +4081,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     local bPlatoonNameDisplay = false
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -4350,7 +4356,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions)
     local bPlatoonNameDisplay = false
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -5277,6 +5283,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
                         if ShouldPlatoonMoveInFormation(oPlatoon, false) then IssueFormMove(tCurrentUnits, tTempMovePosition, (oPlatoon.PlatoonData.UseFormation or 'GrowthFormation'), 0)
                         else IssueMove(tCurrentUnits, tTempMovePosition) end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Sending platoon to the temporary move position='..repr(tTempMovePosition)) end
                 end
             else
                 -- GetPositionToFollowTargets(tUnitsToFollow, oFollowingUnit, iFollowDistance)
@@ -5481,7 +5488,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -6199,7 +6206,7 @@ function ProcessPlatoonAction(oPlatoon)
                 if bDebugMessages == true then
                     local sPlatoonAction = oPlatoon[refiCurrentAction]
                     if sPlatoonAction == nil then sPlatoonAction = 'nil' end
-                    LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': end of function - ACU state='..M27Logic.GetUnitState(M27Utilities.GetACU(aiBrain))..'; curaction='..sPlatoonAction)
+                    LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': end of function - platoon curaction='..sPlatoonAction)
                 end
             end
         else
@@ -6245,7 +6252,7 @@ function PlatoonInitialSetup(oPlatoon)
 
         --Backup - not sure if it even works:
         if oPlatoon.PlatoonData.UseFormation == nil then oPlatoon.PlatoonData.UseFormation = oPlatoon[sFormationOverride] end
-        --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+        if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
 
         if aiBrain[refiLifetimePlatoonCount] == nil then aiBrain[refiLifetimePlatoonCount] = {} end
         if aiBrain[refiLifetimePlatoonCount][sPlatoonName] == nil then aiBrain[refiLifetimePlatoonCount][sPlatoonName] = 0 end

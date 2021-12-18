@@ -283,7 +283,7 @@ end
 function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     --Looks for the nearest non-upgrading unit of iunitcategory to tStartPoint
     --Returns nil if cant find one
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
     --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
@@ -306,7 +306,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
         if bDebugMessages == true then LOG(sFunctionRef..': Have shortlist of potential units, size='..table.getn(tAllUnits)) end
         for iUnit, oUnit in tAllUnits do
             if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; checking if its valid') end
-            if IsUnitValid(oUnit) and not(M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, true) == nil) then
+            if IsUnitValid(oUnit) and not(M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, true) == nil) and not(oUnit:IsUnitState('Upgrading')) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a unit that is available for upgrading; iUnit='..iUnit..'; Unit ref='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                 if M27Conditions.SafeToUpgradeUnit(oUnit) then
                     iPotentialUnits = iPotentialUnits + 1
@@ -626,10 +626,12 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
         tMassThresholds[1] = {0, -2.0}
         tMassThresholds[2] = {2000, -20}
         tMassThresholds[3] = {4000, -40}
+        tMassThresholds[4] = {5000,-200}
     elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refiMexesUpgrading] == 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 then
         tMassThresholds[1] = {0, -2.0}
         tMassThresholds[2] = {2000, -20}
         tMassThresholds[3] = {4000, -40}
+        tMassThresholds[4] = {5000,-200}
     elseif aiBrain[refiPausedUpgradeCount] > 1 or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
         tMassThresholds[1] = {100, 0.1}
         tMassThresholds[2] = {150, 0}
@@ -637,6 +639,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
         tMassThresholds[4] = {1500, -1.5}
         tMassThresholds[5] = {3000, -2.5}
         tMassThresholds[6] = {4000, -5}
+        tMassThresholds[7] = {5000,-200}
     else
         if bHaveLotsOfFactories == false and bWantMoreFactories == true then
             tMassThresholds[1] = {300, 0.3}
@@ -645,6 +648,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             tMassThresholds[4] = {2000, -1.0}
             tMassThresholds[5] = {3000, -2.5}
             tMassThresholds[6] = {4000, -5}
+            tMassThresholds[7] = {5000,-200}
         else
             if bHaveLotsOfFactories == true and bWantMoreFactories == false then
                 tMassThresholds[1] = {100, 0.2}
@@ -653,6 +657,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 tMassThresholds[4] = {1600, -1.4}
                 tMassThresholds[5] = {3000, -2.5}
                 tMassThresholds[6] = {4000, -5}
+                tMassThresholds[7] = {5000,-200}
             else
                 tMassThresholds[1] = {150, 0.2}
                 tMassThresholds[2] = {350, 0}
@@ -660,6 +665,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 tMassThresholds[4] = {1600, -1.3}
                 tMassThresholds[5] = {3000, -2.5}
                 tMassThresholds[6] = {4000, -5}
+                tMassThresholds[7] = {5000,-200}
             end
         end
     end
@@ -676,21 +682,24 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             elseif iEnergyNetIncome > 2 and iEnergyStored > 2500 and iEnergyPercentStorage > 0.5 then bHaveEnoughEnergy = true
             end
         elseif iEnergyNetIncome > 5 and iEnergyStored > 2500 and iEnergyPercentStorage > 0.8 then bHaveEnoughEnergy = true
+        elseif iEnergyPercentStorage >= 0.99 then bHaveEnoughEnergy = true
         end
 
         if bHaveEnoughEnergy then
             local iGameTime = GetGameTimeSeconds()
             --Do we have lots of resources?
-            if iMassStored > 800 and iMassNetIncome > 0.2 and iEnergyNetIncome > 4 and iEnergyStored > 1000 then bHaveLotsOfResources = true end
+            if iMassStored > 800 and iMassNetIncome > 0.2 and iEnergyNetIncome > 4 and iEnergyStored > 1000 then bHaveLotsOfResources = true
+            elseif iMassStored > 2000 and iEnergyPercentStorage >= 0.99 then bHaveLotsOfResources = true
+            end
             if iGameTime > 180 then --Dont consider upgrading at start of game
                 iMaxToUpgrade = 1
                 if bHaveLotsOfResources == true then
-                    iMaxToUpgrade = 5
+                    iMaxToUpgrade = 20
                 elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refiMexesUpgrading] <= 0 then iMaxToUpgrade = 2
                 end
             end
             --Backup for unusual scenarios - are we about to overflow mass and have high energy stored and have positive mass and energy income? then upgrade with no limit
-            if iEnergyNetIncome > 5 and (aiBrain:GetEconomyStoredRatio('MASS') >= 0.95 or iMassStored >= 3000) then iMaxToUpgrade = 100
+            if (iEnergyPercentStorage >= 0.99 or iEnergyNetIncome > 5) and (aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 or iMassStored >= 2000) then iMaxToUpgrade = 100
             elseif bHaveLotsOfResources == true and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.9 and aiBrain:GetEconomyStoredRatio('MASS') > 0.7 then iMaxToUpgrade = 1000
             end
         end
@@ -760,11 +769,13 @@ function RefreshEconomyData(aiBrain)
 end
 
 function UpgradeManager(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
     --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
 
     local iCycleWaitTime = 40
+    local iReducedWaitTime = 20
+    local iCurCycleTime
     local iCategoryToUpgrade, oUnitToUpgrade
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
     local iMaxToBeUpgrading, iAmountToUpgradeAfterUnpausing
@@ -778,6 +789,7 @@ function UpgradeManager(aiBrain)
     --Initial wait:
     WaitTicks(300)
     while(not(aiBrain:IsDefeated())) do
+        iCurCycleTime = iCycleWaitTime --default (is shortened if have lots to upgrade)
         ForkThread(GetMassStorageTargets, aiBrain)
         iMaxToBeUpgrading = DecideMaxAmountToBeUpgrading(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': iMaxToBeUpgrading='..iMaxToBeUpgrading) end
@@ -811,7 +823,7 @@ function UpgradeManager(aiBrain)
                         end
                     end
                     if oUnitToUpgrade and not(oUnitToUpgrade.Dead) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': About to try and upgrade unit ID='..oUnitToUpgrade:GetUnitId()) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to try and upgrade unit ID='..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)) end
                         UpgradeUnit(oUnitToUpgrade, true)
                         if bDebugMessages == true then LOG(sFunctionRef..': Finished sending order to upgrade unit') end
                     else
@@ -820,6 +832,7 @@ function UpgradeManager(aiBrain)
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have anything to upgrade') end
                 end
+                if iAmountToUpgradeAfterUnpausing > 2 then iCurCycleTime = iReducedWaitTime end
             end
         elseif iMaxToBeUpgrading < 0 then
             --Need to pause

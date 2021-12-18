@@ -1355,7 +1355,7 @@ function GetBomberTargetShortlist(aiBrain)
         bIgnoreMobileShield = true
         reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage}
         iTypeLowPriority = 4
-    elseif aiBrain[M27Overseer.refiOurHighestFactoryTech] == 2 then
+    elseif aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 2 then
         --Currently same as for a t3 bomber
         reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryEngineer}
         iTypeLowPriority = 4

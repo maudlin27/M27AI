@@ -556,12 +556,16 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
         local iPlatoonMass = oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue]
         --If not dealing with a platoon but instead a unit then cap the mass value (as e.g. we're dealing with a mex)
 
-        if oPlatoon.GetUnitId then iPlatoonMass = math.min(iPlatoonMass, iPlatoonValueToShieldRatio * iShieldMass + 50) end
+        if oPlatoon.GetUnitId then
+            iPlatoonMass = math.min(iPlatoonMass, iPlatoonValueToShieldRatio * iShieldMass + 50)
+            if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a unit such as a mex; iPlatoonMass after cap='..iPlatoonMass) end
+        end
         local iShieldValueWanted = iPlatoonMass / iPlatoonValueToShieldRatio
         local iShieldValueHave = 0
         local iShieldUnitsHave = 0
         if oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon] and oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon].GetPlan then
             iShieldValueHave = oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonMassValue]
+            if bDebugMessages == true then LOG(sFunctionRef..': have a supporting shield platoon, will compare the mass value of that to what we want; iShieldValueHave='..(iShieldValueHave or 'nil')) end
             if iShieldValueHave == nil then
                 M27PlatoonUtilities.RecordPlatoonUnitsByType(oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon])
                 iShieldValueHave = oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonMassValue]
@@ -572,14 +576,14 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
         end
         if bDebugMessages == true then LOG(sFunctionRef..': iShieldValueWanted='..iShieldValueWanted..'; iShieldValueHave='..iShieldValueHave..'; iShieldMass='..iShieldMass..'; iShieldUnitsHave='..iShieldUnitsHave) end
         if iShieldValueWanted > (iShieldValueHave + iShieldMass) and iShieldUnitsHave < 5 then
-            if bDebugMessages == true then LOG(sFunctionRef..': Returning true') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Returning true as the shield value wanted is more than the value we have plus shield mass, and we have fewer than 5 shield units') end
             return true
         else
             if bDebugMessages == true then LOG(sFunctionRef..': Returning false') end
             return false
         end
     else
-        if bDebugMessages == true then LOG(sFunctionRef..': Platoon hasnt said that it wants a shield') end
+        if bDebugMessages == true then LOG(sFunctionRef..': Platoon hasnt said that it wants a shield so returning false') end
         return false
     end
 end
@@ -668,7 +672,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                     bRetreatCurShield = true
                     tStartPosition = oCurUnitToAssign:GetPosition()
                     --Do we want to assign to a platoon or run away?
-                    if oUnit:GetShieldRatio(true) >= 0.95 then
+                    if oUnit:GetShieldRatio(true) >= 0.8 then --WARNING: Mustnt be higher than the logic for retreating a shield or else risk infinite loop
                         --Are we either close to our base or have no enemy untis near the shield?
                         if M27Utilities.GetDistanceBetweenPositions(tStartPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iBaseSafeDistance then
                             bRetreatCurShield = false
@@ -685,7 +689,13 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
         if oCurUnitToAssign then
             if bDebugMessages == true then LOG(sFunctionRef..': We have a shield unit to assign; bRetreatCurShield='..tostring(bRetreatCurShield)) end
             if bRetreatCurShield == true then
-                oShieldPlatoon = CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', {oCurUnitToAssign}, true)
+                if oCurUnitToAssign.Platoonhandle and oCurUnitToAssign.Platoonhandle.GetPlan and oCurUnitToAssign.Platoonhandle:GetPlan() == 'M27RetreatingShieldUnits' then
+                    --Do nothing
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want to retreat cur shield, but it already is in a retreating shield platoon') end
+                else
+                    oShieldPlatoon = CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', {oCurUnitToAssign}, true)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want to retreat cur shield, so have created a new retreating shield platoon for it') end
+                end
             else
                 --Get the platoon to help
                 if bDebugMessages == true then LOG(sFunctionRef..': Look for platoon that wants shield; bNoMorePlatoonsToHelp='..tostring(bNoMorePlatoonsToHelp)) end
