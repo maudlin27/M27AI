@@ -1157,7 +1157,8 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
         tNewBuildingSize = {0,0}
     end
     local fSizeMod = 0.5
-    local iMaxDistanceToBuildWithoutMoving = iBuilderRange + tNewBuildingSize[1] * fSizeMod
+    local iBuildingSizeRadius = tNewBuildingSize[1] * fSizeMod
+    local iMaxDistanceToBuildWithoutMoving = iBuilderRange + iBuildingSizeRadius
     local sPathing
     local iBuilderSegmentX, iBuilderSegmentZ
     local iBuilderPathingGroup, iCurPathingGroup
@@ -1186,10 +1187,10 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
             iSignageZ = tSignageZ[iCurSizeCycleCount]
             iRandomX = iRandomDistance * iSignageX + tStartPosition[1]
             iRandomZ = iRandomDistance * iSignageZ + tStartPosition[3]
-            if iRandomX < iMapBoundMinX then iRandomX = iMapBoundMinX
-            elseif iRandomX > iMapBoundMaxX then iRandomX = iMapBoundMaxX end
-            if iRandomZ < iMapBoundMinZ then iRandomZ = iMapBoundMinZ
-            elseif iRandomZ > iMapBoundMaxZ then iRandomZ = iMapBoundMaxZ end
+            if iRandomX < (iMapBoundMinX + iBuildingSizeRadius) then iRandomX = iMapBoundMinX + iBuildingSizeRadius
+            elseif iRandomX > (iMapBoundMaxX - iBuildingSizeRadius) then iRandomX = iMapBoundMaxX - iBuildingSizeRadius end
+            if iRandomZ < (iMapBoundMinZ + iBuildingSizeRadius) then iRandomZ = iMapBoundMinZ + iBuildingSizeRadius
+            elseif iRandomZ > (iMapBoundMaxZ - iBuildingSizeRadius) then iRandomZ = iMapBoundMaxZ - iBuildingSizeRadius end
 
             tTargetLocation = {iRandomX, GetTerrainHeight(iRandomX, iRandomZ), iRandomZ}
             if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) == true then
@@ -1224,7 +1225,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
 
         local rBuildAreaRect
         for iCurLocation, tLocation in tValidLocations do
-            rBuildAreaRect = Rect(tLocation[1] - tNewBuildingSize[1]*fSizeMod, tLocation[3] - tNewBuildingSize[2]*fSizeMod, tLocation[1] + tNewBuildingSize[1]*fSizeMod, tLocation[3] + tNewBuildingSize[2]*fSizeMod)
+            rBuildAreaRect = Rect(tLocation[1] - iBuildingSizeRadius, tLocation[3] - tNewBuildingSize[2]*fSizeMod, tLocation[1] + iBuildingSizeRadius, tLocation[3] + tNewBuildingSize[2]*fSizeMod)
             if M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
             if AreMobileUnitsInRect(rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
             if tValidDistanceToEnemy[iCurLocation] >= iMaxDistanceToEnemy then iCurPriority = iCurPriority + 1 end
@@ -1614,8 +1615,8 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     local sBlueprintBuildBy
     local bFindRandomLocation = false
     local tTargetLocation = tAlternativePositionToLookFrom
-    local oEngineerPosition = oEngineer:GetPosition()
-    if not(tTargetLocation) then tTargetLocation = oEngineerPosition end
+    local tEngineerPosition = oEngineer:GetPosition()
+    if not(tTargetLocation) then tTargetLocation = tEngineerPosition end
     local bFoundEnemyInstead = false
     local iBuildingSizeRadius = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)[1] * 0.5
 
@@ -1692,6 +1693,11 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                             M27Utilities.ErrorHandler('Cant build '..sBlueprintToBuild..' on adjacency location tTargetLocation='..repr(tTargetLocation))
                             bFindRandomLocation = true
                         else
+                            --Check we're within mapBoundary
+                            if tTargetLocation[1] - iBuildingSizeRadius < M27MapInfo.rMapPlayableArea[1] or tTargetLocation[3] - iBuildingSizeRadius < M27MapInfo.rMapPlayableArea[3] or tTargetLocation[1] + iBuildingSizeRadius > M27MapInfo.rMapPlayableArea[1] or tTargetLocation[3] + iBuildingSizeRadius > M27MapInfo.rMapPlayableArea then
+                                bFindRandomLocation = true
+                                tTargetLocation = tEngineerPosition
+                            end
                             if bDebugMessages == true then M27Utilities.DrawLocation(tTargetLocation) end
                         end
                     end
@@ -1706,7 +1712,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
         end
         if bFindRandomLocation == true then
             if bDebugMessages == true then LOG(sFunctionRef..': Are finding a random location to build unless current location is valid; sBlueprintToBuild='..sBlueprintToBuild) end
-            if M27Utilities.IsTableEmpty(tTargetLocation) == true then tTargetLocation = oEngineerPosition end
+            if M27Utilities.IsTableEmpty(tTargetLocation) == true then tTargetLocation = tEngineerPosition end
             if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) == false then
                 if bDebugMessages == true then
                     LOG(sFunctionRef..' Cant build '..sBlueprintToBuild..' and '..repr(tTargetLocation))

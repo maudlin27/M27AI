@@ -1700,7 +1700,10 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 if oACU[M27Overseer.refiACULastTakenUnseenDamage] and GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenDamage] <= 25 then
                     local oUnseenDamageDealer = oACU[M27Overseer.refoUnitDealingUnseenDamage]
                     if oUnseenDamageDealer and not(oUnseenDamageDealer.Dead) and oUnseenDamageDealer.GetUnitId then
-                        if M27Logic.GetUnitMaxGroundRange({oUnseenDamageDealer}) >= 35 then bACUNeedsToRun = true end
+                        if M27Logic.GetUnitMaxGroundRange({oUnseenDamageDealer}) >= 35 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': ACU taken unseem damage from a unit with a range of at least 35 so want to run') end
+                            bACUNeedsToRun = true
+                        end
                     end
                 end
                 if bACUNeedsToRun == false then
@@ -1711,6 +1714,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         local tEnemyT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])
                         if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false then
                             if table.getn(tEnemyT2PlusPD) >= 3 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': ACU against at least 3 T2 PD so need to run') end
                                 bACUNeedsToRun = true
                             end
                         end
@@ -1720,8 +1724,16 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         if oPlatoon[refiEnemyStructuresInRange] > 0 then iEnemyThreatRating = iEnemyThreatRating + M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemyStructuresInRange], true) end
                         if iEnemyThreatRating > 0 then
                             local iOurThreatRating = 0
+                            if bDebugMessages == true then
+                                --Reproduce every unit in tFriendlyNearbyCombatUnits:
+                                LOG('Size of oPlatoon[reftFriendlyNearbyCombatUnits]='..table.getn(oPlatoon[reftFriendlyNearbyCombatUnits])..'; about to list out every unit')
+                                for iUnit, oUnit in oPlatoon[reftFriendlyNearbyCombatUnits] do
+                                    LOG('iUnit='..iUnit..'; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                end
+                            end
                             iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftFriendlyNearbyCombatUnits], false)
-                            if iOurThreatRating / iEnemyThreatRating <= 0.8 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': iOurThreatRating='..iOurThreatRating..'; iEnemyThreatRating='..iEnemyThreatRating..'; will run if our threat rating less than 80% of enemy') end
+                            if iOurThreatRating / iEnemyThreatRating <= 1.2 then
                                 bACUNeedsToRun = true
                             end
                         end

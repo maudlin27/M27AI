@@ -1337,7 +1337,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                 end
             end
             if bCalcActualThreat == true then
-                if bDebugMessages == true then LOG(sFunctionRef..': About to calculate threat using actual unit data') end
+                if bDebugMessages == true then LOG(sFunctionRef..': About to calculate threat using actual unit data; unitID='..oUnit:GetUnitId()) end
                 --get actual threat calc
                 if bJustGetMassValue == true then iCurThreat = oUnit:GetBlueprint().Economy.BuildCostMass
                 else
