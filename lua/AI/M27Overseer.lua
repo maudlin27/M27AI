@@ -2706,7 +2706,7 @@ function ThreatAssessAndRespond(aiBrain)
 
     --Record how many torp bombers we want
     if iCumulativeTorpBomberThreatShortfall > 0 then
-        aiBrain[M27AirOverseer.refiTorpBombersWanted] = iCumulativeTorpBomberThreatShortfall / 240
+        aiBrain[M27AirOverseer.refiTorpBombersWanted] = math.ceil(iCumulativeTorpBomberThreatShortfall / 240)
     else
         aiBrain[M27AirOverseer.refiTorpBombersWanted] = 0
     end
