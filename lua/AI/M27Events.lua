@@ -103,23 +103,32 @@ function OnDamaged(self, instigator)
                         end
                         if not(oUnitCausingDamage) and bDebugMessages == true then LOG(sFunctionRef..': Dont ahve a valid unit as instigator') end
 
-                        if oUnitCausingDamage and oUnitCausingDamage.GetAIBrain then
+                        if oUnitCausingDamage and oUnitCausingDamage.GetAIBrain and oUnitCausingDamage.GetUnitId then
                             --Can we see the unit?
                             if bDebugMessages == true then LOG(sFunctionRef..': Checking if can see the unit that dealt us damage') end
                             if not(M27Utilities.CanSeeUnit(aiBrain, oUnitCausingDamage, true)) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': cant see unit that caused damage, will ask for an air scout and flag the ACU has taken damage recently') end
-                                self[M27Overseer.refiACULastTakenUnseenDamage] = GetGameTimeSeconds()
+                                self[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] = GetGameTimeSeconds()
                                 self[M27Overseer.refoUnitDealingUnseenDamage] = oUnitCausingDamage
                                 --Flag that we want the location (and +- 2 segments around it) the shot came from scouted asap
                                 M27AirOverseer.MakeSegmentsAroundPositionHighPriority(aiBrain, oUnitCausingDamage:GetPosition(), 2)
-
+                            else
+                                if oUnitCausingDamage.GetUnitId and EntityCategoryContains(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnitCausingDamage:GetUnitId()) then
+                                    self[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] = GetGameTimeSeconds()
+                                    self[M27Overseer.refoUnitDealingUnseenDamage] = oUnitCausingDamage
+                                end
                             end
                             --If we're upgrading consider cancelling
-                            if self:IsUnitState('Upgrading') and self:GetWorkProgress() <= 0.3 and oUnitCausingDamage:EntityCategoryContains(categories.INDIRECT, oUnitCausingDamage:GetUnitId()) and M27Conditions.DoesACUHaveGun(aiBrain, false, self) then
+
+                            if self:IsUnitState('Upgrading') and self:GetWorkProgress() <= 0.3 and oUnitCausingDamage:EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage:GetUnitId()) and M27Conditions.DoesACUHaveGun(aiBrain, false, self) then
                                 --Do we have nearby friendly units?
                                 if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
-                                    IssueClearCommands({self})
-                                    IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                    --Is the unit within range of us?
+                                    local iOurMaxRange = GetUnitMaxGroundRange({self})
+                                    if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
+                                        IssueClearCommands({self})
+                                        IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                    end
                                 end
                             end
                         end

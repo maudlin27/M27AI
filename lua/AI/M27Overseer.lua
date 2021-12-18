@@ -108,7 +108,7 @@ refFactoryTypeAir = 2
 refFactoryTypeNavy = 3
 
 --Other ACU related
-refiACULastTakenUnseenDamage = 'M27OverseerACULastTakenUnseenDamage' --Used to determine if ACU should run or not
+refiACULastTakenUnseenOrTorpedoDamage = 'M27OverseerACULastTakenUnseenDamage' --Used to determine if ACU should run or not
 refoUnitDealingUnseenDamage = 'M27OverseerACUUnitDealingUnseenDamage' --so can see if it was a T2+ PD that should run away from
 refbACUWasDefending = 'M27ACUWasDefending'
 iACUMaxTravelToNearbyMex = 20 --ACU will go up to this distance out of its current position to build a mex (i.e. add 10 to this for actual range)
@@ -3897,6 +3897,6 @@ function OverseerManager(aiBrain)
             LOG(sFunctionRef..': End of overseer cycle code (about to start new cycle) ACU platoon=')
             DebugPrintACUPlatoon(aiBrain)
         end
-        iTempProfiling = M27Utilities.ProfilerTimeSinceLastCall('End of overseer', iTempProfiling)
+        --iTempProfiling = M27Utilities.ProfilerTimeSinceLastCall('End of overseer', iTempProfiling)
     end
 end

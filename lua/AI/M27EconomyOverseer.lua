@@ -735,7 +735,8 @@ end
 
 function RefreshEconomyData(aiBrain)
     --Yes, hardcoding resource values will make it really hard to support mods or patches that change these values
-
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RefreshEconomyData'
     local iACUMass = 1
     local iACUEnergy = 20
     local iEnergyT3Power = 2500
@@ -766,6 +767,8 @@ function RefreshEconomyData(aiBrain)
     aiBrain[refiEnergyNetBaseIncome] = aiBrain[refiEnergyGrossBaseIncome] - iEnergyUsage
     aiBrain[refiMassGrossBaseIncome] = (iACUMass + iT3MexMass * iT3MexCount + iT2MexMass * iT2MexCount + iT1MexMass * iT1MexCount)*iPerTickFactor
     aiBrain[refiMassNetBaseIncome] = aiBrain[refiMassGrossBaseIncome] - iMassUsage
+
+    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiEnergyGrossBaseIncome]='..aiBrain[refiEnergyGrossBaseIncome]..'; aiBrain[refiEnergyNetBaseIncome]='..aiBrain[refiEnergyNetBaseIncome]..'; iT2PowerCount='..iT2PowerCount..'; iEnergyT1Power='..iEnergyT1Power..'; iEnergyUsage='..iEnergyUsage) end
 end
 
 function UpgradeManager(aiBrain)

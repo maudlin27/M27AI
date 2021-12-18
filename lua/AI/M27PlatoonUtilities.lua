@@ -281,7 +281,7 @@ function MoveAlongPath(oPlatoon, tMovementPath, bAttackMove, iPathStartPoint, bD
     if bAttackMove == nil then bAttackMove = false end
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27MAAAssister' then bDebugMessages = true end
     local sFunctionRef = 'MoveAlongPath'
     local tCurrentUnits = {}
@@ -969,7 +969,7 @@ function HasPlatoonReachedDestination(oPlatoon)
     local sFunctionRef = 'HasPlatoonReachedDestination'
 
     local sPlatoonName = oPlatoon:GetPlan()
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     local iCurrentUnits = oPlatoon[refiCurrentUnits]
     if iCurrentUnits == nil then
@@ -1044,7 +1044,7 @@ function DeterminePlatoonCompletionAction(oPlatoon)
 
     local aiBrain = oPlatoon:GetBrain()
     local sPlatoonName = oPlatoon:GetPlan()
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1092,7 +1092,7 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
         aiBrain = oPlatoon:GetBrain()
         sPlatoonName = oPlatoon:GetPlan()
     end
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -1160,7 +1160,7 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true LOG('UpdatePlatoonActionIfStuck: Start') end
     local sPlatoonName = oPlatoon:GetPlan()
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1541,7 +1541,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     --Checks if platoon is underwater, and if so decides on action
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(tPlatoonPosition, true)
     local iMaxDistanceForLandSearch = 20
@@ -1559,71 +1559,92 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
                 end
             end
             if oUnderwaterUnit and not(oUnderwaterUnit.Dead) then
-                if bDebugMessages == true then LOG(sFunctionRef..': Have amphibious unit, checking firing position') end
-                local tFiringPositionStart = M27Logic.GetDirectFireWeaponPosition(oUnderwaterUnit)
-                if tFiringPositionStart then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have firing position, checking if its below water') end
-                    local iFiringHeight = tFiringPositionStart[2]
-                    if iFiringHeight <= (iHeightAtWhichConsideredUnderwater + 0.2) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Gun is below water, checking if have reclaimers; refiReclaimers='..oPlatoon[refiReclaimers]) end
-                        local bMoveToNearbyLand, tNearbyLandPosition
-                        --Do we contain reclaimers?
-                        if oPlatoon[refiReclaimers] > 0 then
-                            local aiBrain = oPlatoon:GetBrain()
-                            local oReclaimer = oPlatoon[reftReclaimers][1]
-                            if oReclaimer == nil or oReclaimer.Dead then
-                                M27Utilities.ErrorHandler('Reclaimer is nil or dead')
-                            else
-                                local iBuildDistance = oReclaimer:GetBlueprint().Economy.MaxBuildDistance
-                                local tNearbyEnemiesThatCanReclaim = aiBrain:GetUnitsAroundPoint(categories.RECLAIMABLE, tPlatoonPosition, iBuildDistance + 10, 'Enemy')
-                                local oReclaimTarget
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have alive reclaimer in platoon, checking if enemy units nearby that can reclaim') end
-                                if M27Utilities.IsTableEmpty(tNearbyEnemiesThatCanReclaim) == false then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Are nearby enemies that can reclaim') end
-                                    oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesThatCanReclaim, tPlatoonPosition, aiBrain, true)
-                                    if oReclaimTarget then
-                                        local iDistanceToPlatoon = M27Utilities.GetDistanceBetweenPositions(oReclaimTarget:GetPosition(), tPlatoonPosition)
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a reclaim target, iDistanceToPlatoon='..iDistanceToPlatoon..'; iBuildDistance='..iBuildDistance) end
-                                        if iDistanceToPlatoon <= iBuildDistance then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Trying to target nearby enemy for reclaim') end
-                                            oPlatoon[refoNearbyReclaimTarget] = oReclaimTarget
-                                            oPlatoon[refiCurrentAction] = refActionReclaimNearby
-                                        else
-                                            --first see if nearby land that can move to
-                                            --GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchRange)
-                                            tNearbyLandPosition = M27MapInfo.GetNearestPathableLandPosition(oUnderwaterUnit, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], iMaxDistanceForLandSearch)
-                                            if M27Utilities.IsTableEmpty(tNearbyLandPosition) == false then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Have nearby land that can move to') end
-                                                bMoveToNearbyLand = true
-                                            else
-                                                --Reclaim the unit that is further away than our build distance
-                                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby land so will move to enemy and try and reclaim') end
+                --run away if we have nearby enemy units that have torpedos and we dont have antinavy in our platoon
+                local aiBrain = oPlatoon:GetBrain()
+                local iSearchRange = 80
+                local tNearbyAntiNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnderwaterUnit:GetPosition(), iSearchRange, 'Enemy')
+                local bAbort = false
+                if M27Utilities.IsTableEmpty(tNearbyAntiNavy) == false then
+                    --Do we have any antinavy units in our platoon?
+                    local tOurAntiNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpedoLandAndNavy, GetPlatoonUnitsOrUnitCount(oPlatoon, reftCurrentUnits, false))
+                    if M27Utilities.IsTableEmpty(tOurAntiNavy) == true then
+                        oPlatoon[refiCurrentAction] = refActionRun
+                        bAbort = true
+                    end
+                end
+                if bAbort == false then
+
+
+
+
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have amphibious unit, checking firing position') end
+                    local tFiringPositionStart = M27Logic.GetDirectFireWeaponPosition(oUnderwaterUnit)
+                    if tFiringPositionStart then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have firing position, checking if its below water') end
+                        local iFiringHeight = tFiringPositionStart[2]
+                        if iFiringHeight <= (iHeightAtWhichConsideredUnderwater + 0.2) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Gun is below water, checking if have reclaimers; refiReclaimers='..oPlatoon[refiReclaimers]) end
+                            local bMoveToNearbyLand, tNearbyLandPosition
+                            --Do we contain reclaimers?
+                            if oPlatoon[refiReclaimers] > 0 then
+                                local aiBrain = oPlatoon:GetBrain()
+                                local oReclaimer = oPlatoon[reftReclaimers][1]
+                                if oReclaimer == nil or oReclaimer.Dead then
+                                    M27Utilities.ErrorHandler('Reclaimer is nil or dead')
+                                else
+                                    local iBuildDistance = oReclaimer:GetBlueprint().Economy.MaxBuildDistance
+                                    local tNearbyEnemiesThatCanReclaim = aiBrain:GetUnitsAroundPoint(categories.RECLAIMABLE, tPlatoonPosition, iBuildDistance + 10, 'Enemy')
+                                    local oReclaimTarget
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have alive reclaimer in platoon, checking if enemy units nearby that can reclaim') end
+                                    if M27Utilities.IsTableEmpty(tNearbyEnemiesThatCanReclaim) == false then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Are nearby enemies that can reclaim') end
+                                        oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesThatCanReclaim, tPlatoonPosition, aiBrain, true)
+                                        if oReclaimTarget then
+                                            local iDistanceToPlatoon = M27Utilities.GetDistanceBetweenPositions(oReclaimTarget:GetPosition(), tPlatoonPosition)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have a reclaim target, iDistanceToPlatoon='..iDistanceToPlatoon..'; iBuildDistance='..iBuildDistance) end
+                                            if iDistanceToPlatoon <= iBuildDistance then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Trying to target nearby enemy for reclaim') end
                                                 oPlatoon[refoNearbyReclaimTarget] = oReclaimTarget
                                                 oPlatoon[refiCurrentAction] = refActionReclaimNearby
+                                            else
+                                                --first see if nearby land that can move to
+                                                --GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchRange)
+                                                tNearbyLandPosition = M27MapInfo.GetNearestPathableLandPosition(oUnderwaterUnit, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], iMaxDistanceForLandSearch)
+                                                if M27Utilities.IsTableEmpty(tNearbyLandPosition) == false then
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Have nearby land that can move to') end
+                                                    bMoveToNearbyLand = true
+                                                else
+                                                    --Reclaim the unit that is further away than our build distance
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': No nearby land so will move to enemy and try and reclaim') end
+                                                    oPlatoon[refoNearbyReclaimTarget] = oReclaimTarget
+                                                    oPlatoon[refiCurrentAction] = refActionReclaimNearby
+                                                end
                                             end
+                                        else
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Are no nearby enemies that can reclaim') end
                                         end
-                                    else
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Are no nearby enemies that can reclaim') end
                                     end
                                 end
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will see if have nearby land') end
+                                tNearbyLandPosition = M27MapInfo.GetNearestPathableLandPosition(oUnderwaterUnit, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], iMaxDistanceForLandSearch)
+                                if M27Utilities.IsTableEmpty(tNearbyLandPosition) == false then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies but nearby land so will move there') end
+                                    bMoveToNearbyLand = true
+                                end
                             end
-                        else
-                            if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will see if have nearby land') end
-                            tNearbyLandPosition = M27MapInfo.GetNearestPathableLandPosition(oUnderwaterUnit, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], iMaxDistanceForLandSearch)
-                            if M27Utilities.IsTableEmpty(tNearbyLandPosition) == false then
-                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies but nearby land so will move there') end
-                                bMoveToNearbyLand = true
+                            if bMoveToNearbyLand == true then
+                                oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
+                                oPlatoon[reftTemporaryMoveTarget] = tNearbyLandPosition
+                            else
+                                if oPlatoon[refiCurrentAction] == nil then oPlatoon[refiCurrentAction] = refActionContinueMovementPath end
                             end
                         end
-                        if bMoveToNearbyLand == true then
-                            oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
-                            oPlatoon[reftTemporaryMoveTarget] = tNearbyLandPosition
-                        else
-                            if oPlatoon[refiCurrentAction] == nil then oPlatoon[refiCurrentAction] = refActionContinueMovementPath end
-                        end
+                    else
+                        M27Utilities.ErrorHandler('couldnt locate position value for direct fire weapon on oUnderwater unit')
                     end
                 else
-                    M27Utilities.ErrorHandler('couldnt locate position value for direct fire weapon on oUnderwater unit')
+                    if bDebugMessages == true then LOG(sFunctionRef..': Nearby antinavy enemy units and we dont ahve antinavy ourself') end
                 end
             else
                 M27Utilities.ErrorHandler('platoon is registered as having underwater amphibious units, but couldnt locate any with a direct fire weapon')
@@ -1646,7 +1667,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local sPlatoonName = oPlatoon:GetPlan()
     local aiBrain = oPlatoon:GetBrain()
     local bProceed = true
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1692,15 +1713,15 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 --Have we recently taken damage from an unseen source?
                 local oACU = M27Utilities.GetACU(aiBrain)
                 if bDebugMessages == true then
-                    local iLastTimeTakenDamage = oACU[M27Overseer.refiACULastTakenUnseenDamage]
+                    local iLastTimeTakenDamage = oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]
                     if iLastTimeTakenDamage == nil then iLastTimeTakenDamage = 0 end
                     LOG(sFunctionRef..': Checking last time ACU took damage, iLastTimeTakenDamage='..iLastTimeTakenDamage..'; CurGameTime='..GetGameTimeSeconds())
                 end
 
-                if oACU[M27Overseer.refiACULastTakenUnseenDamage] and GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenDamage] <= 25 then
+                if oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] and GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] <= 25 then
                     local oUnseenDamageDealer = oACU[M27Overseer.refoUnitDealingUnseenDamage]
                     if oUnseenDamageDealer and not(oUnseenDamageDealer.Dead) and oUnseenDamageDealer.GetUnitId then
-                        if M27Logic.GetUnitMaxGroundRange({oUnseenDamageDealer}) >= 35 then
+                        if M27Logic.GetUnitMaxGroundRange({oUnseenDamageDealer}) >= 35 or EntityCategoryContains(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnseenDamageDealer:GetUnitId()) then
                             if bDebugMessages == true then LOG(sFunctionRef..': ACU taken unseem damage from a unit with a range of at least 35 so want to run') end
                             bACUNeedsToRun = true
                         end
@@ -2732,7 +2753,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     local oPathingUnit
     if bAbort == false then
         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..':bAbort isnt true, so starting to RecordPlatoonUnitsByType') end
@@ -3170,7 +3191,7 @@ end
 function DetermineActionForNearbyReclaim(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineActionForNearbyReclaim'
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oPlatoon[refiReclaimers]='..oPlatoon[refiReclaimers]) end
     if oPlatoon[refiReclaimers] > 0 then
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code for '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
@@ -3516,7 +3537,7 @@ function DeterminePlatoonAction(oPlatoon)
         local aiBrain = oPlatoon[refoBrain]
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
             local sPlatoonName = oPlatoon:GetPlan()
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -4087,7 +4108,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     local bPlatoonNameDisplay = false
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -4362,7 +4383,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions)
     local bPlatoonNameDisplay = false
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -5494,7 +5515,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -6258,7 +6279,7 @@ function PlatoonInitialSetup(oPlatoon)
 
         --Backup - not sure if it even works:
         if oPlatoon.PlatoonData.UseFormation == nil then oPlatoon.PlatoonData.UseFormation = oPlatoon[sFormationOverride] end
-        if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+        --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
 
         if aiBrain[refiLifetimePlatoonCount] == nil then aiBrain[refiLifetimePlatoonCount] = {} end
         if aiBrain[refiLifetimePlatoonCount][sPlatoonName] == nil then aiBrain[refiLifetimePlatoonCount][sPlatoonName] = 0 end
