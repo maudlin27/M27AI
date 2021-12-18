@@ -773,88 +773,90 @@ function GetMergeLocation(oPlatoonToMergeInto, iPercentOfWayToDestination)
     tBaseMergePosition[2] = GetTerrainHeight(tBaseMergePosition[1], tBaseMergePosition[3])
     --Check we can path here:
     local oPathingUnit = GetPathingUnit(oPlatoonToMergeInto)
-    if bDebugMessages == true then LOG(sFunctionRef..': platoon unit count='..table.getn(oPlatoonToMergeInto:GetPlatoonUnits())) end
-    local iCurSegmentX, iCurSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tCurPos)
-    local sPathingType = M27UnitInfo.GetUnitPathingType(oPathingUnit)
+    if oPathingUnit then
+        if bDebugMessages == true then LOG(sFunctionRef..': platoon unit count='..table.getn(oPlatoonToMergeInto:GetPlatoonUnits())) end
+        local iCurSegmentX, iCurSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tCurPos)
+        local sPathingType = M27UnitInfo.GetUnitPathingType(oPathingUnit)
 
 
-    if oPathingUnit == nil or oPathingUnit.Dead or not(oPathingUnit.GetUnitId) then
-        M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..':'..sFunctionRef..': Pathing unit is nil or dead or has no unit Id')
-        return tCurPos
-    elseif sPathingType == nil then
-        M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..':'..sFunctionRef..': sPathingType is nil')
-        return tCurPos
-    else
-        local iSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iCurSegmentX, iCurSegmentZ)
-        local iMergePositionGroup, iMergeSegmentX, iMergeSegmentZ
-        local tMergePosition = {}
-        local iAttemptCount = 0
-        local iDistanceMod = 0
-        local iDistanceCount = 0
-        local iXSign = 1
-        local iZSign = 1
-        if bDebugMessages == true then LOG('oPathingUnit='..oPathingUnit:GetUnitId()..' sPathingType='..sPathingType..'; iCurSegmentXZ='..iCurSegmentX..'-'..iCurSegmentZ) end
-        if iSegmentGroup == nil then
-            M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..': GetMergeLocation: iSegmentGroup is nil')
-            if oPathingUnit == nil then LOG('oPathingUnilt is nil')
-            else
-                if iCurSegmentX == nil then LOG('iCurSegmentX is nil')
-                else LOG('iCurSegmentX='..iCurSegmentX..'; iCurSegmentZ='..iCurSegmentZ)
-                end
-            end
+        if oPathingUnit == nil or oPathingUnit.Dead or not(oPathingUnit.GetUnitId) then
+            M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..':'..sFunctionRef..': Pathing unit is nil or dead or has no unit Id')
             return tCurPos
-        end
-        local bNearbySegmentsSameGroup = false
-        local iNearbySegmentSize = 1
-        local iPlatoonUnits = oPlatoonToMergeInto[refiCurrentUnits]
-        iNearbySegmentSize = math.ceil( iPlatoonUnits / 10)
-        if iNearbySegmentSize >= 5 then iNearbySegmentSize = 5 end
-        local iSegmentStart = -iNearbySegmentSize
-        local iSegmentEnd = iNearbySegmentSize
-        local iCount = 0
-        while bNearbySegmentsSameGroup == false do
-            iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
-            --Modify position so are cycling between 4 corners of a square around the position that steadily increases in size
-            if iAttemptCount == 0 then iDistanceMod = 0
-            else
-                iDistanceCount = iDistanceCount + 1
-                if iDistanceMod == 0 then iDistanceMod = 1 end
-                if iDistanceCount > 4 then
-                    iDistanceCount = 0
-                    iDistanceMod = iDistanceMod * 2.
-                end
-                if iDistanceCount == 1 then iXSign = 1 iZSign = 1
-                elseif iDistanceCount == 2 then iXSign = 1 iZSign = -1
-                elseif iDistanceCount == 3 then iXSign = -1 iZSign = 1
-                elseif iDistanceCount == 4 then iXSign = -1 iZSign = -1 end
-            end
-            tMergePosition = {tBaseMergePosition[1] + iDistanceMod * iXSign, 0, tBaseMergePosition[3] + iDistanceMod * iZSign}
-            iMergeSegmentX, iMergeSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMergePosition)
-            iMergePositionGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iMergeSegmentX, iMergeSegmentZ)
-            iAttemptCount = iAttemptCount + 1
-            if bDebugMessages == true then M27Utilities.DrawLocation(tMergePosition) end
-
-            if iMergePositionGroup == iSegmentGroup then
-                --Are the nearby segments the same group?
-                bNearbySegmentsSameGroup = true
-                --Cycle from -1 to +1 segments (or -x/+x for larger platoon)
-                for iXMod = iSegmentStart, iSegmentEnd do
-                    for iZMod = iSegmentStart, iSegmentEnd do
-                        if not(M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iMergeSegmentX + iXMod, iMergeSegmentZ + iZMod) == iSegmentGroup) then bNearbySegmentsSameGroup = false break end
-                    end
-                    if bNearbySegmentsSameGroup == false then break end
-                end
-            end
-            if iAttemptCount > 32 then return nil end --Infinite loop protection
-        end
-        if tMergePosition[1] == nil or tMergePosition[3] == nil then
-            M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..': GetMergeLocation: tMergePosition is nil')
-            if iMergePositionGroup == nil then LOG('iMergePositionGroup is nil')
-            else LOG('iMergePositionGroup='..iMergePositionGroup) end
+        elseif sPathingType == nil then
+            M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..':'..sFunctionRef..': sPathingType is nil')
             return tCurPos
         else
-            if iMergePositionGroup == iSegmentGroup then tMergePosition[2] = GetTerrainHeight(tMergePosition[1], tMergePosition[3]) end
-            return tMergePosition
+            local iSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iCurSegmentX, iCurSegmentZ)
+            local iMergePositionGroup, iMergeSegmentX, iMergeSegmentZ
+            local tMergePosition = {}
+            local iAttemptCount = 0
+            local iDistanceMod = 0
+            local iDistanceCount = 0
+            local iXSign = 1
+            local iZSign = 1
+            if bDebugMessages == true then LOG('oPathingUnit='..oPathingUnit:GetUnitId()..' sPathingType='..sPathingType..'; iCurSegmentXZ='..iCurSegmentX..'-'..iCurSegmentZ) end
+            if iSegmentGroup == nil then
+                M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..': GetMergeLocation: iSegmentGroup is nil')
+                if oPathingUnit == nil then LOG('oPathingUnilt is nil')
+                else
+                    if iCurSegmentX == nil then LOG('iCurSegmentX is nil')
+                    else LOG('iCurSegmentX='..iCurSegmentX..'; iCurSegmentZ='..iCurSegmentZ)
+                    end
+                end
+                return tCurPos
+            end
+            local bNearbySegmentsSameGroup = false
+            local iNearbySegmentSize = 1
+            local iPlatoonUnits = oPlatoonToMergeInto[refiCurrentUnits]
+            iNearbySegmentSize = math.ceil( iPlatoonUnits / 10)
+            if iNearbySegmentSize >= 5 then iNearbySegmentSize = 5 end
+            local iSegmentStart = -iNearbySegmentSize
+            local iSegmentEnd = iNearbySegmentSize
+            local iCount = 0
+            while bNearbySegmentsSameGroup == false do
+                iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
+                --Modify position so are cycling between 4 corners of a square around the position that steadily increases in size
+                if iAttemptCount == 0 then iDistanceMod = 0
+                else
+                    iDistanceCount = iDistanceCount + 1
+                    if iDistanceMod == 0 then iDistanceMod = 1 end
+                    if iDistanceCount > 4 then
+                        iDistanceCount = 0
+                        iDistanceMod = iDistanceMod * 2.
+                    end
+                    if iDistanceCount == 1 then iXSign = 1 iZSign = 1
+                    elseif iDistanceCount == 2 then iXSign = 1 iZSign = -1
+                    elseif iDistanceCount == 3 then iXSign = -1 iZSign = 1
+                    elseif iDistanceCount == 4 then iXSign = -1 iZSign = -1 end
+                end
+                tMergePosition = {tBaseMergePosition[1] + iDistanceMod * iXSign, 0, tBaseMergePosition[3] + iDistanceMod * iZSign}
+                iMergeSegmentX, iMergeSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMergePosition)
+                iMergePositionGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iMergeSegmentX, iMergeSegmentZ)
+                iAttemptCount = iAttemptCount + 1
+                if bDebugMessages == true then M27Utilities.DrawLocation(tMergePosition) end
+
+                if iMergePositionGroup == iSegmentGroup then
+                    --Are the nearby segments the same group?
+                    bNearbySegmentsSameGroup = true
+                    --Cycle from -1 to +1 segments (or -x/+x for larger platoon)
+                    for iXMod = iSegmentStart, iSegmentEnd do
+                        for iZMod = iSegmentStart, iSegmentEnd do
+                            if not(M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iMergeSegmentX + iXMod, iMergeSegmentZ + iZMod) == iSegmentGroup) then bNearbySegmentsSameGroup = false break end
+                        end
+                        if bNearbySegmentsSameGroup == false then break end
+                    end
+                end
+                if iAttemptCount > 32 then return nil end --Infinite loop protection
+            end
+            if tMergePosition[1] == nil or tMergePosition[3] == nil then
+                M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..': GetMergeLocation: tMergePosition is nil')
+                if iMergePositionGroup == nil then LOG('iMergePositionGroup is nil')
+                else LOG('iMergePositionGroup='..iMergePositionGroup) end
+                return tCurPos
+            else
+                if iMergePositionGroup == iSegmentGroup then tMergePosition[2] = GetTerrainHeight(tMergePosition[1], tMergePosition[3]) end
+                return tMergePosition
+            end
         end
     end
 end
@@ -3298,10 +3300,11 @@ function GetACUUpgradeWanted(aiBrain, oACU)
         --Get gun upgrade
         for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
             if bDebugMessages == true then LOG(sFunctionRef..': sEnhancement='..sEnhancement..'; tEnhancement='..repr(tEnhancement)) end
-            for iGunEnhancement, sGunEnhancement in M27Conditions.tGunUpgrades do
-                if sEnhancement == sGunEnhancement then
-                    return sEnhancement
-
+            if M27UnitInfo.GetUnitFaction(oACU) == M27UnitInfo.refFactionAeon and not(oACU:HasEnhancement('CrysalisBeam')) then return 'CrysalisBeam' else
+                for iGunEnhancement, sGunEnhancement in M27Conditions.tGunUpgrades do
+                    if sEnhancement == sGunEnhancement and not(oACU:HasEnhancement(sGunEnhancement)) then
+                        return sEnhancement
+                    end
                 end
             end
         end
@@ -5958,11 +5961,19 @@ function ProcessPlatoonAction(oPlatoon)
                         LOG(sFunctionRef..': Have a reclaim target, mass on reclaim='..iReclaim)
                     end
                     --Will have already determined reclaim target as part of the check whether to reclaim (for efficiency)
-                    if oPlatoon[reftReclaimers] and oPlatoon[refoNearbyReclaimTarget] and GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, true, true) > 0 then
+                    if oPlatoon[reftReclaimers] and oPlatoon[refoNearbyReclaimTarget] and M27Utilities.IsTableEmpty(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true)) == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..' about to issue reclaim target') end
                         if bDontClearActions == false then IssueClearCommands(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true)) end
                         IssueReclaim(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), oPlatoon[refoNearbyReclaimTarget])
-                    else M27Utilities.ErrorHandler(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': the object to be reclaim doesnt exist')
+                    else
+                        if M27Utilities.IsTableEmpty(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true)) == true then
+                            --Aborted due to units being busy on micro
+                        else
+                            M27Utilities.ErrorHandler(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': the object to be reclaim doesnt exist or we dont have reclaimers in the platoon')
+                            if oPlatoon[reftReclaimers] then LOG('tReclaimers is valid') end
+                            if oPlatoon[refoNearbyReclaimTarget] then LOG('Reclaim target is valid') end
+                            LOG('Size of tReclaimers='..GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, true, true))
+                        end
                     end
                     --Add move command so unit wont stay idle
                     IssueMove(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])

@@ -3,7 +3,7 @@ local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27EngineerTryReclaimCaptureArea = EngineerTryReclaimCaptureArea
 function EngineerTryReclaimCaptureArea(aiBrain, eng, pos, iAreaSize)
     --Reclaims only if within iAreaSize (defaults to size of 1) - although called iAreaSize, it will be based on rectangle, i.e. see if both x and Z co=-ordinates are within iAreaSize of the pos
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if aiBrain.M27AI == false then
         M27EngineerTryReclaimCaptureArea(aiBrain, eng, pos)
     else
@@ -68,7 +68,7 @@ function AIEngineersAssistFactories(aiBrain, engineers, factories)
     if aiBrain.M27AI == false then
         M27AIEngineersAssistFactories(aiBrain, engineers, factories)
     else
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'AIEngineersAssistFactories'
         if bDebugMessages == true then LOG(sFunctionRef..':Start of code') end
         local factoryData = {}

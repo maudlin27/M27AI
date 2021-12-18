@@ -1331,6 +1331,11 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     if bBetterIfNoReclaim == nil then bBetterIfNoReclaim = false end
     if bLookForQueuedBuildings == nil then bLookForQueuedBuildings = true end
 
+    if sTargetBuildingBPID == nil then
+        M27Utilities.ErrorHandler('Not specified sTargetBuildingBPID; sNewBuildingBPID='..tostring(sNewBuildingBPID)..'; will return nil')
+        return nil
+    end
+
     local bDontBuildByMex = true
     if EntityCategoryContains(categories.MASSEXTRACTION, sTargetBuildingBPID) then bDontBuildByMex = false end
     if bDebugMessages == true then LOG(sFunctionRef..': sNewBuildingBPID='..sNewBuildingBPID..'; sTargetBuildingBPID='..sTargetBuildingBPID..'; tablePosTarget='..repr(tablePosTarget)) end

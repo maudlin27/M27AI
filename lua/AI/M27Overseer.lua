@@ -869,8 +869,8 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
     if M27Utilities.IsTableEmpty(tAllScouts) == false then iScouts = table.getn(tAllScouts) end
     if iScouts >= 25 then
         local iNonScouts = aiBrain:GetCurrentUnits(categories.MOBILE * categories.LAND - categories.SCOUT)
-        if iScouts > 50 then
-            LOG('Have 50 scouts, seems higher than would expect so enabling logs')
+        if iScouts > 80 then
+            LOG('Have 80 scouts, seems higher than would expect so enabling logs')
             bDebugMessages = true --For error identification
         end
         if iScouts > iNonScouts or iScouts >= 100 then
@@ -2265,8 +2265,17 @@ function ThreatAssessAndRespond(aiBrain)
                                 if bDebugMessages == true then LOG(sFunctionRef..': ACU has gun upgrade so dont want it to help as it should be attacking') end
                                 bGetACUHelp = false end
                         end
+                        --Check ACU doesnt have nearby enemies
+                        if bGetACUHelp == true then
+                            if oACU.PlatoonHandle and oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0 then
+                                local iEnemySearchRange = math.max(22, M27Logic.GetUnitMaxGroundRange({oACU}))
+                                local tEnemiesNearACU = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, oACU:GetPosition(), iEnemySearchRange, 'Enemy')
+                                if M27Utilities.IsTableEmpty(tEnemiesNearACU) == false then bGetACUHelp = false end
+                            end
+                        end
 
-                        oACU[refbACUHelpWanted] = bGetACUHelp
+
+                            oACU[refbACUHelpWanted] = bGetACUHelp
                         if bGetACUHelp == true then
                             --Check if ACU not already in a defender platoon:
                             sACUPlan = DebugPrintACUPlatoon(aiBrain, true)
@@ -3005,7 +3014,7 @@ function ACUManager(aiBrain)
             else oNewPlatoon = oACUPlatoon
             end
 
-            if not(oNewPlatoon[M27PlatoonUtilities.reftMovementPath][1] == M27MapInfo.PlayerStartPoints[iPlayerStartNumber]) then
+            if not(oNewPlatoon[M27PlatoonUtilities.reftMovementPath][1] == M27MapInfo.PlayerStartPoints[aiBrain.M27StartPosition]) then
                 oNewPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReturnToBase
                 if bDebugMessages == true then LOG(sFunctionRef..': Forcing action refresh') end
                 M27PlatoonUtilities.ForceActionRefresh(oNewPlatoon, 5)

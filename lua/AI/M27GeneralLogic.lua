@@ -2512,7 +2512,7 @@ function GetDirectFireWeaponPosition(oFiringUnit)
 end
 
 function IsLineBlocked(tShotStartPosition, tShotEndPosition)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLineBlocked'
     local bShotIsBlocked = false
     local iFlatDistance = M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition)
@@ -2524,6 +2524,7 @@ function IsLineBlocked(tShotStartPosition, tShotEndPosition)
         for iPointToTarget = 1, math.floor(iFlatDistance) do
             --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
             tTerrainPositionAtPoint = M27Utilities.MoveTowardsTarget(tShotStartPosition, tShotEndPosition, iPointToTarget, 0)
+            if bDebugMessages == true then LOG(sFunctionRef..': iPointToTarget='..iPointToTarget..'; tTerrainPositionAtPoint='..repr(tTerrainPositionAtPoint)) end
             iShotHeightAtPoint = math.tan(iAngle) * iPointToTarget + tShotStartPosition[2]
             if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
                 if bDebugMessages == true then LOG(sFunctionRef..': Shot blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
@@ -2535,6 +2536,7 @@ function IsLineBlocked(tShotStartPosition, tShotEndPosition)
         end
     else bShotIsBlocked = false
     end
+    return bShotIsBlocked
 end
 
 --NOTE: Use IsLineBlocked if have positions instead of units
@@ -2630,7 +2632,7 @@ function IssueDelayedMove(tUnits, tTarget, iDelay)
 end
 
 function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetUnderShield'
     --Determines if target is under a shield
     if bIgnoreMobileShield == nil then bIgnoreMobileShield = false end

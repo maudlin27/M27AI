@@ -85,8 +85,10 @@ refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * 
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
 refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
 refCategoryGroundExperimental = categories.LAND * categories.EXPERIMENTAL + categories.STRUCTURE * categories.EXPERIMENTAL
-refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD
-refCategoryPersonalShield = categories.PERSONALSHIELD
+--Obsidian special case with shields due to inconsistent categories:
+refCategoryObsidian = categories.AEON * categories.TECH2 * categories.SHIELD * categories.DIRECTFIRE * categories.MOBILE * categories.LAND * categories.TANK --
+refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD - refCategoryObsidian --Miscategorised obsidian tank
+refCategoryPersonalShield = categories.PERSONALSHIELD + refCategoryObsidian
 
 --Air units
 refCategoryAirScout = categories.AIR * categories.SCOUT
@@ -163,6 +165,7 @@ function GetBlueprintFromID(sBlueprintID)
 end
 
 function GetUnitFaction(oUnit)
+    ----1: UEF, 2: Aeon, 3: Cybran, 4: Seraphim, 5: Nomads, 6 = not recognised
     return GetFactionFromBP(oUnit:GetBlueprint())
 end
 
@@ -190,7 +193,7 @@ function GetUnitPathingType(oUnit)
         else return refPathingTypeNone
         end
     else
-        ErrorHandler('oUnit is nil or doesnt have a GetBlueprint function')
+        M27Utilities.ErrorHandler('oUnit is nil or doesnt have a GetBlueprint function')
     end
 end
 
@@ -253,7 +256,7 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
         if not(sUpgradeBP) then
             local oFactoryBP = oUnitToUpgrade:GetBlueprint()
             sUpgradeBP = oFactoryBP.General.UpgradesTo
-            if not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then sUpgradeBP = nil end
+            if not(sUpgradeBP) or not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then sUpgradeBP = nil end
             if bDebugMessages == true then LOG(sFunctionRef..': Didnt have valid support factory to upgrade to; blueprint UpgradesTo='..(sUpgradeBP or 'nil')) end
         end
         if sUpgradeBP == '' then

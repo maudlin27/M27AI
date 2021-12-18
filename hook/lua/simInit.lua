@@ -9,7 +9,7 @@ local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 
 local M27OnCreateArmyBrain = OnCreateArmyBrain
 function OnCreateArmyBrain(index, brain, name, nickname)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnCreateArmyBrain'
     if bDebugMessages == true then LOG(sFunctionRef..': name='..name..'; nickname='..nickname..'; index='..index) end
     M27Overseer.AllAIBrainsBackup[index] = brain
