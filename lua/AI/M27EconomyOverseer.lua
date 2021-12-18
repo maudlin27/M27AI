@@ -283,7 +283,7 @@ end
 function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     --Looks for the nearest non-upgrading unit of iunitcategory to tStartPoint
     --Returns nil if cant find one
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
     --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
@@ -769,7 +769,7 @@ function RefreshEconomyData(aiBrain)
 end
 
 function UpgradeManager(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
     --if GetGameTimeSeconds() > 837 then bDebugMessages = true end
 

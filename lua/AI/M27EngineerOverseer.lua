@@ -3332,7 +3332,10 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
                     end
                 elseif iCurrentConditionToTry == 20 then
-                    if bHaveLowPower == false then
+                    if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
+                    if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
+
+                    if bHaveLowPower == false and iMassStored > 800 and iMassStoredRatio >= 0.5 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 750 then --7.5k net energy income
                         iActionToAssign = refActionBuildSecondPower
                         iSearchRangeForNearestEngi = 100
                         iMaxEngisWanted = 10

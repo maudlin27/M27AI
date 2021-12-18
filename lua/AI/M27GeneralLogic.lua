@@ -1940,7 +1940,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
     local iMassValueOfClaimedMex = 20
     local iMinDistanceAwayFromStart = 40 --Wont consider moving to a new expansion point unless its >= this distance away
     local iMinDistanceAwayFromUnit = 40 --Wont consider moving to a new expansion point unless its >= this distance away from unit unless its reclaim
-    local iMinDistanceAwayForReclaim = 5
+    local iMinDistanceAwayForReclaim = 10
     --If ACU was called away to defend then may want to pick a final destination closer to the ACU:
     if aiBrain[M27Overseer.refbACUWasDefending] == true then
         if bDebugMessages == true then LOG(sFunctionRef..': ACU was previously defending, so reducing mindistancefromunit') end
@@ -1969,6 +1969,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
     local iPlayerStartPoint = aiBrain.M27StartPositionNumber
     local iEnemyStartPoint = GetNearestEnemyStartNumber(aiBrain)
     local iMaxDistanceFromEnemy, iMaxDistanceFromStart, iMinDistanceFromStart, iMinDistanceFromEnemy, iCurDistanceFromUnit, bIsFarEnoughFromStart
+    local tCurPosition = oPathingUnit:GetPosition()
 
     if iEnemyStartPoint == nil then
         LOG(sFunctionRef..': ERROR unless enemy is dead - iEnemyStartPoint is nil; returning our start position')
@@ -2015,20 +2016,24 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                         --Check its far enough away from our start (as dont want ACU running behind its base at the start of the game)
                         if bDebugMessages == true then LOG(sFunctionRef..': Reclaim location='..repr(tFinalDestination)..'; checking how far it is from player start') end
                         if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.PlayerStartPoints[iPlayerStartPoint]) <= iMinDistanceAwayFromStart then
-                            --Its close to our base, so only consider if we could use the mass and its closer to enemy than us
-                            if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, checking if we have enough available storage') end
-                            local iStorageRatio = aiBrain:GetEconomyStoredRatio('MASS')
-                            if iStorageRatio == 0 then
-                                bHaveFinalDestination = true
-                            else
-                                local iSpareStorage = (1 - iStorageRatio) * aiBrain:GetEconomyStored('MASS')
-                                if iSpareStorage >= 100 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, and we have enough storage, checking its closer to enemy than ACU') end
-                                    if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.PlayerStartPoints[iEnemyStartPoint]) <= M27Utilities.GetDistanceBetweenPositions(tUnitPos, M27MapInfo.PlayerStartPoints[iEnemyStartPoint]) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, but closer to enemy than us, so choosing it as final destination') end
-                                        bHaveFinalDestination = true
+                            if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, tCurPosition) >= iMinDistanceAwayForReclaim then
+                                --Its close to our base, so only consider if we could use the mass and its closer to enemy than us
+                                if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, checking if we have enough available storage') end
+                                local iStorageRatio = aiBrain:GetEconomyStoredRatio('MASS')
+                                if iStorageRatio == 0 then
+                                    bHaveFinalDestination = true
+                                else
+                                    local iSpareStorage = (1 - iStorageRatio) * aiBrain:GetEconomyStored('MASS')
+                                    if iSpareStorage >= 100 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, and we have enough storage, checking its closer to enemy than ACU') end
+                                        if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.PlayerStartPoints[iEnemyStartPoint]) <= M27Utilities.GetDistanceBetweenPositions(tUnitPos, M27MapInfo.PlayerStartPoints[iEnemyStartPoint]) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, but closer to enemy than us, so choosing it as final destination') end
+                                            bHaveFinalDestination = true
+                                        end
                                     end
                                 end
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': Location is too close to current position') end
                             end
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is far enough from our start, choosing it as final destination') end
