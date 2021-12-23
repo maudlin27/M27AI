@@ -109,6 +109,9 @@ refCategoryCruiserCarrier = categories.NAVAL * categories.CRUISER + categories.N
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL
 
+--Antinavy mobile units (can include land units - e.g for land factories to build antisub units)
+refCategoryAntiNavy = categories.ANTINAVY * categories.STRUCTURE + categories.ANTINAVY * categories.MOBILE --for some reason get error message if just use antinavy, so need to be more restrictive
+
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, categories.STRUCTURE}

@@ -3307,6 +3307,17 @@ function SetMaximumFactoryLevels(aiBrain)
     local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(1, aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]) + aiBrain[M27AirOverseer.refiBombersWanted] + iTorpBomberShortfall
     aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4) / 5))
     if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
+
+    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then
+        --Just build air factories if we have mass (assuming we have enough energy)
+        aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
+        if aiBrain:GetEconomyStoredRatio('MASS') > 0.1 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 1 then
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = iAirFactoriesOwned + 1
+        else
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, iAirFactoriesOwned)
+        end
+        aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+    end
 end
 
 function DetermineInitialBuildOrder(aiBrain)

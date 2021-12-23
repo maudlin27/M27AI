@@ -685,8 +685,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have a bomber or torp bomber, will check its targets; refbOnAssignment pre check='..tostring(oUnit[refbOnAssignment])) end
                                 UpdateBomberTargets(oUnit)
                                 if oUnit[refbOnAssignment] == false then bUnitIsUnassigned = true end
-                                if bDebugMessages == true then LOG(sFunctionRef..': refbOnAssignment post check='..tostring(oUnit[refbOnAssignment])) end
-                            elseif iUnitType == iTypeAirAA then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbOnAssignment post check='..tostring(oUnit[refbOnAssignment])) end                            elseif iUnitType == iTypeAirAA then
                                 bClearAirAATargets = false
                                 bReturnToBase = false
                                 if oUnit[refoAirAATarget] == nil or oUnit[refoAirAATarget].Dead then
@@ -773,7 +772,10 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is dead or not constructed') end
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished getting all units with type ref='..sAvailableUnitRef..'; size of available unit ref table='..table.getn(aiBrain[sAvailableUnitRef])) end
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Finished getting all units with type ref='..sAvailableUnitRef..'; size of available unit ref table='..table.getn(aiBrain[sAvailableUnitRef]))
+                LOG('IsAvailableTorpBombersEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers])))
+            end
         end
     end
 end
@@ -1633,6 +1635,7 @@ function AirBomberManager(aiBrain)
     local iMaxTargetsForBomber = 4 --Dont want a bomber to have more than this queued as likely it will die so we want other bombers to try and target beyond this number
     if aiBrain[refbShortlistContainsLowPriorityTargets] == true then iMaxTargetsForBomber = 1 end --Dont want to issue low priority targets unless bomber is idle
     local iSpareBombers = -1
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code; IsAvailableTorpBombersEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers]))) end
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableBombers]) == false then
         if bDebugMessages == true then LOG(sFunctionRef..': have available bombers, total number='..table.getn(aiBrain[reftAvailableBombers])) end
         --Record bomber target list
@@ -1762,12 +1765,16 @@ function AirBomberManager(aiBrain)
     end
 
     --Special logic to manually make torp bombers target underwater ACU if we're in ACU snipe mode (normally torp bombers are assigned by threat overseer)
-    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27Utilities.IsTableEmpty[aiBrain[reftAvailableTorpBombers]] == false and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) then
+    if bDebugMessages == true then LOG(sFunctionRef..': Strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers)]='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers]))..'; M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])='..tostring(M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]))) end
+    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers]) == false and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) then
+        if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through available bombers') end
         for iTorpBomber, oTorpBomber in aiBrain[reftAvailableTorpBombers] do
             UpdateBomberTargets(oTorpBomber)
+            if bDebugMessages == true then LOG(sFunctionRef..': Torp bomber LC='..M27UnitInfo.GetUnitLifetimeCount(oTorpBomber)..'; CurTargetNumber='..(oTorpBomber[refiCurTargetNumber] or 'nil')) end
             if oTorpBomber[refiCurTargetNumber] == nil or oTorpBomber[refiCurTargetNumber] == 0 then
                 TrackBomberTarget(oTorpBomber, aiBrain[M27Overseer.refoLastNearestACU])
                 IssueAttack({oTorpBomber}, aiBrain[M27Overseer.refoLastNearestACU])
+                if bDebugMessages == true then LOG(sFunctionRef..': Told torp bomber to attack ACU') end
             end
         end
     end
@@ -2009,9 +2016,11 @@ function AirLogicMainLoop(aiBrain, iCycleCount)
     if bDebugMessages == true then
         LOG(sFunctionRef..': about to show how many available bombers we have')
         if aiBrain[reftAvailableBombers] then LOG('Size of table='..table.getn(aiBrain[reftAvailableBombers])) end
+        LOG(sFunctionRef..': Post recording available units, IsAvailableTorpBombersEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers])))
     end
     ForkThread(AirThreatChecker,aiBrain)
     ForkThread(AirScoutManager,aiBrain)
+    if bDebugMessages == true then LOG(sFunctionRef..': Pre air bomber manager; IsAvailableTorpBombersEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers]))) end
     ForkThread(AirBomberManager,aiBrain)
     ForkThread(AirAAManager,aiBrain)
 

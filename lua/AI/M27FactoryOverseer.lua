@@ -638,16 +638,30 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
                         bGetFastest = true
                         if bDebugMessages == true then LOG(sFunctionRef..': Are doing ACUKill strategy, decide what to build') end
-                        if iCurrentConditionToTry == 1 then
+                        if iCurrentConditionToTry == 1 then --Antinavy because enemy ACU is underwater
+                            if aiBrain[M27Overseer.refoLastNearestACU] and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) then
+                                iCategoryToBuild = M27UnitInfo.refCategoryAntiNavy
+                                iTotalWanted = 1000
+                            end
+                        elseif iCurrentConditionToTry == 2 then --Amphibious if cant path with land to enemy base or ACU
                             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then
                                 iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat
                                 iTotalWanted = 1000
                             else
-                                if bDebugMessages == true then LOG(sFunctionRef..': Will build attack bots') end
-                                iCategoryToBuild = M27UnitInfo.refCategoryLandCombat
-                                iTotalWanted = 1000
+                                --Can we path to ACU with amphib but not with land?
+                                --GetSegmentGroupOfLocation(sPathing, tLocation)
+                                local iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
+                                local iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+                                local iEnemyACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
+                                local iEnemyACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+
+                                if not(iOurBaseLandGroup == iEnemyACULandGroup) and iOurBaseAmphibGroup == iEnemyACUAmphibGroup then
+                                    iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat
+                                    iTotalWanted = 1000
+                                end
                             end
-                        elseif iCurrentConditionToTry == 2 then
+                        elseif iCurrentConditionToTry == 3 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will build normal land combat') end
                             iCategoryToBuild = M27UnitInfo.refCategoryLandCombat
                             iTotalWanted = 1000
                         else

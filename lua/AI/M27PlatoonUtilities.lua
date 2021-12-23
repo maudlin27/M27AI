@@ -770,6 +770,7 @@ function GetMergeLocation(oPlatoonToMergeInto, iPercentOfWayToDestination)
     else iDistanceFactor = iPercentOfWayToDestination end
     local tCurPos = GetPlatoonFrontPosition(oPlatoonToMergeInto)
     local tTargetPos = oPlatoonToMergeInto[reftMovementPath][1]
+
     if bDebugMessages == true then LOG('about to get merge location; platoon to merge into='..oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..'; Position of platoon to merge into='..repr(tCurPos)..' platoontomergeinto movement path='..repr(oPlatoonToMergeInto[reftMovementPath])) end
     local tBaseMergePosition = {}
     for iAxis = 1, 3 do
@@ -3415,6 +3416,10 @@ function RetreatToMobileShields(oPlatoon)
         local iDistanceToShieldHelper = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), GetPlatoonFrontPosition(oPlatoon[refoSupportingShieldPlatoon]))
         if iDistanceToShieldHelper > 50 then
             oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
+            if M27Utilities.IsTableEmpty(oPlatoon[refoSupportingShieldPlatoon][reftMovementPath][1]) == true then
+                oPlatoon[refoSupportingShieldPlatoon][reftMovementPath] = {}
+                oPlatoon[refoSupportingShieldPlatoon][reftMovementPath][1] = GetPlatoonFrontPosition(oPlatoon)
+            end
             oPlatoon[reftTemporaryMoveTarget] = GetMergeLocation(oPlatoon[refoSupportingShieldPlatoon], 0.5)
         end
     end
@@ -3429,7 +3434,6 @@ function DeterminePlatoonAction(oPlatoon)
         local aiBrain = oPlatoon[refoBrain]
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
             local sPlatoonName = oPlatoon:GetPlan()
-            if sPlatoonName == 'M27IntelPathAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
@@ -4035,7 +4039,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     local bPlatoonNameDisplay = false
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
-    if sPlatoonName == 'M27IntelPathAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
+
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -4311,7 +4315,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions)
     local bPlatoonNameDisplay = false
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
-    if sPlatoonName == 'M27IntelPathAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
+
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -5189,7 +5193,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
     local sFunctionRef = 'RefreshSupportPlatoonMovementPath'
     --if oPlatoon:GetPlan() == 'M27MAAAssister' then bDebugMessages = true end
     local sPlatoonName = oPlatoon:GetPlan()
-    if sPlatoonName == 'M27IntelPathAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
+
     local sPlatoonRef = sPlatoonName..oPlatoon[refiPlatoonCount]
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -5459,7 +5463,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            if sPlatoonName == 'M27IntelPathAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
+
             --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
@@ -5667,7 +5671,6 @@ function ProcessPlatoonAction(oPlatoon)
                     end
 
                 elseif oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionTemporaryRetreat then
-                    bDebugMessages = true
                     local bTemporaryRetreat = false
                     if oPlatoon[refiCurrentAction] == refActionTemporaryRetreat then bTemporaryRetreat = true end
                     if bPlatoonNameDisplay == true then
