@@ -14,6 +14,9 @@ tGunUpgrades = { 'HeavyAntiMatterCannon',
                        'CoolingUpgrade',
                        'RateOfFire'
 }
+tBigGunUpgrades = { 'MicrowaveLaserGenerator',
+                    'BlastAttack'
+}
 
 function SafeToUpgradeUnit(oUnit)
     --Intended e.g. for mexes to decide whether to upgrade
@@ -263,12 +266,28 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                 local iNetEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]
                 if bDebugMessages == true then LOG(sFunctionRef..': iNetEnergyIncome='..iNetEnergyIncome..'; iEnergyWanted='..iEnergyWanted) end
                 if iNetEnergyIncome > iEnergyWanted then
-                    --Have enough energy, check if safe to get upgrade
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy, check its safe to get upgrade') end
-                    bSafeToGetUpgrade = SafeToGetACUUpgrade(aiBrain)
-                    if bSafeToGetUpgrade then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Its safe to get upgrade') end
-                        bWantUpgrade = true
+                    --Do we have enough mass? Want this to represent <10% of our total mass income
+                    local iUpgradeMassCost = oBP.Enhancements[sUpgradeRef].BuildCostMass
+                    local iMassIncomePerTickWanted = iUpgradeMassCost / iUpgradeBuildTime * iACUBuildRate
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if enough mass income to get upgrade; iMassIncomePerTickWanted='..iMassIncomePerTickWanted..'; iUpgradeMassCost='..iUpgradeMassCost..'; iUpgradeBuildTime='..iUpgradeBuildTime..'; iACUBuildRate='..iACUBuildRate..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; aiBrain:GetEconomyStored(MASS)='..aiBrain:GetEconomyStored('MASS')) end
+                    if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= iMassIncomePerTickWanted and aiBrain:GetEconomyStored('MASS') >= 5 then --check we're not massively mass stalling
+                        --Have enough energy, check if safe to get upgrade
+                        local bAbort = false
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy and mass, check its safe to get upgrade') end
+                        --Dont treat as being safe if trying to get a slow upgrade and arent on our side of map
+                        if (iUpgradeBuildTime / iACUBuildRate) > 150 then --If will take a while then need to be closer to our base than enemy
+                            local iDistToStart = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                            if iDistToStart + 75 > iDistToEnemy then bAbort = true end
+                        end
+                        if bAbort then bSafeToGetUpgrade = false
+                        else
+                            bSafeToGetUpgrade = SafeToGetACUUpgrade(aiBrain)
+                        end
+                        if bSafeToGetUpgrade then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Its safe to get upgrade') end
+                            bWantUpgrade = true
+                        end
                     end
                 end
             else
@@ -277,6 +296,15 @@ function WantToGetAnotherACUUpgrade(aiBrain)
         end
     end
     return bWantUpgrade, bSafeToGetUpgrade
+end
+
+function HaveLowMass(aiBrain)
+    local bHaveLowMass = false
+    local iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
+    if iMassStoredRatio < 0.03 then bHaveLowMass = true
+    elseif (iMassStoredRatio < 0.1 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0 then bHaveLowMass = true
+    end
+    return bHaveLowMass
 end
 
 function WantMoreMAA(aiBrain, iMassOnMAAVsEnemyAir)
@@ -314,6 +342,19 @@ function WantMoreMAA(aiBrain, iMassOnMAAVsEnemyAir)
             end
         end
     end
+end
+
+function DoesACUHaveBigGun(aiBrain, oAltACU)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'DoesACUHaveBigGun'
+    local oACU = oAltACU
+    if oACU == nil then oACU = M27Utilities.GetACU(aiBrain) end
+    for iUpgrade, sUpgrade in tGunUpgrades do
+        if oACU:HasEnhancement(sUpgrade) then
+            return true
+        end
+    end
+    return false
 end
 
 function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)

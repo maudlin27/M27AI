@@ -23,7 +23,7 @@ refbShieldIsDisabled = 'M27UnitShieldDisabled'
 refbSpecialMicroActive = 'M27UnitSpecialMicroActive' --e.g. if dodging bombers
 refiGameTimeToResetMicroActive = 'M27UnitGameTimeToResetMicro'
 refiGameTimeMicroStarted = 'M27UnitGameTimeMicroStarted'
-
+refbOverchargeOrderGiven = 'M27UnitOverchargeOrderGiven'
 
 --Factions
 refFactionUEF = 1
@@ -63,6 +63,7 @@ refCategoryAllFactories = refCategoryLandFactory + refCategoryAirFactory + refCa
 
 --Building - defensive
 refCategoryT2PlusPD = categories.STRUCTURE * categories.DIRECTFIRE - categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH1
+refCategoryPD = categories.STRUCTURE * categories.DIRECTFIRE
 refCategoryTMD = categories.ANTIMISSILE - categories.SILO * categories.TECH3 --Not perfect but should pick up most TMD without picking up SMD
 refCategoryFixedShield = categories.SHIELD * categories.STRUCTURE
 refCategoryFixedT2Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH2
@@ -107,6 +108,11 @@ refCategoryAllNavy = categories.NAVAL
 refCategoryCruiserCarrier = categories.NAVAL * categories.CRUISER + categories.NAVAL * categories.NAVALCARRIER
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL
+
+
+--Weapon target priorities
+refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, categories.STRUCTURE}
+refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, categories.STRUCTURE}
 
 function GetUnitLifetimeCount(oUnit)
     local sCount = oUnit.M27LifetimeUnitCount
@@ -259,13 +265,14 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
         if not(sUpgradeBP) then
             local oFactoryBP = oUnitToUpgrade:GetBlueprint()
             sUpgradeBP = oFactoryBP.General.UpgradesTo
+            if bDebugMessages == true then LOG(sFunctionRef..': sUpgradeBP='..(sUpgradeBP or 'nil')) end
             if not(sUpgradeBP) or not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then sUpgradeBP = nil end
             if bDebugMessages == true then LOG(sFunctionRef..': Didnt have valid support factory to upgrade to; blueprint UpgradesTo='..(sUpgradeBP or 'nil')) end
         end
         if sUpgradeBP == '' then
             sUpgradeBP = nil
             if bDebugMessages == true then LOG(sFunctionRef..': Have no blueprint to upgrade to') end
-        elseif bDebugMessages == true then LOG(sFunctionRef..': Returning sUpgradeBP'..sUpgradeBP)
+        elseif bDebugMessages == true then LOG(sFunctionRef..': Returning sUpgradeBP'..(sUpgradeBP or 'nil'))
         end
     end
 
@@ -404,4 +411,18 @@ end
 function GetUnitFacingAngle(oUnit)
     --0/360 = north, 90 = west, 180 = south, 270 = east
     return 180 - oUnit:GetHeading() / math.pi * 180
+end
+
+function IsUnitValid(oUnit)
+    --Returns true if unit is constructed and not dead
+    if not(oUnit.GetUnitId) or oUnit.Dead or not(oUnit.GetFractionComplete) or oUnit:GetFractionComplete() < 1 or not(oUnit.GetBlueprint) then return false else return true end
+end
+
+function SetUnitTargetPriorities(oUnit, tPriorityTable)
+    if IsUnitValid(oUnit) then
+        for i =1, oUnit:GetWeaponCount() do
+            local wep = oUnit:GetWeapon(i)
+            wep:SetWeaponPriorities(tPriorityTable)
+        end
+    end
 end

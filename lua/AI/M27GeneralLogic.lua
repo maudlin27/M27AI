@@ -2781,3 +2781,47 @@ function GetNearestRallyPoint(aiBrain, tPosition)
     end
     return tNearestMex
 end
+
+function GetPositionToSideOfTarget(oUnit, tTargetLocation, iBaseAngleToTarget, iDistanceToMove)
+    --Copy of comments from platoonutilities (in case need to refer to later)
+    --[[
+                        If our ACU angle is 0 (enemy ACU is north of us):
+                            -If a platoon angle is between 1 and 179 to enemy ACU then they're to the left, and want the end posiion to be to the left (so 270 degrees from base position)
+                            -If a platoon angle is between 181 and 359 then they're to the right, and want end position to be to the right (so 90 degrees from base position)
+                        If our ACU angle is 90 (enemy ACU is to the right of us): Want to split between units above, and units below us
+                            --	If a platoon angle is between 91 and 269 then theyre above, if between 271 and 89 theyre below
+                        --If our ACU angle is 135 (enemy ACU is south-east of our ACU):
+                             Want to split between units based on a threshold of 135
+                         If our ACU angle is 359 then want platoon angle between 0-178 to go in direction 269; and 179-358 to go 89 degrees from base position
+                         --]]
+
+    --local iDestinationAngleOffset = iOurACUAngleToTarget + 90
+    --local iInverseThresholdAngleUpper = iOurACUAngleToTarget + 180
+
+    --Rework all numbers based on ACU angle of 360 so my head hurts less trying to do the simple maths...
+
+    --E.g.: tTargetLocation is the position of our ACU; iBaseAngleToTarget is the angle of our ACU to the enemy ACU; our ACU is trying to get enemy ACU, which is north-east (45 degrees):
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetPositionToSideOfTarget'
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code: tTargetLocation='..repr(tTargetLocation)..'; oUnit:GetPosition()='..repr(oUnit:GetPosition())..'; iBaseAngleToTarget='..iBaseAngleToTarget..'; iDistanceToMove='..iDistanceToMove) end
+    local iOurACUAngleToTarget = iBaseAngleToTarget
+    local iPreRebasingAngleToMove
+    local iTempRebasingAdjust = 360 - iOurACUAngleToTarget --=315 in this example
+
+    --e.g. We have a platoon which is behind our ACU, and for which our ACU is east (90 degrees)
+    local iPlatoonAngleToTarget = M27Utilities.GetAngleFromAToB(oUnit:GetPosition(), tTargetLocation) --90 degrees in this example
+    if bDebugMessages == true then LOG(sFunctionRef..': iPlatoonAngleToTarget='..iPlatoonAngleToTarget..'; iTempRebasingAdjust='..iTempRebasingAdjust) end
+    local iPlatoonAnglePostRebasing = iPlatoonAngleToTarget + iTempRebasingAdjust --405 in this eg
+    if iPlatoonAnglePostRebasing > 360 then iPlatoonAnglePostRebasing = iPlatoonAnglePostRebasing - 360 end --45 in this eg
+
+    if iPlatoonAnglePostRebasing < 180 then
+        iPreRebasingAngleToMove = 270 --270 in this eg
+    else iPreRebasingAngleToMove = 90 end
+
+
+    --Rebase all numbers now
+    local iPostRebasingAngleToMove = iPreRebasingAngleToMove - iTempRebasingAdjust -- -45 in this eg
+    if iPostRebasingAngleToMove < 0 then iPostRebasingAngleToMove = iPostRebasingAngleToMove + 360 end --315 in this eg
+    if bDebugMessages == true then LOG(sFunctionRef..': About to call MoveInDirection, tTargetLocation='..repr(tTargetLocation)..'; iPostRebasingAngleToMove='..iPostRebasingAngleToMove..'; iDistanceToMove='..iDistanceToMove..'; iPreRebasingAngleToMove='..iPreRebasingAngleToMove..'; iTempRebasingAdjust='..iTempRebasingAdjust) end
+    return M27Utilities.MoveInDirection(tTargetLocation, iPostRebasingAngleToMove, iDistanceToMove) --Should try to move north-west of our ACU (which is what we want)
+end

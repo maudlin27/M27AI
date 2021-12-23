@@ -28,6 +28,8 @@ refbUsingTanksForPlatoons = 'M27PlatoonFormerUsingTanksForPlatoons' --false if h
 refbUsingMobileShieldsForPlatoons = 'M27PlatoonFormerUsingMobileShields' --false if dont ahve any platoons to assign mobile shields to
 refiTimeLastCheckedForIdleShields = 'M27PlatoonFormerTimeCheckedIdleShields' --Gametime that last checked for idle shields
 
+local iIdleUnitSearchThreshold = 10
+
 function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CreatePlatoon'
@@ -297,6 +299,8 @@ function CombatPlatoonFormer(aiBrain)
                         aiBrain[refbUsingTanksForPlatoons] = false
                         break
                     end
+                elseif iStrategy == M27Overseer.refStrategyACUKill then
+                    sPlatoonToForm = 'M27AttackNearestUnits'
                 else
                     M27Utilities.ErrorHandler('Dont have a recognised strategy')
                 end
@@ -1164,11 +1168,42 @@ function UpdateIdlePlatoonActions(aiBrain, iCycleCount)
     end
 end
 
+function PlatoonMainIdleUnitLoop(aiBrain, iCycleCount)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'PlatoonMainIdleUnitLoop'
+
+    local iIdleUnitSearchThreshold = 10 --Change both here and in earlier code
+
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': About to detail unit count of some of the platoons')
+        local tIdleScouts, tIdleMAA, tEngineers, tUnderConstruction, tAllStructures
+        tIdleScouts = aiBrain[M27PlatoonTemplates.refoIdleScouts]:GetPlatoonUnits()
+        tIdleMAA = aiBrain[M27PlatoonTemplates.refoIdleMAA]:GetPlatoonUnits()
+        tEngineers = aiBrain[M27PlatoonTemplates.refoAllEngineers]:GetPlatoonUnits()
+        tUnderConstruction = aiBrain[M27PlatoonTemplates.refoUnderConstruction]:GetPlatoonUnits()
+        tAllStructures = aiBrain[M27PlatoonTemplates.refoAllStructures]:GetPlatoonUnits()
+        local tAllIdlePlatoonUnits = {tIdleScouts, tIdleMAA, tEngineers, tUnderConstruction, tAllStructures}
+        for iSubtable, tSubtable in tAllIdlePlatoonUnits do
+            if M27Utilities.IsTableEmpty(tSubtable) == false then
+                LOG('iSubtable='..iSubtable..'; unit count='..table.getn(tSubtable))
+            end
+        end
+        LOG('Scout platoon exists status='..tostring(aiBrain:PlatoonExists(aiBrain[M27PlatoonTemplates.refoIdleScouts])))
+        LOG('Under construction platoon exists status='..tostring(aiBrain:PlatoonExists(aiBrain[M27PlatoonTemplates.refoUnderConstruction])))
+        LOG('Name of MAA platoon='..aiBrain[M27PlatoonTemplates.refoIdleMAA]:GetPlan())
+    end
+
+    ForkThread(AssignIdlePlatoonUnitsToPlatoons, aiBrain)
+    if iCycleCount == iIdleUnitSearchThreshold then
+        ForkThread(CheckForIdleMobileLandUnits, aiBrain)
+    end
+    ForkThread(UpdateIdlePlatoonActions, aiBrain, iCycleCount)
+end
+
 function PlatoonIdleUnitOverseer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonIdleUnitOverseer'
     local iCycleCount = 0
-    local iIdleUnitSearchThreshold = 10
 
     --Initial setup - create the idle platoons
     WaitTicks(60)
@@ -1184,31 +1219,9 @@ function PlatoonIdleUnitOverseer(aiBrain)
 
     while(not(aiBrain:IsDefeated())) do
         if bDebugMessages == true then LOG(sFunctionRef..': About to fork thread function to assign idle platoon units to platoons') end
-        if bDebugMessages == true then
-            LOG(sFunctionRef..': About to detail unit count of some of the platoons')
-            local tIdleScouts, tIdleMAA, tEngineers, tUnderConstruction, tAllStructures
-            tIdleScouts = aiBrain[M27PlatoonTemplates.refoIdleScouts]:GetPlatoonUnits()
-            tIdleMAA = aiBrain[M27PlatoonTemplates.refoIdleMAA]:GetPlatoonUnits()
-            tEngineers = aiBrain[M27PlatoonTemplates.refoAllEngineers]:GetPlatoonUnits()
-            tUnderConstruction = aiBrain[M27PlatoonTemplates.refoUnderConstruction]:GetPlatoonUnits()
-            tAllStructures = aiBrain[M27PlatoonTemplates.refoAllStructures]:GetPlatoonUnits()
-            local tAllIdlePlatoonUnits = {tIdleScouts, tIdleMAA, tEngineers, tUnderConstruction, tAllStructures}
-            for iSubtable, tSubtable in tAllIdlePlatoonUnits do
-                if M27Utilities.IsTableEmpty(tSubtable) == false then
-                    LOG('iSubtable='..iSubtable..'; unit count='..table.getn(tSubtable))
-                end
-            end
-            LOG('Scout platoon exists status='..tostring(aiBrain:PlatoonExists(aiBrain[M27PlatoonTemplates.refoIdleScouts])))
-            LOG('Under construction platoon exists status='..tostring(aiBrain:PlatoonExists(aiBrain[M27PlatoonTemplates.refoUnderConstruction])))
-            LOG('Name of MAA platoon='..aiBrain[M27PlatoonTemplates.refoIdleMAA]:GetPlan())
-        end
         iCycleCount = iCycleCount + 1
-        ForkThread(AssignIdlePlatoonUnitsToPlatoons, aiBrain)
-        if iCycleCount == iIdleUnitSearchThreshold then
-            ForkThread(CheckForIdleMobileLandUnits, aiBrain)
-            iCycleCount = 0
-        end
-        ForkThread(UpdateIdlePlatoonActions, aiBrain, iCycleCount)
+        ForkThread(PlatoonMainIdleUnitLoop, aiBrain, iCycleCount)
+        if iCycleCount == iIdleUnitSearchThreshold then iCycleCount = 0 end
         WaitTicks(10)
     end
 end

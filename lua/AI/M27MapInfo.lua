@@ -1790,8 +1790,7 @@ function RecordBaseLevelPathability()
                                     {iSegmentX + 1, iSegmentZ + 1},
 
                                 }
-                                --if bAmphibPathing and iSegmentX <= 59 and iSegmentX >= 55 and iSegmentZ <= 454 and iSegmentZ >= 448 then bDebugMessages = true
-                                --else bDebugMessages = false end
+
 
                                 --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': About to check if are at edge of map') end
                                 --Dont check if are at map edge (if we really wanted to optimise this then I expect predefined tables of all the options would work but for now I'll leave it at this

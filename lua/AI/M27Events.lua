@@ -103,7 +103,7 @@ function OnDamaged(self, instigator)
                         end
                         if not(oUnitCausingDamage) and bDebugMessages == true then LOG(sFunctionRef..': Dont ahve a valid unit as instigator') end
 
-                        if oUnitCausingDamage and oUnitCausingDamage.GetAIBrain and oUnitCausingDamage.GetUnitId then
+                        if oUnitCausingDamage and M27UnitInfo.IsUnitValid(oUnitCausingDamage) then
                             --Can we see the unit?
                             if bDebugMessages == true then LOG(sFunctionRef..': Checking if can see the unit that dealt us damage') end
                             if not(M27Utilities.CanSeeUnit(aiBrain, oUnitCausingDamage, true)) then
@@ -120,7 +120,7 @@ function OnDamaged(self, instigator)
                             end
                             --If we're upgrading consider cancelling
 
-                            if self:IsUnitState('Upgrading') and self:GetWorkProgress() <= 0.3 and oUnitCausingDamage:EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage:GetUnitId()) and M27Conditions.DoesACUHaveGun(aiBrain, false, self) then
+                            if self.IsUnitState and self:IsUnitState('Upgrading') and self:GetWorkProgress() <= 0.3 and EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage:GetUnitId()) and M27Conditions.DoesACUHaveGun(aiBrain, false, self) then
                                 --Do we have nearby friendly units?
                                 if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
                                     --Is the unit within range of us?
@@ -161,7 +161,7 @@ function OnBombFired(oWeapon, projectile)
 end
 
 --WARNING: OnWeaponFired and/or OnProjectilfeFired - one of these (probably the latter) resulted in error messages when t1 arti fired, disabled both of them as dont use now
---[[
+
 function OnWeaponFired(oWeapon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnWeaponFired'
@@ -170,12 +170,13 @@ function OnWeaponFired(oWeapon)
     --if oWeapon.GetBlueprint then LOG('OnWeaponFired hook for blueprint='..repr(oWeapon:GetBlueprint())) end
     local oUnit = oWeapon.unit
     if oUnit and oUnit.GetUnitId then
-        local sUnitID = oUnit:GetUnitId()
-        if EntityCategoryContains(M27UnitInfo.refCategoryBomber - categories.EXPERIMENTAL, sUnitID) then
-            M27UnitMicro.DodgeBombsFiredByUnit(oWeapon, oUnit)
+        --Overcharge
+        if oWeapon.GetBlueprint and oWeapon:GetBlueprint().Overcharge then
+            oUnit[M27UnitInfo.refbOverchargeOrderGiven] = false
+            if bDebugMessages == true then LOG('Overcharge weapon was just fired') end
         end
     end
-end--]]
+end
 
 --[[
 function OnProjectileFired(oWeapon, oMuzzle)
