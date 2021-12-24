@@ -287,7 +287,7 @@ function MoveAlongPath(oPlatoon, tMovementPath, bAttackMove, iPathStartPoint, bD
     if bAttackMove == nil then bAttackMove = false end
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27MAAAssister' then bDebugMessages = true end
     local sFunctionRef = 'MoveAlongPath'
     local tCurrentUnits = {}
@@ -976,7 +976,7 @@ function HasPlatoonReachedDestination(oPlatoon)
     local sFunctionRef = 'HasPlatoonReachedDestination'
 
     local sPlatoonName = oPlatoon:GetPlan()
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     local iCurrentUnits = oPlatoon[refiCurrentUnits]
     if iCurrentUnits == nil then
@@ -1051,7 +1051,7 @@ function DeterminePlatoonCompletionAction(oPlatoon)
 
     local aiBrain = oPlatoon:GetBrain()
     local sPlatoonName = oPlatoon:GetPlan()
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1099,7 +1099,7 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
         aiBrain = oPlatoon:GetBrain()
         sPlatoonName = oPlatoon:GetPlan()
     end
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -1167,7 +1167,7 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true LOG('UpdatePlatoonActionIfStuck: Start') end
     local sPlatoonName = oPlatoon:GetPlan()
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1425,7 +1425,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     --Checks if platoon is underwater, and if so decides on action
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(tPlatoonPosition, true)
     local iMaxDistanceForLandSearch = 20
@@ -1551,7 +1551,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local sPlatoonName = oPlatoon:GetPlan()
     local aiBrain = oPlatoon:GetBrain()
     local bProceed = true
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -2633,7 +2633,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
 
     local oPathingUnit
     if bAbort == false then
@@ -3083,7 +3083,7 @@ end
 function DetermineActionForNearbyReclaim(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineActionForNearbyReclaim'
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oPlatoon[refiReclaimers]='..oPlatoon[refiReclaimers]) end
     if oPlatoon[refiReclaimers] > 0 then
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code for '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
@@ -3445,7 +3445,7 @@ function DeterminePlatoonAction(oPlatoon)
         local aiBrain = oPlatoon[refoBrain]
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
             local sPlatoonName = oPlatoon:GetPlan()
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -4051,7 +4051,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
 
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -4327,7 +4327,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions)
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
 
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -5482,7 +5482,7 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -6416,7 +6416,7 @@ function PlatoonInitialSetup(oPlatoon)
 
         --Backup - not sure if it even works:
         if oPlatoon.PlatoonData.UseFormation == nil then oPlatoon.PlatoonData.UseFormation = oPlatoon[sFormationOverride] end
-        if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+        --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
 
         if aiBrain[refiLifetimePlatoonCount] == nil then aiBrain[refiLifetimePlatoonCount] = {} end
         if aiBrain[refiLifetimePlatoonCount][sPlatoonName] == nil then aiBrain[refiLifetimePlatoonCount][sPlatoonName] = 0 end

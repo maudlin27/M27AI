@@ -3433,7 +3433,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 --GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocationsToPickFrom, tIdleEngineers, iActionPriority, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinTechLevelWanted)
 --GET MIN ENGI TECH LEVEL WANTED
                         --Set minimum engineer tech level if not specified and no existing engineers assigned to the action
-                        if iHighestTechLevelEngi > 1 and iMinEngiTechLevelWanted == nil then
+                        if (iHighestTechLevelEngi > 1 or aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1) and iMinEngiTechLevelWanted == nil then
                             --Are we building power or factory? If so then only build with the highest tech engi unless action is already in progress
                             if iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildLandFactory then
                                 --Have we already got an engineer assigned to this action?
