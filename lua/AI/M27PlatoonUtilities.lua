@@ -3460,7 +3460,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            if sPlatoonName == 'M27MobileShield' then bDebugMessages = false end
+            if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
 
             if bDebugMessages == true then
                 LOG(sFunctionRef..': Start of code')
@@ -4061,7 +4061,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-    if sPlatoonName == 'M27MobileShield' then bDebugMessages = false end
+    if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
 
     local aiBrain = oPlatoon:GetBrain()
   --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
@@ -5212,7 +5212,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
-    if sPlatoonName == 'M27MobileShield' then bDebugMessages = false end
+    if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
     --If no unit assigned default to first intel path midpoint
     local bHaveUnitToFollow = false
     if oPlatoon then
@@ -5498,7 +5498,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            if sPlatoonName == 'M27MobileShield' then bDebugMessages = false end
+            if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
 
             if bDebugMessages == true then
                 if oPlatoon[refiCurrentAction] == nil then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': '..sFunctionRef..': refiCurrentAction is nil')
@@ -5599,12 +5599,27 @@ function ProcessPlatoonAction(oPlatoon)
                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionAttack: About to process action') end
                         --Get DF Unit target:
                         if sPlatoonName == 'M27LargeAttackForce' then
-                            --If only a small number of enemies then target the nearest structure or the slowest enemy unit
-                            if oPlatoon[refiEnemiesInRange] < 8 then
+                            --If only a small number of enemies then target the nearest DF structure or the slowest enemy unit
+                            if oPlatoon[refiEnemiesInRange] < math.min(8, oPlatoon[refiDFUnits] * 0.5) then
                                 if oPlatoon[refiEnemyStructuresInRange] > 0 then
-                                    tDFTargetPosition = M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon)):GetPosition()
-                                    bAlreadyDeterminedTargetEnemy = true
-                                else
+                                    --Are there any nearby PD? If so are we in range of them
+                                    local tNearbyPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, oPlatoon[reftEnemyStructuresInRange])
+                                    if M27Utilities.IsTableEmpty(tNearbyPD) == false then
+                                        local iEnemyPDRange = M27Logic.GetUnitMaxGroundRange(tNearbyPD)
+                                        local oNearestPD = M27Utilities.GetNearestUnit(tNearbyPD, GetPlatoonFrontPosition(oPlatoon))
+                                        if M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) < (iEnemyPDRange + 4) then
+                                            --have a PD thats in range or almost in range of us, so should attack it
+                                            tDFTargetPosition = oNearestPD:GetPosition()
+                                            bAlreadyDeterminedTargetEnemy = true
+                                        end
+                                    end
+                                    if bAlreadyDeterminedTargetEnemy == false then
+                                        --No nearby PD so just go for nearest structure
+                                        tDFTargetPosition = M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon)):GetPosition()
+                                        bAlreadyDeterminedTargetEnemy = true
+                                    end
+                                end
+                                if bAlreadyDeterminedTargetEnemy == false then
                                     --No structures; see if are any slower enemies and if so then target them
                                     local tSlowerEnemies = M27Logic.GetUnitSpeedData(oPlatoon[reftEnemiesInRange], aiBrain, true, 4, M27Logic.GetUnitMinSpeed(oPlatoon[reftCurrentUnits], aiBrain, false))
                                     if not(tSlowerEnemies==nil) then
@@ -5973,6 +5988,13 @@ function ProcessPlatoonAction(oPlatoon)
                         --Are we being tracked as needing an escort?
                         if oPlatoon[refiNeedingEscortUniqueCount] and aiBrain[reftPlatoonsOrUnitsNeedingEscorts][oPlatoon[refiNeedingEscortUniqueCount]] then
                             table.remove(aiBrain[reftPlatoonsOrUnitsNeedingEscorts], oPlatoon[refiNeedingEscortUniqueCount])
+                        end
+                        --Are we a mobile shield platoon? If so then assign the shield to a retreating platoon
+                        if sPlatoonName == 'M27MobileShield' then
+                            local tRemainingUnits = oPlatoon:GetPlatoonUnits()
+                            if M27Utilities.IsTableEmpty(tRemainingUnits) == false then
+                                local oShieldPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', tRemainingUnits, true)
+                            end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Will now disband platoon with ref='..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
                         aiBrain:DisbandPlatoon(oPlatoon)
@@ -6378,7 +6400,7 @@ function PlatoonInitialSetup(oPlatoon)
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-    if sPlatoonName == 'M27MobileShield' then bDebugMessages = false end
+    if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
 
     oPlatoon[refbPlatoonLogicActive] = true
 
