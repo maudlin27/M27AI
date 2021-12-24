@@ -516,9 +516,15 @@ function PauseLastUpgrade(aiBrain)
     local oLastUnpausedUpgrade
     local oLastUnpausedNonMex
     local iOldRecordCount = 0
-    local iMexThresholdToIgnorePausing = 0.95
+    local iMexThresholdToIgnorePausing = 0.9
+    local iGeneralThresholdToIgnorePausing = 0.9
     local sUnitId
-    if aiBrain[refbPauseForPowerStall] == true then iMexThresholdToIgnorePausing = 0.6 end
+    if aiBrain[refbPauseForPowerStall] == false then
+        iMexThresholdToIgnorePausing = 0.6
+        iGeneralThresholdToIgnorePausing = 0.8
+    end
+    local iThresholdToIgnorePausing
+    local bHaveMex = false
     if M27Utilities.IsTableEmpty(aiBrain[reftUpgrading]) == false then
         for iRef, oUnit in aiBrain[reftUpgrading] do
             if bDebugMessages == true then LOG(sFunctionRef..': iRef='..iRef..' Considering if unit is alive and part-complete') end
@@ -528,24 +534,27 @@ function PauseLastUpgrade(aiBrain)
                         sUnitId = oUnit:GetUnitId()
                         if bDebugMessages == true then LOG(sFunctionRef..': Unit ID='..sUnitId..'; Unit is valid and not paused so will pause it unless theres a later upgrade or its a mex and almost complete') end
                         if not(EntityCategoryContains(refCategoryMex, sUnitId)) then
-                            oLastUnpausedUpgrade = oUnit
-                            oLastUnpausedNonMex = oLastUnpausedUpgrade
+                            iThresholdToIgnorePausing = iGeneralThresholdToIgnorePausing
                         else
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef..': oUnit='..sUnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
-                                if oUnit.UnitBeingBuilt then
-                                    LOG(sFunctionRef..': Have a unit being built')
-                                    if oUnit.UnitBeingBuilt.GetUnitId then LOG(sFunctionRef..': ID of unit being built='..oUnit.UnitBeingBuilt:GetUnitId()) end
-                                    if oUnit.UnitBeingBuilt.GetFractionComplete then LOG(sFunctionRef..': Fraction complete='..oUnit.UnitBeingBuilt:GetFractionComplete()) else LOG('Fraction complete is nil') end
-                                elseif oUnit.unitBeingBuilt then
-                                    M27Utilities.ErrorHandler('UnitBeingBuilt sometimes is lower case so need to revise code')
-                                else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': unitBeingBuilt is nil') end
-                                end
+                            bHaveMex = true
+                            iThresholdToIgnorePausing = iMexThresholdToIgnorePausing
+                        end
+
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': oUnit='..sUnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                            if oUnit.UnitBeingBuilt then
+                                LOG(sFunctionRef..': Have a unit being built')
+                                if oUnit.UnitBeingBuilt.GetUnitId then LOG(sFunctionRef..': ID of unit being built='..oUnit.UnitBeingBuilt:GetUnitId()) end
+                                if oUnit.UnitBeingBuilt.GetFractionComplete then LOG(sFunctionRef..': Fraction complete='..oUnit.UnitBeingBuilt:GetFractionComplete()) else LOG('Fraction complete is nil') end
+                            elseif oUnit.unitBeingBuilt then
+                                M27Utilities.ErrorHandler('UnitBeingBuilt sometimes is lower case so need to revise code')
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': unitBeingBuilt is nil') end
                             end
-                            if not(oUnit.UnitBeingBuilt) or not(oUnit.UnitBeingBuilt.GetFractionComplete) or not(oUnit.UnitBeingBuilt:GetFractionComplete() >= iMexThresholdToIgnorePausing) then
-                                oLastUnpausedUpgrade = oUnit
-                            end
+                        end
+                        if oUnit.UnitBeingBuilt and oUnit.UnitBeingBuilt.GetFractionComplete and oUnit.UnitBeingBuilt:GetFractionComplete() < iThresholdToIgnorePausing then
+                            oLastUnpausedUpgrade = oUnit
+                            if not(bHaveMex) then oLastUnpausedNonMex = oLastUnpausedUpgrade end
                         end
                     end
                 end

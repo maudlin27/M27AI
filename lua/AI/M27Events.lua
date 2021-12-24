@@ -136,7 +136,11 @@ function OnDamaged(self, instigator)
                 end
                 --General logic for shields so are very responsive with micro
                 if self.MyShield and self.MyShield.GetHealth and self.MyShield:GetHealth() < 100 and EntityCategoryContains((M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryPersonalShield) * categories.MOBILE, self) then
-                    if self.PlatoonHandle then M27PlatoonUtilities.RetreatLowHealthShields(self.PlatoonHandle) end
+                    if self.PlatoonHandle and aiBrain:PlatoonExists(self.PlatoonHandle) then M27PlatoonUtilities.RetreatLowHealthShields(self.PlatoonHandle, aiBrain)
+                    else
+                        --Assign to a retreating platoon
+                        local oShieldPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', {oCurUnitToAssign}, true)
+                    end
                 end
             end
 
