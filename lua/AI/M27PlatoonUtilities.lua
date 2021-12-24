@@ -2910,7 +2910,7 @@ end
 
 function DetermineIfACUShouldBuildLandFactory(oPlatoon)
     --Allows ACU to build land factory in certain cases
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineIfACUShouldBuildLandFactory'
     --if oPlatoon[refbACUInPlatoon] == true then --Already have this in the determine platoon action function, and might want to use this function for another unit
     local aiBrain = oPlatoon:GetBrain()
@@ -3814,7 +3814,7 @@ function DeterminePlatoonAction(oPlatoon)
                 end
             end
 
-
+--==========REFRESH DELAY LOGIC
             --No need to re-issue command if just gave it (will refresh slower instead) - helps both with performance and to guard against stuttering:
             --DEBUG ONLY
             if bDebugMessages == true then
@@ -3897,6 +3897,8 @@ function DeterminePlatoonAction(oPlatoon)
                                             end
                                         end
                                     end
+                                elseif oBuilder:IsUnitState('Moving') == true then
+                                    iRefreshActionThreshold = 10 --Might be trying to build ontop of current position
                                 else
                                     if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Considering whether to ignore refresh - unit state='..M27Logic.GetUnitState(oBuilder)) end
                                 end
@@ -6089,6 +6091,7 @@ function ProcessPlatoonAction(oPlatoon)
                         IssueMove(tBuilders, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
                     end
                 elseif oPlatoon[refiCurrentAction] == refActionBuildLandFactory then
+                    bDebugMessages = true
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': BuildLandFac') end
                     if GetPlatoonUnitsOrUnitCount(oPlatoon, reftBuilders, true, true) > 0 then
                         local tBuilders = GetPlatoonUnitsOrUnitCount(oPlatoon, reftBuilders, false, true)

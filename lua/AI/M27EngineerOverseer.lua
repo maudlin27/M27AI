@@ -1621,6 +1621,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     --iCatToBuildBy: Optional, specify if want to look for adjacency locations
     --bLookForQueuedBuildings: Optional, if true, then doesnt choose a target if another engineer already has that target function ref assigned to build something
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    if oEngineer == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
 
     local sFunctionRef = 'BuildStructureAtLocation'
     local bAbortConstruction = false
