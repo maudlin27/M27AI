@@ -553,7 +553,12 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
     --if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true then bDebugMessages = true end
 
     local iPlatoonValueToShieldRatio = 3.5 --want 3.5 mass in the platoon for every 1 mass in the shield
-    if bDebugMessages == true then LOG(sFunctionRef..': About to consider if oPlatoon '..oPlatoon:GetPlan()..(oPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil')..' wants a shield; oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort]='..tostring(oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort])) end
+
+    if bDebugMessages == true then
+        if oPlatoon.GetUnitId then LOG(sFunctionRef..': About to consider if Unit='..oPlatoon:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oPlatoon)..' wants a shield.  oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort]='..tostring(oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort])..'; oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue]='..(oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 'nil'))
+        else LOG(sFunctionRef..': About to consider if oPlatoon '..oPlatoon:GetPlan()..(oPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil')..' wants a shield; oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort]='..tostring(oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort]))
+        end
+    end
     if oPlatoon and oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort] and oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] > 0 then
         if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] then
             --bDebugMessages = true
@@ -565,12 +570,17 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
         local iPlatoonMass = oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue]
         --If not dealing with a platoon but instead a unit then cap the mass value (as e.g. we're dealing with a mex)
 
+        local iShieldValueHave = 0
         if oPlatoon.GetUnitId then
+            if bDebugMessages == true then LOG(sFunctionRef..': Pre cap on mass value: iPlatoonMass='..iPlatoonMass..'; iPlatoonValueToShieldRatio='..iPlatoonValueToShieldRatio..'; iShieldMass='..iShieldMass) end
+            if oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon] and oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon].GetPlan then
+                iShieldValueHave = oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonMassValue]
+            end
             iPlatoonMass = math.min(iPlatoonMass, iPlatoonValueToShieldRatio * iShieldMass + 50)
+            iPlatoonMass = math.max((iShieldValueHave or 0), iPlatoonMass)
             if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a unit such as a mex; iPlatoonMass after cap='..iPlatoonMass) end
         end
         local iShieldValueWanted = iPlatoonMass / iPlatoonValueToShieldRatio
-        local iShieldValueHave = 0
         local iShieldUnitsHave = 0
         if oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon] and oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon].GetPlan then
             iShieldValueHave = oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonMassValue]
@@ -594,6 +604,8 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
                     end
                 end
             end
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..': Dont have an existing supporting shield platoon') end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': iShieldValueWanted='..iShieldValueWanted..'; iShieldValueHave='..iShieldValueHave..'; iShieldMass='..iShieldMass..'; iShieldUnitsHave='..iShieldUnitsHave) end
         if iShieldValueWanted > (iShieldValueHave + iShieldMass) and iShieldUnitsHave < 5 then
@@ -627,7 +639,7 @@ function GetClosestPlatoonWantingMobileShield(aiBrain, tStartPosition, oShield)
         if oPlatoon.GetPlan then
             sPlan = oPlatoon:GetPlan()
             if sPlan then
-                --if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] then bDebugMessages = true end
+                --if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true then bDebugMessages = true end
                 if bDebugMessages == true then LOG(sFunctionRef..': Platoon plan='..oPlatoon:GetPlan()..(oPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil')) end
                 if bDebugMessages == true then LOG(sFunctionRef..': About to consider if oPlatoon '..oPlatoon:GetPlan()..(oPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil')..' and if it wants mobile shields') end
                 if DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass) == true then
@@ -676,7 +688,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
     local oCurUnitToAssign
     local bRetreatCurShield
     local iEnemySearchRange = math.max(60, aiBrain[M27Overseer.refiSearchRangeForEnemyStructures])
-    local iBaseSafeDistance = 50
+    local iBaseSafeDistance = 60
     aiBrain[refbUsingMobileShieldsForPlatoons] = true
     local iPlatoonRefreshCount = 0
     local iShieldMass
@@ -687,9 +699,11 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
         if iCurCount > iMaxLoop then M27Utilities.ErrorHandler('Infinite loop') break end
         if M27Utilities.IsTableEmpty(tMobileShieldUnits) == false then
             for iUnit, oUnit in tMobileShieldUnits do
-                if oUnit.GetPosition and not(oUnit.Dead) then
+                if M27UnitInfo.IsUnitValid(oUnit) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering shield oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                     --Are we already in a mobile shield platoon?
                     if oUnit.PlatoonHandle and oUnit.PlatoonHandle.GetPlan and oUnit.PlatoonHandle:GetPlan() == 'M27MobileShield' then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Are already in a mobile shield platoon') end
                         --Do nothing
                     else
                         oCurUnitToAssign = oUnit
@@ -697,15 +711,21 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                         bRetreatCurShield = true
                         tStartPosition = oCurUnitToAssign:GetPosition()
                         --Do we want to assign to a platoon or run away?
+                        if bDebugMessages == true then LOG(sFunctionRef..': ShieldRatio='..oUnit:GetShieldRatio(true)) end
                         if oUnit:GetShieldRatio(true) >= 0.8 then --WARNING: Mustnt be higher than the logic for retreating a shield or else risk infinite loop
                             --Are we either close to our base or have no enemy untis near the shield?
                             if M27Utilities.GetDistanceBetweenPositions(tStartPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iBaseSafeDistance then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Close to base so will stop retreating') end
                                 bRetreatCurShield = false
                             else
                                 if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - M27UnitInfo.refCategoryAirAA - M27UnitInfo.refCategoryAirScout, tStartPosition, iEnemySearchRange, 'Enemy')) == true then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will stop retreating') end
                                     bRetreatCurShield = false
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemies so want to keep retreating') end
                                 end
                             end
+                        else if bDebugMessages == true then LOG(sFunctionRef..': Units shield isnt recharegd yet so want to run') end
                         end
                         break
                     end
@@ -743,22 +763,41 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                 if not(oPlatoonToHelp) then
                     bNoMorePlatoonsToHelp = true
                     --No platoon to help; do we have any mexes to shield instead?
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have no more platoons to help, checking if we need to guard mexes') end
                     if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have enemy TML, size='..table.getn(aiBrain[M27Overseer.reftEnemyTML])) end
                         --Search for nearest mex without a shield assigned
                         local tBuildingsWantingShield = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Radar, false, false)
                         if M27Utilities.IsTableEmpty(tBuildingsWantingShield) == false then
+                            if bDebugMessages == true then LOG(sFunctionRef..': tBuildingsWantingShield size='..table.getn(tBuildingsWantingShield)) end
                             for iMex, oMex in tBuildingsWantingShield do
-                                M27PlatoonUtilities.RecordPlatoonUnitsByType(oMex, true)
-                                if DoesPlatoonWantAnotherMobileShield(oMex, iShieldMass) == true then
-                                    oMexToHelp = oMex
-                                    break
+                                if M27UnitInfo.IsUnitValid(oMex) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..'iMex='..iMex..'; oMex='..oMex:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oMex)) end
+                                    M27PlatoonUtilities.RecordPlatoonUnitsByType(oMex, true)
+                                    oMex[M27PlatoonTemplates.refbWantsShieldEscort] = true
+                                    if DoesPlatoonWantAnotherMobileShield(oMex, iShieldMass) == true then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a mex to help') end
+                                        oMexToHelp = oMex
+                                        break
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Mex doesnt want shield coverage') end
+                                    end
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iMex='..iMex..': Unit is not valid') end
                                 end
                             end
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': tBuildingsWantingShield is empty') end
                         end
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': No enemy TML detected') end
                     end
                 end
                 local oUnitOrPlatoonToHelp = oPlatoonToHelp
-                if oUnitOrPlatoonToHelp == nil then oUnitOrPlatoonToHelp = oMexToHelp end
+                if oUnitOrPlatoonToHelp == nil then
+                    if bDebugMessages == true and oMexToHelp then LOG(sFunctionRef..': Assigning the mex as the unit or platoon needing help') end
+                    oUnitOrPlatoonToHelp = oMexToHelp
+                end
                 if not(oUnitOrPlatoonToHelp) then
                     if bDebugMessages == true then LOG(sFunctionRef..': No platoons or TML threatened mexes to help, will tell platoon to go to rally point') end
                     aiBrain[refbUsingMobileShieldsForPlatoons] = false

@@ -394,7 +394,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 if not(M27Conditions.DoesACUHaveGun(aiBrain, true)) then iPowerWanted = math.max(iPowerWanted, 40) end
                                 if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iPowerWanted and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.9 then
                                     iCategoryToBuild = M27UnitInfo.refCategoryMobileLandShield
-                                    iTotalWanted = 2
+                                    iTotalWanted = 1
                                 end
                             elseif iCurrentConditionToTry == 15 then --Intel line scouts
                                 if aiBrain[M27Overseer.refiScoutShortfallIntelLine] > 0 then

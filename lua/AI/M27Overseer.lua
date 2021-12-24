@@ -3355,7 +3355,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         tCurCategoryUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
         if iCategory == M27UnitInfo.refCategoryGroundExperimental or iCategory == M27UnitInfo.refCategoryFixedT3Arti then tReferenceTable = aiBrain[reftEnemyGroundExperimentals]
         elseif iCategory == M27UnitInfo.refCategorySML then tReferenceTable = aiBrain[reftEnemyNukeLaunchers]
-        elseif iCategory == M27UnitInfo.refCategoryTML then tReferenceTable = aiBrain[reftEnemyTML]
+        elseif iCategory == M27UnitInfo.refCategoryTML then
+            tReferenceTable = aiBrain[reftEnemyTML]
+            if bDebugMessages == true then LOG(sFunctionRef..': Looking for enemy TML') end
         else
             M27Utilities.ErrorHandler('Unrecognised enemy super threat category, wont be recorded')
             break
