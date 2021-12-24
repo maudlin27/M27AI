@@ -2996,7 +2996,8 @@ function ACUManager(aiBrain)
         local iHealthThresholdAdjIfAlreadyAllIn = 0
         local iHealthAbsoluteThresholdIfAlreadyAllIn = 750
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iHealthThresholdAdjIfAlreadyAllIn = 0.05 end
-        local bWantEscort = false
+        local bWantEscort = oACU:IsUnitState('Upgrading')
+
         local bEmergencyRequisition = false
         local iLastDistanceToACU = 10000
         if aiBrain[reftLastNearestACU] then iLastDistanceToACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], tACUPos) end
@@ -3126,46 +3127,47 @@ function ACUManager(aiBrain)
                 M27PlatoonUtilities.ForceActionRefresh(oNewPlatoon, 5)
             end
         end
-
-        if bEmergencyRequisition and oACUPlatoon and not(bAllInAttack) then
+        if oACUPlatoon then
             oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = bWantEscort
-            --Is the ACU close to our base? If so then only do emergency response if very low health
-            if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iRangeForACUToBeNearBase or iHealthPercentage < iACUEmergencyHealthPercentThreshold then
-                --Get all nearby combat units we own
-                local tNearbyCombat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tACUPos, iRangeForEmergencyEscort, 'Ally')
-                if M27Utilities.IsTableEmpty(tNearbyCombat) == false then
-                    --Check we have at least 1 unit that can be assigned
-                    local bHaveAUnit = false
-                    for iUnit, oUnit in tNearbyCombat do
-                        if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain() == aiBrain and not(M27Utilities.IsACU(oUnit)) then
-                            bHaveAUnit = true
-                            break
-                        end
-                    end
-
-                    if bHaveAUnit == true then
-                        local oEscortingPlatoon = oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon]
-                        if not(oEscortingPlatoon) or not(aiBrain:PlatoonExists(oEscortingPlatoon)) then
-                            oEscortingPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27EscortAI', nil)
-                            oEscortingPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oACUPlatoon
-                            oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon] = oEscortingPlatoon
-                        end
-
-
-                        --Filter to only units we control that arent already in this platoon
-                        local tNearbyOwnedCombat = {}
-                        local iNearbyOwnedCombatCount = 0
+            if bEmergencyRequisition and not(bAllInAttack) then
+                --Is the ACU close to our base? If so then only do emergency response if very low health
+                if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iRangeForACUToBeNearBase or iHealthPercentage < iACUEmergencyHealthPercentThreshold then
+                    --Get all nearby combat units we own
+                    local tNearbyCombat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tACUPos, iRangeForEmergencyEscort, 'Ally')
+                    if M27Utilities.IsTableEmpty(tNearbyCombat) == false then
+                        --Check we have at least 1 unit that can be assigned
+                        local bHaveAUnit = false
                         for iUnit, oUnit in tNearbyCombat do
                             if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain() == aiBrain and not(M27Utilities.IsACU(oUnit)) then
-                                if not(oUnit.PlatoonHandle) or not(oUnit.PlatoonHandle == oEscortingPlatoon) then
-                                    iNearbyOwnedCombatCount = iNearbyOwnedCombatCount + 1
-                                    tNearbyOwnedCombat[iNearbyOwnedCombatCount] = oUnit
-                                end
+                                bHaveAUnit = true
+                                break
                             end
                         end
-                        if iNearbyOwnedCombatCount > 0 then
-                            --Add combat units to this
-                            aiBrain:AssignUnitsToPlatoon(oEscortingPlatoon, tNearbyOwnedCombat, 'Attack', 'GrowthFormation')
+
+                        if bHaveAUnit == true then
+                            local oEscortingPlatoon = oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon]
+                            if not(oEscortingPlatoon) or not(aiBrain:PlatoonExists(oEscortingPlatoon)) then
+                                oEscortingPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27EscortAI', nil)
+                                oEscortingPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oACUPlatoon
+                                oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon] = oEscortingPlatoon
+                            end
+
+
+                            --Filter to only units we control that arent already in this platoon
+                            local tNearbyOwnedCombat = {}
+                            local iNearbyOwnedCombatCount = 0
+                            for iUnit, oUnit in tNearbyCombat do
+                                if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain() == aiBrain and not(M27Utilities.IsACU(oUnit)) then
+                                    if not(oUnit.PlatoonHandle) or not(oUnit.PlatoonHandle == oEscortingPlatoon) then
+                                        iNearbyOwnedCombatCount = iNearbyOwnedCombatCount + 1
+                                        tNearbyOwnedCombat[iNearbyOwnedCombatCount] = oUnit
+                                    end
+                                end
+                            end
+                            if iNearbyOwnedCombatCount > 0 then
+                                --Add combat units to this
+                                aiBrain:AssignUnitsToPlatoon(oEscortingPlatoon, tNearbyOwnedCombat, 'Attack', 'GrowthFormation')
+                            end
                         end
                     end
                 end

@@ -419,6 +419,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     local oOverchargeTarget
     local iMinT1ForOvercharge = 3
     local bAreRunning = false
+    local oEnemyACU
 
     --Check unit not already been given an overcharge action recently
     if not(oUnitWithOvercharge[M27UnitInfo.refbOverchargeOrderGiven]) then
@@ -438,6 +439,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 local iDistanceToEnemyACU
                 --Target enemy ACU if its low health as a top priority unless it's about to move out of our range
                 if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) then
+                    oEnemyACU = aiBrain[M27Overseer.refoLastNearestACU]
                     if aiBrain[M27Overseer.refoLastNearestACU]:GetHealthPercent() < 0.2 then
                         iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition)
                         if iDistanceToEnemyACU + 2 < iACURange then
@@ -549,8 +551,14 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 end
             end
             if oOverchargeTarget == nil then
-                if bDebugMessages == true then LOG(sFunctionRef..': oOverchargeTarget is nil, wont give overcharge action') end
-            else
+                --Target enemy ACU anyway if we have max energy and in attack mode
+                if oEnemyACU and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 then
+                    oOverchargeTarget = oEnemyACU
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': oOverchargeTarget is nil, wont give overcharge action') end
+                end
+            end
+            if oOverchargeTarget then
                 if bDebugMessages == true then LOG(sFunctionRef..': Telling platoon to process overcharge action') end
                 oPlatoon[M27PlatoonUtilities.refiExtraAction] = M27PlatoonUtilities.refExtraActionOvercharge
                 oPlatoon[M27PlatoonUtilities.refExtraActionTargetUnit] = oOverchargeTarget
