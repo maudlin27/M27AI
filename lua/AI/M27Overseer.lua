@@ -3030,6 +3030,9 @@ function ACUManager(aiBrain)
         if iLastDistanceToACU <= iEnemyACUSearchRange then
             aiBrain[refbEnemyACUNearOurs] = true
             bWantEscort = true
+            --Extra health buffer for some of below checks
+            local iExtraHealthCheck = 0
+            if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tACUPos) > M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tACUPos) then iExtraHealthCheck = 1000 end
             --Do we have a big gun, or is the enemy ACU low on health?
             if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true then
                 bAllInAttack = true
@@ -3037,14 +3040,17 @@ function ACUManager(aiBrain)
             else
                 local iACURange = M27Logic.GetUnitMaxGroundRange({ oACU })
                 --Attack if we're close to ACU and have a notable health advantage, and are on our side of the map or are already in attack mode
-                if iLastDistanceToACU <= (iACURange + 15) and aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.5 + iHealthThresholdAdjIfAlreadyAllIn) and aiBrain[refoLastNearestACU]:GetHealth() < (oACU:GetHealth() + 2500  - iHealthAbsoluteThresholdIfAlreadyAllIn) and (M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) or aiBrain[refbIncludeACUInAllOutAttack] == true) then
+                if iLastDistanceToACU <= (iACURange + 15) and aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.5 + iHealthThresholdAdjIfAlreadyAllIn) and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck < (oACU:GetHealth() + 2500 + iHealthAbsoluteThresholdIfAlreadyAllIn) and (M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) or aiBrain[refbIncludeACUInAllOutAttack] == true) then
                     bAllInAttack = true
+                    bIncludeACUInAttack = true
                 --Attack if enemy ACU is in range and could die to an explosion (so we either win or draw)
                 elseif iLastDistanceToACU <= iACURange and aiBrain[refoLastNearestACU]:GetHealth() < (1800 + iHealthAbsoluteThresholdIfAlreadyAllIn) then
                     bAllInAttack = true
                     bIncludeACUInAttack = true
                 --Attack if we have gun and enemy ACU doesnt, and we have at least as much health
-                elseif M27Conditions.DoesACUHaveBigGun(aiBrain, aiBrain[refoLastNearestACU]) == false and M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true and aiBrain[refoLastNearestACU]:GetHealth() < oACU:GetHealth() then
+                elseif M27Conditions.DoesACUHaveBigGun(aiBrain, aiBrain[refoLastNearestACU]) == false and M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck < oACU:GetHealth() then
+                    --Want extra health buffer if are on enemy side of the map
+
                     bAllInAttack = true
                     bIncludeACUInAttack = true
                 end
