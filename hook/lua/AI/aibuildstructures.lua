@@ -185,8 +185,8 @@ function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder,
                         local bBuildNearToEnemy = true
                         if iDistFromStart >= 80 then bBuildNearToEnemy = false end
                         local bBuildAwayFromEnemy = not(bBuildNearToEnemy)
-                        --GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
-                        relativeLoc = M27EngineerOverseer.GetAdjacencyLocationForTarget(tBuildAdjacentTo, sBuildAdjacentToBP, sToBuildBP, true, aiBrain, true, builderPos, iBuildDistance, iBuildDistance, false, true, bBuildNearToEnemy, bBuildAwayFromEnemy)
+                        --GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
+                        relativeLoc = M27EngineerOverseer.GetBestBuildLocationForTarget(tBuildAdjacentTo, sBuildAdjacentToBP, sToBuildBP, true, aiBrain, true, builderPos, iBuildDistance, iBuildDistance, false, true, bBuildNearToEnemy, bBuildAwayFromEnemy)
 
                         if relativeLoc == nil or relativeLoc[1] == nil then
                             --Do nothing

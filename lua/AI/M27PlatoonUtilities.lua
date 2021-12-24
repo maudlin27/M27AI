@@ -2626,7 +2626,6 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
         else aiBrain[refiLifetimePlatoonCount][sPlatoonName] = aiBrain[refiLifetimePlatoonCount][sPlatoonName] + 1 end
         oPlatoon[refiPlatoonCount] = aiBrain[refiLifetimePlatoonCount][sPlatoonName]
     end
-    if sPlatoonName == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code') end
     --if sPlatoonName == 'M27ACUMain' then bDebugMessages = true end
@@ -2910,7 +2909,7 @@ end
 
 function DetermineIfACUShouldBuildLandFactory(oPlatoon)
     --Allows ACU to build land factory in certain cases
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineIfACUShouldBuildLandFactory'
     --if oPlatoon[refbACUInPlatoon] == true then --Already have this in the determine platoon action function, and might want to use this function for another unit
     local aiBrain = oPlatoon:GetBrain()

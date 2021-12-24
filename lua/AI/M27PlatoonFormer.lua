@@ -550,7 +550,7 @@ end
 function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemoveExistingShield)
     local sFunctionRef = 'DoesPlatoonWantAnotherMobileShield'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true then bDebugMessages = true end
 
     local iPlatoonValueToShieldRatio = 3.5 --want 3.5 mass in the platoon for every 1 mass in the shield
     if bDebugMessages == true then LOG(sFunctionRef..': About to consider if oPlatoon '..oPlatoon:GetPlan()..(oPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil')..' wants a shield; oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort]='..tostring(oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort])) end

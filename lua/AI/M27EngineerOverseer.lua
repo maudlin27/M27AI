@@ -1299,7 +1299,7 @@ function WillBuildingBlockMex(sNewBuildingBPID, tPositionOfNewBuilding)
     return false--]]
 end
 
-function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
+function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
     --Returns all co-ordinates that will result in a sNewBuildingBPID being built adjacent to PosTarget; if bCheckValid is true (default) then will also check it's a valid location to build
     -- tablePosTarget can either be a table (e.g. a table of mex locations), or just a single position
     --Only need to specify aiBrain if bCheckValid = true
@@ -1310,7 +1310,7 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     --bLookForQueuedBuildings - optional, defaults to true, if true then check if any engineer has been assigned to buidl to that location already
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --True if want most log messages to print
-    local sFunctionRef = 'GetAdjacencyLocationForTarget'
+    local sFunctionRef = 'GetBestBuildLocationForTarget'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
 
@@ -1335,23 +1335,25 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     if bBetterIfNoReclaim == nil then bBetterIfNoReclaim = false end
     if bLookForQueuedBuildings == nil then bLookForQueuedBuildings = true end
 
+    local bWantAdjacency = true
+
     if sTargetBuildingBPID == nil then
-        M27Utilities.ErrorHandler('Not specified sTargetBuildingBPID; sNewBuildingBPID='..tostring(sNewBuildingBPID)..'; will return nil')
-        return nil
+        bWantAdjacency = false
     end
 
     local bDontBuildByMex = true
-    if EntityCategoryContains(categories.MASSEXTRACTION, sTargetBuildingBPID) then bDontBuildByMex = false end
-    if bDebugMessages == true then LOG(sFunctionRef..': sNewBuildingBPID='..sNewBuildingBPID..'; sTargetBuildingBPID='..sTargetBuildingBPID..'; tablePosTarget='..repr(tablePosTarget)) end
+    if bWantAdjacency and EntityCategoryContains(categories.MASSEXTRACTION, sTargetBuildingBPID) then bDontBuildByMex = false end
+    if bDebugMessages == true then LOG(sFunctionRef..': sNewBuildingBPID='..sNewBuildingBPID..'; sTargetBuildingBPID='..(sTargetBuildingBPID or 'nil')..'; tablePosTarget='..repr(tablePosTarget)) end
     --local TargetSize = GetBuildingTypeInfo(TargetBuildingType, 1)
-    local TargetSize = M27UnitInfo.GetBuildingSize(sTargetBuildingBPID)
+    local TargetSize
+    if bWantAdjacency then TargetSize = M27UnitInfo.GetBuildingSize(sTargetBuildingBPID) end
 
     --local tNewBuildingSize = GetBuildingTypeInfo(NewBuildingType, 1)
     local tNewBuildingSize = M27UnitInfo.GetBuildingSize(sNewBuildingBPID)
     local fSizeMod = 0.5
     local iRectangleSizeReduction = 0
     local iNewBuildingRadius = tNewBuildingSize[1] * fSizeMod
-    if bDebugMessages == true then LOG(sFunctionRef..': TargetSize='..repr(TargetSize)..'; NewBuildingSize='..repr(tNewBuildingSize)) end
+    if bDebugMessages == true and bWantAdjacency then LOG(sFunctionRef..': TargetSize='..repr(TargetSize)..'; NewBuildingSize='..repr(tNewBuildingSize)) end
     local iBuildRangeExtension = iNewBuildingRadius
     if bDebugMessages == true then LOG(sFunctionRef..': Increasing builder distance from '..iBuilderRange..' by '..iBuildRangeExtension) end
     iBuilderRange = iBuilderRange + iBuildRangeExtension
@@ -1381,7 +1383,15 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     local iMaxMapZ = rPlayableArea[4]
     local bHaveGoodMatch
     local iMapBoundarySize = 4
-    if bDebugMessages == true then LOG(sFunctionRef..': About to try and build '..sNewBuildingBPID..' adjacent to '..sTargetBuildingBPID..'; bDontBuildByMex='..tostring(bDontBuildByMex)) end
+    local iActualMaxSearchRange
+    local iIncrementSize = 4
+    if bWantAdjacency then
+        iIncrementSize = 1
+        iActualMaxSearchRange = math.min(iMaxAreaToSearch + iNewBuildingRadius, TargetSize[1] * fSizeMod + iNewBuildingRadius)
+        else iActualMaxSearchRange = math.min(iMaxAreaToSearch + iNewBuildingRadius, iBuilderRange)
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to try and build '..sNewBuildingBPID..' adjacent to '..(sTargetBuildingBPID or 'nil')..'; bDontBuildByMex='..tostring(bDontBuildByMex)..'; iTotalTargets='..iTotalTargets) end
+
     for iCurTarget = 1, iTotalTargets do
         if bMultipleTargets == true then
             PosTarget = tablePosTarget[iCurTarget]
@@ -1391,74 +1401,86 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
         --LOG('PosTarget[1]='..PosTarget[1])
         --LOG('TargetSize[1]='..TargetSize[1])
         --LOG('tNewBuildingSize[1]='..tNewBuildingSize[1])
-        iMaxX = PosTarget[1] + TargetSize[1] * fSizeMod + iNewBuildingRadius
-        if iMaxX > (iMaxMapX - iNewBuildingRadius) then iMaxX = iMaxMapX - iNewBuildingRadius end
-        iMinX = PosTarget[1] - TargetSize[1] * fSizeMod - tNewBuildingSize[1]* fSizeMod
-        if iMinX < (rPlayableArea[1] + iMapBoundarySize + iNewBuildingRadius) then iMinX = rPlayableArea[1] + iMapBoundarySize + iNewBuildingRadius end
-        iMaxZ = PosTarget[3] + TargetSize[2] * fSizeMod + tNewBuildingSize[2]* fSizeMod
-        if iMaxZ > (iMaxMapZ - iNewBuildingRadius) then iMaxZ = iMaxMapZ - iNewBuildingRadius end
-        iMinZ = PosTarget[3] - TargetSize[2] * fSizeMod - tNewBuildingSize[2]* fSizeMod
-        if iMinZ < (rPlayableArea[2] + iMapBoundarySize + iNewBuildingRadius) then iMinZ = rPlayableArea[2] + iMapBoundarySize + iNewBuildingRadius end
-        iTargetMaxX = PosTarget[1] + TargetSize[1] * fSizeMod
-        iTargetMinX = PosTarget[1] - TargetSize[1] * fSizeMod
-        iTargetMaxZ = PosTarget[3] + TargetSize[2] * fSizeMod
-        iTargetMinZ = PosTarget[3] - TargetSize[2] * fSizeMod
+        if bWantAdjacency then
+            iMaxX = PosTarget[1] + TargetSize[1] * fSizeMod + iNewBuildingRadius
+            if iMaxX > (iMaxMapX - iNewBuildingRadius) then iMaxX = iMaxMapX - iNewBuildingRadius end
+            iMinX = PosTarget[1] - TargetSize[1] * fSizeMod - tNewBuildingSize[1]* fSizeMod
+            if iMinX < (rPlayableArea[1] + iMapBoundarySize + iNewBuildingRadius) then iMinX = rPlayableArea[1] + iMapBoundarySize + iNewBuildingRadius end
+            iMaxZ = PosTarget[3] + TargetSize[2] * fSizeMod + tNewBuildingSize[2]* fSizeMod
+            if iMaxZ > (iMaxMapZ - iNewBuildingRadius) then iMaxZ = iMaxMapZ - iNewBuildingRadius end
+            iMinZ = PosTarget[3] - TargetSize[2] * fSizeMod - tNewBuildingSize[2]* fSizeMod
+            if iMinZ < (rPlayableArea[2] + iMapBoundarySize + iNewBuildingRadius) then iMinZ = rPlayableArea[2] + iMapBoundarySize + iNewBuildingRadius end
+
+            iTargetMaxX = PosTarget[1] + TargetSize[1] * fSizeMod
+            iTargetMinX = PosTarget[1] - TargetSize[1] * fSizeMod
+            iTargetMaxZ = PosTarget[3] + TargetSize[2] * fSizeMod
+            iTargetMinZ = PosTarget[3] - TargetSize[2] * fSizeMod
+        else --Not interested in adjacency
+            iMaxX = math.min(PosTarget[1] + iActualMaxSearchRange, iMaxMapX - iNewBuildingRadius)
+            iMinX = math.max(PosTarget[1] - iActualMaxSearchRange,  rPlayableArea[1] + iMapBoundarySize + iNewBuildingRadius)
+            iMaxZ = math.min(PosTarget[3] + iActualMaxSearchRange, iMaxMapZ - iNewBuildingRadius)
+            iMinZ = math.max(PosTarget[3] - iActualMaxSearchRange,  rPlayableArea[2] + iMapBoundarySize + iNewBuildingRadius)
+            if bDebugMessages == true then LOG(sFunctionRef..': Dont have adjancy so X Min-Max='..iMinX..'-'..iMaxX..'; Z Min-Max='..iMinZ..'-'..iMaxZ..'; iActualMaxSearchRange='..iActualMaxSearchRange) end
+        end
         OptionsX = math.floor(iMaxX - iMinX)
         OptionsZ = math.floor(iMaxZ - iMinZ)
-        if bDebugMessages == true then LOG(sFunctionRef..':About to cycle through potential adjacency locations for iCurTarget='..iCurTarget..'; iTotalTargets='..iTotalTargets..'; iMinX-iMaxX='..iMinX..'-'..iMaxX..'; iMinZ-iMaxZ='..iMinZ..'-'..iMaxZ..'; OptionsX='..OptionsX..'; OptionsZ='..OptionsZ)end
-        for xi = 0, OptionsX do
+        if bDebugMessages == true then LOG(sFunctionRef..':About to cycle through potential adjacency locations for iCurTarget='..iCurTarget..'; iTotalTargets='..iTotalTargets..'; iMinX-iMaxX='..iMinX..'-'..iMaxX..'; iMinZ-iMaxZ='..iMinZ..'-'..iMaxZ..'; OptionsX='..OptionsX..'; OptionsZ='..OptionsZ..'; bWantAdjacency='..tostring(bWantAdjacency))end
+
+        for xi = 0, OptionsX, iIncrementSize do
             iNewX = iMinX + xi
             --if iNewX >= (iMinX + TargetSize[1]*fSizeMod) or iNewX >= (iTargetMaxX - iNewBuildingRadius) then
-            for zi = 0, OptionsZ do
+            for zi = 0, OptionsZ, iIncrementSize do
                 iPriority = 0
                 iNewZ = iMinZ + zi
 
                 --if iNewZ < (iTargetMinZ + tNewBuildingSize[2]* fSizeMod) or iNewZ > (iTargetMaxZ - tNewBuildingSize[2]* fSizeMod) then
                 --ignore corner results (new building larger than target):
                 local bIgnore = false
-                if bNewBuildingLargerThanNewTarget == true then
-                    if iNewX - iNewBuildingRadius > iTargetMinX or iNewX + iNewBuildingRadius < iTargetMaxX then
-                        if iNewZ - iNewBuildingRadius > iTargetMinZ or iNewZ + iNewBuildingRadius < iTargetMaxZ then
-                            iPriority = iPriority - 4
-                            --bIgnore = true
-                            if bDebugMessages == true then LOG(sFunctionRef..': Corner position so no adjacency - priority decreased; iNewX='..iNewX..'; iNewZ='..iNewZ) end
-                        end
-                    end
-                else
-                    if iNewX >= iTargetMinX and iNewX <= iTargetMaxX then
-                        if bDebugMessages == true then LOG(sFunctionRef..': x value is within the required range for adjacency, now checking if z values are') end
-                        --z value needs to be right by the min or max values:
-                        if iNewZ == (iTargetMinZ - iNewBuildingRadius) or iNewZ == (iTargetMaxZ + iNewBuildingRadius) then
-                            --valid co-ordinate
-                                if bDebugMessages == true then LOG(sFunctionRef..': Should benefit from adjacency') end
-                        else
-                            --If it's within the target building area then ignore, otherwise record with lower priority as no adjacency:
-                            if iNewZ < (iTargetMinZ - iNewBuildingRadius) or iNewZ > (iTargetMaxZ + iNewBuildingRadius) then
+                if bWantAdjacency then
+                    if bNewBuildingLargerThanNewTarget == true then
+                        if iNewX - iNewBuildingRadius > iTargetMinX or iNewX + iNewBuildingRadius < iTargetMaxX then
+                            if iNewZ - iNewBuildingRadius > iTargetMinZ or iNewZ + iNewBuildingRadius < iTargetMaxZ then
                                 iPriority = iPriority - 4
-                            else bIgnore = true end
-                            if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 1 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ..'; iTargetMinX='..iTargetMinX..'; iTargetMaxX='..iTargetMaxX..'; iTargetMinZ='..iTargetMinZ..'; iTargetMaxZ='..iTargetMaxZ..'; iNewBuildingRadius='..iNewBuildingRadius..'; tNewBuildingSize[1] * fSizeMod='..tNewBuildingSize[1] * fSizeMod) end
+                                --bIgnore = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Corner position so no adjacency - priority decreased; iNewX='..iNewX..'; iNewZ='..iNewZ) end
+                            end
                         end
                     else
-                        if iNewZ >= iTargetMinZ and iNewZ <= iTargetMaxZ then
-                            if iNewX == (iTargetMinX - iNewBuildingRadius) or iNewX == (iTargetMaxX + iNewBuildingRadius) then
-                                --Valid match
-                                if bDebugMessages == true then LOG(sFunctionRef..': Should benefit from adjacency') end
+                        if iNewX >= iTargetMinX and iNewX <= iTargetMaxX then
+                            if bDebugMessages == true then LOG(sFunctionRef..': x value is within the required range for adjacency, now checking if z values are') end
+                            --z value needs to be right by the min or max values:
+                            if iNewZ == (iTargetMinZ - iNewBuildingRadius) or iNewZ == (iTargetMaxZ + iNewBuildingRadius) then
+                                --valid co-ordinate
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Should benefit from adjacency') end
                             else
                                 --If it's within the target building area then ignore, otherwise record with lower priority as no adjacency:
-                                if iNewX < (iTargetMinX - iNewBuildingRadius) or iNewX > (iTargetMaxX + iNewBuildingRadius) then
+                                if iNewZ < (iTargetMinZ - iNewBuildingRadius) or iNewZ > (iTargetMaxZ + iNewBuildingRadius) then
                                     iPriority = iPriority - 4
                                 else bIgnore = true end
-                                if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 2 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ..'; iTargetMinX='..iTargetMinX..'; iTargetMaxX='..iTargetMaxX..'; iTargetMinZ='..iTargetMinZ..'; iTargetMaxZ='..iTargetMaxZ..'; iNewBuildingRadius='..iNewBuildingRadius..'; tNewBuildingSize[1] * fSizeMod='..tNewBuildingSize[1] * fSizeMod) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 1 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ..'; iTargetMinX='..iTargetMinX..'; iTargetMaxX='..iTargetMaxX..'; iTargetMinZ='..iTargetMinZ..'; iTargetMaxZ='..iTargetMaxZ..'; iNewBuildingRadius='..iNewBuildingRadius..'; tNewBuildingSize[1] * fSizeMod='..tNewBuildingSize[1] * fSizeMod) end
                             end
                         else
-                            if (iNewX < (iTargetMinX - iNewBuildingRadius) or iNewX > (iTargetMaxX + iNewBuildingRadius)) and (iNewZ < (iTargetMinZ - iNewBuildingRadius) or iNewZ > (iTargetMaxZ + iNewBuildingRadius)) then
-                                --should be valid just no adjacency
-                                iPriority = iPriority - 4
-                            else bIgnore = true end
-                            if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 3 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ..'; iTargetMinX='..iTargetMinX..'; iTargetMaxX='..iTargetMaxX..'; iTargetMinZ='..iTargetMinZ..'; iTargetMaxZ='..iTargetMaxZ..'; iNewBuildingRadius='..iNewBuildingRadius..'; tNewBuildingSize[1] * fSizeMod='..tNewBuildingSize[1] * fSizeMod) end
+                            if iNewZ >= iTargetMinZ and iNewZ <= iTargetMaxZ then
+                                if iNewX == (iTargetMinX - iNewBuildingRadius) or iNewX == (iTargetMaxX + iNewBuildingRadius) then
+                                    --Valid match
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Should benefit from adjacency') end
+                                else
+                                    --If it's within the target building area then ignore, otherwise record with lower priority as no adjacency:
+                                    if iNewX < (iTargetMinX - iNewBuildingRadius) or iNewX > (iTargetMaxX + iNewBuildingRadius) then
+                                        iPriority = iPriority - 4
+                                    else bIgnore = true end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 2 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ..'; iTargetMinX='..iTargetMinX..'; iTargetMaxX='..iTargetMaxX..'; iTargetMinZ='..iTargetMinZ..'; iTargetMaxZ='..iTargetMaxZ..'; iNewBuildingRadius='..iNewBuildingRadius..'; tNewBuildingSize[1] * fSizeMod='..tNewBuildingSize[1] * fSizeMod) end
+                                end
+                            else
+                                if (iNewX < (iTargetMinX - iNewBuildingRadius) or iNewX > (iTargetMaxX + iNewBuildingRadius)) and (iNewZ < (iTargetMinZ - iNewBuildingRadius) or iNewZ > (iTargetMaxZ + iNewBuildingRadius)) then
+                                    --should be valid just no adjacency
+                                    iPriority = iPriority - 4
+                                else bIgnore = true end
+                                if bDebugMessages == true then LOG(sFunctionRef..': NewBuilding <= NewTarget size 3 - failed to find adjacency match so reducing priority by 4; iNewX='..iNewX..'; iNewZ='..iNewZ..'; iTargetMinX='..iTargetMinX..'; iTargetMaxX='..iTargetMaxX..'; iTargetMinZ='..iTargetMinZ..'; iTargetMaxZ='..iTargetMaxZ..'; iNewBuildingRadius='..iNewBuildingRadius..'; tNewBuildingSize[1] * fSizeMod='..tNewBuildingSize[1] * fSizeMod) end
+                            end
                         end
+                        -- If bCheckValid then see if aiBrain can build the desired structure at the location
                     end
-                    -- If bCheckValid then see if aiBrain can build the desired structure at the location
                 end
                 if bIgnore == false and bLookForQueuedBuildings == true then
 
@@ -1522,10 +1544,12 @@ function GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                         --end
                         --end
                         --Check if level with target (makes it easier for other buildings to get adjacency):
-                        if CurPosition[1] - iNewBuildingRadius == iTargetMinX then iPriority = iPriority + 1 end
-                        if CurPosition[1] + iNewBuildingRadius == iTargetMaxX then iPriority = iPriority + 1 end
-                        if CurPosition[3] - iNewBuildingRadius == iTargetMinZ then iPriority = iPriority + 1 end
-                        if CurPosition[3] + iNewBuildingRadius == iTargetMaxZ then iPriority = iPriority + 1 end
+                        if bWantAdjacency then
+                            if CurPosition[1] - iNewBuildingRadius == iTargetMinX then iPriority = iPriority + 1 end
+                            if CurPosition[1] + iNewBuildingRadius == iTargetMaxX then iPriority = iPriority + 1 end
+                            if CurPosition[3] - iNewBuildingRadius == iTargetMinZ then iPriority = iPriority + 1 end
+                            if CurPosition[3] + iNewBuildingRadius == iTargetMaxZ then iPriority = iPriority + 1 end
+                        end
                     end
                     if bIgnoreOutsideBuildArea == true then
                         if iDistanceBetween > iMaxAreaToSearch then
@@ -1621,7 +1645,6 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     --iCatToBuildBy: Optional, specify if want to look for adjacency locations
     --bLookForQueuedBuildings: Optional, if true, then doesnt choose a target if another engineer already has that target function ref assigned to build something
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if oEngineer == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
 
     local sFunctionRef = 'BuildStructureAtLocation'
     local bAbortConstruction = false
@@ -1639,155 +1662,178 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
         LOG('oEngineer='..oEngineer:GetUnitId()..GetEngineerUniqueCount(oEngineer))
     else
 
+        local iBuilderRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
+        local iDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local bBuildNearToEnemy = false
+        if iDistanceFromStart <= 80 then bBuildNearToEnemy = true end
 
         --Check if is an existing building of the type wanted first:
         local oPartCompleteBuilding
         if bLookForPartCompleteBuildings then
-            oPartCompleteBuilding = GetPartCompleteBuilding(aiBrain, oBuilder, iCategoryToBuild, iBuildingSearchRange, iEnemySearchRange)
+                --GetPartCompleteBuilding(aiBrain, oBuilder, iCategoryToBuild, iBuildingSearchRange, iEnemySearchRange)
+                --Returns nil if no nearby part complete building
+                --iEnemySearchRange: nil if dont care about nearby enemies, otherwise will ignore buildings that have enemies within iEnemySearchRange
+            oPartCompleteBuilding = GetPartCompleteBuilding(aiBrain, oEngineer, iCategoryToBuild, iBuilderRange + 15, nil)
         end
         if oPartCompleteBuilding then
             if bDebugMessages == true then LOG(sFunctionRef..': have partcompletebuilding so returning that as the position') end
             tTargetLocation = oPartCompleteBuilding:GetPosition()
         else
-            local iBuilderRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
             if bDebugMessages == true then
                 local sEngUniqueRef = GetEngineerUniqueCount(oEngineer)
                 LOG(sFunctionRef..': Eng builder unique ref='..sEngUniqueRef..'; builder range='..iBuilderRange)
             end
-            if iCatToBuildBy then
-                sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
-                local oPossibleBuildingsToBuildBy = aiBrain:GetUnitsAroundPoint(iCatToBuildBy, tTargetLocation, iMaxAreaToSearch, 'Ally')
-                local iBuildingCount = 0
-                local tPossibleTargets = {}
-                local tBuildingPosition
-                if M27Utilities.IsTableEmpty(oPossibleBuildingsToBuildBy) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have possible buildings to build by, so will consider best location') end
-                    for iBuilding, oBuilding in oPossibleBuildingsToBuildBy do
-                        if not(oBuilding.Dead) and oBuilding.GetPosition then
-                            tBuildingPosition = oBuilding:GetPosition()
-                            if M27Utilities.GetDistanceBetweenPositions(tBuildingPosition, tTargetLocation) <= iMaxAreaToSearch then
-                                --Check we're not building by a mex
-                                --if M27Utilities.IsTableEmpty(M27MapInfo.GetResourcesNearTargetLocation(tBuildingPosition, iNewBuildingRadius, true)) == true then
-                                    --if bDebugMessages == true then LOG(sFunctionRef..': No resources near the target build position') end
-                                    iBuildingCount = iBuildingCount + 1
-                                    tPossibleTargets[iBuildingCount] = tBuildingPosition
-                                --else
-                                    --if bDebugMessages == true then LOG(sFunctionRef..': Have resources near the target build position') end
-                                --end
+            --Check we're not trying to buidl a mex or hydro or mass storage
+            local bMexHydroOrStorage = false
+            if EntityCategoryContains(refCategoryMex, sBlueprintToBuild) or EntityCategoryContains(refCategoryHydro, sBlueprintToBuild) or EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, sBlueprintToBuild) then bMexHydroOrStorage = true end
+
+
+
+            if not(bMexHydroOrStorage) then
+                if iCatToBuildBy then
+                    sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
+                    local oPossibleBuildingsToBuildBy = aiBrain:GetUnitsAroundPoint(iCatToBuildBy, tTargetLocation, iMaxAreaToSearch, 'Ally')
+                    local iBuildingCount = 0
+                    local tPossibleTargets = {}
+                    local tBuildingPosition
+                    if M27Utilities.IsTableEmpty(oPossibleBuildingsToBuildBy) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have possible buildings to build by, so will consider best location') end
+                        for iBuilding, oBuilding in oPossibleBuildingsToBuildBy do
+                            if not(oBuilding.Dead) and oBuilding.GetPosition then
+                                tBuildingPosition = oBuilding:GetPosition()
+                                if M27Utilities.GetDistanceBetweenPositions(tBuildingPosition, tTargetLocation) <= iMaxAreaToSearch then
+                                    --Check we're not building by a mex
+                                    --if M27Utilities.IsTableEmpty(M27MapInfo.GetResourcesNearTargetLocation(tBuildingPosition, iNewBuildingRadius, true)) == true then
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': No resources near the target build position') end
+                                        iBuildingCount = iBuildingCount + 1
+                                        tPossibleTargets[iBuildingCount] = tBuildingPosition
+                                    --else
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': Have resources near the target build position') end
+                                    --end
+                                end
                             end
                         end
-                    end
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Cant find any buildings for adjacency, getting random location to build unless we want to build by a mex/hydro and have an unbuilt one nearby') end
-                    bFindRandomLocation = true
-                end
-                --Also check for unbuilt buildings if dealing with a mex or hydro
-                local tResourceLocations
-                if EntityCategoryContains(M27UnitInfo.refCategoryMex, sBlueprintBuildBy) then
-                    tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, true)
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryHydro, sBlueprintBuildBy) or EntityCategoryContains(M27UnitInfo.refCategoryT2Power, sBlueprintBuildBy) then --Dont want to make this all power, because the adjacency code requires a building size, and only works for a single building size; i.e. if try and get adjacency for t1 power and include hydro locations, then it will think it needs to build within the hydro for adjacency
-                    tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, false)
-                end
-                if M27Utilities.IsTableEmpty(tResourceLocations) == false then
-                    for iResource, tCurResourceLocation in tResourceLocations do
-                        iBuildingCount = iBuildingCount + 1
-                        tPossibleTargets[iBuildingCount] = tCurResourceLocation
-                    end
-                end
-                if iBuildingCount > 0 then
-                    local iDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                    local bBuildNearToEnemy = false
-                    if iDistanceFromStart <= 80 then bBuildNearToEnemy = true end
-                                --GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
-                    tTargetLocation = GetAdjacencyLocationForTarget(tPossibleTargets, sBlueprintBuildBy, sBlueprintToBuild, true, aiBrain, true, tTargetLocation, iMaxAreaToSearch, iBuilderRange, false, true, bBuildNearToEnemy, not(bBuildNearToEnemy), bLookForQueuedBuildings)
-                    if M27Utilities.IsTableEmpty(tTargetLocation) == true then
-                        if bDebugMessages == true then LOG('Adjacency location is empty, will try finding anywhere to build') end
-                        bFindRandomLocation = true
                     else
-                        if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) == false then
-                            M27Utilities.ErrorHandler('Cant build '..sBlueprintToBuild..' on adjacency location tTargetLocation='..repr(tTargetLocation))
+                        if bDebugMessages == true then LOG(sFunctionRef..': Cant find any buildings for adjacency, getting random location to build unless we want to build by a mex/hydro and have an unbuilt one nearby') end
+                        bFindRandomLocation = true
+                    end
+                    --Also check for unbuilt buildings if dealing with a mex or hydro
+                    local tResourceLocations
+                    if EntityCategoryContains(M27UnitInfo.refCategoryMex, sBlueprintBuildBy) then
+                        tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, true)
+                    elseif EntityCategoryContains(M27UnitInfo.refCategoryHydro, sBlueprintBuildBy) or EntityCategoryContains(M27UnitInfo.refCategoryT2Power, sBlueprintBuildBy) then --Dont want to make this all power, because the adjacency code requires a building size, and only works for a single building size; i.e. if try and get adjacency for t1 power and include hydro locations, then it will think it needs to build within the hydro for adjacency
+                        tResourceLocations = M27MapInfo.GetResourcesNearTargetLocation(tTargetLocation, 30, false)
+                    end
+                    if M27Utilities.IsTableEmpty(tResourceLocations) == false then
+                        for iResource, tCurResourceLocation in tResourceLocations do
+                            iBuildingCount = iBuildingCount + 1
+                            tPossibleTargets[iBuildingCount] = tCurResourceLocation
+                        end
+                    end
+                    if iBuildingCount > 0 then
+                                    --GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to call GetBestBuildLocation; iBuildingCount='..iBuildingCount..'; sBlueprintBuildBy='..sBlueprintBuildBy) end
+                        tTargetLocation = GetBestBuildLocationForTarget(tPossibleTargets, sBlueprintBuildBy, sBlueprintToBuild, true, aiBrain, true, tTargetLocation, iMaxAreaToSearch, iBuilderRange, false, true, bBuildNearToEnemy, not(bBuildNearToEnemy), bLookForQueuedBuildings)
+                        if M27Utilities.IsTableEmpty(tTargetLocation) == true then
+                            if bDebugMessages == true then LOG('Adjacency location is empty, will try finding anywhere to build') end
                             bFindRandomLocation = true
                         else
-                            --Check we're within mapBoundary
-                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if tTargetLocation '..repr(tTargetLocation)..' is in the playable area '..repr(M27MapInfo.rMapPlayableArea)..' based on building size radius='..iNewBuildingRadius) end
-                            if (tTargetLocation[1] - iNewBuildingRadius) < M27MapInfo.rMapPlayableArea[1] or (tTargetLocation[3] - iNewBuildingRadius) < M27MapInfo.rMapPlayableArea[2] or (tTargetLocation[1] + iNewBuildingRadius) > M27MapInfo.rMapPlayableArea[3] or (tTargetLocation[3] + iNewBuildingRadius) > M27MapInfo.rMapPlayableArea[4] then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Target location isnt in playable area so will find random place to build instead') end
+                            bFindRandomLocation = false
+                            if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) == false then
+                                M27Utilities.ErrorHandler('Cant build '..sBlueprintToBuild..' on adjacency location tTargetLocation='..repr(tTargetLocation))
                                 bFindRandomLocation = true
-                                tTargetLocation = tEngineerPosition
+                            else
+                                --Check we're within mapBoundary
+                                if bDebugMessages == true then LOG(sFunctionRef..': Checking if tTargetLocation '..repr(tTargetLocation)..' is in the playable area '..repr(M27MapInfo.rMapPlayableArea)..' based on building size radius='..iNewBuildingRadius) end
+                                if (tTargetLocation[1] - iNewBuildingRadius) < M27MapInfo.rMapPlayableArea[1] or (tTargetLocation[3] - iNewBuildingRadius) < M27MapInfo.rMapPlayableArea[2] or (tTargetLocation[1] + iNewBuildingRadius) > M27MapInfo.rMapPlayableArea[3] or (tTargetLocation[3] + iNewBuildingRadius) > M27MapInfo.rMapPlayableArea[4] then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Target location isnt in playable area so will find random place to build instead') end
+                                    bFindRandomLocation = true
+                                    tTargetLocation = tEngineerPosition
+                                end
+                                if bDebugMessages == true then M27Utilities.DrawLocation(tTargetLocation) end
                             end
-                            if bDebugMessages == true then M27Utilities.DrawLocation(tTargetLocation) end
                         end
+                    else
+                        bFindRandomLocation = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': Cant find any valid buildings for adjacency') end
                     end
                 else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have a category to build by, will look for random location unless current target is valid') end
                     bFindRandomLocation = true
-                    if bDebugMessages == true then LOG(sFunctionRef..': Cant find any valid buildings for adjacency') end
                 end
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': Dont have a category to build by, will look for random location unless current target is valid') end
-                bFindRandomLocation = true
-            end
-        end
-        if bFindRandomLocation == true then
-            if bDebugMessages == true then LOG(sFunctionRef..': Are finding a random location to build unless current location is valid; sBlueprintToBuild='..sBlueprintToBuild) end
-            if M27Utilities.IsTableEmpty(tTargetLocation) == true then tTargetLocation = tEngineerPosition end
-            if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) == false then
-                if bDebugMessages == true then
-                    LOG(sFunctionRef..' Cant build '..sBlueprintToBuild..' and '..repr(tTargetLocation))
-                    if iCategoryToBuild == nil then LOG(sFunctionRef..' iCategoryToBuild is nil somehow') end
-                end
-                if EntityCategoryContains(refCategoryMex, sBlueprintToBuild) or EntityCategoryContains(refCategoryHydro, sBlueprintToBuild) or EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, sBlueprintToBuild) then
-                    --Cant build at location, is that because of enemy building blocking it, or we have a part-built building?
-                    if bDebugMessages == true then LOG(sFunctionRef..': Are trying to build a mex or hydro or mass storage so cant get a random location') end
-                    local tEnemyBuildingAtTarget = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tTargetLocation, 1, 'Enemy')
-                    if M27Utilities.IsTableEmpty(tEnemyBuildingAtTarget) == false then
-                        M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
-                        oEngineer:IssueReclaim(tEnemyBuildingAtTarget[1])
-                        IssueBuildMobile({oEngineer}, tTargetLocation, sBlueprintToBuild, {})
-                        bAbortConstruction = true
-                        bFoundEnemyInstead = true
-                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy building is at the target mex/hydro so will try and reclaim that first') end
+                --Dealing with mex or hydro or storage
+                if bDebugMessages == true then LOG(sFunctionRef..': Are trying to build a mex, hydro or storage; tTargetLocation='..repr((tTargetLocation or {}))..'; oEngineer='..GetEngineerUniqueCount(oEngineer)..'; LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
+                if M27Utilities.IsTableEmpty(tTargetLocation) == true then
+                    M27Utilities.ErrorHandler('Trying to build mex, hydro or storage without defined location')
+                else
+                    if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Can build structure at targetlocation='..repr(tTargetLocation)) end
                     else
-                        local tAllyBuildingAtTarget = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tTargetLocation, 1, 'Ally')
-                        if M27Utilities.IsTableEmpty(tAllyBuildingAtTarget) == false then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Will target the ally building as its part complete') end
-                            oPartCompleteBuilding = tAllyBuildingAtTarget[1]
+                        --Cant build at location, is that because of enemy building blocking it, or we have a part-built building?
+                        if bDebugMessages == true then LOG(sFunctionRef..': Are trying to build a mex or hydro or mass storage so cant get a random location') end
+                        local tEnemyBuildingAtTarget = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tTargetLocation, 1, 'Enemy')
+                        if M27Utilities.IsTableEmpty(tEnemyBuildingAtTarget) == false then
+                            M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
+                            oEngineer:IssueReclaim(tEnemyBuildingAtTarget[1])
+                            IssueBuildMobile({oEngineer}, tTargetLocation, sBlueprintToBuild, {})
+                            bAbortConstruction = true
+                            bFoundEnemyInstead = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy building is at the target mex/hydro so will try and reclaim that first') end
                         else
-                            --Are we stopped from building due to reclaim?
-
-                            local tNewBuildingSize = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)
-                            local fSizeMod = 0.5
-
-                            local rTargetRect = M27Utilities.GetRectAroundLocation(tTargetLocation, tNewBuildingSize[1] * fSizeMod)
-                            if bDebugMessages == true then LOG(sFunctionRef..': tTargetLocation='..repr(tTargetLocation)..'; tNewBuildingSize='..repr(tNewBuildingSize)..'; rTargetRect='..repr(rTargetRect)) end
-                            --GetReclaimInRectangle(iReturnType, rRectangleToSearch)
-                            --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass, 4 = valid wrecks
-                            local tReclaimables = M27MapInfo.GetReclaimInRectangle(4, rTargetRect)
-
-                            if M27Utilities.IsTableEmpty(tReclaimables) == false then
-                                for iReclaim, oReclaim in tReclaimables do
-                                    --oEngineer:IssueReclaim(oReclaim)
-                                    IssueReclaim({oEngineer}, oReclaim)
-                                end
-                                IssueBuildMobile({oEngineer}, tTargetLocation, sBlueprintToBuild, {})
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef..': Reclaim found that is blocking mex or hydro so will reclaim all wrecks in rectangle='..repr(rTargetRect))
-                                    M27Utilities.DrawRectangle(rTargetRect, 7, 100)
-                                end
+                            local tAllyBuildingAtTarget = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tTargetLocation, 1, 'Ally')
+                            if M27Utilities.IsTableEmpty(tAllyBuildingAtTarget) == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will target the ally building as its part complete') end
+                                oPartCompleteBuilding = tAllyBuildingAtTarget[1]
                             else
-                                LOG('Warning: Cant build at resource location but no enemy or ally units on it, will just try moving near the target instead')
-                                M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
-                                bAbortConstruction = true
+                                --Are we stopped from building due to reclaim?
+
+                                local tNewBuildingSize = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)
+                                local fSizeMod = 0.5
+
+                                local rTargetRect = M27Utilities.GetRectAroundLocation(tTargetLocation, tNewBuildingSize[1] * fSizeMod)
+                                if bDebugMessages == true then LOG(sFunctionRef..': tTargetLocation='..repr(tTargetLocation)..'; tNewBuildingSize='..repr(tNewBuildingSize)..'; rTargetRect='..repr(rTargetRect)) end
+                                --GetReclaimInRectangle(iReturnType, rRectangleToSearch)
+                                --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass, 4 = valid wrecks
+                                local tReclaimables = M27MapInfo.GetReclaimInRectangle(4, rTargetRect)
+
+                                if M27Utilities.IsTableEmpty(tReclaimables) == false then
+                                    for iReclaim, oReclaim in tReclaimables do
+                                        --oEngineer:IssueReclaim(oReclaim)
+                                        IssueReclaim({oEngineer}, oReclaim)
+                                    end
+                                    IssueBuildMobile({oEngineer}, tTargetLocation, sBlueprintToBuild, {})
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef..': Reclaim found that is blocking mex or hydro so will reclaim all wrecks in rectangle='..repr(rTargetRect))
+                                        M27Utilities.DrawRectangle(rTargetRect, 7, 100)
+                                    end
+                                else
+                                    M27Utilities.ErrorHandler(sFunctionRef..': Cant build at resource location but no enemy or ally units on it, will just try moving near the target instead', nil, true)
+                                    M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
+                                    bAbortConstruction = true
+                                end
                             end
                         end
                     end
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Not trying to build mex or hydro so about to find random place to build') end
-                    --FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug)
-                    tTargetLocation = FindRandomPlaceToBuild(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 2, iMaxAreaToSearch, bDebugMessages)
-                    if M27Utilities.IsTableEmpty(tTargetLocation) == true then
-                        LOG(sFunctionRef..': WARNING - couldnt find a random place to build based on position='..repr(tTargetLocation)..'; will abort construction')
-                        bAbortConstruction = true
-                    end
+                end
+            end
+        end
+        if bFindRandomLocation == true and not(bAbortConstruction) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are finding a random location to build unless current location is valid; sBlueprintToBuild='..sBlueprintToBuild) end
+            if M27Utilities.IsTableEmpty(tTargetLocation) == true then tTargetLocation = tEngineerPosition end
+            --First check in build area for the best location
+            tTargetLocation = GetBestBuildLocationForTarget(tTargetLocation, nil, sBlueprintToBuild, true, aiBrain, true, tTargetLocation, iMaxAreaToSearch, iBuilderRange, false, true, bBuildNearToEnemy, not(bBuildNearToEnemy), false)
+            if M27Utilities.IsTableEmpty(tTargetLocation) == true then
+                tTargetLocation = tEngineerPosition
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..' Cant build '..sBlueprintToBuild..' and '..repr(tTargetLocation)..'; will try and find a random place to build')
+                    if iCategoryToBuild == nil then LOG(sFunctionRef..' iCategoryToBuild is nil somehow') end
+                end
+                --FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug)
+                tTargetLocation = FindRandomPlaceToBuild(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 2, iMaxAreaToSearch, bDebugMessages)
+                if M27Utilities.IsTableEmpty(tTargetLocation) == true then
+                    LOG(sFunctionRef..': WARNING - couldnt find a random place to build based on position='..repr(tTargetLocation)..'; will abort construction')
+                    bAbortConstruction = true
                 end
             else if bDebugMessages == true then LOG(sFunctionRef..': No need for random place as current targetlocation is valid, ='..repr(tTargetLocation)) end
             end
