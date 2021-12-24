@@ -139,7 +139,7 @@ function OnDamaged(self, instigator)
                     if self.PlatoonHandle and aiBrain:PlatoonExists(self.PlatoonHandle) then M27PlatoonUtilities.RetreatLowHealthShields(self.PlatoonHandle, aiBrain)
                     else
                         --Assign to a retreating platoon
-                        local oShieldPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', {oCurUnitToAssign}, true)
+                        local oShieldPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', {self}, true)
                     end
                 end
             end
