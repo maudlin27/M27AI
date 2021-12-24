@@ -37,6 +37,7 @@ function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately
     if sPlatoonPlan == nil then
         M27Utilities.ErrorHandler('sPlatoonPlan is nil')
     else
+        if sPlatoonPlan == 'M27MobileShield' then bDebugMessages = false end
         local tPlatoonTemplate = M27PlatoonTemplates.PlatoonTemplate[sPlatoonPlan]
         if M27Utilities.IsTableEmpty(tPlatoonTemplate) == true then
             M27Utilities.ErrorHandler('Dont have a platoon template for sPlatoonPlan='..sPlatoonPlan)
@@ -58,6 +59,9 @@ function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately
                 IssueClearCommands(oPlatoonUnits)
                 IssueMove(oPlatoonUnits, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             end--]]
+
+            --Make sure our cycler works (the normal platoon.lua should do this but have come across some instances where it doesnt seem to work)
+            ForkThread(M27PlatoonUtilities.PlatoonCycler, oNewPlatoon)
         end
     end
     --Check first unit has a platoon now
@@ -546,6 +550,7 @@ end
 function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemoveExistingShield)
     local sFunctionRef = 'DoesPlatoonWantAnotherMobileShield'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true then bDebugMessages = true end
 
     local iPlatoonValueToShieldRatio = 3.5 --want 3.5 mass in the platoon for every 1 mass in the shield
     if bDebugMessages == true then LOG(sFunctionRef..': About to consider if oPlatoon '..oPlatoon:GetPlan()..(oPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil')..' wants a shield; oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort]='..tostring(oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort])) end
@@ -577,6 +582,18 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
             end
             iShieldUnitsHave = oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiCurrentUnits]
             if iShieldUnitsHave == nil then iShieldUnitsHave = 0 end
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Supporting shield platoon details='..oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon]:GetPlan()..(oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonCount] or 'nil'))
+                local tShieldPlatoonUnits = oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon]:GetPlatoonUnits()
+                if M27Utilities.IsTableEmpty(tShieldPlatoonUnits) == true then
+                    LOG('Shield platoon units is empty')
+                    if M27Utilities.IsTableEmpty(oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.reftCurrentUnits]) == true then LOG('reftCurrentUnits is also empty') else LOG('reftCurrentUnits isnt empty though') end
+                else LOG('Size of shield platoon units='..table.getn(tShieldPlatoonUnits)..'; will list out each unit')
+                    for iShield, oShield in tShieldPlatoonUnits do
+                        LOG('Shield unit='..oShield:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oShield))
+                    end
+                end
+            end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': iShieldValueWanted='..iShieldValueWanted..'; iShieldValueHave='..iShieldValueHave..'; iShieldMass='..iShieldMass..'; iShieldUnitsHave='..iShieldUnitsHave) end
         if iShieldValueWanted > (iShieldValueHave + iShieldMass) and iShieldUnitsHave < 5 then
@@ -671,22 +688,27 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
         if M27Utilities.IsTableEmpty(tMobileShieldUnits) == false then
             for iUnit, oUnit in tMobileShieldUnits do
                 if oUnit.GetPosition and not(oUnit.Dead) then
-                    oCurUnitToAssign = oUnit
-                    tMobileShieldUnits[iUnit] = nil
-                    bRetreatCurShield = true
-                    tStartPosition = oCurUnitToAssign:GetPosition()
-                    --Do we want to assign to a platoon or run away?
-                    if oUnit:GetShieldRatio(true) >= 0.8 then --WARNING: Mustnt be higher than the logic for retreating a shield or else risk infinite loop
-                        --Are we either close to our base or have no enemy untis near the shield?
-                        if M27Utilities.GetDistanceBetweenPositions(tStartPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iBaseSafeDistance then
-                            bRetreatCurShield = false
-                        else
-                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, tStartPosition, iEnemySearchRange, 'Enemy')) == true then
+                    --Are we already in a mobile shield platoon?
+                    if oUnit.PlatoonHandle and oUnit.PlatoonHandle.GetPlan and oUnit.PlatoonHandle:GetPlan() == 'M27MobileShield' then
+                        --Do nothing
+                    else
+                        oCurUnitToAssign = oUnit
+                        tMobileShieldUnits[iUnit] = nil
+                        bRetreatCurShield = true
+                        tStartPosition = oCurUnitToAssign:GetPosition()
+                        --Do we want to assign to a platoon or run away?
+                        if oUnit:GetShieldRatio(true) >= 0.8 then --WARNING: Mustnt be higher than the logic for retreating a shield or else risk infinite loop
+                            --Are we either close to our base or have no enemy untis near the shield?
+                            if M27Utilities.GetDistanceBetweenPositions(tStartPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iBaseSafeDistance then
                                 bRetreatCurShield = false
+                            else
+                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - M27UnitInfo.refCategoryAirAA - M27UnitInfo.refCategoryAirScout, tStartPosition, iEnemySearchRange, 'Enemy')) == true then
+                                    bRetreatCurShield = false
+                                end
                             end
                         end
+                        break
                     end
-                    break
                 end
             end
         else oCurUnitToAssign = nil end
@@ -754,6 +776,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                         --Add to existing platoon
                         aiBrain:AssignUnitsToPlatoon(oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], { oCurUnitToAssign }, 'Attack', 'GrowthFormation')
                         M27PlatoonUtilities.RecordPlatoonUnitsByType(oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon], false)
+
                         if bDebugMessages == true then LOG(sFunctionRef..': Added shield unit to existing platoon='..oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon]:GetPlan()..oUnitOrPlatoonToHelp[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonCount]) end
                     else
                         --Create new platoon
