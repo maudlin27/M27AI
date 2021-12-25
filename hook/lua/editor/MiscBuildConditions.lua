@@ -14,7 +14,7 @@ function M27IsXNearbyMex(aiBrain, bool, iMexNumber)
     end
 end
 function M27IsXPlusNearbyMex(aiBrain, bool, iMexNumber)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local iNearbyMex = M27MapInfo.RecordMexNearStartPosition(M27Utilities.GetAIBrainArmyNumber(aiBrain), nil, true)
     if bDebugMessages == true then LOG('M27IsXPlusNearbyMex: iNearbyMex='..iNearbyMex) end
     if iNearbyMex >= iMexNumber then return bool
@@ -33,7 +33,7 @@ end
 function M27IsUnclaimedHydro(aiBrain, bool, bOurSideOfMap)
     --returns true if are any unclaimed hydro positions on the map (refreshes every 5s)
     --bOurSideOfMap: true if only consider hydro positions closer to us than enemy
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'M27IsUnclaimedHydro'
     if M27MapInfo.HydroCount > 0 then
         local iLastCheck = aiBrain[sFunctionRef]
@@ -70,7 +70,7 @@ end
 
 function M27HydroUnderConstruction(aiBrain, bool)
 --Returns true if a hydro is under construction; resets hydro tracker variable if any hydro has been completed
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local iArmy = M27Utilities.GetAIBrainArmyNumber(aiBrain)
     if M27ConUtility.tHydroBuilder[iArmy][1] == nil then
         --LOG('Build condition: Hydro Under construction: Not started yet')
@@ -108,7 +108,7 @@ function M27MexToFactoryRatio(aiBrain, bool, iMexesPerFactory)
 end
 
 function M27NeedDefenders(aiBrain, bool)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then
         if aiBrain[M27Overseer.refbNeedDefenders] == nil then aiBrain[M27Overseer.refbNeedDefenders] = false end
         LOG('MIBC: M27NeedDefenders: aiBrain[M27Overseer.refbNeedDefenders]='..tostring(aiBrain[M27Overseer.refbNeedDefenders])) end
@@ -116,7 +116,7 @@ function M27NeedDefenders(aiBrain, bool)
 end
 
 function M27NeedScoutPlatoons(aiBrain, bool)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG('M27NeedScoutPlatoons: aiBrain[M27Overseer.refbNeedScoutPlatoons]='..tostring(aiBrain[M27Overseer.refbNeedScoutPlatoons])..'; bool='..tostring(bool)) end
     if aiBrain[M27Overseer.refbNeedScoutPlatoons] == true then return bool else return not(bool) end
 end
@@ -136,7 +136,7 @@ function M27NeedMAABuilt(aiBrain, bool, iMassOnMAAVsEnemyAir)
 end
 
 function M27IsUnclaimedMexNearACU(aiBrain, bool)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then
         if aiBrain[M27Overseer.refbUnclaimedMexNearACU] == nil then
             LOG('MIBC M27IsUnclaimedMexNearACU: refbUnclaimedMexNearACU=nil')
@@ -174,7 +174,7 @@ function M27ACUHasGunUpgrade(aiBrain, bool, bBothUpgrades)
     --For some reason referencing this function from elsewhere causes an error, so M27GeneralLogic includes a variant of this
     --Returns true if commander has finished any of the gun upgrades
     --[[
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local oACU = M27Utilities.GetACU(aiBrain)
     local bHasGun = false
     local tGunUpgrades = { 'HeavyAntiMatterCannon',
@@ -190,7 +190,7 @@ function M27ACUHasGunUpgrade(aiBrain, bool, bBothUpgrades)
     end
     if bDebugMessages == true then LOG('M27ACUHasGunUpgradebHasGun: No gun upgrades, returning false') end
     return not(bool)]]--
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'M27ACUHasGunUpgrade'
     local bHasGun = M27Conditions.DoesACUHaveGun(aiBrain, bBothUpgrades)
     if bDebugMessages == true then LOG(sFunctionRef..': ACU has gun='..tostring(bHasGun)..'; bool condition='..tostring(bool)) end

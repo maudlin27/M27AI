@@ -10,11 +10,11 @@ BaseBuilderTemplate {
     BaseTemplateName = 'M27AI',
     Builders = {
         -- List all our builder groups here
-        'M27ACUBuildOrder',
-        'M27AIEngineerBuilder',
-        'M27AILandBuilder',
-        'M27AIAirBuilder',
-        'M27AIPlatoonBuilder',
+        --'M27ACUBuildOrder',
+        --'M27AIEngineerBuilder',
+        'M27AILandBuilder', --If remove this then causes an error - guessing we need at least 1 non-platoon builder
+        --'M27AIAirBuilder',
+        --'M27AIPlatoonBuilder',
 
         --'M27AI T1 Reclaim',
     },

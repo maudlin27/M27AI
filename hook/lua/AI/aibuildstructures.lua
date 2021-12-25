@@ -15,7 +15,7 @@ function AddToBuildQueue(aiBrain, builder, whatToBuild, buildLocation, relative)
     if aiBrain.M27AI == false then
         M27AddToBuildQueue(aiBrain, builder, whatToBuild, buildLocation, relative)
     else
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         --repeat of core code, but with log added for debugging:
         if not builder.EngineerBuildQueue then
             builder.EngineerBuildQueue = {}
@@ -78,11 +78,11 @@ function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder,
     if not aiBrain.M27AI then
         return M27AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder, relative, buildingTemplate, baseTemplate, reference, NearMarkerType)
     else
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'aiBuildStructures'
         M27Utilities.ErrorHandler('Not an error but I want to move away from using this function - this is to highlight if I have any code still using this that I have missed')
         if builder and not(builder.Dead) then
-            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             -- M27AI - initially a copy of the original code, so that tweaks can be added
             if bDebugMessages == true then LOG('* M27AI: aibuildstructures.lua: Hook successful') end
 
@@ -185,8 +185,8 @@ function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder,
                         local bBuildNearToEnemy = true
                         if iDistFromStart >= 80 then bBuildNearToEnemy = false end
                         local bBuildAwayFromEnemy = not(bBuildNearToEnemy)
-                        --GetAdjacencyLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
-                        relativeLoc = M27EngineerOverseer.GetAdjacencyLocationForTarget(tBuildAdjacentTo, sBuildAdjacentToBP, sToBuildBP, true, aiBrain, true, builderPos, iBuildDistance, iBuildDistance, false, true, bBuildNearToEnemy, bBuildAwayFromEnemy)
+                        --GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
+                        relativeLoc = M27EngineerOverseer.GetBestBuildLocationForTarget(tBuildAdjacentTo, sBuildAdjacentToBP, sToBuildBP, true, aiBrain, true, builderPos, iBuildDistance, iBuildDistance, false, true, bBuildNearToEnemy, bBuildAwayFromEnemy)
 
                         if relativeLoc == nil or relativeLoc[1] == nil then
                             --Do nothing

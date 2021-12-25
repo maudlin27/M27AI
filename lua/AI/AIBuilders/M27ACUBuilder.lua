@@ -1,3 +1,4 @@
+--OBSOLETE - below isnt united by M27AI
 local UCBC = '/lua/editor/UnitCountBuildConditions.lua'
 local EBC = '/lua/editor/EconomyBuildConditions.lua'
 local IBC = '/lua/editor/InstantBuildConditions.lua'
@@ -8,9 +9,23 @@ local SAI = '/lua/ScenarioPlatoonAI.lua'
 local MIBC = '/lua/editor/MiscBuildConditions.lua'
 local MABC = '/lua/editor/MarkerBuildConditions.lua'
 
-BuilderGroup {
+--[[BuilderGroup {
     BuilderGroupName = 'M27ACUBuildOrder', -- Globally unique key that the AI base template file uses to add the contained builders to your AI.
     BuildersType = 'EngineerBuilder', -- The kind of builder this is.  One of 'EngineerBuilder', 'PlatoonFormBuilder', or 'FactoryBuilder'.
+    Builder {
+        BuilderName = 'Ignore', -- Names need to be GLOBALLY unique.  Prefixing the AI name will help avoid name collisions with other AIs.
+        PlatoonTemplate = 'M27CommanderBuilder', -- Specify what platoon template to use, see the PlatoonTemplates folder.
+        Priority = 1500,
+        BuilderConditions = {
+            { MIBC, 'M27TestReturnFalse', {true} },
+        },
+        BuilderData = {
+            Construction = {
+                BuildStructures = { 'T1LandFactory',
+                }
+            }
+        }
+    },--]]
     -- The initial build order - note this is set to repeat with a <1 factory condition, due to rare issue on 1 map (so possible happens on others) where depending on the adjacency location chosen for building the factory wont build with the feirst build command, but after waiting 1 tick and retrying it will
     --[[
     Builder {
@@ -265,7 +280,7 @@ BuilderGroup {
         BuilderType = 'Any',
     },--]]
 
-
+    --[[
     --Gun upgrades by faction:
     Builder {
         BuilderName = 'M27GunComUEF', -- Names need to be GLOBALLY unique.  Prefixing the AI name will help avoid name collisions with other AIs.
@@ -357,5 +372,5 @@ BuilderGroup {
         BuilderData = {
             Enhancement = { 'RateOfFire' },
         },
-    },
-}
+    },--]]
+--}

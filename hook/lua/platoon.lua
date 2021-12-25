@@ -18,7 +18,7 @@ Platoon = Class(M27PlatoonClass) {
     PlatoonDisband = function(self)
 
         if self.GetBrain and self:GetBrain().M27AI then
-            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             local sFunctionRef = 'PlatoonDisband'
             if bDebugMessages == true then LOG(sFunctionRef..' Just attempted to disband platoon') end
             M27PlatoonClass.PlatoonDisband(self)
@@ -48,7 +48,7 @@ Platoon = Class(M27PlatoonClass) {
     -- For AI Patch V9. Fixed a bug where the ACU stops working when build to close
             local bDoNothing = false
 
-            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             if bDebugMessages == true then LOG('Running ProcessBuildCommand') end
             if not eng or eng.Dead or not eng.PlatoonHandle then
                 return
@@ -226,7 +226,7 @@ Platoon = Class(M27PlatoonClass) {
 
         --Gets engineer to attack-move to the best reclaim area on the map (based on location, mass value, how many other platoons have gone, etc.)
         --does nothing if engineer is busy
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local bPlatoonNameDisplay = false
         if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
         local sPlatoonName = 'M27ReclaimAI'
@@ -304,7 +304,7 @@ Platoon = Class(M27PlatoonClass) {
 
         --Used with initial build order to get ACU to assist engineer constructing a hydro; stops as soon as player has a hydro constructed
         --Done before had introduced main platoon logic, so most of this is manual, but it's been updated to reference some of the standard platoon logic re nearby enemies, mexes and reclaim
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sPlatoonName = 'M27AssistHydroEngi'
         M27Utilities.ErrorHandler('Redundant AI logic '..sPlatoonName..' still being used')
         local sFunctionRef = sPlatoonName
@@ -507,7 +507,7 @@ Platoon = Class(M27PlatoonClass) {
         --Intended as low priority function for ACU and spare engis to help any engis building near it in the base, unless engi is building a mex
         --will keep searching for engi that is building something nearby; once located will assist the engi and cancel the platoon
         --if no ACU in platoon, then will attack-move to home base if no nearby units
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local bPlatoonNameDisplay = false
         if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
         local sPlatoonName = 'M27EngiAssister'
@@ -666,7 +666,7 @@ Platoon = Class(M27PlatoonClass) {
     end,
 
 
---START OF ACTUAL PLATOON CODE - we just list out every platoon here for now, long term want to just remove use of platoon.lua entirely
+--START OF ACTUAL PLATOON CODE - we just list out every platoon here for now, long term might want to just remove use of platoon.lua entirely
     M27AttackNearestUnits = function(self)
         --Has platoon attack nearby structures and (if there are none) nearby land units forever; if no known units then will attack enemy base and then go back to our base and repeat
         M27PlatoonUtilities.PlatoonCycler(self)
@@ -705,6 +705,9 @@ Platoon = Class(M27PlatoonClass) {
         --Scout that will follow a target and provide it with intel
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27LocationAssister = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
     M27MAAAssister = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
@@ -712,6 +715,12 @@ Platoon = Class(M27PlatoonClass) {
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27CombatPatrolAI = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27MobileShield = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27RetreatingShieldUnits = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27IdleScouts = function(self)

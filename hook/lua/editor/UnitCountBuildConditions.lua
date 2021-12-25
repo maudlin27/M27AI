@@ -4,7 +4,7 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 
 function M27LifetimeBuildCountLessThan(aiBrain, bool, category, iBuiltThreshold)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local iTotalBuilt = 0
     if bDebugMessages == true then LOG('M27LifetimeBuildCountLessThan - start') end
     local testCat = category
@@ -37,7 +37,7 @@ end
 
 function M27LifetimePlatoonCount(aiBrain, bool, sPlatoonAI, iBuiltThreshold, bLessThan)
     --bLessThan: True if test is whether are less than the number; false if test is greater than
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'M27LifetimePlatoonCount'
     if bDebugMessages == true then LOG(sFunctionRef..': start') end
     if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] == nil then aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] = {} end
@@ -55,7 +55,7 @@ function M27LifetimePlatoonCount(aiBrain, bool, sPlatoonAI, iBuiltThreshold, bLe
 end
 
 function M27LifetimePlatoonCountLessThan(aiBrain, bool, sPlatoonAI, iBuiltThreshold)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG('M27LifetimePlatoonCountLessThan - start') end
     if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] == nil then aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] = {} end
     local iCurCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount][sPlatoonAI]
@@ -69,7 +69,7 @@ end
 
 function M27AtLeastXUnclaimedMexesNearUs(aiBrain, bool, iUnclaimedThreshold)
     --Checks if are iUnclaimedThreshold mexes left that are closer to aiBrain than the enemy; refreshes details of unclaimed mexes every 10s
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'M27AtLeastXUnclaimedMexesNearUs'
     local iLastCheck = aiBrain[sFunctionRef]
     local bRefreshCheck = false

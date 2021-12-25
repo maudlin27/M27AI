@@ -36,6 +36,7 @@ refiStartingSegmentGroup = 'M27StartingSegmentGroup' --[sPathingType]  - returns
 reftSortedMexesInOriginalGroup = 'M27SortedMexesInOriginalGroup' --Local to AI Brain, [iPathingGroup][iMexCount], returns mex location; ordered based on how close the mex is to our base and enemy (early entries are closest to our base)
 reftMexesInPathingGroupFilteredByDistanceToEnemy = 'M27MexesInPathingGroupFilteredByDistanceToEnemy' --local to aiBrain; [sPathing][iPathingGroup][iMinRangeFromEnemy][iMaxRangeFromEnemy][iMexCount] returns Mex Location
 reftHighPriorityMexes = 'M27HighPriorityMexes' --Local to aiBrain, list of mex locations
+reftMexesToKeepScoutsBy = 'M27MapMexesToKeepScoutsBy'
 
 reftMexPatrolLocations = 'M27MapMexPatrolLocations' --aiBrain variable, [x] = nth mex will be the locations e.g. top 3 locations to patrol between
 refbCanPathToEnemyBaseWithLand = 'M27MapCanPathToEnemyWithLand' --True if can path to enemy base, false otherwise
@@ -47,7 +48,7 @@ bMapHasWater = true --true or false based on water % of map
 bPathfindingAlreadyCommenced = false
 bMapDrawingAlreadyCommenced = {}
 bPathfindingComplete = false
-rMapPlayableArea = 2 --Set at start of the game, use instead of the scenarioinfo method
+rMapPlayableArea = 2 --{x1,z1, x2,z2} - Set at start of the game, use instead of the scenarioinfo method
 iPathingIntervalSize = 0.5
 iLowHeightDifThreshold = 0.007 --Used to trigger check for max height dif in an area
 iHeightDifAreaSize = 0.2 --T1 engineer is 0.6 x 0.9, so this results in a 1x1 size box by searching +- iHeightDifAreaSize if this is set to 0.5; however given are using a 0.25 interval size dont want this to be too large or destroys the purpose of the interval size and makes the threshold unrealistic
@@ -67,7 +68,7 @@ iMaxBaseSegmentZ = 1
 iMapWaterHeight = 0 --Surface height of water on the map
 
 function DetermineMaxTerrainHeightDif()
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if M27Config.M27ShowPathingGraphically then bDebugMessages = true end
     local sFunctionRef = 'DetermineMaxTerrainHeightDif'
 
@@ -103,8 +104,9 @@ end
 
 function RecordResourcePoint(t,x,y,z,size)
     --called by hook into simInit, more reliable method of figuring out if have adaptive map
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordResourcePoint'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': t='..t..'; x='..x..'; y='..y..'; z='..z..'; size='..repr(size)) end
 
     if t == 'Mass' then
@@ -114,11 +116,13 @@ function RecordResourcePoint(t,x,y,z,size)
         HydroCount = HydroCount + 1
         HydroPoints[HydroCount] = {x,y,z}
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordResourceLocations(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordResourceLocations'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     M27Utilities.ErrorHandler('Deprecated, covered by RecordResourcePoint now')
     MassCount = 0
     HydroCount = 0
@@ -182,10 +186,11 @@ function RecordResourceLocations(aiBrain)
         end
     end -- GetMarkers() loop
     if bDebugMessages == true then
-        LOG(sFunctionRef..': Finished recording mass markers, total mass marker count='..MassCount..'; list of all mass points='..repr(MassPoints)) end
+        LOG(sFunctionRef..': Finished recording mass markers, total mass marker count='..MassCount..'; list of all mass points='..repr(MassPoints))
+    end
 
     -- MapMexCount = MassCount
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNotHydro)
@@ -193,8 +198,9 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
     --bMexNotHydro - true if looking for nearby mexes, false if looking for nearby hydros; defaults to true
 
     -- Returns a table containing positions of any mex meeting the criteria, unless bCountOnly is true in which case returns the no. of such mexes
-
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local sFunctionRef = 'RecordResourceNearStartPosition'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if iMaxDistance == nil then iMaxDistance = 12 end --NOTE: As currently only run the actual code to locate nearby mexes once, the first iMaxDistance will determine what to use, and any subsequent uses it wont matter
     if bMexNotHydro == nil then bMexNotHydro = true end
     if bCountOnly == nil then bCountOnly = false end
@@ -231,6 +237,7 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
         for iCurResource, v in tResourceNearStart[iArmy][iResourceType] do
             NearbyResourcePos[iResourceCount] = v
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return NearbyResourcePos
     else
         iResourceCount = 0
@@ -239,6 +246,7 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
             if bDebugMessages == true then LOG('valid resource location iResourceCount='..iResourceCount..'; v[1-3]='..v[1]..'-'..v[2]..'-'..v[3]) end
         end
         if bDebugMessages == true then LOG('RecordResourceNearStartPosition: iResourceCount='..iResourceCount..'; bmexNotHydro='..tostring(bMexNotHydro)..'; iMaxDistance='..iMaxDistance) end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iResourceCount
     end
 end
@@ -252,7 +260,7 @@ end
 
 function RecordPlayerStartLocations()
     -- Updates PlayerStartPoints to Record all the possible player start points
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local iMarkerType = 3
     for i = 1, 16 do
         local tempPos = ScenarioUtils.GetMarker('ARMY_'..i).position
@@ -272,8 +280,9 @@ function GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
     --Returns a table of locations of the chosen resource within iMaxDistance of tTargetPos
     --returns nil if no matches
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetResourcesNearTargetLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if iMaxDistance == nil then iMaxDistance = 7 end
     if bMexNotHydro == nil then bMexNotHydro = true end
     local iResourceCount = 0
@@ -300,6 +309,7 @@ function GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tNearbyResources
 end
 
@@ -351,6 +361,8 @@ function TEMPMAPTEST(sExtraRef)
 end
 
 function InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly, bReturnDestinationGroupOnly)
+    local sFunctionRef = 'InSameSegmentGroup'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oUnit and not(oUnit.Dead) and oUnit.GetUnitId then
         local sPathingType = M27UnitInfo.GetUnitPathingType(oUnit)
         local tCurPosition = oUnit:GetPosition()
@@ -363,11 +375,16 @@ function InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly, bReturnDe
             iTargetSegmentX, iTargetSegmentZ = GetPathingSegmentFromPosition(tDestination)
             iTargetGroup = tPathingSegmentGroupBySegment[sPathingType][iTargetSegmentX][iTargetSegmentZ]
         end
-        if bReturnUnitGroupOnly then return iUnitGroup
-        elseif bReturnDestinationGroupOnly then return iTargetGroup end
 
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        if bReturnUnitGroupOnly then
+            return iUnitGroup
+        elseif bReturnDestinationGroupOnly then
+            return iTargetGroup
+        end
         if iUnitGroup == iTargetGroup then return true else return false end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
@@ -389,8 +406,9 @@ function GetUnitSegmentGroup(oUnit)
 end
 
 function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetReclaimablesMassValue'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bAlsoReturnLargestReclaimPosition == nil then bAlsoReturnLargestReclaimPosition = false end
     if iIgnoreReclaimIfNotMoreThanThis == nil then iIgnoreReclaimIfNotMoreThanThis = 0 end
     if iIgnoreReclaimIfNotMoreThanThis < 0 then iIgnoreReclaimIfNotMoreThanThis = 0 end
@@ -432,6 +450,7 @@ function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPositi
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if bAlsoReturnLargestReclaimPosition then
         return iTotalMassValue, tReclaimPos
     else return iTotalMassValue end
@@ -440,8 +459,9 @@ end
 function GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
     --Returns the object/wreck of the nearest reclaim that is more than iMinReclaimValue and within iSearchRadius of tLocation
     --returns nil if no valid locations
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNearestReclaim'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if iMinReclaimValue == nil then iMinReclaimValue = 1 end
     if iSearchRadius == nil then iSearchRadius = 5 end
     local tRectangle = Rect(tLocation[1] - iSearchRadius, tLocation[3] - iSearchRadius, tLocation[1] + iSearchRadius, tLocation[3] + iSearchRadius)
@@ -475,6 +495,7 @@ function GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iClosestWreck == nil then
         if bDebugMessages == true then LOG(sFunctionRef..': No reclaimable objects found, returning nil') end
         return nil
@@ -485,6 +506,8 @@ end
 
 function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
     --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass, 4 = valid wrecks
+    local sFunctionRef = 'GetReclaimInRectangle'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tReclaimables = GetReclaimablesInRect(rRectangleToSearch)
     local iCurMassValue = 0
     local iWreckCount = 0
@@ -514,6 +537,7 @@ function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iReturnType == 1 then return bHaveReclaim
         elseif iReturnType == 2 then return iWreckCount
         elseif iReturnType == 3 then return iTotalMassValue
@@ -528,8 +552,9 @@ function UpdateReclaimMarkers()
     --Updates the global variable tReclaimAreas{}
     --Config settings:
     --Note: iMaxSegmentInterval defined at the top as a global variable
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end --set to true for certain positions where want logs to print
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'UpdateReclaimMarkers'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
     local iTimeBeforeFullRefresh = 60 --Will do a full refresh of reclaim every 1m
@@ -592,11 +617,14 @@ function UpdateReclaimMarkers()
                 iMapTotalMass = iMapTotalMass + iTotalMassValue
                 if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; iTotalMassValue='..iTotalMassValue) end
             end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(1)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
         if bDebugMessages == true then LOG('Finished updating reclaim areas') end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 --GetUnclaimedMexes - contained within EngineerOverseer
@@ -604,8 +632,10 @@ end
 function GetHydroLocationsForPathingGroup(oPathingUnit, sPathingType, iPathingGroup)
     --Return table of hydro locations for iPathingGroup
     --Return {} if no such table
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetHydroLocationsForPathingGroup'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local tHydroForPathingGroup = {}
     local bNeedToRecord = false
     if bDebugMessages == true then LOG(sFunctionRef..': Checking for hydros in pathing group; HydroCount='..HydroCount) end
@@ -638,12 +668,14 @@ function GetHydroLocationsForPathingGroup(oPathingUnit, sPathingType, iPathingGr
             LOG(sFunctionRef..': Couldnt find any hydros in pathing group')
         else LOG(sFunctionRef..': Found '..table.getn(tHydroForPathingGroup)..' hydros in pathing group') end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tHydroForPathingGroup
 end
 
 function RecordMexForPathingGroup()
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordMexForPathingGroup'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tsPathingTypes = {M27UnitInfo.refPathingTypeAmphibious, M27UnitInfo.refPathingTypeNavy, M27UnitInfo.refPathingTypeLand}
     local iCurResourceGroup
     local iValidCount = 0
@@ -664,14 +696,16 @@ function RecordMexForPathingGroup()
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..'; tMexByPathingAndGrouping='..repr(tMexByPathingAndGrouping)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordMexForPathingGroupOld(oPathingUnit, bForceRefresh)
     --Updates tMexByPathingAndGrouping to record the mex that are in the same pathing group as oPathingUnit
     --bForceRefresh - issue where not all mexes register as being pathable at start of game, so overseer will call this again after a short delay
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'RecordMexForPathingGroupOld'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oPathingUnit and not(oPathingUnit.Dead) then
         local sPathingType = M27UnitInfo.GetUnitPathingType(oPathingUnit)
         local tUnitPosition = oPathingUnit:GetPosition()
@@ -741,14 +775,15 @@ function RecordMexForPathingGroupOld(oPathingUnit, bForceRefresh)
     else
         M27Utilities.ErrorHandler('pathing unit is nil or dead so not recording mexes')
     end
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetNumberOfResource (aiBrain, bMexNotHydro, bUnclaimedOnly, bVisibleOnly, iType)
     --iType: 1 = mexes nearer to aiBrain than nearest enemy (in future can add more, e.g. entire map; mexes closer to us than ally, etc.)
     --bUnclaimedOnly - true if mex can't have an extractor on it
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNumberOfResource'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if aiBrain then
         if bVisibleOnly == nil then bVisibleOnly = true end
         if M27Utilities.IsTableEmpty(PlayerStartPoints) then RecordPlayerStartLocations() end
@@ -828,9 +863,11 @@ function GetNumberOfResource (aiBrain, bMexNotHydro, bUnclaimedOnly, bVisibleOnl
                 end
             end
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iResourceCount
     else
         M27Utilities.ErrorHandler('aiBrain is nil')
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return 0
     end
 end
@@ -843,8 +880,9 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
     --tStartPositionOverride - use this instead of the builder start position if its specified
     --tMexesToIgnore - a table of locations to ignore if they're the nearest mex
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNearestMexToUnit'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bCanBeBuiltOnByAlly == nil then bCanBeBuiltOnByAlly = false end
     if bCanBeBuiltOnByEnemy == nil then bCanBeBuiltOnByEnemy = false end
@@ -919,6 +957,7 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
         if iNearestMexFromUnit == nil then LOG(sFunctionRef..': Nearest mex is nil')
         else LOG(sFunctionRef..'iNearestMexFromUnit='..iNearestMexFromUnit) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iNearestMexFromUnit == nil then return nil
     else return tMexByPathingAndGrouping[sPathing][iUnitPathGroup][iNearestMexFromUnit] end
 end
@@ -946,7 +985,8 @@ function GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchR
     --Looks for a position with >0 surface height within iMaxSearchRange of oPathingUnit
     --first looks in a straight line along tTravelTarget, and only if no match does it consider looking left, right and behind
     --Returns nil if cant find target
-
+    local sFunctionRef = 'GetNearestPathableLandPosition'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tValidTarget
     if oPathingUnit and not(oPathingUnit.Dead) and M27Utilities.IsTableEmpty(tTravelTarget)==false and iMaxSearchRange then
         local iDistanceForEachCheckLow = 2.5
@@ -995,6 +1035,7 @@ function GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchR
     end
     --Redundancy - check in same pathing group:
     if tValidTarget then if InSameSegmentGroup(oPathingUnit, tValidTarget, false) == false then tValidTarget = nil end end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tValidTarget
 end
 
@@ -1004,8 +1045,9 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
 
     --tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
     --Can also be used for general movement
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FindEmptyPathableAreaNearTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local rPlayableArea = rMapPlayableArea
     local iMapSizeX = rPlayableArea[3] - rPlayableArea[1]
@@ -1087,12 +1129,14 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
         tValidLocation = PlayerStartPoints[aiBrain.M27StartPositionNumber]
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tValidLocation
 end
 
 function RecordMexesInPathingGroupFilteredByEnemyDistance(aiBrain, sPathing, iPathingGroup, iMinDistanceFromEnemy, iMaxDistanceFromEnemy)
     --reftMexesInPathingGroupFilteredByDistanceToEnemy = 'M27MexesInPathingGroupFilteredByDistanceToEnemy' --local to aiBrain; [sPathing][iPathingGroup][iMinRangeFromEnemy][iMaxRangeFromEnemy][iMexCount] returns Mex Location
+    local sFunctionRef = 'RecordMexesInPathingGroupFilteredByEnemyDistance'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iCurDistanceToEnemy
     if M27Utilities.IsTableEmpty(aiBrain[reftMexesInPathingGroupFilteredByDistanceToEnemy][sPathing]) == false
             and M27Utilities.IsTableEmpty(aiBrain[reftMexesInPathingGroupFilteredByDistanceToEnemy][sPathing][iPathingGroup]) == false
@@ -1116,11 +1160,13 @@ function RecordMexesInPathingGroupFilteredByEnemyDistance(aiBrain, sPathing, iPa
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordSortedMexesInOriginalPathingGroup(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordSortedMexesInOriginalPathingGroup'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tUnsortedMexDetails = {}
     local refiMexLocation = 1
     local refiMexDistance = 2
@@ -1175,6 +1221,62 @@ function RecordSortedMexesInOriginalPathingGroup(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': iEntry='..iEntry..'; Distance='..tValue[refiMexDistance]..'; Location='..repr(tValue[refiMexLocation])) end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tMexByPathingAndGrouping[sPathing][iPathingGroup])..' mexes in MexByPathingAndGrouping, and iSortedCount='..iSortedCount) end
+
+    --Now record mexes that we want to maintain scouts for
+    if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy]) == true then
+        aiBrain[reftMexesToKeepScoutsBy] = {}
+        local sPathingType = M27UnitInfo.refPathingTypeLand
+        local iStartPathingGroup = GetSegmentGroupOfLocation(sPathingType, PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local sLocationRef
+        local iMinDistanceFromBase = 40
+        local tNearbyMexes
+        local iNearbyMexSearchRange = 15 --Wont assign a scout to a mex if it's already covered by another mex within this range
+        local bHaveNearbyAssignedMex
+        local sNearbyLocationRef
+        local iCurDistanceToEnemy, iCurDistanceToStart
+        if bDebugMessages == true then LOG(sFunctionRef..': sPathingType='..sPathingType..'; iStartPathingGroup='..iStartPathingGroup..'; tMexByPathingAndGrouping='..repr(aiBrain[tMexByPathingAndGrouping])) end
+
+        for iMex, tMex in tMexByPathingAndGrouping[sPathingType][iStartPathingGroup] do
+            iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tMex, tOurStartPos)
+            if bDebugMessages == true then LOG(sFunctionRef..': iMex='..iMex..'; tMex='..repr(tMex)..'; iCurDistanceToStart='..iCurDistanceToStart) end
+            if iCurDistanceToStart > iMinDistanceFromBase then
+                --Are we closer to us than enemy?
+                iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tMex, tEnemyStartPos)
+                if bDebugMessages == true then LOG(sFunctionRef..': iCurDistanceToEnemy='..iCurDistanceToEnemy) end
+                if iCurDistanceToStart <= iCurDistanceToEnemy then
+                    sLocationRef = M27Utilities.ConvertLocationToReference(tMex)
+                    bHaveNearbyAssignedMex = false
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to check if near another mex that have already assigned') end
+                    for iNearbyMex, tNearbyMex in tMexByPathingAndGrouping[sPathingType][iStartPathingGroup] do
+                        sNearbyLocationRef = M27Utilities.ConvertLocationToReference(tNearbyMex)
+                        if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy][sNearbyLocationRef]) == false then
+                            if M27Utilities.GetDistanceBetweenPositions(tNearbyMex, tMex) <= iNearbyMexSearchRange then
+                                if bDebugMessages == true then LOG(sFunctionRef..': sLocationRef='..sLocationRef..'; sNearbyLocationRef='..sNearbyLocationRef..'; tNearbyMex='..repr(tNearbyMex)..'; already have an entry for this in reftMexesToKeepScoutsBy='..repr(aiBrain[reftMexesToKeepScoutsBy][sNearbyLocationRef])) end
+                                bHaveNearbyAssignedMex = true
+                                break
+                            end
+                        end
+                    end
+                    if bHaveNearbyAssignedMex == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have nearby mex so will record this one, sLocationRef='..sLocationRef) end
+                        aiBrain[reftMexesToKeepScoutsBy][sLocationRef] = {}
+                        aiBrain[reftMexesToKeepScoutsBy][sLocationRef][1] = tMex[1]
+                        aiBrain[reftMexesToKeepScoutsBy][sLocationRef][2] = tMex[2]
+                        aiBrain[reftMexesToKeepScoutsBy][sLocationRef][3] = tMex[3]
+                    end
+                end
+            end
+        end
+    end
+
+    if bDebugMessages == true then
+        if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy]) == true then
+            M27Utilities.ErrorHandler('No mexes on our side of map in pathing group outside core mexes - likely error unless unusual map setup', nil, true)
+        else
+            LOG(sFunctionRef..': Finished recording mexes to keep scouts by='..repr(aiBrain[reftMexesToKeepScoutsBy])..'; count='..table.getn(aiBrain[reftMexesToKeepScoutsBy]))
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordStartingPathingGroups(aiBrain)
@@ -1186,7 +1288,8 @@ end
 function GetMexPatrolLocations(aiBrain)
     --Returns a table of mexes on our side of the map near middle of map to patrol
     local sFunctionRef = 'GetMexPatrolLocations'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if M27Utilities.IsTableEmpty(aiBrain[reftMexPatrolLocations]) then
         --Cycle through mexes on our side of the map:
         aiBrain[reftMexPatrolLocations] = {}
@@ -1249,13 +1352,14 @@ function GetMexPatrolLocations(aiBrain)
         tPatrolLocations[iEntry][2] = tEntry[2]
         tPatrolLocations[iEntry][3] = tEntry[3]
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tPatrolLocations
 end
 
 
 --[[function RecordSegmentGroup(iSegmentX, iSegmentZ, sPathingType, iSegmentGroup)
     --Cycle through all adjacent cells, and then call this function on them as well
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordSegmentGroup'
     if bDebugMessages == true then LOG(sFunctionRef..': About to record iSegmentX='..iSegmentX..'; iSegmentZ='..iSegmentZ..'; iSegmentGroup='..iSegmentGroup..'; and then check if can path to adjacent segments') end
     tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] = iSegmentGroup
@@ -1301,8 +1405,9 @@ end
 end--]]
 
 function RecordBaseLevelPathability()
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end --Manually uncomment out logs that want - disabled for performance reasons for the most part
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --Manually uncomment out logs that want - disabled for performance reasons for the most part
     local sFunctionRef = 'RecordBaseLevelPathability'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Setup some common logic used to see if it makes things faster
     local Max = math.max
@@ -1408,7 +1513,7 @@ function RecordBaseLevelPathability()
 
     function IsAmphibiousPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)--, bForceDebug)
         --This is mostly a copy of land pathing but with changes for water
-        --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         --local sFunctionRef = 'IsAmphibiousPathableAlongLine'
         --if bForceDebug then bDebugMessages = true end
 
@@ -1498,7 +1603,7 @@ function RecordBaseLevelPathability()
     function IsLandPathableAlongLine(xStartInteger, xEndInteger, zStartInteger, zEndInteger)
         --Assumes will call for positions in a straight line from each other
         --Can handle diagonals, but x and z differences must be identical (error handler re this can be uncommented out if come across issues)
-        --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        --local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         --if bForceDebug == true then bDebugMessages = true end
         --local sFunctionRef = 'IsLandPathableAlongLine'
         --if bDebugMessages == true then LOG(sFunctionRef..': Start of code, X Start-End='..xStartInteger..'-'..xEndInteger..'; Z='..zStartInteger..'-'..zEndInteger..'; iMaxDifInHeight='..iMaxDifInHeight) end
@@ -1734,8 +1839,7 @@ function RecordBaseLevelPathability()
                                     {iSegmentX + 1, iSegmentZ + 1},
 
                                 }
-                                --if bAmphibPathing and iSegmentX <= 59 and iSegmentX >= 55 and iSegmentZ <= 454 and iSegmentZ >= 448 then bDebugMessages = true
-                                --else bDebugMessages = false end
+
 
                                 --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': About to check if are at edge of map') end
                                 --Dont check if are at map edge (if we really wanted to optimise this then I expect predefined tables of all the options would work but for now I'll leave it at this
@@ -1830,13 +1934,15 @@ function RecordBaseLevelPathability()
         end
 
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function MappingInitialisation(aiBrain)
     --aiBrain needed for waterpercent function
     local bProfiling = true
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MappingInitialisation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if bPathfindingAlreadyCommenced == false then
         bPathfindingAlreadyCommenced = true
@@ -1880,10 +1986,13 @@ function MappingInitialisation(aiBrain)
         end
         bPathfindingComplete = true
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function SetWhetherCanPathToEnemy(aiBrain)
     --Set flag for whether AI can path to enemy base
+    local sFunctionRef = 'SetWhetherCanPathToEnemy'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tEnemyBase = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
     local tOurBase = PlayerStartPoints[aiBrain.M27StartPositionNumber]
     local sPathing = M27UnitInfo.refPathingTypeLand
@@ -1896,13 +2005,15 @@ function SetWhetherCanPathToEnemy(aiBrain)
     iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyBase)
     if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithAmphibious] = true
     else aiBrain[refbCanPathToEnemyBaseWithAmphibious] = false end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function LogMapTerrainTypes()
     --Outputs to log the terrain types used and how often theyre used
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'LogMapTerrainTypes'
     WaitTicks(150)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
     local tTerrainTypeCount = {}
     local sTerrainType
@@ -1928,7 +2039,7 @@ function LogMapTerrainTypes()
     LOG(sFunctionRef..': End of table of terrain type, iDirt9Count2='..iDirt9Count2)
     LOG(sFunctionRef..': Surface height of water count table='..repr(tWaterSurfaceHeightCount))
 
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DrawAllMapPathing(aiBrain)
@@ -1958,7 +2069,7 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
             else bDontDrawWaterIfPathingLand = true end
         end
         --Draw core pathing group
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'DrawMapPathing'
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
         local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -2081,7 +2192,7 @@ end
 
 --[[function DrawHeightMapAstro()
     --Temp for astro craters to help figure out why amphibious pathing doesnt work
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DrawHeightMapAstro'
     local iCurSurfaceHeight, iCurTerrainHeight, tCurPosition
     local iCurHeight

@@ -1,4 +1,4 @@
-M27ACUBOTemplate =
+M27ACUBOTemplate = --OBSOLETE - below isnt united by M27AI
 {
     -- Template for initial build to avoid ACU building on top of itself
     -- Thanks to RNGAI which helped me to figure out how this worked
