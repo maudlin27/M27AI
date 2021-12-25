@@ -21,7 +21,8 @@ tBigGunUpgrades = { 'MicrowaveLaserGenerator',
 function SafeToUpgradeUnit(oUnit)
     --Intended e.g. for mexes to decide whether to upgrade
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-
+    local sFunctionRef = 'SafeToUpgradeUnit'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Can the unit be upgraded?
     local bNoNearbyEnemies = false
     local aiBrain = oUnit:GetAIBrain()
@@ -72,17 +73,21 @@ function SafeToUpgradeUnit(oUnit)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bNoNearbyEnemies
 end
 
 function HaveNearbyMobileShield(oPlatoon)
     local bHaveNearbyShield = false
+    local sFunctionRef = 'HaveNearbyMobileShield'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon] then
         local iShieldValueHave = oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon][M27PlatoonUtilities.refiPlatoonMassValue]
         if iShieldValueHave >= 100 and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon[M27PlatoonUtilities.refoSupportingShieldPlatoon])) <= 20 then
             bHaveNearbyShield = true
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bHaveNearbyShield
 end
 
@@ -90,6 +95,7 @@ function SafeToGetACUUpgrade(aiBrain)
     --Determines if its safe for the ACU to get an upgrade - considers ACU health and whether ACU is in a platoon set to heal
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SafeToGetACUUpgrade'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local bIsSafe = false
     local iSearchRange = 33
@@ -175,11 +181,14 @@ function SafeToGetACUUpgrade(aiBrain)
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of check, bIsSafe='..tostring(bIsSafe)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bIsSafe
 end
 
 function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
     --Need to have iMinSearchRange intel available, and will look up to iMaxSearchRange
+    local sFunctionRef = 'NoEnemyUnitsNearACU'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tACUPos = M27Utilities.GetACU(aiBrain):GetPosition()
     local bNoEnemyUnits = true
     if M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iMinSearchRange) == false then bNoEnemyUnits = false
@@ -187,12 +196,14 @@ function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
         local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND, tACUPos, iMaxSearchRange, 'Enemy')
         bNoEnemyUnits = M27Utilities.IsTableEmpty(tNearbyEnemies)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bNoEnemyUnits
 end
 
 function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'WantToGetGunUpgrade'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Returns true if meet all the conditions that mean will want gun upgrade
     if bIgnoreEnemies == nil then bIgnoreEnemies = false end
     local bWantToGetGun = true
@@ -242,6 +253,7 @@ function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
         end
         if bDebugMessages == true then LOG(sFunctionRef..'; bWantToGetGun='..tostring(bWantToGetGun)) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantToGetGun
 end
 
@@ -249,6 +261,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
     --Returns 2 variables: true/false if we have eco+safety to get upgrade; also returns true/false if safe to get upgrade
     local sFunctionRef = 'WantToGetAnotherACUUpgrade'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local bWantUpgrade = false
     local bSafeToGetUpgrade = true
@@ -295,6 +308,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantUpgrade, bSafeToGetUpgrade
 end
 
@@ -310,6 +324,7 @@ end
 function WantMoreMAA(aiBrain, iMassOnMAAVsEnemyAir)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'WantMoreMAA'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMAAMaxUnitCount = 50
     local bWantMoreMAA = false
     if aiBrain[M27Overseer.refbNeedMAABuilt] == true then
@@ -342,6 +357,7 @@ function WantMoreMAA(aiBrain, iMassOnMAAVsEnemyAir)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DoesACUHaveBigGun(aiBrain, oAltACU)
@@ -364,6 +380,7 @@ function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
     --e.g. need to specify 1 of aiBrain and oAltACU (no need to specify both)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DoesACUHaveGun'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bROFAndRange == nil then bROFAndRange = true end
     local oACU = oAltACU
     if oACU == nil then oACU = M27Utilities.GetACU(aiBrain) end
@@ -396,12 +413,15 @@ function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of check, bACUHasUpgrade='..tostring(bACUHasUpgrade)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bACUHasUpgrade
 end
 
 function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable)
     --If further away hydro, considers if its closer to enemy base than start point; returns empty table if no hydro
     --if bAlsoReturnHydroTable == true then returns table of the hydro locations
+    local sFunctionRef = 'HydroNearACUAndBase'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bNearBaseOnlyCheck == nil then bNearBaseOnlyCheck = false end
     local iMaxDistanceForHydro = 70 --must be within this distance of start position and ACU
     local tACUPosition = M27Utilities.GetACU(aiBrain):GetPosition()
@@ -436,6 +456,7 @@ function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bHydroNear, tValidHydro
 end
 
@@ -448,6 +469,8 @@ end
 
 function CanUnitUseOvercharge(aiBrain, oUnit)
     --For now checks if enough energy and not underwater; separate function used as may want to expand this with rate of fire check in future
+    local sFunctionRef = 'CanUnitUseOvercharge'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oBP = oUnit:GetBlueprint()
     local iEnergyNeeded
     for iWeapon, oWeapon in oBP.Weapon do
@@ -472,6 +495,7 @@ function CanUnitUseOvercharge(aiBrain, oUnit)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bCanUseOC
 end
 
@@ -507,6 +531,7 @@ end
 function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'LifetimeBuildCountLessThan'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iTotalBuilt = 0
     if bDebugMessages == true then LOG(sFunctionRef..' - start') end
     local testCat = category
@@ -533,6 +558,7 @@ function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
     local bBuiltLessThan = true
     if iTotalBuilt >= iBuiltThreshold then bBuiltLessThan = false end
     if bDebugMessages == true then LOG(sFunctionRef..': iTotalBuilt='..iTotalBuilt..'; iBuiltThreshold='..iBuiltThreshold..'; bBuiltLessThan='..tostring(bBuiltLessThan)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bBuiltLessThan
 end
 
@@ -540,6 +566,7 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
     --bTreatQueuedBuildingsAsUnclaimed: If set to false, then consideres all planned mex buidlings for engineers and treats them as being claimed
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsMexOrHydroUnclaimed'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bTreatEnemyBuildingAsUnclaimed == nil then bTreatEnemyBuildingAsUnclaimed = false end
     if bTreatOurOrAllyBuildingAsUnclaimed == nil then bTreatOurOrAllyBuildingAsUnclaimed = false end
     if bTreatQueuedBuildingsAsUnclaimed == nil then bTreatQueuedBuildingsAsUnclaimed = bTreatOurOrAllyBuildingAsUnclaimed end
@@ -631,6 +658,7 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End: bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bResourceIsUnclaimed
 end
 
@@ -715,6 +743,7 @@ function IsLocationWithinIntelPathLine(aiBrain, tLocation)
     --Returns true if tLocation is closer to our start than the intel line
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLocationWithinIntelPathLine'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bWithinIntelLine = false
     if aiBrain[M27Overseer.refbIntelPathsGenerated] == true then
         local iIntelPathPosition = aiBrain[M27Overseer.refiCurIntelLineTarget]
@@ -751,13 +780,17 @@ function IsLocationWithinIntelPathLine(aiBrain, tLocation)
         if bDebugMessages == true then LOG(sFunctionRef..': No intel line generated yet') end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Finished considering; bWithinIntelLine='..tostring(bWithinIntelLine)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWithinIntelLine
 end
 function IsLocationWithinDefenceCoverage(aiBrain, tLocation)
     --Returns true if tLocation is within defence coverage range
+    local sFunctionRef = 'IsLocationWithinDefenceCoverage'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bWithinCoverage = false
     local iDefenceCoverage = aiBrain[M27Overseer.refiNearestOutstandingThreat]
     local iModDistanceFromStart = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocation)
     if iModDistanceFromStart <= iDefenceCoverage then bWithinCoverage = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWithinCoverage
 end

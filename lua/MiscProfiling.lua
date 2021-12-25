@@ -47,7 +47,7 @@ function ListCategoriesUsedByCount(tAllBlueprints)
             end
         end
     end
-    for iCategory, iCount in M27Utilities.SortTableByValue(tCategoryUsage, true) do
+    for iCategory, iCount in M27Utilities.SortTableByValue(tCategoryUsage, false) do
         LOG(iCategory..': '..iCount)
     end
 

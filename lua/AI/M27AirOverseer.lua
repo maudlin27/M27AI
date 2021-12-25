@@ -1,6 +1,4 @@
 --Overseer to handle air threat detection, air scout usage, interceptor logic, and bomber logic
-local PROFILER = import('/mods/M27AI/lua/DilliProfiler.lua').GetProfiler()
-
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
@@ -162,6 +160,7 @@ end
 function ClearPreviousMovementEntries(aiBrain, oAirUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearPreviousMovementEntries'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMaxMovementPaths = 0
     if oAirUnit[reftMovementPath] and oAirUnit[refiCurMovementPath] and oAirUnit[refiCurMovementPath] > 1 then iMaxMovementPaths = table.getn(oAirUnit[reftMovementPath]) end
     if iMaxMovementPaths > 1 then
@@ -180,6 +179,7 @@ function ClearPreviousMovementEntries(aiBrain, oAirUnit)
         if oAirUnit[reftMovementPath] and M27Utilities.IsTableEmpty(oAirUnit[reftMovementPath][1]) == false then sPath = oAirUnit[reftMovementPath][1][1]..oAirUnit[reftMovementPath][1][3] end
         M27PlatoonUtilities.UpdateUnitNames({oAirUnit}, oAirUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)..':MoveTo:'..sPath)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ClearTrackersOnUnitsTargets(oAirUnit, iAirUnitMassCost)
@@ -205,6 +205,7 @@ end
 function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearAirUnitAssignmentTrackers'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMaxMovementPaths = 0
     if oAirUnit[reftMovementPath] then iMaxMovementPaths = table.getn(oAirUnit[reftMovementPath]) end
     if iMaxMovementPaths > 0 then
@@ -223,12 +224,14 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit)
 
 
     ClearTrackersOnUnitsTargets(oAirUnit)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
 end
 
 function MakeSegmentsAroundPositionHighPriority(aiBrain, tPosition, iSegmentSize)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MakeSegmentsAroundPositionHighPriority'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local iBaseAirSegmentX, iBaseAirSegmentZ = GetAirSegmentFromPosition(tPosition)
     local rPlayableArea = M27MapInfo.rMapPlayableArea
@@ -246,12 +249,14 @@ function MakeSegmentsAroundPositionHighPriority(aiBrain, tPosition, iSegmentSize
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
 function CheckForUnseenKiller(aiBrain, oKilled, oKiller)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CheckForUnseenKiller'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Air scout specific - if air scout died then also update the area around the killer to flag an air scout as being killed
     if EntityCategoryContains(refCategoryAirScout, oKilled:GetUnitId()) == true then
@@ -283,12 +288,14 @@ function CheckForUnseenKiller(aiBrain, oKilled, oKiller)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function OnBomberDeath(aiBrain, oDeadBomber)
     --Track how effective the bomber was
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnBomberDeath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Checking if have a unitID for dead bomber') end
     if oDeadBomber.GetUnitId then
         local oBomberBP = oDeadBomber:GetBlueprint()
@@ -334,11 +341,14 @@ function OnBomberDeath(aiBrain, oDeadBomber)
 
     --Update units it was targetting to show them as no longer having bomber strike damage assigned
     ClearTrackersOnUnitsTargets(oDeadBomber)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function OnScoutDeath(aiBrain, oDeadScout)
     --Get scouts current movement target, and update its trackers to show it no longer has as many scouts assigned and we have a dead scout
     --also flags a dead scout in the segments around where the scout died, and the segments around its current movement path target
+    local sFunctionRef = 'OnScoutDeath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oDeadScout[reftMovementPath] and oDeadScout[refiCurMovementPath] then
         --Cycle through remaining points on movement path and note they're no longer assigned to this scout
         local tFirstTarget
@@ -354,9 +364,12 @@ function OnScoutDeath(aiBrain, oDeadScout)
     --Update all nearby segments to show a scout has died
     iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(oDeadScout:GetPosition())
     RecordAirScoutDyingInNearbySegments(aiBrain, iCurAirSegmentX, iCurAirSegmentZ)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function OnAirAADeath(oDeadAirAA)
+    local sFunctionRef = 'OnAirAADeath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oDeadAirAA[refoAirAATarget] and M27Utilities.IsTableEmpty(oDeadAirAA[refoAirAATarget][reftTargetedByList]) == false then
         for iTargetedBy, oTargetedBy in oDeadAirAA[refoAirAATarget][reftTargetedByList] do
             if oTargetedBy == oDeadAirAA then
@@ -364,9 +377,12 @@ function OnAirAADeath(oDeadAirAA)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function TrackBomberTarget(oBomber, oTarget)
+    local sFunctionRef = 'TrackBomberTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oBomber[reftTargetList] == nil then oBomber[reftTargetList] = {} end
     table.insert(oBomber[reftTargetList], oTarget)
 
@@ -389,12 +405,14 @@ function TrackBomberTarget(oBomber, oTarget)
     else oTarget[refiStrikeDamageAssigned] = oTarget[refiStrikeDamageAssigned] + iCurBomberStrikeDamage end
 
     if M27Config.M27ShowUnitNames == true and oBomber.GetUnitId then M27PlatoonUtilities.UpdateUnitNames({oBomber}, oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..':Attack:'..oTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTarget)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UpdateBomberTargets(oBomber, bRemoveIfOnLand)
     --Checks if target dead; or (if not part of a large attack) if its shielded
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateBomberTargets'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bRemoveCurTarget
     local tTargetPos
     if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
@@ -482,6 +500,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand)
     if bDebugMessages == true then LOG(sFunctionRef..': Bomer cur target='..oBomber[refiCurTargetNumber]) end
     if oBomber[refbPartOfLargeAttack] == true then oBomber[refbOnAssignment] = true end
     oBomber[refiBomberTargetLastAssessed] = GetGameTimeSeconds()
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
@@ -495,6 +514,7 @@ function AirThreatChecker(aiBrain)
     --Get enemy total air threat level
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirThreatChecker'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of cycle') end
     local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(categories.AIR, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
     --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride)
@@ -545,11 +565,13 @@ function AirThreatChecker(aiBrain)
         end
     end
     aiBrain[M27Overseer.refbEmergencyMAANeeded] = bEmergencyAA
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordAvailableAndLowFuelAirUnits(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAvailableAndLowFuelAirUnits'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Updates aiBrain trackers to record units with and without enough fuel
     local tAllScouts = aiBrain:GetListOfUnits(refCategoryAirScout, false, true)
     local tAllBombers = aiBrain:GetListOfUnits(refCategoryBomber, false, true)
@@ -778,11 +800,13 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OrderUnitsToRefuel'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Sends low fuel units to air staging
     if M27Utilities.IsTableEmpty(tUnitsToRefuel) == false then
         local tAirStaging = aiBrain:GetListOfUnits(categories.AIRSTAGINGPLATFORM, false, true)
@@ -875,11 +899,13 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RefuelIdleAirUnits(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefuelIdleAirUnits'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Checks for any idle air units near start that could do with a slight refuel
     local iSearchRange = 50
     local tOurStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
@@ -916,12 +942,14 @@ function RefuelIdleAirUnits(aiBrain)
     if iUnitsToRefuel > 0 then
         OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UnloadUnit(oTransport)
     --Unfortunately couldnt get this to work by issuing transportunload command to the unit docked in the transport, so having to have transport release all its units
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UnloadUnit'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Issuing unload command to transport/air staging unit') end
     local tTransportPosition = oTransport:GetPosition()
     local tRefuelingUnits = oTransport:GetCargo()
@@ -932,12 +960,14 @@ function UnloadUnit(oTransport)
     if bDebugMessages == true then LOG(sFunctionRef..': Issuing clear commands') end
     IssueClearCommands({oTransport})
     IssueTransportUnload({oTransport}, {tTransportPosition[1]+5, tTransportPosition[2], tTransportPosition[3]+5})
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ReleaseRefueledUnits(aiBrain)
     --Only want to call this periodically as doesnt seem an easy way of telling it to only release some of the units, instead it releases all
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReleaseRefueledUnits'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tStagingPosition = {}
     local bReadyToLeave
     local tAirStaging = aiBrain:GetListOfUnits(categories.AIRSTAGINGPLATFORM, false, true)
@@ -967,6 +997,7 @@ function ReleaseRefueledUnits(aiBrain)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UpdateScoutingSegmentRequirements(aiBrain)
@@ -974,7 +1005,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
     --returns the number of scouts we want
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateScoutingSegmentRequirements'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iCurIntervalWanted, iLastScoutedTime, tCurPosition
     local iCurTime = GetGameTimeSeconds()
     local iIntervalInSecondsBeforeRefresh = 3 --If last had visual < this time ago then wont refresh
@@ -1045,12 +1076,13 @@ function UpdateScoutingSegmentRequirements(aiBrain)
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableScouts]) == false then iAvailableScouts = table.getn(aiBrain[reftAvailableScouts]) end
 
     aiBrain[refiExtraAirScoutsWanted] = iScoutsWantedActual - iAvailableScouts
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetEndDestinationForScout(aiBrain, oScout)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetEndDestinationForScout'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tEndDestination
     local iSegmentDistance
     local iCurOverdueTime
@@ -1092,11 +1124,13 @@ function GetEndDestinationForScout(aiBrain, oScout)
         if bDebugMessages == true then LOG(sFunctionRef..': No final destination found, will return to base') end
         return nil
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function CreateMovementPathFromDestination(aiBrain, tEndDestination, oScout)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CreateMovementPathFromDestination'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tMovementPath = {}
     tMovementPath[1] = tEndDestination
     local tLocalisedShortlist, iLocalShortlistCount
@@ -1217,12 +1251,14 @@ function CreateMovementPathFromDestination(aiBrain, tEndDestination, oScout)
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, tMovementPath='..repr(tMovementPath)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tMovementPath
 end
 
 function AirScoutManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirScoutManager'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Determine how many scouts we want and what locations need scouting:
     UpdateScoutingSegmentRequirements(aiBrain)
 
@@ -1275,6 +1311,7 @@ function AirScoutManager(aiBrain)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordThatCanSeeSegment(aiBrain, iAirSegmentX, iAirSegmentZ, iTimeStamp)
@@ -1284,6 +1321,8 @@ function RecordThatCanSeeSegment(aiBrain, iAirSegmentX, iAirSegmentZ, iTimeStamp
 end
 
 function UpdateSegmentsForUnitVision(aiBrain, oUnit, iVisionRange, iTimeStamp)
+    local sFunctionRef = 'UpdateSegmentsForUnitVision'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tUnitPosition = oUnit:GetPosition()
     local iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tUnitPosition)
 
@@ -1304,11 +1343,13 @@ function UpdateSegmentsForUnitVision(aiBrain, oUnit, iVisionRange, iTimeStamp)
             RecordThatCanSeeSegment(aiBrain, iX, iZ, iTimeStamp)
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordSegmentsThatHaveVisualOf(aiBrain)
     local sFunctionRef = 'RecordSegmentsThatHaveVisualOf'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local iTimeStamp = GetGameTimeSeconds()
 
@@ -1340,12 +1381,13 @@ function RecordSegmentsThatHaveVisualOf(aiBrain)
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetBomberTargetShortlist(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBomberTargetShortlist'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local tEnemyUnitsOfType
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
@@ -1483,13 +1525,13 @@ function GetBomberTargetShortlist(aiBrain)
 
         if bDebugMessages == true then LOG(sFunctionRef..': end of loop for iTypeCount='..iTypeCount..'; iTargetShortlistCount='..iTargetShortlistCount) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function IssueLargeBomberAttack(aiBrain, tBombers)
     --Call via forkthread; will assign targets to tBombers until they're all dead
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IssueLargeBomberAttack'
-
     local iAliveBombers, iBombersNeedingTargets
     local bValidAttackPlatoon = true
     local refoTrackerUnit = 'TrackerUnit'
@@ -1522,6 +1564,7 @@ function IssueLargeBomberAttack(aiBrain, tBombers)
 
         while bValidAttackPlatoon do
             --Update number of bombers that are alive and that need targets
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             iCurLoop = iCurLoop + 1
             if iCurLoop >= iMaxLoop then M27Utilities.ErrorHandler('Infinite loop') break end
             iAliveBombers = 0
@@ -1623,6 +1666,7 @@ function IssueLargeBomberAttack(aiBrain, tBombers)
                 bValidAttackPlatoon = false
                 break
             end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(10)
         end
     end
@@ -1631,6 +1675,7 @@ end
 function AirBomberManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirBomberManager'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMaxJourneyDistanceForBomber = aiBrain[refiMaxScoutRadius] --Dont want a single bomber to have queued up actions which will make it go more than this
     local iMaxTargetsForBomber = 4 --Dont want a bomber to have more than this queued as likely it will die so we want other bombers to try and target beyond this number
     if aiBrain[refbShortlistContainsLowPriorityTargets] == true then iMaxTargetsForBomber = 1 end --Dont want to issue low priority targets unless bomber is idle
@@ -1778,11 +1823,13 @@ function AirBomberManager(aiBrain)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AirAAManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirAAManager'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iNearToACUThreshold = 80
     local iMAANearACURange = 40
     local iEnemyGroundAASearchRange = 90
@@ -2004,11 +2051,13 @@ function AirAAManager(aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': Have no inties, will flag we need more AirAA if any enemy air threats are detected; aiBrain[refiAirAANeeded]='..tostring(aiBrain[refiAirAANeeded])) end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AirLogicMainLoop(aiBrain, iCycleCount)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirLogicMainLoop'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bDebugMessages == true then LOG(sFunctionRef..': iCycleCount='..iCycleCount..': GameTime='..GetGameTimeSeconds()) end
     RecordSegmentsThatHaveVisualOf(aiBrain)
@@ -2034,6 +2083,7 @@ function AirLogicMainLoop(aiBrain, iCycleCount)
     elseif iCycleCount == (iLongCycleThreshold - 1) then
         ForkThread(RefuelIdleAirUnits, aiBrain)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
 end
 
@@ -2172,6 +2222,7 @@ function UpdateMexScoutingPriorities(aiBrain)
     --called from strategic overseer
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateMexScoutingPriorities'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
     if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftSortedMexesInOriginalGroup]) == true then
@@ -2259,4 +2310,5 @@ function UpdateMexScoutingPriorities(aiBrain)
             M27Utilities.DrawLocations(aiBrain[M27MapInfo.reftHighPriorityMexes])
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

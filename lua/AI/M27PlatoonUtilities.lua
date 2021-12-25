@@ -157,6 +157,8 @@ function UpdateUnitNames(tUnits, sNewName, bAddLifetimeCount)
 end
 
 function UpdatePlatoonName(oPlatoon, sNewName)
+    local sFunctionRef = 'UpdatePlatoonName'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oPlatoon.GetPlan then
         local sPlan = oPlatoon:GetPlan()
         if sPlan == M27PlatoonTemplates.refoAllEngineers then
@@ -188,6 +190,7 @@ function UpdatePlatoonName(oPlatoon, sNewName)
             UpdateUnitNames(GetPlatoonUnits(oPlatoon), sNewName, true)
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetPlatoonFrontPosition(oPlatoon)
@@ -212,6 +215,8 @@ end
 
 function GetActivePlatoonCount(aiBrain, sPlatoonPlan)
     --Returns the number of platoons using sPlatoonPlan that contain alive units
+    local sFunctionRef = 'GetActivePlatoonCount'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMatchingPlatoonCount = 0
     if sPlatoonPlan then
         for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
@@ -221,6 +226,7 @@ function GetActivePlatoonCount(aiBrain, sPlatoonPlan)
         end
     else M27Utilities.ErrorHandler('sPlatoonPlan is nil')
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iMatchingPlatoonCount
 end
 
@@ -228,6 +234,7 @@ function GetPlatoonUnitsOrUnitCount(oPlatoon, sFriendlyUnitTableVariableWanted, 
     --if bOnlyGetIfUnitAvailable is true then will check if unit is microing on special task and exclude it
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPlatoonUnitsOrUnitCount'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tBaseVariable = oPlatoon[sFriendlyUnitTableVariableWanted]
     local tNewVariable = {}
     local iCount = 0
@@ -260,9 +267,12 @@ function GetPlatoonUnitsOrUnitCount(oPlatoon, sFriendlyUnitTableVariableWanted, 
             if bReturnCountNotTable then return iCount else return tNewVariable end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ShouldPlatoonMoveInFormation(oPlatoon, bAttackMove)
+    local sFunctionRef = 'ShouldPlatoonMoveInFormation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bMoveInFormation = false
     if oPlatoon[M27PlatoonTemplates.refbFormMoveIfCloseTogetherAndNoEnemies] and oPlatoon[refiEnemiesInRange] == 0 and oPlatoon[refiEnemyStructuresInRange] == 0 then
         --Are the front and rear platoon units close together?
@@ -278,6 +288,7 @@ function ShouldPlatoonMoveInFormation(oPlatoon, bAttackMove)
             bMoveInFormation = true
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bMoveInFormation
 end
 
@@ -290,6 +301,7 @@ function MoveAlongPath(oPlatoon, tMovementPath, bAttackMove, iPathStartPoint, bD
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27MAAAssister' then bDebugMessages = true end
     local sFunctionRef = 'MoveAlongPath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tCurrentUnits = {}
     --tCurrentUnits = oPlatoon[reftCurrentUnits]
 
@@ -332,6 +344,7 @@ function MoveAlongPath(oPlatoon, tMovementPath, bAttackMove, iPathStartPoint, bD
             if bDebugMessages == true then LOG(sFunctionRef..': All units in platoon are microing so not doing anything') end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     --[[if bDebugMessages == true then
         LOG(sFunctionRef..'TEMP ERROR - Platoon not moving - delaying code 5s')
         WaitSeconds(5)
@@ -341,7 +354,9 @@ end
 function GetPlatoonPositionDeviation(oPlatoon)
     --Returns the standard deviation in positions of oPlatoon; will target a centre point whose size increases based on the platoon size
     --very approximate guide: <3 is close, >10 spread out, >30 very spread out, >100 likely on different parts of the map altogether
+    local sFunctionRef = 'GetPlatoonPositionDeviation'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tPositions = {}
     local iCount = 0
     if oPlatoon[refiCurrentUnits] > 0 then
@@ -351,15 +366,19 @@ function GetPlatoonPositionDeviation(oPlatoon)
         local iCentreSize = math.sqrt(oPlatoon[refiCurrentUnits])*3
         if bDebugMessages == true then LOG(oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': GetPlatoonPositionDeviation: CentreSize='..iCentreSize..'; UnitCount='..oPlatoon[refiCurrentUnits]) end
         if bDebugMessages == true then LOG(oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Deviation='..M27Utilities.CalculateDistanceDeviationOfPositions(tPositions, iCentreSize)) end
-
-        return M27Utilities.CalculateDistanceDeviationOfPositions(tPositions, iCentreSize)
-    else return 0
+        local iDeviation = M27Utilities.CalculateDistanceDeviationOfPositions(tPositions, iCentreSize)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return iDeviation
+    else
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return 0
     end
 end
 
 function TestAltMostRestriveLayer(platoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'TestAltMostRestriveLayer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     -- in case the platoon is already destroyed return false.
     if not platoon then
         if bDebugMessages == true then LOG(sFunctionRef..': platoon is nil, returning false') end
@@ -388,7 +407,7 @@ function TestAltMostRestriveLayer(platoon)
             end
         end
     end
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return unit
 end
 
@@ -399,6 +418,7 @@ function GetPathingUnit(oPlatoon, oExistingPathingUnit, bRecheckAllUnits)
     --returns nil if no valid units
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPathingUnit'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon:GetPlan() == 'M27LargeAttackForce' then bDebugMessages = true end
     local bGetNewUnit = false
     local oNewPathingUnit
@@ -413,18 +433,25 @@ function GetPathingUnit(oPlatoon, oExistingPathingUnit, bRecheckAllUnits)
         end
         if oNewPathingUnit == false then
             if bDebugMessages == true then LOG(sFunctionRef..': aiAttackUtils returned false') end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return nil
         elseif oNewPathingUnit == nil then
             if bDebugMessages == true then LOG(sFunctionRef..': aiAttackUtils returned nil') end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return nil
         elseif oNewPathingUnit.Dead then
             if bDebugMessages == true then LOG(sFunctionRef..': aiAttackUtils returned dead unit') end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return nil
         end
     else oNewPathingUnit = oExistingPathingUnit
     end
-    if oNewPathingUnit.Dead then return nil
-    else return oNewPathingUnit
+    if oNewPathingUnit.Dead then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return nil
+    else
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return oNewPathingUnit
     end
 end
 
@@ -434,6 +461,7 @@ function RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo
     --If try to assign to armypool platoon then instead tries to form a platoon
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RemoveUnitsFromPlatoon'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if oPlatoon and oPlatoon.GetBrain and oPlatoon.GetPlan and not(oPlatoon.Dead) then
         local aiBrain = oPlatoon:GetBrain()
@@ -521,11 +549,14 @@ function RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo
         end
         if bDebugMessages == true then if tUnits[1] == M27Utilities.GetACU(aiBrain) then LOG(sFunctionRef..': end of function; ACU current platoon='..M27Overseer.DebugPrintACUPlatoon(aiBrain, true)) end end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
 function GetCyclesSinceLastMoved(oUnit, bIsPlatoonNotUnit, iTriggerDistance)
     --returns the number of times this function has been called where oUnit hasnt moved by more than x spaces
+    local sFunctionRef = 'GetCyclesSinceLastMoved'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bIsPlatoonNotUnit == nil then bIsPlatoonNotUnit = false end
 
     local iDistTreatedAsStuck = iTriggerDistance
@@ -541,8 +572,12 @@ function GetCyclesSinceLastMoved(oUnit, bIsPlatoonNotUnit, iTriggerDistance)
     local iLastX = oUnit[sLastX]
     local iLastZ = oUnit[sLastZ]
     local tCurPos = {}
-    if oUnit == nil then return 0
-    elseif oUnit.Dead then return 0
+    if oUnit == nil then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return 0
+    elseif oUnit.Dead then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return 0
     else
         if bIsPlatoonNotUnit then tCurPos = GetPlatoonFrontPosition(oUnit)
         else tCurPos = oUnit:GetPosition() end
@@ -562,6 +597,7 @@ function GetCyclesSinceLastMoved(oUnit, bIsPlatoonNotUnit, iTriggerDistance)
             oUnit[sLastZ]= tCurPos[3]
         end
         oUnit[sCyclesSinceMoved] = iCyclesSinceMoved
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iCyclesSinceMoved
     end
 end
@@ -570,6 +606,7 @@ function IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPos, tCurDestination, i
     --Used for running away from enemies (if they have a threat rating)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsDestinationAwayFromNearbyEnemies'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bIsAwayFromNearbyEnemies = false
     local bStoppedLoop = false
     local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, tCurPos, iEnemySearchRadius, 'Enemy')
@@ -635,7 +672,9 @@ function IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPos, tCurDestination, i
     end
     if bIsAwayFromNearbyEnemies == true then
         --Do we also want to be away from the enemy start?
-        if bAlsoRunFromEnemyStartLocation == nil or bAlsoRunFromEnemyStartLocation == false then return true
+        if bAlsoRunFromEnemyStartLocation == nil or bAlsoRunFromEnemyStartLocation == false then
+
+            bIsAwayFromNearbyEnemies = true
         else
             if bDebugMessages == true then LOG('IsDestinationAwayFromEnemy: Is away from nearest enemy, checking if away from enemy start pos') end
             local bEnemyStartXLessThanTarget = false
@@ -662,6 +701,7 @@ function IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPos, tCurDestination, i
     else
         bIsAwayFromNearbyEnemies = false
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bIsAwayFromNearbyEnemies
 end
 
@@ -670,6 +710,7 @@ function IsDestinationAwayFromNearbyEnemy(tCurPos, tCurDestination, oNearestEnem
     --Quicker but more limited version of 'NearbyEnemies' - will only consider the nearest enemy
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsDestinationAwayFromNearbyEnemy'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tNearestEnemy = oNearestEnemy:GetPosition()
     --Does the current target move us away from the enemy in both directions? If so then dont change it
     local bXLessThanOurs = false
@@ -687,9 +728,12 @@ function IsDestinationAwayFromNearbyEnemy(tCurPos, tCurDestination, oNearestEnem
     if bDebugMessages == true then LOG('bTargetXLessThanOurs='..tostring(bTargetXLessThanOurs)..'; bTargetZLessThanOurs='..tostring(bTargetXLessThanOurs)) end
     if bTargetXLessThanOurs == bXLessThanOurs or bTargetZLessThanOurs == bZLessThanOurs then
         if bDebugMessages == true then LOG(sFunctionRef..': Isnt away from oNearestEnemy; tCurPos[1][3]='..tCurPos[1]..'-'..tCurPos[3]..'tNearestEnemy='..tNearestEnemy[1]..'-'..tNearestEnemy[3]..'; tCurDestination='..tCurDestination[1]..'-'..tCurDestination[3]) end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return false
     else
-        if bAlsoRunFromEnemyStartLocation == nil or bAlsoRunFromEnemyStartLocation == false then return true
+        if bAlsoRunFromEnemyStartLocation == nil or bAlsoRunFromEnemyStartLocation == false then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return true
         else
             if bDebugMessages == true then LOG(sFunctionRef..': Is away from nearest enemy, checking if away from enemy start pos') end
             local bEnemyStartXLessThanTarget = false
@@ -703,10 +747,13 @@ function IsDestinationAwayFromNearbyEnemy(tCurPos, tCurDestination, oNearestEnem
             if tEnemyStart[3] < tCurPos[3] then bEnemyStartZLessThanOurs = true end
             if bEnemyStartXLessThanOurs == bEnemyStartXLessThanTarget and bEnemyStartZLessThanOurs == bEnemyStartZLessThanTarget then
                 if bDebugMessages == true then LOG(sFunctionRef..': Is away from enemy start as well') end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return true
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Isnt awway from enemystart; tCurPos[1][3]='..tCurPos[1]..'-'..tCurPos[3]..'tCurDestination='..tCurDestination[1]..'-'..tCurDestination[3]..'; tEnemyStart='..tEnemyStart[1]..'-'..tEnemyStart[3]) end
-                return false end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return false
+            end
         end
     end
 end
@@ -716,6 +763,7 @@ function MergePlatoons(oPlatoonToMergeInto, oPlatoonToBeMerged)
     --Adds all units from oPlatoonToBeMerged into oPlatoonToMergeInto unless they're dead or attached
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MergePlatoons'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tMergingUnits = oPlatoonToBeMerged:GetPlatoonUnits()
     local tValidUnits = {}
     local bValidUnits = false
@@ -758,6 +806,7 @@ function MergePlatoons(oPlatoonToMergeInto, oPlatoonToBeMerged)
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Disbanding oPlatoonToBeMerged') end
     oPlatoonToBeMerged[refiCurrentAction] = refActionDisband
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetMergeLocation(oPlatoonToMergeInto, iPercentOfWayToDestination)
@@ -766,6 +815,7 @@ function GetMergeLocation(oPlatoonToMergeInto, iPercentOfWayToDestination)
     --Returns the platoon current position if an error occurs
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetMergeLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoonToMergeInto:GetPlan() == 'M27LargeAttackForce' then bDebugMessages = true end
     local iDistanceFactor
     if iPercentOfWayToDestination == nil then iDistanceFactor = 0.4
@@ -789,9 +839,11 @@ function GetMergeLocation(oPlatoonToMergeInto, iPercentOfWayToDestination)
 
         if oPathingUnit == nil or oPathingUnit.Dead or not(oPathingUnit.GetUnitId) then
             M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..':'..sFunctionRef..': Pathing unit is nil or dead or has no unit Id')
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return tCurPos
         elseif sPathingType == nil then
             M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..':'..sFunctionRef..': sPathingType is nil')
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return tCurPos
         else
             local iSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iCurSegmentX, iCurSegmentZ)
@@ -811,6 +863,7 @@ function GetMergeLocation(oPlatoonToMergeInto, iPercentOfWayToDestination)
                     else LOG('iCurSegmentX='..iCurSegmentX..'; iCurSegmentZ='..iCurSegmentZ)
                     end
                 end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return tCurPos
             end
             local bNearbySegmentsSameGroup = false
@@ -854,15 +907,20 @@ function GetMergeLocation(oPlatoonToMergeInto, iPercentOfWayToDestination)
                         if bNearbySegmentsSameGroup == false then break end
                     end
                 end
-                if iAttemptCount > 32 then return nil end --Infinite loop protection
+                if iAttemptCount > 32 then
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                    return nil
+                end --Infinite loop protection
             end
             if tMergePosition[1] == nil or tMergePosition[3] == nil then
                 M27Utilities.ErrorHandler(oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount]..': GetMergeLocation: tMergePosition is nil')
                 if iMergePositionGroup == nil then LOG('iMergePositionGroup is nil')
                 else LOG('iMergePositionGroup='..iMergePositionGroup) end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return tCurPos
             else
                 if iMergePositionGroup == iSegmentGroup then tMergePosition[2] = GetTerrainHeight(tMergePosition[1], tMergePosition[3]) end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return tMergePosition
             end
         end
@@ -874,6 +932,7 @@ function MergeWithPlatoonsOnPath(oPlatoonToMergeInto, sTargetPlatoonPlanName, bO
     --bOnlyOnOurSideOfMap - will ignore platoons closer to enemy base than our base if this is true
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MergeWithPlatoonsOnPath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bOnlyOnOurSideOfMap == nil then bOnlyOnOurSideOfMap = false end
     local aiBrain = oPlatoonToMergeInto:GetBrain()
     local tFriendlyPlatoons = aiBrain:GetPlatoonsList()
@@ -918,6 +977,7 @@ function MergeWithPlatoonsOnPath(oPlatoonToMergeInto, sTargetPlatoonPlanName, bO
     else
         M27Utilities.ErrorHandler('Merge location is nil - only scenarios where expect this are if map has lots of water or impassable areas')
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ForceActionRefresh(oPlatoon, iMinGapBetweenForces)
@@ -925,6 +985,7 @@ function ForceActionRefresh(oPlatoon, iMinGapBetweenForces)
     if iMinGapBetweenForces == nil then iMinGapBetweenForces = 5 end
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ForceActionRefresh'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iTimeOfLastRefresh = oPlatoon[refiGameTimeOfLastRefresh]
     if iTimeOfLastRefresh == nil then iTimeOfLastRefresh = 2 end
     local iCurGameTime = GetGameTimeSeconds()
@@ -950,6 +1011,7 @@ function ForceActionRefresh(oPlatoon, iMinGapBetweenForces)
         oPlatoon[refiGameTimeOfLastRefresh] = iCurGameTime
         if bDebugMessages == true then LOG(sFunctionRef..': Updated time of last refresh, oPlatoon[refiGameTimeOfLastRefresh]='..oPlatoon[refiGameTimeOfLastRefresh]) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 --[[function GetFollowerTargetPosition(oPlatoon)
@@ -975,6 +1037,7 @@ function HasPlatoonReachedDestination(oPlatoon)
     --Have we reached the current move destination?
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'HasPlatoonReachedDestination'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local sPlatoonName = oPlatoon:GetPlan()
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
@@ -1041,15 +1104,18 @@ function HasPlatoonReachedDestination(oPlatoon)
             local aiBrain = oPlatoon:GetBrain()
             M27EngineerOverseer.UpdateActionsForACUMovementPath(oPlatoon[reftMovementPath], aiBrain, M27Utilities.GetACU(aiBrain), oPlatoon[refiCurrentPathTarget])
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return true
-    else return false end
+    else
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return false end
 end
 
 function DeterminePlatoonCompletionAction(oPlatoon)
     --Updates oPlatoon's action if have completed movement path
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DeterminePlatoonCompletionAction'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local aiBrain = oPlatoon:GetBrain()
     local sPlatoonName = oPlatoon:GetPlan()
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
@@ -1077,6 +1143,7 @@ function DeterminePlatoonCompletionAction(oPlatoon)
             else oPlatoon[refiCurrentAction] = refActionNewMovementPath end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
@@ -1086,6 +1153,7 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
     --iEnemySearchRadius - used for mobile units (not structures)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef='GetNearbyEnemyData'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tCurPos = GetPlatoonFrontPosition(oPlatoon)
     local aiBrain, sPlatoonName
     local bAbort = false
@@ -1159,12 +1227,14 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
             M27Utilities.DrawLocation(tCurPos, nil, 2, 50)
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UpdatePlatoonActionIfStuck(oPlatoon)
     --Considers if oPlatoon is likely to be stuck, and if so then updates oPlatoon's action
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdatePlatoonActionIfStuck'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true LOG('UpdatePlatoonActionIfStuck: Start') end
     local sPlatoonName = oPlatoon:GetPlan()
@@ -1420,12 +1490,14 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
         else LOG('action is '..oPlatoon[refiCurrentAction]) end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetUnderwaterActionForLandUnit(oPlatoon)
     --Checks if platoon is underwater, and if so decides on action
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(tPlatoonPosition, true)
@@ -1538,6 +1610,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     else
         if bDebugMessages == true then LOG(sFunctionRef..': tPlatoonPosition[2]='..tPlatoonPosition[2]..'; terrain height='..GetTerrainHeight(tPlatoonPosition[1], tPlatoonPosition[3])..'; surface height='..GetSurfaceHeight(tPlatoonPosition[1], tPlatoonPosition[3])) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionFromOverseer)
@@ -1548,6 +1621,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local iExistingAction = oPlatoon[refiCurrentAction]
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdatePlatoonActionForNearbyEnemies'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --ACU run away if low on health (regardless of whether enemies are in range, although put here since at some point will want T1 arti micro)
     local sPlatoonName = oPlatoon:GetPlan()
     local aiBrain = oPlatoon:GetBrain()
@@ -2365,12 +2439,14 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
             oPlatoon[refiPrevNearestEnemyDistance] = nil
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function MergeNearbyPlatoons(oBasePlatoon)
 --Merges nearby platoons, and updates current platoons current units
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MergeNearbyPlatoons'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oPlatoonToMergeInto
     if oBasePlatoon[M27PlatoonTemplates.refbAmalgamateIntoEscort] then oPlatoonToMergeInto = oBasePlatoon[refoEscortingPlatoon]
     else oPlatoonToMergeInto = oBasePlatoon end
@@ -2443,6 +2519,7 @@ function MergeNearbyPlatoons(oBasePlatoon)
         end
         oPlatoonToMergeInto[refiMergeCycleCount] = iMergeCycleCount
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
     --(Decided wont update platoon unit data this cycle, as if wait then next cycle it will force a refresh due to the change in units)
 end
@@ -2450,6 +2527,7 @@ end
 function DoesPlatoonStillHaveSupportTarget(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DoesPlatoonStillHaveSupportTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bStillHaveTarget = true
 
     if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Start of code') end
@@ -2535,12 +2613,14 @@ function DoesPlatoonStillHaveSupportTarget(oPlatoon)
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, bStillHaveTarget='..tostring(bStillHaveTarget)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bStillHaveTarget
 end
 
 function UpdateEscortDetails(oPlatoonOrUnitToBeEscorted)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateEscortDetails'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local sPlatoonName, aiBrain
     local bAbort = false
     if oPlatoonOrUnitToBeEscorted.GetUnitId then
@@ -2600,6 +2680,7 @@ function UpdateEscortDetails(oPlatoonOrUnitToBeEscorted)
         end
         if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoonOrUnitToBeEscorted[refiPlatoonCount]..': End of function, oPlatoonOrUnitToBeEscorted[refiNeedingEscortUniqueCount]='..oPlatoonOrUnitToBeEscorted[refiNeedingEscortUniqueCount]..'; size of aibrain of tables='..table.getn(aiBrain[reftPlatoonsOrUnitsNeedingEscorts])) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
@@ -2607,7 +2688,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordPlatoonUnitsByType'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local sPlatoonName, aiBrain
     local bAbort = false
     if bPlatoonIsAUnit == true then
@@ -2836,12 +2917,14 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DetermineActionForNearbyMex(oPlatoon)
     --Double-check we can still build a mex
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineActionForNearbyMex'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': About to check have builders in platoon and get first builder') end
     if oPlatoon[refiBuilders] > 0 then
         local oFirstBuilder
@@ -2883,9 +2966,12 @@ function DetermineActionForNearbyMex(oPlatoon)
             oPlatoon[refiBuilders] = 0
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DetermineIfACUShouldBuildPower(oPlatoon)
+    local sFunctionRef = 'DetermineIfACUShouldBuildPower'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Only call if ACU in platoon
     if oPlatoon:GetPlan() == 'M27ACUMain' then
         local aiBrain = oPlatoon:GetBrain()
@@ -2907,12 +2993,14 @@ function DetermineIfACUShouldBuildPower(oPlatoon)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DetermineIfACUShouldBuildLandFactory(oPlatoon)
     --Allows ACU to build land factory in certain cases
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineIfACUShouldBuildLandFactory'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbACUInPlatoon] == true then --Already have this in the determine platoon action function, and might want to use this function for another unit
     local aiBrain = oPlatoon:GetBrain()
     local iFactoryCount = aiBrain:GetCurrentUnits(categories.STRUCTURE * categories.FACTORY)
@@ -2989,6 +3077,7 @@ function DetermineIfACUShouldBuildLandFactory(oPlatoon)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     --end
 end
 
@@ -3021,6 +3110,7 @@ function DetermineActionForNearbyHydro(oPlatoon)
     --Tries to assist any hydro being constructed
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineActionForNearbyHydro'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMaxDistanceToMove = M27Overseer.iACUMaxTravelToNearbyMex
     if bDebugMessages == true then LOG(sFunctionRef..': About to check have builders in platoon and get first builder') end
     if oPlatoon[refiBuilders] > 0 then
@@ -3079,11 +3169,13 @@ function DetermineActionForNearbyHydro(oPlatoon)
             oPlatoon[refiBuilders] = 0
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DetermineActionForNearbyReclaim(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineActionForNearbyReclaim'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oPlatoon[refiReclaimers]='..oPlatoon[refiReclaimers]) end
     if oPlatoon[refiReclaimers] > 0 then
@@ -3198,10 +3290,12 @@ function DetermineActionForNearbyReclaim(oPlatoon)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
     local sFunctionRef = 'DecideWhetherToGetACUUpgrade'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if M27Conditions.DoesACUHaveGun(aiBrain, true) == false then
@@ -3221,12 +3315,14 @@ function DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
             oPlatoon[refiCurrentAction] = refActionReturnToBase
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetACUUpgradeWanted(aiBrain, oACU)
     --Returns nil if cantr find anything
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetACUUpgradeWanted'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Assumes have already decided want to get an upgrade
     local sUpgradeID
     if M27Conditions.DoesACUHaveGun(aiBrain, true) == false then
@@ -3270,6 +3366,7 @@ function GetACUUpgradeWanted(aiBrain, oACU)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return sUpgradeID
 end
 
@@ -3283,6 +3380,7 @@ function RetreatLowHealthShields(oPlatoon, aiBrain)
     --Units with personal shield - will assign to retreating platoon based on individual unit health and shield %
     local sFunctionRef = 'RetreatLowHealthShields'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if aiBrain:PlatoonExists(oPlatoon) then
         local sPlan = oPlatoon:GetPlan()
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code for Platoon='..sPlan..(oPlatoon[refiPlatoonCount] or 'nil')..'; GameTime='..GetGameTimeSeconds()) end
@@ -3422,9 +3520,12 @@ function RetreatLowHealthShields(oPlatoon, aiBrain)
         end
         if bDebugMessages == true then LOG(sFunctionRef..': End of code for platoon '..sPlan..(oPlatoon[refiPlatoonCount] or 'nil')..'; iUnitsToFight='..iUnitsToFight..'; iUnitsToRun='..iUnitsToRun..'; iMobileShieldCount='..iMobileShieldCount) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RetreatToMobileShields(oPlatoon)
+    local sFunctionRef = 'RetreatToMobileShields'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --If the platoon has a mobile shield assisting platoon whose front units are far away, then fall back to it
     if oPlatoon[refoSupportingShieldPlatoon] and oPlatoon[refoSupportingShieldPlatoon][refiUnitsWithShields] > 0 then
         local iDistanceToShieldHelper = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), GetPlatoonFrontPosition(oPlatoon[refoSupportingShieldPlatoon]))
@@ -3437,12 +3538,14 @@ function RetreatToMobileShields(oPlatoon)
             oPlatoon[reftTemporaryMoveTarget] = GetMergeLocation(oPlatoon[refoSupportingShieldPlatoon], 0.5)
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DeterminePlatoonAction(oPlatoon)
     --Record current action as previous action
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DeterminePlatoonAction'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     if oPlatoon and oPlatoon.GetBrain then
         local aiBrain = oPlatoon[refoBrain]
@@ -3982,14 +4085,16 @@ function DeterminePlatoonAction(oPlatoon)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ReturnToBase(oPlatoon, iOnlyGoThisFarTowardsBase, bDontClearActions, bUseTemporaryMoveLocation)
     --Resets movement path so it is only going to return to base (meaning it will be treated as reaching final destination when it gets there)
     --iOnlyGoThisFarTowardsBase - if nil then go all the way to base, otherwise go x distance from current position
     --bUseTemporaryMoveLocation - if true then will assign a temporary move location instead of replacing the current move location
-
+    local sFunctionRef = 'ReturnToBase'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local sPlatoonName = oPlatoon:GetPlan()
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -4043,6 +4148,7 @@ function ReturnToBase(oPlatoon, iOnlyGoThisFarTowardsBase, bDontClearActions, bU
         oPlatoon[reftMovementPath][1] = tNewDestination
         oPlatoon[refiCurrentPathTarget] = 1
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     --oPlatoon[refiLastPathTarget] = 1
     --WaitSeconds(2)
 end
@@ -4052,6 +4158,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     --bDontClearActions: Set to true if want to add the movement actions to existing orders (e.g. if have issued secondary action such as overcharge)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNewMovementPath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bPlatoonNameDisplay = false
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
@@ -4323,11 +4430,13 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
           --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Finished calling function to ACU action tracker') end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ReissueMovementPath(oPlatoon, bDontClearActions)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReissueMovementPath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bPlatoonNameDisplay = false
     if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
     local sPlatoonName = oPlatoon:GetPlan()
@@ -4419,6 +4528,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function HoldAndReenableFire(tUnitsToSynchronise, iMaxTimeToHold, iTimeToSpreadOver)
@@ -4505,18 +4615,21 @@ end
 function SynchroniseUnitFiring(tUnitsToSynchronise, iTimeToSpreadOver)
     local sFunctionRef = 'SynchroniseUnitFiring'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oBP = tUnitsToSynchronise[1]:GetBlueprint()
     if oBP and oBP.Weapon and oBP.Weapon[1] and oBP.Weapon[1].RateOfFire > 0 then
         local iFiringCycle = 1 / oBP.Weapon[1].RateOfFire
         if bDebugMessages == true then LOG(sFunctionRef..': About to synchronise firing for '..table.getn(tUnitsToSynchronise)..' units, iFiringCycle='..iFiringCycle..'; iTimeToSpreadOver='..iTimeToSpreadOver) end
         ForkThread(HoldAndReenableFire, tUnitsToSynchronise, iFiringCycle, iTimeToSpreadOver)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function IssueIndirectAttack(oPlatoon, bDontClearActions)
     --Targets structures first, if no structures then spread attack on units
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IssueIndirectAttack'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..':'..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Start of code: iIndirectUnites='..oPlatoon[refiIndirectUnits]) end
     if oPlatoon[refiIndirectUnits] > 0 then
         local sPlatoonName = oPlatoon:GetPlan()
@@ -4853,10 +4966,13 @@ function IssueIndirectAttack(oPlatoon, bDontClearActions)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UpdateScoutPositions(oPlatoon)
     --Send scouts to the platoons current position (so should never be in front); sends up to 2 scouts to the middle (so for v.large platoons dont group them all in 1 place)
+    local sFunctionRef = 'UpdateScoutPositions'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if oPlatoon[refiScoutUnits] <= 2 then
         if oPlatoon[refiScoutUnits] > 0 and GetPlatoonUnitsOrUnitCount(oPlatoon, reftScoutUnits, true, true) >= 1 then
@@ -4872,6 +4988,7 @@ function UpdateScoutPositions(oPlatoon)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
@@ -4889,6 +5006,7 @@ function GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanc
         --iMinDistanceFromCurrentBuilderMoveTarget - if bCheckAgainstExistingCommandTarget is true, then this will also check if the potential move target is >1 from the current target (and ignore if its not)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPositionNearTargetInSamePathingGroup'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bCheckAgainstExistingCommandTarget == nil then bCheckAgainstExistingCommandTarget = true end
     if iMinDistanceFromCurrentBuilderMoveTarget == nil then iMinDistanceFromCurrentBuilderMoveTarget = 0 end
     if bDebugMessages == true then LOG(sFunctionRef..': Start; oPathingUnit blueprint='..oPathingUnit:GetUnitId()..'; iDistanceFromTarget='..iDistanceFromTarget) end
@@ -5054,6 +5172,7 @@ function GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanc
         if M27Utilities.IsTableEmpty(tPossibleTarget) == true then LOG(sFunctionRef..': End of code, tPossibleTarget is empty')
         else LOG(sFunctionRef..': End of code, tPossibleTarget='..repr(tPossibleTarget)) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tPossibleTarget
 end
 --PUT IN TO HELP SEARCHING - USE ABOVE INSTEAD
@@ -5070,6 +5189,7 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
     --bReturnNilIfAlreadyMovingNearConstruction - will return nil if bReturnMovePathInstead is set to true and unit is already moving towards target, otherwise will return current move target if its close enough, or the builder position if already in position
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveNearConstruction'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
         local sBuilderName = oBuilder:GetUnitId()
         sBuilderName = sBuilderName..M27UnitInfo.GetUnitLifetimeCount(oBuilder)
@@ -5194,6 +5314,7 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
         end
     end
     --Return position if have asked for one:
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if bReturnMovePathInstead == true then
         if bDebugMessages == true then
             if tPossibleTarget == nil then LOG(sFunctionRef..': End of function, returning nil')
@@ -5207,6 +5328,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
     --Updates movement path for oPlatoon
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshSupportPlatoonMovementPath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon:GetPlan() == 'M27MAAAssister' then bDebugMessages = true end
     local sPlatoonName = oPlatoon:GetPlan()
 
@@ -5428,6 +5550,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
     else
         if bDebugMessages == true then LOG(sFunctionRef..': dont have a platoon assigned to scout helper') end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function MoveNearHydroAndAssistEngiBuilder(oPlatoon, oHydroBuilder, tHydroPosition)
@@ -5435,6 +5558,7 @@ function MoveNearHydroAndAssistEngiBuilder(oPlatoon, oHydroBuilder, tHydroPositi
     --oHydroBuilder is the unit constructing a hydro at tHydroPosition that want to assist
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveNearHydroAndAssistEngiBuilder'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
     local aiBrain = oPlatoon:GetBrain()
     local iCurHydroDistance = M27Utilities.GetDistanceBetweenPositions(tHydroPosition, tPlatoonPosition)
@@ -5460,12 +5584,14 @@ function MoveNearHydroAndAssistEngiBuilder(oPlatoon, oHydroBuilder, tHydroPositi
             IssueGuard({ oBuilder}, oHydroBuilder)
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ReplaceMovementPathWithNewTarget(oPlatoon, tNewTarget)
     --Replace current movement path target with this
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReplaceMovementPathWithNewTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]] = tNewTarget
     local iLoopCountCheck = 0
     while table.getn(oPlatoon[reftMovementPath]) > oPlatoon[refiCurrentPathTarget] do
@@ -5474,6 +5600,7 @@ function ReplaceMovementPathWithNewTarget(oPlatoon, tNewTarget)
         table.remove(oPlatoon[reftMovementPath], oPlatoon[refiCurrentPathTarget] + 1)
     end
     if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Replacing remaining movement path with tNewTarget='..repr(tNewTarget)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
@@ -5481,6 +5608,7 @@ function ProcessPlatoonAction(oPlatoon)
     --Assumes DeterminePlatoonAction has been called
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ProcessPlatoonAction'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oPlatoon and oPlatoon.GetBrain then
         local aiBrain = oPlatoon[refoBrain]
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
@@ -6116,7 +6244,6 @@ function ProcessPlatoonAction(oPlatoon)
                         IssueMove(tBuilders, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
                     end
                 elseif oPlatoon[refiCurrentAction] == refActionBuildLandFactory then
-                    bDebugMessages = true
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': BuildLandFac') end
                     if GetPlatoonUnitsOrUnitCount(oPlatoon, reftBuilders, true, true) > 0 then
                         local tBuilders = GetPlatoonUnitsOrUnitCount(oPlatoon, reftBuilders, false, true)
@@ -6387,6 +6514,7 @@ function ProcessPlatoonAction(oPlatoon)
             LOG(sFunctionRef..': PlatoonExists is no longer valid')
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
@@ -6395,6 +6523,7 @@ function PlatoonInitialSetup(oPlatoon)
     --Updates platoon name and number of times its been called, then ensures segment pathing and mexes within the pathing group exist
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonInitialSetup'
+    --PROFILER NOTE - is included lower down due to waitticks
     local aiBrain = oPlatoon:GetBrain()
     local sPlatoonName = oPlatoon:GetPlan()
     --if sPlatoonName == 'M27ACUMain' then bDebugMessages = true end
@@ -6426,6 +6555,7 @@ function PlatoonInitialSetup(oPlatoon)
             if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')..': Now have units after waiting 1s, so will proceed') end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if not(bAbort) then
         if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..': Platoon has units so proceeding with intialisation') end
@@ -6583,11 +6713,15 @@ function PlatoonInitialSetup(oPlatoon)
         end
     end
     oPlatoon[refiLastPrevActionOverride] = 0
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RunPlatoonSingleCycle(oPlatoon)
+    local sFunctionRef = 'RunPlatoonSingleCycle'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     DeterminePlatoonAction(oPlatoon)
     ProcessPlatoonAction(oPlatoon)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function PlatoonCycler(oPlatoon)

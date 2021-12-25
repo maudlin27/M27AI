@@ -218,6 +218,7 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'ClearEngineerActionTrackers'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oEngineer == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
 
     if bDontClearUnitThatAreGuarding == nil then bDontClearUnitThatAreGuarding = true end
@@ -351,12 +352,14 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
     end
     --DoesPlatoonStillHaveSupportTarget function will cause the escort to be disbanded (eventually) - dont want to do here since we may assign an action that leads us to wanting the engineer to still be escorted immediately after clearing its actions
   --TEMPTEST(aiBrain, sFunctionRef..': End')
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'UpdateEngineerActionTrackers'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if iActionToAssign == nil then M27Utilities.ErrorHandler('iActionToAssign is nil') end
 
@@ -488,6 +491,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
         end
 
     end
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
   --TEMPTEST(aiBrain, sFunctionRef..': End')
 end
 
@@ -495,6 +499,7 @@ function UpdateActionsForACUMovementPath(tMovementPath, aiBrain, oEngineer, iPat
     --Assumes oEngineer (e.g. the ACU) will build mexes anywhere near tMovementPath locations
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateActionsForACUMovementPath'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iUniqueRef = GetEngineerUniqueCount(oEngineer)
 
     if bDebugMessages == true then
@@ -538,6 +543,7 @@ function UpdateActionsForACUMovementPath(tMovementPath, aiBrain, oEngineer, iPat
     end
   --TEMPTEST(aiBrain, sFunctionRef..': End')
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
@@ -545,6 +551,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bAreNearbyEnemies = false
     if oEngineer and not(oEngineer.Dead) then
         local iSearchRangeLong = iEngineerEnemySearchRange
@@ -660,6 +667,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     end
     --oEngineer[refbEngineerHasNearbyEnemies] = bAreNearbyEnemies
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, bAreNearEnemies='..tostring(bAreNearbyEnemies)) end
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bAreNearbyEnemies
 end
 
@@ -676,6 +684,7 @@ function GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentAction
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'GetNearestEngineerWithLowerPriority'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local oNearestEngineer
     --local iActionExistingCount = 0
@@ -803,6 +812,7 @@ function GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentAction
         else LOG(sFunctionRef..': Found engineer='..oNearestEngineer:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNearestEngineer))
         end
     end
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return oNearestEngineer
 end
 
@@ -824,6 +834,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'IssueSpareEngineerAction'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --Action already cleared in previous code
     local iCurSearchDistance = 40
@@ -934,12 +945,14 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
     end
     ForkThread(DelayedSpareEngineerClearAction, aiBrain, oEngineer, iTimeToWaitInSecondsBeforeRefresh)
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AreMobileUnitsInRect(rRectangleToSearch, bOnlyLookForMobileLand)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'AreMobileUnitsInRect'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bAreUnits
     local tBlockingUnits = GetUnitsInRect(rRectangleToSearch)
     if bOnlyLookForMobileLand == nil then bOnlyLookForMobileLand = true end
@@ -968,6 +981,7 @@ function AreMobileUnitsInRect(rRectangleToSearch, bOnlyLookForMobileLand)
             end
         else bAreUnits = true end
     end
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bAreUnits
 end
 
@@ -978,6 +992,7 @@ function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprint
     --Can also be used for general movement
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FindRandomPlaceToBuildOld'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local iMapSizeX, iMapSizeZ = GetMapSize()
     local iMapBoundMaxX = iMapSizeX - 4
@@ -1101,7 +1116,7 @@ function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprint
         end
     end
 
-
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tTargetLocation
 end
 
@@ -1112,6 +1127,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bForcedDebug then bDebugMessages = true end --for error handling
     local sFunctionRef = 'FindRandomPlaceToBuild'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local rPlayableArea = M27MapInfo.rMapPlayableArea
 
@@ -1253,12 +1269,14 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
 
     if bDebugMessages == true then LOG(sFunctionRef..'; Found random place to build, which is tTargetLocation='..repr(tTargetLocation)..'; aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation)='..tostring(aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation))) end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tTargetLocation
 end
 
 function WillBuildingBlockMex(sNewBuildingBPID, tPositionOfNewBuilding)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'WillBuildingBlockMex'
+      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --returns true if building will build by a mex; will only check outer border of the buildingID, i.e. assumes mex location wont be inside this since hten we couldnt build anyway
     --MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
     --tMexPointsByLocationRef = {} --As per mass points, but the key is the locationref value, and it returns the position
@@ -1274,6 +1292,7 @@ function WillBuildingBlockMex(sNewBuildingBPID, tPositionOfNewBuilding)
     local iSizeZ = math.floor(tBuildingSize[2] * 0.5 + 3)
     local iBuildingSizeRadius = math.max(iSizeX, iSizeZ)
     --local sLocationRef
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return not(M27Utilities.IsTableEmpty(M27MapInfo.GetResourcesNearTargetLocation(tPositionOfNewBuilding, iBuildingSizeRadius, true)))
 
     --[[if bDebugMessages == true then LOG(sFunctionRef..': tMexPointsByLocationRef='..repr(M27MapInfo.tMexPointsByLocationRef)..'; tBuildingSize='..repr(tBuildingSize)..'; sNewBuildingBPID='..sNewBuildingBPID..'; tPositionOfNewBuilding='..repr(tPositionOfNewBuilding)) end
@@ -1311,6 +1330,7 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --True if want most log messages to print
     local sFunctionRef = 'GetBestBuildLocationForTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
 
@@ -1628,13 +1648,16 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                 M27Utilities.DrawLocations(PossiblePositions, nil, 3, 10)
                 M27Utilities.DrawLocation(tBestPosition, nil, 7, 100) --draws best position in white
             end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return tBestPosition
         else
             if bDebugMessages == true then LOG(sFunctionRef..': Returning table of possible positions; PossiblePositions[1][1]='..PossiblePositions[1][1]..'-'..PossiblePositions[1][2]..'-'..PossiblePositions[1][3]) end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return PossiblePositions
         end
     else
         if bDebugMessages == true then LOG(sFunctionRef..': No valid matches found. PosTarget='..PosTarget[1]..'-'..PosTarget[3]) end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return nil
     end
 
@@ -1647,6 +1670,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'BuildStructureAtLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bAbortConstruction = false
     local sBlueprintToBuild = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oEngineer)--, false, false)
     local sBlueprintBuildBy
@@ -1870,12 +1894,15 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
             LOG('tsUnitRefs='..repr(tsUnitRefs))
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tTargetLocation
 end
 
 function GetPartCompleteBuilding(aiBrain, oBuilder, iCategoryToBuild, iBuildingSearchRange, iEnemySearchRange)
     --Returns nil if no nearby part complete building
     --iEnemySearchRange: nil if dont care about nearby enemies, otherwise will ignore buildings that have enemies within iEnemySearchRange
+    local sFunctionRef = 'GetPartCompleteBuilding'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tBuilderPosition = oBuilder:GetPosition()
     local tAllBuildings = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tBuilderPosition, iBuildingSearchRange, 'Ally')
     local iCurDistanceToBuilder
@@ -1898,6 +1925,7 @@ function GetPartCompleteBuilding(aiBrain, oBuilder, iCategoryToBuild, iBuildingS
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return oNearestPartCompleteBuilding
 end
 
@@ -1954,6 +1982,7 @@ function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpg
     if bDebugMessages == true then LOG(sFunctionRef..': About to clear engineer with ref '..GetEngineerUniqueCount(oEngineer)..' actions') end
     IssueClearCommands({oEngineer})
     ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+
 end
 
 function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iConditionNumber, sBuildingBPRef)
@@ -1961,6 +1990,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'AssignActionToEngineer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if oEngineer then
         if oEngineer.GetUnitId then
@@ -2181,13 +2211,14 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
     else
         M27Utilities.ErrorHandler('oEngineer is nil')
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function FilterLocationsBasedOnDistanceToEnemy(aiBrain, tLocationsToFilter, iMaxPercentageOfWayTowardsEnemy, bSortTable)
     --Returns {} if cant find any
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FilterLocationsBasedOnDistanceToEnemy'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local tRevisedLocations = {}
     --local tNearestLocation = {}
@@ -2217,12 +2248,14 @@ function FilterLocationsBasedOnDistanceToEnemy(aiBrain, tLocationsToFilter, iMax
     else
         M27Utilities.ErrorHandler('tLocationsToFilter is empty')
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tRevisedLocations--, tNearestLocation
 end
 
 function FilterLocationsBasedOnIntelPathCoverage(aiBrain, tLocationsToFilter, bNOTYETCODEDAlsoReturnClosest, bTableOfObjectsNotLocations)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FilterLocationsBasedOnIntelPathCoverage'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tFilteredLocations = {}
     if bTableOfObjectsNotLocations == nil then bTableOfObjectsNotLocations = false end
     if M27Utilities.IsTableEmpty(tLocationsToFilter) == true then
@@ -2244,6 +2277,7 @@ function FilterLocationsBasedOnIntelPathCoverage(aiBrain, tLocationsToFilter, bN
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tFilteredLocations
 end
 
@@ -2252,6 +2286,7 @@ function FilterLocationsBasedOnDefenceCoverage(aiBrain, tLocationsToFilter, bAls
     --Returns nil if cant find anywhere
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FilterLocationsBasedOnDefenceCoverage'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bTableOfObjectsNotLocations == nil then bTableOfObjectsNotLocations = false end
     local tFilteredLocations = {}
     if M27Utilities.IsTableEmpty(tLocationsToFilter) == true then
@@ -2282,10 +2317,13 @@ function FilterLocationsBasedOnDefenceCoverage(aiBrain, tLocationsToFilter, bAls
     if bAlsoNeedIntelCoverage == true and M27Utilities.IsTableEmpty(tFilteredLocations) == false then
         tFilteredLocations = FilterLocationsBasedOnIntelPathCoverage(aiBrain, tFilteredLocations, bNOTYETCODEDAlsoReturnClosest, bTableOfObjectsNotLocations)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tFilteredLocations
 end
 
 function FilterLocationsBasedOnIfUnclaimed(aiBrain, tLocationsToFilter, bMexNotHydro)
+    local sFunctionRef = 'FilterLocationsBasedOnIfUnclaimed'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tValidLocations = {}
     if M27Utilities.IsTableEmpty(tLocationsToFilter) == true then
         M27Utilities.ErrorHandler('tLocationsToFilter doesnt contain values')
@@ -2305,6 +2343,7 @@ function FilterLocationsBasedOnIfUnclaimed(aiBrain, tLocationsToFilter, bMexNotH
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tValidLocations
 end
 
@@ -2313,6 +2352,7 @@ function GetUnclaimedMexOrHydro(bMexNotHydro, aiBrain, oPathingUnit, sPathing, i
     --returns {} if no such table
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnclaimedMexOrHydro'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tAllLocationsInGroup
     if bTreatQueuedBuildingAsUnclaimed == nil then bTreatQueuedBuildingAsUnclaimed = bTreatOurOrAllyMexAsUnclaimed end
     if bMexNotHydro == false then
@@ -2349,6 +2389,7 @@ function GetUnclaimedMexOrHydro(bMexNotHydro, aiBrain, oPathingUnit, sPathing, i
         else LOG('Table is empty')
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
     return tUnclaimedLocations
 end
@@ -2356,7 +2397,7 @@ end
 function GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSearchRange)
     local bDebugMessages = false
     local sFunctionRef = 'GetNearestPartBuiltUnit'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oNearestPartBuilt
     --Check if any nearby part-built units (that have abandoned) near tStartPosition
     if iCategoryToBuild then
@@ -2378,6 +2419,7 @@ function GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSea
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return oNearestPartBuilt
 end
 
@@ -2388,6 +2430,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'GetActionTargetAndObject'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tLocationsToGoThrough = tExistingLocationsToPickFrom
     local tNearbyUnitsOfType, iCategoryToBuild
     local tActionLocation, oActionObject
@@ -2626,6 +2669,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
             else LOG(sFunctionRef..': oActionObject exists but has no lifetime count') end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tActionLocation, oActionObject, bClearCurrentlyAssignedEngineer
 end
 
@@ -2652,6 +2696,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
 
     local sFunctionRef = 'ReassignEngineers'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tEngineers
     local bOnlyLookingAtSomeEngineers = false
     if tEngineersToReassign == nil then
@@ -3605,6 +3650,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
   --TEMPTEST(aiBrain, sFunctionRef..': End of code')
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassign)

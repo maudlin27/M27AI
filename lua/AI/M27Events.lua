@@ -57,6 +57,7 @@ function OnUnitDeath(oUnit)
         if oUnit.GetAIBrain then
             local aiBrain = oUnit:GetAIBrain()
             if aiBrain.M27AI then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 local sUnitBP = oUnit:GetUnitId()
                 if EntityCategoryContains(refCategoryEngineer, sUnitBP) then
                     --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Pre clear action')
@@ -71,6 +72,7 @@ function OnUnitDeath(oUnit)
                 --elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sUnitBP) then
                     --aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
                 end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             end
         end
     end
@@ -84,10 +86,13 @@ end
 
 function OnDamaged(self, instigator)
 
+
     if self.GetUnitId then
         if self.GetAIBrain and not(self.Dead) then
             local aiBrain = self:GetAIBrain()
             if aiBrain.M27AI then
+                local sFunctionRef = 'OnDamaged'
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 --Has our ACU been hit by an enemy we have no sight of?
                 if self == M27Utilities.GetACU(aiBrain) then
                     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -142,6 +147,7 @@ function OnDamaged(self, instigator)
                         local oShieldPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', {self}, true)
                     end
                 end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             end
 
         end

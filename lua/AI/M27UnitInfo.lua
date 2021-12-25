@@ -341,6 +341,7 @@ end
 function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsEnemyUnitAnEngineer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bIsEngineer = true
     local iEnemySpeed
     if oEnemyUnit.GetUnitId then
@@ -362,12 +363,14 @@ function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Checking if oEnemyUnit with ID='..sEnemyID..' is an engineer; bIsEngineer='..tostring(bIsEngineer)..'; iEnemySpeed if we have calculated it='..(iEnemySpeed or 'nil')) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bIsEngineer
 end
 
 function GetCurrentAndMaximumShield(oUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCurrentAndMaximumShield'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iCurShield = 0
     local iMaxShield = 0
     if oUnit.MyShield then
@@ -376,13 +379,14 @@ function GetCurrentAndMaximumShield(oUnit)
     else
         local tShield = oUnit:GetBlueprint().Defense
         if tShield then
-            local iCurShield = (oUnit:GetShieldRatio(false) or 0) * iMaxShield
+            iCurShield = (oUnit:GetShieldRatio(false) or 0) * iMaxShield
         end
     end
     if bDebugMessages == true then
         LOG(sFunctionRef..': iCurShield='..iCurShield..'; iMaxShield='..iMaxShield..'; ShieldRatio False='..oUnit:GetShieldRatio(false)..'; ShieldRatio true='..oUnit:GetShieldRatio(true)..' iCurShield='..iCurShield)
         if oUnit.MyShield then LOG('Unit has MyShield; IsUp='..tostring(oUnit.MyShield:IsUp())..'; shield health='..oUnit.MyShield:GetHealth()) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iCurShield, iMaxShield
 end
 

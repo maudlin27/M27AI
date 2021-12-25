@@ -33,6 +33,7 @@ local iIdleUnitSearchThreshold = 10
 function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CreatePlatoon'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oNewPlatoon
     if sPlatoonPlan == nil then
         M27Utilities.ErrorHandler('sPlatoonPlan is nil')
@@ -66,10 +67,13 @@ function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately
     end
     --Check first unit has a platoon now
     if bDebugMessages == true then LOG(sFunctionRef..': Plan of First unit in oPlatoonUnits platoon='..oPlatoonUnits[1].PlatoonHandle:GetPlan()) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return oNewPlatoon
 end
 
 function RefreshUnitsWaitingForAssignment(aiBrain)
+    local sFunctionRef = 'RefreshUnitsWaitingForAssignment'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tUnitsWaiting = aiBrain[reftoCombatUnitsWaitingForAssignment]
     local tValidRemainingUnits = {}
     local iValidUnits = 0
@@ -86,11 +90,13 @@ function RefreshUnitsWaitingForAssignment(aiBrain)
         end
         aiBrain[reftoCombatUnitsWaitingForAssignment] = tValidRemainingUnits
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function PlatoonOrUnitNeedingEscortIsStillValid(aiBrain, oPlatoonOrUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonOrUnitNeedingEscortIsStillValid'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bStillValid = true
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if oPlatoonOrUnit == nil or (not(oPlatoonOrUnit[M27PlatoonUtilities.refbShouldHaveEscort]) and not(oPlatoonOrUnit[M27PlatoonTemplates.refbWantsShieldEscort])) then
@@ -112,12 +118,14 @@ function PlatoonOrUnitNeedingEscortIsStillValid(aiBrain, oPlatoonOrUnit)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bStillValid
 end
 
 function GetPlatoonOrUnitToEscort(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPlatoonOrUnitToEscort'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oPlatoonOrUnitToEscort = nil
     --Returns the platoon handle if we have one that needs an escort, otherwise returns nil
     local bRefreshPlatoonsNeedingEscortingList = false
@@ -164,6 +172,7 @@ function GetPlatoonOrUnitToEscort(aiBrain)
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Finished refreshing list of platoons needing an escort, current table size='..table.getn(aiBrain[M27PlatoonUtilities.reftPlatoonsOrUnitsNeedingEscorts])) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return oPlatoonOrUnitToEscort
 end
 
@@ -171,6 +180,7 @@ end
 function CombatPlatoonFormer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CombatPlatoonFormer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, about to refresh units waiting for assignment') end
     RefreshUnitsWaitingForAssignment(aiBrain)
     local iUnitsWaiting = 0
@@ -444,11 +454,13 @@ function CombatPlatoonFormer(aiBrain)
         end
     else if bDebugMessages == true then LOG(sFunctionRef..': No units waiting for assigment to a platoon') end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AddIdleUnitsToPlatoon(aiBrain, tUnits, oPlatoonToAddTo)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddIdleUnitsToPlatoon'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local sPlatoonName = 'None'
     if oPlatoonToAddTo.GetPlan then
         sPlatoonName = oPlatoonToAddTo:GetPlan()
@@ -466,6 +478,7 @@ function AddIdleUnitsToPlatoon(aiBrain, tUnits, oPlatoonToAddTo)
             end
         end
     else M27Utilities.ErrorHandler('no plan for oPlatoonToAddTo, aborting allocation - SetupIdlePlatoon needs to be added on initialisation for every idle platoon plan') end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
@@ -475,6 +488,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AllocateUnitsToIdlePlatoons'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if M27Utilities.IsTableEmpty(tNewUnits) == true then M27Utilities.ErrorHandler('tNewUnits is empty')
     else
@@ -545,11 +559,13 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
             if M27Utilities.IsTableEmpty(tOther) == false then AddIdleUnitsToPlatoon(aiBrain, tOther, aiBrain[M27PlatoonTemplates.refoIdleOther]) end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemoveExistingShield)
     local sFunctionRef = 'DoesPlatoonWantAnotherMobileShield'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true then bDebugMessages = true end
 
     local iPlatoonValueToShieldRatio = 3.5 --want 3.5 mass in the platoon for every 1 mass in the shield
@@ -610,13 +626,16 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
         if bDebugMessages == true then LOG(sFunctionRef..': iShieldValueWanted='..iShieldValueWanted..'; iShieldValueHave='..iShieldValueHave..'; iShieldMass='..iShieldMass..'; iShieldUnitsHave='..iShieldUnitsHave) end
         if iShieldValueWanted > (iShieldValueHave + iShieldMass) and iShieldUnitsHave < 5 then
             if bDebugMessages == true then LOG(sFunctionRef..': Returning true as the shield value wanted is more than the value we have plus shield mass, and we have fewer than 5 shield units') end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return true
         else
             if bDebugMessages == true then LOG(sFunctionRef..': Returning false') end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return false
         end
     else
         if bDebugMessages == true then LOG(sFunctionRef..': Platoon hasnt said that it wants a shield so returning false') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return false
     end
 end
@@ -625,6 +644,7 @@ function GetClosestPlatoonWantingMobileShield(aiBrain, tStartPosition, oShield)
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetClosestPlatoonWantingMobileShield'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iClosestDistanceToUs = 100000
     local iCurDistanceToUs
     local oClosestPlatoon
@@ -672,11 +692,13 @@ function GetClosestPlatoonWantingMobileShield(aiBrain, tStartPosition, oShield)
             LOG(sFunctionRef..': Returning oClosestPlatoon as wanting a shield, oClosestPlatoon='..oClosestPlatoon:GetPlan()..oClosestPlatoon[M27PlatoonUtilities.refiPlatoonCount])
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return oClosestPlatoon
 end
 
 function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
     local sFunctionRef = 'MobileShieldPlatoonFormer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local tStartPosition
     local bHaveUnitsToAssign = true
@@ -834,6 +856,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
     if aiBrain[refbUsingMobileShieldsForPlatoons] == true and (GetGameTimeSeconds() - aiBrain[refiTimeLastCheckedForIdleShields]) >= 1 then
         CheckForIdleMobileLandUnits(aiBrain)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
@@ -845,6 +868,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
     --if bNoDelay is true then wont do normal waiting for the unit to move away from the factory (nb: should only set this to true if we're not talking about a newly produced unit from a factory as it will bypass the workaround for factory error where factories stop building)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AllocateNewUnitToPlatoonBase'
+    --DONT USE PROFILER HERE as need solution to the waitticks
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
     local iLifetimeCount
@@ -984,6 +1008,8 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                 end
             end
         end
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 
         if bProceed == true then
@@ -1136,11 +1162,11 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                     AllocateUnitsToIdlePlatoons(aiBrain, tNavalUnits)
                 end
 
-                WaitSeconds(1)
-                if oNewUnit then oNewUnit[refbJustCleared] = false end
+                M27Utilities.DelayChangeVariable(oNewUnit, refbJustCleared, false, 1, nil, nil)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AllocatNewUnitsToPlatoonNotFromFactory(tNewUnits)
@@ -1156,6 +1182,8 @@ function AllocateNewUnitToPlatoonFromFactory(oNewUnit)
 end
 
 function AssignIdlePlatoonUnitsToPlatoons(aiBrain)
+    local sFunctionRef = 'AssignIdlePlatoonUnitsToPlatoons'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tIdleCombat = aiBrain[M27PlatoonTemplates.refoIdleCombat]:GetPlatoonUnits()
     if M27Utilities.IsTableEmpty(tIdleCombat) == false then
         AllocatNewUnitsToPlatoonNotFromFactory(tIdleCombat)
@@ -1177,12 +1205,14 @@ function AssignIdlePlatoonUnitsToPlatoons(aiBrain)
         end
         if M27Utilities.IsTableEmpty(tFinishedConstruction) == false then AllocateUnitsToIdlePlatoons(aiBrain, tFinishedConstruction) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function CheckForIdleMobileLandUnits(aiBrain)
     --Assigns any units without a platoon to the relevant platoon handle
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CheckForIdleMobileLandUnits'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tAllUnits = aiBrain:GetListOfUnits(categories.MOBILE * categories.LAND, false, true)
     local oPlatoon
     local oArmyPool = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
@@ -1202,6 +1232,7 @@ function CheckForIdleMobileLandUnits(aiBrain)
         end
     end
     aiBrain[refbUsingMobileShieldsForPlatoons] = not(bHaveIdleMobileShield)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function SetupIdlePlatoon(aiBrain, sPlan)
@@ -1215,6 +1246,7 @@ end
 function UpdateIdlePlatoonActions(aiBrain, iCycleCount)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateIdlePlatoonActions'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Indirect fire platoon - assign to temporary attack platoon every other cycle
     if (math.mod(iCycleCount, 2) == 0) then
         --Even cycle count so refresh
@@ -1228,11 +1260,13 @@ function UpdateIdlePlatoonActions(aiBrain, iCycleCount)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function PlatoonMainIdleUnitLoop(aiBrain, iCycleCount)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonMainIdleUnitLoop'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iIdleUnitSearchThreshold = 10 --Change both here and in earlier code
 
@@ -1260,6 +1294,7 @@ function PlatoonMainIdleUnitLoop(aiBrain, iCycleCount)
         ForkThread(CheckForIdleMobileLandUnits, aiBrain)
     end
     ForkThread(UpdateIdlePlatoonActions, aiBrain, iCycleCount)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function PlatoonIdleUnitOverseer(aiBrain)

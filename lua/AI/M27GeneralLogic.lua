@@ -6,6 +6,7 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
+local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
 refiNearestEnemyIndex = 'M27NearestEnemyIndex'
@@ -72,6 +73,8 @@ end
 function ReturnUnitsInTargetSegmentGroup(tUnits, iTargetGroup)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReturnUnitsInTargetSegmentGroup'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local tCurPosition = {}
     local iCurSegmentX, iCurSegmentZ
     local tMatchingUnits = {}
@@ -97,6 +100,7 @@ function ReturnUnitsInTargetSegmentGroup(tUnits, iTargetGroup)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tMatchingUnits
 end
 
@@ -105,6 +109,8 @@ function ChooseReclaimTarget(oEngineer)
     --If are no reclaim positions then returns the current segment
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ChooseReclaimTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if bDebugMessages == true then LOG(sFunctionRef..':Started ChooseReclaimTarget') end
     local tEngPosition = oEngineer:GetPosition()
     local iEngSegmentX, iEngSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tEngPosition)
@@ -225,6 +231,7 @@ function ChooseReclaimTarget(oEngineer)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetNearestEnemyIndex(aiBrain, bForceDebug)
@@ -232,6 +239,8 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bForceDebug == true then bDebugMessages = true end --for error control
     local sFunctionRef = 'GetNearestEnemyIndex'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local iPlayerArmyIndex = aiBrain:GetArmyIndex()
     local iDistToCurEnemy
     local iMinDistToEnemy = 10000000
@@ -303,13 +312,17 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                 WaitSeconds(30)
             elseif bHaveBrains then
                 M27Utilities.ErrorHandler('iNearestEnemyIndex is nil so will repeat function with logs enabled')
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return GetNearestEnemyIndex(aiBrain, true)
             else
                 M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will wait 1 second then call again; gametime='..GetGameTimeSeconds())
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(1)
                 return GetNearestEnemyIndex(aiBrain, true)
             end
-        else return aiBrain[refiNearestEnemyIndex] end
+        else
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return aiBrain[refiNearestEnemyIndex] end
     else
         if iNearestEnemyIndex == nil then
             if not(aiBrain[refbNearestEnemyBugDisplayed]) then
@@ -317,14 +330,17 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                 if iLastValue == nil then iLastValue = -1 end --so error message wont return nil value
                 M27Utilities.ErrorHandler('iNearestEnemyIndex is nil; bForceDebug='..tostring(bForceDebug)..'; relying on last valid value='..iLastValue..'; all future error messages re this will be suppressed; iPlayerArmyIndex='..iPlayerArmyIndex)
                 aiBrain[refbNearestEnemyBugDisplayed] = true
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return aiBrain[refiNearestEnemyIndex]
             else
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return aiBrain[refiNearestEnemyIndex]
             end
         else
             if bDebugMessages == true then LOG(sFunctionRef..'; iNearestEnemyIndex='..iNearestEnemyIndex) end
             aiBrain[refiNearestEnemyIndex] = iNearestEnemyIndex
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iNearestEnemyIndex
     end
 end
@@ -429,6 +445,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
     --if are no mexes that can path to then will return the enemy base
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetMexRaidingPath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if iIgnoreDistanceFromOwnStart == nil then iIgnoreDistanceFromOwnStart = iIgnoreDistanceFromStartLocation end
     if bOnlyTargetEndDestination == nil then bOnlyTargetEndDestination = false end
 
@@ -441,6 +458,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
     local bAbort = false
     if aiBrain == nil then
         M27Utilities.ErrorHandler('aiBrain is nil, will return the position for the first player')
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return {M27MapInfo.PlayerStartPoints[1]}
     end
 
@@ -656,6 +674,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                 if iPossibleTargetCount == nil then bErrorControl = true
                 elseif iPossibleTargetCount == 0 then bErrorControl = true end
                 if bErrorControl then
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
                 else
                     M27Utilities.ErrorHandler('iRevisedPossibleMex is nil or 0 but iPossibleTargetCount > 0 so reverting to that')
@@ -680,6 +699,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             end
             if bNoBetterTargets == true then
                 M27Utilities.ErrorHandler('bNoBetterTargets is true, returning player start point')
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
             end
 
@@ -787,7 +807,10 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                         else
                             bSearchForMexes = false
                         end
-                        if iWaitCount > 2 then WaitTicks(1) iWaitCount = 0 end
+                        if iWaitCount > 2 then
+                            if not(M27Config.M27RunProfiling) then WaitTicks(1) end
+                            iWaitCount = 0
+                        end
                         bAbort = true
                         if oPlatoonHandle and aiBrain and aiBrain:PlatoonExists(oPlatoonHandle) == true and oUnit and not(oUnit.Dead) then bAbort = false end
                         if bAbort == true then
@@ -830,7 +853,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                                 --Current distance from last enemy mex and current location:
                                 iLoopCount = iLoopCount + 1
                                 if iLoopCount > iMaxLoopCountBeforeChecks then
-                                    LOG(sFunctionRef..': iLoopCount has exceeded iMaxLoopCountBeforeChecks, likely infinite loop; slowing down script')
+                                    M27Utilities.ErrorHandler(sFunctionRef..': iLoopCount has exceeded iMaxLoopCountBeforeChecks, likely infinite loop; slowing down script', nil, true)
                                     WaitTicks(5)
                                 end
 
@@ -878,7 +901,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                                         break
                                     end
                                 end
-                                WaitTicks(1)
+                                if not(M27Config.M27RunProfiling) then WaitTicks(1) end
                                 bAbort = true
                                 if oPlatoonHandle and aiBrain and aiBrain:PlatoonExists(oPlatoonHandle) == true and oUnit and not(oUnit.Dead) then bAbort = false end
                                 if bAbort == true then
@@ -923,14 +946,15 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             tSortedFinalWaypoints[1] = M27MapInfo.PlayerStartPoints[iPlayerArmyIndex]
         end
     end
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tSortedFinalWaypoints
 end
 
 function SetFactoryRallyPoint(oFactory)
     --Sets the rally point on oFactory
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-
+    local sFunctionRef = 'SetFactoryRallyPoint'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iDistFromFactory = 5 --Factories are 8x8, midpoint is middle of it so 4 to end of factory
     local oBrain = oFactory:GetAIBrain()
     if oBrain == nil then M27Utilities.ErrorHandler('SetFactoryRallyPoint: oBrain is Nil') end
@@ -949,6 +973,7 @@ function SetFactoryRallyPoint(oFactory)
     if bDebugMessages == true then LOG('SetFactoryRallyPoint: tFactoryPos='..tFactoryPos[1]..'-'..tFactoryPos[3]..'; iRallyXZ='..iRallyX..'-'..iRallyZ..'; iEnemyXZ='..iEnemyX..'-'..iEnemyZ) end
     IssueClearFactoryCommands({oFactory})
     IssueFactoryRallyPoint({oFactory}, tRallyPoint)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
@@ -1029,6 +1054,9 @@ end
 function GetACUCombatMassRating(oACU)
     --Returns the combat adjusted mass value (ignoring current health percentage) of oACU, factoring in any upgrades
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetACUCombatMassRating'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local tPossibleUpgrades = {}
     local tPossibleUpgrades = oACU:GetBlueprint().Enhancements
     local aiBrain = oACU:GetAIBrain()
@@ -1048,12 +1076,14 @@ function GetACUCombatMassRating(oACU)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iTotalMassValue
 end
 
 function GetACUMaxDFRange(oACU)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetACUMaxDFRange'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oBP = oACU:GetBlueprint()
     local tPossibleUpgrades = oBP.Enhancements
     local iRange = 22 --can't figure out easy way to determine this so will just hard-enter
@@ -1069,6 +1099,7 @@ function GetACUMaxDFRange(oACU)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iRange
 end
 
@@ -1078,6 +1109,8 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
     --Works if either sent a table of units or a single unit
     --iReturnRangeType: nil or 0: Return min+Max; 1: Return min only; 2: Return max only
     --Cycles through each unit and then each weapon to determine the minimum range
+    local sFunctionRef = 'GetDirectFireUnitMinOrMaxRange'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iCurRange = 0
     local iMinRange = 1000000000
     local iMaxRange = 0
@@ -1113,6 +1146,7 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iReturnRangeType == 1 then return iMinRange
     elseif iReturnRangeType == 2 then return iMaxRange
     else return iMinRange, iMaxRange
@@ -1133,6 +1167,8 @@ function GetUnitSpeedData(tUnits, aiBrain, bNeedToHaveBlipOrVisual, iReturnType,
     --iReturnType: 1 = min speed; 2 = max speed; 3 = average speed; 4 = return a table of the units that we know are <= iOptionalSpeedThreshold
     --bNeedToHaveBlipOrVisual: if true, then will check if aiBrain can see the tUnits; defaults to false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetUnitSpeedData'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bNeedToHaveBlipOrVisual == nil then bNeedToHaveBlipOrVisual = false end
     local tUnitBPs = {}
     local oBlip
@@ -1142,6 +1178,7 @@ function GetUnitSpeedData(tUnits, aiBrain, bNeedToHaveBlipOrVisual, iReturnType,
     --Get a list of units that can see
     if M27Utilities.IsTableEmpty(tUnits) == true then
         M27Utilities.ErrorHandler('tUnits is empty')
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return nil
     else
         for i, oUnit in tUnits do
@@ -1169,7 +1206,10 @@ function GetUnitSpeedData(tUnits, aiBrain, bNeedToHaveBlipOrVisual, iReturnType,
                 end
             end
         end
-        if iValidUnits == 0 then return nil else
+        if iValidUnits == 0 then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return nil
+        else
             local tUniqueBPs = {}
             if iReturnType == 3 then tUniqueBPs = tUnitBPs
             else
@@ -1201,6 +1241,7 @@ function GetUnitSpeedData(tUnits, aiBrain, bNeedToHaveBlipOrVisual, iReturnType,
                 end
             end
             if bDebugMessages == true then LOG('GetUnitSpeedData: iReturnType='..iReturnType..'; iTotalEntries='..iTotalEntries..'; iMinSpeed='..iMinSpeed..'; iMaxSpeed='..iMaxSpeed..'; iTotalSpeed='..iTotalSpeed) end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             if iReturnType == 1 then return iMinSpeed
             elseif iReturnType == 2 then return iMaxSpeed
             elseif iReturnType == 3 then
@@ -1230,6 +1271,8 @@ end
 
 function GetVisibleUnitsOnly(aiBrain, tUnits)
     --Returns a table of tUnits containing only those that have visibility of, or ahve radar blips where know the type of unit
+    local sFunctionRef = 'GetVisibleUnitsOnly'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oBlip
     local iArmyIndex = aiBrain:GetArmyIndex()
     local tVisibleUnits = {}
@@ -1249,6 +1292,7 @@ function GetVisibleUnitsOnly(aiBrain, tUnits)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iVisibleCount == 0 then return nil
     else return tVisibleUnits end
 end
@@ -1261,6 +1305,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     --iSoloBlipMassOverride - similar to massvalue of blips override
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCombatThreatRating'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iBlipThreat = 54 --assumes blip is t1 tank
     local iSoloBlipThreat = 10 -- assumes a single unit as a blip is more likely a scout or engineer
     local iHealthFactor --if unit has 40% health, then threat reduced by (1-40%)*iHealthFactor
@@ -1277,6 +1322,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     if M27Utilities.IsTableEmpty(tUnits, false) == true then
     --if tUnits == nil then
         if bDebugMessages == true then LOG(sFunctionRef..': Warning: tUnits is empty, returning 0') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return 0
     else
         if table.getn(tUnits) == 0 then
@@ -1392,6 +1438,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
             iTotalThreat = iTotalThreat + iCurThreat
         end
         if bDebugMessages == true then LOG(sFunctionRef..': iTotalThreat='..iTotalThreat) end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iTotalThreat
     end
 end
@@ -1403,6 +1450,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     --bIncludeAirTorpedo - Adds threat for torpedo bombers
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCombatThreatRating'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iSoloBlipThreat = 10 -- assumes a single unit as a blip is more likely a scout or engineer
     local iStructureBlipThreat = 0 --Assumes an unrevealed structure has no threat rating
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
@@ -1454,6 +1502,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     if M27Utilities.IsTableEmpty(tUnits, false) == true then
         --if tUnits == nil then
         if bDebugMessages == true then LOG(sFunctionRef..': Warning: tUnits is empty, returning 0') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return 0
     else
         if table.getn(tUnits) == 0 then
@@ -1590,6 +1639,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
             end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': iTotalThreat='..iTotalThreat) end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iTotalThreat
     end
 end
@@ -1627,6 +1677,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     --if bGuardIsIdle == true then will treat a unit that is guarding/assisting as being idle
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsUnitIdle'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
     local refiIdleCount = 'M27UnitIdleCount'
@@ -1670,6 +1721,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
                     bHaveValidFocusUnit = true
                 end
             end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             if bHaveValidFocusUnit == true then
                 return bGuardWithFocusUnitIsIdle
             else return bGuardWithNoFocusUnitIsIdle
@@ -1720,11 +1772,13 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     end
     if bIsIdle == false then
         oUnit[refiIdleCount] = 0
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return false
     else
         if oUnit[refiIdleCount] == nil then oUnit[refiIdleCount] = 1
         else oUnit[refiIdleCount] = oUnit[refiIdleCount] + 1 end
         if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..oUnit[refiIdleCount]..'; Idle threshold='..iIdleCountThreshold) end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if oUnit[refiIdleCount] >=  iIdleCountThreshold then
             return true
         else return false
@@ -1761,6 +1815,7 @@ function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPass
     --Other variables:
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddMexesAndReclaimToMovementPath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oUnitBP = oPathingUnit:GetBlueprint()
     local iBuildDistance = oUnitBP.Economy.MaxBuildDistance
     local iUnitSpeed = oUnitBP.Physics.MaxSpeed
@@ -1913,6 +1968,7 @@ function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPass
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of function, iPassingLocationCount='..iPassingLocationCount..'; tAllTargetLocations='..repr(tAllTargetLocations)) end
   --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': End of code') end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tAllTargetLocations
 
 end
@@ -1923,6 +1979,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
     --Returns nil if no locations can be found
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPriorityExpansionMovementPath'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
   --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
     --if oPathingUnit == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
     --Key config variables:
@@ -1975,10 +2032,12 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
 
     if iEnemyStartPoint == nil then
         LOG(sFunctionRef..': ERROR unless enemy is dead - iEnemyStartPoint is nil; returning our start position')
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return M27MapInfo.PlayerStartPoints[iPlayerStartPoint]
     else
         --Do we have an ACU with gun? If so then just pick enemy base
         if M27Utilities.IsACU(oPathingUnit) and M27Conditions.DoesACUHaveGun(aiBrain, true, oPathingUnit) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return M27MapInfo.PlayerStartPoints[iEnemyStartPoint]
         else
             if bDebugMessages == true then LOG(sFunctionRef..': iEnemyStartPoint='..iEnemyStartPoint..'; iPlayerStartPoint='..iPlayerStartPoint) end
@@ -2369,7 +2428,9 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                 if iMaxDistancePercentage > iStopCyclingMaxThreshold or M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == true then return nil
                 else
                     local iNewMaxDistance = iMaxDistancePercentage + 0.2
-                    return GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOverride, iNewMaxDistance)
+                    local tExpansionPath = GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOverride, iNewMaxDistance)
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                    return tExpansionPath
                 end
             else
                 --Update final destination to move near it:
@@ -2388,7 +2449,9 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                 end
                 oPathingUnit.GetPriorityExpansionMovementPath = true
               --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to add nearby reclaim and mexes to movement path') end
-                return AddMexesAndReclaimToMovementPath(oPathingUnit, tRevisedDestination)
+                local tRevisedPath = AddMexesAndReclaimToMovementPath(oPathingUnit, tRevisedDestination)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return tRevisedPath
             end
         end
     end
@@ -2399,6 +2462,7 @@ function GetPositionToFollowTargets(tUnitsToFollow, oFollowingUnit, iFollowDista
     --returns the units to follow average position if cant find anywhere at iFollowDistance from it
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPositionToFollowTargets'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tTargetPosition = M27Utilities.GetAveragePosition(tUnitsToFollow)
     local tPossibleMovePosition = {}
     local tFollowerPosition = oFollowingUnit:GetPosition()
@@ -2422,6 +2486,7 @@ function GetPositionToFollowTargets(tUnitsToFollow, oFollowingUnit, iFollowDista
 
         tPossibleMovePosition = tFollowerPosition
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tPossibleMovePosition
 end
 
@@ -2430,6 +2495,7 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
     --if iMinCoverageWanted isn't specified then will return the highest amount, otherwise returns true/false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetIntelCoverageOfPosition'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tCategoryList = {categories.SCOUT, M27UnitInfo.refCategoryRadar}
     local iCurIntelRange, iCurDistanceToPosition, iCurIntelCoverage
     local tCurUnits = {}
@@ -2448,6 +2514,7 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
                 if not(iMinCoverageWanted==nil) then
                     if iCurIntelCoverage > iMinCoverageWanted then
                         if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage) end
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         return true end
                 end
             end
@@ -2462,11 +2529,14 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
                 iCurIntelCoverage = iCurVisionRange - M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPosition)
                 if iCurIntelCoverage > iMaxIntelCoverage then
                     iMaxIntelCoverage = iCurIntelCoverage
-                    if not(iMinCoverageWanted==nil) and iCurIntelCoverage > iMinCoverageWanted then return true end
+                    if not(iMinCoverageWanted==nil) and iCurIntelCoverage > iMinCoverageWanted then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return true end
                 end
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iMinCoverageWanted == nil then
         if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage is nil; returning iMaxIntelCoverage='..iMaxIntelCoverage) end
         return iMaxIntelCoverage
@@ -2480,6 +2550,7 @@ function GetDirectFireWeaponPosition(oFiringUnit)
     --for ACU, returns this for the overcharge weapon
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDirectFireWeaponPosition'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local tShotStartPosition
     if EntityCategoryContains(categories.DIRECTFIRE, oBPFiringUnit.BlueprintId) == true then
@@ -2521,12 +2592,14 @@ function GetDirectFireWeaponPosition(oFiringUnit)
             tShotStartPosition = oFiringUnit:GetPosition()
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tShotStartPosition
 end
 
 function IsLineBlocked(tShotStartPosition, tShotEndPosition)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLineBlocked'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bShotIsBlocked = false
     local iFlatDistance = M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition)
     local tTerrainPositionAtPoint = {}
@@ -2549,6 +2622,7 @@ function IsLineBlocked(tShotStartPosition, tShotEndPosition)
         end
     else bShotIsBlocked = false
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bShotIsBlocked
 end
 
@@ -2558,6 +2632,7 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
     --intended for direct fire units only
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsShotBlocked'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local bShotIsBlocked = false
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -2632,6 +2707,7 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bShotIsBlocked
 end
 
@@ -2647,6 +2723,7 @@ end
 function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetUnderShield'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Determines if target is under a shield
     if bIgnoreMobileShield == nil then bIgnoreMobileShield = false end
     local bUnderShield = false
@@ -2700,12 +2777,14 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
     else
         if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bUnderShield
 end
 
 function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoint, iMaxDistance, iMinDistance)
     --Tries to find a random location in a square around tMidpoint that can path to; returns nil if couldnt find anywhere
-
+    local sFunctionRef = 'GetRandomPointInAreaThatCanPathTo'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iLoopCount = 0
     local iMaxLoop = 20
@@ -2733,6 +2812,7 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
         iLoopCount = iLoopCount + 1
         if iLoopCount > iMaxLoop then
             M27Utilities.ErrorHandler('Couldnt find random point in area, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathingType='..sPathingType..'; iSegmentGroup='..iSegmentGroup..'; will return midpoint instead')
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return tMidpoint
         end
 
@@ -2762,11 +2842,14 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
     if iPathingTarget == iSegmentGroup then
         tEndDestination = M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tEndDestination
 end
 
 function GetNearestRallyPoint(aiBrain, tPosition)
     --Placeholder code below - longer term want to integrate this with forward base logic
+    local sFunctionRef = 'GetNearestRallyPoint'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tMexPatrolLocations = M27MapInfo.GetMexPatrolLocations(aiBrain)
     local iNearestToStart = 10000
     local tNearestMex
@@ -2779,6 +2862,7 @@ function GetNearestRallyPoint(aiBrain, tPosition)
             tNearestMex = tMexLocation
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tNearestMex
 end
 
@@ -2803,6 +2887,7 @@ function GetPositionToSideOfTarget(oUnit, tTargetLocation, iBaseAngleToTarget, i
     --E.g.: tTargetLocation is the position of our ACU; iBaseAngleToTarget is the angle of our ACU to the enemy ACU; our ACU is trying to get enemy ACU, which is north-east (45 degrees):
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPositionToSideOfTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code: tTargetLocation='..repr(tTargetLocation)..'; oUnit:GetPosition()='..repr(oUnit:GetPosition())..'; iBaseAngleToTarget='..iBaseAngleToTarget..'; iDistanceToMove='..iDistanceToMove) end
     local iOurACUAngleToTarget = iBaseAngleToTarget
     local iPreRebasingAngleToMove
@@ -2823,5 +2908,7 @@ function GetPositionToSideOfTarget(oUnit, tTargetLocation, iBaseAngleToTarget, i
     local iPostRebasingAngleToMove = iPreRebasingAngleToMove - iTempRebasingAdjust -- -45 in this eg
     if iPostRebasingAngleToMove < 0 then iPostRebasingAngleToMove = iPostRebasingAngleToMove + 360 end --315 in this eg
     if bDebugMessages == true then LOG(sFunctionRef..': About to call MoveInDirection, tTargetLocation='..repr(tTargetLocation)..'; iPostRebasingAngleToMove='..iPostRebasingAngleToMove..'; iDistanceToMove='..iDistanceToMove..'; iPreRebasingAngleToMove='..iPreRebasingAngleToMove..'; iTempRebasingAdjust='..iTempRebasingAdjust) end
-    return M27Utilities.MoveInDirection(tTargetLocation, iPostRebasingAngleToMove, iDistanceToMove) --Should try to move north-west of our ACU (which is what we want)
+    local tDestination = M27Utilities.MoveInDirection(tTargetLocation, iPostRebasingAngleToMove, iDistanceToMove) --Should try to move north-west of our ACU (which is what we want)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return tDestination
 end

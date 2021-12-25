@@ -11,6 +11,7 @@ local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveAwayFromTargetTemporarily'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local tUnitPosition = oUnit:GetPosition()
     local iUnitSpeed = oUnit:GetBlueprint().Physics.MaxSpeed
@@ -39,12 +40,14 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
         end
         M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ForkedMoveInHalfCircle(oUnit, iTimeToRun, tPositionToRunFrom)
     --More intensive version of MoveAwayFromTargetTemporarily, intended e.g. for ACUs
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ForkedMoveInHalfCircle'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --KEY CONFIG SETTINGS:
 
@@ -121,6 +124,7 @@ function ForkedMoveInHalfCircle(oUnit, iTimeToRun, tPositionToRunFrom)
 
         WaitTicks(iTicksBetweenOrders)
     end--]]
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function MoveInHalfCircleTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
@@ -217,6 +221,7 @@ function MoveInOppositeDirectionTemporarily(oUnit, iTimeToMove)
     --e.g. so can dodge a bomb
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveInOppositeDirectionTemporarily'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if oUnit.GetNavigator then
         local tUnitPosition = oUnit:GetPosition()
@@ -249,6 +254,7 @@ function MoveInOppositeDirectionTemporarily(oUnit, iTimeToMove)
             M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToMove, M27UnitInfo.refiGameTimeToResetMicroActive, oUnit[M27UnitInfo.refiGameTimeToResetMicroActive])
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetBombTarget(weapon, projectile)
@@ -295,6 +301,7 @@ end
 function DodgeBomb(oBomber, oWeapon, projectile)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DodgeBombsFiredByUnit'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tBombTarget = GetBombTarget(oWeapon, projectile)
     if tBombTarget then
         local iBombSize = 2.5
@@ -352,6 +359,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
     else
         if bDebugMessages == true then LOG(sFunctionRef..': tBombTarget is nil') end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DodgeBombsFiredByUnit(oWeapon, oBomber)
@@ -359,6 +367,7 @@ function DodgeBombsFiredByUnit(oWeapon, oBomber)
     --Should have already checked we have a bomber before calling this
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DodgeBombsFiredByUnit'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tBombTarget = oWeapon:GetCurrentTargetPos()
     local iRadiusSize = 1.5
     local iBombSize = 2.5
@@ -406,12 +415,14 @@ function DodgeBombsFiredByUnit(oWeapon, oBomber)
 
 
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     --should have already confirmed overcharge action is available using CanUnitUseOvercharge
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetOverchargeExtraAction'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --Do we have positive energy income? If not, then only overcharge if ACU is low on health as an emergency
@@ -565,4 +576,5 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

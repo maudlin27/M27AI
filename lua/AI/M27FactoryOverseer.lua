@@ -61,6 +61,8 @@ iMaxCyclesBeforeOverride = 28
 function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFactory, bGetSlowest, bGetFastest)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBlueprintsThatCanBuildOfCategory'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local tBlueprints = EntityCategoryGetUnitList(iCategoryCondition)
     local tValidBlueprints = {}
     local iValidBlueprints = 0
@@ -153,6 +155,7 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
     end
 
     local iBPToBuild = math.random(1, iBestBlueprints)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tBestBlueprints[iBPToBuild]
 end
 
@@ -174,6 +177,9 @@ end
 
 function GetPreferredArtiProportion(aiBrain, bAreSeraphimT1LandFactory)
     --Returns the % of units that want to be indirect fire units; will be much higher when enemy has lots of point defence
+    local sFunctionRef = 'GetPreferredArtiProportion'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local iArtiProportion = 0
     if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and bAreSeraphimT1LandFactory and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then
         iArtiProportion = 1
@@ -203,6 +209,7 @@ function GetPreferredArtiProportion(aiBrain, bAreSeraphimT1LandFactory)
             if iCap < iArtiProportion then iArtiProportion = iCap end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iArtiProportion
 end
 
@@ -229,6 +236,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
     --Returns unit BP ID to be built
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineWhatToBuild'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local sBPIDToBuild
     if not(oFactory.GetBlueprint) then M27Utilities.ErrorHandler('Factory doesnt have a blueprint')
@@ -911,6 +919,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
         end
         if iCategoryToBuild == true then RecordUnderConstruction(aiBrain, oFactory, iCategoryToBuild) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return sBPIDToBuild
 end
 
@@ -925,7 +934,7 @@ end
 function FactoryMainOverseerLoop(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FactoryMainOverseerLoop'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iFactoryCategory = categories.CONSTRUCTION * categories.FACTORY * categories.STRUCTURE
     local sUnitToBuild, oCommandAction, tCommandQueue, bFactoryIsIdle
     local refbUpdatedFactoryUnitTracker = 'M27FactoryUnitTracker'
@@ -1070,6 +1079,7 @@ function FactoryMainOverseerLoop(aiBrain)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function FactoryOverseer(aiBrain)

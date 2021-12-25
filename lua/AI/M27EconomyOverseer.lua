@@ -53,6 +53,7 @@ local refbPauseForPowerStall = 'M27PauseForPowerStall'
 function GetMexCountOnOurSideOfMap(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetMexCountOnOurSideOfMap'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iCount = 0
     if aiBrain[reftMexOnOurSideOfMap] then iCount = table.getn(aiBrain[reftMexOnOurSideOfMap]) end
@@ -86,12 +87,14 @@ function GetMexCountOnOurSideOfMap(aiBrain)
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Mexes on our side='..iCount) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iCount
 end
 
 function GetMassStorageTargets(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetMassStorageTargets'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Goes through all mexes and records any available locations for mass storage
     local iDistanceModForEachAdjacentMex = -60
@@ -212,12 +215,14 @@ function GetMassStorageTargets(aiBrain)
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Storage locations='..repr(aiBrain[reftMassStorageLocations])) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCategory)
     --Doesnt factor in if a unit is paused
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iUpgradingCount = 0
     local iAvailableToUpgradeCount = 0
@@ -245,6 +250,7 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
     end
     if iHighestFactoryBeingUpgraded >= iHighestTech then bAreAlreadyUpgradingToHQ = true end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, iUpgradingCount='..iUpgradingCount..'; iAvailableToUpgradeCount='..iAvailableToUpgradeCount) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iUpgradingCount, iAvailableToUpgradeCount, bAreAlreadyUpgradingToHQ
 end
 
@@ -252,6 +258,7 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
     --Work out the upgrade ID wanted; if bUpdateUpgradeTracker is true then records upgrade against unit's aiBrain
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeUnit'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Do we have any HQs of the same factory type of a higher tech level?
     local sUpgradeID = M27UnitInfo.GetUnitUpgradeBlueprint(oUnitToUpgrade, true) --If not a factory or dont recognise the faction then just returns the normal unit ID
@@ -274,6 +281,7 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
         end
     else M27Utilities.ErrorHandler('Dont have a valid upgrade ID; UnitID='..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade))
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
@@ -281,6 +289,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     --Returns nil if cant find one
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
     local oUnitToUpgrade, tCurPosition, iCurDistanceToStart, iCurDistanceToEnemy, iCurCombinedDist
@@ -336,13 +345,14 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     if oUnitToUpgrade and EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnitToUpgrade:GetUnitId()) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
         aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
     end
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return oUnitToUpgrade
 end
 
 function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --iMexesUpgrading, iMexesAvailableForUpgrade = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex + refCategoryT2Mex, true)
     local iT1Mexes = aiBrain:GetCurrentUnits(refCategoryT1Mex)
@@ -404,7 +414,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
             LOG(sFunctionRef..': Have a category to upgrade, number of untis of that category='..aiBrain:GetCurrentUnits(iCategoryToUpgrade))
         end
     end
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iCategoryToUpgrade
 end
 
@@ -412,6 +422,7 @@ function ClearOldRecords(aiBrain, iOldRecordsExpected)
     --iOldRecordsExpected - optional - allows optimisation by having this called from loops which can already determine this for minimal extra cost
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearOldRecords'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iLoopCount = 0
     local iLoopMax = 100
@@ -456,13 +467,14 @@ function ClearOldRecords(aiBrain, iOldRecordsExpected)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UnpauseUpgrades(aiBrain, iMaxToUnpause)
     --Note - this will try and unpause any units that have been paused previously.  However, in some cases there may not be a unit to unpause e.g. if engineers have assisted it while its paused
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UnpauseUpgrades'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iAmountToUnpause = math.min(iMaxToUnpause, aiBrain[refiPausedUpgradeCount])
     local iOldRecordCount = 0
@@ -506,12 +518,13 @@ function UnpauseUpgrades(aiBrain, iMaxToUnpause)
             ClearOldRecords(aiBrain, iOldRecordCount) iOldRecordCount = 0
         end
     end
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function PauseLastUpgrade(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PauseLastUpgrade'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local oLastUnpausedUpgrade
     local oLastUnpausedNonMex
@@ -581,13 +594,14 @@ function PauseLastUpgrade(aiBrain)
     if iOldRecordCount > 0 then
         if iOldRecordCount > 0 then ClearOldRecords(aiBrain, iOldRecordCount) end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DecideMaxAmountToBeUpgrading(aiBrain)
     --Returns max number to upgrade
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
     local bHaveHighMass, bHaveEnoughEnergy
@@ -756,6 +770,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     aiBrain[refiEnergyStoredLastCycle] = iEnergyStored
 
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, iMaxToUpgrade='..iMaxToUpgrade..'; iMassStored='..iMassStored..'; bHaveHighMass='..tostring(bHaveHighMass)..'; iMassNetIncome='..iMassNetIncome..'; iEnergyNetIncome='..iEnergyNetIncome..'; iEnergyStored='..iEnergyStored..'; iEnergyPercentStorage='..iEnergyPercentStorage..'; iEnergyChangeFromLastCycle='..iEnergyChangeFromLastCycle..'; bHaveEnoughEnergy='..tostring(bHaveEnoughEnergy)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iMaxToUpgrade
 end
 
@@ -763,6 +778,7 @@ function RefreshEconomyData(aiBrain)
     --Yes, hardcoding resource values will make it really hard to support mods or patches that change these values
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshEconomyData'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iACUMass = 1
     local iACUEnergy = 20
     local iEnergyT3Power = 2500
@@ -831,11 +847,13 @@ function RefreshEconomyData(aiBrain)
     aiBrain[refiMassNetBaseIncome] = aiBrain[refiMassGrossBaseIncome] - iMassUsage
 
     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiEnergyGrossBaseIncome]='..aiBrain[refiEnergyGrossBaseIncome]..'; aiBrain[refiEnergyNetBaseIncome]='..aiBrain[refiEnergyNetBaseIncome]..'; iT2PowerCount='..iT2PowerCount..'; iEnergyT1Power='..iEnergyT1Power..'; iEnergyUsage='..iEnergyUsage) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UpgradeMainLoop(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iCategoryToUpgrade, oUnitToUpgrade
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
@@ -892,6 +910,7 @@ function UpgradeMainLoop(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': We need to pause an upgrade') end
         PauseLastUpgrade(aiBrain)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
 end
 
@@ -914,12 +933,15 @@ function UpgradeManager(aiBrain)
     --Initial wait:
     WaitTicks(300)
     while(not(aiBrain:IsDefeated())) do
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         iCurCycleTime = iCycleWaitTime --default (is shortened if have lots to upgrade)
         ForkThread(UpgradeMainLoop, aiBrain)
         if aiBrain[refbWantToUpgradeMoreBuildings] then iCurCycleTime = iReducedWaitTime end
 
         ForkThread(GetMassStorageTargets, aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': End of loop about to wait '..iCycleWaitTime..' ticks') end
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(iCycleWaitTime)
         if bDebugMessages == true then LOG(sFunctionRef..': End of loop after waiting ticks') end
     end
