@@ -29,7 +29,6 @@ refiLongestTickAfterStartTime = 0
 bFullOutputAlreadyDone = {} -- true if have done the full output for the nth time; n being based on how long an interval we want
 iFullOutputIntervalInTicks = 3000 --every 5m
 iFullOutputCount = 0 --increased each time do a full output
-tProfilerCountByFunctionCumulative = {}
 tProfilerCountByTickByFunction = {}
 
 
@@ -825,7 +824,6 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
                 tProfilerFunctionStart[sFunctionRef] = {}
                 tProfilerTimeTakenCumulative[sFunctionRef] = 0
                 tProfilerTimeTakenByCount[sFunctionRef] = {}
-                tProfilerCountByFunctionCumulative[sFunctionRef] = 0
             end
 
             --1-off for this tick
@@ -917,7 +915,7 @@ function ProfilerOutput()
         local iCount = 0
         for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
             iCount = iCount + 1
-            LOG(sFunctionRef..': Top10Cumulative No.'..iCount..'='..sFunctionName..'; Times run cumulative='..tProfilerCountByFunctionCumulative[sFunctionName]..'; Time='..iValue)
+            LOG(sFunctionRef..': Top10Cumulative No.'..iCount..'='..sFunctionName..'; Times run cumulative='..tProfilerStartCount[sFunctionName]..'; Time='..iValue)
             if iCount >= 10 then break end
         end
 
@@ -956,9 +954,9 @@ function ProfilerOutput()
         --Include full output of function cumulative time taken every interval
         local bFullOutputNow = false
 
-        if iStartTick > iFullOutputCount * (iFullOutputIntervalInTicks + 1) then bFullOutputNow = true end
+        if iStartTick > (iFullOutputCount + 1) * iFullOutputIntervalInTicks then bFullOutputNow = true end
         if bFullOutputNow then
-            if bFullOutputAlreadyDone[iFullOutputCount] then
+            if bFullOutputAlreadyDone[iFullOutputCount + 1] then
                 --Already done
             else
                 iFullOutputCount = iFullOutputCount + 1
@@ -967,11 +965,19 @@ function ProfilerOutput()
                 iCount = 0
                 for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
                     iCount = iCount + 1
-                    if tProfilerCountByFunctionCumulative[sFunctionName] == nil then LOG('ERROR somehow '..sFunctionName..' hasnt been recorded in the cumulative count despite having its time recorded.  iValue='..iValue)
+                    if tProfilerStartCount[sFunctionName] == nil then LOG('ERROR somehow '..sFunctionName..' hasnt been recorded in the cumulative count despite having its time recorded.  iValue='..iValue)
                     else
-                        LOG(sFunctionRef..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerCountByFunctionCumulative[sFunctionName]..'; Time='..iValue)
+                        LOG(sFunctionRef..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerStartCount[sFunctionName]..'; Time='..iValue)
                     end
                 end
+                --Give the total time taken to get to this point based on time per tick
+                local iTotalTimeTakenToGetHere = 0
+                local iTotalDelayedTime = 0
+                for iTick, iTime in tProfilerActualTimeTakenInTick do
+                    iTotalTimeTakenToGetHere = iTotalTimeTakenToGetHere + iTime
+                    iTotalDelayedTime = iTotalDelayedTime + math.max(0, iTime - 0.1)
+                end
+                LOG(sFunctionRef..': Total time taken to get to '..iStartTick..'= '..iTotalTimeTakenToGetHere..'; Total time of any freezes = '..iTotalDelayedTime)
             end
         end
     end
@@ -983,6 +989,47 @@ function ProfilerTimeSinceLastCall(sReference, iStartTime)
     local iTimeNow = GetSystemTimeSecondsOnlyForProfileUse()
     LOG(sReference..': Time elapsed='..iTimeNow-iStartTime)
     return iTimeNow
+end
+
+--Softles profiler - thanks to Softles for providing this as an alternative approach
+local TIME_TABLE = {}
+local COUNT_TABLE = {}
+
+local function OnEvent(eventType, lineNo)
+    local t = GetSystemTimeSecondsOnlyForProfileUse()
+    local funcName = tostring(debug.getinfo(2).name)
+    if eventType == "call" then
+        if not COUNT_TABLE[funcName] then
+            COUNT_TABLE[funcName] = 0
+        end
+        COUNT_TABLE[funcName] = COUNT_TABLE[funcName] + 1
+    end
+end
+local amStarted = false
+
+function StartSoftlesProfiling()
+    if not amStarted then
+        amStarted = true
+        ForkThread(
+                function()
+                    coroutine.yield(1)
+                    while true do
+                        local last = GetSystemTimeSecondsOnlyForProfileUse()
+                        debug.sethook(OnEvent,"c")
+                        coroutine.yield(1)
+                        local diff = math.round(1000*(GetSystemTimeSecondsOnlyForProfileUse() - last))/1000
+                        debug.sethook()
+                        local s = "PROFILING:"..tostring(diff)
+                        for k, v in COUNT_TABLE do
+                            s = s.." ("..k..", "..tostring(v)..")"
+                        end
+                        WARN(s)
+                        TIME_TABLE = {}
+                        COUNT_TABLE = {}
+                    end
+                end
+        )
+    end
 end
 
 function ForkedDelayedChangedVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerTimeRef, iMustBeLessThanThisTimeValue)
