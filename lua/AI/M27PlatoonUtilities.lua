@@ -1176,11 +1176,11 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
     if bAbort == false then
         oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures] = math.max(aiBrain[M27Overseer.refiSearchRangeForEnemyStructures], iEnemySearchRadius)
         oPlatoon[refiEnemySearchRadius] = iEnemySearchRadius
-        if oPlatoon[reftEnemiesInRange] == nil then oPlatoon[reftEnemiesInRange] = {} end
+        --if oPlatoon[reftEnemiesInRange] == nil then oPlatoon[reftEnemiesInRange] = {} end
         local iMobileEnemyCategories = categories.LAND * categories.MOBILE
         if oPlatoon[refbPlatoonHasOverwaterLand] == true then iMobileEnemyCategories = categories.LAND * categories.MOBILE + categories.NAVAL * categories.MOBILE end
         oPlatoon[reftEnemiesInRange] = aiBrain:GetUnitsAroundPoint(iMobileEnemyCategories, tCurPos, iEnemySearchRadius, 'Enemy')
-        if oPlatoon[reftEnemiesInRange] == nil then
+        if M27Utilities.IsTableEmpty(oPlatoon[reftEnemiesInRange]) == true then
             oPlatoon[refiEnemiesInRange] = 0
         else oPlatoon[refiEnemiesInRange] = table.getn(oPlatoon[reftEnemiesInRange]) end
         oPlatoon[reftEnemyStructuresInRange] = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE - categories.STRUCTURE * categories.BENIGN, tCurPos, oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures], 'Enemy')
@@ -2643,7 +2643,12 @@ function UpdateEscortDetails(oPlatoonOrUnitToBeEscorted)
         --Get larger escort if we're escorting the ACU (factor in nearby enemies and ACU upgrades when deciding how large an escort to send)
         if bEscortingLowHealthACU then oPlatoonOrUnitToBeEscorted[refiEscortThreatWanted] = 100000
         else
-            if oPlatoonOrUnitToBeEscorted[refbACUInPlatoon] then oPlatoonOrUnitToBeEscorted[refiEscortThreatWanted] = math.max(2000, oPlatoonOrUnitToBeEscorted[refiPlatoonMassValue] * iEscortSizeDefaultFactor, M27Logic.GetCombatThreatRating(aiBrain, M27Utilities.GetACU(aiBrain), false, nil, nil, false, false), M27Logic.GetCombatThreatRating(aiBrain, oPlatoonOrUnitToBeEscorted[reftEnemiesInRange]))
+
+            if oPlatoonOrUnitToBeEscorted[refbACUInPlatoon] then
+                oPlatoonOrUnitToBeEscorted[refiEscortThreatWanted] = math.max(2000, oPlatoonOrUnitToBeEscorted[refiPlatoonMassValue] * iEscortSizeDefaultFactor, M27Logic.GetCombatThreatRating(aiBrain, {M27Utilities.GetACU(aiBrain)}, false, nil, nil, false, false))
+                if oPlatoonOrUnitToBeEscorted[refiEnemiesInRange] > 0 then
+                    oPlatoonOrUnitToBeEscorted[refiEscortThreatWanted] = math.max(oPlatoonOrUnitToBeEscorted[refiEscortThreatWanted], M27Logic.GetCombatThreatRating(aiBrain, oPlatoonOrUnitToBeEscorted[reftEnemiesInRange]))
+                end
             else oPlatoonOrUnitToBeEscorted[refiEscortThreatWanted] = oPlatoonOrUnitToBeEscorted[refiPlatoonMassValue] * iEscortSizeDefaultFactor end
         end
 

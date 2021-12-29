@@ -1,6 +1,6 @@
 name = "M27AI"
-uid = "f27c55b4-v014-55b4-92b6-64398e75e23f"
-version = 14 --REMINDER: Update M27Config to flag to remove ConExecute("WLD_GameSpeed 10"); Version reference in uid updated? Tested offline vs AI it should beat to check for any last minute errors introduced?
+uid = "f27c55b4-v015-55b4-92b6-64398e75e23f"
+version = 15 --REMINDER: Update M27Config to flag to remove ConExecute("WLD_GameSpeed 10"); Version reference in uid updated? Tested offline vs AI it should beat to check for any last minute errors introduced?
 copyright = "FreeWare"
 description = "Intended for 5x5 and to a lesser extent 10x10 1v1 maps. In relatively early stages of development but should be playable.  Report any bugs to maudlin27 (via forum or discord). See forum for details of changes by version.  Summary of recent focus areas: v9-Air v10-AntiTurtle v13-AntiNavy"
 author = "maudlin27" --With thanks to Softles/Softlnoob for original Micro AI that was used as a starting point as I learned how to code AI

@@ -424,6 +424,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand)
         local bIgnoreMobileShield = true
         if M27UnitInfo.IsUnitValid(oBomber) then
             local sBomberID = oBomber:GetUnitId()
+            if bDebugMessages == true then LOG(sFunctionRef..': '..sBomberID..M27UnitInfo.GetUnitLifetimeCount(oBomber)) end
             if EntityCategoryContains(categories.TECH1, sBomberID) or EntityCategoryContains(categories.TECH2, sBomberID) then bIgnoreMobileShield = false end
             local aiBrain = oBomber:GetAIBrain()
 

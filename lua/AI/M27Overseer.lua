@@ -3998,22 +3998,6 @@ function TestNewMovementCommands(aiBrain)
     LOG('tMapMidPointMethod1='..repr(tMapMidPointMethod1)..'; tMapMidPointMethod2='..repr(tMapMidPointMethod2))
 end
 
-function TestTableSortHighToLow()
-    local sFunctionRef = 'TestTableSortHighToLow'
-    local tValues = {[0.1] = 2,
-                     [0.2] = 1,
-                     [0.3] = 10,
-                     [0.4] = 0}
-    LOG('About to sort high to low')
-    for iKey, iValue in M27Utilities.SortTableByValue(tValues, true) do
-        LOG(sFunctionRef..': iKey='..iKey..'; iValue='..iValue)
-    end
-    LOG('About to sort low to high')
-    for iKey, iValue in M27Utilities.SortTableByValue(tValues, false) do
-        LOG(sFunctionRef..': iKey='..iKey..'; iValue='..iValue)
-    end
-end
-
 
 function OverseerManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -4063,7 +4047,6 @@ function OverseerManager(aiBrain)
     if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
     DetermineInitialBuildOrder(aiBrain)
     local iTempProfiling
-    TestTableSortHighToLow()
 
 
 

@@ -29,6 +29,8 @@ refiLongestTickAfterStartTime = 0
 bFullOutputAlreadyDone = {} -- true if have done the full output for the nth time; n being based on how long an interval we want
 iFullOutputIntervalInTicks = 3000 --every 5m
 iFullOutputCount = 0 --increased each time do a full output
+tProfilerCountByFunctionCumulative = {}
+tProfilerCountByTickByFunction = {}
 
 
 function ErrorHandler(sErrorMessage, iOptionalWaitInSeconds, bWarningNotError)
@@ -201,7 +203,7 @@ function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCo
     elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
     elseif iColour == 4 then sColour = 'fff4a460' --Gold
     elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
-    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan
+    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
     elseif iColour == 7 then sColour = 'ffffffff' --white
     else sColour = 'ffFF6060' --Orangy pink
     end
@@ -246,7 +248,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
     elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
     elseif iColour == 4 then sColour = 'fff4a460' --Gold
     elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
-    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan
+    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
     elseif iColour == 7 then sColour = 'ffffffff' --white
     else sColour = 'ffFF6060' --Orangy pink
     end
@@ -809,7 +811,7 @@ end
 
 function FunctionProfiler(sFunctionRef, sStartOrEndRef)
     --sStartOrEndRef: refProfilerStart or refProfilerEnd (0 or 1)
-    local bDebugMessages = true if bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     if M27Config.M27RunProfiling then
 
         if sStartOrEndRef == refProfilerStart then
@@ -823,6 +825,7 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
                 tProfilerFunctionStart[sFunctionRef] = {}
                 tProfilerTimeTakenCumulative[sFunctionRef] = 0
                 tProfilerTimeTakenByCount[sFunctionRef] = {}
+                tProfilerCountByFunctionCumulative[sFunctionRef] = 0
             end
 
             --1-off for this tick
@@ -832,6 +835,7 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
                 tProfilerTimeTakenInTickByFunction[iGameTimeInTicks] = {}
                 tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = 0
                 sProfilerActiveFunctionForThisTick = 'nil'
+                tProfilerCountByTickByFunction[iGameTimeInTicks] = {}
             end
 
             --Increase unique count
@@ -839,6 +843,8 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
             tProfilerStartCount[sFunctionRef] = iCount
             tProfilerFunctionStart[sFunctionRef][iCount] = GetSystemTimeSecondsOnlyForProfileUse()
             if sProfilerActiveFunctionForThisTick == 'nil' then sProfilerActiveFunctionForThisTick = sFunctionRef end
+            if tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] == nil then tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] = 0 end
+            tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] = tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] + 1
             --if bDebugMessages == true then LOG('FunctionProfiler: '..sFunctionRef..': refProfilerStart; iCount='..iCount..'; iGameTimeInTicks='..iGameTimeInTicks..'; System time at start='..GetSystemTimeSecondsOnlyForProfileUse()..'; tProfilerFunctionStart[sFunctionRef][iCount]='..tProfilerFunctionStart[sFunctionRef][iCount]) end
 
         elseif sStartOrEndRef == refProfilerEnd then
@@ -858,6 +864,7 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
             if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks]) then
                 tProfilerTimeTakenInTickByFunction[iGameTimeInTicks] = {}
                 tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = 0
+                tProfilerCountByTickByFunction[iGameTimeInTicks] = {}
             end
 
             if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef]) then tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] = 0 end
@@ -903,14 +910,14 @@ end
 
 function ProfilerOutput()
     local sFunctionRef = 'ProfilerOutput'
-    local bDebugMessages = true if bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
 
     if M27Config.M27RunProfiling then
         --Cumulative most intensive functions
         local iCount = 0
         for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
             iCount = iCount + 1
-            LOG(sFunctionRef..': Top10Cumulative No.'..iCount..'='..sFunctionName..' Time='..iValue)
+            LOG(sFunctionRef..': Top10Cumulative No.'..iCount..'='..sFunctionName..'; Times run cumulative='..tProfilerCountByFunctionCumulative[sFunctionName]..'; Time='..iValue)
             if iCount >= 10 then break end
         end
 
@@ -930,7 +937,15 @@ function ProfilerOutput()
                 local iCount = 0
                 for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenInTickByFunction[iCurTick], true) do
                     iCount = iCount + 1
-                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..' Time='..iValue)
+                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerCountByTickByFunction[iCurTick][sFunctionName]..'; Total Time='..iValue)
+                    if iCount >= 10 then break end
+                end
+
+                LOG(sFunctionRef..': About to list top 10 called functions in this tick')
+                iCount = 0
+                for sFunctionName, iValue in SortTableByValue(tProfilerCountByTickByFunction[iCurTick], true) do
+                    iCount = iCount + 1
+                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerCountByTickByFunction[iCurTick][sFunctionName]..'; Total Time='..iValue)
                     if iCount >= 10 then break end
                 end
             else
@@ -949,9 +964,13 @@ function ProfilerOutput()
                 iFullOutputCount = iFullOutputCount + 1
                 bFullOutputAlreadyDone[iFullOutputCount] = true
                 LOG(sFunctionRef..': About to print detailed output of all functions cumulative values')
+                iCount = 0
                 for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
                     iCount = iCount + 1
-                    LOG(sFunctionRef..': No.'..iCount..'='..sFunctionName..' Time='..iValue)
+                    if tProfilerCountByFunctionCumulative[sFunctionName] == nil then LOG('ERROR somehow '..sFunctionName..' hasnt been recorded in the cumulative count despite having its time recorded.  iValue='..iValue)
+                    else
+                        LOG(sFunctionRef..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerCountByFunctionCumulative[sFunctionName]..'; Time='..iValue)
+                    end
                 end
             end
         end
@@ -981,4 +1000,18 @@ function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDel
     --sOptionalOwnerTimeRef - can specify a variable for oVariableOwner; if so then the value of this variable must be <= iMustBeLessThanThisTimeValue
     --e.g. if delay reset a variable, but are claling multiple times so want to only reset on the latest value, then this allows for that
     ForkThread(ForkedDelayedChangedVariable, oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerTimeRef, iMustBeLessThanThisTimeValue)
+end
+
+
+function DebugArray(Table)
+    --Thanks to Uveso who gave me this as a solution for doing a repr of a large table such as a unit or aiBrain that would normally crash the game
+    for Index, Array in Table do
+        if type(Array) == 'thread' or type(Array) == 'userdata' then
+            LOG('Index['..Index..'] is type('..type(Array)..'). I wont print that!')
+        elseif type(Array) == 'table' then
+            LOG('Index['..Index..'] is type('..type(Array)..'). I wont print that!')
+        else
+            LOG('Index['..Index..'] is type('..type(Array)..'). "', repr(Array),'".')
+        end
+    end
 end

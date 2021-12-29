@@ -420,9 +420,16 @@ function GetUnitFacingAngle(oUnit)
     return 180 - oUnit:GetHeading() / math.pi * 180
 end
 
-function IsUnitValid(oUnit)
+function IsUnitValid(oUnit, bMustBeComplete)
     --Returns true if unit is constructed and not dead
-    if not(oUnit.GetUnitId) or oUnit.Dead or not(oUnit.GetFractionComplete) or oUnit:GetFractionComplete() < 1 or not(oUnit.GetBlueprint) then return false else return true end
+    --Note - if get error in this that arises from getting threat value of units, then check we're sending a table to the threat value function rather than a single unit
+    if not(oUnit) or oUnit.Dead or not(oUnit.GetFractionComplete) or not(oUnit.GetUnitId) or not(oUnit.GetBlueprint) or not(oUnit.GetAIBrain) then return false
+    else
+        if bMustBeComplete and oUnit:GetFractionComplete() < 1 then return false
+        else
+            return true
+        end
+    end
 end
 
 function SetUnitTargetPriorities(oUnit, tPriorityTable)

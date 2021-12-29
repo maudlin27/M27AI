@@ -875,7 +875,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
         if iDistToStart <= 30 then tLocationToSearchFrom = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] else tLocationToSearchFrom = tEngineerPosition end
 
         --Check if we have a reasonable amount of power
-        local iNetCurEnergyIncome = aiBrain:GetEconomyTrend('ENERGY')
+        local iNetCurEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]
         local iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
         local iEnergyPercentStorage = aiBrain:GetEconomyStoredRatio('ENERGY')
         local bHaveLowPower = false
@@ -1127,6 +1127,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bForcedDebug then bDebugMessages = true end --for error handling
     local sFunctionRef = 'FindRandomPlaceToBuild'
+
       M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local rPlayableArea = M27MapInfo.rMapPlayableArea
@@ -1331,6 +1332,8 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --True if want most log messages to print
     local sFunctionRef = 'GetBestBuildLocationForTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
 
@@ -1671,6 +1674,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
 
     local sFunctionRef = 'BuildStructureAtLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local bAbortConstruction = false
     local sBlueprintToBuild = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oEngineer)--, false, false)
     local sBlueprintBuildBy
@@ -1832,7 +1836,15 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                                         M27Utilities.DrawRectangle(rTargetRect, 7, 100)
                                     end
                                 else
-                                    M27Utilities.ErrorHandler(sFunctionRef..': Cant build at resource location but no enemy or ally units on it, will just try moving near the target instead', nil, true)
+                                    --One likely explanation is that enemy has built on the mex and we cant see the building, in which case we only want to check this for debugging purposes, and proceed with the default action of having hte engineer try to move there
+                                    local tUnits = GetUnitsInRect(rTargetRect)
+                                    if M27Utilities.IsTableEmpty(tUnits) == true then
+                                        M27Utilities.ErrorHandler(sFunctionRef..': Cant build at resource location but no units or reclaim on it, will just try moving near the target instead.  Will draw white circle around the target if in debug mode', nil, true)
+                                        if bDebugMessages == true then
+                                            M27Utilities.DrawLocation(tTargetLocation, nil, 7)
+                                            LOG(sFunctionRef..': Cnat build at TargetLocation='..repr(tTargetLocation)..'; RectangleSearched='..repr(rTargetRect))
+                                        end
+                                    end
                                     M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
                                     bAbortConstruction = true
                                 end
@@ -1991,6 +2003,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
 
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
 
     if oEngineer then
         if oEngineer.GetUnitId then
@@ -2693,10 +2706,9 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     --DEBUGGING: Key log below to look for: LOG(sFunctionRef..': Game time='..GetGameTimeSeconds()..': About to assign action '..iActionToAssign..' to engineer number '..GetEngineerUniqueCount(oEngineerToAssign)..' with lifetime count='..sEngineerName..'; Eng unitId='..oEngineerToAssign:GetUnitId()..'; ActionTargetLocation='..repr(tActionTargetLocation))
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-
-
     local sFunctionRef = 'ReassignEngineers'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local tEngineers
     local bOnlyLookingAtSomeEngineers = false
     if tEngineersToReassign == nil then
@@ -2793,7 +2805,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         --LOG('iEngineersAlreadyBuildingMexes='..iEngineersAlreadyBuildingMexes)
     end
 
-
+    local iHighestFactoryOrEngineerTechAvailable = math.max(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel], iHighestTechLevelEngi)
 
     if iEngineersToConsider > 0 then
   --TEMPTEST(aiBrain, sFunctionRef..': After determined have engineers to consider')
@@ -2845,7 +2857,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         local tUnclaimedMexesWithinDefenceCoverage, iUnclaimedMexesWithinDefenceCoverage
         local iUnclaimedHydroWithinDefenceCoverage, tUnclaimedHydroWithinDefenceCoverage
         local bNearbyHydro, tNearbyHydro, iUnclaimedHydroNearBase, tUnclaimedHydroNearBase
-        local iEnergyNetIncomeWantedPerTick, iGrossCurEnergyIncome, iNetCurEnergyIncome, iCurEnergySpend
+        local iGrossCurEnergyIncome, iNetCurEnergyIncome
         local iLandFactories, iAirFactories, iMassStored, iEnergyStored, iEnergyStorageMax, iEnergyStoredRatio, iMassStoredRatio
         local tExistingLocationsToPickFrom
         local iMexesAndFactoriesCurrentlyUpgrading
@@ -2855,16 +2867,16 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         local tActionTargetLocation, oActionTargetObject
         local iSearchRangeForPrevEngi = 100 --when set to 50 would sometimes have issues with engis looping from one to the other
         local iSearchRangeForNearestEngi --will ignore engis further away than this - should set to massive value for mexes etc. that build far away from base, but low value for buildings that want built by base
-        local iPowerStructuresOwned, bWantToBuildPower
 
         --Build order threshold variables:
         local iThresholdInitialEngineerCondition, bThresholdInitialEngineerCondition
-        local iThresholdPreReclaimEngineerCondition, bThresholdPreReclaimEngineerCondition
+        local bThresholdPreReclaimEngineerCondition
         local iCurConditionEngiShortfall
         local bClearCurrentlyAssignedEngineer
 
         local bHaveVeryLowPower = false
-        iNetCurEnergyIncome = aiBrain:GetEconomyTrend('ENERGY')
+        local bWantMorePower = true
+        iNetCurEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]
         iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
         --NOTE: IF UPDATING LOW POWER VALUES: Also consider updating spare engineer action
         if iNetCurEnergyIncome < 0 then
@@ -2874,9 +2886,35 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         elseif iEnergyStored < 50 then bHaveVeryLowPower = true
         end
         local bHaveLowPower = bHaveVeryLowPower
+        local iLowPowerThreshold = 6
+        local iGrossMassIncome = aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]
+        local iAbsolutePowerBufferWanted = 10 --Min amoutn of net energy income wanted per tick; 100 for t1
+        local iEnergyBufferMassFactorWanted = 7 --e.g. t2 mex needs 6 power for every 1 mass; T1 bomber is 22; striker is 4.75
+        local iExtraEngisForPowerBasedOnTech = 0
+
+        if iHighestFactoryOrEngineerTechAvailable >= 3 then
+            iLowPowerThreshold = 40
+            iEnergyBufferMassFactorWanted = 30--t3 mex needs 7 power for every 1 mass; titan needs 11, t3 strat 69
+            iAbsolutePowerBufferWanted = 250 --2500
+            iExtraEngisForPowerBasedOnTech = 5
+        elseif iHighestFactoryOrEngineerTechAvailable == 2 then
+            iLowPowerThreshold = 10
+            iEnergyBufferMassFactorWanted = 12    --T3 mex is 7:1, janus is 20, pillar is 5
+            iAbsolutePowerBufferWanted = 40 --400
+            iExtraEngisForPowerBasedOnTech = 7
+        end
+        local iPowerWantedPerTick = math.max(iGrossMassIncome * iEnergyBufferMassFactorWanted, aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] - aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]) + iAbsolutePowerBufferWanted
+        --Ensure we can support guncom
+        iPowerWantedPerTick = math.max(iPowerWantedPerTick, 50)
+
         if bHaveLowPower == false then
-            if iNetCurEnergyIncome < 6 and iEnergyStored < 4000 then bHaveLowPower = true
-            elseif iEnergyStored < 2000 then bHaveLowPower = true end
+            if iNetCurEnergyIncome < iLowPowerThreshold and (iEnergyStored < 4000 or aiBrain:GetEconomyStoredRatio('ENERGY') < 0.95) then bHaveLowPower = true
+            elseif iEnergyStored < 2000 or aiBrain:GetEconomyStoredRatio('ENERGY') < 0.6 then bHaveLowPower = true end
+        end
+        if bHaveLowPower == false then
+            --Do we have enough power? Base the power wanted on factory tech level
+            --is true by default
+            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > iPowerWantedPerTick then bWantMorePower = false end
         end
 
 
@@ -2890,15 +2928,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         local bGetInitialEngineer
         local bAreOnSpareActions = false
         local iT2Power, iT3Power
-        local iExtraEngisForPowerBasedOnTech = 0
-        local iAbsolutePowerBufferWanted = 20 --200
-        if iHighestTechLevelEngi == 2 then
-            iExtraEngisForPowerBasedOnTech = 5
-            iAbsolutePowerBufferWanted = 75 --750
-        elseif iHighestTechLevelEngi == 3 then
-            iExtraEngisForPowerBasedOnTech = 7
-            iAbsolutePowerBufferWanted = 500 --5000
-        end
         local iCurRadarCount, iCurT2RadarCount
         local iNearbyOmniCount
         local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
@@ -2911,7 +2940,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             bThresholdInitialEngineerCondition = false
             bThresholdPreReclaimEngineerCondition = false
       --TEMPTEST(aiBrain, sFunctionRef..': just after while loop start')
-            if bDebugMessages == true then LOG(sFunctionRef..': Start of loop to assign engineer action; iEngineersToConsider='..iEngineersToConsider..'; iCurrentConditionToTry='..iCurrentConditionToTry..'; iHighestTechLevelEngi='..iHighestTechLevelEngi..'; iAbsolutePowerBufferWanted='..iAbsolutePowerBufferWanted) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Start of loop to assign engineer action; iEngineersToConsider='..iEngineersToConsider..'; iCurrentConditionToTry='..iCurrentConditionToTry..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; iAbsolutePowerBufferWanted='..iAbsolutePowerBufferWanted) end
             tExistingLocationsToPickFrom = {}
             iMaxEngisWanted = 1 --default; NOTE: This should be the cumulative value for that action (not that condition)
             iActionToAssign = nil
@@ -3010,9 +3039,9 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
                     end
                 elseif iCurrentConditionToTry == 3 then --If engi tech level >1 then want to build power if have none >= that tech level
-                    if iHighestTechLevelEngi > 1 then
+                    if iHighestFactoryOrEngineerTechAvailable > 1 then
                         if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
-                        if iHighestTechLevelEngi > 2 then
+                        if iHighestFactoryOrEngineerTechAvailable > 2 then
                             if iT3Power == 0 then
                                 iSearchRangeForNearestEngi = 100
                                 iActionToAssign = refActionBuildPower
@@ -3028,7 +3057,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
                         if bDebugMessages == true then
                             if iT2Power == nil then iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2) end
-                            LOG('Condition:'..iCurrentConditionToTry..': iT3Power='..iT3Power..'; iT2Power='..iT2Power..'; iHighestTechLevelEngi='..iHighestTechLevelEngi)
+                            LOG('Condition:'..iCurrentConditionToTry..': iT3Power='..iT3Power..'; iT2Power='..iT2Power..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable)
                             if iActionToAssign == nil then LOG('Not assigned an action') else LOG('iActionToAssign='..iActionToAssign) end
                         end
                     end
@@ -3056,14 +3085,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
                     end
                 elseif iCurrentConditionToTry == 5 then --Low power action part 1
-                    if iEnergyNetIncomeWantedPerTick == nil then
-                        if iGrossCurEnergyIncome == nil then iGrossCurEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] end
-                        iCurEnergySpend = iGrossCurEnergyIncome - iNetCurEnergyIncome
-                        iEnergyNetIncomeWantedPerTick = math.max(iCurEnergySpend * 1.5, iAbsolutePowerBufferWanted)
-                        if bDebugMessages == true then LOG(sFunctionRef..': iEnergyNetIncomeWantedPerTick='..iEnergyNetIncomeWantedPerTick..'; Actual net energy income='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; iGrossCurEnergyIncome='..iGrossCurEnergyIncome) end
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..'Low power urgent: iNetCurEnergyIncome='..iNetCurEnergyIncome..'; iEnergyNetIncomeWantedPerTick='..iEnergyNetIncomeWantedPerTick) end
-                    if iNetCurEnergyIncome < iEnergyNetIncomeWantedPerTick or bWantToBuildPower == true then
+                    if bHaveLowPower then
                         --Build power unless early game hydro under construction in which case assist it instead
                         local bAssistHydroInstead = false
                         if iUnclaimedHydroNearBase > 0 and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildHydro]) == false then
@@ -3136,7 +3158,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
                     end
                 elseif iCurrentConditionToTry == 7 then --SMD
-                    if iHighestTechLevelEngi >= 3 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false then
+                    if iHighestFactoryOrEngineerTechAvailable >= 3 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false then
                         --Do we have as many SMD as they have nuke launchers?
                         local iSMDsWeHave = aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySMD)
                         local iEnemyNukes = table.getn(aiBrain[M27Overseer.reftEnemyNukeLaunchers])
@@ -3184,11 +3206,19 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         tExistingLocationsToPickFrom = tUnclaimedHydroNearBase
                         iSearchRangeForNearestEngi = 10000
                         iMaxEngisWanted = 2
+                        --Increase max number of engis if hydro is close to us
+                        local iNearestHydroDistance = 10000
+                        local iCurHydroDistance
+                        for iHydro, tHydro in tUnclaimedHydroWithinDefenceCoverage do
+                            iCurHydroDistance = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tHydro)
+                            if iCurHydroDistance < iNearestHydroDistance then iNearestHydroDistance = iCurHydroDistance end
+                        end
+                        if iNearestHydroDistance <= 90 then iMaxEngisWanted = 4 end
                         tExistingLocationsToPickFrom = tUnclaimedHydroWithinDefenceCoverage
                     end
                 elseif iCurrentConditionToTry == 10 then --Lower power action part 2 - want enough power to support guncom
-                    if bDebugMessages == true then LOG(sFunctionRef..': 2nd low power action; iNetCurEnergyIncome='..iNetCurEnergyIncome..'; iEnergyNetIncomeWantedPerTick='..iEnergyNetIncomeWantedPerTick..'; want to get gun upgrade='..tostring(M27Conditions.WantToGetGunUpgrade(aiBrain, true))) end
-                    if bWantToBuildPower == true or iNetCurEnergyIncome < iEnergyNetIncomeWantedPerTick then
+                    if bDebugMessages == true then LOG(sFunctionRef..': 2nd low power action; bHaveLowPower='..tostring(bHaveLowPower)..'; bWantMorePower='..tostring(bWantMorePower)..'; bHaveLowMass='..tostring(bHaveLowMass)) end
+                    if bHaveLowPower or (bWantMorePower and bHaveLowMass == false) then
                         --Hydro or power
                         if bNearbyHydro == nil then bNearbyHydro, tNearbyHydro = M27Conditions.HydroNearACUAndBase(aiBrain, true, true) end --Ignores ACU and just checks if near start position
                         if iUnclaimedHydroNearBase == nil then
@@ -3204,7 +3234,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         if iUnclaimedHydroNearBase > 0 then
                             iActionToAssign = refActionBuildHydro
                             tExistingLocationsToPickFrom = tUnclaimedHydroNearBase
-                            iMaxEngisWanted = 4
+                            iMaxEngisWanted = 5
                         else
                             iActionToAssign = refActionBuildPower
                             iMaxEngisWanted = math.min(math.ceil(iAllEngineers * 0.4), 5)
@@ -3318,13 +3348,22 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         if iGrossCurEnergyIncome >= 28 then
                             if iEnergyStoredRatio == nil then iEnergyStoredRatio = aiBrain:GetEconomyStoredRatio('ENERGY') end
                             if iEnergyStorageMax == nil then iEnergyStorageMax = iEnergyStored / iEnergyStoredRatio end
-                            if iEnergyStorageMax < 6000 then
+                            local iMaxStorageWanted = 9000
+                            if iGrossCurEnergyIncome >= 90 then
+                                if iGrossCurEnergyIncome >= 200 then
+                                    iMaxStorageWanted = math.max(17000, aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] * 200) --Energy storage to replenish overcharge every 20s
+                                else
+                                    iMaxStorageWanted = 13000
+                                end
+                            end
+                            iMaxStorageWanted = math.min(65000, iMaxStorageWanted) --need 60k energy to deal max of 15k, but only a % of current energy (90%?) is used; when sandboxing, dealt max 15k damage at 68.5k storage, and c.800 below max at 63.5k storage
+
+                            if iEnergyStorageMax < iMaxStorageWanted then
                                 iActionToAssign = refActionBuildEnergyStorage
-                                iSearchRangeForNearestEngi = 100
-                                iMaxEngisWanted = 3
-                            elseif iNetCurEnergyIncome > 0 and iGrossCurEnergyIncome > 50 then
-                                if iEnergyStorageMax - (5000 * math.ceil(iGrossCurEnergyIncome / 50)) < 0 and iEnergyStorageMax < 45000 then
-                                    iActionToAssign = refActionBuildEnergyStorage
+                                if iEnergyStorageMax < 9000 then
+                                    iSearchRangeForNearestEngi = 100
+                                    iMaxEngisWanted = 3
+                                else
                                     iSearchRangeForNearestEngi = 75
                                     iMaxEngisWanted = 2
                                 end
@@ -3355,11 +3394,11 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     end
                 elseif iCurrentConditionToTry == 16 then --2nd T1 power construction with low priority engineers
                     if bHaveVeryLowPower == false and bHaveLowMass == false then --If almost power stalling then want to focus on the first T1 power rather than trying multiple at once
-                        if bDebugMessages == true then LOG(sFunctionRef..': Separate power action; iNetCurEnergyIncome='..iNetCurEnergyIncome..'; iEnergyNetIncomeWantedPerTick='..iEnergyNetIncomeWantedPerTick) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Separate power action; bWantMorePower='..tostring(bWantMorePower)) end
                         if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
                         if iT2Power == nil then iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2) end
-                        if bWantToBuildPower == true or iNetCurEnergyIncome < iEnergyNetIncomeWantedPerTick then
-                            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 or (iHighestTechLevelEngi == 2 and iT2Power >= 2) or (iHighestTechLevelEngi >= 3 and iT3Power >= 2) then
+                        if bWantMorePower == true then
+                            if iHighestFactoryOrEngineerTechAvailable == 1 or (iHighestFactoryOrEngineerTechAvailable == 2 and iT2Power >= 2) or (iHighestFactoryOrEngineerTechAvailable >= 3 and iT3Power >= 2) then
                                 iActionToAssign = refActionBuildSecondPower
                                 iSearchRangeForNearestEngi = 100
                                 iMaxEngisWanted = 5
@@ -3422,7 +3461,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             if iNearbyOmniCount == 0 then
                                 --Build omni if we can
                                 if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
-                                if iHighestTechLevelEngi >= 3 and iNetCurEnergyIncome >= 300 and iT3Power > 0 then
+                                if iHighestFactoryOrEngineerTechAvailable >= 3 and iNetCurEnergyIncome >= 300 and iT3Power > 0 then
                                     iActionToAssign = refActionBuildT3Radar
                                     iMinEngiTechLevelWanted = 3
                                     iMaxEngisWanted = 3
@@ -3446,8 +3485,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     bAreOnSpareActions = true
                     if iCurrentConditionToTry == 19 then
                         if bHaveVeryLowPower == false and bHaveLowMass == false then
-                            if bWantToBuildPower == true or iNetCurEnergyIncome < iEnergyNetIncomeWantedPerTick or M27Conditions.WantToGetGunUpgrade(aiBrain, true) == false then
-                                if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 then
+                            if bWantMorePower then
+                                if iHighestFactoryOrEngineerTechAvailable == 1 then
                                     iActionToAssign = refActionBuildSecondPower
                                     iSearchRangeForNearestEngi = 100
                                     iMaxEngisWanted = 8
@@ -3525,15 +3564,15 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 --GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocationsToPickFrom, tIdleEngineers, iActionPriority, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinTechLevelWanted)
 --GET MIN ENGI TECH LEVEL WANTED
                         --Set minimum engineer tech level if not specified and no existing engineers assigned to the action
-                        if (iHighestTechLevelEngi > 1 or aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1) and iMinEngiTechLevelWanted == nil then
+                        if (iHighestFactoryOrEngineerTechAvailable > 1 or iHighestFactoryOrEngineerTechAvailable > 1) and iMinEngiTechLevelWanted == nil then
                             --Are we building power or factory? If so then only build with the highest tech engi unless action is already in progress
                             if iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildLandFactory then
                                 --Have we already got an engineer assigned to this action?
                                 if iExistingEngineersAssigned == 0 then
-                                    if iActionToAssign == refActionBuildPower then iMinEngiTechLevelWanted = math.max(iHighestTechLevelEngi, aiBrain[M27Overseer.refiOurHighestFactoryTechLevel])
-                                    else iMinEngiTechLevelWanted = iHighestTechLevelEngi end
+                                    if iActionToAssign == refActionBuildPower then iMinEngiTechLevelWanted = math.max(iHighestFactoryOrEngineerTechAvailable, iHighestFactoryOrEngineerTechAvailable)
+                                    else iMinEngiTechLevelWanted = iHighestFactoryOrEngineerTechAvailable end
                                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then
-                                        iMinEngiTechLevelWanted = math.min(iHighestTechLevelEngi, iHighestTechLevelEngi)
+                                        iMinEngiTechLevelWanted = math.min(iHighestFactoryOrEngineerTechAvailable, iHighestFactoryOrEngineerTechAvailable)
                                     end
                                 end
                             end
@@ -3638,7 +3677,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         end
     end
     local iExistingSpareEngisForCurTechLevel = 0
-    for iCurTechLevel = aiBrain[M27Overseer.refiOurHighestFactoryTechLevel], 4 do
+    for iCurTechLevel = iHighestFactoryOrEngineerTechAvailable, 4 do
         if tiSpareEngiCount[iCurTechLevel] > 0 then iExistingSpareEngisForCurTechLevel = iExistingSpareEngisForCurTechLevel + 1 end
     end
     aiBrain[refiBOActiveSpareEngineers] = tiSpareEngiCount

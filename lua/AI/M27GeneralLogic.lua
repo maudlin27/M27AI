@@ -1345,7 +1345,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
             iCurThreat = 0
             bCalcActualThreat = false
             if bDebugMessages == true then LOG(sFunctionRef..': About to check if unit is dead') end
-            if not(oUnit.Dead) then
+            if M27UnitInfo.IsUnitValid(oUnit) then
                 if oUnit:GetAIBrain() == aiBrain then
                     bOurUnits = true
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and has same ai brain so will determine actual threat') end
