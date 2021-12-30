@@ -21,6 +21,7 @@ HydroCount = 0
 tReclaimAreas = {} --Stores reclaim info for each segment: tReclaimAreas[iSegmentX][iSegmentZ][x]; if x=1 returns total mass in area; if x=2 then returns position of largest reclaim in the area, if x=3 returns how many platoons have been sent here since the game started
 refReclaimTotalMass = 1
 refReclaimPositionOfLargestReclaim = 2
+refReclaimHighestIndividualReclaim = 3
 refReclaimTimeOfLastEngineerDeath = 4
 refReclaimTimeLastEnemySighted = 5
 --tLastReclaimRefreshByGroup = {} --time that last refreshed reclaim positions for [x] group
@@ -416,17 +417,18 @@ function GetUnitSegmentGroup(oUnit)
     return tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
 end
 
-function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis)
+function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis, bAlsoReturnAmountOfHighestIndividualReclaim)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetReclaimablesMassValue'
+    --V14 and earlier would modify total mass value to reduce it by 25% if its small, and 50% if its medium; v15 removed this
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bAlsoReturnLargestReclaimPosition == nil then bAlsoReturnLargestReclaimPosition = false end
     if iIgnoreReclaimIfNotMoreThanThis == nil then iIgnoreReclaimIfNotMoreThanThis = 0 end
     if iIgnoreReclaimIfNotMoreThanThis < 0 then iIgnoreReclaimIfNotMoreThanThis = 0 end
-    local iMedMassThreshold = 20 --as per large mass threshold
-    local iLargeMassThreshold = 150 --any mass with a value more than iLargeMassTreshold gets increased in weighted value by iLargeMassMod
-    local iMedMassMod = 2 --increases value of mass over a particular threshold by this
-    local iLargeMassMod = 2 --increases value of mass over a particular threshold by this (multiplicative with iMedMassMod)
+    --local iMedMassThreshold = 20 --as per large mass threshold
+    --local iLargeMassThreshold = 150 --any mass with a value more than iLargeMassTreshold gets increased in weighted value by iLargeMassMod
+    --local iMedMassMod = 2 --increases value of mass over a particular threshold by this
+    --local iLargeMassMod = 2 --increases value of mass over a particular threshold by this (multiplicative with iMedMassMod)
 
     local tWreckPos = {}
     local iCurMassValue
@@ -441,12 +443,13 @@ function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPositi
                     if not(v:BeenDestroyed()) then
                         -- Determine mass - reduce low value mass value for weighting purposes (since it takes longer to get):
                         --if bDebugMessages == true then LOG('Have wrecks with a valid position and positive mass value within the segment iCurXZ='..iCurX..'-'..iCurZ..'; iWreckNo='.._) end
-                        iCurMassValue = v.MaxMassReclaim / (iMedMassMod * iLargeMassMod)
-                        if iCurMassValue >= iMedMassThreshold then iCurMassValue = iCurMassValue * iMedMassMod end
-                        if iCurMassValue >= iLargeMassThreshold then iCurMassValue = iCurMassValue * iLargeMassMod end
-                        iTotalMassValue = iTotalMassValue + iCurMassValue
-                        if iCurMassValue > iLargestCurReclaim then
-                            iLargestCurReclaim = iCurMassValue
+                        --iCurMassValue = v.MaxMassReclaim / (iMedMassMod * iLargeMassMod)
+                        --if iCurMassValue >= iMedMassThreshold then iCurMassValue = iCurMassValue * iMedMassMod end
+                        --if iCurMassValue >= iLargeMassThreshold then iCurMassValue = iCurMassValue * iLargeMassMod end
+                        --iTotalMassValue = iTotalMassValue + iCurMassValue
+                        iTotalMassValue = iTotalMassValue + v.MaxMassReclaim
+                        if v.MaxMassReclaim > iLargestCurReclaim then
+                            iLargestCurReclaim = v.MaxMassReclaim
                             tReclaimPos = {tWreckPos[1], tWreckPos[2], tWreckPos[3]}
                         end
                     end
@@ -463,8 +466,12 @@ function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPositi
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if bAlsoReturnLargestReclaimPosition then
-        return iTotalMassValue, tReclaimPos
-    else return iTotalMassValue end
+        if bAlsoReturnAmountOfHighestIndividualReclaim then return iTotalMassValue, tReclaimPos, iLargestCurReclaim
+        else return iTotalMassValue, tReclaimPos end
+    else
+        if bAlsoReturnAmountOfHighestIndividualReclaim then return iTotalMassValue, iLargestCurReclaim
+        else return iTotalMassValue end
+    end
 end
 
 function GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
@@ -575,13 +582,13 @@ function UpdateReclaimMarkers()
     --Updates the global variable tReclaimAreas{}
     --Config settings:
     --Note: iMaxSegmentInterval defined at the top as a global variable
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'UpdateReclaimMarkers'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
     local iTimeBeforeFullRefresh = 10 --Will do a full refresh of reclaim every x seconds
-    local iMinValueOfIndividualReclaim = 4.5
+    local iMinValueOfIndividualReclaim = 2.5
 
 
     local bDoFullRefresh = false
@@ -635,7 +642,7 @@ function UpdateReclaimMarkers()
                     -- local iWreckCount = 0
                     --local bIsProp = nil  --only used for log/testing
                     if bDebugMessages == true then LOG('Have wrecks within the segment iCurXZ='..iCurX..'-'..iCurZ) end
-                    iTotalMassValue, tReclaimPos = GetReclaimablesMassValue(tReclaimables, true, iMinValueOfIndividualReclaim)
+                    iTotalMassValue, tReclaimPos, iLargestCurReclaim = GetReclaimablesMassValue(tReclaimables, true, iMinValueOfIndividualReclaim, true)
 
                     --Record this table:
                     if tReclaimAreas[iCurX] == nil then
@@ -646,9 +653,10 @@ function UpdateReclaimMarkers()
                     tReclaimAreas[iCurX][iCurZ][refReclaimTotalMass] = iTotalMassValue
                     tReclaimAreas[iCurX][iCurZ][refReclaimPositionOfLargestReclaim] = {}
                     tReclaimAreas[iCurX][iCurZ][refReclaimPositionOfLargestReclaim] = GetPositionFromPathingSegments(iCurX, iCurZ)
+                    tReclaimAreas[iCurX][iCurZ][refReclaimHighestIndividualReclaim] = iLargestCurReclaim
                 end
                 iMapTotalMass = iMapTotalMass + iTotalMassValue
-                if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; iTotalMassValue='..iTotalMassValue) end
+                if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; iTotalMassValue='..iTotalMassValue..'; Location of segment='..repr(GetReclaimLocationFromSegment(iCurX, iCurZ))) end
             end
             iCurCount = iCurCount + 1
             if iCurCount >= iWaitInterval then
@@ -666,11 +674,12 @@ end
 
 function UpdateReclaimAreasOfInterest(aiBrain)
     --Sets out reclaim areas of interest to try and claim, e.g. with engineer
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'UpdateReclaimAreasOfInterest'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iRefreshTimeInSeconds = 5
+    UpdateReclaimMarkers() --Wont do anything if have already updated recently
     if GetGameTimeSeconds() - (aiBrain[refiLastRefreshOfReclaimAreasOfInterest] or 0) >= iRefreshTimeInSeconds then
         if bDebugMessages == true then LOG(sFunctionRef..': Are doing a detailed refresh of reclaim points of interest') end
         local iMinSegmentReclaim = 40 --Ignore if less than this
@@ -733,7 +742,7 @@ function UpdateReclaimAreasOfInterest(aiBrain)
                                             if tReclaimAreas[iCurX][iCurZ][refReclaimTimeOfLastEngineerDeath] and GetGameTimeSeconds() - tReclaimAreas[iCurX][iCurZ][refReclaimTimeOfLastEngineerDeath] < 300 then
                                                 bEngineerDiedOrSpottedEnemiesRecently = true
                                                 break
-                                            elseif tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySighted] or GetGameTimeSeconds() - tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySighted] < 120 then
+                                            elseif tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySighted] and GetGameTimeSeconds() - tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySighted] < 120 then
                                                 bEngineerDiedOrSpottedEnemiesRecently = true
                                                 break
                                             end

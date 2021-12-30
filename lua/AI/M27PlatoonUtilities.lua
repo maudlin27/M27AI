@@ -235,6 +235,7 @@ function GetPlatoonUnitsOrUnitCount(oPlatoon, sFriendlyUnitTableVariableWanted, 
     --if bOnlyGetIfUnitAvailable is true then will check if unit is microing on special task and exclude it
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPlatoonUnitsOrUnitCount'
+    if sFriendlyUnitTableVariableWanted == 'reftReclaimers' then bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tBaseVariable = oPlatoon[sFriendlyUnitTableVariableWanted]
     local tNewVariable = {}
@@ -3193,7 +3194,7 @@ function DetermineActionForNearbyReclaim(oPlatoon)
         if bProceed then
             local iSpareStorage = (1 - aiBrain:GetEconomyStoredRatio('MASS')) * aiBrain:GetEconomyStored('MASS')
 
-            if iSpareStorage > 1 then --In some cases will want to finish reclaiming if are already reclaiming
+            if iSpareStorage > 50 then --v14 and earlier - was 1 as In some cases will want to finish reclaiming if are already reclaiming; v15: Changed to be 50 as approx (since reclaim at 5*buildpower, so ACU would reclaim up to 50/s)
                 if bDebugMessages == true then LOG(sFunctionRef..': About to get first unit with reclaim function') end
                 --if oPlatoon[refoNearbyReclaimTarget] == nil then oPlatoon[refoNearbyReclaimTarget] = {} end
                 local oFirstReclaimer
@@ -3214,6 +3215,19 @@ function DetermineActionForNearbyReclaim(oPlatoon)
                     end
                     if bDebugMessages == true then LOG(sFunctionRef..': bHaveNearbyEnemies='..tostring(bHaveNearbyEnemies)) end
                     if bHaveNearbyEnemies == false then
+                        --New approach for v14
+                        --Are we in a segment with reclaim or near a segment with reclaim?
+                        --IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal, iMinIndividual)
+                        if M27Conditions.IsReclaimNearby(GetPlatoonFrontPosition(oPlatoon), 1, 15, 5) then
+                            oPlatoon[refiCurrentAction] = refActionReclaimAllNearby
+                            oPlatoon[refoNearbyReclaimTarget] = nil
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have nearby reclaim, so will try to get') end
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': No nearby reclaim') end
+                        end
+
+                        --Old approach pre v15 below
+                        --[[
 
 
                         local oReclaimerBP = oFirstReclaimer:GetBlueprint()
@@ -3281,19 +3295,21 @@ function DetermineActionForNearbyReclaim(oPlatoon)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will overflow mass so wont issue action to reclaim') end
                                 oPlatoon[refoNearbyReclaimTarget] = nil
                             end
-                        end
+                        end --]]
                     end
                 else
                     oPlatoon[refiReclaimers] = 0
                 end
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..': iSpareStorage='..iSpareStorage) end
             end
-            if bDebugMessages == true and oPlatoon[refoNearbyReclaimTarget] then
+            --[[if bDebugMessages == true and oPlatoon[refoNearbyReclaimTarget] then
                 if oPlatoon[refiCurrentAction] == nil then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Have a reclaim target but no action')
                 else
                     LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Have a reclaim target; action='..oPlatoon[refiCurrentAction]..': mass on reclaim='..oPlatoon[refoNearbyReclaimTarget].MaxMassReclaim)
                     if oPlatoon[refoNearbyReclaimTarget]:BeenDestroyed() then M27Utilities.ErrorHandler('Reclaim has been destroyed') end
                 end
-            end
+            end--]]
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -4015,10 +4031,12 @@ function DeterminePlatoonAction(oPlatoon)
                                     if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Considering whether to ignore refresh - unit state='..M27Logic.GetUnitState(oBuilder)) end
                                 end
                             end
-                        elseif oPlatoon[refiCurrentAction] == refActionReclaimTarget then
+                        elseif oPlatoon[refiCurrentAction] == refActionReclaimTarget or oPlatoon[refiCurrentAction] == refActionReclaimAllNearby then
                             if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Action is to reclaim, First reclaimer in platoon status='..M27Logic.GetUnitState(oPlatoon[reftReclaimers][1])) end
                             bBuildingOrReclaimingLogic = true
                             bRefreshAction = true
+                            iRefreshActionThreshold = 1
+                            if oPlatoon[refiCurrentAction] == refActionReclaimAllNearby then iRefreshActionThreshold = 0 end --The reclaimallnearby logic already checks if position has moved so dont need a delay
                             for iReclaimer, oReclaimer in oPlatoon[reftReclaimers] do
                                 if not(oReclaimer.Dead) then
                                     if oReclaimer:IsUnitState('Reclaiming') == true then
@@ -4028,6 +4046,7 @@ function DeterminePlatoonAction(oPlatoon)
                                     end
                                 end
                             end
+                            if bDebugMessages == true then LOG(sFunctionRef..': bRefreshAction after checking if unit state is reclaiming='..tostring(bRefreshAction)) end
                         elseif oPlatoon[refiCurrentAction] == refActionAttackSpecificUnit then
                             --Has the unit changed?
                             if oPlatoon[refoTemporaryAttackTarget] == oPlatoon[refoPrevTemporaryAttackTarget] then
@@ -5708,7 +5727,7 @@ function ProcessPlatoonAction(oPlatoon)
             else
                 --local aiBrain = oPlatoon:GetBrain()
                 local bPlatoonNameDisplay = false
-                if bDebugMessages == true then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(M27Utilities.GetACU(aiBrain))) end
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(M27Utilities.GetACU(aiBrain))..'; Special Micro='..tostring(M27Utilities.GetACU(aiBrain).M27UnitInfo.refbSpecialMicroActive or false)) end
                 if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
                 if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': ProcessPlatoonAction: refiCurrentAction='..oPlatoon[refiCurrentAction]..'; bDontClearActions='..tostring(bDontClearActions)) end
                 if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': A'..oPlatoon[refiCurrentAction]) end
@@ -6201,7 +6220,21 @@ function ProcessPlatoonAction(oPlatoon)
                     end
                     --Add move command so unit wont stay idle
                     IssueMove(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
-
+                elseif oPlatoon[refiCurrentAction] == refActionReclaimAllNearby then
+                    --Have reclaim potentially near us - action will be cleared as part of engineer logic
+                    local tAvailableReclaimers = GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true)
+                    if M27Utilities.IsTableEmpty(tAvailableReclaimers) == false then
+                        for iEngineer, oEngineer in tAvailableReclaimers do
+                            oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] = oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have set engineer '..oEngineer:GetUnitId()..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to have a current target of '..repr(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]] or {'nil'})..'; oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget]='..repr(oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] or {'nil'})) end
+                            --UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDontIssueMoveAfter)
+                            M27EngineerOverseer.UpdateActionForNearbyReclaim(oEngineer, 5, true)
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to reissue movement path after updating action for nearby reclaim') end
+                        ReissueMovementPath(oPlatoon, true)
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': tReclaimers is nil; oPlatoon[refiReclaimers]='..oPlatoon[refiReclaimers]..'; Is micro active on first unit on platoon='..tostring(oPlatoon[refoFrontUnit].M27UnitInfo.refbSpecialMicroActive or false)) end
+                    end
                 elseif oPlatoon[refiCurrentAction] == refActionBuildMex then
                     --Will have already determined the location to build the mex on (and checked its available to build oin) as part of the check of whether to have this as an action
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': ActionBuildMex') end

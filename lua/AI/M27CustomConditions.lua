@@ -562,19 +562,36 @@ function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
     return bBuiltLessThan
 end
 
-function IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal)
+function IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal, iMinIndividual)
     --Returns true if any nearby adjacent segments have reclaim; to be used as basic check before calling getreclaimablesinrect
     local sFunctionRef = 'IsReclaimNearby'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
     local iBaseX, iBaseZ = M27MapInfo.GetReclaimSegmentsFromLocation(tLocation)
     for iAdjX = -iAdjacentSegmentSize, iAdjacentSegmentSize do
         for iAdjZ = -iAdjacentSegmentSize, iAdjacentSegmentSize do
-            if M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimTotalMass] >= iMinTotal then
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': X-Z='..iBaseX + iAdjX..'-'..iBaseZ + iAdjZ..'; Location='..repr(tLocation)..'; refReclaimTotalMass='..(M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 'nil')..'; refReclaimHighestIndividualReclaim='..(M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimHighestIndividualReclaim] or 'nil')..'; Location from segment='..repr(M27MapInfo.GetReclaimLocationFromSegment(iBaseX, iBaseZ)))
+                if iAdjX == 0 and iAdjZ == 0 then
+                    local rRect = Rect((iBaseX - 1) * M27MapInfo.iReclaimSegmentSizeX, (iBaseZ - 1) * M27MapInfo.iReclaimSegmentSizeZ, iBaseX * M27MapInfo.iReclaimSegmentSizeX, iBaseZ * M27MapInfo.iReclaimSegmentSizeZ)
+                    local tReclaimables = GetReclaimablesInRect(rRect)
+                    M27Utilities.DrawRectangle(rRect)
+                    for iReclaim, oReclaim in tReclaimables do
+                        if oReclaim.MaxMassReclaim > 0 and oReclaim.CachePosition then
+                            LOG('iReclaim='..iReclaim..'; MaxMassReclaim='..oReclaim.MaxMassReclaim..'; CachePosition='..repr(oReclaim.CachePosition))
+                        end
+                    end
+                end
+            end
+            if M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimTotalMass] >= iMinTotal and (not iMinIndividual or M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimHighestIndividualReclaim] >= iMinIndividual) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have enough reclaim so returning true') end
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return true
             end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': None of locations had enough reclaim so returning false') end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return false
 end
