@@ -562,6 +562,23 @@ function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
     return bBuiltLessThan
 end
 
+function IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal)
+    --Returns true if any nearby adjacent segments have reclaim; to be used as basic check before calling getreclaimablesinrect
+    local sFunctionRef = 'IsReclaimNearby'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local iBaseX, iBaseZ = M27MapInfo.GetReclaimSegmentsFromLocation(tLocation)
+    for iAdjX = -iAdjacentSegmentSize, iAdjacentSegmentSize do
+        for iAdjZ = -iAdjacentSegmentSize, iAdjacentSegmentSize do
+            if M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimTotalMass] >= iMinTotal then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return true
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return false
+end
+
 function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatEnemyBuildingAsUnclaimed, bTreatOurOrAllyBuildingAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
     --bTreatQueuedBuildingsAsUnclaimed: If set to false, then consideres all planned mex buidlings for engineers and treats them as being claimed
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end

@@ -96,6 +96,7 @@ refCategoryPersonalShield = categories.PERSONALSHIELD + refCategoryObsidian
 refCategoryAirScout = categories.AIR * categories.SCOUT
 refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - categories.GROUNDATTACK
 refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - categories.CANNOTUSEAIRSTAGING --excludes mercies
+refCategoryGunship = categories.AIR * categories.GROUNDATTACK
 refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3
@@ -109,8 +110,11 @@ refCategoryCruiserCarrier = categories.NAVAL * categories.CRUISER + categories.N
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL
 
+--Multi-category:
 --Antinavy mobile units (can include land units - e.g for land factories to build antisub units)
 refCategoryAntiNavy = categories.ANTINAVY * categories.STRUCTURE + categories.ANTINAVY * categories.MOBILE --for some reason get error message if just use antinavy, so need to be more restrictive
+--Dangerous to land units, e.g. engieners look for these when deciding reclaim area
+refCategoryDangerousToLand = refCategoryLandCombat + refCategoryIndirect + refCategoryAllNavy + refCategoryBomber + refCategoryGunship + refCategoryPD + refCategoryFixedT2Arti
 
 
 --Weapon target priorities

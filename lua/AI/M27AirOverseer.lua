@@ -35,9 +35,9 @@ local refiIntervalEnemyMex = 'M27AirIntervalEnemyMex'
 local refiIntervalEnemyBase = 'M27AirIntervalEnemyBase'
 
 --Main trackers: Scout
-local reftAirSegmentTracker = 'M27AirSegmentTracker' --[x][z]{a,b,c,d etc.} - x = segment x, z = segment z, a, b, c etc. = subtable refs - Used to track all things relating to air scouting for a particular segment
+reftAirSegmentTracker = 'M27AirSegmentTracker' --[x][z]{a,b,c,d etc.} - x = segment x, z = segment z, a, b, c etc. = subtable refs - Used to track all things relating to air scouting for a particular segment
 --Subtable values (include in SetupAirSegments to make sure these can be referenced)
-local refiLastScouted = 'M27AirLastScouted'
+refiLastScouted = 'M27AirLastScouted'
 local refiAirScoutsAssigned = 'M27AirScoutsAssigned'
 local refiNormalScoutingIntervalWanted = 'M27AirScoutIntervalWanted' --What to default to if e.g. temporairly increased
 local refiCurrentScoutingInterval = 'M27AirScoutCurrentIntervalWanted' --e.g. can temporarily override this if a unit dies and want to make it higher priority

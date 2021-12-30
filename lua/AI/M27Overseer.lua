@@ -899,7 +899,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
             LOG('Have 80 scouts, seems higher than would expect so enabling logs')
             bDebugMessages = true --For error identification
         end
-        if iScouts > iNonScouts or iScouts >= 100 then
+        if (iScouts > 50 and iScouts > iNonScouts) or iScouts >= 120 then
             bDebugMessages = true --For errors
             M27Utilities.ErrorHandler('Warning possible error unless large map or lots of small platoons - more than 25 scouts, but only '..iNonScouts..' non-scouts; iScouts='..iScouts..'; turning on debug messages.  Still stop producing scouts if get to 100')
             aiBrain[refiScoutShortfallInitialRaider] = 0

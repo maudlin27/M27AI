@@ -67,7 +67,7 @@ Platoon = Class(M27PlatoonClass) {
                             local iPlatoonAction = oPlatoonHandle[M27PlatoonUtilities.refiCurrentAction]
                             if iPlatoonAction == nil then iPlatoonAction = 'nil' end
                             if bDebugMessages == true then LOG('ProcessBuildCommand: iPlatoonAction='..iPlatoonAction..'; Platoon plan='..oPlatoonHandle:GetPlan()) end
-                            if iPlatoonAction == M27PlatoonUtilities.refActionReclaimNearby then bDoNothing = true
+                            if iPlatoonAction == M27PlatoonUtilities.refActionReclaimTarget then bDoNothing = true
                             else
 
 

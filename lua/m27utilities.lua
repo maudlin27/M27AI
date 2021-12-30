@@ -274,7 +274,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
 
     local iCount = 0
     while true do
-        iCount = iCount + 1 if iCount > 200 then ErrorHandler('Infinite loop') break end
+        iCount = iCount + 1 if iCount > 10000 then ErrorHandler('Infinite loop') break end
         for iValX = 1, 2 do
             for iValZ = 1, 2 do
                 if iValX == 1 then

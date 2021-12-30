@@ -31,7 +31,7 @@ refActionUseAttackAI = 6
 refActionDisband = 7
 refActionMoveDFToNearestEnemy = 8 --Direct fire units in the platoon move to the nearest enemy (doesnt affect scouts, T1 arti, and MAA)
 refActionReturnToBase = 9
-refActionReclaimNearby = 10
+refActionReclaimTarget = 10 --Reclaim a specific target
 refActionBuildMex = 11
 refActionAssistConstruction = 12
 refActionMoveJustWithinRangeOfNearestPD = 13
@@ -42,6 +42,7 @@ refActionBuildInitialPower = 17 --NOTE: I(f adding more build actions that the A
 refActionTemporaryRetreat = 18 --similar to actionrun, but wont clear movement path
 refActionUpgrade = 19 --Either gets a new upgrade, or continues existing upgrade if we have one
 refActionKillACU = 20 --Units will target enemy ACU if they have combat units, regardless of overrides
+refActionReclaimAllNearby = 21 --Use normal engineer logic for reclaiming wrecks nearby
 
 --Extra actions (i.e. performed in addition to main action)
 refiExtraAction = 'M27ExtraActionRef'
@@ -1562,7 +1563,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
                                             if iDistanceToPlatoon <= iBuildDistance then
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Trying to target nearby enemy for reclaim') end
                                                 oPlatoon[refoNearbyReclaimTarget] = oReclaimTarget
-                                                oPlatoon[refiCurrentAction] = refActionReclaimNearby
+                                                oPlatoon[refiCurrentAction] = refActionReclaimTarget
                                             else
                                                 --first see if nearby land that can move to
                                                 --GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchRange)
@@ -1574,7 +1575,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
                                                     --Reclaim the unit that is further away than our build distance
                                                     if bDebugMessages == true then LOG(sFunctionRef..': No nearby land so will move to enemy and try and reclaim') end
                                                     oPlatoon[refoNearbyReclaimTarget] = oReclaimTarget
-                                                    oPlatoon[refiCurrentAction] = refActionReclaimNearby
+                                                    oPlatoon[refiCurrentAction] = refActionReclaimTarget
                                                 end
                                             end
                                         else
@@ -1891,7 +1892,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                     if iClosestMobileUnit <= (iBuildDistance + 1) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Units are blocked but in build range so will reclaim') end
                                         oPlatoon[refoNearbyReclaimTarget] = oClosestMobileUnit
-                                        oPlatoon[refiCurrentAction] = refActionReclaimNearby
+                                        oPlatoon[refiCurrentAction] = refActionReclaimTarget
                                     else
                                         oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
                                     end
@@ -3275,7 +3276,7 @@ function DetermineActionForNearbyReclaim(oPlatoon)
                             end
                             if bWillOverflowMass == false then
                                 if bDebugMessages == true then LOG(sFunctionRef..': wont overflow mass so proceed with reclaim') end
-                                oPlatoon[refiCurrentAction] = refActionReclaimNearby
+                                oPlatoon[refiCurrentAction] = refActionReclaimTarget
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will overflow mass so wont issue action to reclaim') end
                                 oPlatoon[refoNearbyReclaimTarget] = nil
@@ -4014,7 +4015,7 @@ function DeterminePlatoonAction(oPlatoon)
                                     if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Considering whether to ignore refresh - unit state='..M27Logic.GetUnitState(oBuilder)) end
                                 end
                             end
-                        elseif oPlatoon[refiCurrentAction] == refActionReclaimNearby then
+                        elseif oPlatoon[refiCurrentAction] == refActionReclaimTarget then
                             if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Action is to reclaim, First reclaimer in platoon status='..M27Logic.GetUnitState(oPlatoon[reftReclaimers][1])) end
                             bBuildingOrReclaimingLogic = true
                             bRefreshAction = true
@@ -6176,7 +6177,7 @@ function ProcessPlatoonAction(oPlatoon)
                 elseif oPlatoon[refiCurrentAction] == refActionReturnToBase   then
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionReturnToBase') end
                     ReturnToBase(oPlatoon)
-                elseif oPlatoon[refiCurrentAction] == refActionReclaimNearby then
+                elseif oPlatoon[refiCurrentAction] == refActionReclaimTarget then
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': ActionReclaim') end
                     if bDebugMessages == true then
                         local iReclaim = oPlatoon[refoNearbyReclaimTarget].MaxMassReclaim

@@ -112,12 +112,49 @@ function ChooseReclaimTarget(oEngineer)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bDebugMessages == true then LOG(sFunctionRef..':Started ChooseReclaimTarget') end
+    --Update reclaim if havent recently
+    local aiBrain = oEngineer:GetAIBrain()
+    M27MapInfo.UpdateReclaimAreasOfInterest(aiBrain)
+
+    local sLocationRef, tCurMidpoint
+    local iClosestDistanceToEngi = 10000
+    local iCurDistanceToEngi
+    local tClosestLocationToEngi
+    local tEngiPosition = oEngineer:GetPosition()
+
+    for iCurPriority = 1, 3 do --priority 4 is for ACU only
+        if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftReclaimAreasOfInterest][iCurPriority]) == false then
+            --Check have areas where an engineer hasn't been assigned
+            for iCount, tSegmentXAndZ in aiBrain[M27MapInfo.reftReclaimAreasOfInterest][iCurPriority] do
+                tCurMidpoint = M27MapInfo.GetReclaimLocationFromSegment(tSegmentXAndZ[1], tSegmentXAndZ[2])
+                sLocationRef = M27Utilities.ConvertLocationToReference(tCurMidpoint)
+                if not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) or not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim]) or not(M27UnitInfo.IsUnitValid(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim])) then
+                    iCurDistanceToEngi = M27Utilities.GetDistanceBetweenPositions(tEngiPosition, tCurMidpoint)
+                    if iCurDistanceToEngi < iClosestDistanceToEngi then
+                        iClosestDistanceToEngi = iCurDistanceToEngi
+                        tClosestLocationToEngi = tCurMidpoint
+                    end
+                end
+            end
+        end
+        --Ignore lower priority locations if have a valid location
+        if M27Utilities.IsTableEmpty(tClosestLocationToEngi) == false then break end
+    end
+    if M27Utilities.IsTableEmpty(tClosestLocationToEngi) == true then
+        if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a valid reclaim target for engineer but presumably gave it an action to reclaim, will return nil') end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return tClosestLocationToEngi
+
+    --OLD METHOD Below
+    --[[
+
     local tEngPosition = oEngineer:GetPosition()
     local iEngSegmentX, iEngSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tEngPosition)
     if bDebugMessages == true then LOG(sFunctionRef..': iEngSegmentXZ='..iEngSegmentX..'-'..iEngSegmentZ) end
     local sPathingType = M27UnitInfo.GetUnitPathingType(oEngineer)
     local iEngSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iEngSegmentX, iEngSegmentZ)
-    local aiBrain = oEngineer:GetAIBrain()
+
     if not(iEngSegmentGroup) then
         M27Utilities.ErrorHandler('iEngSegmentGroup is nil')
     else
@@ -230,8 +267,7 @@ function ChooseReclaimTarget(oEngineer)
                 return M27MapInfo.tReclaimAreas[iCurSegmentX][iCurSegmentZ][2]
             end
         end
-    end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    end --]]
 end
 
 function GetNearestEnemyIndex(aiBrain, bForceDebug)

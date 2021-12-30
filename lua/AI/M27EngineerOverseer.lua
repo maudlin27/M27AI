@@ -69,6 +69,9 @@ local refiActionRef = 'ActionRef'
 --Localised engineer tracking:
 local refiEngineerConditionNumber = 'M27EngineerConditionNumber' --condition number of the action assigned to the engineer (for if want an engineer with a lower priority, i.e. higher condition number)
 refiEngineerCurrentAction = 'M27EngineerCurrentAction' --current action reference number that the engineer has been assigned
+reftEngineerCurrentTarget = 'M27EngineerCurrentTarget'
+refbEngineerActiveReclaimChecker = 'M27EngineerActiveReclaim'
+reftEngineerLastPositionOfReclaimOrder = 'M27EngineerIssueReclaimLastPosition'
 local reftGuardedBy = 'M27EngineerGuardedByList' --stored as a variable on a particular unit, to track units which are guarding it
 refiEngineerCurUniqueReference = 'M27EngineerCurUniqueReference' --aiBrain stores the xth engineer object its given an action to, so this can be used as a unique reference
 local refiTotalActionsAssigned = 'M27EngineerTotalActionsAssigned' --Having issues with counting size of table so use this instead
@@ -233,6 +236,8 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
         --Clear engineer local variables:
         oEngineer[refiEngineerConditionNumber] = nil
         oEngineer[refiEngineerCurrentAction] = nil
+        oEngineer[reftEngineerCurrentTarget] = nil
+        oEngineer[reftEngineerLastPositionOfReclaimOrder] = nil
         oEngineer[refiTotalActionsAssigned] = 0
         --reftGuardedBy is cleared later
       --TEMPTEST(aiBrain, sFunctionRef..': Just cleared local variables moving on to tables')
@@ -361,6 +366,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
     local sFunctionRef = 'UpdateEngineerActionTrackers'
       M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+
     if iActionToAssign == nil then M27Utilities.ErrorHandler('iActionToAssign is nil') end
 
   --TEMPTEST(aiBrain, sFunctionRef..': Start')
@@ -399,6 +405,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
         if bDebugMessages == true then LOG(sFunctionRef..': Not clearing engineers trackers due to input settings') end
     end
     oEngineer[refiEngineerCurrentAction] = iActionToAssign
+    oEngineer[reftEngineerCurrentTarget] = tTargetLocation
     oEngineer[refiEngineerConditionNumber] = iConditionNumber
     local iCurPlaceInEngineerActionTable = oEngineer[refiTotalActionsAssigned]
     if iCurPlaceInEngineerActionTable == nil then iCurPlaceInEngineerActionTable = 1
@@ -835,6 +842,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
 
     local sFunctionRef = 'IssueSpareEngineerAction'
       M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 13 or M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 9 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     --Action already cleared in previous code
     local iCurSearchDistance = 40
@@ -1997,6 +2005,108 @@ function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpg
 
 end
 
+function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue)
+    --Gets engineer to stop and reclaim if its about to move out of range of reclaim with at least iMinReclaimIndividualValue
+    --Will stop and reclaim anyway if >100 reclaim individually, or if engineer almost at its target destination
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'UpdateActionForNearbyReclaim'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 13 or M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 9 then bDebugMessages = true end
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering for E'..GetEngineerUniqueCount(oEngineer)..' LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' with unit state='..M27Logic.GetUnitState(oEngineer)) end
+
+    local tCurPos = oEngineer:GetPosition()
+    --Has the engineer moved from its location when it was last told to reclaim?
+
+    if not(oEngineer[reftEngineerLastPositionOfReclaimOrder]) or (M27Utilities.GetDistanceBetweenPositions(tCurPos, oEngineer[reftEngineerLastPositionOfReclaimOrder]) > 1 or M27Utilities.GetDistanceBetweenPositions(tCurPos, oEngineer[reftEngineerCurrentTarget]) <= 1) then
+        --Is the engineer part of a segment with iMinReclaimIndividualValue reclaim, or near a segment with this minimum)?
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': Engineer isnt close to recent reclaim order; will check if any reclaim in range of engi')
+            --DrawRectangle(rRect, iColour, iDisplayCount)
+            local iCurX, iCurZ = M27MapInfo.GetReclaimSegmentsFromLocation(tCurPos)
+            M27Utilities.DrawRectangle(Rect((iCurX - 1) * M27MapInfo.iReclaimSegmentSizeX, (iCurZ - 1) * M27MapInfo.iReclaimSegmentSizeZ, iCurX * M27MapInfo.iReclaimSegmentSizeX, iCurZ * M27MapInfo.iReclaimSegmentSizeZ))
+            LOG(sFunctionRef..': Have drawn rectangle that the engineer is in, iCurX='..iCurX..'; iCurZ='..iCurZ)
+        end
+        if M27Conditions.IsReclaimNearby(tCurPos, 1, iMinReclaimIndividualValue) then --want to only look at adjacent segments even for ACU, as build range of 10 should still be smaller than 1+bit of segment in almost all cases
+            if bDebugMessages == true then LOG(sFunctionRef..' Is reclaim in current or adjacent segment, will check if any reclaim will move out of range') end
+            local oEngBP = oEngineer:GetBlueprint()
+            local iMoveSpeed = oEngBP.Physics.MaxSpeed
+            local iMaxDistanceToEngineer = oEngBP.Economy.MaxBuildDistance + 0.5
+            local iRadius = iMaxDistanceToEngineer * 0.5
+            local bReclaimWillMoveOutOfRangeSoon = false
+            local iCurDistToEngineer
+            local iMinDistanceToEngineer = math.max(oEngBP.SizeX, oEngBP.SizeZ)
+
+            local tExpectedPositionSoon = M27Utilities.MoveInDirection(tCurPos, M27Utilities.GetAngleFromAToB(tCurPos, oEngineer[reftEngineerCurrentTarget]), iMoveSpeed)
+
+            --GetReclaimInRectangle(iReturnType, rRectangleToSearch)
+            --    --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass, 4 = valid wrecks
+            local tNearbyReclaim = M27MapInfo.GetReclaimInRectangle(4, Rect(tCurPos[1] - iRadius, tCurPos[3] - iRadius, tCurPos[1] + iRadius, tCurPos[3] + iRadius))
+
+            if M27Utilities.IsTableEmpty(tNearbyReclaim) == false then
+                if M27Utilities.GetDistanceBetweenPositions(oEngineer[reftEngineerCurrentTarget], tCurPos) <= 2 then
+                    bReclaimWillMoveOutOfRangeSoon = true
+                    iMinDistanceToEngineer = 0
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..'Have nearby reclaim, will check if any will move out of range soon') end
+                local tReclaimInRange = {}
+                local iValidReclaimInRange = 0
+                for iReclaim, oReclaim in tNearbyReclaim do
+                    --is this valid reclaim within our build area?
+                    if bDebugMessages == true then LOG(sFunctionRef..': iReclaim='..iReclaim..'; oReclaim.MaxMassReclaim='..(oReclaim.MaxMassReclaim or 0)) end
+                    if oReclaim.MaxMassReclaim >= iMinReclaimIndividualValue and oReclaim.CachePosition and not(oReclaim:BeenDestroyed()) then
+                        iCurDistToEngineer = M27Utilities.GetDistanceBetweenPositions(tCurPos, oReclaim.CachePosition)
+                        if iCurDistToEngineer <= iMaxDistanceToEngineer and (iCurDistToEngineer > iMinDistanceToEngineer or oReclaim.MaxMassReclaim > 100) then
+                            table.insert(tReclaimInRange, oReclaim)
+                            --Will the reclaim be out of range soon? or is it very high value such that we want to reclaim immediately?
+                            if oReclaim.MaxMassReclaim > 100 or M27Utilities.GetDistanceBetweenPositions(tExpectedPositionSoon, oReclaim.CachePosition) > iMaxDistanceToEngineer then
+                                bReclaimWillMoveOutOfRangeSoon = true
+                                --(dont want a break here, as need to record all reclaim in range right now for the recelaim command)
+                            end
+                        end
+                    end
+                end
+
+                if bDebugMessages == true then LOG(sFunctionRef..'bReclaimWillMoveOutOfRangeSoon='..tostring(bReclaimWillMoveOutOfRangeSoon)) end
+                if bReclaimWillMoveOutOfRangeSoon then
+                    if bDebugMessages == true then LOG(sFunctionRef..'Reclaim is about to go out of range so will issue reclaim command for any valid reclaim') end
+                    oEngineer[reftEngineerLastPositionOfReclaimOrder] = {tCurPos[1], tCurPos[2], tCurPos[3]}
+                    IssueClearCommands({oEngineer})
+                    for iValidReclaim, oValidReclaim in tReclaimInRange do
+                        if bDebugMessages == true then LOG(sFunctionRef..'Issuing reclaim command') end
+                        IssueReclaim({oEngineer}, oValidReclaim)
+                    end
+                    IssueMove({oEngineer}, oEngineer[reftEngineerCurrentTarget])
+                end
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..' No reclaim in engineer build range') end
+            end
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..' No reclaim in nearby segments') end
+        end
+    else
+        if bDebugMessages == true then LOG(sFunctionRef..': Engineer hasnt moved from its last position where it was given a reclaim order; tCurPos='..repr(tCurPos)..'; oEngineer[reftEngineerLastPositionOfReclaimOrder]='..repr(oEngineer[reftEngineerLastPositionOfReclaimOrder] or {'nil'})) end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function RegularlyCheckForNearbyReclaim(oEngineer)
+    --Should be called via a fork thread
+    --(dont use function profiler as too few commands absent the waitseconds to be worth putting in lots of profiler calls)
+    if not(oEngineer[refbEngineerActiveReclaimChecker]) then
+        oEngineer[refbEngineerActiveReclaimChecker] = true
+        WaitSeconds(1)
+        while M27UnitInfo.IsUnitValid(oEngineer) do
+            if oEngineer[refiEngineerCurrentAction] == refActionReclaim then
+                UpdateActionForNearbyReclaim(oEngineer, 2.5) --Get any reclaim >= 5 in value
+                WaitSeconds(1)
+            else
+                oEngineer[refbEngineerActiveReclaimChecker] = false
+                break
+            end
+        end
+    end
+end
+
 function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iConditionNumber, sBuildingBPRef)
     --If oActionTargetObject is specified, then will assist this, otherwise will try and construct a new building
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -2017,9 +2127,15 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                 local bAreAssisting = false
                 if iActionToAssign == refActionReclaim then
                     tActionTargetLocation = M27Logic.ChooseReclaimTarget(oEngineer)
-                    if M27Utilities.IsTableEmpty(tActionTargetLocation) == true then tActionTargetLocation = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] end
-                    IssueAggressiveMove({ oEngineer }, tActionTargetLocation)
-                    --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
+                    if M27Utilities.IsTableEmpty(tActionTargetLocation) == true then
+                        --Get random position between 50 and 100 of base to attack-move to
+                        M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oEngineer), M27MapInfo.GetUnitSegmentGroup(oEngineer), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 100, 50)
+                        tActionTargetLocation = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                        IssueAggressiveMove({ oEngineer }, tActionTargetLocation)
+                    else
+                        IssueMove({ oEngineer }, tActionTargetLocation)
+                    end
+                    ForkThread(RegularlyCheckForNearbyReclaim, oEngineer)
                     UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, false, iConditionNumber)
                 else
                     if oActionTargetObject then
@@ -2502,8 +2618,8 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
             if bDebugMessages == true then LOG(sFunctionRef..': Dont have existing locations to choose from, so pick location based on action') end
             --Pick targets based on action
             if iActionRefToAssign == refActionReclaim then
-                --Get preferred reclaim position
-                tActionLocation = tStartPosition --Temporary, will overwrite when actually processing action (as we want engineer object to determine reclaim)
+                --Get preferred reclaim position - pick engineer closest to below location (will overwrite the actual target location later on when assigning reclaim action)
+                tActionLocation = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
             else
                 --First check if we are already building anything under this action (in which case want to assist it instead of building a new one)
                 if aiBrain[reftEngineerAssignmentsByActionRef] then
@@ -2748,6 +2864,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             if not(oEngineer.Dead) and oEngineer.GetFractionComplete and oEngineer:GetFractionComplete() >= 1 then
                 sEngineerID = oEngineer:GetUnitId()
                 if M27UnitInfo.GetUnitLifetimeCount(oEngineer) <= iInitialCountThreshold then bStillHaveEarlyEngis = true end
+                if M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 13 or M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 9 then bDebugMessages = true end
                 bEngineerIsBusy = ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 if bDebugMessages == true then
                     local sUniqueRef = GetEngineerUniqueCount(oEngineer)
@@ -2931,6 +3048,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         local iCurRadarCount, iCurT2RadarCount
         local iNearbyOmniCount
         local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
+
 
 
         local iCount = 0
@@ -3372,12 +3490,18 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     end
                 elseif iCurrentConditionToTry == 14 then --Get reclaim
                     bThresholdPreReclaimEngineerCondition = true
+
                     if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; iMassStoredRatio='..iMassStoredRatio..'; M27MapInfo.iMapTotalMass='..(M27MapInfo.iMapTotalMass or 'nil')..'; aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]='..(aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] or 'nil')) end
                     if iMassStoredRatio < 0.98 then
-                        iActionToAssign = refActionReclaim
-                        --M27MapInfo.UpdateReclaimMarkers() --Does periodically if been a while since last update --Moved this to overseer so dont end up with engis waiting for this to compelte
-                        iMaxEngisWanted = math.floor(M27MapInfo.iMapTotalMass / 250)
-                        if iMaxEngisWanted > 5 then iMaxEngisWanted = 5 end
+                        if M27MapInfo.iMapTotalMass > 250 or aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] > 0 then
+                            --Have some reclaim somewhere on map, so have at least 1 engineer assigned to reclaim even if no high priority locations
+                            iActionToAssign = refActionReclaim
+                            --M27MapInfo.UpdateReclaimMarkers() --Does periodically if been a while since last update --Moved this to overseer so dont end up with engis waiting for this to compelte
+                            iMaxEngisWanted = math.max(1, math.ceil((aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] or 0)/3))
+                            if iMaxEngisWanted > 5 then iMaxEngisWanted = 5 end
+                            iSearchRangeForNearestEngi = 10000
+                        end
                     end
                 elseif iCurrentConditionToTry == 15 then --Try to get nearest unclaimed mex (i.e. this will only run if are no mexes within defensive area or our side of map):
                     if iAllUnclaimedMexesInPathingGroup == nil then
@@ -3478,6 +3602,20 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                             end
+                        end
+                    end
+                elseif iCurrentConditionToTry == 19 then --More reclaim (lower priority locations)
+                    if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; iMassStoredRatio='..iMassStoredRatio..'; M27MapInfo.iMapTotalMass='..M27MapInfo.iMapTotalMass..'; aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]='..aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]) end
+                    if iMassStoredRatio < 0.98 then
+                        if M27MapInfo.iMapTotalMass > 250 or aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3] > 0 then
+                            --Have some reclaim somewhere on map, so have at least 1 engineer assigned to reclaim even if no high priority locations
+                            iActionToAssign = refActionReclaim
+                            --M27MapInfo.UpdateReclaimMarkers() --Does periodically if been a while since last update --Moved this to overseer so dont end up with engis waiting for this to compelte
+                            iMaxEngisWanted = math.max(1, math.ceil((aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3])/3))
+                            if iMaxEngisWanted > 20 then iMaxEngisWanted = 20 end
+                            iSearchRangeForNearestEngi = 10000
+                            if bDebugMessages == true then LOG(sFunctionRef..': Reclaim: iMaxEngisWanted='..iMaxEngisWanted) end
                         end
                     end
                 --SPARE ACTIONS BELOW

@@ -5,6 +5,8 @@ local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
+local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
+local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 
 
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
@@ -17,9 +19,18 @@ tResourceNearStart = {} --[iArmy][iResourceType (1=mex2=hydro)][iCount][tLocatio
 MassCount = 0 -- used as a way of checking if have the core markers needed
 HydroCount = 0
 tReclaimAreas = {} --Stores reclaim info for each segment: tReclaimAreas[iSegmentX][iSegmentZ][x]; if x=1 returns total mass in area; if x=2 then returns position of largest reclaim in the area, if x=3 returns how many platoons have been sent here since the game started
+refReclaimTotalMass = 1
+refReclaimPositionOfLargestReclaim = 2
+refReclaimTimeOfLastEngineerDeath = 4
+refReclaimTimeLastEnemySighted = 5
 --tLastReclaimRefreshByGroup = {} --time that last refreshed reclaim positions for [x] group
 iLastReclaimRefresh = 0 --stores time that last refreshed reclaim positions
-iMaxSegmentInterval = 80 --constant - no. of times to divide the map by segments for X (and separately for Z) so will end up with this value squared as the no. of segments
+refiLastRefreshOfReclaimAreasOfInterest = 'M27MapLastRefreshOfReclaim'
+refiTotalReclaimAreasOfInterestByPriority = 'M27MapReclaimAreasOfInterestCount' --[1] = total for priority 1, etc.
+reftReclaimAreasOfInterest = 'M27MapReclaimAreasOfInterest' --assigned to aiBrain, [1] = priority (1, 2, 3); [2] = {segmentx, segmentz}
+iReclaimSegmentSizeX = 0 --Updated separately
+iReclaimSegmentSizeZ = 0 --Updated separately
+iMaxSegmentInterval = 1 --Updated by map pathing logic; constant - no. of times to divide the map by segments for X (and separately for Z) so will end up with this value squared as the no. of segments
 --iSegmentSizeX = 12
 --iSegmentSizeZ = 12
 --Experience significant slowdown of a couple of seconds at 100 (10k segments), so dont recommend much higher than 60s
@@ -546,18 +557,31 @@ function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
     end
 end
 
+function GetReclaimLocationFromSegment(iReclaimSegmentX, iReclaimSegmentZ)
+    --e.g. segment (1,1) will be 0 to ReclaimSegmentSizeX and 0 to ReclaimSegmentSizeZ in size
+    --This will return the midpoint
+    local iX = (iReclaimSegmentX - 0.5) * iReclaimSegmentSizeX
+    local iZ = (iReclaimSegmentZ - 0.5) * iReclaimSegmentSizeZ
+    return {iX, GetSurfaceHeight(iX, iZ), iZ}
+end
+
+function GetReclaimSegmentsFromLocation(tLocation)
+    return math.ceil(tLocation[1] / iReclaimSegmentSizeX), math.ceil(tLocation[3] / iReclaimSegmentSizeZ)
+end
+
 function UpdateReclaimMarkers()
     --Divides map into segments, determines reclaim in each segment and stores this in tReclaimAreas along with the location of the highest reclaim in this segment
     --if oEngineer isn't nil then it will also determine if the segment is pathable
     --Updates the global variable tReclaimAreas{}
     --Config settings:
     --Note: iMaxSegmentInterval defined at the top as a global variable
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'UpdateReclaimMarkers'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
-    local iTimeBeforeFullRefresh = 60 --Will do a full refresh of reclaim every 1m
+    local iTimeBeforeFullRefresh = 10 --Will do a full refresh of reclaim every x seconds
+    local iMinValueOfIndividualReclaim = 4.5
 
 
     local bDoFullRefresh = false
@@ -566,8 +590,17 @@ function UpdateReclaimMarkers()
     local rPlayableArea = rMapPlayableArea
     local iMapSizeX = rPlayableArea[3] - rPlayableArea[1]
     local iMapSizeZ = rPlayableArea[4] - rPlayableArea[2]
-    local iSegmentSizeX = iMapSizeX / iMaxSegmentInterval
-    local iSegmentSizeZ = iMapSizeZ / iMaxSegmentInterval
+    if iReclaimSegmentSizeX == 0 then --Not yet determined reclaim sizes
+        local iMinReclaimSegmentSize = 8.5 --Engineer build range is 6; means that a square of about 4.2 will fit inside this circle; If have 2 separate engineers assigned to adjacent reclaim segments, and want their build range to cover the two areas, then would want a gap twice this, so 8.4; will therefore go with min size of 8
+        iReclaimSegmentSizeX = math.max(iMinReclaimSegmentSize, iMapSizeX / iMaxSegmentInterval)
+        iReclaimSegmentSizeZ = math.max(iMinReclaimSegmentSize, iMapSizeZ / iMaxSegmentInterval)
+    end
+
+    local iReclaimMaxSegmentX = math.ceil(iMapSizeX / iReclaimSegmentSizeX)
+    local iReclaimMaxSegmentZ = math.ceil(iMapSizeZ / iReclaimSegmentSizeZ)
+    local iCurCount = 0
+    local iWaitInterval = math.max(1, math.floor(1 / math.floor(iReclaimMaxSegmentX / (iTimeBeforeFullRefresh * 10))))
+
     local tReclaimables = {}
     local iTotalMassValue
 
@@ -589,20 +622,20 @@ function UpdateReclaimMarkers()
         iLastReclaimRefresh = GetGameTimeSeconds()
         tReclaimPos = {}
         iMapTotalMass = 0
-        for iCurX = 1, iMaxSegmentInterval do
-            for iCurZ = 1, iMaxSegmentInterval do
+        for iCurX = 1, iReclaimMaxSegmentX do
+            for iCurZ = 1, iReclaimMaxSegmentZ do
         --for iCurX = 1, math.floor(iMapSizeX / iSegmentSizeX) do
             --for iCurZ = 1, math.floor(iMapSizeZ / iSegmentSizeZ) do
                 if bDebugMessages == true then LOG('Cycling through each segment; iCurX='..iCurX..'; iCurZ='..iCurZ) end
 
                 iTotalMassValue = 0
-                tReclaimables = GetReclaimablesInRect(Rect((iCurX - 1) * iSegmentSizeX, (iCurZ - 1) * iSegmentSizeZ, iCurX * iSegmentSizeX, iCurZ * iSegmentSizeZ))
+                tReclaimables = GetReclaimablesInRect(Rect((iCurX - 1) * iReclaimSegmentSizeX, (iCurZ - 1) * iReclaimSegmentSizeZ, iCurX * iReclaimSegmentSizeX, iCurZ * iReclaimSegmentSizeZ))
                 iLargestCurReclaim = 0
                 if tReclaimables and table.getn( tReclaimables ) > 0 then
                     -- local iWreckCount = 0
                     --local bIsProp = nil  --only used for log/testing
                     if bDebugMessages == true then LOG('Have wrecks within the segment iCurXZ='..iCurX..'-'..iCurZ) end
-                    iTotalMassValue, tReclaimPos = GetReclaimablesMassValue(tReclaimables, true)
+                    iTotalMassValue, tReclaimPos = GetReclaimablesMassValue(tReclaimables, true, iMinValueOfIndividualReclaim)
 
                     --Record this table:
                     if tReclaimAreas[iCurX] == nil then
@@ -610,21 +643,176 @@ function UpdateReclaimMarkers()
                         if bDebugMessages == true then LOG('Setting table to nothing as is currently nil; iCurX='..iCurX) end
                     end
                     if tReclaimAreas[iCurX][iCurZ] == nil then tReclaimAreas[iCurX][iCurZ] = {} end
-                    tReclaimAreas[iCurX][iCurZ][1] = iTotalMassValue
-                    tReclaimAreas[iCurX][iCurZ][2] = {}
-                    tReclaimAreas[iCurX][iCurZ][2] = GetPositionFromPathingSegments(iCurX, iCurZ)
+                    tReclaimAreas[iCurX][iCurZ][refReclaimTotalMass] = iTotalMassValue
+                    tReclaimAreas[iCurX][iCurZ][refReclaimPositionOfLargestReclaim] = {}
+                    tReclaimAreas[iCurX][iCurZ][refReclaimPositionOfLargestReclaim] = GetPositionFromPathingSegments(iCurX, iCurZ)
                 end
                 iMapTotalMass = iMapTotalMass + iTotalMassValue
                 if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; iTotalMassValue='..iTotalMassValue) end
             end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            WaitTicks(1)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            iCurCount = iCurCount + 1
+            if iCurCount >= iWaitInterval then
+                iCurCount = 0
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                WaitTicks(1)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            end
         end
         if bDebugMessages == true then LOG('Finished updating reclaim areas') end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function UpdateReclaimAreasOfInterest(aiBrain)
+    --Sets out reclaim areas of interest to try and claim, e.g. with engineer
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local sFunctionRef = 'UpdateReclaimAreasOfInterest'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iRefreshTimeInSeconds = 5
+    if GetGameTimeSeconds() - (aiBrain[refiLastRefreshOfReclaimAreasOfInterest] or 0) >= iRefreshTimeInSeconds then
+        if bDebugMessages == true then LOG(sFunctionRef..': Are doing a detailed refresh of reclaim points of interest') end
+        local iMinSegmentReclaim = 40 --Ignore if less than this
+        local iCurPriority
+        local iStartPositionPathingGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local tCurMidpoint, sLocationRef
+        local tNearbyEnemies, bEngineerDiedOrSpottedEnemiesRecently, iCurDistToBase, iCurDistToEnemyBase
+        local tACUPosition = M27Utilities.GetACU(aiBrain):GetPosition()
+        local iNearestEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
+        local iDistanceFromStartToEnemy = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], PlayerStartPoints[iNearestEnemyStartNumber])
+        local iCurAirSegmentX, iCurAirSegmentZ, bUnassigned
+
+        aiBrain[reftReclaimAreasOfInterest] = {}
+        aiBrain[refiTotalReclaimAreasOfInterestByPriority] = {}
+        for iPriority = 1, 4 do
+            aiBrain[reftReclaimAreasOfInterest][iPriority] = {}
+            aiBrain[refiTotalReclaimAreasOfInterestByPriority][iPriority] = 0
+        end
+
+
+
+        --Refresh table with reclaim areas of interest
+        if bDebugMessages == true then LOG(sFunctionRef..': About to loop through every reclaim segment; iStartPositionPathingGroup='..iStartPositionPathingGroup) end
+        for iCurX, tSubtable in tReclaimAreas do
+            for iCurZ, tSubtable in tReclaimAreas[iCurX] do
+                --First decide whether we should even consider the location for reclaim
+                iCurPriority = nil
+                bEngineerDiedOrSpottedEnemiesRecently = false
+                --if bDebugMessages == true then LOG(sFunctionRef..': iCurX='..iCurX..'; iCurZ='..iCurZ..'; tReclaimAreas[iCurX][iCurZ][refReclaimTotalMass]='..tReclaimAreas[iCurX][iCurZ][refReclaimTotalMass]..'; iMinSegmentReclaim='..iMinSegmentReclaim) end
+                if tReclaimAreas[iCurX][iCurZ][refReclaimTotalMass] >= iMinSegmentReclaim then
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurX='..iCurX..'; iCurZ='..iCurZ..'; tReclaimAreas[iCurX][iCurZ][refReclaimTotalMass]='..tReclaimAreas[iCurX][iCurZ][refReclaimTotalMass]..'; iMinSegmentReclaim='..iMinSegmentReclaim) end
+                    --Can an amphibious unit path here
+                    tCurMidpoint = GetReclaimLocationFromSegment(iCurX, iCurZ)
+                    if bDebugMessages == true then LOG(sFunctionRef..': tCurMidpoint='..repr(tCurMidpoint)..'; SegmentGroup='..(GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tCurMidpoint) or 'nil')..'; iStartPositionPathingGroup='..(iStartPositionPathingGroup or 'nil')) end
+                    if iStartPositionPathingGroup == GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tCurMidpoint) then
+                        --Has an engineer already been assigned to reclaim here?
+                        sLocationRef = M27Utilities.ConvertLocationToReference(tCurMidpoint)
+                        if not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) or not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim]) or M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim]) == true then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have a valid assigned engineer to this location for reclaim; will now check not assigned to adjacent location unless high reclaim') end
+                            bUnassigned = true
+                            if tReclaimAreas[iCurX][iCurZ][refReclaimTotalMass] >= 250 then
+                                --do nothing as bUnassigned = true already
+                            else
+                                for iAdjX = iCurX - 1, iCurX + 1, 1 do
+                                    for iAdjZ = iCurZ - 1, iCurZ + 1, 1 do
+                                        sLocationRef = M27Utilities.ConvertLocationToReference(GetReclaimLocationFromSegment(iCurX + iAdjX, iCurZ + iAdjZ))
+                                        if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim]) == false then
+                                            bUnassigned = false
+                                            break
+                                        end
+                                    end
+                                    if bUnassigned then break end
+                                end
+                            end
+                            if bUnassigned then
+                                --Check no engineers died recently or had enemies spotted (priority 1-3)
+                                for iAdjX = iCurX - 1, iCurX + 1, 1 do
+                                    for iAdjZ = iCurZ - 1, iCurZ + 1, 1 do
+                                        if tReclaimAreas[iCurX + iAdjX] and tReclaimAreas[iCurX + iAdjX][iCurZ + iAdjZ] then
+                                            if tReclaimAreas[iCurX][iCurZ][refReclaimTimeOfLastEngineerDeath] and GetGameTimeSeconds() - tReclaimAreas[iCurX][iCurZ][refReclaimTimeOfLastEngineerDeath] < 300 then
+                                                bEngineerDiedOrSpottedEnemiesRecently = true
+                                                break
+                                            elseif tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySighted] or GetGameTimeSeconds() - tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySighted] < 120 then
+                                                bEngineerDiedOrSpottedEnemiesRecently = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                    if bEngineerDiedOrSpottedEnemiesRecently then break end
+                                end
+                                if not(bEngineerDiedOrSpottedEnemiesRecently) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': No enemies have died recently and no enemies have been spotted recently around target') end
+
+                                    --Check no nearby enemies
+                                    tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, tCurMidpoint, 90, 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies detected') end
+                                        --Check no t2 arti in range
+                                        if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, tCurMidpoint, 150, 'Enemy')) == true then
+
+
+                                            iCurDistToBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                            iCurDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[iNearestEnemyStartNumber])
+                                            if bDebugMessages == true then LOG(sFunctionRef..': No nearby T2 arti detected; iCurDistToBase='..iCurDistToBase..'; iCurDistToEnemyBase='..iCurDistToEnemyBase..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase='..iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase)..'; M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)..'; iDistanceFromStartToEnemy='..iDistanceFromStartToEnemy) end
+                                            --Within defence and front unit coverage?
+                                            if aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase] - 0.1 > iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Are more than 10% closer to base than furthest front unit') end
+                                                if (aiBrain[M27Overseer.refiPercentageOutstandingThreat] - 0.1) * iDistanceFromStartToEnemy  > M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false) then
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Are more than 10% closer to base than defence coverage') end
+                                                    --On our side of the map?
+                                                    if iCurDistToBase < iCurDistToEnemyBase then
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Are on our side of map') end
+                                                        --Priority 1 - have current visual intel of location or intel coverage
+                                                        iCurAirSegmentX, iCurAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tCurMidpoint)
+                                                        if GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][M27AirOverseer.refiLastScouted] <= 1 then
+                                                            iCurPriority = 1
+                                                        elseif M27Logic.GetIntelCoverageOfPosition(aiBrain, tCurMidpoint, 10) then iCurPriority = 1
+                                                        else
+                                                            iCurPriority = 2
+                                                        end
+                                                    else iCurPriority = 3
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': enemies have died recently and/or enemies have been spotted recently around target') end
+                                end
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': Engineers assigned to nearby segment and dont have at least 250 mass in current segment') end
+                            end
+                            if not(iCurPriority) then
+                                --Consider if still suitable for an ACU location
+                                if M27Utilities.GetDistanceBetweenPositions(tACUPosition, tCurMidpoint) <= 200 then
+                                    if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, tCurMidpoint, 150, 'Enemy')) == true then
+                                        tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, tCurMidpoint, 90, 'Enemy')
+                                        if M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemies, true, nil, nil, false, false) < 200 then
+                                            iCurPriority = 4
+                                        end
+                                    end
+                                end
+                            end
+
+                            if iCurPriority then
+                                table.insert(aiBrain[reftReclaimAreasOfInterest][iCurPriority], {iCurX, iCurZ})
+                                aiBrain[refiTotalReclaimAreasOfInterestByPriority][iCurPriority] = aiBrain[refiTotalReclaimAreasOfInterestByPriority][iCurPriority] + 1
+                            end
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': Already have a valid assigned engineer to this location for reclaim, table size='..table.getn(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim])) end
+                        end
+                    end
+                end
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished going through all segments.  aiBrain[refiTotalReclaimAreasOfInterestByPriority]='..repr(aiBrain[refiTotalReclaimAreasOfInterestByPriority])) end
+    else
+        if bDebugMessages == true then LOG(sFunctionRef..': Have recently refreshed reclaim points of interest so will use those values') end
+    end
+
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 --GetUnclaimedMexes - contained within EngineerOverseer
