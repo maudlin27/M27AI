@@ -7,6 +7,7 @@ local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
+local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
 refiNearestEnemyIndex = 'M27NearestEnemyIndex'
@@ -1339,33 +1340,22 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     --Threat method: based on mass value * multiplier; 1 if are direct fire, 0.2 if are indirect (0.75 for t1 arti), *2 if are a direct fire structure, *1.5 if are a shield or wall
     --iMassValueOfBlipsOverride - if not nil then will use this instead of coded value for blip threats
     --iSoloBlipMassOverride - similar to massvalue of blips override
+
+    --Note: bMustBeVisibleToIntelOrSight and onwards are all optional, with default values set in the below (within the code for performance reasons)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCombatThreatRating'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local iBlipThreat = 54 --assumes blip is t1 tank
-    local iSoloBlipThreat = 10 -- assumes a single unit as a blip is more likely a scout or engineer
-    local iHealthFactor --if unit has 40% health, then threat reduced by (1-40%)*iHealthFactor
-    local bOnlyGetIndirectFireThreat = bIndirectFireThreatOnly
-    if bOnlyGetIndirectFireThreat == nil then bOnlyGetIndirectFireThreat = false end
-    if bJustGetMassValue == nil then bJustGetMassValue = false end
 
-    if not(iSoloBlipMassOverride == nil) then iSoloBlipThreat = iSoloBlipMassOverride end
-    if not(iMassValueOfBlipsOverride==nil) then iBlipThreat = iMassValueOfBlipsOverride end
-    local iStructureBlipThreat = 0 --Assumes an unrevealed structure has no threat rating
+
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
     --IsTableEmpty(tTable, bNotEmptyIfSingleValueNotTable)
     if bDebugMessages == true then LOG(sFunctionRef..': About to check if table is empty') end
-    if M27Utilities.IsTableEmpty(tUnits, false) == true then
+    if M27Utilities.IsTableEmpty(tUnits, true) == true then
     --if tUnits == nil then
         if bDebugMessages == true then LOG(sFunctionRef..': Warning: tUnits is empty, returning 0') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return 0
     else
-        if table.getn(tUnits) == 0 then
-            --Have sent a single unit instead of a table of units - workaround:
-            tUnits = {tUnits}
-            if bDebugMessages == true then LOG(sFunctionRef..': tUnits is a table size 0, so moving it into a table incase its a single unit reference') end
-        end
         local iArmyIndex = aiBrain:GetArmyIndex()
         if bDebugMessages == true then LOG(sFunctionRef..': tUnits has units in it='..table.getn(tUnits)) end
         local oBlip
@@ -1377,6 +1367,8 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
         local iTotalUnits = table.getn(tUnits)
         local iHealthPercentage
         local bOurUnits = false
+        local iHealthFactor --if unit has 40% health, then threat reduced by (1-40%)*iHealthFactor
+
         for iUnit, oUnit in tUnits do
             iCurThreat = 0
             bCalcActualThreat = false
@@ -1400,11 +1392,11 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                         --Is it a structure:
                                         if EntityCategoryContains(categories.STRUCTURE, oUnit:GetBlueprint().BlueprintId) then
                                             if bDebugMessages == true then LOG('iUnit='..iUnit..'; IsSeenEver is false; have a structure so will be reduced threat') end
-                                            iCurThreat = iStructureBlipThreat
+                                            iCurThreat = 0
                                         else
                                             if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not') end
-                                            if iTotalUnits <= 1 then iCurThreat = iSoloBlipThreat
-                                            else iCurThreat = iBlipThreat end
+                                            if iTotalUnits <= 1 then iCurThreat = (iSoloBlipMassOverride or 10)
+                                            else iCurThreat = (iMassValueOfBlipsOverride or 54) end
                                         end
                                     end
                                 end
@@ -1424,7 +1416,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                 if bJustGetMassValue == true then iCurThreat = oUnit:GetBlueprint().Economy.BuildCostMass
                 else
                     iMassMod = 0
-                    if bOnlyGetIndirectFireThreat == false then
+                    if not(bIndirectFireThreatOnly) then
                         if EntityCategoryContains(categories.DIRECTFIRE, oUnit) then iMassMod = 1
                         elseif EntityCategoryContains(categories.SUBCOMMANDER, oUnit) then iMassMod = 1 --SACUs dont have directfire category for some reason (they have subcommander and overlaydirectfire)
                         elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.STRUCTURE * categories.TECH2, oUnit) then iMassMod = 0.1 --Gets doubled as its a structure
@@ -1487,7 +1479,6 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCombatThreatRating'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local iSoloBlipThreat = 10 -- assumes a single unit as a blip is more likely a scout or engineer
     local iStructureBlipThreat = 0 --Assumes an unrevealed structure has no threat rating
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
     if bIncludeAirTorpedo == nil then bIncludeAirTorpedo = bIncludeAirToGround end
@@ -2627,51 +2618,83 @@ function GetPositionToFollowTargets(tUnitsToFollow, oFollowingUnit, iFollowDista
     return tPossibleMovePosition
 end
 
-function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted)
+function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted, bOnlyGetRadarCoverage)
     --Look for the nearest intel coverage for tTargetPosition, or (if nil) then the visual range of the nearest unit to the position that is friendly
     --if iMinCoverageWanted isn't specified then will return the highest amount, otherwise returns true/false
+    --if bOnlyGetRadarCoverage is true then will only consider if we have a radar structure providing iMinCoverageWanted
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetIntelCoverageOfPosition'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local tCategoryList = {categories.SCOUT, M27UnitInfo.refCategoryRadar}
-    local iCurIntelRange, iCurDistanceToPosition, iCurIntelCoverage
-    local tCurUnits = {}
-    local iMaxIntelCoverage = 0
-    for _, iCategoryType in tCategoryList do
-        tCurUnits = aiBrain:GetListOfUnits(iCategoryType, false, true)
-        for iUnit, oUnit in tCurUnits do
-            iCurIntelRange = oUnit:GetBlueprint().Intel.RadarRadius
-            iCurDistanceToPosition = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPosition)
-            iCurIntelCoverage = iCurIntelRange - iCurDistanceToPosition
-            if iCurIntelCoverage > iMaxIntelCoverage then
 
-                --if iMinCoverageWanted == nil then
-                    iMaxIntelCoverage = iCurIntelCoverage
-                --else
-                if not(iMinCoverageWanted==nil) then
-                    if iCurIntelCoverage > iMinCoverageWanted then
-                        if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage) end
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        return true end
+    --Visual range - base on air segments and if they've been flagged as having had recent visual
+    local iAirSegmentAdjSize = math.ceil(iMinCoverageWanted / M27AirOverseer.iAirSegmentSize)
+    local iBaseAirSegmentX, iBaseAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tTargetPosition)
+    local bHaveRecentVisual = true
+    for iAdjX = -iAirSegmentAdjSize, iAirSegmentAdjSize do
+        for iAdjZ = -iAirSegmentAdjSize, iAirSegmentAdjSize do
+            if aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX] and aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX][iBaseAirSegmentZ + iAdjZ]
+                    and GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX][iBaseAirSegmentZ + iAdjZ][M27AirOverseer.refiLastScouted] > 1.1 then
+                --Dont have recent visual - check are either 0 adj, or are within iMinCoverageWanted
+                if iAdjX == 0 and iAdjZ == 0 then
+                    bHaveRecentVisual = false
+                    break
+                elseif M27Utilities.GetDistanceBetweenPositions(tTargetPosition, M27AirOverseer.GetAirPositionFromSegment(iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ)) <= iMinCoverageWanted then
+                    bHaveRecentVisual = false
+                    break
                 end
             end
         end
     end
-    if iMaxIntelCoverage <= 30 then
-        --Consider vision range of nearest friendly units
-        local iCurVisionRange
-        for iUnit, oUnit in aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, tTargetPosition, 30, 'Ally') do
-            iCurVisionRange = oUnit.Intel.VisionRadius
-            if iCurVisionRange and iCurVisionRange > iMaxIntelCoverage then
-                iCurIntelCoverage = iCurVisionRange - M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPosition)
+
+
+    if bHaveRecentVisual == false then
+        --Dont have recent visual, so see if have nearby radar or scout
+        local tCategoryList = {M27UnitInfo.refCategoryRadar, categories.SCOUT}
+        if bOnlyGetRadarCoverage then tCategoryList = {M27UnitInfo.refCategoryRadar} end
+        local tiSearchRange = {570, 70} --Omni radar is 600; spy plan is 96; want to be at least 30
+        local iCurIntelRange, iCurDistanceToPosition, iCurIntelCoverage
+        local tCurUnits = {}
+        local iMaxIntelCoverage = 0
+
+        for iCategoryTableRef, iCategoryType in tCategoryList do
+            tCurUnits = aiBrain:GetUnitsAroundPoint(iCategoryType, tTargetPosition, tiSearchRange[iCategoryTableRef], 'Ally')
+            --tCurUnits = aiBrain:GetListOfUnits(iCategoryType, false, true)
+            for iUnit, oUnit in tCurUnits do
+                iCurIntelRange = oUnit:GetBlueprint().Intel.RadarRadius
+                iCurDistanceToPosition = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPosition)
+                iCurIntelCoverage = iCurIntelRange - iCurDistanceToPosition
                 if iCurIntelCoverage > iMaxIntelCoverage then
-                    iMaxIntelCoverage = iCurIntelCoverage
-                    if not(iMinCoverageWanted==nil) and iCurIntelCoverage > iMinCoverageWanted then
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        return true end
+
+                    --if iMinCoverageWanted == nil then
+                        iMaxIntelCoverage = iCurIntelCoverage
+                    --else
+                    if not(iMinCoverageWanted==nil) then
+                        if iCurIntelCoverage > iMinCoverageWanted then
+                            if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage) end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return true end
+                    end
                 end
             end
         end
+        --Below removed from v15 for performance reasons and replaced with check to air segments above
+        --[[
+        if iMaxIntelCoverage <= 30 and not(bOnlyGetRadarCoverage) then
+            --Consider vision range of nearest friendly units
+            local iCurVisionRange
+            for iUnit, oUnit in aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, tTargetPosition, 30, 'Ally') do
+                iCurVisionRange = oUnit.Intel.VisionRadius
+                if iCurVisionRange and iCurVisionRange > iMaxIntelCoverage then
+                    iCurIntelCoverage = iCurVisionRange - M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPosition)
+                    if iCurIntelCoverage > iMaxIntelCoverage then
+                        iMaxIntelCoverage = iCurIntelCoverage
+                        if not(iMinCoverageWanted==nil) and iCurIntelCoverage > iMinCoverageWanted then
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return true end
+                    end
+                end
+            end
+        end--]]
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iMinCoverageWanted == nil then
@@ -2680,6 +2703,7 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
     else
         if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage) end
         return false end
+
 end
 
 function GetDirectFireWeaponPosition(oFiringUnit)

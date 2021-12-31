@@ -1972,7 +1972,10 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                         bDontConsiderFurtherOrders = true
                                                         oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
                                                     else
-                                                        local iIntelCoverage = M27Logic.GetIntelCoverageOfPosition(aiBrain, tPlatoonPosition, nil)
+                                                        local iIntelCoverage
+                                                        --If ACU in platoon, then check if it has a scout assigned that is close enough (for CPU performance reasons only want to call getintelcoverage if we dont)
+                                                        if oPlatoon[refbACUInPlatoon] and oPlatoon[refoFrontUnit] and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit][M27Overseer.refoUnitsScoutHelper]) then iIntelCoverage = oPlatoon[refoFrontUnit][M27Overseer.refoUnitsScoutHelper]:GetBlueprint().Intel.RadarRadius - M27Utilities.GetDistanceBetweenPositions(oPlatoon[refoFrontUnit][M27Overseer.refoUnitsScoutHelper]:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) end
+                                                        if not(iIntelCoverage) or iIntelCoverage < math.max(iEnemyMaxRange, 22) then iIntelCoverage = M27Logic.GetIntelCoverageOfPosition(aiBrain, tPlatoonPosition, math.max(iEnemyMaxRange, 22)) end
                                                         if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..': We outrange nearest enemy, checking our intel coverage, iIntelCoverage='..iIntelCoverage) end
                                                         if iIntelCoverage >= math.max(iEnemyMaxRange, 22) then --ACU has range of 22 (no gun) and vision of 26, so want to have intel coverage of at least this before consider other actions
                                                             local iDistanceInsideOurRange = iPlatoonMaxRange - iNearestEnemyDistance

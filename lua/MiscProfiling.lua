@@ -143,6 +143,7 @@ end
 
 
 function GetReclaimInRectVsCheckingTable()
+    --Summary conclusion - checking reclaim segments in a 3x3 grid takes about 10-15% of the time of getting reclaim in the area if there's some low level reclaim that we're ignoring like trees; so if just interested in amount of reclaim then it's more efficient.  If using as a check for whether should do GetReclaimablesInRect then its only more efficient if c.50% or less of the time on the map a 3x3 reclaim segment would return no reclaim
 
     local iCycleCount = 250000
     local tReclaim

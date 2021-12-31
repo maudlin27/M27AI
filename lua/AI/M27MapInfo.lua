@@ -780,9 +780,10 @@ function UpdateReclaimAreasOfInterest(aiBrain)
                                                         if bDebugMessages == true then LOG(sFunctionRef..': Are on our side of map') end
                                                         --Priority 1 - have current visual intel of location or intel coverage
                                                         iCurAirSegmentX, iCurAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tCurMidpoint)
-                                                        if GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][M27AirOverseer.refiLastScouted] <= 1 then
+                                                        if GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][M27AirOverseer.refiLastScouted] <= 1.1 then
                                                             iCurPriority = 1
-                                                        elseif M27Logic.GetIntelCoverageOfPosition(aiBrain, tCurMidpoint, 10) then iCurPriority = 1
+                                                            --Check if we have radar coverage (ignore visual sight and non-radar structure intel units for performance reasons)
+                                                        elseif M27Logic.GetIntelCoverageOfPosition(aiBrain, tCurMidpoint, 10, true) then iCurPriority = 1
                                                         else
                                                             iCurPriority = 2
                                                         end

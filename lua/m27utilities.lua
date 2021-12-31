@@ -353,7 +353,11 @@ function GetRoughDistanceBetweenPositions(tPosition1, tPosition2)
     return math.abs(tPosition1[1] - tPosition2[1]) + math.abs(tPosition1[3] - tPosition2[3])
 end
 
-function GetDistanceBetweenPositions(Position1, Position2, iBuildingSize)
+function GetDistanceBetweenPositions(Position1, Position2)
+    return VDist2(Position1[1], Position1[3], Position2[1], Position2[3])
+end
+
+function GetDistanceBetweenBuildingPositions(Position1, Position2, iBuildingSize)
     -- Returns distance ignoring the y value and taking just x and z values
     --if iBuildingSize is set to a value, then will instead reduce the distance to determine the distance between 1 position and the nearest part of the other position with iBuildingSize
     --iBuildingSize should be the building size from its build location, in 'wall units' - so a land fac is an 8x8 size, and the build position will be the centre of it, making the building size 4, a T1 PGen a size of 1, etc.

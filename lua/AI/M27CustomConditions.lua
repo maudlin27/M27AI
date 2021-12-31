@@ -109,7 +109,9 @@ function SafeToGetACUUpgrade(aiBrain)
             bIsSafe = true
         else
             if bDebugMessages == true then LOG(sFunctionRef..': About to check if have intel coverage of iSearchRange='..iSearchRange..' for ACU position repr='..repr(tACUPos)) end
-            if M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iSearchRange) == true then
+            --Does ACU have an assigned scout that is nearby, or does it have sufficient intel coverage
+            if M27UnitInfo.IsUnitValid(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]) and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]:GetPosition(), tACUPos) <= M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]:GetBlueprint().Intel.RadarRadius - iSearchRange or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iSearchRange) == true then
+
                 --Are there enemies near the ACU with a threat value?
                 local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND, tACUPos, iSearchRange, 'Enemy')
                 local iThreat = M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemies, true, nil, 50)
@@ -191,7 +193,10 @@ function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tACUPos = M27Utilities.GetACU(aiBrain):GetPosition()
     local bNoEnemyUnits = true
-    if M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iMinSearchRange) == false then bNoEnemyUnits = false
+    local bHaveIntelCoverage = false
+    --Do we have a nearby scout, or if not do we have intel coverage of the position?
+    if M27UnitInfo.IsUnitValid(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]) and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]:GetPosition(), tACUPos) <= M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]:GetBlueprint().Intel.RadarRadius - iMinSearchRange or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iMinSearchRange) == true then bHaveIntelCoverage = true end
+    if bHaveIntelCoverage == false then bNoEnemyUnits = false
     else
         local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND, tACUPos, iMaxSearchRange, 'Enemy')
         bNoEnemyUnits = M27Utilities.IsTableEmpty(tNearbyEnemies)

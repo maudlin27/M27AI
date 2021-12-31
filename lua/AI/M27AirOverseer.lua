@@ -9,7 +9,7 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 
 --General air scouting values
-local iAirSegmentSize--set in initialisation
+iAirSegmentSize = 1 --Updated/set in initialisation
 local iSegmentVisualThresholdBoxSize1 --set in initialisation, e.g. v11 this is AirSegmentSize*2
 local iSegmentVisualThresholdBoxSize2 --set in initialisation, eg v11 this is aiisegmentsixe * 3
 

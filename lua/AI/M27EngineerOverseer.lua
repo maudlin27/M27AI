@@ -1597,7 +1597,7 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                     iPriority = iPriority + 1
 
                     if bDebugMessages == true then LOG(sFunctionRef..': Have valid build location, iPriority pre considering build distance='..iPriority..'; CurPosition[1]='..CurPosition[1]..'-'..CurPosition[2]..'-'..CurPosition[3]) end
-                    if bIgnoreOutsideBuildArea == true or bReturnOnlyBestMatch == true then iDistanceBetween = M27Utilities.GetDistanceBetweenPositions(pBuilderPos, CurPosition, iNewBuildingRadius) end
+                    if bIgnoreOutsideBuildArea == true or bReturnOnlyBestMatch == true then iDistanceBetween = M27Utilities.GetDistanceBetweenBuildingPositions(pBuilderPos, CurPosition, iNewBuildingRadius) end
                     --if bIgnoreOutsideBuildArea == true or bReturnOnlyBestMatch == true then iDistanceBetween = GetDistanceBetweenPositions(pBuilderPos, PosTarget) end
                     if bReturnOnlyBestMatch == true then
                         --Check if within build area:
@@ -2173,7 +2173,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'AssignActionToEngineer'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
 
 
     if oEngineer then
@@ -2401,7 +2401,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
     else
         M27Utilities.ErrorHandler('oEngineer is nil')
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerEnd)
 end
 
 function FilterLocationsBasedOnDistanceToEnemy(aiBrain, tLocationsToFilter, iMaxPercentageOfWayTowardsEnemy, bSortTable)
