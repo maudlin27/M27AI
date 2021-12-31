@@ -235,7 +235,6 @@ function GetPlatoonUnitsOrUnitCount(oPlatoon, sFriendlyUnitTableVariableWanted, 
     --if bOnlyGetIfUnitAvailable is true then will check if unit is microing on special task and exclude it
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPlatoonUnitsOrUnitCount'
-    if sFriendlyUnitTableVariableWanted == 'reftReclaimers' then bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tBaseVariable = oPlatoon[sFriendlyUnitTableVariableWanted]
     local tNewVariable = {}
@@ -3182,6 +3181,7 @@ end
 function DetermineActionForNearbyReclaim(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineActionForNearbyReclaim'
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oPlatoon[refiReclaimers]='..oPlatoon[refiReclaimers]) end
@@ -3219,9 +3219,16 @@ function DetermineActionForNearbyReclaim(oPlatoon)
                         --Are we in a segment with reclaim or near a segment with reclaim?
                         --IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal, iMinIndividual)
                         if M27Conditions.IsReclaimNearby(GetPlatoonFrontPosition(oPlatoon), 1, 15, 5) then
-                            oPlatoon[refiCurrentAction] = refActionReclaimAllNearby
-                            oPlatoon[refoNearbyReclaimTarget] = nil
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have nearby reclaim, so will try to get') end
+                            --check we have reclaim in range of the ACU itself
+                            local iMaxRange = oFirstReclaimer:GetBlueprint().Economy.MaxBuildDistance + 0.5
+                            local oNearestReclaim = M27MapInfo.GetNearestReclaim(GetPlatoonFrontPosition(oPlatoon), iMaxRange, 5)
+                            if oNearestReclaim and oNearestReclaim.CachePosition and M27Utilities.GetDistanceBetweenPositions(oNearestReclaim.CachePosition, GetPlatoonFrontPosition(oPlatoon)) <= iMaxRange then
+                                oPlatoon[refiCurrentAction] = refActionReclaimAllNearby
+                                oPlatoon[refoNearbyReclaimTarget] = nil
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have nearby reclaim, so will try to get') end
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close but not in build range') end
+                            end
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': No nearby reclaim') end
                         end
@@ -3573,6 +3580,7 @@ function DeterminePlatoonAction(oPlatoon)
         local aiBrain = oPlatoon[refoBrain]
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
             local sPlatoonName = oPlatoon:GetPlan()
+
             --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27DefenderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end

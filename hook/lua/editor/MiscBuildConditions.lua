@@ -145,9 +145,10 @@ function M27IsUnclaimedMexNearACU(aiBrain, bool)
     if aiBrain[M27Overseer.refbUnclaimedMexNearACU] == true then return bool else return not(bool) end
 end
 
-function M27IsReclaimNearACU(aiBrain, bool)
+--Removed below and related flag in v15 for performance
+--[[function M27IsReclaimNearACU(aiBrain, bool)
     if aiBrain[M27Overseer.refbReclaimNearACU] == true then return bool else return not(bool) end
-end
+end--]]
 
 function M27SafeToGetACUUpgrade(aiBrain, bool)
 

@@ -61,7 +61,7 @@ function OnUnitDeath(oUnit)
                 local sUnitBP = oUnit:GetUnitId()
                 if EntityCategoryContains(refCategoryEngineer, sUnitBP) then
                     --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Pre clear action')
-                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oUnit, true)
+                    M27EngineerOverseer.OnEngineerDeath(aiBrain, oUnit)
                     --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Post clear action')
                 elseif EntityCategoryContains(refCategoryAirScout, sUnitBP) then
                     M27AirOverseer.OnScoutDeath(aiBrain, oUnit)

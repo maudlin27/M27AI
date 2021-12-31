@@ -18,12 +18,14 @@ PlayerStartPoints = {} -- Stores position values i.e. a table with 3 values, x, 
 tResourceNearStart = {} --[iArmy][iResourceType (1=mex2=hydro)][iCount][tLocation] Stores location of mass extractors and hydrocarbons that are near to start locations; 1st value is the army number, 2nd value the resource type, 3rd the mex number, 4th value the position array (which itself is made up of 3 values)
 MassCount = 0 -- used as a way of checking if have the core markers needed
 HydroCount = 0
+iHighestReclaimInASegment = 0 --WARNING - reference the higher of this and previoushighestreclaiminasegment, since this gets reset to 0 each time
+iPreviousHighestReclaimInASegment = 0
 tReclaimAreas = {} --Stores reclaim info for each segment: tReclaimAreas[iSegmentX][iSegmentZ][x]; if x=1 returns total mass in area; if x=2 then returns position of largest reclaim in the area, if x=3 returns how many platoons have been sent here since the game started
 refReclaimTotalMass = 1
 refReclaimPositionOfLargestReclaim = 2
 refReclaimHighestIndividualReclaim = 3
-refReclaimTimeOfLastEngineerDeath = 4
-refReclaimTimeLastEnemySighted = 5
+reftReclaimTimeOfLastEngineerDeathByArmyIndex = 4 --Table: [a] where a is the army index, and it returns the time the last engineer died
+refReclaimTimeLastEnemySightedByArmyIndex = 5
 --tLastReclaimRefreshByGroup = {} --time that last refreshed reclaim positions for [x] group
 iLastReclaimRefresh = 0 --stores time that last refreshed reclaim positions
 refiLastRefreshOfReclaimAreasOfInterest = 'M27MapLastRefreshOfReclaim'
@@ -629,6 +631,8 @@ function UpdateReclaimMarkers()
         iLastReclaimRefresh = GetGameTimeSeconds()
         tReclaimPos = {}
         iMapTotalMass = 0
+        iPreviousHighestReclaimInASegment = iHighestReclaimInASegment
+        iHighestReclaimInASegment = 0
         for iCurX = 1, iReclaimMaxSegmentX do
             for iCurZ = 1, iReclaimMaxSegmentZ do
         --for iCurX = 1, math.floor(iMapSizeX / iSegmentSizeX) do
@@ -654,6 +658,7 @@ function UpdateReclaimMarkers()
                     tReclaimAreas[iCurX][iCurZ][refReclaimPositionOfLargestReclaim] = {}
                     tReclaimAreas[iCurX][iCurZ][refReclaimPositionOfLargestReclaim] = GetPositionFromPathingSegments(iCurX, iCurZ)
                     tReclaimAreas[iCurX][iCurZ][refReclaimHighestIndividualReclaim] = iLargestCurReclaim
+                    iHighestReclaimInASegment = math.max(iHighestReclaimInASegment, iTotalMassValue)
                 end
                 iMapTotalMass = iMapTotalMass + iTotalMassValue
                 if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; iTotalMassValue='..iTotalMassValue..'; Location of segment='..repr(GetReclaimLocationFromSegment(iCurX, iCurZ))) end
@@ -691,6 +696,7 @@ function UpdateReclaimAreasOfInterest(aiBrain)
         local iNearestEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
         local iDistanceFromStartToEnemy = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], PlayerStartPoints[iNearestEnemyStartNumber])
         local iCurAirSegmentX, iCurAirSegmentZ, bUnassigned
+        local iArmyIndex = aiBrain:GetArmyIndex()
 
         aiBrain[reftReclaimAreasOfInterest] = {}
         aiBrain[refiTotalReclaimAreasOfInterestByPriority] = {}
@@ -739,10 +745,10 @@ function UpdateReclaimAreasOfInterest(aiBrain)
                                 for iAdjX = iCurX - 1, iCurX + 1, 1 do
                                     for iAdjZ = iCurZ - 1, iCurZ + 1, 1 do
                                         if tReclaimAreas[iCurX + iAdjX] and tReclaimAreas[iCurX + iAdjX][iCurZ + iAdjZ] then
-                                            if tReclaimAreas[iCurX][iCurZ][refReclaimTimeOfLastEngineerDeath] and GetGameTimeSeconds() - tReclaimAreas[iCurX][iCurZ][refReclaimTimeOfLastEngineerDeath] < 300 then
+                                            if tReclaimAreas[iCurX][iCurZ][reftReclaimTimeOfLastEngineerDeathByArmyIndex] and tReclaimAreas[iCurX][iCurZ][reftReclaimTimeOfLastEngineerDeathByArmyIndex][iArmyIndex] and GetGameTimeSeconds() - tReclaimAreas[iCurX][iCurZ][reftReclaimTimeOfLastEngineerDeathByArmyIndex][iArmyIndex] < 300 then
                                                 bEngineerDiedOrSpottedEnemiesRecently = true
                                                 break
-                                            elseif tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySighted] and GetGameTimeSeconds() - tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySighted] < 120 then
+                                            elseif tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySightedByArmyIndex] and tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySightedByArmyIndex][iArmyIndex] and GetGameTimeSeconds() - tReclaimAreas[iCurX][iCurZ][refReclaimTimeLastEnemySightedByArmyIndex][iArmyIndex] < 120 then
                                                 bEngineerDiedOrSpottedEnemiesRecently = true
                                                 break
                                             end

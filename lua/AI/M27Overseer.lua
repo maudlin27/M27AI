@@ -82,7 +82,6 @@ refbNeedScoutPlatoons = 'M27NeedScoutPlatoons'
 refbNeedMAABuilt = 'M27NeedMAABuilt'
 refbEmergencyMAANeeded = 'M27OverseerNeedEmergencyMAA'
 refbUnclaimedMexNearACU = 'M27UnclaimedMexNearACU'
-refbReclaimNearACU = 'M27M27IsReclaimNearACU'
 refoReclaimNearACU = 'M27ReclaimObjectNearACU'
 refiScoutShortfallInitialRaider = 'M27ScoutShortfallRaider'
 refiScoutShortfallACU = 'M27ScoutShortfallRaider'
@@ -3004,17 +3003,8 @@ function ACUManager(aiBrain)
                 end
             end
             aiBrain[refbUnclaimedMexNearACU] = bNearbyUnclaimedMex
-
-            --Check for nearby reclaim
-            --GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
-            local oReclaim = M27MapInfo.GetNearestReclaim(tACUPos, iDistanceToLookForReclaim, iMinReclaimValue)
-            if not(oReclaim == nil) then
-                aiBrain[refbReclaimNearACU] = true
-                aiBrain[refoReclaimNearACU] = oReclaim
-            end
         else
-            --Set flags to false as will need refreshing before know if there's still nearby mex/reclaim
-            aiBrain[refbReclaimNearACU] = false
+            --Set flags to false as will need refreshing before know if there's still nearby mex
             aiBrain[refbUnclaimedMexNearACU] = false
         end
 
@@ -4042,7 +4032,6 @@ function OverseerManager(aiBrain)
     local iSlowerCycleThreshold = 10
     local iSlowerCycleCount = 0
 
-    --ForkThread(M27MiscProfiling.ListCategoriesUsedByCount)
     --ForkThread(TempEnemyACUDirection, aiBrain)
     if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
     DetermineInitialBuildOrder(aiBrain)
@@ -4052,7 +4041,6 @@ function OverseerManager(aiBrain)
 
     while(not(aiBrain:IsDefeated())) do
         --ForkThread(TestNewMovementCommands, aiBrain)
-        --M27MiscProfiling.OptimisationComparisonDistanceToStart(aiBrain)
 
         if bDebugMessages == true then
             LOG(sFunctionRef..': Start of cycle')
@@ -4137,6 +4125,7 @@ function OverseerManager(aiBrain)
             LOG(sFunctionRef..': End of overseer cycle code (about to start new cycle) ACU platoon=')
             DebugPrintACUPlatoon(aiBrain)
         end
+
         --iTempProfiling = M27Utilities.ProfilerTimeSinceLastCall('End of overseer', iTempProfiling)
 
         M27Utilities.ProfilerOutput()
