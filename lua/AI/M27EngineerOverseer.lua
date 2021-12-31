@@ -3673,7 +3673,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             --Have some reclaim somewhere on map, so have at least 1 engineer assigned to reclaim even if no high priority locations
                             iActionToAssign = refActionReclaim
                             --M27MapInfo.UpdateReclaimMarkers() --Does periodically if been a while since last update --Moved this to overseer so dont end up with engis waiting for this to compelte
-                            iMaxEngisWanted = math.max(1, math.ceil((aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3])/3))
+                            iMaxEngisWanted = math.max(1, math.ceil(((aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] or 0) + (aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] or 0) + (aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3] or 0))/3))
                             if iMaxEngisWanted > 20 then iMaxEngisWanted = 20 end
                             iSearchRangeForNearestEngi = 10000
                             if bDebugMessages == true then LOG(sFunctionRef..': Reclaim: iMaxEngisWanted='..iMaxEngisWanted) end

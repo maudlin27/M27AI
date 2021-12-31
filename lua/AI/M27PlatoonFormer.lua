@@ -550,12 +550,12 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
             if M27Utilities.IsTableEmpty(tEngi) == false then AddIdleUnitsToPlatoon(aiBrain, tEngi, aiBrain[M27PlatoonTemplates.refoAllEngineers]) end
             if M27Utilities.IsTableEmpty(tCombat) == false then
                 AddIdleUnitsToPlatoon(aiBrain, tCombat, aiBrain[M27PlatoonTemplates.refoIdleCombat])
-                AllocatNewUnitsToPlatoonNotFromFactory(tCombat)
+                AllocateNewUnitsToPlatoonNotFromFactory(tCombat)
             end
             if M27Utilities.IsTableEmpty(tIndirect) == false then AddIdleUnitsToPlatoon(aiBrain, tIndirect, aiBrain[M27PlatoonTemplates.refoIdleIndirect]) end
             if M27Utilities.IsTableEmpty(tStructures) == false then AddIdleUnitsToPlatoon(aiBrain, tStructures, aiBrain[M27PlatoonTemplates.refoAllStructures]) end
             if M27Utilities.IsTableEmpty(tAir) == false then AddIdleUnitsToPlatoon(aiBrain, tAir, aiBrain[M27PlatoonTemplates.refoIdleAir]) end
-            if M27Utilities.IsTableEmpty(tMobileShield) == false then AllocatNewUnitsToPlatoonNotFromFactory(tMobileShield) end
+            if M27Utilities.IsTableEmpty(tMobileShield) == false then AllocateNewUnitsToPlatoonNotFromFactory(tMobileShield) end
             if M27Utilities.IsTableEmpty(tOther) == false then AddIdleUnitsToPlatoon(aiBrain, tOther, aiBrain[M27PlatoonTemplates.refoIdleOther]) end
         end
     end
@@ -1053,7 +1053,8 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                 --Give the new unit a move command to try and make sure its away from the factory
                 --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
                 if tStartPosition then
-                    local tRallyPoint = M27Utilities.MoveTowardsTarget(tStartPosition, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], 10, 0)
+                    local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, tStartPosition)
+                    --local tRallyPoint = M27Utilities.MoveTowardsTarget(tStartPosition, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], 10, 0)
                     if EntityCategoryContains(refCategoryLandCombat, sUnitID) then
                         IssueAggressiveMove(tNewUnits, tRallyPoint)
                     elseif not(EntityCategoryContains(M27UnitInfo.refCategoryEngineer, sUnitID)) then IssueMove(tNewUnits, tRallyPoint) end
@@ -1169,7 +1170,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function AllocatNewUnitsToPlatoonNotFromFactory(tNewUnits)
+function AllocateNewUnitsToPlatoonNotFromFactory(tNewUnits)
     ForkThread(AllocateNewUnitToPlatoonBase, tNewUnits, true)
 end
 
@@ -1186,7 +1187,7 @@ function AssignIdlePlatoonUnitsToPlatoons(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tIdleCombat = aiBrain[M27PlatoonTemplates.refoIdleCombat]:GetPlatoonUnits()
     if M27Utilities.IsTableEmpty(tIdleCombat) == false then
-        AllocatNewUnitsToPlatoonNotFromFactory(tIdleCombat)
+        AllocateNewUnitsToPlatoonNotFromFactory(tIdleCombat)
     end
     local oArmyPool = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
     local tIdleArmyPool = oArmyPool:GetPlatoonUnits()

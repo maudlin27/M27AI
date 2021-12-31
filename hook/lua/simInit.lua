@@ -21,7 +21,7 @@ function OnCreateArmyBrain(index, brain, name, nickname)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OnCreateArmyBrain'
     if bDebugMessages == true then LOG(sFunctionRef..': name='..name..'; nickname='..nickname..'; index='..index) end
-    M27Overseer.AllAIBrainsBackup[index] = brain
+    M27Overseer.tAllAIBrainsByArmyIndex[index] = brain
     --M27Overseer.AnotherAIBrainsBackup[index] = brain
     --if bDebugMessages == true then LOG(sFunctionRef..': Size of AnotherAIBrainsBackup='..table.getn(M27Overseer.AnotherAIBrainsBackup)) end
     M27OnCreateArmyBrain(index, brain, name, nickname)

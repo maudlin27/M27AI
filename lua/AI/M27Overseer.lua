@@ -23,7 +23,7 @@ refbACUOnInitialBuildOrder = 'M27ACUOnInitialBuildOrder' --local variable for AC
 local iLandThreatSearchRange = 1000
 refbACUHelpWanted = 'M27ACUHelpWanted' --flags if we want teh ACU to stay in army pool platoon so its available for defence
 refoStartingACU = 'M27PlayerStartingACU' --NOTE: Use M27Utilities.GetACU(aiBrain) instead of getting this directly (to help with crash control)
-AllAIBrainsBackup = {} --Stores table of all aiBrains, used as sometimes are getting errors when trying to use ArmyBrains
+tAllAIBrainsByArmyIndex = {} --Stores table of all aiBrains, used as sometimes are getting errors when trying to use ArmyBrains
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = {}
 iACUDeathCount = 0
@@ -1649,21 +1649,22 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddNearbyUnitsToThreatGroup'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local iArmyIndex = aiBrain:GetArmyIndex()
-
-    local bNewUnitIsOnRightTerrain
-    local bIsOnWater
-    local tCurPosition
-
-    if bMustBeOnLand == nil then
-        bMustBeOnLand = true
-        if bMustBeOnWater == nil then bMustBeOnLand = false end
-    end
-    if bMustBeOnWater == nil then bMustBeOnWater = false end
-
     --Only call this if haven't already called this on a unit:
     if oEnemyUnit[iArmyIndex] == nil then oEnemyUnit[iArmyIndex] = {} end
     if oEnemyUnit[iArmyIndex][refbUnitAlreadyConsidered] == nil then
+
+        local bNewUnitIsOnRightTerrain
+        local bIsOnWater
+        local tCurPosition
+
+        if bMustBeOnLand == nil then
+            bMustBeOnLand = true
+            if bMustBeOnWater == nil then bMustBeOnLand = false end
+        end
+        if bMustBeOnWater == nil then bMustBeOnWater = false end
+
         --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
         local iCurThreat
         if bMustBeOnWater == true then
@@ -1715,8 +1716,8 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
             if not(sOldRef == nil) then aiBrain[reftUnitGroupPreviousReferences][sOldRef] = sThreatGroup end
         end
 
-        --look for nearby units:
-        if iRadius and iRadius > 0 then
+        --look for nearby units: v15 - removed this part of the logic to see if improves CPU performance
+        --[[if iRadius and iRadius > 0 then
             tCurPosition = oEnemyUnit:GetPosition()
             local tNearbyUnits = aiBrain:GetUnitsAroundPoint(iCategory, tCurPosition, iRadius, 'Enemy')
             for iUnit, oUnit in tNearbyUnits do
@@ -1730,7 +1731,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
 
                 if bNewUnitIsOnRightTerrain and M27Utilities.CanSeeUnit(aiBrain, oUnit, true) == true then AddNearbyUnitsToThreatGroup(aiBrain, oUnit, sThreatGroup, iRadius, iCategory, bMustBeOnLand, bMustBeOnWater) end
             end
-        end
+        end --]]
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -1966,14 +1967,18 @@ function ThreatAssessAndRespond(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Key config variables:
-    local iLandThreatGroupDistance = 20 --Units this close to each other get included in the same threat group
-    local iNavyThreatGroupDistance = 30
+    --v14 and earlier values:
+    --local iLandThreatGroupDistance = 20 --Units this close to each other get included in the same threat group
+    --local iNavyThreatGroupDistance = 30
+    --v15 values since moving to a simpler (less accurate) threat detection approach
+    local iLandThreatGroupDistance = 50
+    local iNavyThreatGroupDistance = 80
     local iThreatGroupDistance
     if aiBrain[refiEnemyHighestTechLevel] > 1 then iNavyThreatGroupDistance = 60 end
     local iACUDistanceToConsider = 30 --If enemy within this distance of ACU, and within iACUEnemyDistanceFromBase distance of our base, ACU will consider helping (subject to also helping in emergency situation)
     local iACUEnemyDistanceFromBase = 80
     local iEmergencyExcessEnemyThreatNearBase = 200 --If >this much threat near our base ACU will consider helping from a much further distance away
-    local iThreatMaxFactor = 1.35 --i.e. will send up to iThreatMaxFactor * enemy threat to deal with the platoon
+    local iThreatMaxFactor = 1.5 --i.e. will send up to iThreatMaxFactor * enemy threat to deal with the platoon --v14 was 1.35; v15 changed to 1.5 given change to how threat groups work
     local iNavalThreatMaxFactor = 1.2
     local iThresholdToRemoveSpareUnitsPercent = 1.35 --When cycling through platoons, will reduce the threat wanted by the closest platoon threat; if then come to a platoon that has more threat than remaining balance, spare units get removed.  This % means this only happens if that platoons threat exceeds the remaining threat wanted by this percent
     local iThresholdToRemoveSpareUnitsAbsolute = 120 --Wont remove spare units if only exceed threat wanted by this amount
@@ -3724,16 +3729,18 @@ function RecordAllEnemies(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iOurIndex = aiBrain:GetArmyIndex()
     local iEnemyCount = 0
+    local iArmyIndex
     if M27Utilities.IsTableEmpty(ArmyBrains) == false then
         for iCurBrain, oBrain in ArmyBrains do
-            AllAIBrainsBackup[iCurBrain] = oBrain
+            iArmyIndex = oBrain:GetArmyIndex()
+            tAllAIBrainsByArmyIndex[iArmyIndex] = oBrain
             if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
                 iEnemyCount = iEnemyCount + 1
                 toEnemyBrains[iEnemyCount] = oBrain
             end
         end
     else
-        for iCurBrain, oBrain in AllAIBrainsBackup do
+        for iCurBrain, oBrain in tAllAIBrainsByArmyIndex do
             if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
                 iEnemyCount = iEnemyCount + 1
                 toEnemyBrains[iEnemyCount] = oBrain

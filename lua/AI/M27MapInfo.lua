@@ -22,10 +22,11 @@ iHighestReclaimInASegment = 0 --WARNING - reference the higher of this and previ
 iPreviousHighestReclaimInASegment = 0
 tReclaimAreas = {} --Stores reclaim info for each segment: tReclaimAreas[iSegmentX][iSegmentZ][x]; if x=1 returns total mass in area; if x=2 then returns position of largest reclaim in the area, if x=3 returns how many platoons have been sent here since the game started
 refReclaimTotalMass = 1
-refReclaimPositionOfLargestReclaim = 2
+refReclaimSegmentMidpoint = 2
 refReclaimHighestIndividualReclaim = 3
 reftReclaimTimeOfLastEngineerDeathByArmyIndex = 4 --Table: [a] where a is the army index, and it returns the time the last engineer died
 refReclaimTimeLastEnemySightedByArmyIndex = 5
+refsSegmentMidpointLocationRef = 6
 --tLastReclaimRefreshByGroup = {} --time that last refreshed reclaim positions for [x] group
 iLastReclaimRefresh = 0 --stores time that last refreshed reclaim positions
 refiLastRefreshOfReclaimAreasOfInterest = 'M27MapLastRefreshOfReclaim'
@@ -586,47 +587,32 @@ function UpdateReclaimMarkers()
     --Note: iMaxSegmentInterval defined at the top as a global variable
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'UpdateReclaimMarkers'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
     local iTimeBeforeFullRefresh = 10 --Will do a full refresh of reclaim every x seconds
-    local iMinValueOfIndividualReclaim = 2.5
-
-
-    local bDoFullRefresh = false
-    local tReclaimPos = {}
-    local iLargestCurReclaim
-    local rPlayableArea = rMapPlayableArea
-    local iMapSizeX = rPlayableArea[3] - rPlayableArea[1]
-    local iMapSizeZ = rPlayableArea[4] - rPlayableArea[2]
-    if iReclaimSegmentSizeX == 0 then --Not yet determined reclaim sizes
-        local iMinReclaimSegmentSize = 8.5 --Engineer build range is 6; means that a square of about 4.2 will fit inside this circle; If have 2 separate engineers assigned to adjacent reclaim segments, and want their build range to cover the two areas, then would want a gap twice this, so 8.4; will therefore go with min size of 8
-        iReclaimSegmentSizeX = math.max(iMinReclaimSegmentSize, iMapSizeX / iMaxSegmentInterval)
-        iReclaimSegmentSizeZ = math.max(iMinReclaimSegmentSize, iMapSizeZ / iMaxSegmentInterval)
-    end
-
-    local iReclaimMaxSegmentX = math.ceil(iMapSizeX / iReclaimSegmentSizeX)
-    local iReclaimMaxSegmentZ = math.ceil(iMapSizeZ / iReclaimSegmentSizeZ)
-    local iCurCount = 0
-    local iWaitInterval = math.max(1, math.floor(1 / math.floor(iReclaimMaxSegmentX / (iTimeBeforeFullRefresh * 10))))
-
-    local tReclaimables = {}
-    local iTotalMassValue
-
-
-    --local iLastReclaimRefresh = tLastReclaimRefreshByGroup[iEngSegmentGroup]
-    if iLastReclaimRefresh==nil then bDoFullRefresh = true
-        if bDebugMessages == true then LOG('This is the first time reclaim is being determined for the map') end
-    else
-        if iLastReclaimRefresh == 0 then bDoFullRefresh = true
-            if bDebugMessages == true then LOG('This is the first time reclaim is being determined for the map') end
-        else
-            if GetGameTimeSeconds() - iLastReclaimRefresh >= iTimeBeforeFullRefresh then bDoFullRefresh = true if bDebugMessages == true then LOG('UpdateReclaimMarkers: Sufficient time has elapsed since last refresh so re-doing reclaim values') end
-            elseif bDebugMessages == true then LOG('UpdateReclaimMarkers: Insufficient time since last reclaim refresh so not refreshing') end
-        end
-    end
     --Record all segments' mass information:
-    if bDoFullRefresh then
+    if GetGameTimeSeconds() - (iLastReclaimRefresh or 0) >= iTimeBeforeFullRefresh then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart) --Want the profile coutn to reflect the number of times actually running the core code
+        local iMinValueOfIndividualReclaim = 2.5
+        local tReclaimPos = {}
+        local iLargestCurReclaim
+        local rPlayableArea = rMapPlayableArea
+        local iMapSizeX = rPlayableArea[3] - rPlayableArea[1]
+        local iMapSizeZ = rPlayableArea[4] - rPlayableArea[2]
+        if iReclaimSegmentSizeX == 0 then --Not yet determined reclaim sizes
+            local iMinReclaimSegmentSize = 8.5 --Engineer build range is 6; means that a square of about 4.2 will fit inside this circle; If have 2 separate engineers assigned to adjacent reclaim segments, and want their build range to cover the two areas, then would want a gap twice this, so 8.4; will therefore go with min size of 8
+            iReclaimSegmentSizeX = math.max(iMinReclaimSegmentSize, iMapSizeX / iMaxSegmentInterval)
+            iReclaimSegmentSizeZ = math.max(iMinReclaimSegmentSize, iMapSizeZ / iMaxSegmentInterval)
+        end
+
+        local iReclaimMaxSegmentX = math.ceil(iMapSizeX / iReclaimSegmentSizeX)
+        local iReclaimMaxSegmentZ = math.ceil(iMapSizeZ / iReclaimSegmentSizeZ)
+        local iCurCount = 0
+        local iWaitInterval = math.max(1, math.floor(1 / math.floor(iReclaimMaxSegmentX / (iTimeBeforeFullRefresh * 10))))
+
+        local tReclaimables = {}
+        local iTotalMassValue
+
         if bDebugMessages == true then LOG('ReclaimRefresh: About to do full refresh') end
         iLastReclaimRefresh = GetGameTimeSeconds()
         tReclaimPos = {}
@@ -655,10 +641,10 @@ function UpdateReclaimMarkers()
                     end
                     if tReclaimAreas[iCurX][iCurZ] == nil then tReclaimAreas[iCurX][iCurZ] = {} end
                     tReclaimAreas[iCurX][iCurZ][refReclaimTotalMass] = iTotalMassValue
-                    tReclaimAreas[iCurX][iCurZ][refReclaimPositionOfLargestReclaim] = {}
-                    tReclaimAreas[iCurX][iCurZ][refReclaimPositionOfLargestReclaim] = GetPositionFromPathingSegments(iCurX, iCurZ)
+                    if tReclaimAreas[iCurX][iCurZ][refReclaimSegmentMidpoint] == nil then tReclaimAreas[iCurX][iCurZ][refReclaimSegmentMidpoint] = GetReclaimLocationFromSegment(iCurX, iCurZ) end
                     tReclaimAreas[iCurX][iCurZ][refReclaimHighestIndividualReclaim] = iLargestCurReclaim
                     iHighestReclaimInASegment = math.max(iHighestReclaimInASegment, iTotalMassValue)
+
                 end
                 iMapTotalMass = iMapTotalMass + iTotalMassValue
                 if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; iTotalMassValue='..iTotalMassValue..'; Location of segment='..repr(GetReclaimLocationFromSegment(iCurX, iCurZ))) end
@@ -672,20 +658,20 @@ function UpdateReclaimMarkers()
             end
         end
         if bDebugMessages == true then LOG('Finished updating reclaim areas') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UpdateReclaimAreasOfInterest(aiBrain)
     --Sets out reclaim areas of interest to try and claim, e.g. with engineer
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'UpdateReclaimAreasOfInterest'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    local iRefreshTimeInSeconds = 5
-    UpdateReclaimMarkers() --Wont do anything if have already updated recently
+    local iRefreshTimeInSeconds = 10
+    ForkThread(UpdateReclaimMarkers) --Wont do anything if have already updated recently
     if GetGameTimeSeconds() - (aiBrain[refiLastRefreshOfReclaimAreasOfInterest] or 0) >= iRefreshTimeInSeconds then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart) --Want accurate assessment of how long this takes on average
         if bDebugMessages == true then LOG(sFunctionRef..': Are doing a detailed refresh of reclaim points of interest') end
         local iMinSegmentReclaim = 40 --Ignore if less than this
         local iCurPriority
@@ -823,12 +809,12 @@ function UpdateReclaimAreasOfInterest(aiBrain)
             end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Finished going through all segments.  aiBrain[refiTotalReclaimAreasOfInterestByPriority]='..repr(aiBrain[refiTotalReclaimAreasOfInterestByPriority])) end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     else
         if bDebugMessages == true then LOG(sFunctionRef..': Have recently refreshed reclaim points of interest so will use those values') end
     end
 
 
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 --GetUnclaimedMexes - contained within EngineerOverseer

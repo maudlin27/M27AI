@@ -532,7 +532,7 @@ function RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo
                         end
 
                         M27PlatoonFormer.AllocateUnitsToIdlePlatoons(aiBrain, tUnits)
-                        M27PlatoonFormer.AllocatNewUnitsToPlatoonNotFromFactory(tUnits)
+                        M27PlatoonFormer.AllocateNewUnitsToPlatoonNotFromFactory(tUnits)
                     else
                         aiBrain:AssignUnitsToPlatoon(oPlatoonToAddTo, tUnits, 'Unassigned', 'None')
                         if M27Config.M27ShowUnitNames == true then
@@ -540,7 +540,7 @@ function RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo
                             UpdatePlatoonName(oPlatoonToAddTo, sName)
                         end
                         if oPlatoonToAddTo == oArmyPool then
-                            M27PlatoonFormer.AllocatNewUnitsToPlatoonNotFromFactory(tUnits)
+                            M27PlatoonFormer.AllocateNewUnitsToPlatoonNotFromFactory(tUnits)
                         end
                         --Update basic platoon tracker details
                         RecordPlatoonUnitsByType(oPlatoon)
@@ -6126,7 +6126,7 @@ function ProcessPlatoonAction(oPlatoon)
                                 end
                                 if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Still have units, so sending them to rallypoint='..repr(tRallyPoint)) end
 
-                                M27PlatoonFormer.AllocatNewUnitsToPlatoonNotFromFactory(tPlatoonUnits)
+                                M27PlatoonFormer.AllocateNewUnitsToPlatoonNotFromFactory(tPlatoonUnits)
                             end
                         end
                         --Was there a helper assigned to this platoon? If so clear its target and tell it to return to base
