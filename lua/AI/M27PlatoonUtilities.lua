@@ -686,16 +686,16 @@ function IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPos, tCurDestination, i
             if iEnemyStartNumber == nil then
                 M27Utilities.ErrorHandler('iEnemyStartNumber=nil')
             else
-                local tEnemyStart = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
-                if tEnemyStart[1] < tCurDestination[1] then bEnemyStartXLessThanTarget = true end
-                if tEnemyStart[3] < tCurDestination[3] then bEnemyStartZLessThanTarget = true end
-                if tEnemyStart[1] < tCurPos[1] then bEnemyStartXLessThanOurs = true end
-                if tEnemyStart[3] < tCurPos[3] then bEnemyStartZLessThanOurs = true end
+                local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                if tEnemyStartPosition[1] < tCurDestination[1] then bEnemyStartXLessThanTarget = true end
+                if tEnemyStartPosition[3] < tCurDestination[3] then bEnemyStartZLessThanTarget = true end
+                if tEnemyStartPosition[1] < tCurPos[1] then bEnemyStartXLessThanOurs = true end
+                if tEnemyStartPosition[3] < tCurPos[3] then bEnemyStartZLessThanOurs = true end
                 if bEnemyStartXLessThanOurs == bEnemyStartXLessThanTarget and bEnemyStartZLessThanOurs == bEnemyStartZLessThanTarget then
                     if bDebugMessages == true then LOG('IsDestinationAwayFromEnemy: Is away from enemy start as well') end
                     bIsAwayFromNearbyEnemies = true
                 else
-                    if bDebugMessages == true then LOG('IsDestinationAwayFromEnemy: Isnt away from enemystart; tCurPos[1][3]='..tCurPos[1]..'-'..tCurPos[3]..'tCurDestination='..tCurDestination[1]..'-'..tCurDestination[3]..'; tEnemyStart='..tEnemyStart[1]..'-'..tEnemyStart[3]) end
+                    if bDebugMessages == true then LOG('IsDestinationAwayFromEnemy: Isnt away from enemystart; tCurPos[1][3]='..tCurPos[1]..'-'..tCurPos[3]..'tCurDestination='..tCurDestination[1]..'-'..tCurDestination[3]..'; tEnemyStartPosition='..tEnemyStartPosition[1]..'-'..tEnemyStartPosition[3]) end
                     bIsAwayFromNearbyEnemies = false end
             end
         end
@@ -741,17 +741,17 @@ function IsDestinationAwayFromNearbyEnemy(tCurPos, tCurDestination, oNearestEnem
             local bEnemyStartZLessThanTarget = false
             local bEnemyStartXLessThanOurs = false
             local bEnemyStartZLessThanOurs = false
-            local tEnemyStart = M27MapInfo.PlayerStartPoints[oNearestEnemy:GetAIBrain().M27StartPositionNumber]
-            if tEnemyStart[1] < tCurDestination[1] then bEnemyStartXLessThanTarget = true end
-            if tEnemyStart[3] < tCurDestination[3] then bEnemyStartZLessThanTarget = true end
-            if tEnemyStart[1] < tCurPos[1] then bEnemyStartXLessThanOurs = true end
-            if tEnemyStart[3] < tCurPos[3] then bEnemyStartZLessThanOurs = true end
+            local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[oNearestEnemy:GetAIBrain().M27StartPositionNumber]
+            if tEnemyStartPosition[1] < tCurDestination[1] then bEnemyStartXLessThanTarget = true end
+            if tEnemyStartPosition[3] < tCurDestination[3] then bEnemyStartZLessThanTarget = true end
+            if tEnemyStartPosition[1] < tCurPos[1] then bEnemyStartXLessThanOurs = true end
+            if tEnemyStartPosition[3] < tCurPos[3] then bEnemyStartZLessThanOurs = true end
             if bEnemyStartXLessThanOurs == bEnemyStartXLessThanTarget and bEnemyStartZLessThanOurs == bEnemyStartZLessThanTarget then
                 if bDebugMessages == true then LOG(sFunctionRef..': Is away from enemy start as well') end
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return true
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': Isnt awway from enemystart; tCurPos[1][3]='..tCurPos[1]..'-'..tCurPos[3]..'tCurDestination='..tCurDestination[1]..'-'..tCurDestination[3]..'; tEnemyStart='..tEnemyStart[1]..'-'..tEnemyStart[3]) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Isnt awway from enemystart; tCurPos[1][3]='..tCurPos[1]..'-'..tCurPos[3]..'tCurDestination='..tCurDestination[1]..'-'..tCurDestination[3]..'; tEnemyStartPosition='..tEnemyStartPosition[1]..'-'..tEnemyStartPosition[3]) end
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return false
             end
@@ -1975,7 +1975,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                         local iIntelCoverage
                                                         --If ACU in platoon, then check if it has a scout assigned that is close enough (for CPU performance reasons only want to call getintelcoverage if we dont)
                                                         if oPlatoon[refbACUInPlatoon] and oPlatoon[refoFrontUnit] and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit][M27Overseer.refoUnitsScoutHelper]) then iIntelCoverage = oPlatoon[refoFrontUnit][M27Overseer.refoUnitsScoutHelper]:GetBlueprint().Intel.RadarRadius - M27Utilities.GetDistanceBetweenPositions(oPlatoon[refoFrontUnit][M27Overseer.refoUnitsScoutHelper]:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) end
-                                                        if not(iIntelCoverage) or iIntelCoverage < math.max(iEnemyMaxRange, 22) then iIntelCoverage = M27Logic.GetIntelCoverageOfPosition(aiBrain, tPlatoonPosition, math.max(iEnemyMaxRange, 22)) end
+                                                        if not(iIntelCoverage) or iIntelCoverage < math.max(iEnemyMaxRange, 22) then iIntelCoverage = M27Logic.GetIntelCoverageOfPosition(aiBrain, tPlatoonPosition, nil) end
                                                         if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..': We outrange nearest enemy, checking our intel coverage, iIntelCoverage='..iIntelCoverage) end
                                                         if iIntelCoverage >= math.max(iEnemyMaxRange, 22) then --ACU has range of 22 (no gun) and vision of 26, so want to have intel coverage of at least this before consider other actions
                                                             local iDistanceInsideOurRange = iPlatoonMaxRange - iNearestEnemyDistance
@@ -3558,16 +3558,36 @@ end
 function RetreatToMobileShields(oPlatoon)
     local sFunctionRef = 'RetreatToMobileShields'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
     --If the platoon has a mobile shield assisting platoon whose front units are far away, then fall back to it
     if oPlatoon[refoSupportingShieldPlatoon] and oPlatoon[refoSupportingShieldPlatoon][refiUnitsWithShields] > 0 then
         local iDistanceToShieldHelper = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), GetPlatoonFrontPosition(oPlatoon[refoSupportingShieldPlatoon]))
-        if iDistanceToShieldHelper > 50 then
+        if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToShieldHelper='..iDistanceToShieldHelper) end
+        if iDistanceToShieldHelper > 50 and iDistanceToShieldHelper <= 250 then
             oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
             if M27Utilities.IsTableEmpty(oPlatoon[refoSupportingShieldPlatoon][reftMovementPath][1]) == true then
                 oPlatoon[refoSupportingShieldPlatoon][reftMovementPath] = {}
                 oPlatoon[refoSupportingShieldPlatoon][reftMovementPath][1] = GetPlatoonFrontPosition(oPlatoon)
             end
+
             oPlatoon[reftTemporaryMoveTarget] = GetMergeLocation(oPlatoon[refoSupportingShieldPlatoon], 0.5)
+            if bDebugMessages == true then LOG(sFunctionRef..': Just got merge location; result='..repr(oPlatoon[reftTemporaryMoveTarget] or {'nil'})) end
+            if M27Utilities.IsTableEmpty(oPlatoon[reftTemporaryMoveTarget]) == true then
+                if bDebugMessages == true then LOG(sFunctionRef..': No merge location so will move to shield platoon position instead if we can path there and its not too far away') end
+                if iDistanceToShieldHelper <= 150 then
+                    if oPlatoon[refoFrontUnit]:CanPathTo(GetPlatoonFrontPosition(oPlatoon[refoSupportingShieldPlatoon])) then
+                        oPlatoon[reftTemporaryMoveTarget] = GetPlatoonFrontPosition(oPlatoon[refoSupportingShieldPlatoon])
+                    else
+                        --cant move to supporting shield platoon so cancel action
+                        if bDebugMessages == true then LOG(sFunctionRec..': Cant path to shield platoon so will cancel action') end
+                        oPlatoon[refiCurrentAction] = nil
+                    end
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Supporting shield platoon too far away so will ignore action') end
+                    oPlatoon[refiCurrentAction] = nil
+                end
+            end
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

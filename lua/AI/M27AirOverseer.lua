@@ -1551,7 +1551,7 @@ function IssueLargeBomberAttack(aiBrain, tBombers)
             oBomber[refbPartOfLargeAttack] = true
         end
 
-        local tEnemyBase = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+        local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
 
         local iCurLoop = 0
         local iMaxLoop = 100
@@ -1586,7 +1586,7 @@ function IssueLargeBomberAttack(aiBrain, tBombers)
                             iBombersNeedingTargets = iBombersNeedingTargets + 1
                             tBombersNeedingTargetsTracker[iBombersNeedingTargets] = {}
                             tBombersNeedingTargetsTracker[iBombersNeedingTargets][refoTrackerUnit] = oBomber
-                            tBombersNeedingTargetsTracker[iBombersNeedingTargets][refiTrackerDistanceToEnemy] = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tEnemyBase)
+                            tBombersNeedingTargetsTracker[iBombersNeedingTargets][refiTrackerDistanceToEnemy] = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tEnemyStartPosition)
                         end
                     else
                         if bDebugMessages == true then LOG(sFunctionRef..': iBomber='..iBomber..': Bomber already has a current target number='..oBomber[refiCurTargetNumber]) end
@@ -1851,7 +1851,7 @@ function AirAAManager(aiBrain)
         local iDistanceFromACUToStart = 0
         if iNearToACUThreshold > 0 then iDistanceFromACUToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tACUPos) end
         local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
-        local iDistanceFromEnemyStartToOurStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tEnemyStartPosition)
+        local iDistanceFromEnemyStartToOurStart = aiBrain[M27Overseer.refiDistanceToNearestEnemy]
         local iMapMidpointDistance = iDistanceFromEnemyStartToOurStart * 0.5
 
         local tValidEnemyAirThreats = {}
@@ -1863,7 +1863,7 @@ function AirAAManager(aiBrain)
 
         local iCurTargetModDistanceFromStart
         local bShouldAttackThreat
-        local iDefenceCoverage = aiBrain[M27Overseer.refiNearestOutstandingThreat]
+        local iDefenceCoverage = aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]
         local iCurDistanceToStart
         local tEnemyGroundAA
         local bCloseEnoughToConsider
@@ -2161,7 +2161,7 @@ function SetupAirOverseer(aiBrain)
     iMaxScoutsForMap = iMinScoutsForMap * 3
 
     if bDebugMessages == true then LOG(sFunctionRef..': iMapMaxSegmentX='..iMapMaxSegmentX..'; iMapMaxSegmentZ='..iMapMaxSegmentZ..'; rPlayableArea='..repr(rPlayableArea)..'; iAirSegmentSize='..iAirSegmentSize) end
-    --For large maps want to limit the segments that we consider
+    --For large maps want to limit the segments that we consider (dont want to use aiBrain[M27Overseer.refiDistanceToNearestEnemy] in case its not updated
     local iDistanceToEnemyFromStart = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
     aiBrain[refiMaxScoutRadius] = math.max(1250, iDistanceToEnemyFromStart * 1.5)
     local iStartSegmentX, iStartSegmentZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])

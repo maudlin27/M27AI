@@ -291,20 +291,21 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     local sFunctionRef = 'GetUnitToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
     local oUnitToUpgrade, tCurPosition, iCurDistanceToStart, iCurDistanceToEnemy, iCurCombinedDist
     local iMaxCombinedDist = -100000
     local tOurStartPosition
     if tStartPoint then tOurStartPosition = tStartPoint else tOurStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] end
-    local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-    local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
-    local iEnemySearchRange = 60
-    local tNearbyEnemies
+    --local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
+    --local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+    --local iEnemySearchRange = 60
+    --local tNearbyEnemies
     if bDebugMessages == true then LOG(sFunctionRef..': About to loop through units to find one to upgrade; size of tAllUnits='..table.getn(tAllUnits)) end
     local tPotentialUnits = {}
     local iPotentialUnits = 0
-    local iDistFromOurStartToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tOurStartPosition)
-    local iDistanceBufferToEnemy = iDistFromOurStartToEnemy * 0.15
+    --local iDistFromOurStartToEnemy = aiBrain[M27Overseer.refiDistanceToNearestEnemy]
+    --local iDistanceBufferToEnemy = iDistFromOurStartToEnemy * 0.15
 
     --First create a shortlist of units that we could upgrade: - must be closer to us than enemy base by at least 10% of distance between us and enemy; Must have defence coverage>=10% of the % between us and enemy (or have it behind our base)
     if M27Utilities.IsTableEmpty(tAllUnits) == false then
@@ -322,7 +323,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
         end
         if iPotentialUnits > 0 then
             --FilterLocationsBasedOnDefenceCoverage(aiBrain, tLocationsToFilter, bAlsoNeedIntelCoverage, bNOTYETCODEDAlsoReturnClosest, bTableOfObjectsNotLocations)
-            if bDebugMessages == true then LOG(sFunctionRef..': About to check if we have any safe units') end
+            if bDebugMessages == true then LOG(sFunctionRef..': About to check if we have any safe units; defence coverage='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]) end
             local tSafeUnits = M27EngineerOverseer.FilterLocationsBasedOnDefenceCoverage(aiBrain, tPotentialUnits, true, nil, true)
             if M27Utilities.IsTableEmpty(tSafeUnits) == false then
                 local tTech1SafeUnits = EntityCategoryFilterDown(categories.TECH1, tSafeUnits)
@@ -858,7 +859,7 @@ function UpgradeMainLoop(aiBrain)
     local iCategoryToUpgrade, oUnitToUpgrade
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
     local iMaxToBeUpgrading, iAmountToUpgradeAfterUnpausing
-    local iAltCategory
+
 
     aiBrain[refbWantToUpgradeMoreBuildings] = false --default
 
@@ -880,15 +881,25 @@ function UpgradeMainLoop(aiBrain)
                 oUnitToUpgrade = GetUnitToUpgrade(aiBrain, iCategoryToUpgrade, tStartPosition)
                 if oUnitToUpgrade == nil then
                     M27Utilities.ErrorHandler('Couldnt find unit to upgrade, will try searching for other options as backup',nil, true)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find unit to upgrade, will revert to default categories') end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find unit to upgrade, will revert to default categories, starting with T1 mex') end
                     oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT1Mex, tStartPosition)
                     if oUnitToUpgrade == nil then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will look for T1 land factory') end
                         oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory * categories.TECH1, tStartPosition)
                         if oUnitToUpgrade == nil then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will look for T1 air factory') end
                             oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryAirFactory * categories.TECH1, tStartPosition)
                             if oUnitToUpgrade == nil then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 mex') end
                                 oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT2Mex, tStartPosition)
-                                if oUnitToUpgrade == nil then oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory + refCategoryAirFactory, tStartPosition) end
+                                if oUnitToUpgrade == nil then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 land factory') end
+                                    oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory * categories.TECH2, tStartPosition)
+                                    if oUnitToUpgrade == nil then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 air factory') end
+                                        oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryAirFactory * categories.TECH2, tStartPosition)
+                                    end
+                                end
                             end
                         end
                     end
@@ -898,7 +909,7 @@ function UpgradeMainLoop(aiBrain)
                     UpgradeUnit(oUnitToUpgrade, true)
                     if bDebugMessages == true then LOG(sFunctionRef..': Finished sending order to upgrade unit') end
                 else
-                    if bDebugMessages == true then LOG('Couldnt get a unit to upgrade despite trying alternative categories.  Likely cause is that we have enemies near our base meaning poor defence coverage. UnitToUpgrade='..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount()) end
+                    if bDebugMessages == true then LOG('Couldnt get a unit to upgrade despite trying alternative categories.  Likely cause is that we have enemies near our base meaning poor defence coverage. UnitToUpgrade='..(oUnitToUpgrade:GetUnitId() or 'nil')) end
                 end
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Dont have anything to upgrade') end

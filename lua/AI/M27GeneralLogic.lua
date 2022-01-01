@@ -115,7 +115,8 @@ function ChooseReclaimTarget(oEngineer)
     if bDebugMessages == true then LOG(sFunctionRef..':Started ChooseReclaimTarget') end
     --Update reclaim if havent recently
     local aiBrain = oEngineer:GetAIBrain()
-    ForkThread(M27MapInfo.UpdateReclaimAreasOfInterest, aiBrain)
+    --ForkThread(M27MapInfo.UpdateReclaimAreasOfInterest, aiBrain)
+
 
     local sLocationRef, tCurMidpoint
     local iClosestDistanceToEngi = 10000
@@ -277,7 +278,7 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
     if bForceDebug == true then bDebugMessages = true end --for error control
     local sFunctionRef = 'GetNearestEnemyIndex'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain[refiNearestEnemyIndex] and not(M27Overseer.M27Overseer.tAllAIBrainsByArmyIndex[aiBrain[refiNearestEnemyIndex]]:IsDefeated()) then
+    if aiBrain[refiNearestEnemyIndex] and not(M27Overseer.tAllAIBrainsByArmyIndex[aiBrain[refiNearestEnemyIndex]]:IsDefeated()) then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return aiBrain[refiNearestEnemyIndex]
     else
@@ -1929,15 +1930,17 @@ function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPass
     local iUnitPathGroup = M27MapInfo.InSameSegmentGroup(oPathingUnit, tCurStartPosition, true)
     local iReclaimLoopCount
   --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to loop through mexes in pathing group') end
-    for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
-        local iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
-        if iSegmentX <= math.max(iDestinationSegmentX, iACUSegmentX) then
-            if iSegmentX >= math.min(iDestinationSegmentX, iACUSegmentX) then
-                if iSegmentZ <= math.max(iDestinationSegmentZ, iACUSegmentZ) then
-                    if iSegmentZ >= math.min(iDestinationSegmentZ, iACUSegmentZ) then
-                        iPossibleMex = iPossibleMex + 1
-                        tMexShortlist[iPossibleMex] = {}
-                        tMexShortlist[iPossibleMex] = tMexLocation
+    if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
+        for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
+            local iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
+            if iSegmentX <= math.max(iDestinationSegmentX, iACUSegmentX) then
+                if iSegmentX >= math.min(iDestinationSegmentX, iACUSegmentX) then
+                    if iSegmentZ <= math.max(iDestinationSegmentZ, iACUSegmentZ) then
+                        if iSegmentZ >= math.min(iDestinationSegmentZ, iACUSegmentZ) then
+                            iPossibleMex = iPossibleMex + 1
+                            tMexShortlist[iPossibleMex] = {}
+                            tMexShortlist[iPossibleMex] = tMexLocation
+                        end
                     end
                 end
             end
@@ -2626,7 +2629,8 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Visual range - base on air segments and if they've been flagged as having had recent visual
-    local iAirSegmentAdjSize = math.ceil(iMinCoverageWanted / M27AirOverseer.iAirSegmentSize)
+    local iAirSegmentAdjSize = 1
+    if iMinCoverageWanted then iAirSegmentAdjSize = math.ceil(iMinCoverageWanted / M27AirOverseer.iAirSegmentSize) end
     local iBaseAirSegmentX, iBaseAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tTargetPosition)
     local bHaveRecentVisual = true
     for iAdjX = -iAirSegmentAdjSize, iAirSegmentAdjSize do
@@ -2645,15 +2649,15 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
         end
     end
 
-
-    if bHaveRecentVisual == false then
+    local iMaxIntelCoverage = 0
+    if iMinCoverageWanted == nil and bHaveRecentVisual then iMaxIntelCoverage = M27AirOverseer.iAirSegmentSize end
+    if bHaveRecentVisual == false or iMinCoverageWanted == nil then
         --Dont have recent visual, so see if have nearby radar or scout
         local tCategoryList = {M27UnitInfo.refCategoryRadar, categories.SCOUT}
         if bOnlyGetRadarCoverage then tCategoryList = {M27UnitInfo.refCategoryRadar} end
         local tiSearchRange = {570, 70} --Omni radar is 600; spy plan is 96; want to be at least 30
         local iCurIntelRange, iCurDistanceToPosition, iCurIntelCoverage
         local tCurUnits = {}
-        local iMaxIntelCoverage = 0
 
         for iCategoryTableRef, iCategoryType in tCategoryList do
             tCurUnits = aiBrain:GetUnitsAroundPoint(iCategoryType, tTargetPosition, tiSearchRange[iCategoryTableRef], 'Ally')
@@ -2945,9 +2949,13 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
     --Tries to find a random location in a square around tMidpoint that can path to; returns nil if couldnt find anywhere
     local sFunctionRef = 'GetRandomPointInAreaThatCanPathTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
+
 
     local iLoopCount = 0
-    local iMaxLoop = 20
+    local iMaxLoop1 = 6
+    local iMaxLoop2 = iMaxLoop1 + 8
     local tEndDestination
 
     local iMidSegmentX, iMidSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMidpoint)
@@ -2968,36 +2976,88 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
     local iRandX, iRandZ
     local iRandFlag
     local iPathingTarget
+    local bTryManualAlterantive = false
+    local iManualRandomStart
+    local tiManualSegments --
+    local iSegmentThickness
+
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': About to search between Segment min and max X of '..iMinSegmentX..'-'..iMaxSegmentX..'; and Z min and max of '..iMinSegmentZ..'-'..iMaxSegmentZ..' if the pathing target of each point checked is different to iSegmentGroup'..iSegmentGroup)
+
+    end
     while not(iPathingTarget == iSegmentGroup) do
         iLoopCount = iLoopCount + 1
-        if iLoopCount > iMaxLoop then
-            M27Utilities.ErrorHandler('Couldnt find random point in area, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathingType='..sPathingType..'; iSegmentGroup='..iSegmentGroup..'; will return midpoint instead')
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            return tMidpoint
-        end
+        if iLoopCount > iMaxLoop1 then
+            if bTryManualAlterantive == false then
+                bTryManualAlterantive = true
+                iSegmentThickness = math.max(1, math.floor((iMaxDistance - iMinDistance) / M27MapInfo.iPathingIntervalSize))
+                iManualRandomStart = math.random(0, 7)
+                tiManualSegments = {
+                    {iMinSegmentX + iSegmentThickness, iMinSegmentZ + iSegmentThickness },
+                    {math.floor((iMaxSegmentX - iMinSegmentX) * 0.5), iMinSegmentZ + iSegmentThickness },
+                    {iMaxSegmentX - iSegmentThickness, iMinSegmentZ + iSegmentThickness},
+                    {iMaxSegmentX - iSegmentThickness, math.floor((iMaxSegmentZ - iMinSegmentZ) * 0.5)},
+                    {iMaxSegmentX - iSegmentThickness, iMaxSegmentZ - iSegmentThickness},
+                    {math.floor((iMaxSegmentX - iMinSegmentX) * 0.5), iMaxSegmentZ - iSegmentThickness },
+                    {iMinSegmentX + iSegmentThickness, iMaxSegmentZ - iSegmentThickness},
+                    {iMinSegmentX + iSegmentThickness, math.floor((iMaxSegmentZ - iMinSegmentZ) * 0.5)},
+                    --Copy above so can just pick a random point 1-8 in the table
+                    {iMinSegmentX + iSegmentThickness, iMinSegmentZ + iSegmentThickness },
+                    {math.floor((iMaxSegmentX - iMinSegmentX) * 0.5), iMinSegmentZ + iSegmentThickness },
+                    {iMaxSegmentX - iSegmentThickness, iMinSegmentZ + iSegmentThickness},
+                    {iMaxSegmentX - iSegmentThickness, math.floor((iMaxSegmentZ - iMinSegmentZ) * 0.5)},
+                    {iMaxSegmentX - iSegmentThickness, iMaxSegmentZ - iSegmentThickness},
+                    {math.floor((iMaxSegmentX - iMinSegmentX) * 0.5), iMaxSegmentZ - iSegmentThickness },
+                    {iMinSegmentX + iSegmentThickness, iMaxSegmentZ - iSegmentThickness},
+                    {iMinSegmentX + iSegmentThickness, math.floor((iMaxSegmentZ - iMinSegmentZ) * 0.5)}
+                }
 
-        --Get random position in the X range first
-        iRandX = math.random(iMinSegmentX, iMaxSegmentX)
-        --Set the revised Z range to look from
-        if iRandX <= iConstraintMinX or iRandX >= iConstraintMaxX then
-            --Wherever we are we're outside the X range cosntraint so will be far enough away
-            iCurMinSegmentZ = iMinSegmentZ
-            iCurMaxSegmentZ = iMaxSegmentZ
-        else
-            --We're within range of the X constraints so our Z value must be outside the range
-            iRandFlag = math.random(0, 1)
-            if iRandFlag == 0 then
-                iCurMinSegmentZ = iMinSegmentZ
-                iCurMaxSegmentZ = iConstraintMinZ
-            else
-                iCurMinSegmentZ = iConstraintMaxZ
-                iCurMaxSegmentZ = iMaxSegmentZ
+            end
+            if iLoopCount > iMaxLoop2 then
+                M27Utilities.ErrorHandler('Couldnt find random point in area after looking '..iLoopCount..' times, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathingType='..sPathingType..'; iSegmentGroup='..iSegmentGroup..'; will return midpoint instead')
+                if bDebugMessages == true then
+                    --Draw midpoint in white, draw last place checked in gold
+                    M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 4, 20)
+                    M27Utilities.DrawLocation(tMidpoint, nil, 7, 20)
+                end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return tMidpoint
             end
         end
-        iRandZ = math.random(iCurMinSegmentZ, iCurMaxSegmentZ)
+        if bTryManualAlterantive == false then
+
+            --Get random position in the X range first
+            iRandX = math.random(iMinSegmentX, iMaxSegmentX)
+            --Set the revised Z range to look from
+            if iRandX <= iConstraintMinX or iRandX >= iConstraintMaxX then
+                --Wherever we are we're outside the X range cosntraint so will be far enough away
+                iCurMinSegmentZ = iMinSegmentZ
+                iCurMaxSegmentZ = iMaxSegmentZ
+            else
+                --We're within range of the X constraints so our Z value must be outside the range
+                iRandFlag = math.random(0, 1)
+                if iRandFlag == 0 then
+                    iCurMinSegmentZ = iMinSegmentZ
+                    iCurMaxSegmentZ = iConstraintMinZ
+                else
+                    iCurMinSegmentZ = iConstraintMaxZ
+                    iCurMaxSegmentZ = iMaxSegmentZ
+                end
+            end
+            iRandZ = math.random(iCurMinSegmentZ, iCurMaxSegmentZ)
+        else
+            --Have tried randomly and failed, now just try by looking at NW/N/NE/E etc. randomly
+            iRandX = tiManualSegments[iLoopCount - iMaxLoop1 + iManualRandomStart][1]
+            iRandZ = tiManualSegments[iLoopCount - iMaxLoop1 + iManualRandomStart][2]
+        end
 
         --Can we path here?
         iPathingTarget = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iRandX, iRandZ)
+
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; Target='..repr(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ))..'; iRandX='..iRandX..'; iRandZ='..iRandZ..'; iPathingTarget (i.e. group) ='..iPathingTarget..'; will draw in red')
+            M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 2, 20)
+        end
     end
     if iPathingTarget == iSegmentGroup then
         tEndDestination = M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ)

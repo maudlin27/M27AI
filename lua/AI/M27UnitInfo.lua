@@ -82,7 +82,7 @@ refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR
 refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE
 refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - refCategoryEngineer -refCategoryLandScout -refCategoryMAA
-refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS
+refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS - categories.ANTISHIELD * categories.AEON --Dont include aeon T3 anti-shield here as it sucks unless against shields
 refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
 refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
@@ -217,10 +217,11 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     --Returns support factory ID if it can be built, otherwise returns normal upgrade unit (works for any unit, not just factory)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitUpgradeBlueprint'
+
     if bGetSupportFactory == nil then bGetSupportFactory = true end
     --Gets the support factory blueprint, and checks if it can be built; if not then returns the normal UpgradesTo blueprint
     local sUpgradeBP
-    if not(oUnitToUpgrade.Dead) then
+    if not(oUnitToUpgrade.Dead) and oUnitToUpgrade.CanBuild then
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code, UnitToUpgrade='..oUnitToUpgrade:GetUnitId()..GetUnitLifetimeCount(oUnitToUpgrade)) end
         if bGetSupportFactory == true and oUnitToUpgrade.CanBuild then
             local tsSupportFactoryBP = {

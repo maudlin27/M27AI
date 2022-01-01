@@ -790,11 +790,10 @@ function IsLocationWithinIntelPathLine(aiBrain, tLocation)
             local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
 
             local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-            local tEnemyPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
-            local iDistanceFromStartToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyPosition, tStartPosition)
-            local iLocationDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyPosition, tLocation)
-            if bDebugMessages == true then LOG(sFunctionRef..': tLocation='..repr(tLocation)..'; iLocationDistanceToEnemy='..iLocationDistanceToEnemy..'; iDistanceFromStartToEnemy='..iDistanceFromStartToEnemy..'; tEnemyPosition='..repr(tEnemyPosition)..'; tStartPosition='..repr(tStartPosition)) end
-            if iLocationDistanceToEnemy > iDistanceFromStartToEnemy then
+            local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+            local iLocationDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tLocation)
+            if bDebugMessages == true then LOG(sFunctionRef..': tLocation='..repr(tLocation)..'; iLocationDistanceToEnemy='..iLocationDistanceToEnemy..'; iDistanceFromStartToEnemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemy]..'; tEnemyStartPosition='..repr(tEnemyStartPosition)..'; tStartPosition='..repr(tStartPosition)) end
+            if iLocationDistanceToEnemy > aiBrain[M27Overseer.refiDistanceToNearestEnemy] then
                 bWithinIntelLine = true
             else
                 local iLocationDistanceToBase = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tLocation)
@@ -827,7 +826,7 @@ function IsLocationWithinDefenceCoverage(aiBrain, tLocation)
     local sFunctionRef = 'IsLocationWithinDefenceCoverage'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bWithinCoverage = false
-    local iDefenceCoverage = aiBrain[M27Overseer.refiNearestOutstandingThreat]
+    local iDefenceCoverage = aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]
     local iModDistanceFromStart = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocation)
     if iModDistanceFromStart <= iDefenceCoverage then bWithinCoverage = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

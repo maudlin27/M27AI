@@ -77,7 +77,6 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
     local tiHighestSpeedByTech = {0,0,0}
     local oCurBlueprint
     local iHighestPriority = 0
-    local sHighestPriorityBP
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': reftBlueprintPriorityOverride='..repr(aiBrain[reftBlueprintPriorityOverride])) end
@@ -116,6 +115,16 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
     --Now get a list of blueprints that are this tech level and of the highest priority
     --if bDebugMessages == true then LOG(sFunctionRef..': iHighestTech='..iHighestTech..'; tiHighestSpeedByTech='..tiHighestSpeedByTech[iHighestTech]..'; bGetSlowest='..tostring(bGetSlowest)..'; bGetFastest='..tostring(bGetFastest)) end
     local bIsValid, iCurrentPriority
+    local iMinTechToUse = iHighestTech
+    local iFastestSpeed = tiHighestSpeedByTech[iHighestTech]
+    if bGetFastest == true and iHighestTech >= 3 then
+        --If cybran, want loyalist instead of bomb; if Aeon want blaze instead of harbinger or shield disrupter; If sera probably want hover tank instead of siege tank; if UEF want titan
+        if tiHighestSpeedByTech[3] <= 3.5 and tiHighestSpeedByTech[2] - tiHighestSpeedByTech[3] >= 0.6 then
+            iMinTechToUse = 2
+            iFastestSpeed = math.max(tiHighestSpeedByTech[3], tiHighestSpeedByTech[2])
+        end
+    end
+
     for _, sBlueprint in tValidBlueprints do
         bIsValid = false
         if EntityCategoryContains(categories.TECH3, sBlueprint) then iCurrentTech = 3
@@ -123,7 +132,7 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
         else iCurrentTech = 1
         end
         if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..': Considering whether we have high enough tech to consider') end
-        if iCurrentTech >= iHighestTech then
+        if iCurrentTech >= iMinTechToUse then
             if bGetFastest == false and bGetSlowest == false then iCurrentPriority = aiBrain[reftBlueprintPriorityOverride][sBlueprint] end
             if iCurrentPriority == nil then iCurrentPriority = 0 end
             if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..'; iCurrentTech='..iCurrentTech..'; considering priority, iCurrentPriority='..iCurrentPriority..'; iHighestPriority='..iHighestPriority) end
@@ -140,8 +149,8 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
                     if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..'; iCurSpeed='..iCurSpeed) end
                     if bGetSlowest == true then
                         if iCurSpeed <= tiLowestSpeedByTech[iHighestTech] then bIsValid = true end
-                    elseif iCurSpeed >= tiHighestSpeedByTech[iHighestTech] then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have the highest speed for this tech level') end
+                    elseif iCurSpeed >= iFastestSpeed then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have the highest speed for tech levels being considered') end
                         bIsValid = true
                     end
                 end
@@ -176,7 +185,7 @@ function RecordUnderConstruction(aiBrain, oFactory, iUnitCategoryToBuild)
 end
 
 function GetPreferredArtiProportion(aiBrain, bAreSeraphimT1LandFactory)
-    --Returns the % of units that want to be indirect fire units; will be much higher when enemy has lots of point defence
+    --Returns the % of units that want to be indirect fire units; will be much higher when enemy has lots of point defence; also higher when we have access to t3
     local sFunctionRef = 'GetPreferredArtiProportion'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -185,9 +194,8 @@ function GetPreferredArtiProportion(aiBrain, bAreSeraphimT1LandFactory)
         iArtiProportion = 1
     else
         local iOurStartPosition = aiBrain.M27StartPositionNumber
-        local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
         local tOurStart = M27MapInfo.PlayerStartPoints[iOurStartPosition]
-        local iRange = M27Utilities.GetDistanceBetweenPositions(tOurStart, M27MapInfo.PlayerStartPoints[iEnemyStartPosition])
+        local iRange = aiBrain[M27Overseer.refiDistanceToNearestEnemy]
         local tEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.DIRECTFIRE + categories.INDIRECTFIRE, tOurStart, iRange, 'Enemy')
         local iEnemyTotalThreat = 0
         local iEnemyPDThreat = 0
@@ -197,6 +205,9 @@ function GetPreferredArtiProportion(aiBrain, bAreSeraphimT1LandFactory)
             if tEnemyPD then iEnemyPDThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyPD, true) end
             iEnemyTotalThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnits, true)
         end
+
+
+
         if iEnemyPDThreat == 0 then iArtiProportion = 0.1
         elseif iEnemyPDThreat <= 500 then iArtiProportion = 0.15
         elseif iEnemyPDThreat <= 1500 then iArtiProportion = 0.2
@@ -208,6 +219,9 @@ function GetPreferredArtiProportion(aiBrain, bAreSeraphimT1LandFactory)
             if iCap < 0.15 then iCap = 0.15 end
             if iCap < iArtiProportion then iArtiProportion = iCap end
         end
+        --Are we at tech 3 yet?  If so go for higher % of T3 arti; if at tech2 then go for lower % if no PD since MMLs arent as good
+        if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 3 then iArtiProportion = iArtiProportion + 0.05
+        elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and iEnemyPDThreat <= 100 then iArtiProportion = iArtiProportion - 0.025 end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iArtiProportion
@@ -1118,6 +1132,7 @@ function SetPreferredUnitsByCategory(aiBrain)
         --T3
     aiBrain[reftBlueprintPriorityOverride]['uel0303'] = 1 --Titan (instead of Percy)
     aiBrain[reftBlueprintPriorityOverride]['ual0303'] = 1 --Harby (instead of sniper bot)
+    --aiBrain[reftBlueprintPriorityOverride]['ual0304'] = 1 --Mobile t3 arti instead of shield disrupter
     aiBrain[reftBlueprintPriorityOverride]['url0303'] = 1 --Loyalist (instead of Brick)
     aiBrain[reftBlueprintPriorityOverride]['xsl0303'] = 1 --Siege tank (instead of sniper bot)
 

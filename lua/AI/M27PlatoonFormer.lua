@@ -237,7 +237,7 @@ function CombatPlatoonFormer(aiBrain)
                         if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] < aiBrain[M27Overseer.refiInitialRaiderPlatoonsWanted] then
                             sPlatoonToForm = 'M27MexRaiderAI' end
                     elseif iCurrentConditionToTry == 2 then --Emergency defence
-                        --iDefenceCoverage = aiBrain[M27Overseer.refiNearestOutstandingThreat]
+                        --iDefenceCoverage = aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]
                         if iDefenceCoverage < 0.3 then sPlatoonToForm = 'M27DefenderAI' end
                     elseif iCurrentConditionToTry == 3 then
                         --Platoon escorts
@@ -289,7 +289,7 @@ function CombatPlatoonFormer(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Start of loop for eco strategy, iCurrentConditionToTry='..iCurrentConditionToTry) end
                     aiBrain[refbUsingTanksForPlatoons] = true
                     if iCurrentConditionToTry == 1 then --Emergency defence
-                        --iDefenceCoverage = aiBrain[M27Overseer.refiNearestOutstandingThreat]
+                        --iDefenceCoverage = aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]
                         if iDefenceCoverage < 0.3 then sPlatoonToForm = 'M27DefenderAI' end
                     elseif iCurrentConditionToTry == 2 then
                         --Platoon escorts
@@ -418,7 +418,7 @@ function CombatPlatoonFormer(aiBrain)
                             tBasePosition = {tStartPoint[1], tStartPoint[2], tStartPoint[3]}
                         end
 
-                        local tEnemyBase = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                        local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
                         local bHaveValidLocation = false
                         local oPathingUnitExample = aiBrain[reftoCombatUnitsWaitingForAssignment][1]
                         local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnitExample)
@@ -434,7 +434,7 @@ function CombatPlatoonFormer(aiBrain)
                                 iCurLoop = iCurLoop + 1
                                 if iCurLoop > iMaxLoop then M27Utilities.ErrorHandler('Infinite loop') break end
                                 --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
-                                tTargetPosition = M27Utilities.MoveTowardsTarget(tBasePosition, tEnemyBase, 5 * iCurLoop, 0)
+                                tTargetPosition = M27Utilities.MoveTowardsTarget(tBasePosition, tEnemyStartPosition, 5 * iCurLoop, 0)
                                 iNewPositionSegmentX, iNewPositionSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tTargetPosition)
                                 iNewPositionGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iNewPositionSegmentX, iNewPositionSegmentZ)
                             end

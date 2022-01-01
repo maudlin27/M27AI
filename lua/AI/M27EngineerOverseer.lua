@@ -229,12 +229,14 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
     local iCurActionRef, sCurLocationRef, oCurAssistingRef, iGuardedByTableLocation
     local iUniqueRef = GetEngineerUniqueCount(oEngineer)
     local iEngiActionPreClear = oEngineer[refiEngineerCurrentAction]
+    local tPrevReclaimTarget
   --TEMPTEST(aiBrain, sFunctionRef..': Start')
 
     if iUniqueRef then --Wont have any actions assigned by code if unique ref is nil (since its set by the action tracker)
         if bDebugMessages == true then LOG(sFunctionRef..': iUniqueRef='..iUniqueRef..': Start of clearing actions. bDontClearUnitThatAreGuarding='..tostring(bDontClearUnitThatAreGuarding)) end
 
         --Clear engineer local variables:
+        if oEngineer[refiEngineerCurrentAction] == refActionReclaim then tPrevReclaimTarget = {oEngineer[reftEngineerCurrentTarget][1], oEngineer[reftEngineerCurrentTarget][2], oEngineer[reftEngineerCurrentTarget][3]} end
         oEngineer[refiEngineerConditionNumber] = nil
         oEngineer[refiEngineerCurrentAction] = nil
         oEngineer[reftEngineerCurrentTarget] = nil
@@ -341,6 +343,12 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
             end
         elseif bDebugMessages == true then LOG(sFunctionRef..': Dont have any guards assigned')
         end
+        if tPrevReclaimTarget then
+            local iReclaimSegmentX, iReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tPrevReclaimTarget)
+            if bDebugMessages == true then LOG(sFunctionRef..': iReclaimSegmentX-Z='..iReclaimSegmentX..'-'..iReclaimSegmentZ..'; Engineer UC='..GetEngineerUniqueCount(oEngineer)..'; LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
+            M27MapInfo.UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, {aiBrain})
+        end
+
     else if bDebugMessages == true then LOG(sFunctionRef..'; Unique ref is nil') end
     end
 
@@ -476,9 +484,9 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
                 if iTargetDistanceFromOurBase > 100 then bWantEscort = true
                 elseif iTargetDistanceFromOurBase > 50 then
                     --Are we closer to enemy base than our base is?
-                    local tEnemyBase = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
-                    local iDistanceBetweenBases = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyBase)
-                    local iTargetDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tEnemyBase)
+                    local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                    local iDistanceBetweenBases = aiBrain[M27Overseer.refiDistanceToNearestEnemy]
+                    local iTargetDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tEnemyStartPosition)
                     if iTargetDistanceToEnemyBase < iDistanceBetweenBases then bWantEscort = true end
                 end
             end
@@ -533,6 +541,13 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
         end
 
     end
+    --Update reclaim tracker
+    if iActionToAssign == refActionReclaim then
+        local iReclaimSegmentX, iReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tTargetLocation)
+        if bDebugMessages == true then LOG(sFunctionRef..': iReclaimSegmentX-Z='..iReclaimSegmentX..'-'..iReclaimSegmentZ..'; Engineer UC='..GetEngineerUniqueCount(oEngineer)..'; LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
+        M27MapInfo.UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, {aiBrain})
+    end
+
       M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
   --TEMPTEST(aiBrain, sFunctionRef..': End')
 end
@@ -882,9 +897,11 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'IssueSpareEngineerAction'
-      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+
     --Action already cleared in previous code
     local iCurSearchDistance = 40
     --local iRangeIncreaseFactor = 2 --Will increase search distance by this factor each cycle
@@ -984,12 +1001,14 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
         --Are we within 50 of the base? If not then attack-move to random point within 30 of start position
         local tPlaceToMoveTo
         if iDistToStart > 50 then
-            tPlaceToMoveTo = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oEngineer), M27MapInfo.GetUnitSegmentGroup(oEngineer), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 30, 20)
+            AttackMoveToRandomPositionAroundBase(aiBrain, oEngineer, 30, 20)
+            --tPlaceToMoveTo = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oEngineer), M27MapInfo.GetUnitSegmentGroup(oEngineer), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 30, 20)
         else
             --Already near base - have checked above to upgrade within a 40 range, so presumably we are power stalling; attack-move further away from base
-            tPlaceToMoveTo = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oEngineer), M27MapInfo.GetUnitSegmentGroup(oEngineer), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 50, 30)
+            AttackMoveToRandomPositionAroundBase(aiBrain, oEngineer, 50, 30)
+            --tPlaceToMoveTo = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oEngineer), M27MapInfo.GetUnitSegmentGroup(oEngineer), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 50, 30)
         end
-        IssueAggressiveMove({oEngineer}, tPlaceToMoveTo)
+        --IssueAggressiveMove({oEngineer}, tPlaceToMoveTo)
         iTimeToWaitInSecondsBeforeRefresh = 5
     end
     ForkThread(DelayedSpareEngineerClearAction, aiBrain, oEngineer, iTimeToWaitInSecondsBeforeRefresh)
@@ -1080,7 +1099,7 @@ function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprint
 
 
     local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-    local tEnemyPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+    local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
     local tNewBuildingSize
     if sBlueprintToBuild then tNewBuildingSize = M27UnitInfo.GetBuildingSize(sBlueprintToBuild) end
     if tNewBuildingSize == nil then
@@ -1116,7 +1135,7 @@ function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprint
             if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) == true then
                 iValidLocationCount = iValidLocationCount + 1
                 tValidLocations[iValidLocationCount] = tTargetLocation
-                iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyPosition, tTargetLocation)
+                iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tTargetLocation)
                 tValidDistanceToEnemy[iValidLocationCount] = iCurDistanceToEnemy
                 if iCurDistanceToEnemy > iMaxDistanceToEnemy then iMaxDistanceToEnemy = iCurDistanceToEnemy end
                 iCurDistanceToBuilder = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tBuilderPosition)
@@ -1177,6 +1196,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     if bForcedDebug then bDebugMessages = true end --for error handling
     local sFunctionRef = 'FindRandomPlaceToBuild'
 
+
       M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local rPlayableArea = M27MapInfo.rMapPlayableArea
@@ -1217,7 +1237,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
 
 
     local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-    local tEnemyPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+    local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
     local tNewBuildingSize
     if sBlueprintToBuild then tNewBuildingSize = M27UnitInfo.GetBuildingSize(sBlueprintToBuild) end
     if tNewBuildingSize == nil then
@@ -1266,7 +1286,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
                 if WillBuildingBlockMex(sBlueprintToBuild, tTargetLocation) == false then
                     iValidLocationCount = iValidLocationCount + 1
                     tValidLocations[iValidLocationCount] = tTargetLocation
-                    iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyPosition, tTargetLocation)
+                    iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tTargetLocation)
                     tValidDistanceToEnemy[iValidLocationCount] = iCurDistanceToEnemy
                     if iCurDistanceToEnemy > iMaxDistanceToEnemy then iMaxDistanceToEnemy = iCurDistanceToEnemy end
                     iCurDistanceToBuilder = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tBuilderPosition)
@@ -1392,7 +1412,7 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     if bReturnOnlyBestMatch == nil then bReturnOnlyBestMatch = false end
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
     local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-    local tEnemyPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+    local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
     local iDistanceToEnemy
     local iMinDistanceToEnemy = 10000
     local iMaxDistanceToEnemy = 0
@@ -1641,7 +1661,7 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
 
                     --Check if want to weight for if its closer or further from start (jsut enough that it affects equal priority locations)
                     if bPreferCloseToEnemy or bPreferFarFromEnemy then
-                        iDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(CurPosition, tEnemyPosition)
+                        iDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(CurPosition, tEnemyStartPosition)
                         if iDistanceToEnemy < iMinDistanceToEnemy then iMinDistanceToEnemy = iDistanceToEnemy end
                         if iDistanceToEnemy > iMaxDistanceToEnemy then iMaxDistanceToEnemy = iDistanceToEnemy end
                     end
@@ -2080,8 +2100,8 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
 
                     local iCurDistToEngineer
                     local iMinDistanceToEngineer = math.max(oEngBP.SizeX, oEngBP.SizeZ)
-                    local iCompletionDistToFinalDestination = 2
-                    if oEngineer.PlatoonHandle and oEngineer.Platoonhandle[M27PlatoonUtilities.refiOverrideDistanceToReachDestination] then iCompletionDistToFinalDestination = oEngineer.Platoonhandle[M27PlatoonUtilities.refiOverrideDistanceToReachDestination] end
+                    local iCompletionDistToFinalDestination = 3.5
+                    if oEngineer.PlatoonHandle and oEngineer.Platoonhandle[M27PlatoonUtilities.refiOverrideDistanceToReachDestination] then iCompletionDistToFinalDestination = math.max(iCompletionDistToFinalDestination, oEngineer.Platoonhandle[M27PlatoonUtilities.refiOverrideDistanceToReachDestination]) end
 
                     local tExpectedPositionSoon = M27Utilities.MoveInDirection(tCurPos, M27Utilities.GetAngleFromAToB(tCurPos, oEngineer[reftEngineerCurrentTarget]), iMoveSpeed)
 
@@ -2168,13 +2188,34 @@ function RegularlyCheckForNearbyReclaim(oEngineer)
     end
 end
 
+function AttackMoveToRandomPositionAroundBase(aiBrain, oEngineer, iMaxDistance, iMinDistance)
+    --Check pathing group
+    local iEngiPathingGroup = M27MapInfo.GetUnitSegmentGroup(oEngineer)
+    local sPathingType = M27UnitInfo.GetUnitPathingType(oEngineer)
+    local tActionTargetLocation = {M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][2], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]}
+    if not(iEngiPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) then
+        --Engi cant path to base based on segment pathing - check if this is correct
+        if oEngineer:CanPathTo(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+            --Can actually path to base, so use normal logic but with the base starting group
+            M27MapInfo.FixSegmentPathingGroup(sPathingType, oEngineer:GetPosition(), M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+            iEngiPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        else
+            --Engi cant path to base, so instead look for somwhere randomly from where it currently is and reduce min and max distance
+            tActionTargetLocation = oEngineer:GetPosition()
+            iMinDistance = math.min(5, iMinDistance)
+            iMaxDistance = math.min(iMinDistance + 5, iMaxDistance)
+        end
+    end
+    tActionTargetLocation = M27Logic.GetRandomPointInAreaThatCanPathTo(sPathingType, iEngiPathingGroup, tActionTargetLocation, iMaxDistance, iMinDistance)
+    IssueAggressiveMove({ oEngineer }, tActionTargetLocation)
+end
+
 function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iConditionNumber, sBuildingBPRef)
     --If oActionTargetObject is specified, then will assist this, otherwise will try and construct a new building
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
-
 
     if oEngineer then
         if oEngineer.GetUnitId then
@@ -2190,9 +2231,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                     tActionTargetLocation = M27Logic.ChooseReclaimTarget(oEngineer)
                     if M27Utilities.IsTableEmpty(tActionTargetLocation) == true then
                         --Get random position between 50 and 100 of base to attack-move to
-                        M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oEngineer), M27MapInfo.GetUnitSegmentGroup(oEngineer), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 100, 50)
-                        tActionTargetLocation = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-                        IssueAggressiveMove({ oEngineer }, tActionTargetLocation)
+                        AttackMoveToRandomPositionAroundBase(aiBrain, oEngineer, 100, 50)
                     else
                         IssueMove({ oEngineer }, tActionTargetLocation)
                     end
@@ -2417,13 +2456,13 @@ function FilterLocationsBasedOnDistanceToEnemy(aiBrain, tLocationsToFilter, iMax
         local iCurPercentageDistance, iCurDistanceToEnemy, iCurDistanceToStart
         local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
         local iNearestEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-        local tEnemyPosition = M27MapInfo.PlayerStartPoints[iNearestEnemyStartNumber]
+        local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iNearestEnemyStartNumber]
         local iValidLocationCount = 0
         local iClosestDistance = 1000
-        if M27Utilities.IsTableEmpty(tStartPosition) == false and M27Utilities.IsTableEmpty(tEnemyPosition) == false then
-            if bDebugMessages == true then LOG(sFunctionRef..': Just before main loop; tStartPosition='..repr(tStartPosition)..'; tEnemyPosition='..repr(tEnemyPosition)..'; our startposition number='..aiBrain.M27StartPositionNumber..'; enemy start position number='..iNearestEnemyStartNumber) end
+        if M27Utilities.IsTableEmpty(tStartPosition) == false and M27Utilities.IsTableEmpty(tEnemyStartPosition) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Just before main loop; tStartPosition='..repr(tStartPosition)..'; tEnemyStartPosition='..repr(tEnemyStartPosition)..'; our startposition number='..aiBrain.M27StartPositionNumber..'; enemy start position number='..iNearestEnemyStartNumber) end
             for iLocation, tLocation in tLocationsToFilter do
-                iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tLocation, tEnemyPosition)
+                iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tLocation, tEnemyStartPosition)
                 iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tLocation, tStartPosition)
                 iCurPercentageDistance = iCurDistanceToStart / (iCurDistanceToEnemy + iCurDistanceToStart)
                 if iCurPercentageDistance <= iMaxPercentageOfWayTowardsEnemy then
@@ -2433,7 +2472,7 @@ function FilterLocationsBasedOnDistanceToEnemy(aiBrain, tLocationsToFilter, iMax
                 if bDebugMessages == true then LOG(sFunctionRef..': LocationRef='..M27Utilities.ConvertLocationToReference(tLocation)..'; iCurDistanceToEnemy='..iCurDistanceToEnemy..'; iCurDistanceToStart='..iCurDistanceToStart..'; iCurPercentageDistance='..iCurPercentageDistance..'; iValidLocationCount='..iValidLocationCount) end
             end
         else
-            M27Utilities.ErrorHandler('tStartPosition or tEnemyPosition is empty')
+            M27Utilities.ErrorHandler('tStartPosition or tEnemyStartPosition is empty')
         end
     else
         M27Utilities.ErrorHandler('tLocationsToFilter is empty')
@@ -2445,6 +2484,7 @@ end
 function FilterLocationsBasedOnIntelPathCoverage(aiBrain, tLocationsToFilter, bNOTYETCODEDAlsoReturnClosest, bTableOfObjectsNotLocations)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FilterLocationsBasedOnIntelPathCoverage'
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tFilteredLocations = {}
     if bTableOfObjectsNotLocations == nil then bTableOfObjectsNotLocations = false end
@@ -2459,6 +2499,12 @@ function FilterLocationsBasedOnIntelPathCoverage(aiBrain, tLocationsToFilter, bN
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Checking if tLocation '..repr(tLocation)..' is within intel path line') end
                 bInIntelLine = M27Conditions.IsLocationWithinIntelPathLine(aiBrain, tLocation)
+            end
+            if bInIntelLine == false then
+                --Do we have visual/intel coverage of the location anyway?
+                if bTableOfObjectsNotLocations then bInIntelLine = M27Logic.GetIntelCoverageOfPosition(aiBrain, tLocation:GetPosition(), 40, true)
+                else bInIntelLine = M27Logic.GetIntelCoverageOfPosition(aiBrain, tLocation, 40, true)
+                end
             end
             if bInIntelLine == true then
                 if bDebugMessages == true then LOG(sFunctionRef..': Location is within intel path line so recording') end
@@ -2477,6 +2523,7 @@ function FilterLocationsBasedOnDefenceCoverage(aiBrain, tLocationsToFilter, bAls
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FilterLocationsBasedOnDefenceCoverage'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if bTableOfObjectsNotLocations == nil then bTableOfObjectsNotLocations = false end
     local tFilteredLocations = {}
     if M27Utilities.IsTableEmpty(tLocationsToFilter) == true then
@@ -2484,7 +2531,7 @@ function FilterLocationsBasedOnDefenceCoverage(aiBrain, tLocationsToFilter, bAls
     else
         local iValidLocationCount = 0
         local iModDistanceFromStart
-        local iDefenceCoverage = aiBrain[M27Overseer.refiNearestOutstandingThreat]
+        local iDefenceCoverage = aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]
         if iDefenceCoverage and iDefenceCoverage > 0 then
             for iLocation, tLocation in tLocationsToFilter do
                 if bTableOfObjectsNotLocations == true then
