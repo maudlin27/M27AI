@@ -1330,6 +1330,8 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
                     local bEscortingPlatoonAndNearIt = false
                     if oPlatoon[refoPlatoonOrUnitToEscort] and oPlatoon[refoPlatoonOrUnitToEscort].GetPlatoonPosition and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), GetPlatoonFrontPosition(oPlatoon[refoPlatoonOrUnitToEscort])) <= 20 then bEscortingPlatoonAndNearIt = true end
                     if bEscortingPlatoonAndNearIt == false then
+
+
                         local iTriggerDistance = 5
                         if oPlatoon[refbACUInPlatoon] then iTriggerDistance = 2.5 end
                         local iCyclesSinceLastMoved = GetCyclesSinceLastMoved(oPlatoon, true, 5)
@@ -1478,6 +1480,26 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
                                 --Force a refresh in the platoon action (redundancy for unforseen impact of the 'ignore refresh' logic)
                                 if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Stuck action forced refresh enabled') end
                                 ForceActionRefresh(oPlatoon)
+                            end
+                        elseif iCyclesSinceLastMoved > 2 then
+                            --Are we a DF platoon with enemies within range of the front unit of the platoon and our current shot is blocked?
+                            if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..oPlatoon[refiPlatoonCount]..': iCyclesSinceLastMoved='..iCyclesSinceLastMoved..'; will check if nearby enemies where shot is blocked') end
+                            local bNearbyEnemyWhereShotBlocked = false
+                            if oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] > 0 and oPlatoon[refiDFUnits] > 0 and EntityCategoryContains(categories.DIRECTFIRE, oPlatoon[refoFrontUnit]:GetUnitId()) then
+                                if bDebugMessages == true then LOG('Our front unit is a DF unit, and has enemies nearby, will check if any are in its range and if so if its shot is blocked') end
+                                local iPlatoonRange = M27Logic.GetUnitMaxGroundRange({oPlatoon[refoFrontUnit]})
+                                local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND + categories.STRUCTURE, GetPlatoonFrontPosition(oPlatoon), iPlatoonRange, 'Enemy')
+                                if M27Utilities.IsTableEmpty(tNearbyEnemies) == false then
+                                    local oNearestEnemy = M27Utilities.GetNearestUnit(tNearbyEnemies, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Front unit='..oPlatoon[refoFrontUnit]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])..'; nearest enemy='..oNearestEnemy:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNearestEnemy)) end
+                                    if M27Logic.IsShotBlocked(oPlatoon[refoFrontUnit], oNearestEnemy) then
+                                        if bDebugMessages == true then LOG('Shot is blocked so will set action to move DF to nearest enemy') end
+                                        oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
+                                    else
+                                        if bDebugMessages == true then LOG('Shot sint blocked so even though not moving will say we arent stuck') end
+                                        oPlatoon[refiCyclesForLastStuckAction] = 0
+                                    end
+                                end
                             end
                         end
                     end
@@ -3813,7 +3835,7 @@ function DeterminePlatoonAction(oPlatoon)
                                             if oACU:IsUnitState('Upgrading') then
                                                 if bDebugMessages == true then LOG(sFunctionRef..': ACU unit state is upgrading') end
                                                 local iUpgradePercent = oACU:GetWorkProgress()
-                                                if iHealthPercentage <= 0.5 and iUpgradePercent < (1 - iHealthPercentage) then
+                                                if iHealthPercentage <= 0.5 and iUpgradePercent < (1 - iHealthPercentage) and M27Conditions.SafeToGetACUUpgrade == false then
                                                     if bDebugMessages == true then LOG(sFunctionRef..': ACU needs to run as iHealthPercentage='..iHealthPercentage..' and iUpgradePercent='..iUpgradePercent) end
                                                     bRun = true
                                                 else

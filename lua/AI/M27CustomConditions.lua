@@ -126,7 +126,8 @@ function SafeToGetACUUpgrade(aiBrain)
                 local bACUNearBase = false
                 if bDebugMessages == true then LOG(sFunctionRef..': M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]='..repr(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; M27Overseer.iDistanceFromBaseToBeSafe='..M27Overseer.iDistanceFromBaseToBeSafe..'; tACUPos='..repr(tACUPos)) end
 
-                if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= M27Overseer.iDistanceFromBaseToBeSafe then bACUNearBase = true end
+                local iACUDistToBase = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                if iACUDistToBase <= M27Overseer.iDistanceFromBaseToBeSafe then bACUNearBase = true end
                 if iCurrentHealth <= aiBrain[M27Overseer.refiACUHealthToRunOn] and bACUNearBase == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU health is '..iCurrentHealth..'; Health to run on='..aiBrain[M27Overseer.refiACUHealthToRunOn]) end
                     bIsSafe = false
@@ -135,7 +136,7 @@ function SafeToGetACUUpgrade(aiBrain)
                     bIsSafe = false
                 elseif oACU:GetHealthPercent() <= M27Overseer.iACUEmergencyHealthPercentThreshold then
                     if bACUNearBase then
-                        if oACU:GetHealthPercent() <= M27Overseer.iACUEmergencyHealthPercentThreshold * 0.8 then bIsSafe = false end
+                        if iACUDistToBase > M27Overseer.iDistanceFromBaseWhenVeryLowHealthToBeSafe then bIsSafe = false end
                     else bIsSafe = false
                     end
                 end

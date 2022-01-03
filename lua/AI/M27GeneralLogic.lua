@@ -274,7 +274,7 @@ end
 
 function GetNearestEnemyIndex(aiBrain, bForceDebug)
     --Returns the ai brain index of the enemy who's got the nearest start location to aiBrain's start location and is still alive
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bForceDebug == true then bDebugMessages = true end --for error control
     local sFunctionRef = 'GetNearestEnemyIndex'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
