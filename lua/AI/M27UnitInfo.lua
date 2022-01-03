@@ -57,7 +57,7 @@ refCategoryT3Radar = refCategoryRadar * categories.TECH3 --+ categories.OMNI * c
 
 --Building - factory
 refCategoryLandFactory = categories.LAND * categories.FACTORY * categories.STRUCTURE
-refCategoryAirFactory = categories.AIR * categories.FACTORY * categories.STRUCTURE
+refCategoryAirFactory = categories.AIR * categories.FACTORY * categories.STRUCTURE - categories.ORBITALSYSTEM --Novax is an air factory, so excluded from being treated as an air factory by my logic
 refCategoryNavalFactory = categories.NAVAL * categories.FACTORY * categories.STRUCTURE
 refCategoryAllFactories = refCategoryLandFactory + refCategoryAirFactory + refCategoryNavalFactory
 

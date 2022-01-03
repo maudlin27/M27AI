@@ -132,7 +132,7 @@ function ChooseReclaimTarget(oEngineer)
                 sLocationRef = M27Utilities.ConvertLocationToReference(tCurMidpoint)
                 if not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) or not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim]) or not(M27UnitInfo.IsUnitValid(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim])) then
                     iCurDistanceToEngi = M27Utilities.GetDistanceBetweenPositions(tEngiPosition, tCurMidpoint)
-                    if iCurDistanceToEngi < iClosestDistanceToEngi then
+                    if iCurDistanceToEngi < iClosestDistanceToEngi and iCurDistanceToEngi > M27MapInfo.iReclaimSegmentSizeX then --Need to be a certain distance away or else risk the same location being given to the engineer repeatedly
                         iClosestDistanceToEngi = iCurDistanceToEngi
                         tClosestLocationToEngi = tCurMidpoint
                     end
@@ -390,7 +390,7 @@ function IndexToStartNumber(iArmyIndex)
         local iCurIndex
         for iCurBrain, oBrain in ArmyBrains do
             iCurIndex = oBrain:GetArmyIndex()
-            tPlayerStartPointByIndex[iCurIndex] = oBrain.M27StartPositionNumber
+            tPlayerStartPointByIndex[iCurIndex] = (oBrain.M27StartPositionNumber or M27Utilities.GetAIBrainArmyNumber(oBrain))
         end
     end
     iStartPoint = tPlayerStartPointByIndex[iArmyIndex]
@@ -2188,6 +2188,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
 
             local iDistanceFromStartToEnd = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
 
+            M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimNearACU', M27Utilities.refProfilerStart)
             --First check if overseer has flagged there's nearby reclaim (in which case have this as the end destination)
             --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to check overseer reclaim flag') end
             if bDebugMessages == true then LOG(sFunctionRef..': About to check if significant reclaim near ACU in which case will have this as final destination') end
@@ -2209,7 +2210,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             if bReclaimNearACU == true then
                 if bDebugMessages == true then LOG(sFunctionRef..': Is reclaim near ACU, checking if platoon contains an ACU') end
                 local oUnitBP = oPathingUnit:GetBlueprint()
-                if EntityCategoryContains(categories.COMMAND, oUnitBP.BlueprintId) == true then
+                if M27Utilities.IsACU(oUnitBP) then
                     if bDebugMessages == true then LOG(sFunctionRef..': Platoon contains an ACU, obtaining location of reclaim') end
                     if M27Utilities.IsTableEmpty(tFinalDestination) == false then
                         --Check its far enough away from our start (as dont want ACU running behind its base at the start of the game)
@@ -2258,9 +2259,10 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             --================High value reclaim locations (ignoring mexes)================
             --Consider if high value reclaim locations on the map:
             local iChosenReclaimLocationMass = 0
-
+            M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimNearACU', M27Utilities.refProfilerEnd)
             if bHaveFinalDestination == false then
                 --M27MapInfo.UpdateReclaimMarkers() --Moved this to overseer so dont risk ACU waiting a while for this to complete
+                M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimAreas', M27Utilities.refProfilerStart)
                 if math.max(M27MapInfo.iHighestReclaimInASegment, M27MapInfo.iPreviousHighestReclaimInASegment) >= iMinReclaimWanted and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftReclaimAreasOfInterest]) == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': Have enough reclaim in a segment somewhere on map, so want to go through all segments to see if any have enough reclaim to warrant consideration even if no mex') end
                     --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to loop through segments looking at reclaim') end
@@ -2352,6 +2354,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                         end
                     end
                 end
+                M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimAreas', M27Utilities.refProfilerEnd)
 
                 --[[if table.getn(tPossibleReclaimLocationAndReclaim) > 0 then
                     local iNewMinReclaimWanted = iMaxReclaimFound * iReclaimPercentageOfMaxWanted
@@ -2406,6 +2409,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             if bDebugMessages == true then LOG(sFunctionRef..': table of MexByPathingAndGrouping='..table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup])..'; sPathing='..sPathing..'; iUnitPathGroup='..iUnitPathGroup) end
             --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to cycle through mexes in pathing group') end
             if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
+                M27Utilities.FunctionProfiler(sFunctionRef..'Mexes', M27Utilities.refProfilerStart)
                 for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
                     --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': Start of loop') end
                     iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
@@ -2512,9 +2516,11 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                     end
                     --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': End of loop') end
                 end
+                M27Utilities.FunctionProfiler(sFunctionRef..'Mexes', M27Utilities.refProfilerEnd)
             end
             --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to consider possible locations to pass through') end
             if table.getn(tPossibleMexLocationsAndNumber) > 0 then
+                M27Utilities.FunctionProfiler(sFunctionRef..'Prioritisation', M27Utilities.refProfilerStart)
                 local iMaxPriority = 0
                 local iAreaWithMaxPriority
                 local iCurPriority
@@ -2549,10 +2555,14 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                 tFinalDestination = tPossibleMexLocationsAndNumber[iAreaWithMaxPriority][reftMexPosition]
                 if bDebugMessages == true then M27Utilities.DrawLocation(tFinalDestination, false, 1) end
                 bHaveFinalDestination = true
+                M27Utilities.FunctionProfiler(sFunctionRef..'Prioritisation', M27Utilities.refProfilerEnd)
             end
             --end
             if bDebugMessages == true then LOG(sFunctionRef..': Near end of code, will return value based on specifics') end
             if bHaveFinalDestination == false then
+                tFinalDestination = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]
+                if bDebugMessages == true then LOG(sFunctionRef..': Failed to find a final destination, will just use enemy base') end
+                --[[ As of v15 removed this since performance on this function is already terrible
                 --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Failed to get final destination, repeating again') end
                 if bDebugMessages == true then LOG(sFunctionRef..': Failed to find a final destination, will retry with higher bounds unless already done that or no mexes in pathing group') end
                 if iMaxDistancePercentage > iStopCyclingMaxThreshold or M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == true then return nil
@@ -2561,28 +2571,29 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                     local tExpansionPath = GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOverride, iNewMaxDistance)
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     return tExpansionPath
-                end
-            else
-                --Update final destination to move near it:
-
-                local tRevisedDestination = {}
-                if bDebugMessages == true then LOG(sFunctionRef..': About to call MoveNearConstruction') end
-                --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
-                tRevisedDestination = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tFinalDestination, nil, -3, true, false, false)
-                --=========Get mexes and high value reclaim en-route================
-                if bDebugMessages == true then
-                    LOG(sFunctionRef..': tFinalDestination determined, ='..repr(tFinalDestination)..'; tRevisedDestination='..repr(tRevisedDestination))
-                    M27Utilities.DrawLocation(tRevisedDestination, nil, 1, 100)
-                    --Below may cause desync so only enable temporarily
-                    --if bDebugMessages == true then LOG(sFunctionRef..': SegmentGroup of tFinalDestination='..M27MapInfo.InSameSegmentGroup(oPathingUnit, tFinalDestination, true)) end
-                    --if bDebugMessages == true then LOG(sFunctionRef..': CanPathToManual for tFinalDestination='..tostring(oPathingUnit:CanPathTo(tFinalDestination))) end
-                end
-                oPathingUnit.GetPriorityExpansionMovementPath = true
-                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to add nearby reclaim and mexes to movement path') end
-                local tRevisedPath = AddMexesAndReclaimToMovementPath(oPathingUnit, tRevisedDestination)
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                return tRevisedPath
+                end --]]
             end
+
+            --Update final destination to move near it:
+            M27Utilities.FunctionProfiler(sFunctionRef..'AddingDetours', M27Utilities.refProfilerStart)
+            local tRevisedDestination = {}
+            if bDebugMessages == true then LOG(sFunctionRef..': About to call MoveNearConstruction') end
+            --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
+            tRevisedDestination = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tFinalDestination, nil, -3, true, false, false)
+            --=========Get mexes and high value reclaim en-route================
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': tFinalDestination determined, ='..repr(tFinalDestination)..'; tRevisedDestination='..repr(tRevisedDestination))
+                M27Utilities.DrawLocation(tRevisedDestination, nil, 1, 100)
+                --Below may cause desync so only enable temporarily
+                --if bDebugMessages == true then LOG(sFunctionRef..': SegmentGroup of tFinalDestination='..M27MapInfo.InSameSegmentGroup(oPathingUnit, tFinalDestination, true)) end
+                --if bDebugMessages == true then LOG(sFunctionRef..': CanPathToManual for tFinalDestination='..tostring(oPathingUnit:CanPathTo(tFinalDestination))) end
+            end
+            oPathingUnit.GetPriorityExpansionMovementPath = true
+            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to add nearby reclaim and mexes to movement path') end
+            local tRevisedPath = AddMexesAndReclaimToMovementPath(oPathingUnit, tRevisedDestination)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            M27Utilities.FunctionProfiler(sFunctionRef..'AddingDetours', M27Utilities.refProfilerEnd)
+            return tRevisedPath
         end
     end
 end
@@ -2609,7 +2620,8 @@ function GetPositionToFollowTargets(tUnitsToFollow, oFollowingUnit, iFollowDista
         local iPossibleGroup
         local sPathing = M27UnitInfo.GetUnitPathingType(oFollowingUnit)--]]
         --function GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions)
-        tPossibleMovePosition = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tFollowerPosition, tTargetPosition, iFollowDistance, 0, oFollowingUnit, 3, true)
+        --tPossibleMovePosition = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tFollowerPosition, tTargetPosition, iFollowDistance, 0, oFollowingUnit, 3, true)
+        tPossibleMovePosition = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tFollowerPosition, tTargetPosition, iFollowDistance, 0, oFollowingUnit, true, true, 2)
         if tPossibleMovePosition == nil then tPossibleMovePosition = tTargetPosition end
     else
         M27Utilities.ErrorHandler(sFunctionRef..': Warning - trying to follow target but unit do do following is dead or nil - if this triggers more than one cycle in a row then have error')

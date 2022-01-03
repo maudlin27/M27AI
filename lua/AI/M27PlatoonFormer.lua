@@ -718,7 +718,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
 
     while bHaveUnitsToAssign == true do
         iCurCount = iCurCount + 1
-        if iCurCount > iMaxLoop then M27Utilities.ErrorHandler('Infinite loop') break end
+        if iCurCount > iMaxLoop then M27Utilities.ErrorHandler('Infinite loop or excessive mobile shields') break end
         if M27Utilities.IsTableEmpty(tMobileShieldUnits) == false then
             for iUnit, oUnit in tMobileShieldUnits do
                 if M27UnitInfo.IsUnitValid(oUnit) then

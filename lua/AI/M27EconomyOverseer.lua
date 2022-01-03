@@ -709,6 +709,15 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 end
             end
         end
+
+        --Increase thresholds if we're trying to build a missile
+        if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] then
+            for iThresholdRef, tThreshold in tMassThresholds do
+                tMassThresholds[iThresholdRef][1] = tMassThresholds[iThresholdRef][1] + math.max(500, tMassThresholds[iThresholdRef][1] * 0.5)
+                tMassThresholds[iThresholdRef][2] = tMassThresholds[iThresholdRef][2] + 1
+            end
+        end
+
         aiBrain[refbWantMoreFactories] = bWantMoreFactories
 
         for _, tThreshold in tMassThresholds do

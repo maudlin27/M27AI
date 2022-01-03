@@ -1408,7 +1408,9 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
                                                         if tModPosition[3] < rPlayableArea[2] + 1 then tModPosition[3] = rPlayableArea[2] + 1
                                                         elseif tModPosition[3] > (iMapSizeZ - 1) then tModPosition[3] = iMapSizeZ - 1 end
                                                         --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions, bCheckAgainstExistingCommandTarget, iMinDistanceFromCurrentBuilderMoveTarget)
-                                                        tModPosition = GetPositionNearTargetInSamePathingGroup(GetPlatoonFrontPosition(oPlatoon), tModPosition, 1, 0, oPathingUnit, 3, true, false, 0)
+                                                        --tModPosition = GetPositionNearTargetInSamePathingGroup(GetPlatoonFrontPosition(oPlatoon), tModPosition, 1, 0, oPathingUnit, 3, true, false, 0)
+                                                        --GetPositionAtOrNearTargetInPathingGroup(tStartPos, tTargetPos, iDistanceFromTargetToStart, iAngleAdjust, oPathingUnit, bMoveCloserBeforeFurtherIfBlocked, bCheckIfExistingTargetIsBetter, iMinDistanceFromExistingCommandTarget)
+                                                        tModPosition = GetPositionAtOrNearTargetInPathingGroup(GetPlatoonFrontPosition(oPlatoon), tModPosition, 1, 0, oPathingUnit, true, false)
 
 
                                                     end
@@ -1627,6 +1629,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local sPlatoonName = oPlatoon:GetPlan()
     local aiBrain = oPlatoon:GetBrain()
     local bProceed = true
+    --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -1682,34 +1685,36 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     end
                 end
                 if bACUNeedsToRun == false then
-                    --Are we significantly outnumbered in threat and/or up against alot of T2+ PD?
+                    --Are we significantly outnumbered in threat and/or up against alot of T2+ PD and not near our base?
                     if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU significantly outnumbered or lots of T2 PD nearby') end
                     local iEnemyThreatRating = 0
-                    if oPlatoon[refiEnemyStructuresInRange] > 0 then
-                        local tEnemyT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])
-                        if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false then
-                            if table.getn(tEnemyT2PlusPD) >= 3 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': ACU against at least 3 T2 PD so need to run') end
-                                bACUNeedsToRun = true
-                            end
-                        end
-                    end
-                    if bACUNeedsToRun == false then
-                        if oPlatoon[refiEnemiesInRange] > 0 then iEnemyThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemiesInRange], true) end
-                        if oPlatoon[refiEnemyStructuresInRange] > 0 then iEnemyThreatRating = iEnemyThreatRating + M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemyStructuresInRange], true) end
-                        if iEnemyThreatRating > 0 then
-                            local iOurThreatRating = 0
-                            if bDebugMessages == true then
-                                --Reproduce every unit in tFriendlyNearbyCombatUnits:
-                                LOG('Size of oPlatoon[reftFriendlyNearbyCombatUnits]='..table.getn(oPlatoon[reftFriendlyNearbyCombatUnits])..'; about to list out every unit')
-                                for iUnit, oUnit in oPlatoon[reftFriendlyNearbyCombatUnits] do
-                                    LOG('iUnit='..iUnit..'; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                    if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
+                        if oPlatoon[refiEnemyStructuresInRange] > 0 then
+                            local tEnemyT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])
+                            if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false then
+                                if table.getn(tEnemyT2PlusPD) >= 3 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': ACU against at least 3 T2 PD so need to run') end
+                                    bACUNeedsToRun = true
                                 end
                             end
-                            iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftFriendlyNearbyCombatUnits], false)
-                            if bDebugMessages == true then LOG(sFunctionRef..': iOurThreatRating='..iOurThreatRating..'; iEnemyThreatRating='..iEnemyThreatRating..'; will run if our threat rating less than 80% of enemy') end
-                            if iOurThreatRating / iEnemyThreatRating <= 1.2 then
-                                bACUNeedsToRun = true
+                        end
+                        if bACUNeedsToRun == false then
+                            if oPlatoon[refiEnemiesInRange] > 0 then iEnemyThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemiesInRange], true) end
+                            if oPlatoon[refiEnemyStructuresInRange] > 0 then iEnemyThreatRating = iEnemyThreatRating + M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemyStructuresInRange], true) end
+                            if iEnemyThreatRating > 0 then
+                                local iOurThreatRating = 0
+                                if bDebugMessages == true then
+                                    --Reproduce every unit in tFriendlyNearbyCombatUnits:
+                                    LOG('Size of oPlatoon[reftFriendlyNearbyCombatUnits]='..table.getn(oPlatoon[reftFriendlyNearbyCombatUnits])..'; about to list out every unit')
+                                    for iUnit, oUnit in oPlatoon[reftFriendlyNearbyCombatUnits] do
+                                        LOG('iUnit='..iUnit..'; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                    end
+                                end
+                                iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftFriendlyNearbyCombatUnits], false)
+                                if bDebugMessages == true then LOG(sFunctionRef..': iOurThreatRating='..iOurThreatRating..'; iEnemyThreatRating='..iEnemyThreatRating..'; will run if our threat rating less than 80% of enemy') end
+                                if iOurThreatRating / iEnemyThreatRating <= 1.2 then
+                                    bACUNeedsToRun = true
+                                end
                             end
                         end
                     end
@@ -1738,6 +1743,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
             if bProceed == true then
                 --Intel specific - just run unless only structures and known to be hostile:
                 if oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies] == true then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Platoon is flagged to run from all enemies, will see if enemies to run away from') end
                     if oPlatoon[refiEnemiesInRange] > 0 then
                         --Are any enemy units >5 inside our intel range (if M27ScoutAssister or M27MAAAssister, then this is increased to 10)?
                         local bCloseThreat = false
@@ -1778,12 +1784,14 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                 if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonName='..sPlatoonName..oPlatoon[refiPlatoonCount]..': enemy threat='..M27Logic.GetCombatThreatRating(aiBrain, tMobileUnitsInIntelRange, true, 50)) end
                             end
                         end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have enemies in intel range; bCloseThreat='..tostring(bCloseThreat)..'; if true then will temporarily retreat') end
                         if bCloseThreat == true then
                             --Have enemies in intel range - run away (but not too far)
                             if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonName='..sPlatoonName..oPlatoon[refiPlatoonCount]..':  setting platoon action to run away') end
                             oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
                         else
                             --Do nothing
+                            bDontConsiderFurtherOrders = true
                         end
                     else
                         --Only have structures nearby - only run if know are hostile:
@@ -2055,7 +2063,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
 
 
-            if oPlatoon[refiCurrentAction] == nil then bDontConsiderFurtherOrders = false
+            if oPlatoon[refiCurrentAction] == nil and not(oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies]) then bDontConsiderFurtherOrders = false
             else
                 if bAlreadyHaveAttackActionFromOverseer == true and oPlatoon[refiCurrentAction] == iExistingAction then bDontConsiderFurtherOrders = false
                 else bDontConsiderFurtherOrders = true
@@ -2719,10 +2727,11 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
     end
 
     if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code') end
-    --if sPlatoonName == 'M27ACUMain' then bDebugMessages = true end
+
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
+    --if sPlatoonName == 'M27ACUMain' then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
 
     local oPathingUnit
@@ -2820,6 +2829,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                             for iUnit, oUnit in oPlatoon[reftDFUnits] do
                                 M27UnitInfo.SetUnitTargetPriorities(oUnit, oPlatoon[reftPlatoonDFTargettingCategories])
                             end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Finished setting unit target priorities for all units in platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
                         end
                         if bPlatoonIsAUnit == true then oPathingUnit = oPlatoon
                         else
@@ -3487,16 +3497,21 @@ function RetreatLowHealthShields(oPlatoon, aiBrain)
                                             end
                                         end
                                     end
-                                    if iOverlappingShield > iMaxShieldsBeforeStartCycling then
+                                    if iOverlappingShield > iMaxShieldsBeforeStartCycling and not(sPlan == sRetreatingShieldPlatoon) then
                                         M27UnitInfo.DisableUnitShield(oUnit)
-                                    elseif iOverlappingShield < iMaxShieldsBeforeStartCycling and M27UnitInfo.IsUnitShieldEnabled(oUnit) == false then M27UnitInfo.EnableUnitShield(oUnit)
+                                    elseif (sPlan == sRetreatingShieldPlatoon or iOverlappingShield < iMaxShieldsBeforeStartCycling) and M27UnitInfo.IsUnitShieldEnabled(oUnit) == false then M27UnitInfo.EnableUnitShield(oUnit)
                                     end
                                 else
                                     --Are we due to get to the front soon?
-                                    if iCurDistanceToPlatoonFront >= iMaxDistanceToPlatoonFront * 1.5 then bConsiderLowShieldIndividually = true end
+                                    if iCurDistanceToPlatoonFront >= iMaxDistanceToPlatoonFront * 1.5 then
+                                        bConsiderLowShieldIndividually = true
+                                    else
+                                        if sPlan == sRetreatingShieldPlatoon and M27UnitInfo.IsUnitShieldEnabled(oUnit) == false then M27UnitInfo.EnableUnitShield(oUnit) end
+                                    end
                                 end
                             end
                             if bConsiderLowShieldIndividually == true then
+                                if M27UnitInfo.IsUnitShieldEnabled(oUnit) == false then M27UnitInfo.EnableUnitShield(oUnit) end
                                 if iCurShieldHealth <= math.min(100, iMaxShieldHealth * 0.1) and M27UnitInfo.IsUnitShieldEnabled(oUnit) == true then
                                     iUnitsToRun = iUnitsToRun + 1
                                     tUnitsToRun[iUnitsToRun] = oUnit
@@ -3558,7 +3573,7 @@ end
 function RetreatToMobileShields(oPlatoon)
     local sFunctionRef = 'RetreatToMobileShields'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     --If the platoon has a mobile shield assisting platoon whose front units are far away, then fall back to it
     if oPlatoon[refoSupportingShieldPlatoon] and oPlatoon[refoSupportingShieldPlatoon][refiUnitsWithShields] > 0 then
@@ -4178,7 +4193,8 @@ function ReturnToBase(oPlatoon, iOnlyGoThisFarTowardsBase, bDontClearActions, bU
             --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
             local oPathingUnit = GetPathingUnit(oPlatoon, oPlatoon[refoPathingUnit], true)
             if oPathingUnit and not(oPathingUnit.Dead) then
-                tNewDestination = GetPositionNearTargetInSamePathingGroup(tPlatoonPosition, M27MapInfo.PlayerStartPoints[iArmyStartNumber], iDistToStart - iOnlyGoThisFarTowardsBase, 0, oPathingUnit, 1, true)
+                --tNewDestination = GetPositionNearTargetInSamePathingGroup(tPlatoonPosition, M27MapInfo.PlayerStartPoints[iArmyStartNumber], iDistToStart - iOnlyGoThisFarTowardsBase, 0, oPathingUnit, 1, true)
+                tNewDestination = GetPositionAtOrNearTargetInPathingGroup(tPlatoonPosition, M27MapInfo.PlayerStartPoints[iArmyStartNumber], iDistToStart - iOnlyGoThisFarTowardsBase, 0, oPathingUnit, true, true, 2)
                 --M27Utilities.MoveTowardsTarget(tPlatoonPosition, M27MapInfo.PlayerStartPoints[iArmyStartNumber], iOnlyGoThisFarTowardsBase, 0)
                 if tNewDestination == nil then tNewDestination =  M27MapInfo.PlayerStartPoints[iArmyStartNumber] end
                 if bDebugMessages == true then LOG(sPlatoonName..': Sent order to only go part of the way back towawrds base') end
@@ -5047,6 +5063,162 @@ function UpdateScoutPositions(oPlatoon)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function GetPositionAtOrNearTargetInPathingGroup(tStartPos, tTargetPos, iDistanceFromTargetToStart, iAngleAdjust, oPathingUnit, bMoveCloserBeforeFurtherIfBlocked, bCheckIfExistingTargetIsBetter, iMinDistanceFromExistingCommandTarget)
+    --Intended as a rewriting of GetPositionNearTargetInSamePathingGroup due to some inconsistencies arising with the below, to make use of new logic that allows any angle; introduced from v15
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetPositionAtOrNearTargetInPathingGroup'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --Get angle from target to start
+    local iAngleFromTargetToStart = M27Utilities.GetAngleFromAToB(tTargetPos, tStartPos) + (iAngleAdjust or 0)
+    --Get initial desired position
+    local tPossibleTarget = M27Utilities.MoveInDirection(tTargetPos, iAngleFromTargetToStart, iDistanceFromTargetToStart)
+    local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnit)
+    local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTargetPos)
+    local iPathingGroupOfPossibleTarget = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPossibleTarget)
+    local bCanPathToTarget = false
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code; oPathingUnit='..oPathingUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..'; tTargetPos='..repr(tTargetPos)..'; iAngleAdjust ='..iAngleAdjust..'; iDistanceFromTargetToStart='..iDistanceFromTargetToStart..'; tStartPos='..repr(tStartPos)..'; iPathingGroupOfPossibleTarget='..iPathingGroupOfPossibleTarget..'; iPathingGroupWanted='..iPathingGroupWanted) end
+    --Find a target we can path to
+    if iPathingGroupOfPossibleTarget == iPathingGroupWanted then
+        bCanPathToTarget = true
+    else
+        --Dif pathing group, need to try alternatives; first try the target itself
+        if not(bMoveCloserBeforeFurtherIfBlocked == false) then
+            tPossibleTarget = {tTargetPos[1], tTargetPos[2], tTargetPos[3]}
+            iPathingGroupOfPossibleTarget = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPossibleTarget)
+            if bDebugMessages == true then LOG(sFunctionRef..': Pathing group if just try target position='..iPathingGroupOfPossibleTarget) end
+            if iPathingGroupOfPossibleTarget == iPathingGroupWanted then
+                bCanPathToTarget = true
+            end
+        end
+
+        if bCanPathToTarget == false then
+            local tDistanceFactors
+            if bMoveCloserBeforeFurtherIfBlocked then
+                tDistanceFactors = {0.5, 1.5, 3}
+            else tDistanceFactors = {1.25, 3}
+            end
+            local tAngleVariations = {-45, 0, 45}
+            --Make sure we have at least some distance we're moving away from
+            if iDistanceFromTargetToStart == 0 then iDistanceFromTargetToStart = 1 end
+
+            if math.abs(iDistanceFromTargetToStart) < 4 then
+                local iFactorIncrease = 4 / iDistanceFromTargetToStart
+                for iDistanceFactor = 1, table.getn(tDistanceFactors) do
+                    tDistanceFactors[iDistanceFactor] = tDistanceFactors[iDistanceFactor] * iFactorIncrease
+                end
+            end
+            for iDistanceFactor = 1, table.getn(tDistanceFactors) do
+                for iAngleAlternative = 1, table.getn(tAngleVariations) do
+                    tPossibleTarget = M27Utilities.MoveInDirection(tTargetPos, iAngleFromTargetToStart + tAngleVariations[iAngleAlternative], iDistanceFromTargetToStart * tDistanceFactors[iDistanceFactor])
+                    if M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPossibleTarget) == iPathingGroupWanted then
+                        bCanPathToTarget = true
+                        break
+                    end
+                end
+                if bCanPathToTarget then break end
+                if bDebugMessages == true then LOG(sFunctionRef..': iDistanceFactor='..iDistanceFactor..'; tPossibleTarget based on the last of the angle variations='..repr(tPossibleTarget)..'; still cant path to the target so will keep looking') end
+            end
+        end
+
+    end
+
+    if bCanPathToTarget then
+        --Consider if the target meets any other values specified (e.g. if must be certain distance away from current target or unit)
+        if bCheckIfExistingTargetIsBetter == true or iMinDistanceFromExistingCommandTarget then
+            if bDebugMessages == true then LOG(sFunctionRef..': Checking against existing target to see if thats better') end
+            if oPathingUnit.GetNavigator then
+                local oNavigator = oPathingUnit:GetNavigator()
+                if oNavigator.GetCurrentTargetPos then
+                    local tExistingTargetPos = oNavigator:GetCurrentTargetPos()
+                    if M27Utilities.IsTableEmpty(tExistingTargetPos) == false then
+                        if M27MapInfo.GetSegmentGroupOfLocation(sPathing, tExistingTargetPos) == iPathingGroupWanted then
+                            --Do we have a minimum distance away from current target required?
+                            if iMinDistanceFromExistingCommandTarget and M27Utilities.GetDistanceBetweenPositions(tExistingTargetPos, tPossibleTarget) < iMinDistanceFromExistingCommandTarget then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Distance between existing target position and possible target position is less than the min distance; tExistingTargetPos='..repr(tExistingTargetPos)..'; tPossibleTarget='..repr(tPossibleTarget)) end
+                                tPossibleTarget = tExistingTargetPos
+                            else
+                                --Is the existing target position closer to the distance required than the new position, factoring in if we want a negative position or not?
+                                local iDistanceFromQueuedMoveLocationToTarget = M27Utilities.GetDistanceBetweenPositions(tExistingTargetPos, tTargetPos)
+                                local iDistanceFromPossibleTargetToTarget = M27Utilities.GetDistanceBetweenPositions(tPossibleTarget, tTargetPos)
+                                --Are these further away from the start position than the actual target?
+                                if math.abs(iDistanceFromQueuedMoveLocationToTarget - iDistanceFromTargetToStart) < math.abs(iDistanceFromPossibleTargetToTarget - iDistanceFromTargetToStart) then
+                                    --Factor in we might be infront of the target and actually want to be behind
+                                    local iDistanceFromStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPos, tTargetPos)
+                                    local iDistanceFromQueuedToStart = M27Utilities.GetDistanceBetweenPositions(tStartPos, tExistingTargetPos)
+                                    local iDistanceFromPossibleTargetToStart = M27Utilities.GetDistanceBetweenPositions(tStartPos, tPossibleTarget)
+                                    if (iDistanceFromQueuedToStart < iDistanceFromStartToTarget and iDistanceFromTargetToStart > 0) or (iDistanceFromQueuedToStart > iDistanceFromStartToTarget and iDistanceFromTargetToStart < 0) then
+
+                                --Adjust these based on if they're in the opposite direction - replaced with above distance checks to see if quicker
+                                --[[local iAngleDifference = math.abs(M27Utilities.GetAngleFromAToB(tTargetPos, tExistingTargetPos) - iAngleFromTargetToStart)
+                                if iAngleDifference <= 90 then iDistanceFromQueuedMoveLocationToTarget = -iDistanceFromQueuedMoveLocationToTarget end
+                                iAngleDifference = math.abs(M27Utilities.GetAngleFromAToB(tTargetPos, tPossibleTarget) - iAngleFromTargetToStart)
+                                if iAngleDifference <= 90 then iDistanceFromPossibleTargetToTarget = -iDistanceFromPossibleTargetToTarget end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iDistanceFromQueuedMoveLocationToTarget='..iDistanceFromQueuedMoveLocationToTarget..'; iDistanceFromTargetToStart='..iDistanceFromTargetToStart..'; iDistanceFromPossibleTargetToTarget='..iDistanceFromPossibleTargetToTarget) end
+                                if math.abs(iDistanceFromQueuedMoveLocationToTarget - iDistanceFromTargetToStart) < math.abs(iDistanceFromPossibleTargetToTarget -iDistanceFromTargetToStart) then
+                                --]]
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Existing location is closer than the new possible location so go with this') end
+                                        --Existing location is closer than the new location so go with this
+                                        tPossibleTarget = tExistingTargetPos
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    else
+        --This could be due to a pathfinding error - is either location in same pathing group as our start position?
+        local aiBrain = oPathingUnit:GetAIBrain()
+        local iStartPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a target in same pathing group, will double check with canpathto; iStartPathingGroup='..iStartPathingGroup..'; Unit position pathing group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())..'; target pathing group='..iPathingGroupWanted) end
+        if iStartPathingGroup == iPathingGroupWanted then
+            --Unit is in a different pathing group; check if it can path to start - double-check its dif pathing group to be sure
+            if not(iStartPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())) then
+                if not(M27MapInfo.tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) and oPathingUnit:CanPathTo(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Pathing unit can path to player start point so will fix pathing') end
+                    --Error with map's predetermined pathing logic
+                    M27MapInfo.FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iStartPathingGroup)
+                    tPossibleTarget = {tTargetPos[1], tTargetPos[2], tTargetPos[3]}
+                    bCanPathToTarget = true
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Pathing unit cant path to player start point so pathing is correct') end
+                end
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..': iStartPathingGroup='..iStartPathingGroup..'; Segment group of pathing unit='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())..'; Pathing group of destination='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTargetPos)) end
+                M27Utilities.ErrorHandler('Possible flaw in logic as wasnt expecting this to be possible - are we checking we can path to the targe tposition in earlier code?', nil, true)
+            end
+        else
+            --Target is in a different pathing group to start; check if unit is in same group as start and (if so) if it can path to the target
+            if iStartPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition()) then
+                --Double-check it really is a different pathing group to be sure before using canpathto
+                --if not(iStartPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTargetPos)) then
+                if not(M27MapInfo.tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) and oPathingUnit:CanPathTo(tTargetPos) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing unit can path to target point so pathing is wrong') end
+                        --Error with map's predetermined pathing logic
+                        M27MapInfo.FixSegmentPathingGroup(sPathing, tTargetPos, iStartPathingGroup)
+                        tPossibleTarget = {tTargetPos[1], tTargetPos[2], tTargetPos[3]}
+                        bCanPathToTarget = true
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing unit cant path to target point so pathing is correct') end
+                    end
+                --else
+                    M27Utilities.ErrorHandler('Possible flaw in logic as wasnt expecting this to be possible - are we checking we can path to the targe tposition in earlier code?', nil, true)
+                --end
+            end
+        end
+        if not(bCanPathToTarget) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Cant path to the target so will return nil') end
+            --dont have a valid pathing target so return nil
+            tPossibleTarget = nil
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code; tPossibleTarget='..repr(tPossibleTarget or {'nil'})) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return tPossibleTarget
+end
+
 
 function GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions, bCheckAgainstExistingCommandTarget, iMinDistanceFromCurrentBuilderMoveTarget)
     --Returns the position to move to in order to be iDistanceFromTarget away from tTargetPos
@@ -5063,6 +5235,7 @@ function GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanc
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPositionNearTargetInSamePathingGroup'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.ErrorHandler('Deprecated function as of v15')
     if bCheckAgainstExistingCommandTarget == nil then bCheckAgainstExistingCommandTarget = true end
     if iMinDistanceFromCurrentBuilderMoveTarget == nil then iMinDistanceFromCurrentBuilderMoveTarget = 0 end
     if bDebugMessages == true then LOG(sFunctionRef..': Start; oPathingUnit blueprint='..oPathingUnit:GetUnitId()..'; iDistanceFromTarget='..iDistanceFromTarget) end
@@ -5100,6 +5273,7 @@ function GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanc
             iAngleToTarget = iAngleBase
 
             tBasePossibleTarget = M27Utilities.MoveTowardsTarget(tTargetPos, tStartPos, (iDistanceFromTarget + iAdjDistance) * iAdjSignage, iAngleToTarget)
+            if bDebugMessages == true then LOG(sFunctionRef..': Will move from the target towards the start by '..(iDistanceFromTarget + iAdjDistance) * iAdjSignage..' distance, as iDistanceFromTarget='..iDistanceFromTarget..'; iAdjDistance='..iAdjDistance..'; iAdjSignage='..iAdjSignage..'; iAngleToTarget='..iAngleToTarget..'; tBasePossibleTarget='..repr(tBasePossibleTarget)) end
             for iAngleCycleCount = 1, iMaxAngleCycleCount do
 
                 if iAngleCycleCount == 1 then
@@ -5151,8 +5325,6 @@ function GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanc
             end
             if bHaveValidTarget == true then break end
         end
-
-
     end
     --Check if already have a move location that will take us here
     if bHaveValidTarget == true then
@@ -5233,7 +5405,8 @@ function GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanc
 end
 --PUT IN TO HELP SEARCHING - USE ABOVE INSTEAD
 function MoveTowardsSameGroupTarget(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions, bCheckAgainstExistingCommandTarget, iMinDistanceFromCurrentBuilderMoveTarget)
-    GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions, bCheckAgainstExistingCommandTarget, iMinDistanceFromCurrentBuilderMoveTarget)
+    M27Utilities.ErrorHandler('Obsolete code')
+    --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions, bCheckAgainstExistingCommandTarget, iMinDistanceFromCurrentBuilderMoveTarget)
 end
 
 function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
@@ -5285,7 +5458,8 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
         --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceWantedFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions)
         local iMinDistanceFromCurrentBuilderMoveTarget = 2 --dont want to change movement path from the one generated if it's not that different
 
-         tPossibleTarget = GetPositionNearTargetInSamePathingGroup(tBuilderLocation, tLocation, iDistanceWantedFromTarget, 0, oBuilder, 1, true, true, iMinDistanceFromCurrentBuilderMoveTarget)
+         --tPossibleTarget = GetPositionNearTargetInSamePathingGroup(tBuilderLocation, tLocation, iDistanceWantedFromTarget, 0, oBuilder, 1, true, true, iMinDistanceFromCurrentBuilderMoveTarget)
+        tPossibleTarget = GetPositionAtOrNearTargetInPathingGroup(tBuilderLocation, tLocation, iDistanceWantedFromTarget, 0, oBuilder, true, true, iMinDistanceFromCurrentBuilderMoveTarget)
 
         if tPossibleTarget == nil then
             if bDebugMessages == true then LOG(sFunctionRef..': Cant get a nearby location for target; will return tLocation if can path to it') end
@@ -5302,13 +5476,28 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
             bIgnoreMove = true
             if M27MapInfo.InSameSegmentGroup(oBuilder, tLocation, false) == true then
                 if bDebugMessages == true then LOG(sFunctionRef..': Can path to tLocation so returning that') end
-                if tPossibleTarget == tLocation then M27Utilities.ErrorHandler('GetPositionNearTargetInSamePathingGroup should already consider if target location is valid and use that instead of pathing units current position, so investigate how this has triggered (this was added as quick fix backup for v6 hotfix, but hope was with other changes this wouldnt be needed/trigger') end
+                if tPossibleTarget == tLocation then M27Utilities.ErrorHandler('GetPositionAtOrNearTargetInPathingGroup should already consider if target location is valid and use that instead of pathing units current position, so investigate how this has triggered (this was added as quick fix backup for v6 hotfix, but hope was with other changes this wouldnt be needed/trigger') end
                 tPossibleTarget = tLocation
             else
                 --Could be our logic for pathing is faulty - use canpathto instead
-                if oBuilder:CanPathTo(tLocation) then
+                if not(M27MapInfo.tManualPathingChecks[M27UnitInfo.GetUnitPathingType(oBuilder)][M27Utilities.ConvertLocationToReference(tLocation)]) and oBuilder:CanPathTo(tLocation) then
                     LOG(sFunctionRef..': When pathing from '..repr(oBuilder:GetPosition())..' to '..repr(tLocation)..' we thought we were in different pathing groups, but we can path there using CanPathTo for unit ID='..oBuilder:GetUnitId())
                     tPossibleTarget = tLocation
+                    --Is the current position in the same group as our start? If so then correct the current position; if the target is in the same segment then correct that instead
+                    local sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
+                    local iBaseGrouping = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                    local iTargetGrouping = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tLocation)
+                    local iEngineerGrouping = M27MapInfo.GetSegmentGroupOfLocation(sPathing, oBuilder:GetPosition())
+                    if iBaseGrouping == iTargetGrouping or iBaseGrouping == iEngineerGrouping then
+                        if iBaseGrouping == iTargetGrouping then
+                            --Issue is with the builder's location
+                            M27MapInfo.FixSegmentPathingGroup(sPathing, oBuilder:GetPosition(), iBaseGrouping)
+                        else
+                            --Issue is with the target location
+                            M27MapInfo.FixSegmentPathingGroup(sPathing, tLocation, iBaseGrouping)
+                        end
+                    end
+
                 else
                     M27Utilities.ErrorHandler('MoveNearConstructions target location cant be pathed to and cant find pathable positions near it, will return nil, may cause future error depending on what has called this')
                 end
@@ -5452,6 +5641,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
                     end
                 end
                 if bHavePlatoonTarget then
+                    --Get the unit(s) we want to follow
                     if oPlatoon[refoSupportHelperPlatoonTarget] then
                         if bDebugMessages == true then LOG(sFunctionRef..': refoSupportHelperPlatoonTarget='..oPlatoon[refoSupportHelperPlatoonTarget]:GetPlan()..oPlatoon[refoSupportHelperPlatoonTarget][refiPlatoonCount]) end
                         if oPlatoon[refoSupportHelperPlatoonTarget][refoFrontUnit] and not(oPlatoon[refoSupportHelperPlatoonTarget][refoFrontUnit].Dead) then tUnitsToFollow = {oPlatoon[refoSupportHelperPlatoonTarget][refoFrontUnit]}
@@ -5569,31 +5759,37 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
                         end
                         if bHaveUnitToFollow then
                             local oOurPlatoonUnitReference = oPlatoon[refoFrontUnit]
-                            if oOurPlatoonUnitReference == nil then oOurPlatoonUnitReference = oPlatoon[reftCurrentUnits][1] end
-                            --oPlatoon[reftMovementPath][1] = M27Logic.GetPositionToFollowTargets(tUnitsToFollow, oOurPlatoonUnitReference, oPlatoon[refiSupportHelperFollowDistance])
-                            --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions, bCheckAgainstExistingCommandTarget, iMinDistanceFromCurrentBuilderMoveTarget)
-                            if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': About to get position near target in same pathing group; tTargetUnitPosition='..repr(tTargetUnitPosition)..'; distance we want to be towards enemy base from the target='..-oPlatoon[refiSupportHelperFollowDistance]) end
-                            local tNewTargetPath = GetPositionNearTargetInSamePathingGroup(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tTargetUnitPosition, -oPlatoon[refiSupportHelperFollowDistance], 0, oOurPlatoonUnitReference, 1, true, true, 3)
-                            if bDebugMessages == true then
-                                M27Utilities.DrawLocation(tTargetUnitPosition, nil, 5, 10) --Light blue
-                                M27Utilities.DrawLocation(tNewTargetPath, nil, 2, 10) --red
-                            end
-                            if M27Utilities.IsTableEmpty(tNewTargetPath) == true then
-                                if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath][1]) == true then
-                                    --Couldnt get a new path (e.g. target is in a different pathing group) and we dont have an existing path; return to base for now
-                                    oPlatoon[reftMovementPath][1] = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                            if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) then
+                                if oOurPlatoonUnitReference == nil then oOurPlatoonUnitReference = oPlatoon[reftCurrentUnits][1] end
+                                --oPlatoon[reftMovementPath][1] = M27Logic.GetPositionToFollowTargets(tUnitsToFollow, oOurPlatoonUnitReference, oPlatoon[refiSupportHelperFollowDistance])
+                                --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions, bCheckAgainstExistingCommandTarget, iMinDistanceFromCurrentBuilderMoveTarget)
+                                if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': About to get position near target in same pathing group; tTargetUnitPosition='..repr(tTargetUnitPosition)..'; distance we want to be towards enemy base from the target='..-oPlatoon[refiSupportHelperFollowDistance]) end
+                                --local tNewTargetPath = GetPositionNearTargetInSamePathingGroup(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tTargetUnitPosition, -oPlatoon[refiSupportHelperFollowDistance], 0, oOurPlatoonUnitReference, 1, true, true, 3)
+                                local tNewTargetPath = GetPositionAtOrNearTargetInPathingGroup(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tTargetUnitPosition, -oPlatoon[refiSupportHelperFollowDistance], 0, oOurPlatoonUnitReference, true, true, 3)
+                                if bDebugMessages == true then
+                                    if M27Utilities.IsTableEmpty(tNewTargetPath) == false then M27Utilities.DrawLocation(tNewTargetPath, nil, 2, 10) end --red
+                                    M27Utilities.DrawLocation(tTargetUnitPosition, nil, 5, 10) --Light blue
+                                    LOG(sFunctionRef..': tNewTargetPath='..repr(tNewTargetPath or {'nil'})..'; tTargetUnitPosition='..repr(tTargetUnitPosition))
                                 end
-                            else
-                                oPlatoon[reftMovementPath][1] = tNewTargetPath
-                            end
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef..': '..sPlatoonRef..': Targetting location of helper; NewMovementPath='..repr(oPlatoon[reftMovementPath][1])..'; tTargetUnitPosition='..repr(tTargetUnitPosition)..'; oPlatoon[refiSupportHelperFollowDistance]='..oPlatoon[refiSupportHelperFollowDistance])
-                            end
-                            if iCurrentUnits > 0 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Issuing move command to '..repr(oPlatoon[reftMovementPath][1])) end
-                                IssueClearCommands(tCurrentUnits)
-                                if ShouldPlatoonMoveInFormation(oPlatoon, false) then IssueFormMove(tCurrentUnits, oPlatoon[reftMovementPath][1], (oPlatoon.PlatoonData.UseFormation or 'GrowthFormation'), 0)
-                                else IssueMove(tCurrentUnits, oPlatoon[reftMovementPath][1]) end
+                                if M27Utilities.IsTableEmpty(tNewTargetPath) == true then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': tNewTargetPath is empty, will just use the platoons current movement path instead') end
+                                    if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath][1]) == true then
+                                        --Couldnt get a new path (e.g. target is in a different pathing group) and we dont have an existing path; return to base for now
+                                        oPlatoon[reftMovementPath][1] = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                                    end
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': tNewTargetPath='..repr(tNewTargetPath)..'; will set the movement path equal to this') end
+                                    oPlatoon[reftMovementPath][1] = tNewTargetPath
+                                end
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef..': '..sPlatoonRef..': Targetting location of helper; NewMovementPath='..repr(oPlatoon[reftMovementPath][1])..'; tTargetUnitPosition='..repr(tTargetUnitPosition)..'; oPlatoon[refiSupportHelperFollowDistance]='..oPlatoon[refiSupportHelperFollowDistance])
+                                end
+                                if iCurrentUnits > 0 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Issuing move command to '..repr(oPlatoon[reftMovementPath][1])) end
+                                    IssueClearCommands(tCurrentUnits)
+                                    if ShouldPlatoonMoveInFormation(oPlatoon, false) then IssueFormMove(tCurrentUnits, oPlatoon[reftMovementPath][1], (oPlatoon.PlatoonData.UseFormation or 'GrowthFormation'), 0)
+                                    else IssueMove(tCurrentUnits, oPlatoon[reftMovementPath][1]) end
+                                end
                             end
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': Failed to find a unit to follow') end
@@ -5726,7 +5922,8 @@ function ProcessPlatoonAction(oPlatoon)
                                     local iMaxLoop = 100
                                     bGiveMoveTargetFirst = true
                                     --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceWantedFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions)
-                                    tMoveTarget = GetPositionNearTargetInSamePathingGroup(tOverchargingUnitPos, tOCTargetPos, iDistanceBetweenUnits - iOverchargingUnitRange, 0, oOverchargingUnit, 1, true)
+                                    --tMoveTarget = GetPositionNearTargetInSamePathingGroup(tOverchargingUnitPos, tOCTargetPos, iDistanceBetweenUnits - iOverchargingUnitRange, 0, oOverchargingUnit, 1, true)
+                                    tMoveTarget = GetPositionAtOrNearTargetInPathingGroup(tOverchargingUnitPos, tOCTargetPos, iDistanceBetweenUnits - iOverchargingUnitRange, 0, oOverchargingUnit, true, true, 1)
                                     if tMoveTarget == nil then
                                         bCancelOvercharge = true
                                     end
@@ -5921,6 +6118,7 @@ function ProcessPlatoonAction(oPlatoon)
                             end
                         end
                     end
+                    if M27Utilities.IsTableEmpty(tPlatoonCurMoveLocation) then tPlatoonCurMoveLocation = GetPlatoonFrontPosition(oPlatoon) end
                     --if tPlatoonCurMoveLocation == nil then tPlatoonCurMoveLocation = oPlatoon[reftTemporaryMoveTarget] end --redundancy now
                     --Distance to run back by: If follower platoon (such as intel platoon) with temporary retreat or actionrun then will be refreshing every 2s (6s if hover in platoon)
                     local iDistanceToRunBackBy = 60
@@ -6406,7 +6604,8 @@ function ProcessPlatoonAction(oPlatoon)
                                                     --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceWantedFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions)
                                     local iDistanceFromPDWanted = iPlatoonMaxRange - math.ceil(oPlatoon[refiCurrentUnits] / 4)
                                     if iDistanceFromPDWanted < 0 then iDistanceFromPDWanted = 0 end
-                                    local tMoveTarget = GetPositionNearTargetInSamePathingGroup(tPlatoonPosition, oNearestPD:GetPosition(), iDistanceFromPDWanted, 0, GetPathingUnit(oPlatoon), 1, true)
+                                    --local tMoveTarget = GetPositionNearTargetInSamePathingGroup(tPlatoonPosition, oNearestPD:GetPosition(), iDistanceFromPDWanted, 0, GetPathingUnit(oPlatoon), 1, true)
+                                    local tMoveTarget = GetPositionAtOrNearTargetInPathingGroup(tPlatoonPosition, oNearestPD:GetPosition(), iDistanceFromPDWanted, 0, GetPathingUnit(oPlatoon), true, true, 1)
                                     if tMoveTarget then
                                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Move target for enemy PD='..repr(tMoveTarget)) end
                                         IssueMove(tCurrentUnits, tMoveTarget)

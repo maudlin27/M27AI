@@ -18,7 +18,6 @@ local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 
 --Semi-Global for this code:
-local bACUIsDefending
 refbACUOnInitialBuildOrder = 'M27ACUOnInitialBuildOrder' --local variable for ACU, determines whether ACUmanager is running or not
 local iLandThreatSearchRange = 1000
 refbACUHelpWanted = 'M27ACUHelpWanted' --flags if we want teh ACU to stay in army pool platoon so its available for defence
@@ -2321,15 +2320,19 @@ function ThreatAssessAndRespond(aiBrain)
                             end
                         end
 
-
-                            oACU[refbACUHelpWanted] = bGetACUHelp
+                        oACU[refbACUHelpWanted] = bGetACUHelp
+                        -- v15 - decided to instead use the ACUMain platoon logic and just change the movement path as having too many issues with ACU logic getting messed up
+                        --[[
                         if bGetACUHelp == true then
+
                             --Check if ACU not already in a defender platoon:
                             sACUPlan = DebugPrintACUPlatoon(aiBrain, true)
                             if not(sACUPlan == sDefenderPlatoonRef) then
                                 --Flag that ACU has been added to defenders if its using the main AI
-                                if DebugPrintACUPlatoon(aiBrain, true) == 'M27ACUMain' then aiBrain[refbACUWasDefending] = true end
+                                aiBrain[refbACUWasDefending] = true
                                 --Add ACU to defenders
+
+
                                 if bDebugMessages == true then LOG(sFunctionRef..': Getting ACU threat rating before adding to defenders; iAvailableThreat before adding ACU='..iAvailableThreat) end
                                 local oACUPlatoon = oACU.PlatoonHandle
                                 if oACUPlatoon == nil then
@@ -2337,6 +2340,7 @@ function ThreatAssessAndRespond(aiBrain)
                                     oACUPlatoon = aiBrain:MakePlatoon('', '')
                                     aiBrain:AssignUnitsToPlatoon(oACUPlatoon, {oACU},'Attack', 'None')
                                     oACUPlatoon:SetAIPlan(sDefenderPlatoonRef)
+
                                     if bDebugMessages == true then
                                         local iPlatoonCount = oACUPlatoon[M27PlatoonUtilities.refiPlatoonCount]
                                         if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['sDefenderPlatoonRef']
@@ -2348,14 +2352,13 @@ function ThreatAssessAndRespond(aiBrain)
                                 else
                                     if bDebugMessages == true then LOG(sFunctionRef..': ACU will help so have enough threat; iAvailableThreat before adding ACU='..iAvailableThreat..'; changing ACUs plan to use defender plan') end
                                     oACU.PlatoonHandle:SetAIPlan(sDefenderPlatoonRef)
-                                    bACUIsDefending = true
                                 end
                                 iAvailableThreat, iCurAvailablePlatoons = RecordAvailablePlatoonAndReturnValues(aiBrain, oACU.PlatoonHandle, iAvailableThreat, iCurAvailablePlatoons, tACUPos, iDistFromEnemy, iDistToOurBase, tAvailablePlatoons, tNilDefenderPlatoons, bIndirectThreatOnly)
                                 if bDebugMessages == true then LOG(sFunctionRef..': iAvailableThreat after adding ACU to available platoons='..iAvailableThreat) end
                                 --iAvailableThreat = iAvailableThreat + M27Logic.GetCombatThreatRating(aiBrain, {oACU}, false)
 
                             end
-                        end
+                        end --]]
                         if bDebugMessages == true then LOG(sFunctionRef..': Finished considering if ACU should help; bGetACUHelp='..tostring(bGetACUHelp)) end
                     else
                         --Threat higher than needed, so flag that don't need ACU help
@@ -2388,7 +2391,7 @@ function ThreatAssessAndRespond(aiBrain)
                     end
 
                     --Now decide whether we will attack with the platoon, based on whether we have the minimum threat needed
-                    if iAvailableThreat < iThreatNeeded then
+                    if iAvailableThreat < iThreatNeeded and bGetACUHelp == false then
 
                         --Dont have enough units yet, so get units in position so when have enough can respond
                         --Go to midpoint, or if enemy too close then to base
@@ -2425,7 +2428,7 @@ function ThreatAssessAndRespond(aiBrain)
                         bIgnoreRemainingLandThreats = true
                     else
 
-                        --Can beat enemy (or for indirect may be able to beat them) so attack them - filter to just those platoons that need to deal with the threat if we have more than what is needed:
+                        --Can beat enemy (or for indirect may be able to beat them, or if ACU helping then we have to try to beat them) so attack them - filter to just those platoons that need to deal with the threat if we have more than what is needed:
                         --if iAvailableThreat >= iThreatWanted then
                         --Only need some of the platoon units, pick the ones nearest the enemy
                         --tAvailablePlatoons =
@@ -2560,9 +2563,9 @@ function ThreatAssessAndRespond(aiBrain)
                                 else iMinScouts = 0 iMinMAA = 0 end
                             else iMinScouts = 0 iMinMAA = 0 end
                         end
-                        --Base platoon should now be able to beat enemy
+                        --Base platoon should now be able to beat enemy (or shoudl at least try to if ACU is helping)
                         if bIgnoreRemainingLandThreats == false and oBasePlatoon == nil then
-                            LOG(sFunctionRef..': ERROR - oBasePlatoon is nil but had thought could beat the enemy - unless down to just ACU and no defenders likely error')
+                            if bGetACUHelp == false then M27Utilities.ErrorHandler('oBasePlatoon is nil but had thought could beat the enemy, and ACU isnt part of attack - likely error') end
                         elseif bIgnoreRemainingLandThreats == false then
                             if oBasePlatoon == oArmyPoolPlatoon then
                                 M27Utilities.ErrorHandler('WARNING - oArmyPoolPlatoon is oBasePlatoon - will abort threat intereception logic and flag that want defender platoons to be created')
@@ -2634,6 +2637,21 @@ function ThreatAssessAndRespond(aiBrain)
                                 elseif oBasePlatoon[refiActualDistanceFromEnemy] <= 35 then sCurFormation = 'GrowthFormation'
                                 end
                                 oBasePlatoon:SetPlatoonFormationOverride(sCurFormation)
+                            end
+                        end
+                        if bGetACUHelp then
+                            --Make sure ACU is moving where we want already; if not then tell it to
+                            local oACUPlatoon = M27Utilities.GetACU(aiBrain).PlatoonHandle
+                            if oACUPlatoon then
+                                if M27Utilities.GetDistanceBetweenPositions(oACUPlatoon[M27PlatoonUtilities.reftMovementPath][oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget]], tEnemyThreatGroup[reftAveragePosition]) > 10 then
+                                    --ACU isnt moving near where we want it to, update its movement path if it doesnt have nearby enemies
+                                    if oACUPlatoon[M27PlatoonUtilities.refiEnemiesInRange] == 0 or M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE, M27Utilities.GetACU(aiBrain):GetPosition(), 23, 'Enemy')) == true then --ACU range is 22
+                                        oACUPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftAveragePosition]
+                                        oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
+                                        oACUPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
+                                        oACUPlatoon[M27PlatoonUtilities.refbOverseerAction] = true
+                                    end
+                                end
                             end
                         end
                     end --Available threat vs enemy threat
@@ -3389,7 +3407,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
     for _, iCategory in tEnemyBigThreatCategories do
         tCurCategoryUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
         if iCategory == M27UnitInfo.refCategoryGroundExperimental or iCategory == M27UnitInfo.refCategoryFixedT3Arti then tReferenceTable = aiBrain[reftEnemyGroundExperimentals]
-        elseif iCategory == M27UnitInfo.refCategorySML then tReferenceTable = aiBrain[reftEnemyNukeLaunchers]
+        elseif iCategory == M27UnitInfo.refCategorySML then
+            tReferenceTable = aiBrain[reftEnemyNukeLaunchers]
+            if bDebugMessages == true then LOG(sFunctionRef..': Looking for enemy nukes') end
         elseif iCategory == M27UnitInfo.refCategoryTML then
             tReferenceTable = aiBrain[reftEnemyTML]
             if bDebugMessages == true then LOG(sFunctionRef..': Looking for enemy TML') end
@@ -4158,6 +4178,6 @@ function OverseerManager(aiBrain)
 
         --iTempProfiling = M27Utilities.ProfilerTimeSinceLastCall('End of overseer', iTempProfiling)
 
-        M27Utilities.ProfilerOutput()
+        --M27Utilities.ProfilerOutput() --Handled via the time per tick
     end
 end

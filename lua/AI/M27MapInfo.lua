@@ -38,7 +38,10 @@ reftReclaimAreasOfInterest = 'M27MapReclaimAreasOfInterest' --assigned to aiBrai
 reftReclaimAreaPriorityByLocationRef = 'M27MapReclaimAreaPriorityByLocationRef' --key is location ref
 iReclaimSegmentSizeX = 0 --Updated separately
 iReclaimSegmentSizeZ = 0 --Updated separately
+iReclaimAreaOfInterestTickCount = 0 --Updated as part of may reclaim update loop, used to avoid excessive load on an individual tick
+bReclaimRefreshActive = false --Used to avoid duplciating reclaim update logic
 iMaxSegmentInterval = 1 --Updated by map pathing logic; constant - no. of times to divide the map by segments for X (and separately for Z) so will end up with this value squared as the no. of segments
+tManualPathingChecks = {} --[Pathing][LocationRef]; returns true; lists any locations where we have already checked the pathing manually via canpathto
 --iSegmentSizeX = 12
 --iSegmentSizeZ = 12
 --Experience significant slowdown of a couple of seconds at 100 (10k segments), so dont recommend much higher than 60s
@@ -60,6 +63,7 @@ reftMexesToKeepScoutsBy = 'M27MapMexesToKeepScoutsBy'
 reftMexPatrolLocations = 'M27MapMexPatrolLocations' --aiBrain variable, [x] = nth mex will be the locations e.g. top 3 locations to patrol between
 refbCanPathToEnemyBaseWithLand = 'M27MapCanPathToEnemyWithLand' --True if can path to enemy base, false otherwise
 refbCanPathToEnemyBaseWithAmphibious = 'M27MapCanPathToEnemyWithAmphibious'
+
 
 --v3 Pathfinding specific
 local iLandPathingGroupForWater = 1
@@ -89,6 +93,8 @@ iMapWaterHeight = 0 --Surface height of water on the map
 function DetermineMaxTerrainHeightDif()
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if M27Config.M27ShowPathingGraphically then bDebugMessages = true end
+    --Manually specify the terrain height difference to use for certain maps (e.g. where there are ramps and the pathfinding default options return incorrect pathing)
+    --To find out the map name, run with 'display pathing graphically' config option set to true, and search for the last entry containing "DetermineMaxTerrainHeightDif: sMapName="
     local sFunctionRef = 'DetermineMaxTerrainHeightDif'
 
     local tMapHeightOverride = {
@@ -98,6 +104,7 @@ function DetermineMaxTerrainHeightDif()
     ['Adaptive Corona'] = 0.15,
     ['Corona'] = 0.15,
     ['Adaptive Flooded Corona'] = 0.15,
+    ['Fields of Isis'] = 0.15, --minor for completeness - one of cliffs reclaim looks like its pathable but default settings show it as non-pathable
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
@@ -431,6 +438,7 @@ function FixSegmentPathingGroup(sPathingType, tLocation, iCorrectPathingGroup)
     if sPathingType == M27UnitInfo.refPathingTypeLand and tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] == tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] then bUpdateAmphibiousWithSameGroup = true end
     tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] = iCorrectPathingGroup
     if bUpdateAmphibiousWithSameGroup then tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] = iCorrectPathingGroup end
+    tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(tLocation)] = true
 end
 
 function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis, bAlsoReturnAmountOfHighestIndividualReclaim)
@@ -602,6 +610,7 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart) --Want accurate assessment of how long this takes on average
     local iCurPriority
     local sLocationRef = tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][refsSegmentMidpointLocationRef]
+    iReclaimAreaOfInterestTickCount = iReclaimAreaOfInterestTickCount + 1
     for iArmyIndex, aiBrain in tBrainsToUpdateFor do
         iCurPriority = nil
         if bDebugMessages == true then LOG(sFunctionRef..': Considering segment '..iReclaimSegmentX..'-'..iReclaimSegmentZ..' for iArmyIndex='..iArmyIndex) end
@@ -631,8 +640,8 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
                     if tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][refReclaimTotalMass] >= 250 then
                         --do nothing as bUnassigned = true already
                     else
-                        for iAdjX = iReclaimSegmentX - 1, iReclaimSegmentX + 1, 1 do
-                            for iAdjZ = iReclaimSegmentZ - 1, iReclaimSegmentZ + 1, 1 do
+                        for iAdjX = - 1, 1 do
+                            for iAdjZ = - 1, 1 do
                                 sLocationRef = M27Utilities.ConvertLocationToReference(GetReclaimLocationFromSegment(iReclaimSegmentX + iAdjX, iReclaimSegmentZ + iAdjZ))
                                 if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim]) == false then
                                     bUnassigned = false
@@ -752,9 +761,11 @@ function UpdateReclaimMarkers()
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
     local iTimeBeforeFullRefresh = 10 --Will do a full refresh of reclaim every x seconds
+
     --Record all segments' mass information:
-    if GetGameTimeSeconds() - (iLastReclaimRefresh or 0) >= iTimeBeforeFullRefresh then
+    if bReclaimRefreshActive == false and GetGameTimeSeconds() - (iLastReclaimRefresh or 0) >= iTimeBeforeFullRefresh then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart) --Want the profile coutn to reflect the number of times actually running the core code
+        bReclaimRefreshActive = true
         local iMinValueOfIndividualReclaim = 2.5
         local tReclaimPos = {}
         local iLargestCurReclaim
@@ -795,7 +806,8 @@ function UpdateReclaimMarkers()
         local iReclaimMaxSegmentX = math.ceil(iMapSizeX / iReclaimSegmentSizeX)
         local iReclaimMaxSegmentZ = math.ceil(iMapSizeZ / iReclaimSegmentSizeZ)
         local iCurCount = 0
-        local iWaitInterval = math.max(1, math.floor(1 / math.floor(iReclaimMaxSegmentX / (iTimeBeforeFullRefresh * 10))))
+        local iWaitInterval = math.max(1, math.floor((iReclaimMaxSegmentX * iReclaimMaxSegmentZ) / (iTimeBeforeFullRefresh * 10)))
+
 
         local tReclaimables = {}
         local iTotalMassValue
@@ -846,13 +858,14 @@ function UpdateReclaimMarkers()
                 end
                 iMapTotalMass = iMapTotalMass + iTotalMassValue
                 if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; iTotalMassValue='..iTotalMassValue..'; Location of segment='..repr(GetReclaimLocationFromSegment(iCurX, iCurZ))) end
+                iCurCount = iCurCount + 1
             end
-            iCurCount = iCurCount + 1
-            if iCurCount >= iWaitInterval then
+            if iCurCount >= iWaitInterval or iReclaimAreaOfInterestTickCount > 50 then
                 iCurCount = 0
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(1)
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                iReclaimAreaOfInterestTickCount = 0
             end
         end
         if bDebugMessages == true then
@@ -862,6 +875,7 @@ function UpdateReclaimMarkers()
                 break
             end
         end
+        bReclaimRefreshActive = false
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
@@ -2380,6 +2394,12 @@ function MappingInitialisation(aiBrain)
             LOG(sFunctionRef..': End of code')
         end
         bPathfindingComplete = true
+
+        --Other variables used by all M27ai
+        for iPathingType, sPathingType in M27UnitInfo.refPathingTypeAll do
+            tManualPathingChecks[sPathingType] = {}
+        end
+
     end
 
     --Reclaim varaibles
@@ -2392,6 +2412,7 @@ function MappingInitialisation(aiBrain)
     aiBrain[reftReclaimAreaPriorityByLocationRef] = {}
     aiBrain[refiPreviousThreatPercentCoverage] = 0
     aiBrain[refiPreviousFrontUnitPercentFromOurBase] = 0
+
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

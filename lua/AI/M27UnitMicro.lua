@@ -29,7 +29,8 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
 
     local tNewTargetIgnoringGrouping = M27Utilities.MoveTowardsTarget(tUnitPosition, tRevisedPositionToRunFrom, iDistanceToMove, 180)
     if bDebugMessages == true then LOG(sFunctionRef..': tNewTargetIgnoringGrouping='..repr(tNewTargetIgnoringGrouping)..'; tUnitPosition='..repr(tUnitPosition)) end
-    local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
+    --local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
+    local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, true, false)
     if tNewTargetInSameGroup then
         if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tNewTargetInSameGroup='..repr(tNewTargetInSameGroup)) end
         IssueClearCommands({oUnit})
@@ -237,7 +238,8 @@ function MoveInOppositeDirectionTemporarily(oUnit, iTimeToMove)
 
             --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
             local tNewTargetIgnoringGrouping = M27Utilities.MoveTowardsTarget(tUnitPosition, tUnitTarget, iDistanceToMove, 180)
-            local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
+            --local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
+            local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, true, false)
             if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
             local bRecentMicro = false
             local iRecentMicroThreshold = 1

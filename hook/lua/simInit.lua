@@ -27,6 +27,13 @@ function OnCreateArmyBrain(index, brain, name, nickname)
     M27OnCreateArmyBrain(index, brain, name, nickname)
 end
 
+--Enable below if want to profile how often IssueMove command is sent
+--[[local M27IssueMove = IssueMove
+function IssueMove(tUnits, tTarget)
+    M27IssueMove(tUnits, tTarget)
+    M27Utilities.IssueCount = (M27Utilities.IssueCount or 0) + 1
+end--]]
+
 --Approach of hooking to get around adaptive map issues is based on Softels DilliDalli AI - alternative is using CanBuildStructureAt to check, but that runs into issues if the resource point has reclaim on it
 local M27CreateResourceDeposit = CreateResourceDeposit
 CreateResourceDeposit = function(t,x,y,z,size)
