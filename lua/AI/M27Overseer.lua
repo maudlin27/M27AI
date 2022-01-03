@@ -3469,7 +3469,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             end
         end
 
-        local iNearestEnemyArmyIndex = M27Logic.GetNearestEnemyStartNumber(aiBrain)
+        local iNearestEnemyArmyIndex = M27Logic.GetNearestEnemyIndex(aiBrain)
         if not(iNearestEnemyArmyIndex == iPreviousNearestEnemyIndex) then
             aiBrain[refiDistanceToNearestEnemy] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyArmyIndex)])
         end

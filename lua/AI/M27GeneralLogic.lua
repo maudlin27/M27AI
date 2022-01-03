@@ -274,7 +274,7 @@ end
 
 function GetNearestEnemyIndex(aiBrain, bForceDebug)
     --Returns the ai brain index of the enemy who's got the nearest start location to aiBrain's start location and is still alive
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bForceDebug == true then bDebugMessages = true end --for error control
     local sFunctionRef = 'GetNearestEnemyIndex'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -390,11 +390,20 @@ function IndexToStartNumber(iArmyIndex)
         local iCurIndex
         for iCurBrain, oBrain in ArmyBrains do
             iCurIndex = oBrain:GetArmyIndex()
-            tPlayerStartPointByIndex[iCurIndex] = (oBrain.M27StartPositionNumber or M27Utilities.GetAIBrainArmyNumber(oBrain))
+            tPlayerStartPointByIndex[iCurIndex] = oBrain.M27StartPositionNumber
         end
     end
     iStartPoint = tPlayerStartPointByIndex[iArmyIndex]
-    if iStartPoint == nil then M27Utilities.ErrorHandler('Dont have start position for iArmyIndex='..iArmyIndex) end
+    if iStartPoint == nil then
+        M27Utilities.ErrorHandler('Dont have start position for iArmyIndex='..iArmyIndex..'; will now enable logs and try to figure out why')
+        for iCurBrain, aiBrain in ArmyBrains do
+            LOG('iCurBrain='..iCurBrain..'; ArmyIndex='..aiBrain:GetArmyIndex()..'; M27StartPositionNumber='..(aiBrain.M27StartPositionNumber or 'nil'))
+            if not(aiBrain.M27StartPositionNumber) then
+                LOG('M27Utilities.GetAIBrainArmyNumber(aiBrain)='..(M27Utilities.GetAIBrainArmyNumber(aiBrain) or 'nil'))
+            end
+        end
+
+    end
     return iStartPoint
 end
 
@@ -845,7 +854,9 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                             bSearchForMexes = false
                         end
                         if iWaitCount > 2 then
-                            if not(M27Config.M27RunProfiling) then WaitTicks(1) end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            WaitTicks(1)
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                             iWaitCount = 0
                         end
                         bAbort = true
@@ -938,7 +949,9 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                                         break
                                     end
                                 end
-                                if not(M27Config.M27RunProfiling) then WaitTicks(1) end
+                                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                                WaitTicks(1)
+                                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                                 bAbort = true
                                 if oPlatoonHandle and aiBrain and aiBrain:PlatoonExists(oPlatoonHandle) == true and oUnit and not(oUnit.Dead) then bAbort = false end
                                 if bAbort == true then
