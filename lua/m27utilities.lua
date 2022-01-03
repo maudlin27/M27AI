@@ -510,6 +510,10 @@ function MoveInDirection(tStart, iAngle, iDistance)
     local sFunctionRef = 'MoveInDirection'
     local iTheta
     local iFactor
+    if iAngle > 360 then
+        iAngle = iAngle - 360
+    elseif iAngle < 0 then iAngle = iAngle + 360 end
+
     if iAngle >= 270 then iTheta = iAngle - 270 iFactor = {-1,-1}
     elseif iAngle >= 180 then iTheta = 270 - iAngle iFactor = {-1, 1}
     elseif iAngle >= 90 then iTheta = iAngle - 90 iFactor = {1, 1}

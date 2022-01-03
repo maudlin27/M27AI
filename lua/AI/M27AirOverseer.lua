@@ -1878,13 +1878,13 @@ function AirAAManager(aiBrain)
                 bCloseEnoughToConsider = false
                 tUnitCurPosition = oUnit:GetPosition()
                 iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tUnitCurPosition)
-                if iDistanceFromACUToStart > 0 then
-                    if iCurDistanceToStart > iDistanceFromACUToStart then
+                if iDistanceFromACUToStart > iNearToACUThreshold then
+                    --if iCurDistanceToStart > iDistanceFromACUToStart then
                         iDistanceToACU = M27Utilities.GetDistanceBetweenPositions(tACUPos, tUnitCurPosition)
                         if iDistanceToACU <= iNearToACUThreshold then
                             iCurDistanceToStart = math.min(iCurDistanceToStart, iDistanceToACU)
                         end
-                    end
+                    --end
                 end
                 iCurTargetModDistanceFromStart = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tUnitCurPosition)
                 if iCurDistanceToStart <= iNearToACUThreshold then bShouldAttackThreat = true
