@@ -3908,7 +3908,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         --Need to get the location first so can search for engineers nearest to it
                         if iSearchRangeForNearestEngi == nil then iSearchRangeForNearestEngi = 100 end
                                 --GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocationsToPickFrom, tIdleEngineers, iActionPriority, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinTechLevelWanted)
---GET MIN ENGI TECH LEVEL WANTED
+--GET MIN ENGI TECH LEVEL WANTED if not already specified above
                         --Set minimum engineer tech level if not specified and no existing engineers assigned to the action
                         if (iHighestFactoryOrEngineerTechAvailable > 1 or iHighestFactoryOrEngineerTechAvailable > 1) and iMinEngiTechLevelWanted == nil then
                             --Are we building power or factory? If so then only build with the highest tech engi unless action is already in progress
@@ -3919,6 +3919,15 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     else iMinEngiTechLevelWanted = iHighestFactoryOrEngineerTechAvailable end
                                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then
                                         iMinEngiTechLevelWanted = math.min(iHighestFactoryOrEngineerTechAvailable, iHighestFactoryOrEngineerTechAvailable)
+                                    end
+                                elseif iHighestFactoryOrEngineerTechAvailable >= 3 then
+                                    iMinEngiTechLevelWanted = 2
+                                end
+                            else
+                                --Dont use t1 engineers for anything likely to be built near base once we have T3+ factory
+                                if iMinEngiTechLevelWanted == nil and iHighestFactoryOrEngineerTechAvailable >= 3 then
+                                    if not(iActionToAssign == refActionBuildMex) and not(iActionToAssign == refActionBuildT1Radar) and not(iActionToAssign == refActionBuildMassStorage) and not(iActionToAssign == refActionReclaim) and not(iActionToAssign == refActionSpare) and not(iActionToAssign == refActionBuildHydro) then
+                                        iMinEngiTechLevelWanted = 2
                                     end
                                 end
                             end

@@ -764,12 +764,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             end
                         elseif iCurrentConditionToTry == 9 then
                             if bHavePowerForAir then
-                                if aiBrain:GetCurrentUnits(refCategoryAirAA) < 2 then
+                                if aiBrain[M27AirOverseer.refiAirAAWanted] > 0 then
+                                    iCategoryToBuild = refCategoryAirAA
+                                    iTotalWanted = math.max(aiBrain[M27AirOverseer.refiAirAAWanted],2)
+                                elseif aiBrain:GetCurrentUnits(refCategoryAirAA) < 2 then
                                     iCategoryToBuild = refCategoryAirAA
                                     iTotalWanted = 2
-                                elseif aiBrain[M27AirOverseer.refiAirAAWanted] > 0 then
-                                    iCategoryToBuild = refCategoryAirAA
-                                    iTotalWanted = aiBrain[M27AirOverseer.refiAirAAWanted]
                                 end
                             end
                         elseif aiBrain:GetEconomyStored('MASS') > 10 then

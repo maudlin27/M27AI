@@ -6398,8 +6398,15 @@ function ProcessPlatoonAction(oPlatoon)
                         --Are we a mobile shield platoon? If so then assign the shield to a retreating platoon
                         if sPlatoonName == 'M27MobileShield' then
                             local tRemainingUnits = oPlatoon:GetPlatoonUnits()
-                            if M27Utilities.IsTableEmpty(tRemainingUnits) == false then
-                                local oShieldPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', tRemainingUnits, true)
+                            --Strange bug where just doing istableempty wasnt sufficient and could lead to constant spamming of error that object was destroyed; therefore will both check platoon exists and every unit wiithin it is valid
+                            if M27Utilities.IsTableEmpty(tRemainingUnits) == false and aiBrain:PlatoonExists(oPlatoon) then
+                                local tUnitsToRetreat = {}
+                                for iRetreatingUnit, oRetreatingUnit in tRemainingUnits do
+                                    if M27UnitInfo.IsUnitValid(oRetreatingUnit) then table.insert(tUnitsToRetreat, oRetreatingUnit) end
+                                end
+                                if M27Utilities.IsTableEmpty(tUnitsToRetreat) == false then
+                                    local oShieldPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', tUnitsToRetreat, true)
+                                end
                             end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Will now disband platoon with ref='..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
@@ -6440,7 +6447,8 @@ function ProcessPlatoonAction(oPlatoon)
                             end
                             --WaitSeconds(1)
                         else
-                            M27Utilities.ErrorHandler(sPlatoonName..oPlatoon[refiPlatoonCount]..': Told to move DF units to nearby enemy but we have no DF units in our platoon')
+                            --Might have all units on micro (e.g. if platoon is ACU)
+                            if oPlatoon[refiDFUnits] == 0 then M27Utilities.ErrorHandler(sPlatoonName..oPlatoon[refiPlatoonCount]..': Told to move DF units to nearby enemy but we have no DF units in our platoon') end
                         end
                     end
 
@@ -6886,16 +6894,13 @@ function PlatoonInitialSetup(oPlatoon)
 
             --Make sure action that give in this platoon repalces any existing action the platoon has:
             local sPathingType
-            if oPathingUnit == nil or not(tPlatoonUnits) or oPathingUnit.Dead or not(oPathingUnit.GetPosition) then
+            if not(M27UnitInfo.IsUnitValid(oPathingUnit)) then
                 M27Utilities.ErrorHandler('Possible error - no pathing unit in platoon; sPlatoonName='..sPlatoonName..oPlatoon[refiPlatoonCount]..'; will disband platoon')
                 if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then LOG('PlatoonInitialSetup: tPlatoonUnits is not empty') end
                 if oPlatoon then oPlatoon[refiCurrentAction] = refActionDisband end --and aiBrain:PlatoonExists(oPlatoon) then oPlatoon:PlatoonDisband() end
             else
                 IssueClearCommands(tPlatoonUnits)
-                local tCurPos = oPathingUnit:GetPosition()
-                local iCurSegmentX, iCurSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tCurPos)
-                sPathingType = M27UnitInfo.GetUnitPathingType(oPathingUnit)
-                local iSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iCurSegmentX, iCurSegmentZ)
+                local iSegmentGroup = M27MapInfo.GetUnitSegmentGroup(oPathingUnit)
                 if iSegmentGroup == nil then LOG('ERROR: '..sPlatoonName..oPlatoon[refiPlatoonCount]..': No segments that the platoon can path to') end
                 --M27MapInfo.RecordMexForPathingGroup(oPathingUnit)
 

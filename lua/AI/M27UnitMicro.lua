@@ -504,7 +504,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                     end
                 end
                 if oOverchargeTarget == nil then
-                    local tEnemyT2Plus = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.TECH2 + categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.TECH3 + categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.EXPERIMENTAL - categories.SUBCOMMANDER + M27UnitInfo.refCategoryAllNavy, tUnitPosition, iACURange, 'Enemy')
+                    local tEnemyT2Plus = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.TECH2 + categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.TECH3 + categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.EXPERIMENTAL - categories.SUBCOMMANDER + M27UnitInfo.refCategoryNavalSurface, tUnitPosition, iACURange, 'Enemy')
                     if M27Utilities.IsTableEmpty(tEnemyT2Plus) == false then
                         for iUnit, oEnemyT2Unit in tEnemyT2Plus do
                             if bDebugMessages == true then LOG(sFunctionRef..': Have enemy T2+ mobile land to consider') end
@@ -516,23 +516,27 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                         end
                     end
                     if oOverchargeTarget == nil then
-                        local tEnemyT1 = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE * categories.TECH1 * categories.DIRECTFIRE + categories.LAND * categories.MOBILE * categories.TECH1 * categories.INDIRECTFIRE, tUnitPosition, iACURange, 'Enemy')
+                        local tEnemyPossibleTargets = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE + categories.STRUCTURE - categories.COMMAND - categories.FACTORY * categories.STRUCTURE, tUnitPosition, iACURange, 'Enemy')
                         local tNearbyEnemiesToTarget
                         local iMaxUnitsInArea = 0
                         local iCurUnitsInArea
-                        for iUnit, oEnemyT1Unit in tEnemyT1 do
+                        local iMassValueOfUnitsInArea
+                        for iUnit, oEnemyLandUnit in tEnemyPossibleTargets do
                             if bDebugMessages == true then LOG(sFunctionRef..': Have T1 units to consider, checking how many units are near them for AOE') end
-                            tNearbyEnemiesToTarget = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, oEnemyT1Unit:GetPosition(), iOverchargeArea, 'Enemy')
+                            tNearbyEnemiesToTarget = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, oEnemyLandUnit:GetPosition(), iOverchargeArea, 'Enemy')
                             if M27Utilities.IsTableEmpty(tNearbyEnemiesToTarget) == false then
-                                iCurUnitsInArea = table.getn(tNearbyEnemiesToTarget)if bDebugMessages == true then LOG(sFunctionRef..': Have T1 units with iCurUnitsInArea='..iCurUnitsInArea..' within area effect') end
-                                if iCurUnitsInArea >= iMinT1ForOvercharge then
-                                    --bShotIsBlocked = M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT1Unit)
-                                    bShotIsBlocked = M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT1Unit)
+                                iCurUnitsInArea = table.getn(tNearbyEnemiesToTarget)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have T1 units with iCurUnitsInArea='..iCurUnitsInArea..' within area effect') end
+                                iMassValueOfUnitsInArea = 0
+                                if iCurUnitsInArea < iMinT1ForOvercharge then iMassValueOfUnitsInArea = M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemiesToTarget, true, nil, nil, nil, true) end
+                                if iCurUnitsInArea >= iMinT1ForOvercharge or iMassValueOfUnitsInArea >= iMinT1ForOvercharge * 70 then
+                                    --bShotIsBlocked = M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyLandUnit)
+                                    bShotIsBlocked = M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyLandUnit)
                                     if bShotIsBlocked == false then
                                         if iCurUnitsInArea > iMaxUnitsInArea then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Setting target to t1 unit') end
                                             iMaxUnitsInArea = iCurUnitsInArea
-                                            oOverchargeTarget = oEnemyT1Unit
+                                            oOverchargeTarget = oEnemyLandUnit
                                             if oOverchargeTarget == nil and bDebugMessages == true then LOG(sFunctionRef..': Overcharge target is nil1') end
                                         end
                                         if oOverchargeTarget == nil and bDebugMessages == true then LOG(sFunctionRef..': Overcharge target is nil2') end

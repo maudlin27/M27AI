@@ -233,7 +233,7 @@ function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocationTarget
 end
 
 function RecordIntelPaths(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordIntelPaths'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -460,252 +460,6 @@ function RecordIntelPaths(aiBrain)
             aiBrain[reftScoutsNeededPerPathPosition] = {}
             aiBrain[refiMinScoutsNeededForAnyPath] = 10000
             for iCurIntelLine = 1, iValidIntelPaths do
-                aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] = table.getn(aiBrain[reftIntelLinePositions][iCurIntelLine])
-                if aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] < aiBrain[refiMinScoutsNeededForAnyPath] then aiBrain[refiMinScoutsNeededForAnyPath] = aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] end
-            end
-            aiBrain[refiMaxIntelBasePaths] = table.getn(aiBrain[reftIntelLinePositions])
-            aiBrain[refbIntelPathsGenerated] = true
-        end
-    else
-        aiBrain[refiScoutShortfallInitialRaider] = 1
-        aiBrain[refiScoutShortfallACU] = 1
-        aiBrain[refiScoutShortfallIntelLine] = 1
-        aiBrain[refbNeedScoutPlatoons] = true
-    end
-    if bDebugMessages == true then LOG(sFunctionRef..': End of code; aiBrain[refbIntelPathsGenerated]='..tostring(aiBrain[refbIntelPathsGenerated])) end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-end
-
-function RecordIntelPathsOld(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'RecordIntelPaths'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-    local refCategoryLandScout = M27UnitInfo.refCategoryLandScout
-    aiBrain[refiMinScoutsNeededForAnyPath] = 1 --Default so wont have a nil value
-    --First check we have finished map pathing:
-    if M27MapInfo.bPathfindingComplete == true then
-    --if aiBrain:GetCurrentUnits(refCategoryLandScout) > 0 then
-        --Determine our scout range based on our faction
-        local iDefaultScoutRange = 40 --default
-        local iFactionCat = M27Utilities.FactionIndexToCategory[aiBrain:GetFactionIndex()] or categories.ALLUNITS
-        local tScoutsToBuild = EntityCategoryGetUnitList(refCategoryLandScout * iFactionCat)
-        local oScoutBP, iScoutRange
-        if M27Utilities.IsTableEmpty(tScoutsToBuild) == false then
-            for iScout, oScoutBP in tScoutsToBuild do
-                iScoutRange = oScoutBP.Intel.RadarRadius
-                if iScoutRange > 20 then break end
-            end
-        end
-        if iScoutRange == nil or iScoutRange <= 20 then iScoutRange = iDefaultScoutRange end
-        local sPathingType = M27UnitInfo.refPathingTypeLand --want land even for aeon so dont have massive scout lines across large oceans
-        local iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-        local iStartingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iSegmentX, iSegmentZ)
-
-        local iPlayerStartNumber = aiBrain.M27StartPositionNumber
-        local iEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-        if iEnemyStartNumber == nil then
-            M27Utilities.ErrorHandler('iEnemyStartNumber is nil')
-        else
-            if bDebugMessages == true then LOG(sFunctionRef..': iPlayerStartNumber='..iPlayerStartNumber) end
-            if bDebugMessages == true then LOG(sFunctionRef..'; iEnemyStartNumber='..iEnemyStartNumber) end
-            if bDebugMessages == true then LOG(sFunctionRef..': PlayerStartPos repr='..repr(M27MapInfo.PlayerStartPoints[iPlayerStartNumber])) end
-            if bDebugMessages == true then LOG(sFunctionRef..': Enemy Start Pos repr='..repr(M27MapInfo.PlayerStartPoints[iEnemyStartNumber])) end
-            local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartNumber], M27MapInfo.PlayerStartPoints[iEnemyStartNumber])
-            if bDebugMessages == true then LOG(sFunctionRef..': iPlayerStartNumber='..iPlayerStartNumber..'; iEnemyStartNumber='..iEnemyStartNumber..'; iDistToEnemy from our start='..iDistToEnemy) end
-            local iIntelLineTotal = (iDistToEnemy - iScoutRange * 2) / iScoutRange - 1 + 2 --Number of points that will be plotting for intel lines
-            if iIntelLineTotal <= 0 then iIntelLineTotal = 1 end
-            local rPlayableArea = M27MapInfo.rMapPlayableArea
-            local iMapSizeX = rPlayableArea[3] - rPlayableArea[1]
-            local iMapSizeZ = rPlayableArea[4] - rPlayableArea[2]
-
-            --Determine co-ordinates for the midpoints for each intel line:
-            aiBrain[reftIntelLinePositions] = {}
-            local iDistanceAlongPath
-            local iDistanceAlongSubpath
-            local bContinueSubpath
-            local iSubpathCount
-            local iValidSubpathCount
-            local iSubpathLoopCheck = 1000 --Code will abort if >1000 (large maps like frostmill ruins can go above 100 if doing amphibious pathing)
-            local iSubpathAngle
-            local bContinueFor90, bContinueFor270, bContinueCombined
-            local tPossiblePosition = {}
-            local iCorePathDistanceMod = 0
-            local iSubpathTempDistanceMod
-            local bSubpathIsValid
-            local iMaxLoop = iMapSizeX
-            if iMapSizeX < iMapSizeZ then iMaxLoop = iMapSizeZ end
-            local iLoopCount
-            local bInSameGroup
-            if bDebugMessages == true then LOG(sFunctionRef..'; Map size (only used now to determine max loop - i.e. the size of playable area end-playable area start): iMapSizeX='..iMapSizeX..'; iMapSizeZ='..iMapSizeZ) end
-            local iCurPathingGroup, iTargetSegmentX, iTargetSegmentZ, iSubpathPathingGroup, iSubpathSegmentX, iSubpathSegmentZ
-            local tLastSubpathDistanceFromStartByAngle = {} --[x] = 90 or 270;
-            tLastSubpathDistanceFromStartByAngle[90] = 0
-            tLastSubpathDistanceFromStartByAngle[270] = 0
-            for iCurIntelLine = 1, iIntelLineTotal do
-
-                iDistanceAlongPath = iScoutRange * iCurIntelLine
-                aiBrain[reftIntelLinePositions][iCurIntelLine] = {}
-                aiBrain[reftIntelLinePositions][iCurIntelLine][1] = {}
-                tPossiblePosition = M27Utilities.MoveTowardsTarget(M27MapInfo.PlayerStartPoints[iPlayerStartNumber], M27MapInfo.PlayerStartPoints[iEnemyStartNumber], iDistanceAlongPath)
-                --Check if can path to tPossiblePosition; if can't, then need to move down path until mod is half of intel range, and if still not valid then move up path
-                --InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly)
-                iLoopCount = 0
-                iTargetSegmentX, iTargetSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tPossiblePosition)
-                iCurPathingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iTargetSegmentX, iTargetSegmentZ)
-                if iCurPathingGroup == iStartingGroup then bInSameGroup = true else bInSameGroup = false end
-                local btMaxMapSizeCount = {}
-                if bDebugMessages == true then LOG(sFunctionRef..' start of iCurIntelLine; iCurIntelLine='..iCurIntelLine..'; iCurPathingGroup='..iCurPathingGroup..'; iStartingGroup='..iStartingGroup..'; InSameGroup='..tostring(bInSameGroup)..'; btMaxMapSizeCount='..repr(btMaxMapSizeCount)) end
-
-                local iType = 0
-                while bInSameGroup == false do
-                    if bDebugMessages == true then LOG(sFunctionRef..': '..iLoopCount..': intel path for iCurIntelLine='..iCurIntelLine..' isnt in same segment group as possible location='..repr(tPossiblePosition)..'; will try adjusting; iCorePathDistanceMod='..iCorePathDistanceMod..'; iLoopCount='..iLoopCount..'; iMaxLoop='..iMaxLoop) end
-                    iLoopCount = iLoopCount + 1
-                    if iLoopCount > iMaxLoop then
-                        M27Utilities.ErrorHandler('Exceeded max loop count; iCurIntelLine='..iCurIntelLine)
-                        break
-                    end
-
-                    if iCorePathDistanceMod < 0 and not(btMaxMapSizeCount[iType] == true) then
-                        iType = 1
-                        iCorePathDistanceMod = iCorePathDistanceMod - 1
-                        if iCorePathDistanceMod < -(iScoutRange / 2) then iCorePathDistanceMod = 1 end
-                    else
-                        iCorePathDistanceMod = iCorePathDistanceMod + 1
-                        iType = 2
-                        if btMaxMapSizeCount[iType] == true then
-                            if bDebugMessages == true then LOG('iType='..iType..'; MaxMapSizeCount is true for this type') end
-                            break
-                        end
-                    end
-
-                    tPossiblePosition = M27Utilities.MoveTowardsTarget(M27MapInfo.PlayerStartPoints[iPlayerStartNumber], M27MapInfo.PlayerStartPoints[iEnemyStartNumber], iDistanceAlongPath + iCorePathDistanceMod)
-
-                    iTargetSegmentX, iTargetSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tPossiblePosition)
-                    iCurPathingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iTargetSegmentX, iTargetSegmentZ)
-                    if iCurPathingGroup == iStartingGroup then bInSameGroup = true else bInSameGroup = false end
-
-                    if tPossiblePosition[1] >= rPlayableArea[3] - 1 or tPossiblePosition[1] <= rPlayableArea[1] + 1 or tPossiblePosition[3] >= rPlayableArea[4] - 1 or tPossiblePosition[3] <= rPlayableArea[2] + 1 then
-                        if bDebugMessages == true then LOG('Outside playable area for iType='..iType..'; will flag to ignore further places along this type') end
-                        btMaxMapSizeCount[iType] = true
-                    end
-                    if bDebugMessages == true then
-                        LOG('tPossiblePosition='..repr(tPossiblePosition)..'; bInSameGroup='..tostring(bInSameGroup)..'; iCurPathingGroup='..iCurPathingGroup..'; iStartingGroup='..iStartingGroup..'; iDistanceAlongPath='..iDistanceAlongPath..'; iCorePathDistanceMod='..iCorePathDistanceMod)
-                        if iCurIntelLine == 6 then M27Utilities.DrawLocation(tPossiblePosition, nil, 4, 1000) end
-                    end
-                end
-                aiBrain[reftIntelLinePositions][iCurIntelLine][1] = tPossiblePosition
-
-                if bDebugMessages == true then LOG(sFunctionRef..': About to reset subpathdistancefromstart and other variables; reftIntelLinePositions[Cur][1]='..repr(aiBrain[reftIntelLinePositions][iCurIntelLine][1])) end
-                if bDebugMessages == true then M27Utilities.DrawLocations({aiBrain[reftIntelLinePositions][iCurIntelLine][1]}) end
-                bContinueSubpath = true
-                iSubpathCount = 0
-                iValidSubpathCount = 0
-                iSubpathAngle = 90
-                bContinueFor90 = true bContinueFor270 = true
-                local iInfiniteLoopCheck = 100
-                iSubpathTempDistanceMod = 0
-                tLastSubpathDistanceFromStartByAngle[90] = 0
-                tLastSubpathDistanceFromStartByAngle[270] = 0
-
-                while bContinueSubpath == true do
-                    iSubpathCount = iSubpathCount + 1
-                    bSubpathIsValid = false
-                    if iSubpathCount > iSubpathLoopCheck then
-                        M27Utilities.ErrorHandler('Likely infinite loop, iSubpathCount > '..iSubpathLoopCheck..'; iCurIntelLine='..iCurIntelLine)
-                        break
-                    end
-                    if iSubpathAngle == 90 then
-                        bContinueCombined = bContinueFor90
-                    else
-                        bContinueCombined = bContinueFor270
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..' Intel Path'..iCurIntelLine..': iSubpathCount='..iSubpathCount..': bContinueFor90='..tostring(bContinueFor90)..'; bContinueFor270='..tostring(bContinueFor270)..'; bContinueCombined='..tostring(bContinueCombined)..'; tLastSubpathDistanceFromStartByAngle='..repr(tLastSubpathDistanceFromStartByAngle)) end
-                    if bContinueCombined == true then
-                        bSubpathIsValid = true
-                        iValidSubpathCount = iValidSubpathCount + 1
-                        iDistanceAlongSubpath = iScoutRange + tLastSubpathDistanceFromStartByAngle[iSubpathAngle]
-                        tPossiblePosition = M27Utilities.MoveTowardsTarget(aiBrain[reftIntelLinePositions][iCurIntelLine][1], M27MapInfo.PlayerStartPoints[iEnemyStartNumber], iDistanceAlongSubpath, iSubpathAngle)
-
-                        iLoopCount = 0
-
-                        iSubpathSegmentX, iSubpathSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tPossiblePosition)
-                        iSubpathPathingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iSubpathSegmentX, iSubpathSegmentZ)
-                        iSubpathTempDistanceMod = 0
-                        if bDebugMessages == true then LOG(sFunctionRef..': iSubpathPathingGroup='..iSubpathPathingGroup..'; tPossiblePosition='..repr(tPossiblePosition)..'; iDistanceAlongSubpath='..iDistanceAlongSubpath..'; tPossiblePosition='..repr(tPossiblePosition)..'; tLastSubpathDistanceFromStartByAngle='..repr(tLastSubpathDistanceFromStartByAngle)..'; iSubpathTempDistanceMod='..iSubpathTempDistanceMod) end
-                        while not(iSubpathPathingGroup == iStartingGroup) do
-                            if bDebugMessages == true then LOG(sFunctionRef..': '..iLoopCount..': Subpath intel path for iCurIntelLine='..iCurIntelLine..' isnt in same segment group as possible location='..repr(tPossiblePosition)..'; will try adjusting; iCorePathDistanceMod='..iCorePathDistanceMod) end
-                            iLoopCount = iLoopCount + 1
-                            if iLoopCount > iMaxLoop then
-                                M27Utilities.ErrorHandler('Exceeded max loop count; iCurIntelLine='..iCurIntelLine)
-                                break
-                            end
-
-                            if iSubpathTempDistanceMod <= 0 then
-                                iSubpathTempDistanceMod = iSubpathTempDistanceMod - 1
-                                if iSubpathTempDistanceMod < -(iScoutRange / 2) then iSubpathTempDistanceMod = 1 end
-                            else iSubpathTempDistanceMod = iSubpathTempDistanceMod + 1 end
-
-
-                            tPossiblePosition = M27Utilities.MoveTowardsTarget(aiBrain[reftIntelLinePositions][iCurIntelLine][1], M27MapInfo.PlayerStartPoints[iEnemyStartNumber], iDistanceAlongSubpath + iSubpathTempDistanceMod, iSubpathAngle)
-                            if tPossiblePosition[1] <= rPlayableArea[1] + 1 or tPossiblePosition[3] <= rPlayableArea[2] + 1 or tPossiblePosition[1] >= (rPlayableArea[3]-1) or tPossiblePosition[3] >= (rPlayableArea[4]-1) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Are outside playable area='..repr(rPlayableArea)) end
-                                break
-                            end
-
-                            iSubpathSegmentX, iSubpathSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tPossiblePosition)
-                            iSubpathPathingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iSubpathSegmentX, iSubpathSegmentZ)
-                        end
-                        if iSubpathPathingGroup == nil then
-                            M27Utilities.ErrorHandler('iSubpathingGroup is nil; tPossiblePosition='..repr(tPossiblePosition)..'; iSubpathSegmentX-Z='..iSubpathSegmentX..'-'..iSubpathSegmentZ..'; sPathingType='..sPathingType..'; iStartingGroup='..iStartingGroup..'; iSubpathCount='..iSubpathCount..'; iSubpathAngle='..iSubpathAngle..'; iScoutRange='..iScoutRange..'; tLastSubpathDistanceFromStartByAngle='..repr(tLastSubpathDistanceFromStartByAngle)..'; rPlayableArea='..repr(rPlayableArea))
-                        end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Should have a valid location for next point on subpath now; tPossiblePosition='..repr(tPossiblePosition)..'; iSubpathPathingGroup='..iSubpathPathingGroup..'; iStartingGroup='..iStartingGroup..'; will update the tLastSubpathDistanceFromStartByAngle value for this angle, iSubpathAngle='..iSubpathAngle..'; distance along path that resulted in this pre mod='..iDistanceAlongSubpath..'; iSubpathTempDistanceMod='..iSubpathTempDistanceMod) end
-                        tLastSubpathDistanceFromStartByAngle[iSubpathAngle] = iDistanceAlongSubpath + iSubpathTempDistanceMod
-                        if bDebugMessages == true then LOG(sFunctionRef..': tLastSubpathDistanceFromStartByAngle[iSubpathAngle] post update='..repr(tLastSubpathDistanceFromStartByAngle[iSubpathAngle])) end
-
-                        --aiBrain[reftIntelLinePositions][iCurIntelLine][iValidSubpathCount + 1] = tPossiblePosition
-                        --if bDebugMessages == true then LOG(sFunctionRef..'; iValidSupbathCount='..iValidSubpathCount..'; about to consider if should remove valid supbath; Pos='..repr(aiBrain[reftIntelLinePositions][iCurIntelLine][iValidSubpathCount + 1])) end
-                        if tPossiblePosition[1] >= (rPlayableArea[3]-1) or tPossiblePosition[1] <= rPlayableArea[1] + 1 or tPossiblePosition[3] >= (rPlayableArea[4] - 1) or tPossiblePosition[3] <= rPlayableArea[2] + 1 then
-                            bSubpathIsValid = false
-                            if bDebugMessages == true then LOG(sFunctionRef..': Subpath is not valid as outside playable area; tPossiblePosition='..repr(tPossiblePosition)..'; iValidSubpathCount+1 pos after removal='..repr(aiBrain[reftIntelLinePositions][iCurIntelLine][iValidSubpathCount + 1])) end
-                            iValidSubpathCount = iValidSubpathCount - 1
-                            if bDebugMessages == true then LOG(sFunctionRef..'; Subpath wasnt valid so ahve removed; iValidSupbathCount='..iValidSubpathCount) end
-                            if iSubpathAngle == 90 then
-                                bContinueFor90 = false
-                                if bContinueFor270 == false then
-                                    bContinueSubpath = false
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Aborting subpath for both 90 and 270 angles so still stop looking for subpaths now') end
-                                    break
-                                end
-                            elseif iSubpathAngle == 270 then
-                                bContinueFor270 = false
-                                if bContinueFor90 == false then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Aborting subpath for both 270 and 90 angles so still stop looking for subpaths now') end
-                                    bContinueSubpath = false
-                                    break
-                                end
-                            elseif iSubpathCount >= iInfiniteLoopCheck then bContinueSubpath = false break
-                            end
-                        else
-                            if bDebugMessages == true then LOG(sFunctionRef..': Subpath was in playable area so not removed; iValidSubpathCount='..iValidSubpathCount) end
-                            aiBrain[reftIntelLinePositions][iCurIntelLine][iValidSubpathCount + 1] = {}
-                            aiBrain[reftIntelLinePositions][iCurIntelLine][iValidSubpathCount + 1] = tPossiblePosition
-                            if bDebugMessages == true then LOG(sFunctionRef..': iSubpathCount='..iSubpathCount..'; iValidSubpathCount='..iValidSubpathCount..'; iDistanceAlongSubpath='..iDistanceAlongSubpath..'; aiBrain[reftIntelLinePositions][iCurIntelLine][iValidSubpathCount + 1] ='..repr(aiBrain[reftIntelLinePositions][iCurIntelLine][iValidSubpathCount + 1])) end
-                            if bDebugMessages == true then M27Utilities.DrawLocations({aiBrain[reftIntelLinePositions][iCurIntelLine][iValidSubpathCount + 1]}, false, 2) end
-                        end
-                    end
-
-                    if iSubpathAngle == 90 then iSubpathAngle = 270
-                    elseif iSubpathAngle == 270 then iSubpathAngle = 90 end
-
-
-
-                end
-            end
-            --Record the number of scouts needed for each intel path:
-            aiBrain[reftScoutsNeededPerPathPosition] = {}
-            aiBrain[refiMinScoutsNeededForAnyPath] = 10000
-            for iCurIntelLine = 1, iIntelLineTotal do
                 aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] = table.getn(aiBrain[reftIntelLinePositions][iCurIntelLine])
                 if aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] < aiBrain[refiMinScoutsNeededForAnyPath] then aiBrain[refiMinScoutsNeededForAnyPath] = aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] end
             end
@@ -1908,9 +1662,9 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
     if oEnemyUnit[iArmyIndex] == nil then oEnemyUnit[iArmyIndex] = {} end
     if oEnemyUnit[iArmyIndex][refbUnitAlreadyConsidered] == nil then
 
-        local bNewUnitIsOnRightTerrain
+        --[[local bNewUnitIsOnRightTerrain
         local bIsOnWater
-        local tCurPosition
+        local tCurPosition--]]
 
         if bMustBeOnLand == nil then
             bMustBeOnLand = true
@@ -2272,7 +2026,7 @@ function ThreatAssessAndRespond(aiBrain)
     local tEnemyUnits
     local iTMDAndShieldSearchRange = 25 --If dealing with T2+ PD will look for nearby shields and TMD
     local iT2ArtiSearchRange = 50 --Will look for nearby T2 arti within this range
-    local iNavyUnitCategories = M27UnitInfo.refCategoryAllAmphibiousAndNavy
+    local iNavyUnitCategories = M27UnitInfo.refCategoryNavyThatCanBeTorpedoed
     local tCategoriesToSearch = {refCategoryMobileLand, refCategoryPointDefence}
     if M27MapInfo.bMapHasWater == true then
         tCategoriesToSearch = {refCategoryMobileLand, refCategoryPointDefence, iNavyUnitCategories}
@@ -3634,7 +3388,7 @@ function SetMaximumFactoryLevels(aiBrain)
     if bDebugMessages== true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]='..aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]..'; aiBrain[M27AirOverseer.refiBombersWanted]='..aiBrain[M27AirOverseer.refiBombersWanted]..'; iTorpBomberShortfall='..iTorpBomberShortfall) end
 
     local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(1, aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]) + aiBrain[M27AirOverseer.refiBombersWanted] + iTorpBomberShortfall
-    aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4) / 5))
+    aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4)))
     if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 
     if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then
