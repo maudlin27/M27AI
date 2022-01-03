@@ -3355,9 +3355,26 @@ function ACUManager(aiBrain)
             end
         else aiBrain[refbEnemyACUNearOurs] = false
         end
-        if bAllInAttack == false and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.1 + iHealthThresholdAdjIfAlreadyAllIn) then
-            bAllInAttack = true
-            if not(oACU:IsUnitState('Upgrading')) and oACU:GetHealthPercent() > 0.5 then bIncludeACUInAttack = true end
+        if bAllInAttack == false and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
+            if aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.1 + iHealthThresholdAdjIfAlreadyAllIn) then
+                bAllInAttack = true
+            elseif aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.4 + iHealthThresholdAdjIfAlreadyAllIn) then
+                --Do we have more threat near the ACU than the ACU has?
+                local iSearchRange = 60
+                local tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iSearchRange, 'Ally')
+
+                if M27Utilities.IsTableEmpty(tAlliedUnitsNearEnemy) == false then
+                    local tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iSearchRange, 'Enemy')
+                    local iThreatFactor = 1.25
+                    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iThreatFactor = 1 end
+                    if M27Logic.GetCombatThreatRating(aiBrain, tAlliedUnitsNearEnemy, false, nil, nil, false, false) > (M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnitsNearEnemy, false, nil, nil, false, false) * iThreatFactor) then
+                        bAllInAttack = true
+                    end
+                end
+            end
+
+
+            if bAllInAttack and not(oACU:IsUnitState('Upgrading')) and oACU:GetHealthPercent() > 0.5 then bIncludeACUInAttack = true end
         end
 
 

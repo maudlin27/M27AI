@@ -375,6 +375,9 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                 if bDebugMessages == true then LOG(sFunctionRef..'; iNearestEnemyIndex='..iNearestEnemyIndex) end
                 aiBrain[refiNearestEnemyIndex] = iNearestEnemyIndex
                 aiBrain[refiNearestEnemyIndex] = iNearestEnemyIndex
+                --Update intel path as nearest enemy has changed
+                aiBrain[M27Overseer.refbIntelPathsGenerated] = false
+                ForkThread(M27Overseer.RecordIntelPaths, aiBrain)
             end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return iNearestEnemyIndex
