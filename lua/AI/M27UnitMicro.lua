@@ -307,9 +307,15 @@ function DodgeBomb(oBomber, oWeapon, projectile)
     local tBombTarget = GetBombTarget(oWeapon, projectile)
     if tBombTarget then
         local iBombSize = 2.5
-        if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then iBombSize = 3 end --Some t2 bombers do damage in a spread (cybran, uef)
         if oWeapon.GetBlueprint then iBombSize = math.max(iBombSize, (oWeapon:GetBlueprint().DamageRadius or iBombSize)) end
-        local iTimeToRun = math.min(7, iBombSize + 1)
+        local iTimeToRun = 0.75 --T1
+        if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then
+            iBombSize = 3
+            iTimeToRun = 1.5
+        elseif EntityCategoryContains(categories.TECH3, oBomber:GetUnitId()) then
+            iTimeToRun = 2.5
+        end --Some t2 bombers do damage in a spread (cybran, uef)
+        --local iTimeToRun = math.min(7, iBombSize + 1)
         local iRadiusSize = iBombSize + 1
 
         local iBomberArmyIndex = oBomber:GetAIBrain():GetArmyIndex()
@@ -327,7 +333,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                 for iUnit, oUnit in tMobileLandInArea do
                     if not(oUnit.Dead) and oUnit.GetUnitId and oUnit.GetPosition and oUnit.GetAIBrain then
                         oCurBrain = oUnit:GetAIBrain()
-                        if oCurBrain.M27AI and IsEnemy(oCurBrain:GetArmyIndex(), iBomberArmyIndex) then
+                        if oCurBrain.M27AI and not(oCurBrain.M27IsDefeated) and not(oCurBrain:IsDefeated()) and M27Logic.iTimeOfLastBrainAllDefeated < 10 and IsEnemy(oCurBrain:GetArmyIndex(), iBomberArmyIndex) then
                             --ACU specific
                             if M27Utilities.IsACU(oUnit) then
                                 local aiBrain = oCurBrain
@@ -471,7 +477,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
             if bAbort == false then
 
                 --Is there any enemy point defence nearby? If so then overcharge it (unless are running away in which case just target mobile units)
-                if oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionRun or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionTemporaryRetreat or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReturnToBase then bAreRunning = true end
+                if oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionRun or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionTemporaryRetreat or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReturnToBase or (M27Utilities.IsACU(oUnitWithOvercharge) and oUnitWithOvercharge:GetHealth() < aiBrain[M27Overseer.refiACUHealthToRunOn]) then bAreRunning = true end
                 if bAreRunning == false then
                     if oOverchargeTarget == nil then
                         local tEnemyPointDefence = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE * categories.DIRECTFIRE, tUnitPosition, iACURange, 'Enemy')

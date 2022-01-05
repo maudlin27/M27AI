@@ -953,6 +953,7 @@ function UpgradeManager(aiBrain)
     --Initial wait:
     WaitTicks(300)
     while(not(aiBrain:IsDefeated())) do
+        if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         iCurCycleTime = iCycleWaitTime --default (is shortened if have lots to upgrade)
         ForkThread(UpgradeMainLoop, aiBrain)

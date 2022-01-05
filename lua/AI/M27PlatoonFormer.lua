@@ -1166,8 +1166,8 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                 M27Utilities.DelayChangeVariable(oNewUnit, refbJustCleared, false, 1, nil, nil)
             end
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AllocateNewUnitsToPlatoonNotFromFactory(tNewUnits)
@@ -1316,6 +1316,7 @@ function PlatoonIdleUnitOverseer(aiBrain)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleOther)
 
     while(not(aiBrain:IsDefeated())) do
+        if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
         if bDebugMessages == true then LOG(sFunctionRef..': About to fork thread function to assign idle platoon units to platoons') end
         iCycleCount = iCycleCount + 1
         ForkThread(PlatoonMainIdleUnitLoop, aiBrain, iCycleCount)

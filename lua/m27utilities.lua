@@ -581,10 +581,13 @@ function GetACU(aiBrain)
             else
                 --is an error where if return the ACU then causes a hard crash (due to some of hte code that relies on this) - easiest way is to just return nil causing an error message that doesnt cause a hard crash
                 --(have tested without waiting any seconds and it avoids the hard crash, but waiting just to be safe)
-                ErrorHandler('ACU is dead - will wait 30 seconds and then return nil')
-                WaitSeconds(30)
-                ErrorHandler('ACU is dead - finished waiting 30 seconds to try and avoid crash')
-
+                --ErrorHandler('ACU is dead - will wait 1 second and then return nil', nil, true)
+                --WaitSeconds(1)
+                --ErrorHandler('ACU is dead - finished waiting 1 second to try and avoid crash', nil, true)
+                M27Overseer.iACUAlternativeFailureCount = M27Overseer.iACUAlternativeFailureCount + 1
+                aiBrain.M27IsDefeated = true
+                ErrorHandler('ACU is dead, will return nil; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
+                oACU = nil
             end
         end
     end
@@ -933,7 +936,7 @@ function ProfilerOutput()
             if IsTableEmpty(tProfilerTimeTakenInTickByFunction[iCurTick]) == false then
                 for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenInTickByFunction[iCurTick], true) do
                     iCount = iCount + 1
-                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerCountByTickByFunction[iCurTick][sFunctionName]..'; Total Time='..iValue)
+                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..(tProfilerCountByTickByFunction[iCurTick][sFunctionName] or 'nil')..'; Total Time='..iValue)
                     if iCount >= 10 then break end
                 end
 
@@ -941,7 +944,7 @@ function ProfilerOutput()
                 iCount = 0
                 for sFunctionName, iValue in SortTableByValue(tProfilerCountByTickByFunction[iCurTick], true) do
                     iCount = iCount + 1
-                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerCountByTickByFunction[iCurTick][sFunctionName]..'; Total Time='..iValue)
+                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..(tProfilerCountByTickByFunction[iCurTick][sFunctionName] or 'nil')..'; Total Time='..iValue)
                     if iCount >= 10 then break end
                 end
                 LOG(sFunctionRef..': IssueMove cumulative count='..IssueCount)

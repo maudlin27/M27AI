@@ -25,8 +25,9 @@ refoStartingACU = 'M27PlayerStartingACU' --NOTE: Use M27Utilities.GetACU(aiBrain
 tAllAIBrainsByArmyIndex = {} --Stores table of all aiBrains, used as sometimes are getting errors when trying to use ArmyBrains
 refiDistanceToNearestEnemy = 'M27DistanceToNearestEnemy'
 --AnotherAIBrainsBackup = {}
-toEnemyBrains = {}
+toEnemyBrains = 'M27OverseerEnemyBrains'
 iACUDeathCount = 0
+iACUAlternativeFailureCount = 0
 iDistanceFromBaseToBeSafe = 55 --If ACU wants to run (<50% health) then will think its safe once its this close to our base
 iDistanceFromBaseWhenVeryLowHealthToBeSafe = 25 --As above but when ACU on lower health
 
@@ -236,241 +237,284 @@ function RecordIntelPaths(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordIntelPaths'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-    local refCategoryLandScout = M27UnitInfo.refCategoryLandScout
-    aiBrain[refiMinScoutsNeededForAnyPath] = 1 --Default so wont have a nil value
-    --First check we have finished map pathing:
-    if M27MapInfo.bPathfindingComplete == true then
-        --if aiBrain:GetCurrentUnits(refCategoryLandScout) > 0 then
-        --Determine our scout range based on our faction
-        local iDefaultScoutRange = 40 --default
-        local iFactionCat = M27Utilities.FactionIndexToCategory[aiBrain:GetFactionIndex()] or categories.ALLUNITS
-        local tScoutsToBuild = EntityCategoryGetUnitList(refCategoryLandScout * iFactionCat)
-        local oScoutBP, iScoutRange
-        if M27Utilities.IsTableEmpty(tScoutsToBuild) == false then
-            for iScout, oScoutBP in tScoutsToBuild do
-                iScoutRange = oScoutBP.Intel.RadarRadius
-                if iScoutRange > 20 then break end
-            end
-        end
-        if iScoutRange == nil or iScoutRange <= 20 then iScoutRange = iDefaultScoutRange end
-        local iSubpathGap = iScoutRange * 1.7
-        local sPathingType = M27UnitInfo.refPathingTypeLand --want land even for aeon so dont have massive scout lines across large oceans
-        local iStartingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-
-        --Get a table of all enemy start locations
-        if M27Utilities.IsTableEmpty(toEnemyBrains) == true and GetGameTimeSeconds() > 20 then
-            M27Utilities.ErrorHandler('No nearby enemies')
-        else
-            local tEnemyStartPositions = {}
-            local iCount = 0
-            for iBrain, oBrain in toEnemyBrains do
-                iCount = iCount + 1
-                tEnemyStartPositions[iCount] = M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]
-            end
-            local tNearestEnemyStart = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
-            local iAngleToEnemy = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tNearestEnemyStart)
-
-            local iMinX = M27MapInfo.rMapPlayableArea[1] + 5
-            local iMinZ = M27MapInfo.rMapPlayableArea[2] + 5
-            local iMaxX = M27MapInfo.rMapPlayableArea[3] - 5
-            local iMaxZ = M27MapInfo.rMapPlayableArea[4] - 5
-
-            --First determine all the base intel path positions
-            local bStillDeterminingBaseIntelPaths = true
-            local bStillDeterminingSubpaths = true
-            iCount = 0
-            local iMaxCount = 200
-            local tPossibleBasePosition
-            local tiAdjToDistanceAlongPathByAngle = { } --adjustment if going towards enemy base (rather than moving at right angle)
-            local iBaseDistanceAlongPath
-            local iValidIntelPaths = 0
-            local iValidSubpaths = 0
-            local iCurAngleAdjust
-            local iAltCount
-            local iMaxAltCount = 1000
-            local iAdjustIncrement
-            local bCanPathToLocation = false
-            aiBrain[reftIntelLinePositions] = {}
-
-            local tbStopMovingInDirection = {[0]=false, [90]=false, [270] = false}
-
-            --Find the base points on each intel path by moving towards enemy base and seeing if we can path there
-            while bStillDeterminingBaseIntelPaths == true do
-                iCurAngleAdjust = 0
-                tiAdjToDistanceAlongPathByAngle = {[0]=0,[90]=0,[270]=0}
-                tbStopMovingInDirection = {[0]=false, [90]=false, [270] = false}
-                iCount = iCount + 1
-                if iCount > iMaxCount then
-                    M27Utilities.ErrorHandler('Likely infinite loop')
-                    break
+    if not(aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
+        if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+        local refCategoryLandScout = M27UnitInfo.refCategoryLandScout
+        aiBrain[refiMinScoutsNeededForAnyPath] = 1 --Default so wont have a nil value
+        --First check we have finished map pathing:
+        if M27MapInfo.bPathfindingComplete == true then
+            --if aiBrain:GetCurrentUnits(refCategoryLandScout) > 0 then
+            --Determine our scout range based on our faction
+            local iDefaultScoutRange = 40 --default
+            local iFactionCat = M27Utilities.FactionIndexToCategory[aiBrain:GetFactionIndex()] or categories.ALLUNITS
+            local tScoutsToBuild = EntityCategoryGetUnitList(refCategoryLandScout * iFactionCat)
+            local oScoutBP, iScoutRange
+            if M27Utilities.IsTableEmpty(tScoutsToBuild) == false then
+                for iScout, oScoutBP in tScoutsToBuild do
+                    iScoutRange = oScoutBP.Intel.RadarRadius
+                    if iScoutRange > 20 then break end
                 end
-                iBaseDistanceAlongPath = (iValidIntelPaths + 1) * iDefaultScoutRange * 0.5
-                tPossibleBasePosition = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy, iBaseDistanceAlongPath + tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
-                if bDebugMessages == true then M27Utilities.DrawLocation(tPossibleBasePosition, nil, 2, 200) end --red
-                iAltCount = 0
-                iAdjustIncrement = 0
-                bCanPathToLocation = false
-                --Check if we can path to the target; if we cant then search at 0, 90 and 270 degrees to the normal direction in ever increasing distances until we either go off-map or get near an enemy base
-                while bCanPathToLocation == false do
-                    if bDebugMessages == true then LOG(sFunctionRef..': iValidIntelPaths='..iValidIntelPaths..'; tPossibleBasePosition='..repr(tPossibleBasePosition)..'; tbStopMovingInDirection[iCurAngleAdjust]='..tostring(tbStopMovingInDirection[iCurAngleAdjust])..'; iCurAngleAdjust='..iCurAngleAdjust..'; iBaseDistanceAlongPath='..iBaseDistanceAlongPath..'; tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]='..tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]) end
-                    if tbStopMovingInDirection[iCurAngleAdjust] == false then
-                        if M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then bCanPathToLocation = true
-                        else
-                            iAltCount = iAltCount + 1
-                            if iAltCount > iMaxAltCount then
+            end
+            if iScoutRange == nil or iScoutRange <= 20 then iScoutRange = iDefaultScoutRange end
+            local iSubpathGap = iScoutRange * 1.7
+            local sPathingType = M27UnitInfo.refPathingTypeLand --want land even for aeon so dont have massive scout lines across large oceans
+            local iStartingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+
+            --Get a table of all enemy start locations
+            if M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) == true and GetGameTimeSeconds() > 20 then
+                M27Utilities.ErrorHandler('No nearby enemies')
+            else
+                if aiBrain:IsDefeated() == false then --Already have M27IsDefeated check above
+                    local tEnemyStartPositions = {}
+                    local iCount = 0
+                    for iBrain, oBrain in aiBrain[toEnemyBrains] do
+                        if not(oBrain.M27IsDefeated) then
+                            iCount = iCount + 1
+                            tEnemyStartPositions[oBrain:GetArmyIndex()] = M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]
+                        end
+                    end
+                    if iCount > 0 then
+                        local tNearestEnemyStart = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                        local iAngleToEnemy = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tNearestEnemyStart)
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': Our army index='..aiBrain:GetArmyIndex()..'; Our start number='..aiBrain.M27StartPositionNumber..'; Nearest enemy index='..M27Logic.GetNearestEnemyIndex(aiBrain)..'; Nearest enemy start number='..M27Logic.GetNearestEnemyStartNumber(aiBrain)..'; Our start position='..repr(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Nearest enemy startp osition='..repr(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])) end
+
+                        local iMinX = M27MapInfo.rMapPlayableArea[1] + 5
+                        local iMinZ = M27MapInfo.rMapPlayableArea[2] + 5
+                        local iMaxX = M27MapInfo.rMapPlayableArea[3] - 5
+                        local iMaxZ = M27MapInfo.rMapPlayableArea[4] - 5
+
+                        --First determine all the base intel path positions
+                        local bStillDeterminingBaseIntelPaths = true
+                        local bStillDeterminingSubpaths = true
+                        iCount = 0
+                        local iMaxCount = 200
+                        local tPossibleBasePosition
+                        local tiAdjToDistanceAlongPathByAngle = { } --adjustment if going towards enemy base (rather than moving at right angle)
+                        local iBaseDistanceAlongPath
+                        local iValidIntelPaths = 0
+                        local iValidSubpaths = 0
+                        local iCurAngleAdjust
+                        local iAltCount
+                        local iMaxAltCount = 1000
+                        local iAdjustIncrement
+                        local bCanPathToLocation = false
+                        aiBrain[reftIntelLinePositions] = {}
+                        aiBrain[refiCurIntelLineTarget] = 1
+
+                        local tbStopMovingInDirection = {[0]=false, [90]=false, [270] = false}
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop to determine all base intel paths') end
+--=======BASE PATHS
+                        --Find the base points on each intel path by moving towards enemy base and seeing if we can path there
+                        while bStillDeterminingBaseIntelPaths == true do
+                            iCurAngleAdjust = 0
+                            tiAdjToDistanceAlongPathByAngle = {[0]=0,[90]=0,[270]=0}
+                            tbStopMovingInDirection = {[0]=false, [90]=false, [270] = false}
+                            iCount = iCount + 1
+                            if iCount > iMaxCount then
                                 M27Utilities.ErrorHandler('Likely infinite loop')
-                                bStillDeterminingBaseIntelPaths = false
                                 break
                             end
-
-                            --alternate between moving from this position, first forwards by 1, then to the side by 1, then the other side by 1; then by 3; then by 6, then by 10, then 15, then 21, then 28
-                            if iCurAngleAdjust == 0 then
-                                iAdjustIncrement = math.min(iAdjustIncrement + 1, 30)
-                            end
-                            tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iAdjustIncrement
-                            tPossibleBasePosition = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy + iCurAngleAdjust, iBaseDistanceAlongPath + tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
-                            if bDebugMessages == true then M27Utilities.DrawLocation(tPossibleBasePosition, nil, 2, 200) end --red
-
-                            --Check we're still within map bounds
-                            if tPossibleBasePosition[1] <= iMinX or tPossibleBasePosition[1] >= iMaxX or tPossibleBasePosition[3] <= iMinZ or tPossibleBasePosition[3] >= iMaxZ then
-                                --Out of map bounds, flag to ignore angles of this type in the future
-                                tbStopMovingInDirection[iCurAngleAdjust] = true
-                                --Are all the others flagged to be true?
-                                bStillDeterminingBaseIntelPaths = false
-                                for _, bValue in tbStopMovingInDirection do
-                                    if bValue == false then bStillDeterminingBaseIntelPaths = true break end
-                                end
-                                if bStillDeterminingBaseIntelPaths == false then break end
-                            end
-                        end
-                    end
-
-                    --Change angle for next attempt
-                    if iCurAngleAdjust == 0 then iCurAngleAdjust = 90
-                    elseif iCurAngleAdjust == 90 then iCurAngleAdjust = 270
-                    else iCurAngleAdjust = 0
-                    end
-                end
-                if bCanPathToLocation == false then
-                    --Couldnt find any valid locations, so stop looking
-                    bStillDeterminingBaseIntelPaths = false
-                else
-                    --Check the target location isn't too close to an enemy base
-                    for iEnemy, tEnemyBase in tEnemyStartPositions do
-                        if M27Utilities.GetDistanceBetweenPositions(tEnemyBase, tPossibleBasePosition) < 40 then
+                            iBaseDistanceAlongPath = (iValidIntelPaths + 1) * iDefaultScoutRange * 0.5
+                            tPossibleBasePosition = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy, iBaseDistanceAlongPath + tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
+                            if bDebugMessages == true then
+                                LOG('Base path attempt that cant path to; Will draw tPossibleBasePosition='..repr(tPossibleBasePosition)..' in red')
+                                M27Utilities.DrawLocation(tPossibleBasePosition, nil, 2, 200)
+                            end --red
+                            iAltCount = 0
+                            iAdjustIncrement = 0
                             bCanPathToLocation = false
-                            break
+                            --Check if we can path to the target; if we cant then search at 0, 90 and 270 degrees to the normal direction in ever increasing distances until we either go off-map or get near an enemy base
+                            while bCanPathToLocation == false do
+                                if bDebugMessages == true then LOG(sFunctionRef..': iValidIntelPaths='..iValidIntelPaths..'; tPossibleBasePosition='..repr(tPossibleBasePosition)..'; tbStopMovingInDirection[iCurAngleAdjust]='..tostring(tbStopMovingInDirection[iCurAngleAdjust])..'; iCurAngleAdjust='..iCurAngleAdjust..'; iBaseDistanceAlongPath='..iBaseDistanceAlongPath..'; tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]='..tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]) end
+                                if tbStopMovingInDirection[iCurAngleAdjust] == false then
+                                    if M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Can path to location') end
+                                        bCanPathToLocation = true
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Cant path to location so will consider alternative points; iAltCount='..iAltCount) end
+                                        iAltCount = iAltCount + 1
+                                        if iAltCount > iMaxAltCount then
+                                            M27Utilities.ErrorHandler('Likely infinite loop')
+                                            bStillDeterminingBaseIntelPaths = false
+                                            break
+                                        end
+
+                                        --alternate between moving from this position, first forwards by 1, then to the side by 1, then the other side by 1; then by 3; then by 6, then by 10, then 15, then 21, then 28
+                                        if iCurAngleAdjust == 0 then
+                                            iAdjustIncrement = math.min(iAdjustIncrement + 1, 30)
+                                        end
+                                        tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iAdjustIncrement
+                                        tPossibleBasePosition = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy + iCurAngleAdjust, iBaseDistanceAlongPath + tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef..': tPossibleBasePosition='..repr(tPossibleBasePosition)..'; iCurAngleAdjust='..iCurAngleAdjust..'; iBaseDistanceAlongPath='..iBaseDistanceAlongPath..'; tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]='..tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]..'; will draw in red')
+                                            M27Utilities.DrawLocation(tPossibleBasePosition, nil, 2, 200)
+                                        end --red
+
+                                        --Check we're still within map bounds
+                                        if tPossibleBasePosition[1] <= iMinX or tPossibleBasePosition[1] >= iMaxX or tPossibleBasePosition[3] <= iMinZ or tPossibleBasePosition[3] >= iMaxZ then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': tPossibleBasePosition='..repr(tPossibleBasePosition)..'; are out of map bounds so will stop looking in this direction. iCurAngleAdjust='..iCurAngleAdjust) end
+                                            --Out of map bounds, flag to ignore angles of this type in the future
+                                            tbStopMovingInDirection[iCurAngleAdjust] = true
+                                            --Are all the others flagged to be true?
+                                            bStillDeterminingBaseIntelPaths = false
+                                            for _, bValue in tbStopMovingInDirection do
+                                                if bValue == false then bStillDeterminingBaseIntelPaths = true break end
+                                            end
+                                            if bStillDeterminingBaseIntelPaths == false then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Are stopping looking for all angles so will abort; tbStopMovingInDirection='..repr(tbStopMovingInDirection)) end
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+
+                                --Change angle for next attempt
+                                if iCurAngleAdjust == 0 then iCurAngleAdjust = 90
+                                elseif iCurAngleAdjust == 90 then iCurAngleAdjust = 270
+                                else iCurAngleAdjust = 0
+                                end
+                            end
+                            if bCanPathToLocation == false then
+                                --Couldnt find any valid locations, so stop looking
+                                bStillDeterminingBaseIntelPaths = false
+                            else
+                                --Check the target location isn't too close to an enemy base
+                                if bDebugMessages == true then LOG(sFunctionRef..': Checking we arent too close to an enemy base') end
+                                for iEnemy, tEnemyBase in tEnemyStartPositions do
+                                    if M27Utilities.GetDistanceBetweenPositions(tEnemyBase, tPossibleBasePosition) < 40 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Are too close to an enemy. tPossibleBasePosition='..repr(tPossibleBasePosition)..'; tEnemyBase='..repr(tEnemyBase)) end
+                                        bCanPathToLocation = false
+                                        break
+                                    end
+                                end
+                                if bCanPathToLocation == true then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Can path to location so will record as valid intel path') end
+                                    --Record base point of intel path
+                                    iValidIntelPaths = iValidIntelPaths + 1
+                                    aiBrain[reftIntelLinePositions][iValidIntelPaths] = {}
+                                    aiBrain[reftIntelLinePositions][iValidIntelPaths][1] = {tPossibleBasePosition[1], tPossibleBasePosition[2], tPossibleBasePosition[3]}
+                                    if bDebugMessages == true then
+                                        LOG('Base path that can path to; Will draw tPossibleBasePosition='..repr(tPossibleBasePosition)..' in white')
+                                        M27Utilities.DrawLocation(tPossibleBasePosition, nil, 7, 200)
+                                    end --white
+                                else
+                                    --We've got too near enemy base so stop creating new base points
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Got too near enemy base so will stop creating new base points in intel path') end
+                                    bStillDeterminingBaseIntelPaths = false
+                                end
+                            end
                         end
-                    end
-                    if bCanPathToLocation == true then
-                        --Record base point of intel path
-                        iValidIntelPaths = iValidIntelPaths + 1
-                        aiBrain[reftIntelLinePositions][iValidIntelPaths] = {}
-                        aiBrain[reftIntelLinePositions][iValidIntelPaths][1] = {tPossibleBasePosition[1], tPossibleBasePosition[2], tPossibleBasePosition[3]}
-                        if bDebugMessages == true then M27Utilities.DrawLocation(tPossibleBasePosition, nil, 7, 200) end --white
-                    else
-                        --We've got too near enemy base so stop creating new base points
-                        bStillDeterminingBaseIntelPaths = false
+                        --Backup - if no intel paths found then use the first point from our base to enemy even if it cant be pathed to
+                        if iValidIntelPaths == 0 then
+                            M27Utilities.ErrorHandler('Couldnt find any valid base intel paths, will just set one thats near our base as backup; error unless map has very small land pathable base. ArmyIndex='..aiBrain:GetArmyIndex()..'; Nearest enemy army index='..M27Logic.GetNearestEnemyIndex(aiBrain))
+                            iValidIntelPaths = 1
+                            aiBrain[reftIntelLinePositions][iValidIntelPaths] = {}
+                            aiBrain[reftIntelLinePositions][iValidIntelPaths][1] = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy, 20)
+                        end
+--=====SUBPATHS
+                        --Determine subpaths for each main path
+                        local tiCyclesSinceLastMatch
+                        local iInitialInterval = 2
+                        local iPointToSwitchToPositiveAdj = (iScoutRange * 0.5) / iInitialInterval
+                        for iIntelPath = 1, iValidIntelPaths do
+                            bStillDeterminingSubpaths = true
+                            iCount = 0
+                            iValidSubpaths = 0
+
+                            iCurAngleAdjust = 90
+                            tiAdjToDistanceAlongPathByAngle = {[90]=iSubpathGap,[270]=iSubpathGap}
+                            tbStopMovingInDirection = {[90]=false, [270] = false}
+
+                            iAltCount = 0
+                            iAdjustIncrement = 0
+                            bCanPathToLocation = false
+                            tiCyclesSinceLastMatch = {[90]=0, [270]=0}
+
+                            --Start by alternating left and right; if find a match then increase the adjustment for that direction by the relevant scout range and continue with logic
+                            while bStillDeterminingSubpaths == true do
+                                iAltCount = iCount + 1
+                                if bDebugMessages == true then LOG(sFunctionRef..': iIntelPath='..iIntelPath..'; Subpath altcount='..iAltCount..'; tiCyclesSinceLastMatch='..repr(tiCyclesSinceLastMatch)..'; our aiBrain ArmyIndex='..aiBrain:GetArmyIndex()) end
+                                tiCyclesSinceLastMatch[iCurAngleAdjust] = tiCyclesSinceLastMatch[iCurAngleAdjust] + 1
+                                if iAltCount > iMaxAltCount then
+                                    M27Utilities.ErrorHandler('Likely infinite loop')
+                                    bStillDeterminingSubpaths = false
+                                    break
+                                end
+                                if tbStopMovingInDirection[iCurAngleAdjust] == false then
+
+                                    tPossibleBasePosition = M27Utilities.MoveInDirection(aiBrain[reftIntelLinePositions][iIntelPath][1], iAngleToEnemy + iCurAngleAdjust, tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
+                                    --Check we're still within map bounds
+                                    if tPossibleBasePosition[1] <= iMinX or tPossibleBasePosition[1] >= iMaxX or tPossibleBasePosition[3] <= iMinZ or tPossibleBasePosition[3] >= iMaxZ then
+                                        --Out of map bounds, flag to ignore angles of this type in the future
+                                        tbStopMovingInDirection[iCurAngleAdjust] = true
+                                        --Are all the others flagged to be true?
+                                        bStillDeterminingSubpaths = false
+                                        for _, bValue in tbStopMovingInDirection do
+                                            if bValue == false then bStillDeterminingSubpaths = true break end
+                                        end
+                                        if bStillDeterminingSubpaths == false then break end
+                                    end
+
+                                    --Can we path to the location? if so then record as a subpath entry
+                                    if tbStopMovingInDirection[iCurAngleAdjust] == false and M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then
+                                        iValidSubpaths = iValidSubpaths + 1
+                                        aiBrain[reftIntelLinePositions][iValidIntelPaths][iValidSubpaths + 1] = {tPossibleBasePosition[1], tPossibleBasePosition[2], tPossibleBasePosition[3]}
+                                        tiCyclesSinceLastMatch[iCurAngleAdjust] = 0
+                                        tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iSubpathGap
+                                        if bDebugMessages == true then
+                                            LOG('Subpath that can path to; Will draw tPossibleBasePosition='..repr(tPossibleBasePosition)..' in Dark blue')
+                                            M27Utilities.DrawLocation(tPossibleBasePosition, nil, 1, 200)
+                                        end --Dark blue
+                                    elseif bDebugMessages == true then
+                                        LOG('Attempted subpath that cant path to; Will draw tPossibleBasePosition='..repr(tPossibleBasePosition)..' in gold')
+                                        M27Utilities.DrawLocation(tPossibleBasePosition, nil, 4, 200) --Gold
+                                    end
+
+                                    --Increase distance adjustment for next attempt (look in bigger intervals for performance reasons if its been a while since a match, since e.g. might be dealing with a large ocean)
+                                    if tiCyclesSinceLastMatch[iCurAngleAdjust] < iPointToSwitchToPositiveAdj then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]  - iInitialInterval
+                                    elseif tiCyclesSinceLastMatch[iCurAngleAdjust] == iPointToSwitchToPositiveAdj then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iInitialInterval * iPointToSwitchToPositiveAdj
+                                    else
+                                        tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
+                                        if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 17 then
+                                            tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
+                                            if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 22 then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
+                                                if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 27 then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
+                                                    if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 32 then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2 end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+
+                                --Change angle for next attempt
+                                if iCurAngleAdjust == 90 then iCurAngleAdjust = 270
+                                else iCurAngleAdjust = 90
+                                end
+                            end
+                        end
+
+
+                        --Record the number of scouts needed for each intel path:
+                        aiBrain[reftScoutsNeededPerPathPosition] = {}
+                        aiBrain[refiMinScoutsNeededForAnyPath] = 10000
+                        for iCurIntelLine = 1, iValidIntelPaths do
+                            aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] = table.getn(aiBrain[reftIntelLinePositions][iCurIntelLine])
+                            if aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] < aiBrain[refiMinScoutsNeededForAnyPath] then aiBrain[refiMinScoutsNeededForAnyPath] = aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] end
+                        end
+                        aiBrain[refiMaxIntelBasePaths] = table.getn(aiBrain[reftIntelLinePositions])
+                        aiBrain[refbIntelPathsGenerated] = true
+                        if bDebugMessages == true then LOG(sFunctionRef..'; just set intelpathsgenerated to be true') end
                     end
                 end
             end
-            --Backup - if no intel paths found then use the first point from our base to enemy even if it cant be pathed to
-            if iValidIntelPaths == 0 then
-                M27Utilities.ErrorHandler('Couldnt find any valid base intel paths, will just set one thats near our base as backup; error unless map has very small land pathable base')
-                iValidIntelPaths = 1
-                aiBrain[reftIntelLinePositions][iValidIntelPaths] = {}
-                aiBrain[reftIntelLinePositions][iValidIntelPaths][1] = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy, 20)
-            end
-
-            --Determine subpaths for each main path
-            local tiCyclesSinceLastMatch
-            local iInitialInterval = 2
-            local iPointToSwitchToPositiveAdj = (iScoutRange * 0.5) / iInitialInterval
-            for iIntelPath = 1, iValidIntelPaths do
-                bStillDeterminingSubpaths = true
-                iCount = 0
-                iValidSubpaths = 0
-
-                iCurAngleAdjust = 90
-                tiAdjToDistanceAlongPathByAngle = {[90]=iSubpathGap,[270]=iSubpathGap}
-                tbStopMovingInDirection = {[90]=false, [270] = false}
-
-                iAltCount = 0
-                iAdjustIncrement = 0
-                bCanPathToLocation = false
-                tiCyclesSinceLastMatch = {[90]=0, [270]=0}
-
-                --Start by alternating left and right; if find a match then increase the adjustment for that direction by the relevant scout range and continue with logic
-                while bStillDeterminingSubpaths == true do
-                    iAltCount = iCount + 1
-                    if bDebugMessages == true then LOG(sFunctionRef..':Subpath altcount='..iAltCount..'; tiCyclesSinceLastMatch='..repr(tiCyclesSinceLastMatch)) end
-                    tiCyclesSinceLastMatch[iCurAngleAdjust] = tiCyclesSinceLastMatch[iCurAngleAdjust] + 1
-                    if iAltCount > iMaxAltCount then
-                        M27Utilities.ErrorHandler('Likely infinite loop')
-                        bStillDeterminingSubpaths = false
-                        break
-                    end
-                    if tbStopMovingInDirection[iCurAngleAdjust] == false then
-
-                        tPossibleBasePosition = M27Utilities.MoveInDirection(aiBrain[reftIntelLinePositions][iIntelPath][1], iAngleToEnemy + iCurAngleAdjust, tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
-                        --Check we're still within map bounds
-                        if tPossibleBasePosition[1] <= iMinX or tPossibleBasePosition[1] >= iMaxX or tPossibleBasePosition[3] <= iMinZ or tPossibleBasePosition[3] >= iMaxZ then
-                            --Out of map bounds, flag to ignore angles of this type in the future
-                            tbStopMovingInDirection[iCurAngleAdjust] = true
-                            --Are all the others flagged to be true?
-                            bStillDeterminingSubpaths = false
-                            for _, bValue in tbStopMovingInDirection do
-                                if bValue == false then bStillDeterminingSubpaths = true break end
-                            end
-                            if bStillDeterminingSubpaths == false then break end
-                        end
-
-                        --Can we path to the location? if so then record as a subpath entry
-                        if tbStopMovingInDirection[iCurAngleAdjust] == false and M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then
-                            iValidSubpaths = iValidSubpaths + 1
-                            aiBrain[reftIntelLinePositions][iValidIntelPaths][iValidSubpaths + 1] = {tPossibleBasePosition[1], tPossibleBasePosition[2], tPossibleBasePosition[3]}
-                            tiCyclesSinceLastMatch[iCurAngleAdjust] = 0
-                            tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iSubpathGap
-                            if bDebugMessages == true then M27Utilities.DrawLocation(tPossibleBasePosition, nil, 1, 200) end --Dark blue
-                        elseif bDebugMessages == true then M27Utilities.DrawLocation(tPossibleBasePosition, nil, 4, 200) --Gold
-                        end
-
-                        --Increase distance adjustment for next attempt (look in bigger intervals for performance reasons if its been a while since a match, since e.g. might be dealing with a large ocean)
-                        if tiCyclesSinceLastMatch[iCurAngleAdjust] < iPointToSwitchToPositiveAdj then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]  - iInitialInterval
-                        elseif tiCyclesSinceLastMatch[iCurAngleAdjust] == iPointToSwitchToPositiveAdj then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iInitialInterval * iPointToSwitchToPositiveAdj
-                        else
-                            tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
-                            if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 20 then
-                                tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
-                                if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 25 then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2 end
-                            end
-                        end
-                    end
-
-                    --Change angle for next attempt
-                    if iCurAngleAdjust == 90 then iCurAngleAdjust = 270
-                    else iCurAngleAdjust = 90
-                    end
-                end
-            end
-
-
-            --Record the number of scouts needed for each intel path:
-            aiBrain[reftScoutsNeededPerPathPosition] = {}
-            aiBrain[refiMinScoutsNeededForAnyPath] = 10000
-            for iCurIntelLine = 1, iValidIntelPaths do
-                aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] = table.getn(aiBrain[reftIntelLinePositions][iCurIntelLine])
-                if aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] < aiBrain[refiMinScoutsNeededForAnyPath] then aiBrain[refiMinScoutsNeededForAnyPath] = aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLine] end
-            end
-            aiBrain[refiMaxIntelBasePaths] = table.getn(aiBrain[reftIntelLinePositions])
-            aiBrain[refbIntelPathsGenerated] = true
+        else
+            aiBrain[refiScoutShortfallInitialRaider] = 1
+            aiBrain[refiScoutShortfallACU] = 1
+            aiBrain[refiScoutShortfallIntelLine] = 1
+            aiBrain[refbNeedScoutPlatoons] = true
         end
-    else
-        aiBrain[refiScoutShortfallInitialRaider] = 1
-        aiBrain[refiScoutShortfallACU] = 1
-        aiBrain[refiScoutShortfallIntelLine] = 1
-        aiBrain[refbNeedScoutPlatoons] = true
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code; aiBrain[refbIntelPathsGenerated]='..tostring(aiBrain[refbIntelPathsGenerated])) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -1972,7 +2016,6 @@ function ThreatAssessAndRespond(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ThreatAssessAndRespond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
     --Key config variables:
     --v14 and earlier values:
     --local iLandThreatGroupDistance = 20 --Units this close to each other get included in the same threat group
@@ -2578,72 +2621,76 @@ function ThreatAssessAndRespond(aiBrain)
                                 M27Utilities.ErrorHandler('WARNING - oArmyPoolPlatoon is oBasePlatoon - will abort threat intereception logic and flag that want defender platoons to be created')
                                 if table.getn(tAvailablePlatoons) <= 1 then aiBrain[refbNeedDefenders] = true end
                             else
-                                if oBasePlatoon:GetPlan() == nil then
-                                    LOG(sFunctionRef..': ERROR - oBasePlatoons plan is nil, will set to be the defender AI, bIndirectThreatOnly='..tostring(bIndirectThreatOnly))
-                                    if bIndirectThreatOnly then
-                                        oBasePlatoon:SetAIPlan('M27IndirectDefender')
-                                        oBasePlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = true
-                                    else oBasePlatoon:SetAIPlan(sDefenderPlatoonRef) end
-                                end
-                                sPlan = oBasePlatoon:GetPlan()
-                                iPlatoonNumber = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                                if iPlatoonNumber == nil then iPlatoonNumber = 0 end
-                                sPlatoonRef = sPlan..iPlatoonNumber
+                                if (oBasePlatoon[refiTotalThreat] or 0) > 0 and M27Utilities.IsTableEmpty(oBasePlatoon:GetPlatoonUnits()) == false then
+                                    if oBasePlatoon:GetPlan() == nil then
+                                        LOG(sFunctionRef..': ERROR - oBasePlatoons plan is nil, will set to be the defender AI, bIndirectThreatOnly='..tostring(bIndirectThreatOnly))
+                                        if bIndirectThreatOnly then
+                                            oBasePlatoon:SetAIPlan('M27IndirectDefender')
+                                            oBasePlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = true
+                                        else oBasePlatoon:SetAIPlan(sDefenderPlatoonRef) end
+                                    end
+                                    sPlan = oBasePlatoon:GetPlan()
+                                    iPlatoonNumber = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                    if iPlatoonNumber == nil then iPlatoonNumber = 0 end
+                                    sPlatoonRef = sPlan..iPlatoonNumber
+                                    oBasePlatoon[reftAveragePosition] = oBasePlatoon:GetPlatoonPosition()
+                                    if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; Base platoon av position='..repr(oBasePlatoon[reftAveragePosition])..'; tEnemyThreatGroup[reftAveragePosition]='..repr(tEnemyThreatGroup[reftAveragePosition])) end
+                                    oBasePlatoon[refiActualDistanceFromEnemy] = M27Utilities.GetDistanceBetweenPositions(oBasePlatoon[reftAveragePosition], tEnemyThreatGroup[reftAveragePosition])
+                                    bRefreshPlatoonAction = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': BasePlatoonRef='..sPlatoonRef..': Considering whether base platoon should have an overseer action override. bAddedUnitsToPlatoon='..tostring(bAddedUnitsToPlatoon)..'; base platoon size='..table.getn(oBasePlatoon:GetPlatoonUnits())) end
+                                    --if not(bAddedUnitsToPlatoon) then
+                                    local iOverseerRefreshCountThreshold = 4
+                                    if bIndirectThreatOnly == true then iOverseerRefreshCountThreshold = 9 end
+                                    if M27Utilities.IsTableEmpty(oBasePlatoon[M27PlatoonUtilities.reftPrevAction]) == false then
+                                        local iPrevAction = oBasePlatoon[M27PlatoonUtilities.reftPrevAction][1]
+                                        if iPrevAction == M27PlatoonUtilities.refActionRun or iPrevAction == M27PlatoonUtilities.refActionTemporaryRetreat or iPrevAction == M27PlatoonUtilities.refActionAttack then
+                                            bRefreshPlatoonAction = false
+                                        elseif oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] and oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] <= iOverseerRefreshCountThreshold then
+                                            bRefreshPlatoonAction = false
+                                        end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Base platoon has at least 1 previous action, iPrevAction='..iPrevAction..'; bRefreshPlatoonAction='..tostring(bRefreshPlatoonAction)..'; oBasePlatoon[M27PlatoonUtilities.refbOverseerAction]='..tostring(oBasePlatoon[M27PlatoonUtilities.refbOverseerAction])) end
+                                    end
+                                    --end
 
-                                oBasePlatoon[reftAveragePosition] = oBasePlatoon:GetPlatoonPosition()
-                                oBasePlatoon[refiActualDistanceFromEnemy] = M27Utilities.GetDistanceBetweenPositions(oBasePlatoon[reftAveragePosition], tEnemyThreatGroup[reftAveragePosition])
-                                bRefreshPlatoonAction = true
-                                if bDebugMessages == true then LOG(sFunctionRef..': BasePlatoonRef='..sPlatoonRef..': Considering whether base platoon should have an overseer action override. bAddedUnitsToPlatoon='..tostring(bAddedUnitsToPlatoon)..'; base platoon size='..table.getn(oBasePlatoon:GetPlatoonUnits())) end
-                                --if not(bAddedUnitsToPlatoon) then
-                                local iOverseerRefreshCountThreshold = 4
-                                if bIndirectThreatOnly == true then iOverseerRefreshCountThreshold = 9 end
-                                if M27Utilities.IsTableEmpty(oBasePlatoon[M27PlatoonUtilities.reftPrevAction]) == false then
-                                    local iPrevAction = oBasePlatoon[M27PlatoonUtilities.reftPrevAction][1]
-                                    if iPrevAction == M27PlatoonUtilities.refActionRun or iPrevAction == M27PlatoonUtilities.refActionTemporaryRetreat or iPrevAction == M27PlatoonUtilities.refActionAttack then
-                                        bRefreshPlatoonAction = false
-                                    elseif oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] and oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] <= iOverseerRefreshCountThreshold then
-                                        bRefreshPlatoonAction = false
+                                    if bRefreshPlatoonAction == true then
+                                        oBasePlatoon[M27PlatoonUtilities.refbOverseerAction] = true
+                                        if bDebugMessages == true then
+                                            local iPlatoonCount = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                            if iPlatoonCount == nil then iPlatoonCount = 'nil' end
+                                            LOG(sFunctionRef..': Given override action to Base platoon sPlatoonRef='..sPlatoonRef..'; About to issue new orders to oBasePlatoon; oBasePlatoon count='..iPlatoonCount..'; oBasePlatoon[refiActualDistanceFromEnemy]='..oBasePlatoon[refiActualDistanceFromEnemy])
+                                        end
+                                        if oBasePlatoon[refiActualDistanceFromEnemy] <= 30 then
+                                            --if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; Telling base platoon to have actionattack') end
+                                            oBasePlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionAttack
+                                            --oBasePlatoon[M27PlatoonUtilities.refiEnemiesInRange] = tEnemyThreatGroup[refiEnemyThreatGroupUnitCount]
+                                            --oBasePlatoon[M27PlatoonUtilities.reftEnemiesInRange] = tEnemyThreatGroup[refoEnemyGroupUnits]
+                                            if bAddedUnitsToPlatoon == true then M27PlatoonUtilities.ForceActionRefresh(oBasePlatoon) end
+                                        else
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; Telling base platoon to refresh its movement path') end
+                                            M27PlatoonUtilities.ForceActionRefresh(oBasePlatoon)
+                                            oBasePlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
+                                        end
                                     end
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Base platoon has at least 1 previous action, iPrevAction='..iPrevAction..'; bRefreshPlatoonAction='..tostring(bRefreshPlatoonAction)..'; oBasePlatoon[M27PlatoonUtilities.refbOverseerAction]='..tostring(oBasePlatoon[M27PlatoonUtilities.refbOverseerAction])) end
-                                end
-                                --end
-
-                                if bRefreshPlatoonAction == true then
-                                    oBasePlatoon[M27PlatoonUtilities.refbOverseerAction] = true
-                                    if bDebugMessages == true then
-                                        local iPlatoonCount = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                                        if iPlatoonCount == nil then iPlatoonCount = 'nil' end
-                                        LOG(sFunctionRef..': Given override action to Base platoon sPlatoonRef='..sPlatoonRef..'; About to issue new orders to oBasePlatoon; oBasePlatoon count='..iPlatoonCount..'; oBasePlatoon[refiActualDistanceFromEnemy]='..oBasePlatoon[refiActualDistanceFromEnemy])
+                                    --IssueClearCommands(oBasePlatoon:GetPlatoonUnits())
+                                    oBasePlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                    oBasePlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftAveragePosition]
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; oBasePlatoon now has movementpath='..repr(oBasePlatoon[M27PlatoonUtilities.reftMovementPath])) end
+                                    oBasePlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
+                                    --oBasePlatoon[M27PlatoonUtilities.refiLastPathTarget] = 1
+                                    oBasePlatoon[refsEnemyThreatGroup] = iEnemyGroup
+                                    --Free up any spare scouts and MAA post-platoon merger:
+                                    RemoveSpareNonCombatUnits(oBasePlatoon)
+                                    --Remove DF units if are attacking a structure
+                                    if sPlan == 'M27IndirectDefender' and oBasePlatoon[M27PlatoonUtilities.refiDFUnits] and oBasePlatoon[M27PlatoonUtilities.refiDFUnits] > 0 then M27PlatoonUtilities.RemoveUnitsFromPlatoon(oBasePlatoon, oBasePlatoon[M27PlatoonUtilities.reftDFUnits], nil, nil) end
+                                    --Set whether should move in formation or rush towards enemy
+                                    local sCurFormation = 'AttackFormation'
+                                    if tEnemyThreatGroup[refiDistanceFromOurBase] <= 60 then sCurFormation = 'GrowthFormation'
+                                    elseif oBasePlatoon[refiActualDistanceFromEnemy] <= 35 then sCurFormation = 'GrowthFormation'
                                     end
-                                    if oBasePlatoon[refiActualDistanceFromEnemy] <= 30 then
-                                        --if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; Telling base platoon to have actionattack') end
-                                        oBasePlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionAttack
-                                        --oBasePlatoon[M27PlatoonUtilities.refiEnemiesInRange] = tEnemyThreatGroup[refiEnemyThreatGroupUnitCount]
-                                        --oBasePlatoon[M27PlatoonUtilities.reftEnemiesInRange] = tEnemyThreatGroup[refoEnemyGroupUnits]
-                                        if bAddedUnitsToPlatoon == true then M27PlatoonUtilities.ForceActionRefresh(oBasePlatoon) end
-                                    else
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; Telling base platoon to refresh its movement path') end
-                                        M27PlatoonUtilities.ForceActionRefresh(oBasePlatoon)
-                                        oBasePlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
-                                    end
+                                    oBasePlatoon:SetPlatoonFormationOverride(sCurFormation)
+                                else
+                                    if bGetACUHelp == false then M27Utilities.ErrorHandler('oBasePlatoon is nil but had thought could beat the enemy, and ACU isnt part of attack - likely error') end
                                 end
-                                --IssueClearCommands(oBasePlatoon:GetPlatoonUnits())
-                                oBasePlatoon[M27PlatoonUtilities.reftMovementPath] = {}
-                                oBasePlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftAveragePosition]
-                                if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; oBasePlatoon now has movementpath='..repr(oBasePlatoon[M27PlatoonUtilities.reftMovementPath])) end
-                                oBasePlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
-                                --oBasePlatoon[M27PlatoonUtilities.refiLastPathTarget] = 1
-                                oBasePlatoon[refsEnemyThreatGroup] = iEnemyGroup
-                                --Free up any spare scouts and MAA post-platoon merger:
-                                RemoveSpareNonCombatUnits(oBasePlatoon)
-                                --Remove DF units if are attacking a structure
-                                if sPlan == 'M27IndirectDefender' and oBasePlatoon[M27PlatoonUtilities.refiDFUnits] and oBasePlatoon[M27PlatoonUtilities.refiDFUnits] > 0 then M27PlatoonUtilities.RemoveUnitsFromPlatoon(oBasePlatoon, oBasePlatoon[M27PlatoonUtilities.reftDFUnits], nil, nil) end
-                                --Set whether should move in formation or rush towards enemy
-                                local sCurFormation = 'AttackFormation'
-                                if tEnemyThreatGroup[refiDistanceFromOurBase] <= 60 then sCurFormation = 'GrowthFormation'
-                                elseif oBasePlatoon[refiActualDistanceFromEnemy] <= 35 then sCurFormation = 'GrowthFormation'
-                                end
-                                oBasePlatoon:SetPlatoonFormationOverride(sCurFormation)
                             end
                         end
                         if bGetACUHelp then
@@ -2798,121 +2845,76 @@ function ACUManager(aiBrain)
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    if not(aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
+        local oACU = M27Utilities.GetACU(aiBrain)
+        if oACU[refbACUOnInitialBuildOrder] == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Start of code - ACU isnt on initial build order') end
+            --Config related
+            local iBuildDistance = oACU:GetBlueprint().Economy.MaxBuildDistance
 
-    local oACU = M27Utilities.GetACU(aiBrain)
-    if oACU[refbACUOnInitialBuildOrder] == false then
-        if bDebugMessages == true then LOG(sFunctionRef..': Start of code - ACU isnt on initial build order') end
-        --Config related
-        local iBuildDistance = oACU:GetBlueprint().Economy.MaxBuildDistance
+            local iDistanceToLookForMexes = iBuildDistance + iACUMaxTravelToNearbyMex --Note The starting build order uses a condition which references whether ACU has mexes this far away, so factor in if changing this
+            local iDistanceToLookForReclaim = iBuildDistance + iACUMaxTravelToNearbyMex
+            local iMinReclaimValue = 16
+            local iRangeForEmergencyEscort = 150
+            local iRangeForACUToBeNearBase = 150
 
-        local iDistanceToLookForMexes = iBuildDistance + iACUMaxTravelToNearbyMex --Note The starting build order uses a condition which references whether ACU has mexes this far away, so factor in if changing this
-        local iDistanceToLookForReclaim = iBuildDistance + iACUMaxTravelToNearbyMex
-        local iMinReclaimValue = 16
-        local iRangeForEmergencyEscort = 150
-        local iRangeForACUToBeNearBase = 150
-
-        local tACUPos = oACU:GetPosition()
+            local tACUPos = oACU:GetPosition()
 
 
 
-        local oACUPlatoon = oACU.PlatoonHandle
-        local sPlatoonName = 'None'
-        if oACUPlatoon and oACUPlatoon.GetPlan then sPlatoonName = oACUPlatoon:GetPlan() end
-        local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
+            local oACUPlatoon = oACU.PlatoonHandle
+            local sPlatoonName = 'None'
+            if oACUPlatoon and oACUPlatoon.GetPlan then sPlatoonName = oACUPlatoon:GetPlan() end
+            local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
 
-        if oACUPlatoon then
-            aiBrain[refiCyclesThatACUHasNoPlatoon] = 0
-            if oACUPlatoon == oArmyPoolPlatoon then
-                sPlatoonName = 'ArmyPool'
-                aiBrain[refiCyclesThatACUInArmyPool] = aiBrain[refiCyclesThatACUInArmyPool] + 1
-            elseif sPlatoonName == 'M27ACUMain' then
-                --Clear engineer trackers if have an action assigned that doesnt correspond to platoon action
-                if oACU[M27EngineerOverseer.refiEngineerCurrentAction] and oACUPlatoon[M27PlatoonUtilities.refiCurrentAction] then
-                    if not(oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing')) then
-                        local iCurAction = oACUPlatoon[M27PlatoonUtilities.refiCurrentAction]
-                        if not(iCurAction == M27PlatoonUtilities.refActionBuildLandFactory or iCurAction == M27PlatoonUtilities.refActionBuildInitialPower) then
-                            --Have an engineer action assigned but the platoon we're in doesnt, need to clear engineer tracker to free up any guarding units
-                            M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oACU, true)
+            if oACUPlatoon then
+                aiBrain[refiCyclesThatACUHasNoPlatoon] = 0
+                if oACUPlatoon == oArmyPoolPlatoon then
+                    sPlatoonName = 'ArmyPool'
+                    aiBrain[refiCyclesThatACUInArmyPool] = aiBrain[refiCyclesThatACUInArmyPool] + 1
+                elseif sPlatoonName == 'M27ACUMain' then
+                    --Clear engineer trackers if have an action assigned that doesnt correspond to platoon action
+                    if oACU[M27EngineerOverseer.refiEngineerCurrentAction] and oACUPlatoon[M27PlatoonUtilities.refiCurrentAction] then
+                        if not(oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing')) then
+                            local iCurAction = oACUPlatoon[M27PlatoonUtilities.refiCurrentAction]
+                            if not(iCurAction == M27PlatoonUtilities.refActionBuildLandFactory or iCurAction == M27PlatoonUtilities.refActionBuildInitialPower) then
+                                --Have an engineer action assigned but the platoon we're in doesnt, need to clear engineer tracker to free up any guarding units
+                                M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oACU, true)
+                            end
+                        end
+                    end
+                elseif sPlatoonName == sDefenderPlatoonRef then
+                    --ACU should only be in defender platoon if there are land enemies near base
+                    local tEnemiesNearBase = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxACUEmergencyThreatRange, 'Enemy')
+                    if M27Utilities.IsTableEmpty(tEnemiesNearBase) then
+                        --Check we're not upgrading
+                        if not(oACU:IsUnitState('Upgrading')) then
+                            oACU.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
+                            local oNewPlatoon = aiBrain:MakePlatoon('','')
+                            aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU}, 'Attack', 'None')
+                            oNewPlatoon:SetAIPlan('M27ACUMain')
                         end
                     end
                 end
-            elseif sPlatoonName == sDefenderPlatoonRef then
-                --ACU should only be in defender platoon if there are land enemies near base
-                local tEnemiesNearBase = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxACUEmergencyThreatRange, 'Enemy')
-                if M27Utilities.IsTableEmpty(tEnemiesNearBase) then
-                    --Check we're not upgrading
-                    if not(oACU:IsUnitState('Upgrading')) then
-                        oACU.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
-                        local oNewPlatoon = aiBrain:MakePlatoon('','')
-                        aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU}, 'Attack', 'None')
-                        oNewPlatoon:SetAIPlan('M27ACUMain')
-                    end
-                end
+            else
+                aiBrain[refiCyclesThatACUHasNoPlatoon] = aiBrain[refiCyclesThatACUHasNoPlatoon] + 1
+                aiBrain[refiCyclesThatACUInArmyPool] = 0
             end
-        else
-            aiBrain[refiCyclesThatACUHasNoPlatoon] = aiBrain[refiCyclesThatACUHasNoPlatoon] + 1
-            aiBrain[refiCyclesThatACUInArmyPool] = 0
-        end
 
-        --=======ACU Idle override
-        local iIdleCount = 0
-        local iIdleThreshold = 3
-        if M27Logic.IsUnitIdle(oACU, false, true) == true then
-            if bDebugMessages == true then LOG(sFunctionRef..': ACU is idle, iIdleCount='..iIdleCount) end
-            iIdleCount = iIdleCount + 1
-            if iIdleCount > iIdleThreshold then
-                local oNewPlatoon = aiBrain:MakePlatoon('', '')
-                aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU},'Attack', 'None')
-                oNewPlatoon:SetAIPlan('M27ACUMain')
-                if oACUPlatoon and not(oACUPlatoon == oArmyPoolPlatoon) and oACUPlatoon.PlatoonDisband then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Disbanding ACU current platoon') end
-                    oACUPlatoon:PlatoonDisband()
-                end
-                if bDebugMessages == true then
-                    local iPlatoonCount = oNewPlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                    if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27ACUMain']
-                        if iPlatoonCount == nil then iPlatoonCount = 1
-                        else iPlatoonCount = iPlatoonCount + 1 end
-                    end
-                    LOG(sFunctionRef..': Changed ACU platoon back to ACU main, platoon name+count='..'M27ACUMain'..iPlatoonCount)
-                end
-            end
-        else
-            iIdleCount = 0
-        end
-
-        --==============ACU PLATOON FORM OVERRIDES==========------------
-        --Check to try and ensure ACU gets put in a platoon when its gun upgrade has finished (sometimes this doesnt happen)
-        if bDebugMessages == true then LOG(sFunctionRef..'oACU[refbACUHelpWanted]='..tostring(oACU[refbACUHelpWanted])) end
-        if not(sPlatoonName == 'M27ACUMain') then
-
-            if M27Conditions.DoesACUHaveGun(aiBrain, true) == true then
-                if bDebugMessages == true then LOG(sFunctionRef..': ACU has gun, switching it to the ACUMain platoon if its not using it') end
-                local bReplacePlatoon = true
-                if sPlatoonName == 'M27ACUMain' then
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU is using M27ACUMain already so dont refresh platoon') end
-                    bReplacePlatoon = false
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU is using '..sPlatoonName..': Will refresh unless are building') end
-                    --Check if are building something
-                    local bLetACUFinishBuilding = false
-                    if oACU:IsUnitState('Building') == true then
-                        local oUnitBeingBuilt = oACU:GetFocusUnit()
-                        if oUnitBeingBuilt:GetFractionComplete() <= 0.25 then
-                            --Only keep building if is a mex
-                            local sBeingBuilt = oUnitBeingBuilt:GetUnitId()
-                            if EntityCategoryContains(categories.MASSEXTRACTION, sBeingBuilt) == true then bLetACUFinishBuilding = true end
-                        else bLetACUFinishBuilding = true
-                        end
-                    end
-
-                    if bLetACUFinishBuilding == true then bReplacePlatoon = true end
-                end
-                if bReplacePlatoon == true then
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU is using '..sPlatoonName..': Are creating a new AI for ACU') end
+            --=======ACU Idle override
+            local iIdleCount = 0
+            local iIdleThreshold = 3
+            if M27Logic.IsUnitIdle(oACU, false, true) == true then
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU is idle, iIdleCount='..iIdleCount) end
+                iIdleCount = iIdleCount + 1
+                if iIdleCount > iIdleThreshold then
                     local oNewPlatoon = aiBrain:MakePlatoon('', '')
                     aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU},'Attack', 'None')
                     oNewPlatoon:SetAIPlan('M27ACUMain')
+                    if oACUPlatoon and not(oACUPlatoon == oArmyPoolPlatoon) and oACUPlatoon.PlatoonDisband then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Disbanding ACU current platoon') end
+                        oACUPlatoon:PlatoonDisband()
+                    end
                     if bDebugMessages == true then
                         local iPlatoonCount = oNewPlatoon[M27PlatoonUtilities.refiPlatoonCount]
                         if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27ACUMain']
@@ -2923,359 +2925,406 @@ function ACUManager(aiBrain)
                     end
                 end
             else
-                --NOTE: Rare error where ACU would start upgrade and then cancel straight away - if happens again, expand the code where are disbanding to get upgrade so that it also assigns the command to get the upgrade
-                local bCreateNewPlatoon = false
-                local bDisbandExistingPlatoon = false
-                if oACUPlatoon == nil then
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU has no gun and no platoon') end
-                    if aiBrain[refiCyclesThatACUHasNoPlatoon] > 4 then --5 cycles where no platoon, so create a new one unless ACU is busy
-                        if GetGameTimeSeconds() > 30 then --at start of game is a wait of longer than 4 seconds before ACU is able to do anything
-                            bCreateNewPlatoon = true
-                            if bDebugMessages == true then LOG(sFunctionRef..': ACU been in no platoon for '..aiBrain[refiCyclesThatACUHasNoPlatoon]..' cycles so giving it a platoon unless its reclaiming/repairing/upgrading/building') end
-                            --Dont create if ACU is doing somethign likely useful
-                            if oACU:IsUnitState('Building') == true or oACU:IsUnitState('Reclaiming') == true or oACU:IsUnitState('Repairing') == true or oACU:IsUnitState('Upgrading') == true or oACU:IsUnitState('Guarding') then bCreateNewPlatoon = false end
+                iIdleCount = 0
+            end
+
+            --==============ACU PLATOON FORM OVERRIDES==========------------
+            --Check to try and ensure ACU gets put in a platoon when its gun upgrade has finished (sometimes this doesnt happen)
+            if bDebugMessages == true then LOG(sFunctionRef..'oACU[refbACUHelpWanted]='..tostring(oACU[refbACUHelpWanted])) end
+            if not(sPlatoonName == 'M27ACUMain') then
+
+                if M27Conditions.DoesACUHaveGun(aiBrain, true) == true then
+                    if bDebugMessages == true then LOG(sFunctionRef..': ACU has gun, switching it to the ACUMain platoon if its not using it') end
+                    local bReplacePlatoon = true
+                    if sPlatoonName == 'M27ACUMain' then
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU is using M27ACUMain already so dont refresh platoon') end
+                        bReplacePlatoon = false
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU is using '..sPlatoonName..': Will refresh unless are building') end
+                        --Check if are building something
+                        local bLetACUFinishBuilding = false
+                        if oACU:IsUnitState('Building') == true then
+                            local oUnitBeingBuilt = oACU:GetFocusUnit()
+                            if oUnitBeingBuilt:GetFractionComplete() <= 0.25 then
+                                --Only keep building if is a mex
+                                local sBeingBuilt = oUnitBeingBuilt:GetUnitId()
+                                if EntityCategoryContains(categories.MASSEXTRACTION, sBeingBuilt) == true then bLetACUFinishBuilding = true end
+                            else bLetACUFinishBuilding = true
+                            end
+                        end
+
+                        if bLetACUFinishBuilding == true then bReplacePlatoon = true end
+                    end
+                    if bReplacePlatoon == true then
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU is using '..sPlatoonName..': Are creating a new AI for ACU') end
+                        local oNewPlatoon = aiBrain:MakePlatoon('', '')
+                        aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU},'Attack', 'None')
+                        oNewPlatoon:SetAIPlan('M27ACUMain')
+                        if bDebugMessages == true then
+                            local iPlatoonCount = oNewPlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                            if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27ACUMain']
+                                if iPlatoonCount == nil then iPlatoonCount = 1
+                                else iPlatoonCount = iPlatoonCount + 1 end
+                            end
+                            LOG(sFunctionRef..': Changed ACU platoon back to ACU main, platoon name+count='..'M27ACUMain'..iPlatoonCount)
                         end
                     end
                 else
-                    if oACUPlatoon == oArmyPoolPlatoon then
-                        if bDebugMessages == true then LOG(sFunctionRef..': ACU has no gun is in army pool, will try and create a new platoon if no help needed from ACU') end
-                        if oACU[refbACUHelpWanted] == false then
-                            bCreateNewPlatoon = true
-                        else
-                            if aiBrain[refiCyclesThatACUInArmyPool] > 9 then
-                                if GetGameTimeSeconds() > 30 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': ACU been in army pool for '..aiBrain[refiCyclesThatACUInArmyPool]..' cycles so giving it a platoon unless its reclaiming/repairing/upgrading/building/guarding') end
-                                    if oACU:IsUnitState('Building') == true or oACU:IsUnitState('Reclaiming') == true or oACU:IsUnitState('Repairing') == true or oACU:IsUnitState('Upgrading') == true or oACU:IsUnitState('Guarding') then bCreateNewPlatoon = false end
-                                    bCreateNewPlatoon = true --Dont want ACU staying in army pool if its still not been used
-                                end
+                    --NOTE: Rare error where ACU would start upgrade and then cancel straight away - if happens again, expand the code where are disbanding to get upgrade so that it also assigns the command to get the upgrade
+                    local bCreateNewPlatoon = false
+                    local bDisbandExistingPlatoon = false
+                    if oACUPlatoon == nil then
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU has no gun and no platoon') end
+                        if aiBrain[refiCyclesThatACUHasNoPlatoon] > 4 then --5 cycles where no platoon, so create a new one unless ACU is busy
+                            if GetGameTimeSeconds() > 30 then --at start of game is a wait of longer than 4 seconds before ACU is able to do anything
+                                bCreateNewPlatoon = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': ACU been in no platoon for '..aiBrain[refiCyclesThatACUHasNoPlatoon]..' cycles so giving it a platoon unless its reclaiming/repairing/upgrading/building') end
+                                --Dont create if ACU is doing somethign likely useful
+                                if oACU:IsUnitState('Building') == true or oACU:IsUnitState('Reclaiming') == true or oACU:IsUnitState('Repairing') == true or oACU:IsUnitState('Upgrading') == true or oACU:IsUnitState('Guarding') then bCreateNewPlatoon = false end
                             end
                         end
                     else
-                        if bDebugMessages == true then LOG(sFunctionRef..': ACU has no gun and is in platoon '..sPlatoonName) end
-                        --ACU is in a platoon but its not the army pool; disband if meet the conditions for gun upgrade and ACU not building
-                        bDisbandExistingPlatoon = true
-                        if oACU:IsUnitState('Building') == true or oACU:IsUnitState('Repairing') == true or oACU:IsUnitState('Upgrading') == true then bDisbandExistingPlatoon = false
+                        if oACUPlatoon == oArmyPoolPlatoon then
+                            if bDebugMessages == true then LOG(sFunctionRef..': ACU has no gun is in army pool, will try and create a new platoon if no help needed from ACU') end
+                            if oACU[refbACUHelpWanted] == false then
+                                bCreateNewPlatoon = true
+                            else
+                                if aiBrain[refiCyclesThatACUInArmyPool] > 9 then
+                                    if GetGameTimeSeconds() > 30 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU been in army pool for '..aiBrain[refiCyclesThatACUInArmyPool]..' cycles so giving it a platoon unless its reclaiming/repairing/upgrading/building/guarding') end
+                                        if oACU:IsUnitState('Building') == true or oACU:IsUnitState('Reclaiming') == true or oACU:IsUnitState('Repairing') == true or oACU:IsUnitState('Upgrading') == true or oACU:IsUnitState('Guarding') then bCreateNewPlatoon = false end
+                                        bCreateNewPlatoon = true --Dont want ACU staying in army pool if its still not been used
+                                    end
+                                end
+                            end
                         else
-                            bDisbandExistingPlatoon = M27Conditions.WantToGetGunUpgrade(aiBrain)
-                        end
-                        if bDisbandExistingPlatoon == true then
-                            --Check no nearby enemies first
-                            bDisbandExistingPlatoon = false
-                            if oACUPlatoon[M27PlatoonUtilities.refiEnemiesInRange] == nil or oACUPlatoon[M27PlatoonUtilities.refiEnemiesInRange] == 0 then
-                                local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.DIRECTFIRE + categories.LAND*categories.INDIRECTFIRE, tACUPos, aiBrain[refiSearchRangeForEnemyStructures], 'Enemy')
-                                if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == true then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': ACU has no nearby enemies so about to disband so it can upgrade to gun, but first checking if it needs to heal') end
-                                    --Check not injured and wanting to heal
-                                    if not(oACUPlatoon[M27PlatoonUtilities.refbNeedToHeal]==true) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU needs to heal') end
-                                        bDisbandExistingPlatoon = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': ACU has no gun and is in platoon '..sPlatoonName) end
+                            --ACU is in a platoon but its not the army pool; disband if meet the conditions for gun upgrade and ACU not building
+                            bDisbandExistingPlatoon = true
+                            if oACU:IsUnitState('Building') == true or oACU:IsUnitState('Repairing') == true or oACU:IsUnitState('Upgrading') == true then bDisbandExistingPlatoon = false
+                            else
+                                bDisbandExistingPlatoon = M27Conditions.WantToGetGunUpgrade(aiBrain)
+                            end
+                            if bDisbandExistingPlatoon == true then
+                                --Check no nearby enemies first
+                                bDisbandExistingPlatoon = false
+                                if oACUPlatoon[M27PlatoonUtilities.refiEnemiesInRange] == nil or oACUPlatoon[M27PlatoonUtilities.refiEnemiesInRange] == 0 then
+                                    local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.DIRECTFIRE + categories.LAND*categories.INDIRECTFIRE, tACUPos, aiBrain[refiSearchRangeForEnemyStructures], 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == true then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU has no nearby enemies so about to disband so it can upgrade to gun, but first checking if it needs to heal') end
+                                        --Check not injured and wanting to heal
+                                        if not(oACUPlatoon[M27PlatoonUtilities.refbNeedToHeal]==true) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': ACU needs to heal') end
+                                            bDisbandExistingPlatoon = true
+                                        end
                                     end
                                 end
                             end
                         end
                     end
-                end
-                if bDisbandExistingPlatoon == true then
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU ready to get gun so disbanding') end
-                    if oACUPlatoon and aiBrain:PlatoonExists(oACUPlatoon) then
-                        oACUPlatoon:PlatoonDisband()
-                        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oACU, true)
-                    end
-                elseif bCreateNewPlatoon == true then
-                    local oNewPlatoon = aiBrain:MakePlatoon('', '')
-                    aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU},'Support', 'None')
-                    oNewPlatoon:SetAIPlan('M27ACUMain')
-                    aiBrain[refiCyclesThatACUInArmyPool] = 0
-                    aiBrain[refiCyclesThatACUHasNoPlatoon] = 0
-                    if bDebugMessages == true then
-                        local iPlatoonCount = oNewPlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                        if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27ACUMain']
-                            if iPlatoonCount == nil then iPlatoonCount = 1
-                            else iPlatoonCount = iPlatoonCount + 1 end
+                    if bDisbandExistingPlatoon == true then
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU ready to get gun so disbanding') end
+                        if oACUPlatoon and aiBrain:PlatoonExists(oACUPlatoon) then
+                            oACUPlatoon:PlatoonDisband()
+                            M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oACU, true)
                         end
-                        LOG(sFunctionRef..': Changed ACU platoon back to ACU main, platoon name+count='..'M27ACUMain'..iPlatoonCount)
+                    elseif bCreateNewPlatoon == true then
+                        local oNewPlatoon = aiBrain:MakePlatoon('', '')
+                        aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU},'Support', 'None')
+                        oNewPlatoon:SetAIPlan('M27ACUMain')
+                        aiBrain[refiCyclesThatACUInArmyPool] = 0
+                        aiBrain[refiCyclesThatACUHasNoPlatoon] = 0
+                        if bDebugMessages == true then
+                            local iPlatoonCount = oNewPlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                            if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27ACUMain']
+                                if iPlatoonCount == nil then iPlatoonCount = 1
+                                else iPlatoonCount = iPlatoonCount + 1 end
+                            end
+                            LOG(sFunctionRef..': Changed ACU platoon back to ACU main, platoon name+count='..'M27ACUMain'..iPlatoonCount)
+                        end
                     end
                 end
             end
-        end
 
-        --==============BUILD ORDER RELATED=============
-        --Update the build condition flag for if ACU is near an unclaimed mex or has nearby reclaim, unless ACU is part of the main acu platoon ai (which already has this logic in it)
-        local sACUPlan = DebugPrintACUPlatoon(aiBrain, true)
-        local bPlatoonAlreadyChecks = false
-        if sACUPlan == 'M27ACUMain' then
-            if not(oACUPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionDisband) then bPlatoonAlreadyChecks = true end
-        end
-        if bPlatoonAlreadyChecks == false then
-            --Check for nearby mexes:
-            local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
-            --GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ)
-            local iACUSegmentX, iACUSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tACUPos)
-            local iSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iACUSegmentX, iACUSegmentZ)
-            local tNearbyUnits = {}
-            --M27MapInfo.RecordMexForPathingGroup(oACU) --Makes sure we can reference tMexByPathingAndGrouping
-            local iCurDistToACU
-            local iBuildingSizeRadius = 0.5
-            local bNearbyUnclaimedMex = false
-            if bDebugMessages == true then LOG(sFunctionRef..': sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; No. of mexes in tMexByPathingAndGrouping='..table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup])) end
-            --tMexByPathingAndGrouping[a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
-            local tPossibleMexes = M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup]
-            if M27Utilities.IsTableEmpty(tPossibleMexes) == false then
-                for iMex, tMexPosition in M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
-                    iCurDistToACU = M27Utilities.GetDistanceBetweenPositions(tMexPosition, tACUPos)
-                    --if bDebugMessages == true then LOG(sFunctionRef..': iMex='..iMex..'; iCurDistToACU='..iCurDistToACU..'; iDistanceToLookForMexes='..iDistanceToLookForMexes) end
-                    if iCurDistToACU <= iDistanceToLookForMexes then
-                        --Check if any building on mex (won't bother with seeing if its an enemy building as AI should be attacking any such building anyway so not worth the effort to code in a 'hold fire and capture' type logic at this stage)
-                        --if bDebugMessages == true then LOG(sFunctionRef..'; Mex is within distance to look for, checking if any nearby units') end
-                        --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
-                        bNearbyUnclaimedMex = M27Conditions.IsMexUnclaimed(aiBrain, tMexPosition, false, false, false)
-                        break
+            --==============BUILD ORDER RELATED=============
+            --Update the build condition flag for if ACU is near an unclaimed mex or has nearby reclaim, unless ACU is part of the main acu platoon ai (which already has this logic in it)
+            local sACUPlan = DebugPrintACUPlatoon(aiBrain, true)
+            local bPlatoonAlreadyChecks = false
+            if sACUPlan == 'M27ACUMain' then
+                if not(oACUPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionDisband) then bPlatoonAlreadyChecks = true end
+            end
+            if bPlatoonAlreadyChecks == false then
+                --Check for nearby mexes:
+                local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
+                --GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ)
+                local iACUSegmentX, iACUSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tACUPos)
+                local iSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iACUSegmentX, iACUSegmentZ)
+                local tNearbyUnits = {}
+                --M27MapInfo.RecordMexForPathingGroup(oACU) --Makes sure we can reference tMexByPathingAndGrouping
+                local iCurDistToACU
+                local iBuildingSizeRadius = 0.5
+                local bNearbyUnclaimedMex = false
+                if bDebugMessages == true then LOG(sFunctionRef..': sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; No. of mexes in tMexByPathingAndGrouping='..table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup])) end
+                --tMexByPathingAndGrouping[a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
+                local tPossibleMexes = M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup]
+                if M27Utilities.IsTableEmpty(tPossibleMexes) == false then
+                    for iMex, tMexPosition in M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
+                        iCurDistToACU = M27Utilities.GetDistanceBetweenPositions(tMexPosition, tACUPos)
+                        --if bDebugMessages == true then LOG(sFunctionRef..': iMex='..iMex..'; iCurDistToACU='..iCurDistToACU..'; iDistanceToLookForMexes='..iDistanceToLookForMexes) end
+                        if iCurDistToACU <= iDistanceToLookForMexes then
+                            --Check if any building on mex (won't bother with seeing if its an enemy building as AI should be attacking any such building anyway so not worth the effort to code in a 'hold fire and capture' type logic at this stage)
+                            --if bDebugMessages == true then LOG(sFunctionRef..'; Mex is within distance to look for, checking if any nearby units') end
+                            --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
+                            bNearbyUnclaimedMex = M27Conditions.IsMexUnclaimed(aiBrain, tMexPosition, false, false, false)
+                            break
+                        end
                     end
                 end
+                aiBrain[refbUnclaimedMexNearACU] = bNearbyUnclaimedMex
+            else
+                --Set flags to false as will need refreshing before know if there's still nearby mex
+                aiBrain[refbUnclaimedMexNearACU] = false
             end
-            aiBrain[refbUnclaimedMexNearACU] = bNearbyUnclaimedMex
-        else
-            --Set flags to false as will need refreshing before know if there's still nearby mex
-            aiBrain[refbUnclaimedMexNearACU] = false
-        end
 
 
-    --=============Enemy ACU all-in attack with ACU
-        local iEnemyACUSearchRange = 50
-        local tEnemyACUs = aiBrain:GetUnitsAroundPoint(categories.COMMAND, tACUPos, 1000, 'Enemy')
-        local bAllInAttack = false
-        local bIncludeACUInAttack = false
-        local iHealthThresholdAdjIfAlreadyAllIn = 0
-        local iHealthAbsoluteThresholdIfAlreadyAllIn = 750
-        if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iHealthThresholdAdjIfAlreadyAllIn = 0.05 end
-        local bWantEscort = oACU:IsUnitState('Upgrading')
+        --=============Enemy ACU all-in attack with ACU
+            local iEnemyACUSearchRange = 50
+            local tEnemyACUs = aiBrain:GetUnitsAroundPoint(categories.COMMAND, tACUPos, 1000, 'Enemy')
+            local bAllInAttack = false
+            local bIncludeACUInAttack = false
+            local iHealthThresholdAdjIfAlreadyAllIn = 0
+            local iHealthAbsoluteThresholdIfAlreadyAllIn = 750
+            if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iHealthThresholdAdjIfAlreadyAllIn = 0.05 end
+            local bWantEscort = oACU:IsUnitState('Upgrading')
 
-        local bEmergencyRequisition = false
-        local iLastDistanceToACU = 10000
-        if aiBrain[reftLastNearestACU] then iLastDistanceToACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], tACUPos) end
+            local bEmergencyRequisition = false
+            local iLastDistanceToACU = 10000
+            if aiBrain[reftLastNearestACU] then iLastDistanceToACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], tACUPos) end
 
-        if M27Utilities.IsTableEmpty(tEnemyACUs) == false then
-            local oNearestACU = M27Utilities.GetNearestUnit(tEnemyACUs, tACUPos, aiBrain, false, false)
-            local tNearestACU = oNearestACU:GetPosition()
-            local iDistanceToACU = M27Utilities.GetDistanceBetweenPositions(tNearestACU, tACUPos)
-            if aiBrain[refoLastNearestACU] and not(aiBrain[refoLastNearestACU].Dead) then
-                if oNearestACU == aiBrain[refoLastNearestACU] then
-                    aiBrain[reftLastNearestACU] = tNearestACU
-                    iLastDistanceToACU = iDistanceToACU
-                else
-                    if iDistanceToACU < aiBrain[refiLastNearestACUDistance] then
-                        aiBrain[refoLastNearestACU] = oNearestACU
+            if M27Utilities.IsTableEmpty(tEnemyACUs) == false then
+                local oNearestACU = M27Utilities.GetNearestUnit(tEnemyACUs, tACUPos, aiBrain, false, false)
+                local tNearestACU = oNearestACU:GetPosition()
+                local iDistanceToACU = M27Utilities.GetDistanceBetweenPositions(tNearestACU, tACUPos)
+                if aiBrain[refoLastNearestACU] and not(aiBrain[refoLastNearestACU].Dead) then
+                    if oNearestACU == aiBrain[refoLastNearestACU] then
                         aiBrain[reftLastNearestACU] = tNearestACU
                         iLastDistanceToACU = iDistanceToACU
                     else
-                        --Nearest ACU may just be temporarily hidden so dont want to revise the value
-                    end
-                end
-            else
-                aiBrain[refoLastNearestACU] = oNearestACU
-                aiBrain[reftLastNearestACU] = tNearestACU
-                iLastDistanceToACU = iDistanceToACU
-            end
-        end
-
-        --Are we near the last ACU's known position?
-        if iLastDistanceToACU <= iEnemyACUSearchRange then
-            aiBrain[refbEnemyACUNearOurs] = true
-            bWantEscort = true
-            --Extra health buffer for some of below checks
-            local iExtraHealthCheck = 0
-            if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tACUPos) > M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tACUPos) then iExtraHealthCheck = 1000 end
-            --Do we have a big gun, or is the enemy ACU low on health?
-            if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true then
-                bAllInAttack = true
-                bIncludeACUInAttack = true
-            else
-                local iACURange = M27Logic.GetUnitMaxGroundRange({ oACU })
-                --Attack if we're close to ACU and have a notable health advantage, and are on our side of the map or are already in attack mode
-                if iLastDistanceToACU <= (iACURange + 15) and aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.5 + iHealthThresholdAdjIfAlreadyAllIn) and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck < (oACU:GetHealth() + 2500 + iHealthAbsoluteThresholdIfAlreadyAllIn) and (M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) or aiBrain[refbIncludeACUInAllOutAttack] == true) then
-                    bAllInAttack = true
-                    bIncludeACUInAttack = true
-                --Attack if enemy ACU is in range and could die to an explosion (so we either win or draw)
-                elseif iLastDistanceToACU <= iACURange and aiBrain[refoLastNearestACU]:GetHealth() < (1800 + iHealthAbsoluteThresholdIfAlreadyAllIn) then
-                    bAllInAttack = true
-                    bIncludeACUInAttack = true
-                --Attack if we have gun and enemy ACU doesnt, and we have at least as much health
-                elseif M27Conditions.DoesACUHaveBigGun(aiBrain, aiBrain[refoLastNearestACU]) == false and M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck < oACU:GetHealth() then
-                    --Want extra health buffer if are on enemy side of the map
-
-                    bAllInAttack = true
-                    bIncludeACUInAttack = true
-                end
-            end
-        else aiBrain[refbEnemyACUNearOurs] = false
-        end
-        if bAllInAttack == false and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
-            if aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.1 + iHealthThresholdAdjIfAlreadyAllIn) then
-                bAllInAttack = true
-            elseif aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.4 + iHealthThresholdAdjIfAlreadyAllIn) then
-                --Do we have more threat near the ACU than the ACU has?
-                local iSearchRange = 60
-                local tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iSearchRange, 'Ally')
-
-                if M27Utilities.IsTableEmpty(tAlliedUnitsNearEnemy) == false then
-                    local tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iSearchRange, 'Enemy')
-                    local iThreatFactor = 1.25
-                    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iThreatFactor = 1 end
-                    if M27Logic.GetCombatThreatRating(aiBrain, tAlliedUnitsNearEnemy, false, nil, nil, false, false) > (M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnitsNearEnemy, false, nil, nil, false, false) * iThreatFactor) then
-                        bAllInAttack = true
-                    end
-                end
-            end
-
-
-            if bAllInAttack and not(oACU:IsUnitState('Upgrading')) and oACU:GetHealthPercent() > 0.5 then bIncludeACUInAttack = true end
-        end
-
-
-
-
-                --==========ACU Run away logic
-
-        local iHealthPercentage = oACU:GetHealthPercent()
-        local bRunAway = false
-        local bNewPlatoon = true
-        local oNewPlatoon
-
-
-
-        if bIncludeACUInAttack == false and iHealthPercentage <= iACUGetHelpPercentThreshold then
-            bWantEscort = true
-            bEmergencyRequisition = true
-            if bDebugMessages == true then LOG(sFunctionRef..': ACU low on health so forcing it to run to base unless its already there') end
-
-            local iPlayerStartNumber = aiBrain.M27StartPositionNumber
-            --Is the ACU within 25 of our base? If so then no point overriding
-            if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[iPlayerStartNumber]) > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
-                bRunAway = true
-                --Is ACU upgrading and almost done?
-                if oACU:IsUnitState('Upgrading') and oACU.GetWorkProgress then
-                    if not(oACU:GetWorkProgress() <= 0.9) or iHealthPercentage > iACUEmergencyHealthPercentThreshold then bRunAway = false end
-                end
-            end
-        else
-            --Not low health
-            if oACU:IsUnitState('Upgrading') then bWantEscort = true
-            else
-                if iHealthPercentage >= 0.8 then
-                    if oACUPlatoon then oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = false end
-                end
-            end
-        end
-
-        if bRunAway == true and not(sACUPlan == 'M27ACUMain') then --M27ACUMain now has logic for the ACU to run built into it
-            --Make platoon cancel any upgrade and run
-            if bDebugMessages == true then
-                LOG(sFunctionRef..': iHealthPercentage='..iHealthPercentage..'; GetFractionComplete='..oACU:GetFractionComplete())
-                if oACU.GetWorkProgress then LOG('GetWorkProgress='..oACU:GetWorkProgress()) end
-                if oACU.UnitBeingBuilt then LOG('UnitBeingBuilt='..oACU.UnitBeingBuilt:GetUnitId()..'; FractionComplete='..oACU.UnitBeingBuilt:GetFractionComplete())
-                else LOG('No unit being built') end
-            end
-
-
-
-            if oACUPlatoon and oACUPlatoon.GetPlan and oACUPlatoon:GetPlan() == 'M27ACUMain' then bNewPlatoon = false end
-            if bNewPlatoon == true then
-                oNewPlatoon = aiBrain:MakePlatoon('', '')
-                aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU}, 'Support', 'None')
-                oNewPlatoon:SetAIPlan('M27ACUMain')
-                oNewPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
-                oNewPlatoon[M27PlatoonUtilities.reftMovementPath][1] = {}
-                if bDebugMessages == true then
-                    local iPlatoonCount = oNewPlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                    if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27ACUMain']
-                        if iPlatoonCount == nil then iPlatoonCount = 1
-                        else iPlatoonCount = iPlatoonCount + 1 end
-                    end
-                    LOG(sFunctionRef..': Changed ACU platoon back to ACU main, platoon name+count='..'M27ACUMain'..iPlatoonCount)
-                end
-            else oNewPlatoon = oACUPlatoon
-            end
-
-            if not(oNewPlatoon[M27PlatoonUtilities.reftMovementPath][1] == M27MapInfo.PlayerStartPoints[aiBrain.M27StartPosition]) then
-                oNewPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReturnToBase
-                if bDebugMessages == true then LOG(sFunctionRef..': Forcing action refresh') end
-                M27PlatoonUtilities.ForceActionRefresh(oNewPlatoon, 5)
-            end
-        end
-        if oACUPlatoon then
-            oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = bWantEscort
-            if bEmergencyRequisition and not(bAllInAttack) then
-                --Is the ACU close to our base? If so then only do emergency response if very low health
-                if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iRangeForACUToBeNearBase or iHealthPercentage < iACUEmergencyHealthPercentThreshold then
-                    --Get all nearby combat units we own
-                    local tNearbyCombat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tACUPos, iRangeForEmergencyEscort, 'Ally')
-                    if M27Utilities.IsTableEmpty(tNearbyCombat) == false then
-                        --Check we have at least 1 unit that can be assigned
-                        local bHaveAUnit = false
-                        for iUnit, oUnit in tNearbyCombat do
-                            if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain() == aiBrain and not(M27Utilities.IsACU(oUnit)) then
-                                bHaveAUnit = true
-                                break
-                            end
+                        if iDistanceToACU < aiBrain[refiLastNearestACUDistance] then
+                            aiBrain[refoLastNearestACU] = oNearestACU
+                            aiBrain[reftLastNearestACU] = tNearestACU
+                            iLastDistanceToACU = iDistanceToACU
+                        else
+                            --Nearest ACU may just be temporarily hidden so dont want to revise the value
                         end
+                    end
+                else
+                    aiBrain[refoLastNearestACU] = oNearestACU
+                    aiBrain[reftLastNearestACU] = tNearestACU
+                    iLastDistanceToACU = iDistanceToACU
+                end
+            end
 
-                        if bHaveAUnit == true then
-                            local oEscortingPlatoon = oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon]
-                            if not(oEscortingPlatoon) or not(aiBrain:PlatoonExists(oEscortingPlatoon)) then
-                                oEscortingPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27EscortAI', nil)
-                                oEscortingPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oACUPlatoon
-                                oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon] = oEscortingPlatoon
-                            end
+            --Are we near the last ACU's known position?
+            if iLastDistanceToACU <= iEnemyACUSearchRange and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
+                aiBrain[refbEnemyACUNearOurs] = true
+                bWantEscort = true
+                --Extra health buffer for some of below checks
+                local iExtraHealthCheck = 0
+                if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tACUPos) > M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tACUPos) then iExtraHealthCheck = 1000 end
+                --Do we have a big gun, or is the enemy ACU low on health?
+                if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true then
+                    bAllInAttack = true
+                    bIncludeACUInAttack = true
+                else
+                    local iACURange = M27Logic.GetUnitMaxGroundRange({ oACU })
+                    --Attack if we're close to ACU and have a notable health advantage, and are on our side of the map or are already in attack mode
+                    if iLastDistanceToACU <= (iACURange + 15) and aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.5 + iHealthThresholdAdjIfAlreadyAllIn) and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck < (oACU:GetHealth() + 2500 + iHealthAbsoluteThresholdIfAlreadyAllIn) and (M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) or aiBrain[refbIncludeACUInAllOutAttack] == true) then
+                        bAllInAttack = true
+                        bIncludeACUInAttack = true
+                    --Attack if enemy ACU is in range and could die to an explosion (so we either win or draw)
+                    elseif iLastDistanceToACU <= iACURange and aiBrain[refoLastNearestACU]:GetHealth() < (1800 + iHealthAbsoluteThresholdIfAlreadyAllIn) then
+                        bAllInAttack = true
+                        bIncludeACUInAttack = true
+                    --Attack if we have gun and enemy ACU doesnt, and we have at least as much health
+                    elseif M27Conditions.DoesACUHaveBigGun(aiBrain, aiBrain[refoLastNearestACU]) == false and M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck < oACU:GetHealth() then
+                        --Want extra health buffer if are on enemy side of the map
+
+                        bAllInAttack = true
+                        bIncludeACUInAttack = true
+                    end
+                end
+            else aiBrain[refbEnemyACUNearOurs] = false
+            end
+            if bAllInAttack == false and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
+                if aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.1 + iHealthThresholdAdjIfAlreadyAllIn) then
+                    bAllInAttack = true
+                elseif aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.75 + iHealthThresholdAdjIfAlreadyAllIn) then
+                    --Do we have more threat near the ACU than the ACU has?
+                    local iSearchRange = 60
+                    local tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iSearchRange, 'Ally')
+
+                    if M27Utilities.IsTableEmpty(tAlliedUnitsNearEnemy) == false then
+                        local tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iSearchRange, 'Enemy')
+                        local iThreatFactor = 2.5
+                        if aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.4 + iHealthThresholdAdjIfAlreadyAllIn) then iThreatFactor = 1.25 end
+                        if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iThreatFactor = 1 end
+                        if M27Logic.GetCombatThreatRating(aiBrain, tAlliedUnitsNearEnemy, false, nil, nil, false, false) > (M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnitsNearEnemy, false, nil, nil, false, false) * iThreatFactor) then
+                            bAllInAttack = true
+                        end
+                    end
+                end
 
 
-                            --Filter to only units we control that arent already in this platoon
-                            local tNearbyOwnedCombat = {}
-                            local iNearbyOwnedCombatCount = 0
+                if bAllInAttack and not(oACU:IsUnitState('Upgrading')) and oACU:GetHealthPercent() > 0.5 then bIncludeACUInAttack = true end
+            end
+
+
+
+
+                    --==========ACU Run away logic
+
+            local iHealthPercentage = oACU:GetHealthPercent()
+            local bRunAway = false
+            local bNewPlatoon = true
+            local oNewPlatoon
+
+
+
+            if bIncludeACUInAttack == false and iHealthPercentage <= iACUGetHelpPercentThreshold then
+                bWantEscort = true
+                bEmergencyRequisition = true
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU low on health so forcing it to run to base unless its already there') end
+
+                local iPlayerStartNumber = aiBrain.M27StartPositionNumber
+                --Is the ACU within 25 of our base? If so then no point overriding
+                if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[iPlayerStartNumber]) > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
+                    bRunAway = true
+                    --Is ACU upgrading and almost done?
+                    if oACU:IsUnitState('Upgrading') and oACU.GetWorkProgress then
+                        if not(oACU:GetWorkProgress() <= 0.9) or iHealthPercentage > iACUEmergencyHealthPercentThreshold then bRunAway = false end
+                    end
+                end
+            else
+                --Not low health
+                if oACU:IsUnitState('Upgrading') then bWantEscort = true
+                else
+                    if iHealthPercentage >= 0.8 then
+                        if oACUPlatoon then oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = false end
+                    end
+                end
+            end
+
+            if bRunAway == true and not(sACUPlan == 'M27ACUMain') then --M27ACUMain now has logic for the ACU to run built into it
+                --Make platoon cancel any upgrade and run
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': iHealthPercentage='..iHealthPercentage..'; GetFractionComplete='..oACU:GetFractionComplete())
+                    if oACU.GetWorkProgress then LOG('GetWorkProgress='..oACU:GetWorkProgress()) end
+                    if oACU.UnitBeingBuilt then LOG('UnitBeingBuilt='..oACU.UnitBeingBuilt:GetUnitId()..'; FractionComplete='..oACU.UnitBeingBuilt:GetFractionComplete())
+                    else LOG('No unit being built') end
+                end
+
+
+
+                if oACUPlatoon and oACUPlatoon.GetPlan and oACUPlatoon:GetPlan() == 'M27ACUMain' then bNewPlatoon = false end
+                if bNewPlatoon == true then
+                    oNewPlatoon = aiBrain:MakePlatoon('', '')
+                    aiBrain:AssignUnitsToPlatoon(oNewPlatoon, {oACU}, 'Support', 'None')
+                    oNewPlatoon:SetAIPlan('M27ACUMain')
+                    oNewPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                    oNewPlatoon[M27PlatoonUtilities.reftMovementPath][1] = {}
+                    if bDebugMessages == true then
+                        local iPlatoonCount = oNewPlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                        if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27ACUMain']
+                            if iPlatoonCount == nil then iPlatoonCount = 1
+                            else iPlatoonCount = iPlatoonCount + 1 end
+                        end
+                        LOG(sFunctionRef..': Changed ACU platoon back to ACU main, platoon name+count='..'M27ACUMain'..iPlatoonCount)
+                    end
+                else oNewPlatoon = oACUPlatoon
+                end
+
+                if not(oNewPlatoon[M27PlatoonUtilities.reftMovementPath][1] == M27MapInfo.PlayerStartPoints[aiBrain.M27StartPosition]) then
+                    oNewPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReturnToBase
+                    if bDebugMessages == true then LOG(sFunctionRef..': Forcing action refresh') end
+                    M27PlatoonUtilities.ForceActionRefresh(oNewPlatoon, 5)
+                end
+            end
+            if oACUPlatoon then
+                oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = bWantEscort
+                if bEmergencyRequisition and not(bAllInAttack) then
+                    --Is the ACU close to our base? If so then only do emergency response if very low health
+                    if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iRangeForACUToBeNearBase or iHealthPercentage < iACUEmergencyHealthPercentThreshold then
+                        --Get all nearby combat units we own
+                        local tNearbyCombat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tACUPos, iRangeForEmergencyEscort, 'Ally')
+                        if M27Utilities.IsTableEmpty(tNearbyCombat) == false then
+                            --Check we have at least 1 unit that can be assigned
+                            local bHaveAUnit = false
                             for iUnit, oUnit in tNearbyCombat do
                                 if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain() == aiBrain and not(M27Utilities.IsACU(oUnit)) then
-                                    if not(oUnit.PlatoonHandle) or not(oUnit.PlatoonHandle == oEscortingPlatoon) then
-                                        iNearbyOwnedCombatCount = iNearbyOwnedCombatCount + 1
-                                        tNearbyOwnedCombat[iNearbyOwnedCombatCount] = oUnit
-                                    end
+                                    bHaveAUnit = true
+                                    break
                                 end
                             end
-                            if iNearbyOwnedCombatCount > 0 then
-                                --Add combat units to this
-                                aiBrain:AssignUnitsToPlatoon(oEscortingPlatoon, tNearbyOwnedCombat, 'Attack', 'GrowthFormation')
+
+                            if bHaveAUnit == true then
+                                local oEscortingPlatoon = oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon]
+                                if not(oEscortingPlatoon) or not(aiBrain:PlatoonExists(oEscortingPlatoon)) then
+                                    oEscortingPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27EscortAI', nil)
+                                    oEscortingPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oACUPlatoon
+                                    oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon] = oEscortingPlatoon
+                                end
+
+
+                                --Filter to only units we control that arent already in this platoon
+                                local tNearbyOwnedCombat = {}
+                                local iNearbyOwnedCombatCount = 0
+                                for iUnit, oUnit in tNearbyCombat do
+                                    if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain() == aiBrain and not(M27Utilities.IsACU(oUnit)) then
+                                        if not(oUnit.PlatoonHandle) or not(oUnit.PlatoonHandle == oEscortingPlatoon) then
+                                            iNearbyOwnedCombatCount = iNearbyOwnedCombatCount + 1
+                                            tNearbyOwnedCombat[iNearbyOwnedCombatCount] = oUnit
+                                        end
+                                    end
+                                end
+                                if iNearbyOwnedCombatCount > 0 then
+                                    --Add combat units to this
+                                    aiBrain:AssignUnitsToPlatoon(oEscortingPlatoon, tNearbyOwnedCombat, 'Attack', 'GrowthFormation')
+                                end
                             end
                         end
                     end
                 end
             end
-        end
 
-        if bAllInAttack == true then
-            aiBrain[refiAIBrainCurrentStrategy] = refStrategyACUKill
-            aiBrain[refbStopACUKillStrategy] = false
-            aiBrain[refbIncludeACUInAllOutAttack] = bIncludeACUInAttack
-            --Consider Ctrl-K of ACU
-            local bSuicide = false
-            if oACU:GetHealth() <= 275 and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
-                local iEnemyACUHealth = aiBrain[refoLastNearestACU]:GetHealth()
-                if iEnemyACUHealth <= 2000 then
-                    local iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(tACUPos, aiBrain[refoLastNearestACU]:GetPosition())
-                    if iDistanceToEnemyACU <= 30 then
-                        bSuicide = true
-                    elseif iDistanceToEnemyACU <= 40 and iEnemyACUHealth <= 500 then
-                        bSuicide = true
+            if bAllInAttack == true then
+                aiBrain[refiAIBrainCurrentStrategy] = refStrategyACUKill
+                aiBrain[refbStopACUKillStrategy] = false
+                aiBrain[refbIncludeACUInAllOutAttack] = bIncludeACUInAttack
+                --Consider Ctrl-K of ACU
+                local bSuicide = false
+                if oACU:GetHealth() <= 275 and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
+                    local iEnemyACUHealth = aiBrain[refoLastNearestACU]:GetHealth()
+                    if iEnemyACUHealth <= 2000 then
+                        local iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(tACUPos, aiBrain[refoLastNearestACU]:GetPosition())
+                        if iDistanceToEnemyACU <= 30 then
+                            bSuicide = true
+                        elseif iDistanceToEnemyACU <= 40 and iEnemyACUHealth <= 500 then
+                            bSuicide = true
+                        end
                     end
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': bSuicide='..tostring(bSuicide)..'; ACU Health='..oACU:GetHealth()..'; LastACUHealth='..aiBrain[refoLastNearestACU]:GetHealth()..'; distance between ACUs='..M27Utilities.GetDistanceBetweenPositions(tACUPos, aiBrain[refoLastNearestACU]:GetPosition())) end
+                if bSuicide then
+                    M27Chat.SendSuicideMessage(aiBrain)
+                    oACU:Kill()
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have just told our ACU to self destruct') end
+                end
+            else
+                aiBrain[refbIncludeACUInAllOutAttack] = false
+                aiBrain[refbStopACUKillStrategy] = true
+                if oACU.PlatoonHandle then oACU.PlatoonHandle[M27PlatoonUtilities.reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityNormal end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': bSuicide='..tostring(bSuicide)..'; ACU Health='..oACU:GetHealth()..'; LastACUHealth='..aiBrain[refoLastNearestACU]:GetHealth()..'; distance between ACUs='..M27Utilities.GetDistanceBetweenPositions(tACUPos, aiBrain[refoLastNearestACU]:GetPosition())) end
-            if bSuicide then
-                M27Chat.SendSuicideMessage(aiBrain)
-                oACU:Kill()
-                if bDebugMessages == true then LOG(sFunctionRef..': Have just told our ACU to self destruct') end
-            end
-        else
-            aiBrain[refbIncludeACUInAllOutAttack] = false
-            aiBrain[refbStopACUKillStrategy] = true
-            if oACU.PlatoonHandle then oACU.PlatoonHandle[M27PlatoonUtilities.reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityNormal end
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -3341,9 +3390,15 @@ end
 
 function WaitTicksSpecial(aiBrain, iTicksToWait)
     --calls the GetACU function since that will check if ACU is alive, and if not will delay to avoid a crash
-    local oACU = M27Utilities.GetACU(aiBrain)
-    WaitTicks(iTicksToWait)
-    oACU = M27Utilities.GetACU(aiBrain)
+    --Returns false if ACU no longer valid or all enemies are defeated
+    if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then
+        return false
+    else
+        WaitTicks(iTicksToWait)
+        local oACU = M27Utilities.GetACU(aiBrain)
+        if oACU.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then return false end
+    end
+    return true
 end
 
 function EnemyThreatRangeUpdater(aiBrain)
@@ -3485,8 +3540,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             if iCurCount > iMaxCount then M27Utilities.ErrorHandler('Infinite loop') break end
             bCheckBrains = false
             for iArmyIndex, oBrain in tAllAIBrainsByArmyIndex do
-                if oBrain:IsDefeated() then
-                    table.remove(tAllAIBrainsByArmyIndex, iArmyIndex)
+                if oBrain:IsDefeated() or oBrain.M27IsDefeated then
+                    tAllAIBrainsByArmyIndex[iArmyIndex] = nil
                     bCheckBrains = true
                     break
                 end
@@ -3803,16 +3858,18 @@ function RecordAllEnemies(aiBrain)
         for iCurBrain, oBrain in ArmyBrains do
             iArmyIndex = oBrain:GetArmyIndex()
             tAllAIBrainsByArmyIndex[iArmyIndex] = oBrain
-            if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
+            if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) and not(M27Logic.IsCivilianBrain(oBrain)) then
                 iEnemyCount = iEnemyCount + 1
-                toEnemyBrains[iEnemyCount] = oBrain
+                aiBrain[toEnemyBrains][iArmyIndex] = oBrain
+                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain Index='..aiBrain:GetArmyIndex()..'; enemy index='..iArmyIndex..'; recording as an enemy; start position number='..oBrain.M27StartPositionNumber..'; start position='..repr(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])) end
             end
         end
     else
         for iCurBrain, oBrain in tAllAIBrainsByArmyIndex do
             if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
                 iEnemyCount = iEnemyCount + 1
-                toEnemyBrains[iEnemyCount] = oBrain
+                aiBrain[toEnemyBrains][oBrain:GetArmyIndex()] = oBrain
+                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain Index='..aiBrain:GetArmyIndex()..'; enemy index='..iArmyIndex..'; recording as an enemy; start position number='..oBrain.M27StartPositionNumber..'; start position='..repr(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])) end
             end
         end
     end
@@ -3924,7 +3981,8 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refbEnemyTMLSightedBefore] = false
     aiBrain[refbStopACUKillStrategy] = false
 
-
+    --Nearest enemy and ACU and threat
+    aiBrain[toEnemyBrains] = {}
     iPreviousNearestEnemyIndex = M27Logic.GetNearestEnemyIndex(aiBrain, false)
     aiBrain[refiDistanceToNearestEnemy] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iPreviousNearestEnemyIndex)])
     aiBrain[reftLastNearestACU] = M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iPreviousNearestEnemyIndex)]
@@ -4114,6 +4172,7 @@ function OverseerManager(aiBrain)
 
 
     while(not(aiBrain:IsDefeated())) do
+        if aiBrain.M27IsDefeated then break end
         --ForkThread(TestNewMovementCommands, aiBrain)
 
         if bDebugMessages == true then
@@ -4129,7 +4188,9 @@ function OverseerManager(aiBrain)
             LOG(sFunctionRef..': refbIntelPathsGenerated='..tostring(aiBrain[refbIntelPathsGenerated]))
             --ArmyPoolContainsLandFacTest(aiBrain)
         end
-        if aiBrain[refbIntelPathsGenerated] == false then RecordIntelPaths(aiBrain) end
+        if aiBrain[refbIntelPathsGenerated] == false then
+            ForkThread(RecordIntelPaths, aiBrain)
+        end
         if aiBrain[refbIntelPathsGenerated] == true then
             ForkThread(AssignScoutsToPreferredPlatoons, aiBrain)
         end
@@ -4137,7 +4198,7 @@ function OverseerManager(aiBrain)
             --ArmyPoolContainsLandFacTest(aiBrain)
           --M27EngineerOverseer.TEMPTEST(aiBrain)
         end
-        WaitTicksSpecial(aiBrain, 1)
+        if not(WaitTicksSpecial(aiBrain, 1)) then break end
         ForkThread(AssignMAAToPreferredPlatoons, aiBrain) --No point running logic for MAA helpers if havent created any scouts
         if bDebugMessages == true then
             LOG(sFunctionRef..': pre threat assessment')
@@ -4146,7 +4207,7 @@ function OverseerManager(aiBrain)
             DebugPrintACUPlatoon(aiBrain)
         end
 
-        WaitTicksSpecial(aiBrain, 1)
+        if not(WaitTicksSpecial(aiBrain, 1)) then break end
         ForkThread(ThreatAssessAndRespond, aiBrain)
         --if bDebugMessages == true then ArmyPoolContainsLandFacTest(aiBrain) end
 
@@ -4156,7 +4217,7 @@ function OverseerManager(aiBrain)
           --M27EngineerOverseer.TEMPTEST(aiBrain)
         end
 
-        WaitTicksSpecial(aiBrain, 1)
+        if not(WaitTicksSpecial(aiBrain, 1)) then break end
         ForkThread(ACUManager, aiBrain)
         if bDebugMessages == true then
             LOG(sFunctionRef..': post ACU manager, pre wait 10 ticks')
@@ -4171,7 +4232,7 @@ function OverseerManager(aiBrain)
           --M27EngineerOverseer.TEMPTEST(aiBrain)
         end
 
-        WaitTicksSpecial(aiBrain, 1)
+        if not(WaitTicksSpecial(aiBrain, 1)) then break end
         iSlowerCycleCount = iSlowerCycleCount - 1
         ForkThread(StrategicOverseer, aiBrain, iSlowerCycleCount)
         if iSlowerCycleCount <= 0 then
@@ -4184,12 +4245,12 @@ function OverseerManager(aiBrain)
             end
         end
 
-        WaitTicksSpecial(aiBrain, 1)
+        if not(WaitTicksSpecial(aiBrain, 1)) then break end
         ForkThread(M27EconomyOverseer.RefreshEconomyData, aiBrain)
 
         --NOTE: We dont have the number of ticks below as 'available' for use, since on initialisation we're waiting ticks as well when initialising things such as the engineer and upgrade overseers which work off their own loops
         --therefore the actual available tick count will be the below number less the number of ticks we're already waiting
-        WaitTicksSpecial(aiBrain, 4) --Number of ticks should be based on how many ticks have waited in above code, so are refreshing every second
+        if not(WaitTicksSpecial(aiBrain, 4)) then break end
 
 
         if bDebugMessages == true then

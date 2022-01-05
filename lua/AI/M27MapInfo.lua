@@ -625,7 +625,10 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
             --local tNearbyEnemies
 
             iStartPositionPathingGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, PlayerStartPoints[aiBrain.M27StartPositionNumber])
-            tACUPosition = M27Utilities.GetACU(aiBrain):GetPosition()
+            local oACU = M27Utilities.GetACU(aiBrain)
+            if oACU then
+                tACUPosition = oACU:GetPosition()
+            else tACUPosition = PlayerStartPoints[aiBrain.M27StartPositionNumber] end
             iNearestEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
             local iCurAirSegmentX, iCurAirSegmentZ, bUnassigned
             --Can an amphibious unit path here from our start
@@ -759,7 +762,6 @@ function UpdateReclaimMarkers()
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'UpdateReclaimMarkers'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-
     local iTimeBeforeFullRefresh = 10 --Will do a full refresh of reclaim every x seconds
 
     --Record all segments' mass information:
@@ -781,7 +783,7 @@ function UpdateReclaimMarkers()
         local tBrainsWithChangedThreat = {}
         local bHaveBrainsWithChangedThreat = false
         for iArmyIndex, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
-            if aiBrain.M27AI then
+            if aiBrain.M27AI and not(aiBrain:IsDefeated()) and not(aiBrain.M27IsDefeated) then
                 tM27Brains[iArmyIndex] = aiBrain
                 --Has the front position of the brain or threat range changed significantly since the previous cycle?
 
@@ -794,6 +796,8 @@ function UpdateReclaimMarkers()
                 end
             end
         end
+        local iACUDeathCountWhenStarted = M27Overseer.iACUAlternativeFailureCount
+        if bDebugMessages == true then LOG(sFunctionRef..': Pre start of main loop; iACUDeathCountWhenStarted='..iACUDeathCountWhenStarted) end
 
 
 
@@ -855,11 +859,36 @@ function UpdateReclaimMarkers()
                         --Update for any brains where there has been a significant change
                         UpdateReclaimSegmentAreaOfInterest(iCurX, iCurZ, tBrainsWithChangedThreat)
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iACUDeathCountWhenStarted='..iACUDeathCountWhenStarted..'; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount) end
+                    if iACUDeathCountWhenStarted < M27Overseer.iACUAlternativeFailureCount then
+                        --Need to update list of brains
+                        tM27Brains = {}
+                        --tBrainsWithChangedThreat = {}
+                        --bHaveBrainsWithChangedThreat = false
+                        for iArmyIndex, oBrain in M27Overseer.tAllAIBrainsByArmyIndex do
+                            if oBrain.M27AI and not(oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
+                                tM27Brains[iArmyIndex] = oBrain
+                            end
+                        end
+                        local bNeedToUpdateChangedBrains = not(M27Utilities.IsTableEmpty(tBrainsWithChangedThreat))
+                        while bNeedToUpdateChangedBrains == true do
+                            bNeedToUpdateChangedBrains = false
+                            for iArmyIndex, oBrain in tBrainsWithChangedThreat do
+                                if oBrain:IsDefeated() or oBrain.M27IsDefeated then
+                                    bNeedToUpdateChangedBrains = true
+                                    tBrainsWithChangedThreat[iArmyIndex] = nil
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Finished removing brains who have lost their ACU from the list of brains to consider reclaim updates on') end
                 end
                 iMapTotalMass = iMapTotalMass + iTotalMassValue
                 if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; iTotalMassValue='..iTotalMassValue..'; Location of segment='..repr(GetReclaimLocationFromSegment(iCurX, iCurZ))) end
                 iCurCount = iCurCount + 1
             end
+
             if iCurCount >= iWaitInterval or iReclaimAreaOfInterestTickCount > 50 then
                 iCurCount = 0
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

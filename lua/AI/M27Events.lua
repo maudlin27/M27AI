@@ -52,6 +52,13 @@ function OnUnitDeath(oUnit)
     if M27Utilities.IsACU(oUnit) then
         M27Overseer.iACUDeathCount = M27Overseer.iACUDeathCount + 1
         LOG(sFunctionRef..' ACU kill detected; total kills='..M27Overseer.iACUDeathCount)
+        --Update list of brains
+        local iACUBrain = oUnit:GetAIBrain()
+        for iArmyIndex, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
+            if aiBrain == iACUBrain then
+                M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
+            end
+        end
     else
         --Is the unit owned by M27AI?
         if oUnit.GetAIBrain then
@@ -94,7 +101,7 @@ function OnDamaged(self, instigator)
                 local sFunctionRef = 'OnDamaged'
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 --Has our ACU been hit by an enemy we have no sight of?
-                if self == M27Utilities.GetACU(aiBrain) then
+                if M27Utilities.IsACU(self) and self == M27Utilities.GetACU(aiBrain) then
                     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
                     local sFunctionRef = 'OnDamage'
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU has just taken damage, checking if can see the unit that damaged it') end
@@ -149,7 +156,6 @@ function OnDamaged(self, instigator)
                 end
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             end
-
         end
     end
 end

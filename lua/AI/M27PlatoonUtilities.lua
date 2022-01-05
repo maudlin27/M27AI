@@ -1679,6 +1679,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 --Check if we're already near our base - use iDistanceFromBaseToBeSafe for below, and then m27overseer has a lower threshold for if <30% health
                 if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
                     oPlatoon[refiCurrentAction] = refActionReturnToBase
+                    --Consider adding overcharge
+                    if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
                     bProceed = false
                 else
                     --Proceed with normal logic
@@ -1744,6 +1746,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 if bDebugMessages == true then LOG(sFunctionRef..': Finished considering if too many PD or enemy threat nearby, bACUNeedsToRun='..tostring(bACUNeedsToRun)) end
                 if bACUNeedsToRun == true then
                     oPlatoon[refiCurrentAction] = refActionRun
+                    --Add in overcharge
+                    if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
                     bProceed = false
                 end
             end
@@ -3757,7 +3761,7 @@ function DeterminePlatoonAction(oPlatoon)
                                      bAttackACULogic = true
                                  end
                             end
-                            if bAttackACULogic == true then oPlatoon[refiCurrentAction] = refActionKillACU end
+                            if bAttackACULogic == true and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then oPlatoon[refiCurrentAction] = refActionKillACU end
                         end
                         if bAttackACULogic == false then
                             --Escort platoons - if escorting an individual unit as a 'platoon' such as an engineer, then need to update the tracker for that as well
@@ -7032,12 +7036,13 @@ function PlatoonCycler(oPlatoon)
         --Check we're not duplicating a backup loop
         if not(oPlatoon[refbPlatoonLogicActive]) then
             PlatoonInitialSetup(oPlatoon)
-            while aiBrain:PlatoonExists(oPlatoon) do
+            while aiBrain:PlatoonExists(oPlatoon) and not(aiBrain.M27IsDefeated) do
                 ForkThread(RunPlatoonSingleCycle, oPlatoon)
                 WaitSeconds(1)
                 if oPlatoon and oPlatoon.GetPlan and aiBrain then
                     if not(oPlatoon:GetPlan() == sOrigPlatoonName) then break end
                 else break end
+                if M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
             end
         else
             if bDebugMessages == true then LOG(sFunctionRef..': '..sOrigPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')..': Platoon already has an active cycler so wont duplicate') end
