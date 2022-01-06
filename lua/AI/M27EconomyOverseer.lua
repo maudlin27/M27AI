@@ -304,7 +304,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     if bDebugMessages == true then LOG(sFunctionRef..': About to loop through units to find one to upgrade; size of tAllUnits='..table.getn(tAllUnits)) end
     local tPotentialUnits = {}
     local iPotentialUnits = 0
-    --local iDistFromOurStartToEnemy = aiBrain[M27Overseer.refiDistanceToNearestEnemy]
+    --local iDistFromOurStartToEnemy = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
     --local iDistanceBufferToEnemy = iDistFromOurStartToEnemy * 0.15
 
     --First create a shortlist of units that we could upgrade: - must be closer to us than enemy base by at least 10% of distance between us and enemy; Must have defence coverage>=10% of the % between us and enemy (or have it behind our base)

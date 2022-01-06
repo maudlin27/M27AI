@@ -531,8 +531,12 @@ function GetAIBrainArmyNumber(aiBrain)
     --note - this is different to aiBrain:GetArmyIndex() which returns the army index; e.g. if 2 players, will have army index 1 and 2; however if 4 start positions, then might have ARMY_2 and ARMY_4 for those 2 players
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     if aiBrain then
-        if bDebugMessages == true then LOG('GetAIBrainArmyNumber: aiBrain.Name='..aiBrain.Name) end
-        return tonumber(string.sub(aiBrain.Name, (string.len(aiBrain.Name)-7)))
+        --For reference - all the attempts using string.sub to get the last 2 digits - gave up in the end and used gsub
+        --if bDebugMessages == true then LOG('GetAIBrainArmyNumber: aiBrain.Name='..aiBrain.Name..'; string.sub5='..string.sub(aiBrain.Name, (string.len(aiBrain.Name)-5))..'; string.sub7='..string.sub(aiBrain.Name, (string.len(aiBrain.Name)-7))..'; string.sub custom='..string.sub(aiBrain.Name, 6, string.len(aiBrain.Name) - 6)..'string.sub custom2='..string.sub(aiBrain.Name, 6, 1)..'; sub custom3='..string.sub(aiBrain.Name, 6, 2)..'; tostring'..string.sub(tostring(aiBrain.Name), 3, 2)..'; gsub='..string.gsub(aiBrain.Name, 'ARMY_', '')) end
+
+        local sArmyNumber = string.gsub(aiBrain.Name, 'ARMY_', '')
+        if bDebugMessages == true then LOG('GetAIBrainArmyNumber: sArmyNumber='..sArmyNumber) end
+        if string.len(sArmyNumber) <= 2 then return tonumber(sArmyNumber) else return nil end
     else
         ErrorHandler('aiBrain is nil')
         return nil

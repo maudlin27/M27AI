@@ -495,7 +495,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
                 elseif iTargetDistanceFromOurBase > 50 then
                     --Are we closer to enemy base than our base is?
                     local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
-                    local iDistanceBetweenBases = aiBrain[M27Overseer.refiDistanceToNearestEnemy]
+                    local iDistanceBetweenBases = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
                     local iTargetDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tEnemyStartPosition)
                     if iTargetDistanceToEnemyBase < iDistanceBetweenBases then bWantEscort = true end
                 end

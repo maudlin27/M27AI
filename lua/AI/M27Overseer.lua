@@ -23,7 +23,7 @@ local iLandThreatSearchRange = 1000
 refbACUHelpWanted = 'M27ACUHelpWanted' --flags if we want teh ACU to stay in army pool platoon so its available for defence
 refoStartingACU = 'M27PlayerStartingACU' --NOTE: Use M27Utilities.GetACU(aiBrain) instead of getting this directly (to help with crash control)
 tAllAIBrainsByArmyIndex = {} --Stores table of all aiBrains, used as sometimes are getting errors when trying to use ArmyBrains
-refiDistanceToNearestEnemy = 'M27DistanceToNearestEnemy'
+refiDistanceToNearestEnemyBase = 'M27DistanceToNearestEnemy' --Distance from our base to the nearest enemy base
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
 iACUDeathCount = 0
@@ -222,7 +222,7 @@ function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocationTarget
         end
         local tStartPosition = M27MapInfo.PlayerStartPoints[iOurStartNumber]
         local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartNumber]
-        local iDistanceFromEnemyToUs = aiBrain[refiDistanceToNearestEnemy]
+        local iDistanceFromEnemyToUs = aiBrain[refiDistanceToNearestEnemyBase]
         --function MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
         local tMidpointBetweenUsAndEnemy = M27Utilities.MoveTowardsTarget(tStartPosition, tEnemyStartPosition, iDistanceFromEnemyToUs / 2, 0)
         local iActualDistance = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tLocationTarget)
@@ -2055,7 +2055,7 @@ function ThreatAssessAndRespond(aiBrain)
     local iMinScouts, iMinMAA, bIsFirstPlatoon
     local bAddedUnitsToPlatoon = false
     local iEnemyStartPoint = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-    local iDistanceToEnemyFromStart = aiBrain[refiDistanceToNearestEnemy]
+    local iDistanceToEnemyFromStart = aiBrain[refiDistanceToNearestEnemyBase]
     local iNavySearchRange = math.min(iDistanceToEnemyFromStart, aiBrain[refiModDistFromStartNearestOutstandingThreat])
 
     local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
@@ -2436,7 +2436,7 @@ function ThreatAssessAndRespond(aiBrain)
                         if iEnemyGroup >= iTotalEnemyThreatGroups then
                             --is the furthest away enemy threat group and we can beat it, so we have full defensive coverage; will set to 90% to avoid trying to e.g. get mexes in the enemy base itself
                             aiBrain[refiPercentageOutstandingThreat] = 0.9
-                            aiBrain[refiModDistFromStartNearestOutstandingThreat] = aiBrain[refiDistanceToNearestEnemy]
+                            aiBrain[refiModDistFromStartNearestOutstandingThreat] = aiBrain[refiDistanceToNearestEnemyBase]
                         end
                     end
 
@@ -2785,7 +2785,7 @@ function ThreatAssessAndRespond(aiBrain)
         --No threat groups
         M27Utilities.GetACU(aiBrain)[refbACUHelpWanted] = false
         aiBrain[refiPercentageOutstandingThreat] = 1
-        aiBrain[refiModDistFromStartNearestOutstandingThreat] = aiBrain[refiDistanceToNearestEnemy]
+        aiBrain[refiModDistFromStartNearestOutstandingThreat] = aiBrain[refiDistanceToNearestEnemyBase]
         aiBrain[refbNeedDefenders] = false
         aiBrain[refbNeedIndirect] = false
     end -->0 enemy threat groups
@@ -3550,7 +3550,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
         local iNearestEnemyArmyIndex = M27Logic.GetNearestEnemyIndex(aiBrain)
         if not(iNearestEnemyArmyIndex == iPreviousNearestEnemyIndex) then
-            aiBrain[refiDistanceToNearestEnemy] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyArmyIndex)])
+            aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyArmyIndex)])
         end
         iPreviousNearestEnemyIndex = iNearestEnemyArmyIndex
 
@@ -3625,7 +3625,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
         --Should we switch to eco?
             --How far away is the enemy?
-        local iDistanceFromEnemyToUs = aiBrain[refiDistanceToNearestEnemy]
+        local iDistanceFromEnemyToUs = aiBrain[refiDistanceToNearestEnemyBase]
 
         local bWantToEco = false
         local bBigEnemyThreat = false
@@ -3879,7 +3879,7 @@ end
 function RefreshMexPositions(aiBrain)
     WaitTicks(80)
     --Force refresh of mexes to try and fix bug where not all mexes recorded as being pathable
-    M27MapInfo.RecheckPathingToMexes(aiBrain)
+    --M27MapInfo.RecheckPathingToMexes(aiBrain)
     ForkThread(M27MapInfo.RecordMexForPathingGroup)
 
     --Create sorted listing of mexes
@@ -3984,7 +3984,7 @@ function OverseerInitialisation(aiBrain)
     --Nearest enemy and ACU and threat
     aiBrain[toEnemyBrains] = {}
     iPreviousNearestEnemyIndex = M27Logic.GetNearestEnemyIndex(aiBrain, false)
-    aiBrain[refiDistanceToNearestEnemy] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iPreviousNearestEnemyIndex)])
+    aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iPreviousNearestEnemyIndex)])
     aiBrain[reftLastNearestACU] = M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iPreviousNearestEnemyIndex)]
     aiBrain[refoLastNearestACU] = M27Utilities.GetACU(tAllAIBrainsByArmyIndex[iPreviousNearestEnemyIndex])
     aiBrain[refiLastNearestACUDistance] = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -4136,8 +4136,9 @@ function OverseerManager(aiBrain)
     ForkThread(M27MapInfo.MappingInitialisation, aiBrain)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Pre fork thread of player start locations') end
-    ForkThread(M27MapInfo.RecordPlayerStartLocations)
+    ForkThread(M27MapInfo.RecordPlayerStartLocations, aiBrain)
     --ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps - superceded by hook into siminit
+    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain:GetArmyIndex()='..aiBrain:GetArmyIndex()..'; aiBrain start position='..(aiBrain.M27StartPositionNumber or 'nil')) end
     ForkThread(M27MapInfo.RecordMexNearStartPosition, aiBrain.M27StartPositionNumber, 26) --similar to the range of T1 PD
 
 
@@ -4153,8 +4154,8 @@ function OverseerManager(aiBrain)
     WaitTicks(10)
 
     --Hopefully have ACU now so can re-check pathing
-    if bDebugMessages == true then LOG(sFunctionRef..': About to check pathing to mexes') end
-    ForkThread(M27MapInfo.RecheckPathingToMexes, aiBrain) --Note that this includes waitticks, so dont make any big decisions on the map until it has finished
+    --if bDebugMessages == true then LOG(sFunctionRef..': About to check pathing to mexes') end
+    --ForkThread(M27MapInfo.RecheckPathingToMexes, aiBrain) --Note that this includes waitticks, so dont make any big decisions on the map until it has finished
 
     if bDebugMessages == true then LOG(sFunctionRef..': Post wait 10 ticks') end
     OverseerInitialisation(aiBrain) --sets default values for variables, and starts the factory construction manager

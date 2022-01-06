@@ -1418,7 +1418,7 @@ function GetBomberTargetShortlist(aiBrain)
         if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[refiBomberDefencePercentRange] or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= 75 then
             bIgnoreMobileShield = true
             reftPriorityTargetCategories = {M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, categories.STRUCTURE}
-            iMaxSearchRange = math.max(75, aiBrain[M27Overseer.refiPercentageOutstandingThreat] * aiBrain[M27Overseer.refiDistanceToNearestEnemy]) + 25
+            iMaxSearchRange = math.max(75, aiBrain[M27Overseer.refiPercentageOutstandingThreat] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) + 25
             iTypeLowPriority = 4
         else
             if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then
@@ -1860,7 +1860,7 @@ function AirAAManager(aiBrain)
             local iDistanceFromACUToStart = 0
             if iNearToACUThreshold > 0 then iDistanceFromACUToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tACUPos) end
             local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
-            local iDistanceFromEnemyStartToOurStart = aiBrain[M27Overseer.refiDistanceToNearestEnemy]
+            local iDistanceFromEnemyStartToOurStart = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
             local iMapMidpointDistance = iDistanceFromEnemyStartToOurStart * 0.5
 
             local tValidEnemyAirThreats = {}
@@ -2186,7 +2186,7 @@ function SetupAirOverseer(aiBrain)
     iMaxScoutsForMap = iMinScoutsForMap * 3
 
     if bDebugMessages == true then LOG(sFunctionRef..': iMapMaxSegmentX='..iMapMaxSegmentX..'; iMapMaxSegmentZ='..iMapMaxSegmentZ..'; rPlayableArea='..repr(rPlayableArea)..'; iAirSegmentSize='..iAirSegmentSize) end
-    --For large maps want to limit the segments that we consider (dont want to use aiBrain[M27Overseer.refiDistanceToNearestEnemy] in case its not updated
+    --For large maps want to limit the segments that we consider (dont want to use aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] in case its not updated
     local iDistanceToEnemyFromStart = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
     aiBrain[refiMaxScoutRadius] = math.max(1250, iDistanceToEnemyFromStart * 1.5)
     local iStartSegmentX, iStartSegmentZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])

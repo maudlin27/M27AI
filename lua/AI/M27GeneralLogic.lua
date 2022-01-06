@@ -279,15 +279,21 @@ function IsCivilianBrain(aiBrain)
     local sFunctionRef = 'IsCivilianBrain'
 
     local bIsCivilian = false
-    if bDebugMessages == true then LOG(sFunctionRef..': Brain index='..aiBrain:GetArmyIndex()..'; BrainType='..aiBrain.BrainType..'; Personality='..ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality) end
-    if aiBrain.BrainType == "AI" or string.find(aiBrain.BrainType, "AI") then
-        if bDebugMessages == true then LOG('Dealing with an AI brain') end
-        --Does it have no personality?
-        if not(ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality) or ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality == "" then
-            if bDebugMessages == true then LOG(sFunctionRef..': Has no AI personality') end
-            bIsCivilian = true
-        end
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Brain index='..aiBrain:GetArmyIndex()..'; BrainType='..(aiBrain.BrainType or 'nil')..'; Personality='..ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality)
+        M27Utilities.DebugArray(aiBrain)
     end
+    --Basic check that it appears to have the values we'd expect
+    --if aiBrain.BrainType and aiBrain.Name then
+        if aiBrain.BrainType == nil or aiBrain.BrainType == "AI" or string.find(aiBrain.BrainType, "AI") then
+            if bDebugMessages == true then LOG('Dealing with an AI brain') end
+            --Does it have no personality?
+            if not(ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality) or ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality == "" then
+                if bDebugMessages == true then LOG(sFunctionRef..': Index='..aiBrain:GetArmyIndex()..'; Has no AI personality so will treat as being a civilian brain') end
+                bIsCivilian = true
+            end
+        end
+    --end
     return bIsCivilian
 end
 
@@ -370,7 +376,7 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                             bAllDefeated = false break end
                     end
                     if bHaveBrains and bAllDefeated == true then
-                        LOG('All enemies defeated, ACU death count='..M27Overseer.iACUDeathCount..'; will ignore errors with nearest enemy index and wait 30 seconds')
+                        LOG('All enemies defeated, ACU death count='..M27Overseer.iACUDeathCount..'; will ignore errors with nearest enemy index and wait 1 second1')
                         if M27Overseer.iACUDeathCount == 0 then
                             if GetGameTimeSeconds() - iTimeOfLastBrainAllDefeated >= 1 then
                                 M27Utilities.ErrorHandler('All brains are showing as dead but we havent recorded any ACU deaths.  Assuming all enemies are dead and aborting all code')
@@ -379,7 +385,7 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                         end
 
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        WaitSeconds(30)
+                        WaitSeconds(1)
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                     elseif bHaveBrains then
                         M27Utilities.ErrorHandler('iNearestEnemyIndex is nil so will wait 1 sec and then repeat function with logs enabled')
@@ -3157,6 +3163,7 @@ function GetNearestRallyPoint(aiBrain, tPosition)
 end
 
 function GetPositionToSideOfTarget(oUnit, tTargetLocation, iBaseAngleToTarget, iDistanceToMove)
+    --NOTE: Largely replaced by the M27Utilities moveindirection function
     --Copy of comments from platoonutilities (in case need to refer to later)
     --[[
                         If our ACU angle is 0 (enemy ACU is north of us):

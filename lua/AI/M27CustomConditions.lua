@@ -816,8 +816,8 @@ function IsLocationWithinIntelPathLine(aiBrain, tLocation)
             local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
             local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
             local iLocationDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tLocation)
-            if bDebugMessages == true then LOG(sFunctionRef..': tLocation='..repr(tLocation)..'; iLocationDistanceToEnemy='..iLocationDistanceToEnemy..'; iDistanceFromStartToEnemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemy]..'; tEnemyStartPosition='..repr(tEnemyStartPosition)..'; tStartPosition='..repr(tStartPosition)) end
-            if iLocationDistanceToEnemy > aiBrain[M27Overseer.refiDistanceToNearestEnemy] then
+            if bDebugMessages == true then LOG(sFunctionRef..': tLocation='..repr(tLocation)..'; iLocationDistanceToEnemy='..iLocationDistanceToEnemy..'; iDistanceFromStartToEnemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; tEnemyStartPosition='..repr(tEnemyStartPosition)..'; tStartPosition='..repr(tStartPosition)) end
+            if iLocationDistanceToEnemy > aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] then
                 bWithinIntelLine = true
             else
                 local iLocationDistanceToBase = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tLocation)

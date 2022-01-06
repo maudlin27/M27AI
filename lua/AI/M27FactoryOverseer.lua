@@ -195,7 +195,7 @@ function GetPreferredArtiProportion(aiBrain, bAreSeraphimT1LandFactory)
     else
         local iOurStartPosition = aiBrain.M27StartPositionNumber
         local tOurStart = M27MapInfo.PlayerStartPoints[iOurStartPosition]
-        local iRange = aiBrain[M27Overseer.refiDistanceToNearestEnemy]
+        local iRange = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
         local tEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.DIRECTFIRE + categories.INDIRECTFIRE, tOurStart, iRange, 'Enemy')
         local iEnemyTotalThreat = 0
         local iEnemyPDThreat = 0
