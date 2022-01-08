@@ -1086,6 +1086,8 @@ function FactoryMainOverseerLoop(aiBrain)
                                     IssueBuildFactory({ oFactory }, sUnitToBuild, 1)
                                     oFactory[refFactoryIdleCount] = 0
                                     oFactory[refbUpdatedFactoryUnitTracker] = false
+                                    --Update factory rally point
+                                    M27Logic.SetFactoryRallyPoint(oFactory)
                                 end
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': factory not idle') end

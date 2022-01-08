@@ -57,8 +57,9 @@ refiAssignedThreat = 'M27OverseerUnitAssignedThreat' --recorded against oEnemyUn
 refiUnitNavalAAThreat = 'M27OverseerUnitThreat' --Recored against individual oEnemyUnit[iOurBrainArmyIndex]
 local reftUnitGroupPreviousReferences = 'M27UnitGroupPreviousReferences'
 refiModDistFromStartNearestOutstandingThreat = 'M27NearestOutstandingThreat' --Mod distance of the closest enemy threat (using GetDistanceFromStartAdjustedForDistanceFromMid)
+refiModDistFromStartNearestThreat = 'M27OverseerNearestThreat' --Mod distance of the closest enemy, even if we have enough defenders to deal with it
 refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddistance
-refiPercentageClosestFriendlyToEnemyBase = 'M27OverseerPercentageClosestFriendly'
+refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
 refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
 
 local iMaxACUEmergencyThreatRange = 150 --If ACU is more than this distance from our base then won't help even if an emergency threat
@@ -574,7 +575,7 @@ function GetNearestMAAOrScout(aiBrain, tPosition, bScoutNotMAA, bDontTakeFromIni
                         if oCurPlatoon then
                             if bOnlyConsiderAvailableHelpers == true then
                                 if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': Only want units from army pool, checking if is from army pool') end
-                                if not(oCurPlatoon == oArmyPoolPlatoon) and not(oCurPlatoon == oIdleScoutPlatoon) and not(oCurPlatoon == oIdleMAAPlatoon) then
+                                if not(oCurPlatoon == oArmyPoolPlatoon) and not(oCurPlatoon == oIdleScoutPlatoon) and not(oCurPlatoon == oIdleMAAPlatoon) and not(oCurPlatoon:GetPlan() == 'M27MAAPatrol') then
                                     bValidSupport = false
                                     if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': Isnt army pool so dont want this unit unless its a helper platoon without a target') end
                                     --If it a helper platoon that has no helper target?
@@ -2056,7 +2057,7 @@ function ThreatAssessAndRespond(aiBrain)
     local bAddedUnitsToPlatoon = false
     local iEnemyStartPoint = M27Logic.GetNearestEnemyStartNumber(aiBrain)
     local iDistanceToEnemyFromStart = aiBrain[refiDistanceToNearestEnemyBase]
-    local iNavySearchRange = math.min(iDistanceToEnemyFromStart, aiBrain[refiModDistFromStartNearestOutstandingThreat])
+    local iNavySearchRange = math.min(iDistanceToEnemyFromStart, aiBrain[refiModDistFromStartNearestOutstandingThreat] + 120)
 
     local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
 
@@ -2081,6 +2082,8 @@ function ThreatAssessAndRespond(aiBrain)
     local iCumulativeTorpBomberThreatShortfall = 0
     local bFirstUnassignedNavyThreat = true
     local iNavalBlipThreat = 300 --Frigate
+
+    local bFirstThreatGroup = true
     if aiBrain[refiEnemyHighestTechLevel] > 1 then
         iNavalBlipThreat = 2000 --Cruiser
     end
@@ -2095,55 +2098,57 @@ function ThreatAssessAndRespond(aiBrain)
         if bConsideringNavy == true then iThreatGroupDistance = iNavyThreatGroupDistance end
 
         tEnemyUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Enemy')
-        for iCurEnemy, oEnemyUnit in tEnemyUnits do
-            tEnemyUnitPos = oEnemyUnit:GetPosition()
-            bUnitOnWater = false
-            if GetTerrainHeight(tEnemyUnitPos[1], tEnemyUnitPos[3]) < M27MapInfo.iMapWaterHeight then bUnitOnWater = true end
+        if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+            for iCurEnemy, oEnemyUnit in tEnemyUnits do
+                tEnemyUnitPos = oEnemyUnit:GetPosition()
+                bUnitOnWater = false
+                if GetTerrainHeight(tEnemyUnitPos[1], tEnemyUnitPos[3]) < M27MapInfo.iMapWaterHeight then bUnitOnWater = true end
 
-            --Are we on/not on water?
-            if bUnitOnWater == bConsideringNavy then --either on water and considering navy, or not on water and not considering navy
-                --Can we see enemy unit/blip:
-                --function CanSeeUnit(aiBrain, oUnit, bBlipOnly)
-                if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to see if can see the unit and get its threat. Enemy Unit ID='..oEnemyUnit:GetUnitId()) end
-                if M27Utilities.CanSeeUnit(aiBrain, oEnemyUnit, true) == true then
-                    if oEnemyUnit[iArmyIndex] == nil then oEnemyUnit[iArmyIndex] = {} end
-                    if oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] == nil then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy unit doesnt have a threat group') end
-                        --enemy unit hasn't been assigned a threat group - assign it to one now if it's not already got a threat group:
-                        if not(oEnemyUnit[iArmyIndex][refbUnitAlreadyConsidered] == true) then
-                            iCurThreatGroup = iCurThreatGroup + 1
-                            sThreatGroup = 'M27'..iGameTime..'No'..iCurThreatGroup
-                            oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] = sThreatGroup
-                            if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to add unit to threat group '..sThreatGroup) end
-                            AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iThreatGroupDistance, iCategory, not(bConsideringNavy), bConsideringNavy, iNavalBlipThreat)
-                            --Add nearby structures to threat rating if dealing with structures and enemy has T2+ PD near them
-                            if iCategory == refCategoryPointDefence and oEnemyUnit[iArmyIndex][refsEnemyThreatGroup][refiThreatGroupHighestTech] >= 2 then
+                --Are we on/not on water?
+                if bUnitOnWater == bConsideringNavy then --either on water and considering navy, or not on water and not considering navy
+                    --Can we see enemy unit/blip:
+                    --function CanSeeUnit(aiBrain, oUnit, bBlipOnly)
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to see if can see the unit and get its threat. Enemy Unit ID='..oEnemyUnit:GetUnitId()) end
+                    if M27Utilities.CanSeeUnit(aiBrain, oEnemyUnit, true) == true then
+                        if oEnemyUnit[iArmyIndex] == nil then oEnemyUnit[iArmyIndex] = {} end
+                        if oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] == nil then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy unit doesnt have a threat group') end
+                            --enemy unit hasn't been assigned a threat group - assign it to one now if it's not already got a threat group:
+                            if not(oEnemyUnit[iArmyIndex][refbUnitAlreadyConsidered] == true) then
+                                iCurThreatGroup = iCurThreatGroup + 1
+                                sThreatGroup = 'M27'..iGameTime..'No'..iCurThreatGroup
+                                oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] = sThreatGroup
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to add unit to threat group '..sThreatGroup) end
+                                AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iThreatGroupDistance, iCategory, not(bConsideringNavy), bConsideringNavy, iNavalBlipThreat)
+                                --Add nearby structures to threat rating if dealing with structures and enemy has T2+ PD near them
+                                if iCategory == refCategoryPointDefence and oEnemyUnit[iArmyIndex][refsEnemyThreatGroup][refiThreatGroupHighestTech] >= 2 then
 
-                                local tNearbyDefensiveStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD * categories.STRUCTURE + M27UnitInfo.refCategoryFixedShield, tEnemyUnitPos, iTMDAndShieldSearchRange, 'Enemy')
-                                if M27Utilities.IsTableEmpty(tNearbyDefensiveStructures) == false then
-                                    for iDefence, oDefenceUnit in tNearbyDefensiveStructures do
-                                        if not(oDefenceUnit.Dead) then
-                                            AddNearbyUnitsToThreatGroup(aiBrain, oDefenceUnit, sThreatGroup, 0, iCategory)
+                                    local tNearbyDefensiveStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD * categories.STRUCTURE + M27UnitInfo.refCategoryFixedShield, tEnemyUnitPos, iTMDAndShieldSearchRange, 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tNearbyDefensiveStructures) == false then
+                                        for iDefence, oDefenceUnit in tNearbyDefensiveStructures do
+                                            if not(oDefenceUnit.Dead) then
+                                                AddNearbyUnitsToThreatGroup(aiBrain, oDefenceUnit, sThreatGroup, 0, iCategory)
+                                            end
+                                        end
+                                    end
+                                    local tNearbyT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, tEnemyUnitPos, iT2ArtiSearchRange, 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
+                                        for iDefence, oDefenceUnit in tNearbyT2Arti do
+                                            if not(oDefenceUnit.Dead) then
+                                                AddNearbyUnitsToThreatGroup(aiBrain, oDefenceUnit, sThreatGroup, 0, iCategory)
+                                            end
                                         end
                                     end
                                 end
-                                local tNearbyT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, tEnemyUnitPos, iT2ArtiSearchRange, 'Enemy')
-                                if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
-                                    for iDefence, oDefenceUnit in tNearbyT2Arti do
-                                        if not(oDefenceUnit.Dead) then
-                                            AddNearbyUnitsToThreatGroup(aiBrain, oDefenceUnit, sThreatGroup, 0, iCategory)
-                                        end
-                                    end
-                                end
+
                             end
+                            --Can see the unit, if its experimental add to the list of identified experimentals
 
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy unit already has a threat group='..oEnemyUnit[iArmyIndex][refsEnemyThreatGroup]) end
                         end
-                        --Can see the unit, if its experimental add to the list of identified experimentals
-
-                    else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy unit already has a threat group='..oEnemyUnit[iArmyIndex][refsEnemyThreatGroup]) end
+                    else if bDebugMessages == true then LOG(sFunctionRef..': Cant see the unit') end
                     end
-                else if bDebugMessages == true then LOG(sFunctionRef..': Cant see the unit') end
                 end
             end
         end
@@ -2198,7 +2203,12 @@ function ThreatAssessAndRespond(aiBrain)
         local bPlatoonHasRelevantUnits
         local bIndirectThreatOnly
         local bIgnoreRemainingLandThreats = false
+
         for iEnemyGroup, tEnemyThreatGroup in M27Utilities.SortTableBySubtable(aiBrain[reftEnemyThreatGroup], refiModDistanceFromOurStart, true) do
+            if bFirstThreatGroup then
+                bFirstThreatGroup = false
+                aiBrain[refiModDistFromStartNearestThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
+            end
             bIndirectThreatOnly = false
             bConsideringNavy = false
             if tEnemyThreatGroup[refiThreatGroupCategory] == refCategoryPointDefence then bIndirectThreatOnly = true
@@ -2782,12 +2792,15 @@ function ThreatAssessAndRespond(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': Finished cycling through all tEnemyThreatGroups; end of overseer cycle') end
         --if bDebugMessages == true then LOG(sFunctionRef..': End of code - ACU state='..M27Logic.GetUnitState(M27Utilities.GetACU(aiBrain))) end
     else
-        --No threat groups
-        M27Utilities.GetACU(aiBrain)[refbACUHelpWanted] = false
-        aiBrain[refiPercentageOutstandingThreat] = 1
-        aiBrain[refiModDistFromStartNearestOutstandingThreat] = aiBrain[refiDistanceToNearestEnemyBase]
-        aiBrain[refbNeedDefenders] = false
-        aiBrain[refbNeedIndirect] = false
+        if bFirstThreatGroup == true then --Redundancy - dont think we actually need this check as iCurThreatGroup gets increased for threats of any category
+            --No threat groups of any kind
+            M27Utilities.GetACU(aiBrain)[refbACUHelpWanted] = false
+            aiBrain[refiPercentageOutstandingThreat] = 1
+            aiBrain[refiModDistFromStartNearestOutstandingThreat] = aiBrain[refiDistanceToNearestEnemyBase]
+            aiBrain[refbNeedDefenders] = false
+            aiBrain[refbNeedIndirect] = false
+            aiBrain[refiModDistFromStartNearestThreat] = 10000
+        end
     end -->0 enemy threat groups
 
     --Disband any indirect defenders that havent just been assigned
@@ -3184,6 +3197,33 @@ function ACUManager(aiBrain)
 
                     --==========ACU Run away logic
 
+            --If ACU upgrading and >=3 TML nearby, then cancel upgrade
+            if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false and oACU:IsUnitState('Upgrading') then
+                --Abort ACU upgrade if >=3 TML and its not safe to upgrade
+                local iEnemyTML = 0
+                for iUnit, oUnit in aiBrain[reftEnemyTML] do
+                    if M27UnitInfo.IsUnitValid(oUnit) then
+                        iEnemyTML = iEnemyTML + 1
+                    end
+                end
+                if iEnemyTML >= 3 then
+                    if M27Conditions.SafeToGetACUUpgrade(aiBrain) == false and oACU:GetWorkProgress() < 0.85 then
+                        --Double-check all 3 TML are in-range, since safetoget upgrade only uses threshold of 2
+                        iEnemyTML = 0
+                        for iUnit, oUnit in aiBrain[reftEnemyTML] do
+                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tACUPos) <= 259 then
+                                iEnemyTML = iEnemyTML + 1
+                            end
+                        end
+                        if iEnemyTML >= 3 then
+                            --Abort upgrade
+                            IssueClearCommands({M27Utilities.GetACU(aiBrain)})
+                            IssueMove({oACU}, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos))
+                        end
+                    end
+                end
+            end
+
             local iHealthPercentage = oACU:GetHealthPercent()
             local bRunAway = false
             local bNewPlatoon = true
@@ -3215,7 +3255,7 @@ function ACUManager(aiBrain)
                 end
             end
 
-            if bRunAway == true and not(sACUPlan == 'M27ACUMain') then --M27ACUMain now has logic for the ACU to run built into it
+            if bRunAway == true and not(sACUPlan == 'M27ACUMain') then --M27ACUMain now has logic for the ACU to run built into it (so this isnt needed if runing M27ACUMain); have also replaced almost all uses of non-M27Main logic for ACU (including defender and initial build order) so below likely no longer relevant
                 --Make platoon cancel any upgrade and run
                 if bDebugMessages == true then
                     LOG(sFunctionRef..': iHealthPercentage='..iHealthPercentage..'; GetFractionComplete='..oACU:GetFractionComplete())
@@ -3529,6 +3569,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         aiBrain[refbEnemyTMLSightedBefore] = true
     end
 
+
+
+
+
     if iCurCycleCount <= 0 then
         --Update list of nearby enemies if any are dead
         local bCheckBrains = true
@@ -3671,8 +3715,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         local iFurthestFriendlyDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
         local iFurthestFriendlyDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
 
-        aiBrain[refiPercentageClosestFriendlyToEnemyBase] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
-        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyToEnemyBase] < 0.4 then bWantToEco = false end
+        aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then bWantToEco = false end
         if oACU:GetHealthPercent() < 0.45 then bWantToEco = false end
 
 
@@ -3782,7 +3826,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             end
             if aiBrain[refiModDistFromStartNearestOutstandingThreat] then tsGameState['NearestOutstandingThreat'] = aiBrain[refiModDistFromStartNearestOutstandingThreat] end
             if aiBrain[refiPercentageOutstandingThreat] then tsGameState['PercentageOutstandingThreat'] = aiBrain[refiPercentageOutstandingThreat] end
-            tsGameState['PercentDistOfOurUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyToEnemyBase] or 'nil')
+            tsGameState['PercentDistOfOurUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] or 'nil')
 
             if aiBrain[M27AirOverseer.refiOurMassInMAA] then tsGameState['OurMAAThreat'] = aiBrain[M27AirOverseer.refiOurMassInMAA] end
             if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] then tsGameState['EnemyAirThreat'] = aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] end
@@ -3990,8 +4034,9 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refiLastNearestACUDistance] = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
 
     aiBrain[refiPercentageOutstandingThreat] = 0.5
-    aiBrain[refiPercentageClosestFriendlyToEnemyBase] = 0.5
+    aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = 0.5
     aiBrain[refiModDistFromStartNearestOutstandingThreat] = 1000
+    aiBrain[refiModDistFromStartNearestThreat] = 1000
     aiBrain[refiEnemyHighestTechLevel] = 1
 
 

@@ -213,11 +213,12 @@ function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCo
     if relativeStart == nil then relativeStart = {0,0,0} end
     local iMaxDrawCount = iDisplayCount
     local iCurDrawCount = 0
-    if bDebugMessages == true then LOG('About to draw circle at table locations') end
+    if bDebugMessages == true then LOG('About to draw circle at table locations ='..repr(tableLocations)) end
     local bFirstLocation = true
     local tPrevLocation = {}
     local iCount = 0
     while true do
+        bFirstLocation = true
         iCount = iCount + 1 if iCount > 10000 then ErrorHandler('Infinite loop') break end
         if bSingleLocation then DrawCircle(tableLocations, iCircleSize, sColour)
         else

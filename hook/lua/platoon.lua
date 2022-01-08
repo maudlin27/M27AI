@@ -711,6 +711,9 @@ Platoon = Class(M27PlatoonClass) {
     M27MAAAssister = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27MAAPatrol = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
     M27MexLargerRaiderAI = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,

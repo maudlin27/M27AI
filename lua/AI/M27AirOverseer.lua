@@ -51,6 +51,9 @@ local refiTimeSinceWantedToScout = 'M27AirTimeSinceWantedToScout'
 local refiSegmentX = 'M27AirSegmentX'
 local refiSegmentZ = 'M27AirSegmentZ'
 
+--AirAA
+local iNearToACUThreshold = 80
+
 --Main trackers: Bomber
 reftBomberTargetShortlist = 'M27AirBomberTargetShortlist' --[x] is the count (1, 2, 3 etc.)
 local refbShortlistContainsLowPriorityTargets = 'M27AirShortlistContainsLowPriorityTargets' --true if shortlist only contains low priority targets that only want added once to a unit
@@ -589,7 +592,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
     local sAvailableUnitRef
     local bUnitIsUnassigned
     local iTimeStamp = GetGameTimeSeconds()
-    local sTargetBP, tTargetPos, tOurPosition, tTargetDestination, bClearAirAATargets, bReturnToBase
+    local sTargetBP, tTargetPos, tOurPosition, tTargetDestination, bClearAirAATargets, bReturnToRallyPoint
 
     aiBrain[reftLowFuelAir] = {}
     iCurUnitsWithLowFuel = 0
@@ -709,9 +712,10 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have a bomber or torp bomber, will check its targets; refbOnAssignment pre check='..tostring(oUnit[refbOnAssignment])) end
                                 UpdateBomberTargets(oUnit)
                                 if oUnit[refbOnAssignment] == false then bUnitIsUnassigned = true end
-                                if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbOnAssignment post check='..tostring(oUnit[refbOnAssignment])) end                            elseif iUnitType == iTypeAirAA then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbOnAssignment post check='..tostring(oUnit[refbOnAssignment])) end
+                            elseif iUnitType == iTypeAirAA then
                                 bClearAirAATargets = false
-                                bReturnToBase = false
+                                bReturnToRallyPoint = false
                                 if oUnit[refoAirAATarget] == nil or oUnit[refoAirAATarget].Dead then
                                     bClearAirAATargets = true
                                 else
@@ -731,16 +735,22 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Checking if enemy unit navigator target is closer to us or enemy') end
                                                 if oUnit[refoAirAATarget].GetNavigator then
                                                     tTargetDestination = oUnit[refoAirAATarget]:GetNavigator():GetCurrentTargetPos()
-                                                    if M27Utilities.GetDistanceBetweenPositions(tTargetDestination, tStartPosition) > M27Utilities.GetDistanceBetweenPositions(tTargetDestination, tEnemyStartPosition) then
+                                                else tTargetDestination = oUnit[refoAirAATarget]:GetPosition()
+                                                end
+
+                                                if M27Utilities.GetDistanceBetweenPositions(tTargetDestination, tStartPosition) > M27Utilities.GetDistanceBetweenPositions(tTargetDestination, tEnemyStartPosition) then
+                                                    --Clear target unless it's near our ACU
+                                                    if M27Utilities.GetDistanceBetweenPositions(tTargetDestination, M27Utilities.GetACU(aiBrain):GetPosition()) > iNearToACUThreshold then
                                                         if bDebugMessages == true then LOG(sFunctionRef..': Will clear target since its heading towards enemy base and we dont want to follow it') end
                                                         bClearAirAATargets = true
-                                                        bReturnToBase = true
+                                                        bReturnToRallyPoint = true
                                                     else
-                                                        if bDebugMessages == true then
-                                                            LOG(sFunctionRef..': navigator target destination is closer to our start than the enemy start')
-                                                        end
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Air unit is on enemy side of map but near our ACU so will still intercept it') end
                                                     end
-                                                else if bDebugMessages == true then LOG(sFunctionRef..': Target unit doesnt have a navigator') end
+                                                else
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef..': navigator target destination is closer to our start than the enemy start')
+                                                    end
                                                 end
                                             end
                                         end
@@ -749,9 +759,9 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                 if bClearAirAATargets == true then
                                     ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
                                     bUnitIsUnassigned = true
-                                    if bReturnToBase == true then
+                                    if bReturnToRallyPoint == true then
                                         IssueClearCommands({oUnit})
-                                        IssueMove({oUnit}, tStartPosition)
+                                        IssueMove({oUnit}, M27Logic.GetNearestRallyPoint(aiBrain, oUnit:GetPosition()))
                                         if bDebugMessages == true then LOG(sFunctionRef..': Cleared commants for unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                                     end
                                     --oUnit[refbOnAssignment] = false
@@ -1423,11 +1433,11 @@ function GetBomberTargetShortlist(aiBrain)
         else
             if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then
                 bIgnoreMobileShield = true
-                reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage}
+                reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryMobileLand}
                 iTypeLowPriority = 4
             elseif aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 2 then
                 --Currently same as for a t3 bomber
-                reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryEngineer}
+                reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryGroundExperimental, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryMobileLand}
                 iTypeLowPriority = 4
             end
         end
@@ -1841,8 +1851,7 @@ function AirAAManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirAAManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local iNearToACUThreshold = 80
-    local iMAANearACURange = 40
+    local iMAANearACURange = 25
     local iEnemyGroundAASearchRange = 90
     local iAssistNearbyUnitRange = 30 --if spot an enemy air unit, will intercept it if we have friendly non-air units within this range of it
     --Does ACU have MAA near it?
@@ -1850,7 +1859,8 @@ function AirAAManager(aiBrain)
         local tACUPos = M27Utilities.GetACU(aiBrain):GetPosition()
         local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
         local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tACUPos, iMAANearACURange, 'Ally')
-        if M27Utilities.IsTableEmpty(tNearbyMAA) == false then iNearToACUThreshold = 0 end
+        if M27Utilities.IsTableEmpty(tNearbyMAA) == false then iNearToACUThreshold = 0
+        else iNearToACUThreshold = 80 end
 
         local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir, tStartPosition, aiBrain[refiMaxScoutRadius], 'Enemy')
 
@@ -2074,6 +2084,17 @@ function AirAAManager(aiBrain)
         else
             if bDebugMessages == true then LOG(sFunctionRef..': No enemy air units to target') end
         end
+        if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Have available air units after assigning actions to deal with air threats; will send any remaining units to the rally point nearest the enemy unless theyre already near here') end
+            local tAirRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+            for iAirAA, oAirAA in aiBrain[reftAvailableAirAA] do
+               if M27Utilities.GetDistanceBetweenPositions(oAirAA:GetPosition(), tAirRallyPoint) > 40 then
+                   IssueClearCommands({oAirAA})
+                   IssueMove({oAirAA}, tAirRallyPoint)
+               end
+            end
+        end
+
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

@@ -680,7 +680,7 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
                             if bEngineerDiedOrSpottedEnemiesRecently then break end
                         end
                         if not(bEngineerDiedOrSpottedEnemiesRecently) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': No enemies have died recently and no enemies have been spotted recently around target') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': No enemies have died recently and no enemies have been spotted recently around target; tCurMidpoint='..repr(tCurMidpoint)..'; iNearestEnemyStartNumber='..iNearestEnemyStartNumber) end
 
                             --Check no nearby enemies - decided not to implement for CPU performance reasons
                             --tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, tCurMidpoint, 90, 'Enemy')
@@ -692,9 +692,9 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
 
                             iCurDistToBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])
                             iCurDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[iNearestEnemyStartNumber])
-                            --if bDebugMessages == true then LOG(sFunctionRef..': No nearby T2 arti detected; iCurDistToBase='..iCurDistToBase..'; iCurDistToEnemyBase='..iCurDistToEnemyBase..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase='..iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase)..'; M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)..'; iDistanceFromStartToEnemy='..iDistanceFromStartToEnemy) end
+                            --if bDebugMessages == true then LOG(sFunctionRef..': No nearby T2 arti detected; iCurDistToBase='..iCurDistToBase..'; iCurDistToEnemyBase='..iCurDistToEnemyBase..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase='..iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase)..'; M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)..'; iDistanceFromStartToEnemy='..iDistanceFromStartToEnemy) end
                             --Within defence and front unit coverage?
-                            if aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase] - 0.1 > iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase) then
+                            if aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] - 0.1 > iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Are more than 10% closer to base than furthest front unit') end
                                 if aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - 0.1 * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Are more than 10% closer to base than defence coverage') end
@@ -796,12 +796,12 @@ function UpdateReclaimMarkers()
                 tM27Brains[iArmyIndex] = aiBrain
                 --Has the front position of the brain or threat range changed significantly since the previous cycle?
 
-                if math.abs(math.min(aiBrain[refiPreviousThreatPercentCoverage], aiBrain[refiPreviousFrontUnitPercentFromOurBase]) - math.min(aiBrain[M27Overseer.refiPercentageOutstandingThreat], aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase])) > 0.02 then
+                if math.abs(math.min(aiBrain[refiPreviousThreatPercentCoverage], aiBrain[refiPreviousFrontUnitPercentFromOurBase]) - math.min(aiBrain[M27Overseer.refiPercentageOutstandingThreat], aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy])) > 0.02 then
                     bHaveBrainsWithChangedThreat = true
                     tBrainsWithChangedThreat[iArmyIndex] = aiBrain
                     --Only update the previous threat values here, as want to compare to the last time we refreshed based on this (otherwise we risk never refreshing if every change is say 1% every 10s)
                     aiBrain[refiPreviousThreatPercentCoverage] = aiBrain[M27Overseer.refiPercentageOutstandingThreat]
-                    aiBrain[refiPreviousFrontUnitPercentFromOurBase] = aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase]
+                    aiBrain[refiPreviousFrontUnitPercentFromOurBase] = aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]
                 end
             end
         end
@@ -1013,9 +1013,9 @@ function UpdateReclaimAreasOfInterest(aiBrain)
 
                                                 iCurDistToBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                                 iCurDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[iNearestEnemyStartNumber])
-                                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby T2 arti detected; iCurDistToBase='..iCurDistToBase..'; iCurDistToEnemyBase='..iCurDistToEnemyBase..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase='..iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase)..'; M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)..'; iDistanceFromStartToEnemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby T2 arti detected; iCurDistToBase='..iCurDistToBase..'; iCurDistToEnemyBase='..iCurDistToEnemyBase..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase='..iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase)..'; M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)..'; iDistanceFromStartToEnemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
                                                 --Within defence and front unit coverage?
-                                                if aiBrain[M27Overseer.refiPercentageClosestFriendlyToEnemyBase] - 0.1 > iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase) then
+                                                if aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] - 0.1 > iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase) then
                                                     if bDebugMessages == true then LOG(sFunctionRef..': Are more than 10% closer to base than furthest front unit') end
                                                     if (aiBrain[M27Overseer.refiPercentageOutstandingThreat] - 0.1) * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]  > M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false) then
                                                         if bDebugMessages == true then LOG(sFunctionRef..': Are more than 10% closer to base than defence coverage') end
@@ -1733,8 +1733,8 @@ function RecordStartingPathingGroups(aiBrain)
     aiBrain[refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] = GetUnitSegmentGroup(M27Utilities.GetACU(aiBrain))
 end
 
-function GetMexPatrolLocations(aiBrain)
-    --Returns a table of mexes on our side of the map near middle of map to patrol
+function GetMexPatrolLocations(aiBrain, iMexRallyPointsToAdd, bIncludeRallyPoint)
+    --Returns a table of mexes on our side of the map near middle of map to patrol; will add up to iMexRallyPointsToAdd, and also if bIncludeRallyPoint is true will include the last rally point
     local sFunctionRef = 'GetMexPatrolLocations'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -1778,12 +1778,12 @@ function GetMexPatrolLocations(aiBrain)
             end
         end
         if iPossibleMexCount > 0 then
-            --Filter to choose the 4 mexes closest to enemy (s.t. previous requirements that theyre closer to our base than enemy base)
+            --Filter to choose the iMexRallyPointsToAdd mexes closest to enemy (s.t. previous requirements that theyre closer to our base than enemy base)
             if bDebugMessages == true then LOG(sFunctionRef..': iPossibleMexCount='..iPossibleMexCount..'; tPossibleMexDetails='..repr(tPossibleMexDetails)) end
             for iEntry, tValue in M27Utilities.SortTableBySubtable(tPossibleMexDetails, refiMexDistanceToEnemy, true) do
                 iValidMexCount = iValidMexCount + 1
                 aiBrain[reftMexPatrolLocations][iValidMexCount] = tValue[reftPossibleMexLocation]
-                if iValidMexCount >= 4 then break end
+                if iValidMexCount >= iMexRallyPointsToAdd then break end
             end
         else
             M27Utilities.ErrorHandler('Couldnt find any mexes along the line from our base to enemy base, so will pick enemy start position as the patrol point')
@@ -1799,6 +1799,8 @@ function GetMexPatrolLocations(aiBrain)
         tPatrolLocations[iEntry][2] = tEntry[2]
         tPatrolLocations[iEntry][3] = tEntry[3]
     end
+    --Add the nearest rally poitn to the enemy base as a patrol location
+    table.insert(tPatrolLocations, M27Logic.GetNearestRallyPoint(aiBrain, PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]))
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tPatrolLocations
 end
@@ -2875,8 +2877,84 @@ function RecheckPathingToMexes(aiBrain)
 
 end
 
+function RecordIfSuitableRallyPoint(aiBrain, tPossibleRallyPoint, iCurRallyPoints, iOurBaseGroup)
+    --Records the rally point and returns the current number of rally points
+
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RecordIfSuitableRallyPoint'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bAbortDueToIntelOrEnemies = false
+    if M27Utilities.IsTableEmpty(tPossibleRallyPoint) == false and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossibleRallyPoint) == iOurBaseGroup then
+
+        --Far enough away from last rally point?
+        if M27Utilities.IsTableEmpty(tPossibleRallyPoint) then M27Utilities.ErrorHandler('No rally point specified')
+        else
+            --Closer to enemy base than last rally point?
+            if M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftRallyPoints][iCurRallyPoints], PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) then
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': About to check if '..repr(tPossibleRallyPoint)..' is a valid rally point; iCurRallyPoints='..iCurRallyPoints..'; will draw a black circle around potential location')
+                    M27Utilities.DrawLocation(tPossibleRallyPoint, nil, 3)
+                end
+                if M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, aiBrain[reftRallyPoints][iCurRallyPoints]) >= 40 then
+                    --Within defence and closest friendly land unit?
+                    bAbortDueToIntelOrEnemies = true
+                    local iModDistToStart = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tPossibleRallyPoint)
+                    if bDebugMessages == true then LOG(sFunctionRef..': iModDistToStart='..iModDistToStart..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] * 0.9='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] * 0.9..'; aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - 50='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - 50) end
+                    if iModDistToStart < aiBrain[M27Overseer.refiModDistFromStartNearestThreat] and iModDistToStart < math.min(aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] * 0.9, aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - 50) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9..'; M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])='..M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
+                        if M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber]) / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] < (aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9) then
+                            local tNearbyPDAndT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryT2PlusPD, tPossibleRallyPoint, 153, 'Enemy')
+                            local bNearbyEnemyDefences = true
+                            if M27Utilities.IsTableEmpty(tNearbyPDAndT2Arti) == false then
+                                --T2 arti nearby?
+                                local tNearbyDefences = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedT2Arti, tNearbyPDAndT2Arti)
+                                if M27Utilities.IsTableEmpty(tNearbyDefences) == true then
+                                    --T3 PD nearby?
+                                    tNearbyDefences = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH3, tNearbyPDAndT2Arti)
+                                    if M27Utilities.IsTableEmpty(tNearbyDefences) == true or M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, M27Utilities.GetNearestUnit(tNearbyDefences, tPossibleRallyPoint, aiBrain, false, false):GetPosition()) > 90 then
+                                        --T2 PD nearby?
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Nearest PD unit='..M27Utilities.GetNearestUnit(tNearbyPDAndT2Arti, tPossibleRallyPoint, aiBrain, false, false):GetUnitId()..'; Position='..repr(M27Utilities.GetNearestUnit(tNearbyPDAndT2Arti, tPossibleRallyPoint, aiBrain, false, false):GetPosition())..'; Rally point position='..repr(tPossibleRallyPoint)) end
+                                        if M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, M27Utilities.GetNearestUnit(tNearbyPDAndT2Arti, tPossibleRallyPoint, aiBrain, false, false):GetPosition()) > 70 then
+                                            bNearbyEnemyDefences = false
+                                        end
+                                    end
+                                end
+                            else
+                                bNearbyEnemyDefences = false
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': bNearbyEnemyDefences='..tostring(bNearbyEnemyDefences)) end
+                            if bNearbyEnemyDefences == false then
+                                --Do we have intel coverage of at least 20?
+                                --if M27Logic.GetIntelCoverageOfPosition(aiBrain, tPossibleRallyPoint, 20, false) then
+                                    --Have a valid rally point
+                                    bAbortDueToIntelOrEnemies = false
+                                    iCurRallyPoints = iCurRallyPoints + 1
+                                    aiBrain[reftRallyPoints][iCurRallyPoints] = {tPossibleRallyPoint[1], tPossibleRallyPoint[2], tPossibleRallyPoint[3]}
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have a valid rally point; iCurRallyPoints='..iCurRallyPoints..'; aiBrain[reftRallyPoints][iCurRallyPoints]='..repr(aiBrain[reftRallyPoints][iCurRallyPoints])) end
+                                --elseif bDebugMessages == true then LOG(sFunctionRef..': DOnt have sufficient intel coverage; IntelCoverage='..M27Logic.GetIntelCoverageOfPosition(aiBrain, tPossibleRallyPoint, nil, false))
+                                --end
+                            end
+                        elseif bDebugMessages == true then LOG(sFunctionRef..': Nearest unit to enemy base is too close to rally point distance')
+                        end
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': Not far enough away from enemy threats')
+                    end
+                elseif bDebugMessages == true then LOG(sFunctionRef..': Are too close to the existing rally point; existing rally point='..repr(aiBrain[reftRallyPoints][iCurRallyPoints])..'; Distance to this='..M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, aiBrain[reftRallyPoints][iCurRallyPoints]))
+                end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Arent closer to enemy base than last rally point')
+            end
+        end
+    elseif bDebugMessages == true then LOG(sFunctionRef..': Cant path to location or it is nil')
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return iCurRallyPoints, bAbortDueToIntelOrEnemies
+end
+
 function RecordAllRallyPoints(aiBrain)
-    if GetGameTimeSeconds() - (aiBrain[refiLastRallyPointRefresh] or 0) >= 5 then
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RecordAllRallyPoints'
+    if GetGameTimeSeconds() - (aiBrain[refiLastRallyPointRefresh] or 0) >= 5 and aiBrain[M27Overseer.refbIntelPathsGenerated] then
+        if bDebugMessages == true then LOG(sFunctionRef..': Start of code to recalculate rally points') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         local iOurBaseGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[aiBrain.M27StartPositionNumber])
         aiBrain[refiLastRallyPointRefresh] = GetGameTimeSeconds()
 
@@ -2887,53 +2965,115 @@ function RecordAllRallyPoints(aiBrain)
 
             if M27Utilities.IsTableEmpty(tMexByPathingAndGrouping[M27UnitInfo.refPathingTypeLand][iOurBaseGroup]) == false then
                 local iDistToOurBase, iDistToEnemyBase
-                local iMaxDistToBeNearMiddle = math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.2, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] + 60)
+                local iMaxDistToBeNearMiddle
                 for iMex, tMex in tMexByPathingAndGrouping[M27UnitInfo.refPathingTypeLand][iOurBaseGroup] do
+
                     iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tMex, PlayerStartPoints[aiBrain.M27StartPositionNumber])
                     iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tMex, PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                    iMaxDistToBeNearMiddle = math.min(60, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2, iDistToOurBase * 0.3) + aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if mex is near path to enemy base; iMex='..iMex..'; tMex='..repr(tMex)..'; iDistToOurBase='..iDistToOurBase..'; iDistToEnemyBase='..iDistToEnemyBase..'; iMaxDistToBeNearMiddle='..iMaxDistToBeNearMiddle) end
+
                     if iDistToOurBase + iDistToEnemyBase <= iMaxDistToBeNearMiddle then
                         table.insert(aiBrain[reftMexesAndDistanceNearPathToNearestEnemy], {[reftMexLocation] = tMex, [refiDistanceToOurBase] = iDistToOurBase})
                     end
                 end
             end
         end
+        local iCurRallyPoints = 1
+        local iPrevRallyPoints = 1
+        local bAbortedDueToEnemiesOrIntel
         aiBrain[reftRallyPoints] = {}
         local tPossibleRallyPoint
         local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
-        local bStopLookingForRallyPoints = false
+        local iFailedRallyPointChecks = 0
+
+
+        local iCurDistToOurBase
+
+        --Initial rally point: 1st base intel path
+        if bDebugMessages == true then LOG(sFunctionRef..': About to add the first intel line position as a rally point; aiBrain[M27Overseer.reftIntelLinePositions][1][1]='..repr(aiBrain[M27Overseer.reftIntelLinePositions][1][1])..'; reftIntelLinePositions='..repr(aiBrain[M27Overseer.reftIntelLinePositions])) end
+        aiBrain[reftRallyPoints][iCurRallyPoints] = aiBrain[M27Overseer.reftIntelLinePositions][1][1]
+
         --Do we have any mexes near the central line? If so then cycle through these and add rally points as long as theyre valid
         if M27Utilities.IsTableEmpty(aiBrain[reftMexesAndDistanceNearPathToNearestEnemy]) == false then
             local iLastRallyPointDistToStart
+            if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through all mexes near the path to the nearest enemy') end
             for iMex, tSubtable in M27Utilities.SortTableBySubtable(aiBrain[reftMexesAndDistanceNearPathToNearestEnemy], refiDistanceToOurBase, true) do
-                bHaveValidRallyPoint = false
+                iPrevRallyPoints = iCurRallyPoints
                 --Do we have any rally points already? if so how does the mex distance to start compare with the last rally point?
                 if M27Utilities.IsTableEmpty(aiBrain[reftRallyPoints]) == false then
-                     iLastRallyPointDistToStart = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftRallyPoints][table.getn(aiBrain[reftRallyPoints])], PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                     iLastRallyPointDistToStart = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftRallyPoints][iCurRallyPoints], PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if mex is far enoguh away from last rally to consider an intermediate rally point iMex='..iMex..'; Mex distance to base='..aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase]..'; iLastRallyPointDistToStart='..iLastRallyPointDistToStart) end
                     if (aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart) > 100 then
-                        --Add rally point inbetween these positions if can find a nearby area large enough to fit a land factory
+                        --Add rally point inbetween these positions if can find a nearby area large enough to fit a land factory, that is at least 50 from the current mex
                         --FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug)
-                        tPossibleRallyPoint = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemyBase, (aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart)*0.5)
+                        iCurDistToOurBase = math.min(aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - 50, (aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart)*0.5)
+                        tPossibleRallyPoint = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemyBase, iCurDistToOurBase)
                                 ,M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryLandFactory, M27Utilities.GetACU(aiBrain), false, false)
-                                ,0, 15)
-                        if M27Utilities.IsTableEmpty(tPossibleRallyPoint) == false and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossibleRallyPoint) == iOurBaseGroup then
-                            --Can path to the location, check if it seems safe
-                            --TODO add code
+                                ,0, 10)
+                        --if M27Utilities.IsTableEmpty(tPossibleRallyPoint) == false and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossibleRallyPoint) == iOurBaseGroup then
 
-                        end
+                            --Can path to the location, check if its far enough away from most recently added rally point and if any nearby enemies
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to consider if valid rally point; iCurRallyPoints before checking='..iCurRallyPoints) end
+                            iCurRallyPoints, bAbortedDueToEnemiesOrIntel = RecordIfSuitableRallyPoint(aiBrain, tPossibleRallyPoint, iCurRallyPoints, iOurBaseGroup)
+                            if bAbortedDueToEnemiesOrIntel == true then
+                                iFailedRallyPointChecks = iFailedRallyPointChecks + 1
+                                if iFailedRallyPointChecks > 5 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iFailedRallyPointChecks='..iFailedRallyPointChecks..' so wont consider any further mex based locations') end
+                                    break end
+                            end
+                        --elseif bDebugMessages == true then LOG(sFunctionRef..': Possible rally point not being considered further; tPossibleRallyPoint='..repr(tPossibleRallyPoint)..'; Segment group='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossibleRallyPoint)..'; iBaseGroup='..iOurBaseGroup)
+                        --end
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': Less than 100 distance between mex and last rally point so wont conisder via point')
                     end
                 end
-                --Add the mex as a rally point unless we've already flagged to stop looking
-                if bStopLookingForRallyPoints == false then
-                    --TODO
+                iPrevRallyPoints = iCurRallyPoints
+                --Add the mex as a rally point unless we've already flagged to stop looking, or the mex is too close to the last rally point
+                if bDebugMessages == true then LOG(sFunctionRef..': Consider whether to add a place near the mex as a rally point unless we have more than 5 failed checks') end
+                if iFailedRallyPointChecks <= 5 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Difference in distances to start between mex and last rally point='..aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart) end
+                    if (aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart) > 40 then
+                        tPossibleRallyPoint = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][reftMexLocation]
+                        ,M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryLandFactory, M27Utilities.GetACU(aiBrain), false, false)
+                        ,0, 10)
+
+                        --if M27Utilities.IsTableEmpty(tPossibleRallyPoint) == false and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossibleRallyPoint) == iOurBaseGroup then
+                            --Can path to the location, check if its far enough away from most recently added rally point and if any nearby enemies
+                        if bDebugMessages == true then LOG(sFunctionRef..': Mex is far enough away; tPossibleRallyPoint='..repr(tPossibleRallyPoint)) end
+                        iCurRallyPoints, bAbortedDueToEnemiesOrIntel = RecordIfSuitableRallyPoint(aiBrain, tPossibleRallyPoint, iCurRallyPoints, iOurBaseGroup)
+                        --Did we add a rally point?
+                        if bAbortedDueToEnemiesOrIntel then
+                            iFailedRallyPointChecks = iFailedRallyPointChecks + 1
+                            if iFailedRallyPointChecks > 5 then break end
+                        end
+                        --end
+                    end
                 end
-                --TODO - to add code - see notes
+            end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': reftMexesAndDistanceNearPathToNearestEnemy is empty')
+        end
+
+        --Have added for all mexes from start to base; If we have <= 1 rally point, then just use intel lines as potential rally points
+        if iCurRallyPoints <= 1 and iFailedRallyPointChecks <= 5 then
+            for iIntelLine, tIntelPath in aiBrain[M27Overseer.reftIntelLinePositions] do
+                iPrevRallyPoints = iCurRallyPoints
+                if iIntelLine > 1 then
+                    iCurRallyPoints, bAbortedDueToEnemiesOrIntel = RecordIfSuitableRallyPoint(aiBrain, aiBrain[M27Overseer.reftIntelLinePositions][iIntelLine][1], iCurRallyPoints, iOurBaseGroup)
+                    if bAbortedDueToEnemiesOrIntel then
+                        iFailedRallyPointChecks = iFailedRallyPointChecks + 1
+                        if iFailedRallyPointChecks > 5 then break end
+                    end
+                end
             end
         end
 
-        --TODO - to add code
 
         aiBrain[refiNearestEnemyIndexWhenLastCheckedRallyPoints] = M27Logic.GetNearestEnemyIndex(aiBrain)
 
-        --TODO - to add code
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': End of code to recalculate rally points; will highlight all rally points in yellow; ALl rally points='..repr(aiBrain[reftRallyPoints]))
+            M27Utilities.DrawLocations(aiBrain[reftRallyPoints], nil, 4, 40)
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end

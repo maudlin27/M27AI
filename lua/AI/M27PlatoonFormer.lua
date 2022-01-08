@@ -28,6 +28,9 @@ refbUsingTanksForPlatoons = 'M27PlatoonFormerUsingTanksForPlatoons' --false if h
 refbUsingMobileShieldsForPlatoons = 'M27PlatoonFormerUsingMobileShields' --false if dont ahve any platoons to assign mobile shields to
 refiTimeLastCheckedForIdleShields = 'M27PlatoonFormerTimeCheckedIdleShields' --Gametime that last checked for idle shields
 
+refoMAABasePatrolPlatoon = 'M27PlatoonFormerMAABasePatrol'
+refoMAARallyPatrolPlatoon = 'M27PlatoonFormerMAARallyPatrol'
+
 local iIdleUnitSearchThreshold = 10
 
 function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately)
@@ -383,19 +386,20 @@ function CombatPlatoonFormer(aiBrain)
                         end
                     end
                 else
-                    --Get the units that are waiting to move to the intel path location so they're ready/on hand
+                    --Get the units that are waiting to move to the rally point nearest the enemy
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough units for min size, iUnitsWaiting='..iUnitsWaiting..'; iMinSize='..iMinSize..' so will send them to intel path temporarily') end
                     if aiBrain[M27Overseer.refbIntelPathsGenerated] == true then
-                        local iIntelPathPoint = aiBrain[M27Overseer.refiCurIntelLineTarget]
+                        --[[local iIntelPathPoint = aiBrain[M27Overseer.refiCurIntelLineTarget]
                         if iIntelPathPoint == nil then iIntelPathPoint = 1
                         else
                             iIntelPathPoint = iIntelPathPoint - 2
                             if iIntelPathPoint <= 0 then iIntelPathPoint = 1 end
                         end
-
                         local tTargetPosition = aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint][1]
+                        --]]
+                        local tTargetPosition = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
                         --Modify position if its close to a factory
-                        local iCurLoop = 0
+                        --[[local iCurLoop = 0
                         local iMaxLoop = 10
                         local tBasePosition = {tTargetPosition[1], tTargetPosition[2], tTargetPosition[3]}
                         if M27Utilities.IsTableEmpty(tBasePosition) == true then
@@ -438,7 +442,7 @@ function CombatPlatoonFormer(aiBrain)
                                 iNewPositionSegmentX, iNewPositionSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tTargetPosition)
                                 iNewPositionGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iNewPositionSegmentX, iNewPositionSegmentZ)
                             end
-                        end
+                        end --]]
                         if M27Utilities.IsTableEmpty(tTargetPosition) == false then
                             if bDebugMessages == true then LOG(sFunctionRef..': About to clear commands for all units waiting for assignment to a platoon and tell them to move to '..repr(tTargetPosition)) end
                             IssueClearCommands(aiBrain[reftoCombatUnitsWaitingForAssignment])
@@ -446,6 +450,7 @@ function CombatPlatoonFormer(aiBrain)
                             if M27Config.M27ShowUnitNames == true then M27PlatoonUtilities.UpdateUnitNames(aiBrain[reftoCombatUnitsWaitingForAssignment], 'WaitingToForm '..sPlatoonToForm) end
                         else M27Utilities.ErrorHandler('target position doesnt exist')
                         end
+
                     else
                         if bDebugMessages == true then LOG(sFunctionRef..': Dont have intel path generated yet so wont try to move to a new rally point') end
                     end
@@ -694,6 +699,32 @@ function GetClosestPlatoonWantingMobileShield(aiBrain, tStartPosition, oShield)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return oClosestPlatoon
+end
+
+function MAAPlatoonFormer(aiBrain, tMAA)
+    --Assign MAA to a MAA patrol AI platoon by default (units will then be taken from here to MAA assister platoons as and when theyre needed)
+    local sFunctionRef = 'MAAPlatoonFormer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local oPlatoonToAddTo
+    if aiBrain[refoMAABasePatrolPlatoon] == nil or (aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] or 0) == 0 then
+        oPlatoonToAddTo = CreatePlatoon(aiBrain, 'M27MAAPatrol', tMAA)
+        oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard] = aiBrain[M27MapInfo.reftRallyPoints][1]
+        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the base MAA platoon and set location to guard='..repr(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
+    elseif aiBrain[refoMAARallyPatrolPlatoon] == nil or (aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] or 0) == 0 then
+        oPlatoonToAddTo = CreatePlatoon(aiBrain, 'M27MAAPatrol', tMAA)
+        oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard] = M27MapInfo.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the rally point MAA platoon and set location to guard='..repr(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
+    else
+        --Which platoon needs more MAA if we want 60:40 ratio for base:rally point?
+        if aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiPlatoonThreatValue] * 0.6 < aiBrain[refoMAARallyPatrolPlatoon][M27PlatoonUtilities.refiPlatoonThreatValue] * 0.4 then
+            oPlatoonToAddTo = aiBrain[refoMAABasePatrolPlatoon]
+        else oPlatoonToAddTo = aiBrain[refoMAARallyPatrolPlatoon]
+        end
+        AddIdleUnitsToPlatoon(aiBrain, tMAA, oPlatoonToAddTo)
+        if bDebugMessages == true then LOG(sFunctionRef..': Added MAA to platoon '..oPlatoonToAddTo:GetPlan()..oPlatoonToAddTo[M27PlatoonUtilities.refiPlatoonCount]) end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
@@ -1053,7 +1084,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                 --Give the new unit a move command to try and make sure its away from the factory
                 --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
                 if tStartPosition then
-                    local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, tStartPosition)
+                    local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
                     --local tRallyPoint = M27Utilities.MoveTowardsTarget(tStartPosition, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], 10, 0)
                     if EntityCategoryContains(refCategoryLandCombat, sUnitID) then
                         IssueAggressiveMove(tNewUnits, tRallyPoint)
@@ -1094,6 +1125,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                 local tAirUnits = EntityCategoryFilterDown(categories.AIR - refCategoryEngineer, tNewUnits)
                 local tNavalUnits = EntityCategoryFilterDown(categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat, tNewUnits)
                 local tIndirectT2Plus = EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
+                local tMAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryMAA  - M27UnitInfo.refCategoryIndirectT2Plus - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
 
                 local tNeedingAssigningCombatUnits = {}
                 local iValidCombatUnitCount = 0
@@ -1155,6 +1187,9 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                 if M27Utilities.IsTableEmpty(tIndirectT2Plus) == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': Have indirect T2+ units, will assign to idle platoon for now, number of units='..table.getn(tIndirectT2Plus)) end
                     AllocateUnitsToIdlePlatoons(aiBrain, tIndirectT2Plus)
+                end
+                if M27Utilities.IsTableEmpty(tMAA) == false then
+                    MAAPlatoonFormer(aiBrain, tMAA)
                 end
                 if M27Utilities.IsTableEmpty(tAirUnits) == false then
                    AllocateUnitsToIdlePlatoons(aiBrain, tAirUnits)

@@ -1057,12 +1057,12 @@ function SetFactoryRallyPoint(oFactory)
     local sFunctionRef = 'SetFactoryRallyPoint'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iDistFromFactory = 5 --Factories are 8x8, midpoint is middle of it so 4 to end of factory
-    local oBrain = oFactory:GetAIBrain()
-    if oBrain == nil then M27Utilities.ErrorHandler('SetFactoryRallyPoint: oBrain is Nil') end
-    local iEnemyX, iEnemyZ = oBrain:GetCurrentEnemy():GetArmyStartPos()
+    local aiBrain = oFactory:GetAIBrain()
+    if aiBrain == nil then M27Utilities.ErrorHandler('SetFactoryRallyPoint: aiBrain is Nil') end
+    local iEnemyX, iEnemyZ = aiBrain:GetCurrentEnemy():GetArmyStartPos()
     if bDebugMessages == true then LOG('SetFactoryRallyPoint: iEnemyX='..iEnemyX) end
     local tFactoryPos = oFactory:GetPosition()
-    --Set the rally point near to the factory in the direction of the enemy:
+    --Set the rally point near to the factory in the direction of the enemy, unless the nearest rally point is closer to the enemy
     local iRallyX = tFactoryPos[1]
     local iRallyZ = tFactoryPos[3]
     if iEnemyX > iRallyX then iRallyX = iRallyX + iDistFromFactory
@@ -1071,6 +1071,10 @@ function SetFactoryRallyPoint(oFactory)
     else iRallyZ = iRallyZ - iDistFromFactory end
 
     local tRallyPoint = {iRallyX, GetTerrainHeight(iRallyX, iRallyZ), iRallyZ}
+    local tNearestRallyPoint = GetNearestRallyPoint(aiBrain, tFactoryPos)
+    if M27Utilities.GetDistanceBetweenPositions(tRallyPoint, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]) > M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]) then
+        tRallyPoint = {tNearestRallyPoint[1], tNearestRallyPoint[2], tNearestRallyPoint[3]}
+    end
     if bDebugMessages == true then LOG('SetFactoryRallyPoint: tFactoryPos='..tFactoryPos[1]..'-'..tFactoryPos[3]..'; iRallyXZ='..iRallyX..'-'..iRallyZ..'; iEnemyXZ='..iEnemyX..'-'..iEnemyZ) end
     IssueClearFactoryCommands({oFactory})
     IssueFactoryRallyPoint({oFactory}, tRallyPoint)
@@ -3143,9 +3147,34 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
 end
 
 function GetNearestRallyPoint(aiBrain, tPosition)
-    --Placeholder code below - longer term want to integrate this with forward base logic
+    --Todo - longer term want to integrate this with forward base logic
     local sFunctionRef = 'GetNearestRallyPoint'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --Refresh rally points if we've not refreshed in a while
+    M27MapInfo.RecordAllRallyPoints(aiBrain)
+
+    --Cycle through all rally points and pick the closest to tPosition
+    local iNearestToStart = 10000
+    local iNearestRallyPoint, iCurDistanceToStart
+    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftRallyPoints]) then
+        if GetGameTimeSeconds() >= 150 then
+            M27Utilities.ErrorHandler('Dont have any rally point >=2.5m into the game, wouldve expected to have generated intel paths by now; will return base as a rally point', nil, true)
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    else
+
+
+        for iRallyPoint, tRallyPoint in aiBrain[M27MapInfo.reftRallyPoints] do
+            iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tPosition, aiBrain[M27MapInfo.reftRallyPoints][iRallyPoint])
+            if iCurDistanceToStart < iNearestToStart then
+                iNearestRallyPoint = iRallyPoint
+            end
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
+    end
+    --[[ Previous code based on mex patrol locations:
     local tMexPatrolLocations = M27MapInfo.GetMexPatrolLocations(aiBrain)
     local iNearestToStart = 10000
     local tNearestMex
@@ -3159,7 +3188,7 @@ function GetNearestRallyPoint(aiBrain, tPosition)
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return tNearestMex
+    return tNearestMex--]]
 end
 
 function GetPositionToSideOfTarget(oUnit, tTargetLocation, iBaseAngleToTarget, iDistanceToMove)

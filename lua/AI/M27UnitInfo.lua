@@ -446,3 +446,15 @@ function SetUnitTargetPriorities(oUnit, tPriorityTable)
         end
     end
 end
+
+function GetUnitAARange(oUnit)
+    local iMaxRange = 0
+    for iCurWeapon, oCurWeapon in oUnit:GetBlueprint().Weapon do
+        if oCurWeapon.WeaponCategory == 'Anti Air' then
+            if not(oCurWeapon.ManualFire == true) then
+                if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
+            end
+        end
+    end
+    return iMaxRange
+end
