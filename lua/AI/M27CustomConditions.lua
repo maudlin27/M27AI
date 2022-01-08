@@ -93,7 +93,7 @@ end
 
 function SafeToGetACUUpgrade(aiBrain)
     --Determines if its safe for the ACU to get an upgrade - considers ACU health and whether ACU is in a platoon set to heal
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SafeToGetACUUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -203,13 +203,15 @@ function SafeToGetACUUpgrade(aiBrain)
                     end
                 end
                 if bIsSafe == true then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will check for nearby PD, T2 arti and TML unless are underwater') end
                     --Check no enemy T2 arti or T3 PD nearby, or TML
                     if not(M27UnitInfo.IsUnitUnderwater(oACU)) then
                         tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryPD * categories.TECH3 + M27UnitInfo.refCategoryFixedT2Arti, tACUPos, 128, 'Enemy')
                         bIsSafe = M27Utilities.IsTableEmpty(tNearbyEnemies)
-                        if bIsSafe and M27Utilities.IsTableEmpty(M27Overseer.reftEnemyTML) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': bIsSafe after checking for nearby enemies='..tostring(bIsSafe)) end
+                        if bIsSafe and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
                             local iTMLInRange = 0
-                            for iUnit, oUnit in M27Overseer.reftEnemyTML do
+                            for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyTML] do
                                 if M27Utilities.GetDistanceBetweenPositions(tACUPos, oUnit:GetPosition()) <= 259 then
                                     if bDebugMessages == true then LOG(sFunctionRef..': In range of TML') end
                                     iTMLInRange = iTMLInRange + 1

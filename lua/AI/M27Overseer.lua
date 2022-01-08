@@ -3667,47 +3667,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             aiBrain[refiOurHighestAirFactoryTech] = 1
         end
 
-        --Should we switch to eco?
-            --How far away is the enemy?
-        local iDistanceFromEnemyToUs = aiBrain[refiDistanceToNearestEnemyBase]
+--=========DECIDE ON GRAND STRATEGY
+        --Get details on how close friendly units are to enemy
+        --(Want to run below regardless as we use the distance to base for other logic)
 
-        local bWantToEco = false
-        local bBigEnemyThreat = false
-        local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
-        local iT3Mexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex)
-
-        if M27Utilities.IsTableEmpty(aiBrain[reftEnemyGroundExperimentals]) == false then bBigEnemyThreat = true end
-
-        --Dont eco if enemy ACU near ours as likely will need backup
-        if aiBrain[refbEnemyACUNearOurs] == false then
-            if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 8000 then
-                if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.58 or iDistanceFromEnemyToUs >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': No big enemy threats and good defence and mex coverage so will eco') end
-                    bWantToEco = true
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Dont want to eco based on initial tests: bBigEnemyThreat='..tostring(bBigEnemyThreat)..'; %threat='..aiBrain[refiPercentageOutstandingThreat]..'; UnclaimedMex%='..iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup..'; EnemyDist='..iDistanceFromEnemyToUs) end
-                    --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
-                    if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Ok defence coverage and income not changed in a while so will eco') end
-                        bWantToEco = true
-                    else
-                        if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
-                            --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks
-                            if iLandCombatUnits >= 40 then
-                                if bWantToEco == false or aiBrain[refiOurHighestFactoryTechLevel] <= 2 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have tech 3 and/or have lots of land with no big threats and not making use of land factories so will eco') end
-                                    bWantToEco = true
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        --Consider other scenarios that might mean we dont want to eco even if based on earlier we thought we did:
-
-        --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
         local tFriendlyLandCombat = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandCombat, false, true)
         --M27Utilities.GetNearestUnit(tUnits, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], aiBrain, false)
         local oNearestFriendlyCombatUnitToEnemyBase = M27Utilities.GetNearestUnit(tFriendlyLandCombat, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], aiBrain, false)
@@ -3716,14 +3679,56 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         local iFurthestFriendlyDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
 
         aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
-        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then bWantToEco = false end
-        if oACU:GetHealthPercent() < 0.45 then bWantToEco = false end
 
 
+        --Should we switch to eco?
+        local bWantToEco = false
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and not(aiBrain[refbStopACUKillStrategy]) then --set as part of ACU manager
-            --Do nothing - want to continue with ACUKill strategy
+            --Stick with this strategy
         else
-            if bWantToEco == true then --Land factory units to build for 'else' condition
+            --How far away is the enemy?
+            local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
+            local iT3Mexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex)
+            local bBigEnemyThreat = false
+            if M27Utilities.IsTableEmpty(aiBrain[reftEnemyGroundExperimentals]) == false then bBigEnemyThreat = true end
+
+
+
+
+
+            --Dont eco if enemy ACU near ours as likely will need backup
+            if aiBrain[refbEnemyACUNearOurs] == false then
+                if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 8000 then
+                    if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.58 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': No big enemy threats and good defence and mex coverage so will eco') end
+                        bWantToEco = true
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Dont want to eco based on initial tests: bBigEnemyThreat='..tostring(bBigEnemyThreat)..'; %threat='..aiBrain[refiPercentageOutstandingThreat]..'; UnclaimedMex%='..iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup..'; EnemyDist='..aiBrain[refiDistanceToNearestEnemyBase]) end
+                        --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
+                        if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Ok defence coverage and income not changed in a while so will eco') end
+                            bWantToEco = true
+                        else
+                            if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
+                                --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks
+                                if iLandCombatUnits >= 40 then
+                                    if bWantToEco == false or aiBrain[refiOurHighestFactoryTechLevel] <= 2 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have tech 3 and/or have lots of land with no big threats and not making use of land factories so will eco') end
+                                        bWantToEco = true
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            if bWantToEco == true then
+                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then bWantToEco = false end
+
+                --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
+                if oACU:GetHealthPercent() < 0.45 then bWantToEco = false end
+            end
+            if bWantToEco == true then
                 aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = nil
                 aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
             else
@@ -3732,6 +3737,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandEarly
             end
         end
+        
         --Max target defence coverage for strategy
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then aiBrain[refiMaxDefenceCoverageWanted] = 0.65
         else aiBrain[refiMaxDefenceCoverageWanted] = 0.9 end
