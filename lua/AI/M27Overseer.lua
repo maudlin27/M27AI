@@ -2855,7 +2855,7 @@ end
 function ACUManager(aiBrain)
     --A lot of the below code is a hangover from when the ACU would use the built in AIBuilders and platoons;
     --Almost all the functionality has now been integrated into the M27ACUMain platoon logic, with a few exceptions (such as calling for help), although these could probably be moved over as well
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -2891,7 +2891,7 @@ function ACUManager(aiBrain)
                     if oACU[M27EngineerOverseer.refiEngineerCurrentAction] and oACUPlatoon[M27PlatoonUtilities.refiCurrentAction] then
                         if not(oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing')) then
                             local iCurAction = oACUPlatoon[M27PlatoonUtilities.refiCurrentAction]
-                            if not(iCurAction == M27PlatoonUtilities.refActionBuildLandFactory or iCurAction == M27PlatoonUtilities.refActionBuildInitialPower) then
+                            if not(iCurAction == M27PlatoonUtilities.refActionBuildFactory or iCurAction == M27PlatoonUtilities.refActionBuildInitialPower) then
                                 --Have an engineer action assigned but the platoon we're in doesnt, need to clear engineer tracker to free up any guarding units
                                 M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oACU, true)
                             end
@@ -3149,6 +3149,7 @@ function ACUManager(aiBrain)
                 if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tACUPos) > M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tACUPos) then iExtraHealthCheck = 1000 end
                 --Do we have a big gun, or is the enemy ACU low on health?
                 if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Our ACU has a big gun') end
                     bAllInAttack = true
                     bIncludeACUInAttack = true
                 else
@@ -3171,9 +3172,11 @@ function ACUManager(aiBrain)
                         bIncludeACUInAttack = true
                     end
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': bAllInAttack after considering our ACU vs their ACU='..tostring(bAllInAttack)) end
             else aiBrain[refbEnemyACUNearOurs] = false
             end
             if bAllInAttack == false and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Will consider if want all out attack even if our ACU isnt in much stronger position') end
                 if aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.1 + iHealthThresholdAdjIfAlreadyAllIn) then
                     if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is almost dead') end
                     bAllInAttack = true
@@ -3199,6 +3202,7 @@ function ACUManager(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Include ACU in all out attack as it has more than 50% health') end
                     bIncludeACUInAttack = true
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': bAllInAttack='..tostring(bAllInAttack)) end
             end
 
 
@@ -3347,6 +3351,7 @@ function ACUManager(aiBrain)
             end
 
             if bAllInAttack == true then
+                if bDebugMessages == true then LOG(sFunctionRef..': Are doing all in attack, will consider if want to suicide our ACU') end
                 aiBrain[refiAIBrainCurrentStrategy] = refStrategyACUKill
                 aiBrain[refbStopACUKillStrategy] = false
                 aiBrain[refbIncludeACUInAllOutAttack] = bIncludeACUInAttack

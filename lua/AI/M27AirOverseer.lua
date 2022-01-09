@@ -675,12 +675,14 @@ function AirThreatChecker(aiBrain)
     --air AA wanted:
     local tAirAAUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirAA, false, true)
     if M27Utilities.IsTableEmpty(tAirAAUnits) == true then
+        if bDebugMessages == true then LOG(sFunctionRef..': Have no AirAA units so setting amount wanted to 2') end
         aiBrain[refiOurMassInAirAA] = 0
         aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 2)
     else
         aiBrain[refiOurMassInAirAA] = M27Logic.GetAirThreatLevel(aiBrain, tAirAAUnits, false, true, false, false, false)
         if aiBrain[refiOurMassInAirAA] < aiBrain[refiHighestEnemyAirThreat] then aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 2)
         else aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 0) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating how much airAA we want. aiBrain[refiOurMassInAirAA]='..aiBrain[refiOurMassInAirAA]..'; aiBrain[refiHighestEnemyAirThreat]='..aiBrain[refiHighestEnemyAirThreat]..'; aiBrain[refiAirAANeeded]='..aiBrain[refiAirAANeeded]) end
     end
     --Emergency MAA checker
     local bEmergencyAA = false
@@ -2079,6 +2081,10 @@ function AirAAManager(aiBrain)
         local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir, tStartPosition, aiBrain[refiMaxScoutRadius], 'Enemy')
 
         local iAirThreatShortfall = 0
+        local tValidEnemyAirThreats = {}
+        local bDidntHaveAnyAirAAToStartWith = false
+        local refiDistance = 'AirAADistance'
+
         if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then
 
             local iDistanceFromACUToStart = 0
@@ -2087,9 +2093,9 @@ function AirAAManager(aiBrain)
             local iDistanceFromEnemyStartToOurStart = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
             local iMapMidpointDistance = iDistanceFromEnemyStartToOurStart * 0.5
 
-            local tValidEnemyAirThreats = {}
+
             local refoUnit = 'AirAAUnit'
-            local refiDistance = 'AirAADistance'
+
             local iEnemyUnitCount = 0
             local tUnitCurPosition
             local iDistanceToACU
@@ -2168,6 +2174,7 @@ function AirAAManager(aiBrain)
             local tCurUnitPos
             local bAbortAsNoMoreAirAA
             local oCurTarget, iAlreadyAssignedMassValue
+
             if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then
                 --SortTableBySubtable(tTableToSort, sSortByRef, bLowToHigh)
                 bAbortAsNoMoreAirAA = false
@@ -2280,27 +2287,12 @@ function AirAAManager(aiBrain)
                     end
                     if bAbortAsNoMoreAirAA == true then iAirThreatShortfall = iAirThreatShortfall + iRemainingMassThreat end
                 end
-
-                local iExpectedThreatPerCount = 50
-                if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then iExpectedThreatPerCount = 350 end
-                if iAirThreatShortfall > 0 then
-                    aiBrain[refiAirAANeeded] = math.max(5, math.ceil(iAirThreatShortfall / iExpectedThreatPerCount))
-                    if bDebugMessages == true then LOG(sFunctionRef..': End of calculating threat required; iAirThreatShortfall='..iAirThreatShortfall..'; iExpectedThreatPerCount='..iExpectedThreatPerCount..'; aiBrain[refiAirAANeeded]='..aiBrain[refiAirAANeeded]) end
-                else
-                    aiBrain[refiAirAANeeded] = 0
-                    if bDebugMessages == true then LOG(sFunctionRef..': iAirThreatShortfall is 0 so airAA needed is 0') end
-                end
             else
-                local iEnemyAirUnits = 0
-                if M27Utilities.IsTableEmpty(tValidEnemyAirThreats) == false then
-                    for iUnit, tSubtable in M27Utilities.SortTableBySubtable(tValidEnemyAirThreats, refiDistance, true) do
-                        iEnemyAirUnits = iEnemyAirUnits + 1
-                    end
-                end
-                aiBrain[refiAirAANeeded] = iEnemyAirUnits * 1.3 + 2
-                if bDebugMessages == true then LOG(sFunctionRef..': Have no inties, will flag we need more AirAA if any enemy air threats are detected; aiBrain[refiAirAANeeded]='..tostring(aiBrain[refiAirAANeeded])) end
+                bDidntHaveAnyAirAAToStartWith = true
             end
         else
+            --Dont need any airAA any more
+
             if bDebugMessages == true then LOG(sFunctionRef..': No enemy air units to target') end
         end
         if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then
@@ -2314,6 +2306,28 @@ function AirAAManager(aiBrain)
             end
         end
 
+        --Calculate how much airAA we want to build
+
+        local iExpectedThreatPerCount = 50
+        if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then iExpectedThreatPerCount = 350 end
+        if bDidntHaveAnyAirAAToStartWith == true then
+            local iEnemyAirUnits = 0
+            if M27Utilities.IsTableEmpty(tValidEnemyAirThreats) == false then
+                for iUnit, tSubtable in M27Utilities.SortTableBySubtable(tValidEnemyAirThreats, refiDistance, true) do
+                    iEnemyAirUnits = iEnemyAirUnits + 1
+                end
+            end
+            aiBrain[refiAirAANeeded] = iEnemyAirUnits * 1.3 + 2
+        else
+            if iAirThreatShortfall > 0 then
+                aiBrain[refiAirAANeeded] = math.max(5, math.ceil(iAirThreatShortfall / iExpectedThreatPerCount))
+                if bDebugMessages == true then LOG(sFunctionRef..': End of calculating threat required; iAirThreatShortfall='..iAirThreatShortfall..'; iExpectedThreatPerCount='..iExpectedThreatPerCount..'; aiBrain[refiAirAANeeded]='..aiBrain[refiAirAANeeded]) end
+            else
+                --Do we have any available air units?
+                aiBrain[refiAirAANeeded] = 0
+                if bDebugMessages == true then LOG(sFunctionRef..': iAirThreatShortfall is 0 so airAA needed is 0') end
+            end
+        end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

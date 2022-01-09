@@ -37,7 +37,7 @@ refActionAssistConstruction = 12
 refActionMoveJustWithinRangeOfNearestPD = 13
 refActionMoveToTemporaryLocation = 14 --uses reftTemporaryMoveTarget
 refActionAttackSpecificUnit = 15
-refActionBuildLandFactory = 16
+refActionBuildFactory = 16
 refActionBuildInitialPower = 17 --NOTE: I(f adding more build actions that the ACU will use, then update the overseer acu manager as it will clear engineer t rackers if the ACU switches to a different non-building action
 refActionTemporaryRetreat = 18 --similar to actionrun, but wont clear movement path
 refActionUpgrade = 19 --Either gets a new upgrade, or continues existing upgrade if we have one
@@ -3058,20 +3058,26 @@ end
 function DetermineIfACUShouldBuildPower(oPlatoon)
     local sFunctionRef = 'DetermineIfACUShouldBuildPower'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --Only call if ACU in platoon
     if oPlatoon:GetPlan() == 'M27ACUMain' then
         local aiBrain = oPlatoon:GetBrain()
         if oPlatoon[reftPrevAction] and oPlatoon[reftPrevAction][1] == refActionBuildInitialPower then
             local oACU = M27Utilities.GetACU(aiBrain)
             if oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU previous action was to build power and its still building or repairing so have it continue to build power') end
                 oPlatoon[refiCurrentAction] = refActionBuildInitialPower
             end
         end
         if oPlatoon[refiCurrentAction] == nil then
-            local iGrossEnergy = aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]
-            if iGrossEnergy <= 11 then
-                local iGameTime = GetGameTimeSeconds()
-                if iGameTime <= 150 then
+            local iGrossEnergyWanted = 11
+            if aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] <= 2 then iGrossEnergyWanted = 20
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': iGrossEnergyIncome='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; iGrossEnergyWanted='..iGrossEnergyWanted) end
+            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= iGrossEnergyWanted then
+                if bDebugMessages == true then LOG(sFunctionRef..': Want more energy, will build unless not the start of the game, game time='..GetGameTimeSeconds()) end
+                if GetGameTimeSeconds() <= 200 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Near start of game so will build power unless we are near a hydro; NearHydro='..tostring(M27Conditions.HydroNearACUAndBase(aiBrain, true, false))) end
                     if not(M27Conditions.HydroNearACUAndBase(aiBrain, true, false)) then
                         oPlatoon[refiCurrentAction] = refActionBuildInitialPower
                     end
@@ -3082,10 +3088,10 @@ function DetermineIfACUShouldBuildPower(oPlatoon)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function DetermineIfACUShouldBuildLandFactory(oPlatoon)
+function DetermineIfACUShouldBuildFactory(oPlatoon)
     --Allows ACU to build land factory in certain cases
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'DetermineIfACUShouldBuildLandFactory'
+    local sFunctionRef = 'DetermineIfACUShouldBuildFactory'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbACUInPlatoon] == true then --Already have this in the determine platoon action function, and might want to use this function for another unit
     local aiBrain = oPlatoon:GetBrain()
@@ -3096,11 +3102,11 @@ function DetermineIfACUShouldBuildLandFactory(oPlatoon)
         --Is the engineer already building and its previous action was to build a land factory or power?
         local bAlreadyBuilding = false
         local bAlreadyTryingToBuild = false
-        if oPlatoon[reftPrevAction] and oPlatoon[reftPrevAction][1] == refActionBuildLandFactory then
+        if oPlatoon[reftPrevAction] and oPlatoon[reftPrevAction][1] == refActionBuildFactory then
             bAlreadyTryingToBuild = true
             local oACU = M27Utilities.GetACU(aiBrain)
             if oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
-                oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                oPlatoon[refiCurrentAction] = refActionBuildFactory
                 bAlreadyBuilding = true
                 oPlatoon[refbMovingToBuild] = false
             end
@@ -3117,7 +3123,7 @@ function DetermineIfACUShouldBuildLandFactory(oPlatoon)
                 if iDistanceToEnemy >= iDistanceToStart then
                     local iStoredEnergy = aiBrain:GetEconomyStored('ENERGY')
                     if bAlreadyTryingToBuild and iStoredEnergy >= 250 and oPlatoon[refbMovingToBuild] == true then
-                        oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                        oPlatoon[refiCurrentAction] = refActionBuildFactory
                     else
                         if iFactoryCount < 2 then
                             if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 10 then --Have at least 100 gross energy income per second
@@ -3125,7 +3131,7 @@ function DetermineIfACUShouldBuildLandFactory(oPlatoon)
                                     if iStoredEnergy >= 250 then
                                         if aiBrain:GetEconomyStored('MASS') >= 20 then
                                             if bDebugMessages == true then LOG(sFunctionRef..': We have the resources to build a land factory so will try to') end
-                                            oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                                            oPlatoon[refiCurrentAction] = refActionBuildFactory
                                         end
                                     end
                                 end
@@ -3137,7 +3143,7 @@ function DetermineIfACUShouldBuildLandFactory(oPlatoon)
                                         if iStoredEnergy >= 750 then
                                             if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
-                                                oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                                                oPlatoon[refiCurrentAction] = refActionBuildFactory
                                             end
                                         end
                                     end
@@ -3150,7 +3156,7 @@ function DetermineIfACUShouldBuildLandFactory(oPlatoon)
                                         if iStoredEnergy >= 1000 then
                                             if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
-                                                oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                                                oPlatoon[refiCurrentAction] = refActionBuildFactory
                                             end
                                         end
                                     end
@@ -3854,7 +3860,7 @@ function DeterminePlatoonAction(oPlatoon)
                                     end
                                     if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': iFactoryCount='..iFactoryCount) end
                                     if iFactoryCount == 0 then
-                                        oPlatoon[refiCurrentAction] = refActionBuildLandFactory
+                                        oPlatoon[refiCurrentAction] = refActionBuildFactory
                                         bStartingBuildOrder = true
                                     end
                                 end
@@ -3990,7 +3996,7 @@ function DeterminePlatoonAction(oPlatoon)
                                                                                         local bACUUnderwater = M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit])
                                                                                         if not(bACUUnderwater) then
                                                                                             DetermineIfACUShouldBuildPower(oPlatoon)
-                                                                                            if oPlatoon[refiCurrentAction] == nil then DetermineIfACUShouldBuildLandFactory(oPlatoon) end
+                                                                                            if oPlatoon[refiCurrentAction] == nil then DetermineIfACUShouldBuildFactory(oPlatoon) end
                                                                                         end
                                                                                         if bDebugMessages == true then LOG(sFunctionRef..': ACU is in platoon, action after checking to build power or land factory='..(oPlatoon[refiCurrentAction] or 'nil')) end
                                                                                         if oPlatoon[refiCurrentAction] == nil then
@@ -4122,7 +4128,7 @@ function DeterminePlatoonAction(oPlatoon)
                     else
                         local bBuildingOrReclaimingLogic = false
                         --Building and reclaiming - base refresh on whether any units are building/reclaiming
-                        if oPlatoon[refiCurrentAction] == refActionBuildMex or oPlatoon[refiCurrentAction] == refActionAssistConstruction or oPlatoon[refiCurrentAction] == refActionBuildLandFactory or oPlatoon[refiCurrentAction] == refActionBuildInitialPower then
+                        if oPlatoon[refiCurrentAction] == refActionBuildMex or oPlatoon[refiCurrentAction] == refActionAssistConstruction or oPlatoon[refiCurrentAction] == refActionBuildFactory or oPlatoon[refiCurrentAction] == refActionBuildInitialPower then
                             bBuildingOrReclaimingLogic = true
                             bRefreshAction = true
                             if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Checking if any buidlers ahve unit state building') end
@@ -6609,14 +6615,30 @@ function ProcessPlatoonAction(oPlatoon)
                         --Move as soon as are done:
                         IssueMove(tBuilders, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
                     end
-                elseif oPlatoon[refiCurrentAction] == refActionBuildLandFactory then
+                elseif oPlatoon[refiCurrentAction] == refActionBuildFactory then
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': BuildLandFac') end
                     if GetPlatoonUnitsOrUnitCount(oPlatoon, reftBuilders, true, true) > 0 then
                         local tBuilders = GetPlatoonUnitsOrUnitCount(oPlatoon, reftBuilders, false, true)
-                        if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..' about to issue command to build land factory; bDontClearActions='..tostring(bDontClearActions)) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..' about to issue command to build factory; bDontClearActions='..tostring(bDontClearActions)) end
                         if bDontClearActions == false then IssueClearCommands(tBuilders) end
                         local oACU = M27Utilities.GetACU(aiBrain)
                         local iCategoryToBuild = M27UnitInfo.refCategoryLandFactory
+                        --Do we want to build an air factory instead?  Consider building air if we're relatively close to our base, we have a base level of energy taht could support it, and we have the minimum number of land factories wanted
+
+                        --Air fac requires 80 energy per second just to build with an ACU
+                        local iEnergyIncomeNeeded = math.max((2400 - aiBrain:GetEconomyStored('ENERGY')), 1) / 300
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have energy to support an air factory. aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; Stored energy='..aiBrain:GetEconomyStored('ENERGY')..'; iEnergyIncomeNeeded='..iEnergyIncomeNeeded..'; aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]) end
+                        if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 18 and (aiBrain:GetEconomyStored('ENERGY') >= 2500 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= iEnergyIncomeNeeded) then
+                            --We have enough energy to support an air factory, check if we're relatively close to our base
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy, checking if we are close to base; Distance between ACU and base='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+                            if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 90 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Are close enough to base, checking if we have more land factories than we want and not enough air factories. Current land factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory)..'; Current air factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory)..'; Min land fac wanted='..aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]..'; Max air fac wanted='..aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir]) end
+                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory) >= aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory) < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will try to build air factory instead') end
+                                    iCategoryToBuild = M27UnitInfo.refCategoryAirFactory
+                                end
+                            end
+                        end
                         local iMaxAreaToSearch = 35
                         local iCategoryToBuildBy = M27UnitInfo.refCategoryT1Mex
                         local oNearbyUnderConstruction = M27EngineerOverseer.GetPartCompleteBuilding(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, 30)

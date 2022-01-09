@@ -896,6 +896,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 iCategoryToBuild = refCategoryBomber
                             end
                         elseif iCurrentConditionToTry == 5 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..' so will build airAA if its >0') end
                             if bHavePowerForAir and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then --will be set to >0 if we have an existing air target that we want to attack (e.g. its on our side of the map) but we can't crush with our airforce
                                 iCategoryToBuild = refCategoryAirAA
                                 iTotalWanted = aiBrain[M27AirOverseer.refiAirAANeeded]
@@ -929,6 +930,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             end
                         elseif iCurrentConditionToTry == 10 then
                             if bHavePowerForAir then
+                                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAAWanted]='..aiBrain[M27AirOverseer.refiAirAAWanted]..' so will build airAA if its >0') end
                                 if aiBrain[M27AirOverseer.refiAirAAWanted] > 0 then
                                     iCategoryToBuild = refCategoryAirAA
                                     iTotalWanted = math.max(aiBrain[M27AirOverseer.refiAirAAWanted],2)

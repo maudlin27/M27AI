@@ -334,7 +334,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                 if iNetEnergyIncome > iEnergyWanted then
                     --Do we have enough mass? Want this to represent <10% of our total mass income
                     local iUpgradeMassCost = oBP.Enhancements[sUpgradeRef].BuildCostMass
-                    local iMassIncomePerTickWanted = iUpgradeMassCost / iUpgradeBuildTime * iACUBuildRate
+                    local iMassIncomePerTickWanted = iUpgradeMassCost / iUpgradeBuildTime * iACUBuildRate * 0.1
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering if enough mass income to get upgrade; iMassIncomePerTickWanted='..iMassIncomePerTickWanted..'; iUpgradeMassCost='..iUpgradeMassCost..'; iUpgradeBuildTime='..iUpgradeBuildTime..'; iACUBuildRate='..iACUBuildRate..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; aiBrain:GetEconomyStored(MASS)='..aiBrain:GetEconomyStored('MASS')) end
                     if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= iMassIncomePerTickWanted and aiBrain:GetEconomyStored('MASS') >= 5 then --check we're not massively mass stalling
                         --Have enough energy, check if safe to get upgrade
@@ -421,7 +421,7 @@ function DoesACUHaveBigGun(aiBrain, oAltACU)
     local sFunctionRef = 'DoesACUHaveBigGun'
     local oACU = oAltACU
     if oACU == nil then oACU = M27Utilities.GetACU(aiBrain) end
-    for iUpgrade, sUpgrade in tGunUpgrades do
+    for iUpgrade, sUpgrade in tBigGunUpgrades do
         if oACU:HasEnhancement(sUpgrade) then
             return true
         end
@@ -473,9 +473,10 @@ function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
     return bACUHasUpgrade
 end
 
-function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable)
+function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable, bNotYetBuiltOn)
     --If further away hydro, considers if its closer to enemy base than start point; returns empty table if no hydro
     --if bAlsoReturnHydroTable == true then returns table of the hydro locations
+    --bNotYetBuiltOn - if true, only includes hydro if it's not already built on
     local sFunctionRef = 'HydroNearACUAndBase'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bNearBaseOnlyCheck == nil then bNearBaseOnlyCheck = false end
@@ -500,12 +501,14 @@ function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable)
                 if iStartGroup == iHydroGroup then
                     iDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tHydro, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                     if iDistanceToStart <= iMaxDistanceForHydro then
-                        bHydroNear = true
-                        if bAlsoReturnHydroTable == false then
-                            break
-                        else
-                            iValidHydroCount = iValidHydroCount + 1
-                            tValidHydro[iValidHydroCount] = tHydro
+                        if not(bNotYetBuiltOn) or M27Utilities.IsTableEmpty(M27EngineerOverseer.FilterLocationsBasedOnIfUnclaimed(aiBrain, { tHydro }, false)) == false then
+                            bHydroNear = true
+                            if bAlsoReturnHydroTable == false then
+                                break
+                            else
+                                iValidHydroCount = iValidHydroCount + 1
+                                tValidHydro[iValidHydroCount] = tHydro
+                            end
                         end
                     end
                 end
