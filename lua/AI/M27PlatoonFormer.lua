@@ -287,8 +287,8 @@ function CombatPlatoonFormer(aiBrain)
                         aiBrain[refbUsingTanksForPlatoons] = false
                         break
                     end
-                elseif iStrategy == M27Overseer.refStrategyEcoAndTech then
-                    --Defend with coverage up to 70%, and have 1 active raider
+                elseif iStrategy == M27Overseer.refStrategyEcoAndTech or iStrategy == M27Overseer.refStrategyAirDominance then
+                    --Defend with coverage up to the max % value specified, and have 1 active raider
                     if bDebugMessages == true then LOG(sFunctionRef..': Start of loop for eco strategy, iCurrentConditionToTry='..iCurrentConditionToTry) end
                     aiBrain[refbUsingTanksForPlatoons] = true
                     if iCurrentConditionToTry == 1 then --Emergency defence

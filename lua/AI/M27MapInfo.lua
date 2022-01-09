@@ -2950,7 +2950,7 @@ function RecordIfSuitableRallyPoint(aiBrain, tPossibleRallyPoint, iCurRallyPoint
 end
 
 function RecordAllRallyPoints(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAllRallyPoints'
     if GetGameTimeSeconds() - (aiBrain[refiLastRallyPointRefresh] or 0) >= 5 and aiBrain[M27Overseer.refbIntelPathsGenerated] then
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code to recalculate rally points') end

@@ -43,6 +43,7 @@ local refActionBuildT1Radar = 15
 local refActionBuildT2Radar = 16
 local refActionBuildT3Radar = 17
 local refActionAssistSMD = 18
+local refActionAssistAirFactory = 19
 
 --Build order related variables
 refiBOInitialEngineersWanted = 'M27BOInitialEngineersWanted'
@@ -2056,6 +2057,8 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel)
         iCategoryToBuild = M27UnitInfo.refCategoryT3Radar
     elseif iActionToAssign == refActionAssistSMD then
         iCategoryToBuild = nil
+    elseif iActionToAssign == refActionAssistAirFactory then
+        iCategoryToBuild = nil
     elseif iActionToAssign == refActionSpare then
         iCategoryToBuild = nil
     else
@@ -2364,6 +2367,8 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 iCatToBuildBy = M27UnitInfo.refCategoryT3Power
                                 iMaxAreaToSearch = 120
                             elseif iActionToAssign == refActionAssistSMD then
+                                bConstructBuilding = false
+                            elseif iActionToAssign == refActionAssistAirFactory then
                                 bConstructBuilding = false
 
                             elseif iActionToAssign == refActionBuildMassStorage then
@@ -2718,20 +2723,26 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local bClearCurrentlyAssignedEngineer = false --e.g. if want to switch to T2 unit then will clear actions of the currently assigned engineer
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-    if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD then
+    if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistAirFactory then
         --Find the nearest building that is upgrading and assist it, but set a timer to reconsider engineer action after a while
         if bDebugMessages == true then LOG(sFunctionRef..': About to search for buildings to assist in upgrading') end
         local iCategoryToAssist = categories.STRUCTURE
         local sUnitStateWanted = 'Upgrading'
+        local sAltUnitStateWanted
         local iEnemySearchRange = 60
         if iActionRefToAssign == refActionAssistSMD then
             iCategoryToAssist = M27UnitInfo.refCategorySMD
             sUnitStateWanted = 'SiloBuildingAmmo'
             iEnemySearchRange = 0
+        elseif iActionRefToAssign == refActionAssistAirFactory then
+            iCategoryToAssist = M27UnitInfo.refCategoryAirFactory
+            sUnitStateWanted = 'Building'
+            sAltUnitStateWanted = 'Upgrading'
+            iEnemySearchRange = 20
         end
 
 
-        local tAllBuildings = aiBrain:GetListOfUnits(iCategoryToAssist, false, true)
+        local tAllBuildings = aiBrain:GetListOfUnits(iCategoryToAssist, false, false)
         local iNearestUpgradingBuilding = 10000
         local iCurDistanceToStart, tCurPosition
         local tNearbyEnemies
@@ -2741,7 +2752,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
         if M27Utilities.IsTableEmpty(tAllBuildings) == false then
             for iBuilding, oBuilding in tAllBuildings do
                 if bDebugMessages == true then LOG(sFunctionRef..': iBuilding='..iBuilding..'; oBuilding Id='..oBuilding:GetUnitId()..'; Unit state='..M27Logic.GetUnitState(oBuilding)) end
-                if oBuilding.IsUnitState and oBuilding:IsUnitState(sUnitStateWanted) then
+                if oBuilding:GetFractionComplete() < 1 or (oBuilding.IsUnitState and (oBuilding:IsUnitState(sUnitStateWanted) or (sAltUnitStateWanted and oBuilding:IsUnitState(sAltUnitStateWanted)))) then
                     tCurPosition = oBuilding:GetPosition()
                     iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tStartPosition)
                     if bDebugMessages == true then LOG(sFunctionRef..': iBuilding is '..sUnitStateWanted..';  its distance to start='..iCurDistanceToStart) end
@@ -3142,7 +3153,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             local iSearchRangeForNearestEngi --will ignore engis further away than this - should set to massive value for mexes etc. that build far away from base, but low value for buildings that want built by base
 
             --Build order threshold variables:
-            local iThresholdInitialEngineerCondition, bThresholdInitialEngineerCondition
+            local bThresholdInitialEngineerCondition
             local bThresholdPreReclaimEngineerCondition
             local iCurConditionEngiShortfall
             local bClearCurrentlyAssignedEngineer
@@ -3162,20 +3173,25 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             local iLowPowerThreshold = 6
             local iGrossMassIncome = aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]
             local iAbsolutePowerBufferWanted = 10 --Min amoutn of net energy income wanted per tick; 100 for t1
-            local iEnergyBufferMassFactorWanted = 7 --e.g. t2 mex needs 6 power for every 1 mass; T1 bomber is 22; striker is 4.75
+            local iEnergyBufferMassFactorWanted = 7 --e.g. t2 mex needs 6 power for every 1 mass; T1 bomber is 22.8; striker is 4.75
             local iExtraEngisForPowerBasedOnTech = 0
 
             if iHighestFactoryOrEngineerTechAvailable >= 3 then
                 iLowPowerThreshold = 40
                 iEnergyBufferMassFactorWanted = 30--t3 mex needs 7 power for every 1 mass; titan needs 11, t3 strat 69
+                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iEnergyBufferMassFactorWanted = 50 end
                 iAbsolutePowerBufferWanted = 250 --2500
                 iExtraEngisForPowerBasedOnTech = 5
             elseif iHighestFactoryOrEngineerTechAvailable == 2 then
                 iLowPowerThreshold = 10
                 iEnergyBufferMassFactorWanted = 12    --T3 mex is 7:1, janus is 20, pillar is 5
+                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iEnergyBufferMassFactorWanted = 15 end
                 iAbsolutePowerBufferWanted = 40 --400
                 iExtraEngisForPowerBasedOnTech = 7
+            else
+                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iEnergyBufferMassFactorWanted = 15 end
             end
+
             local iPowerWantedPerTick = math.max(iGrossMassIncome * iEnergyBufferMassFactorWanted, aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] - aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]) + iAbsolutePowerBufferWanted
             --Ensure we can support guncom
             iPowerWantedPerTick = math.max(iPowerWantedPerTick, 50)
@@ -3401,6 +3417,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
                             iSearchRangeForNearestEngi = 75
                             iMaxEngisWanted = 3
+                            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > 20 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 40 then iMaxEngisWanted = 4 end
                         end
                     elseif iCurrentConditionToTry == 6 then --Initial land factories
                         if iLandFactories == nil then
@@ -3741,40 +3758,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                             end
                         end
-                    elseif iCurrentConditionToTry == 17 then --Build factory or upgrade building if getting close to overflow provided we have enough energy income
-                        if bHaveLowPower == false and bHaveLowMass == false then
-                            if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
-                            if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
-                            if iNetCurEnergyIncome > 0.2 and (iMassStoredRatio > 0.6 or iMassStored > 3500) then --About to overflow so try to build something
-                                if aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 then iMaxEngisWanted = 7
-                                else iMaxEngisWanted = 2 end
-
-                                if iMexesAndFactoriesCurrentlyUpgrading == nil then iMexesAndFactoriesCurrentlyUpgrading = M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory) + M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex) end
-                                if iMexesAndFactoriesCurrentlyUpgrading > 0 then
-                                    iActionToAssign = refActionUpgradeBuilding
-                                    iMaxEngisWanted = iMaxEngisWanted + 7
-                                else
-                                    if iLandFactories == nil then
-                                        iLandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory)
-                                        if iLandFactories == nil then iLandFactories = 0 end
-                                    end
-                                    if iAirFactories == nil then
-                                        iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
-                                        if iAirFactories == nil then iAirFactories = 0 end
-                                    end
-
-                                    --local iFactoryToAirRatio = iLandFactories / math.max(1, iAirFactories)
-                                    --local iDesiredFactoryToAirRatio = aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir])
-                                    --if iFactoryToAirRatio > iDesiredFactoryToAirRatio then
-                                    if iAirFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then
-                                        iActionToAssign = refActionBuildAirFactory
-                                    else iActionToAssign = refActionBuildLandFactory
-                                    end
-                                end
-                                iMaxEngisWanted = math.min(iNetCurEnergyIncome * 5, iMaxEngisWanted)
-                            end
-                        end
-                    elseif iCurrentConditionToTry == 18 then --Radar near base
+                    elseif iCurrentConditionToTry == 17 then --Radar near base
                         if bHaveLowPower == false then
                             if iCurRadarCount == nil then iCurRadarCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryRadar) end
                             if iCurRadarCount == 0 and iNetCurEnergyIncome > 5 and iEnergyStored >= 2000 then
@@ -3810,7 +3794,54 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 19 then --More reclaim (lower priority locations)
+                    elseif iCurrentConditionToTry == 18 then
+                        if bHaveLowPower == false then
+                            if iAirFactories == nil then
+                                iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
+                                if iAirFactories == nil then iAirFactories = 0 end
+                            end
+
+                            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or (iAirFactories >= 1 and iAirFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir]) then
+                                iActionToAssign = refActionAssistAirFactory
+                                if bHaveLowMass == false then iMaxEngisWanted = 10
+                                else iMaxEngisWanted = 5 end
+                                iSearchRangeForNearestEngi = 75
+                            end
+                        end
+                    elseif iCurrentConditionToTry == 19 then --Build factory or upgrade building if getting close to overflow provided we have enough energy income
+                        if bHaveLowPower == false and bHaveLowMass == false then
+                            if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
+                            if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
+                            if iNetCurEnergyIncome > 0.2 and (iMassStoredRatio > 0.6 or iMassStored > 3500) then --About to overflow so try to build something
+                                if aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 then iMaxEngisWanted = 7
+                                else iMaxEngisWanted = 2 end
+
+                                if iMexesAndFactoriesCurrentlyUpgrading == nil then iMexesAndFactoriesCurrentlyUpgrading = M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory) + M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex) end
+                                if iMexesAndFactoriesCurrentlyUpgrading > 0 then
+                                    iActionToAssign = refActionUpgradeBuilding
+                                    iMaxEngisWanted = iMaxEngisWanted + 7
+                                else
+                                    if iLandFactories == nil then
+                                        iLandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory)
+                                        if iLandFactories == nil then iLandFactories = 0 end
+                                    end
+                                    if iAirFactories == nil then
+                                        iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
+                                        if iAirFactories == nil then iAirFactories = 0 end
+                                    end
+
+                                    --local iFactoryToAirRatio = iLandFactories / math.max(1, iAirFactories)
+                                    --local iDesiredFactoryToAirRatio = aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir])
+                                    --if iFactoryToAirRatio > iDesiredFactoryToAirRatio then
+                                    if iAirFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then
+                                        iActionToAssign = refActionBuildAirFactory
+                                    else iActionToAssign = refActionBuildLandFactory
+                                    end
+                                end
+                                iMaxEngisWanted = math.min(iNetCurEnergyIncome * 5, iMaxEngisWanted)
+                            end
+                        end
+                    elseif iCurrentConditionToTry == 20 then --More reclaim (lower priority locations)
                         if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; iMassStoredRatio='..iMassStoredRatio..'; M27MapInfo.iMapTotalMass='..M27MapInfo.iMapTotalMass..'; aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]='..aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]) end
                         if iMassStoredRatio < 0.98 then
@@ -3841,7 +3872,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 20 then
+                        elseif iCurrentConditionToTry == 21 then
                             if bHaveLowMass == false and bHaveLowPower == false then
                                 if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                                 if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
@@ -3851,7 +3882,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     iMaxEngisWanted = 10
                                 end
                             end
-                        elseif iCurrentConditionToTry == 21 then
+                        elseif iCurrentConditionToTry == 22 then
                             if bHaveLowMass == false and bHaveLowPower == false then
                                if (iMassStoredRatio > 0.6 or iMassStored > 3500) then --About to overflow so try to build something
                                    --local iFactoryToAirRatio = iLandFactories / math.max(1, iAirFactories)
@@ -3936,7 +3967,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                             --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore)
                             if M27Utilities.IsTableEmpty(tActionTargetLocation) == true and oActionTargetObject == nil then
-                                M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review as ideally shoudlnt have this happen. iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry)
+                                M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review as normally shoudlnt have this happen - current examples are if want to assist a building but all of them have nearby enemies. iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry)
                                 iCurConditionEngiShortfall = iMaxEngisWanted - iExistingEngineersAssigned
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngineersAssigned='..iExistingEngineersAssigned..'; iMinEngiTechLevelWanted='..iMinEngiTechLevelWanted) end
@@ -3968,7 +3999,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     if bAreOnSpareActions == false then
                         --NOTE: Although below will set engis wanted, this may be changed back to 0 at end if we have engineers of the highest tech level
                         if bThresholdPreReclaimEngineerCondition == false then
-                            if iThresholdInitialEngineerCondition == false then --Not got through initial conditions
+                            if bThresholdInitialEngineerCondition == false then --Not got through initial conditions
                                 aiBrain[refiBOInitialEngineersWanted] = aiBrain[refiBOInitialEngineersWanted] + iCurConditionEngiShortfall
                                 aiBrain[refiBOPreReclaimEngineersWanted] = 1
                                 aiBrain[refiBOPreSpareEngineersWanted] = 1

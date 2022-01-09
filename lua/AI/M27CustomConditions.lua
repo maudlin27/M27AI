@@ -93,7 +93,7 @@ end
 
 function SafeToGetACUUpgrade(aiBrain)
     --Determines if its safe for the ACU to get an upgrade - considers ACU health and whether ACU is in a platoon set to heal
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SafeToGetACUUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -302,6 +302,10 @@ function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
         end
         if bDebugMessages == true then LOG(sFunctionRef..'; bWantToGetGun='..tostring(bWantToGetGun)) end
     end
+    if bWantToGetGun and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+        if aiBrain:GetEconomyStoredRatio('Energy') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantToGetGun = false end
+    end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantToGetGun
 end
@@ -356,6 +360,9 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                 if bDebugMessages == true then LOG(sFunctionRef..': sUpgradeRef is nil so no more upgrades that we want') end
             end
         end
+    end
+    if bWantUpgrade and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+        if aiBrain:GetEconomyStoredRatio('Energy') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantUpgrade = false end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantUpgrade, bSafeToGetUpgrade

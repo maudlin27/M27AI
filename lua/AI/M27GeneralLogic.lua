@@ -2996,7 +2996,7 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
         if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
         local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
         for iUnit, oUnit in tNearbyShields do
-            if not(oUnit.Dead) then
+            if not(oUnit.Dead) and oUnit:GetFractionComplete() <= 0.75 then
                 oCurUnitBP = oUnit:GetBlueprint()
                 iCurShieldRadius = 0
                 if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
