@@ -362,11 +362,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence') end
                             if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < 0.275 or (aiBrain:GetCurrentUnits(refCategoryDFTank) <= aiBrain[refiMinimumTanksWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) then
                                 if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                    if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                        iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                    else
-                                        iCategoryToBuild = refCategoryIndirect
-                                    end
+                                    iCategoryToBuild = refCategoryIndirect
                                 else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                             end
                         elseif iCurrentConditionToTry == 8 then --Build engineer if have just gained a new tech level
@@ -404,11 +400,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence') end
                                 if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < 0.325 then
                                     if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                        if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                            iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                        else
-                                            iCategoryToBuild = refCategoryIndirect
-                                        end
+                                        iCategoryToBuild = refCategoryIndirect
+
                                     else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                                 end
                             elseif aiBrain:GetEconomyStored('MASS') > 10 then
@@ -449,11 +442,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 elseif iCurrentConditionToTry == 20 then --Threat range
                                     if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= 0.5 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                                         if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                            if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                                iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                            else
-                                                iCategoryToBuild = refCategoryIndirect
-                                            end
+                                            iCategoryToBuild = refCategoryIndirect
+
                                         else
                                             iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
                                             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat end
@@ -472,11 +462,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     elseif iCurrentConditionToTry == 22 then
                                         if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                                             if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                                if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                                    iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                                else
-                                                    iCategoryToBuild = refCategoryIndirect
-                                                end
+                                                iCategoryToBuild = refCategoryIndirect
+
                                             else
                                                 iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
                                                 if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat end
@@ -538,11 +525,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence') end
                             if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < 0.275 or (aiBrain:GetCurrentUnits(refCategoryDFTank) <= aiBrain[refiMinimumTanksWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true) then
                                 if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                    if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                        iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                    else
-                                        iCategoryToBuild = refCategoryIndirect
-                                    end
+                                    iCategoryToBuild = refCategoryIndirect
+
                                 else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                             end
                         elseif iCurrentConditionToTry == 6 then --Escort units
@@ -574,11 +558,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence') end
                                 if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < 0.325 then
                                     if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                        if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                            iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                        else
-                                            iCategoryToBuild = refCategoryIndirect
-                                        end
+                                        iCategoryToBuild = refCategoryIndirect
+
                                     else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                                 end
                             elseif aiBrain:GetEconomyStored('MASS') > 10 then
@@ -622,11 +603,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 elseif iCurrentConditionToTry == 17 then --Threat range
                                     if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] then
                                         if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                            if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                                iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                            else
-                                                iCategoryToBuild = refCategoryIndirect
-                                            end
+                                            iCategoryToBuild = refCategoryIndirect
+
                                         else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false) end
                                     end
                                 elseif M27Conditions.HaveLowMass(aiBrain) == false then
@@ -725,11 +703,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence') end
                             if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < 0.275 or (aiBrain:GetCurrentUnits(refCategoryDFTank) <= aiBrain[refiMinimumTanksWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true) then
                                 if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                    if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                        iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                    else
-                                        iCategoryToBuild = refCategoryIndirect
-                                    end
+                                    iCategoryToBuild = refCategoryIndirect
+
                                 else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                             end
                         elseif iCurrentConditionToTry == 6 then --Escort units
@@ -761,11 +736,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence') end
                                 if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < 0.325 then
                                     if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                        if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                            iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                        else
-                                            iCategoryToBuild = refCategoryIndirect
-                                        end
+                                        iCategoryToBuild = refCategoryIndirect
+
                                     else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                                 end
                             elseif aiBrain:GetEconomyStored('MASS') > 10 then
@@ -809,11 +781,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 elseif iCurrentConditionToTry == 17 then --Threat range
                                     if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] then
                                         if aiBrain[M27Overseer.refbNeedIndirect] == true then
-                                            if aiBrain[M27Overseer.refbNeedT2PlusIndirect] == true then
-                                                iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
-                                            else
-                                                iCategoryToBuild = refCategoryIndirect
-                                            end
+                                            iCategoryToBuild = refCategoryIndirect
+
                                         else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false) end
                                     end
                                 elseif M27Conditions.HaveLowMass(aiBrain) == false then
@@ -1047,7 +1016,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     else LOG(sFunctionRef..': iCategoryToBuild is nil; iCurrentConditionToTry='..iCurrentConditionToTry)
                     end
                 end
-        --=======================Check this is a factory where we want to build engineers and we're not over the cap
+        --=======================Adjustments/overrides to initail category - engineers and indirect
+                --Engineers - Check this is a factory where we want to build engineers and we're not over the cap
                 if iCategoryToBuild == refCategoryEngineer then
                     if oFactory[refbFactoryCanBuildEngis] == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': Factory is flagged to not build engineers, so changing category to build to nil') end
@@ -1067,6 +1037,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             if iFactoryTechLevel == 1 then
                                 if iExistingEngis > aiBrain[refiEngineerCap] * 0.5 then iCategoryToBuild = nil end
                             elseif iExistingEngis > aiBrain[refiEngineerCap] * 0.75 then iCategoryToBuild = nil end
+                        end
+                    end
+                elseif iCategoryToBuild == refCategoryIndirect then
+                    --Set min tech level based on the tech level wanted (so we dont try t1 arti vs t2 PD, and dont try t2 MML against ravagers)
+                    if aiBrain[M27Overseer.refiMinIndirectTechLevel] > 1 then
+                        if aiBrain[M27Overseer.refiMinIndirectTechLevel] >= 3 then iCategoryToBuild = M27UnitInfo.refCategoryIndirectT3
+                        else iCategoryToBuild = M27UnitInfo.refCategoryIndirectT2Plus
                         end
                     end
                 end
@@ -1136,7 +1113,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
         else
             M27Utilities.ErrorHandler('Blueprint is nil')
         end
-        if iCategoryToBuild == true then RecordUnderConstruction(aiBrain, oFactory, iCategoryToBuild) end
+        if iCategoryToBuild and sBPIDToBuild then RecordUnderConstruction(aiBrain, oFactory, iCategoryToBuild) end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return sBPIDToBuild

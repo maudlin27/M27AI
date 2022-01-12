@@ -79,7 +79,7 @@ sIntelPlatoonRef = 'M27IntelPathAI'
 --Build condition related - note that overseer start shoudl set these to false to avoid error messages when build conditions check their status
 refbNeedDefenders = 'M27NeedDefenders'
 refbNeedIndirect = 'M27NeedIndirect'
-refbNeedT2PlusIndirect = 'M27NeedT2PlusIndirect'
+refiMinIndirectTechLevel = 'M27OverseerMinIndirectTech'
 refbNeedScoutPlatoons = 'M27NeedScoutPlatoons'
 refbNeedMAABuilt = 'M27NeedMAABuilt'
 refbEmergencyMAANeeded = 'M27OverseerNeedEmergencyMAA'
@@ -2199,7 +2199,7 @@ function ThreatAssessAndRespond(aiBrain)
 
         aiBrain[refbNeedDefenders] = false
         aiBrain[refbNeedIndirect] = false
-        aiBrain[refbNeedT2PlusIndirect] = false
+        aiBrain[refiMinIndirectTechLevel] = 1
         local iTotalEnemyThreatGroups = table.getn(aiBrain[reftEnemyThreatGroup])
         local bPlatoonHasRelevantUnits
         local bIndirectThreatOnly
@@ -2434,11 +2434,11 @@ function ThreatAssessAndRespond(aiBrain)
                         --M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
                         aiBrain[refiModDistFromStartNearestOutstandingThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
                         aiBrain[refiPercentageOutstandingThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart] / (tEnemyThreatGroup[refiModDistanceFromOurStart] + iCurModDistToEnemyBase)
-                        aiBrain[refbNeedT2PlusIndirect] = false --default
+                        aiBrain[refiMinIndirectTechLevel] = 1 --default
                         if bIndirectThreatOnly then
                             aiBrain[refbNeedIndirect] = true
                             aiBrain[refbNeedDefenders] = false
-                            if tEnemyThreatGroup[refiThreatGroupHighestTech] >= 2 then aiBrain[refbNeedT2PlusIndirect] = true end
+                            if tEnemyThreatGroup[refiThreatGroupHighestTech] >= 2 then aiBrain[refiMinIndirectTechLevel] = math.min(tEnemyThreatGroup[refiThreatGroupHighestTech], 3) end
                         else
                             aiBrain[refbNeedDefenders] = true --will assign more units to defender platoon
                             aiBrain[refbNeedIndirect] = false

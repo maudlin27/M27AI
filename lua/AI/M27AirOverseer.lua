@@ -219,7 +219,6 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearAirUnitAssignmentTrackers'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 4 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': oAirUnit='..oAirUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)) end
     local iMaxMovementPaths = 0
     if oAirUnit[reftMovementPath] then iMaxMovementPaths = table.getn(oAirUnit[reftMovementPath]) end
@@ -408,7 +407,6 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
     local sFunctionRef = 'CheckForBetterBomberTargets'
     --bOneOff - if true, then only run this once (e.g. in response to bomb being fired); otherwise will create a loop
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if M27UnitInfo.GetUnitLifetimeCount(oBomber) == 4 then bDebugMessages = true end
     if bDebugMessages == true then
         LOG(sFunctionRef..': Start of code, oBomber='..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber))
         LOG(sFunctionRef..': Current target='..oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]:GetUnitId())
@@ -515,7 +513,6 @@ function TrackBomberTarget(oBomber, oTarget, iPriority)
     local sFunctionRef = 'TrackBomberTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if M27UnitInfo.GetUnitLifetimeCount(oBomber) == 4 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oBomber='..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; oTarget='..oTarget:GetUnitId()..'; iPriority='..(iPriority or 'nil')..'; bomber cur target='..oBomber[refiCurTargetNumber]) end
     if oBomber[reftTargetList] == nil then oBomber[reftTargetList] = {} end
     table.insert(oBomber[reftTargetList], {[refiShortlistPriority] = iPriority, [refiShortlistUnit] = oTarget})
@@ -565,7 +562,6 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateBomberTargets'
-    if M27UnitInfo.GetUnitLifetimeCount(oBomber) == 4 then bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bRemoveCurTarget
     local tTargetPos
@@ -906,7 +902,6 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             local iDistanceFromStartForReset = 20 --If unit is this close to start then will reset it if its not on its first assignment/doesnt have a target thats further away
             local iFuelPercent, iHealthPercent
             for iUnit, oUnit in tAllAirOfType do
-                if M27UnitInfo.GetUnitLifetimeCount(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
                 bUnitIsUnassigned = false
                 if bDebugMessages == true then LOG(sFunctionRef..'; iUnitType='..iUnitType..'; iUnit='..iUnit..'; checking if unit is dead and has fuel and whether its on assignment') end
                 if not(oUnit.Dead) and oUnit.GetFractionComplete and oUnit:GetFractionComplete() == 1 then
@@ -2087,7 +2082,7 @@ function IssueLargeBomberAttack(aiBrain, tBombers)
 end
 
 function AirBomberManager(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirBomberManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMaxTargetsForBomber = 2 --Dont want a bomber to have more than this queued as likely it will die so we want other bombers to try and target beyond this number
@@ -2114,7 +2109,6 @@ function AirBomberManager(aiBrain)
         local iUnassignedTargets = table.getn(aiBrain[reftBomberTargetShortlist])
         if bDebugMessages == true then LOG(sFunctionRef..': Have a target shortlist and available bombers, so will now cycle through targets and assign bombers to them') end
         for iAvailableBomberCount, oBomber in aiBrain[reftAvailableBombers] do
-            if M27UnitInfo.GetUnitLifetimeCount(oBomber) == 4 then bDebugMessages = true else bDebugMessages = false end
             --Get the bomber's current target (so can use this position to determine the closest target to add to it)
             if bDebugMessages == true then LOG(sFunctionRef..': About to check targets for bomber with LC='..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; iUnassignedTargets='..iUnassignedTargets) end
             UpdateBomberTargets(oBomber)
@@ -2218,12 +2212,10 @@ function AirBomberManager(aiBrain)
 
     --Tell any spare bombers to go to the nearest rally point if hteyre not there already
     --Order any spare bombers that dont have a current target to go to nearest rally point
-    bDebugMessages = true
     if bDebugMessages == true then LOG(sFunctionRef..': iSpareBombers='..iSpareBombers..'; if have available bombers then will get any with no target to go to the nearest rally point') end
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableBombers]) == false and iSpareBombers > 0 then
         local tRallyPoint, tCurTarget, oNavigator
         for iBomber, oBomber in aiBrain[reftAvailableBombers] do
-            if M27UnitInfo.GetUnitLifetimeCount(oBomber) == 4 then bDebugMessages = true else bDebugMessages = false end
             if bDebugMessages == true then LOG(sFunctionRef..': Checking if bomber '..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' has no target and needs to return to a rally point') end
             if (oBomber[refiCurTargetNumber] or 0) == 0 then
                 if bDebugMessages == true then LOG(sFunctionRef..': Bomber '..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' has no target number, will check if its moving to or already near a rally point') end
