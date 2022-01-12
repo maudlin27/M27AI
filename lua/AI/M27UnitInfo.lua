@@ -53,6 +53,7 @@ refCategoryRadar = categories.STRUCTURE * categories.RADAR + categories.STRUCTUR
 refCategoryT1Radar = refCategoryRadar * categories.TECH1
 refCategoryT2Radar = refCategoryRadar * categories.TECH2
 refCategoryT3Radar = refCategoryRadar * categories.TECH3 --+ categories.OMNI * categories.TECH3 (dont need this as refcategoryradar already includes omni)
+refCategoryStructure = categories.STRUCTURE - categories.WALL
 
 
 --Building - factory
@@ -116,6 +117,7 @@ refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categori
 refCategoryAntiNavy = categories.ANTINAVY * categories.STRUCTURE + categories.ANTINAVY * categories.MOBILE --for some reason get error message if just use antinavy, so need to be more restrictive
 --Dangerous to land units, e.g. engieners look for these when deciding reclaim area
 refCategoryDangerousToLand = refCategoryLandCombat + refCategoryIndirect + refCategoryAllNavy + refCategoryBomber + refCategoryGunship + refCategoryPD + refCategoryFixedT2Arti
+refCategoryAllNonAirScoutUnits = categories.MOBILE + refCategoryStructure + refCategoryAirNonScout
 
 
 --Weapon target priorities

@@ -44,6 +44,7 @@ local refActionBuildT2Radar = 16
 local refActionBuildT3Radar = 17
 local refActionAssistSMD = 18
 local refActionAssistAirFactory = 19
+local refActionBuildThirdPower = 20
 
 --Build order related variables
 refiBOInitialEngineersWanted = 'M27BOInitialEngineersWanted'
@@ -632,7 +633,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
         local tEngPosition = oEngineer:GetPosition()
         local bKeepBuilding = true
 
-        local tNearbyEnemiesLong = aiBrain:GetUnitsAroundPoint(categories.LAND + categories.STRUCTURE - categories.BENIGN, tEngPosition, iSearchRangeLong, 'Enemy')
+        local tNearbyEnemiesLong = aiBrain:GetUnitsAroundPoint(categories.LAND + M27UnitInfo.refCategoryStructure - categories.BENIGN, tEngPosition, iSearchRangeLong, 'Enemy')
         local bNearbyMobileEnemies = not(M27Utilities.IsTableEmpty(tNearbyEnemiesLong))
         local bNearbyPD, tNearbyPD
         if bNearbyMobileEnemies == false and aiBrain[M27Overseer.refiSearchRangeForEnemyStructures] > iSearchRangeLong then
@@ -661,7 +662,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             if M27Utilities.IsTableEmpty(tNearbyEnemiesShort) == false then
 
                 oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesShort, tEngPosition, aiBrain, true)
-                if oReclaimTarget.GetFractionComplete and EntityCategoryContains(categories.STRUCTURE, oReclaimTarget:GetUnitId()) and oReclaimTarget:GetFractionComplete() == 1 and oReclaimTarget:GetHealthPercent() >= 0.8 then bCaptureNotReclaim = true end
+                if oReclaimTarget.GetFractionComplete and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oReclaimTarget:GetUnitId()) and oReclaimTarget:GetFractionComplete() == 1 and oReclaimTarget:GetHealthPercent() >= 0.8 then bCaptureNotReclaim = true end
                 if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyEnemiesShort)..' nearby enemies; bCaptureNotReclaim='..tostring(bCaptureNotReclaim)..'; contains structure='..tostring(EntityCategoryContains(categories.STRUCTURE, oReclaimTarget:GetUnitId()))..'; fraction complete='..oReclaimTarget:GetHealthPercent()) end
             else
                 --Have nearby enemies but they're not close - ignore if we're almost done building
@@ -941,7 +942,8 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
         LOG(sFunctionRef..': About to start checking for spare engi actions for engi with unique ref='..GetEngineerUniqueCount(oEngineer)..'; iMassStoredRatio='..iMassStoredRatio)
     end
     if iMassStoredRatio < 0.60 and aiBrain:GetEconomyStored('MASS') < 5000 then
-        local oReclaim = M27MapInfo.GetNearestReclaim(tEngineerPosition, iCurSearchDistance, 1)
+        local oReclaim = M27MapInfo.GetNearestReclaim(tEngineerPosition, iCurSearchDistance, 2)
+        --Setting min value to 1 caused issue with wall segment
         if not(oReclaim == nil) then
             bHaveAction = true
             tTempTarget = oReclaim:GetPosition()
@@ -961,15 +963,27 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
         local iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
         local iEnergyPercentStorage = aiBrain:GetEconomyStoredRatio('ENERGY')
         local bHaveLowPower = false
-        if iNetCurEnergyIncome < 0 and iEnergyPercentStorage < 0.9 then bHaveLowPower = true
-        elseif iEnergyPercentStorage < 0.2 then bHaveLowPower = true end
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+            iCurSearchDistance = 70
+            if iNetCurEnergyIncome < 2 or iEnergyPercentStorage < 0.98 then bHaveLowPower = true end
+        else
+            if iNetCurEnergyIncome < 0 and iEnergyPercentStorage < 0.9 then bHaveLowPower = true
+            elseif iEnergyPercentStorage < 0.2 then bHaveLowPower = true end
+        end
+
         local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
         local bACUIsUpgrading = false
         local oACU = M27Utilities.GetACU(aiBrain)
         if oACU:IsUnitState('Upgrading') then bACUIsUpgrading = true end
+        local iCategoryToSearchFor = M27UnitInfo.refCategoryStructure
+        if bHaveLowPower then
+            iCurSearchDistance = math.max(iCurSearchDistance, 50)
+            iCategoryToSearchFor = refCategoryPower
+        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iCategoryToSearchFor = refCategoryPower + refCategoryAirFactory
+        end
 
-        if bHaveLowPower == false and not(bACUIsUpgrading and bHaveLowMass) then
-            tNearbyBuildings = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tLocationToSearchFrom, iCurSearchDistance, 'Ally')
+        if not(bACUIsUpgrading and bHaveLowMass) then
+            tNearbyBuildings = aiBrain:GetUnitsAroundPoint(iCategoryToSearchFor, tLocationToSearchFrom, iCurSearchDistance, 'Ally')
             if M27Utilities.IsTableEmpty(tNearbyBuildings) == false then
                 for iBuilding, oBuilding in tNearbyBuildings do
                     if oBuilding.GetFractionComplete and oBuilding.GetFractionComplete < 1 then
@@ -2037,7 +2051,7 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel)
         iCategoryToBuild = M27UnitInfo.refCategoryMassStorage
     elseif iActionToAssign == refActionBuildHydro then
         iCategoryToBuild = refCategoryHydro
-    elseif iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower then
+    elseif iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower then
         iCategoryToBuild = refCategoryPower
     elseif iActionToAssign == refActionBuildLandFactory then
         iCategoryToBuild = refCategoryLandFactory
@@ -2313,14 +2327,14 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 bQueueUpMultiple = true
                             elseif iActionToAssign == refActionBuildHydro then
                                 --iCategoryToBuild = refCategoryHydro
-                            elseif iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower then
+                            elseif iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower then
                                 --iCategoryToBuild = refCategoryPower
                                 bConsiderAdjacency = true
                                 iCatToBuildBy = refCategoryLandFactory + refCategoryAirFactory
                                 sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
                                 bQueueUpMultiple = true
                                 iMaxAreaToSearch = 20
-                                if iActionToAssign == refActionBuildSecondPower then iMaxAreaToSearch = 50 end
+                                if iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower then iMaxAreaToSearch = 50 end
                             elseif iActionToAssign == refActionBuildLandFactory then
                                 --iCategoryToBuild = refCategoryLandFactory
                                 bConsiderAdjacency = true
@@ -2421,7 +2435,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                             end
                                         end
                                     end
-                                elseif iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower then
+                                elseif iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower then
                                     if EntityCategoryContains(categories.TECH1, oEngineer:GetUnitId()) then --Dont want to queue up multiple T2 or T3 as theyre much more expensive
                                         if M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), tTargetLocation) <= 10 then
                                             --TODO - improve movenearconstruction so dont need above line
@@ -2726,7 +2740,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistAirFactory then
         --Find the nearest building that is upgrading and assist it, but set a timer to reconsider engineer action after a while
         if bDebugMessages == true then LOG(sFunctionRef..': About to search for buildings to assist in upgrading') end
-        local iCategoryToAssist = categories.STRUCTURE
+        local iCategoryToAssist = M27UnitInfo.refCategoryStructure
         local sUnitStateWanted = 'Upgrading'
         local sAltUnitStateWanted
         local iEnemySearchRange = 60
@@ -3440,7 +3454,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 else
                                     if bHaveLowPower == false and bHaveLowMass == false then
                                         if iAirFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then iActionToAssign = refActionBuildAirFactory
-                                        else iActionToAssign = refActionBuildLandFactory
+                                        else
+                                            if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) then iActionToAssign = refActionBuildLandFactory end
                                         end
                                     end
                                 end
@@ -3653,23 +3668,25 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                                 if bBuildAirFactory == false then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Not building air factory; consider if we want to build more factories; aiBrain[M27EconomyOverseer.refbWantMoreFactories]='..tostring(aiBrain[M27EconomyOverseer.refbWantMoreFactories])) end
-                                    if aiBrain[M27EconomyOverseer.refbWantMoreFactories] == true then
-                                        iActionToAssign = refActionBuildLandFactory
-                                        iSearchRangeForNearestEngi = 75
-                                        iMaxEngisWanted = math.min(math.floor(iMassStored / 100), math.floor(iEnergyStored / 250), 5)
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Overseer still wants more land factories, so assigning this as the action, iMaxEngis='..iMaxEngisWanted) end
-                                    else
-                                        if iMexesAndFactoriesCurrentlyUpgrading == nil then iMexesAndFactoriesCurrentlyUpgrading = M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory) + M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex) end
-                                        if iMexesAndFactoriesCurrentlyUpgrading > 0 then
-                                            --Upgrade building unless we already have a T3 mex (3 if in eco mode)
-                                            local iThreshold = 1
-                                            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iThreshold = 3 end
-                                            if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) >= iThreshold then
-                                                iActionToAssign = refActionBuildLandFactory
-                                            else iActionToAssign = refActionUpgradeBuilding end
-
+                                    if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) or aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.95 then
+                                        if aiBrain[M27EconomyOverseer.refbWantMoreFactories] == true then
+                                            iActionToAssign = refActionBuildLandFactory
                                             iSearchRangeForNearestEngi = 75
                                             iMaxEngisWanted = math.min(math.floor(iMassStored / 100), math.floor(iEnergyStored / 250), 5)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Overseer still wants more land factories, so assigning this as the action, iMaxEngis='..iMaxEngisWanted) end
+                                        else
+                                            if iMexesAndFactoriesCurrentlyUpgrading == nil then iMexesAndFactoriesCurrentlyUpgrading = M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory) + M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex) end
+                                            if iMexesAndFactoriesCurrentlyUpgrading > 0 then
+                                                --Upgrade building unless we already have a T3 mex (3 if in eco mode)
+                                                local iThreshold = 1
+                                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iThreshold = 3 end
+                                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) >= iThreshold then
+                                                    iActionToAssign = refActionBuildLandFactory
+                                                else iActionToAssign = refActionUpgradeBuilding end
+
+                                                iSearchRangeForNearestEngi = 75
+                                                iMaxEngisWanted = math.min(math.floor(iMassStored / 100), math.floor(iEnergyStored / 250), 5)
+                                            end
                                         end
                                     end
                                 end
@@ -3813,32 +3830,34 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                             if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
                             if iNetCurEnergyIncome > 0.2 and (iMassStoredRatio > 0.6 or iMassStored > 3500) then --About to overflow so try to build something
-                                if aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 then iMaxEngisWanted = 7
-                                else iMaxEngisWanted = 2 end
+                                if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) or aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.95 then
+                                    if aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 then iMaxEngisWanted = 7
+                                    else iMaxEngisWanted = 2 end
 
-                                if iMexesAndFactoriesCurrentlyUpgrading == nil then iMexesAndFactoriesCurrentlyUpgrading = M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory) + M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex) end
-                                if iMexesAndFactoriesCurrentlyUpgrading > 0 then
-                                    iActionToAssign = refActionUpgradeBuilding
-                                    iMaxEngisWanted = iMaxEngisWanted + 7
-                                else
-                                    if iLandFactories == nil then
-                                        iLandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory)
-                                        if iLandFactories == nil then iLandFactories = 0 end
-                                    end
-                                    if iAirFactories == nil then
-                                        iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
-                                        if iAirFactories == nil then iAirFactories = 0 end
-                                    end
+                                    if iMexesAndFactoriesCurrentlyUpgrading == nil then iMexesAndFactoriesCurrentlyUpgrading = M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory) + M27EconomyOverseer.GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex) end
+                                    if iMexesAndFactoriesCurrentlyUpgrading > 0 then
+                                        iActionToAssign = refActionUpgradeBuilding
+                                        iMaxEngisWanted = iMaxEngisWanted + 7
+                                    else
+                                        if iLandFactories == nil then
+                                            iLandFactories = aiBrain:GetCurrentUnits(refCategoryLandFactory)
+                                            if iLandFactories == nil then iLandFactories = 0 end
+                                        end
+                                        if iAirFactories == nil then
+                                            iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
+                                            if iAirFactories == nil then iAirFactories = 0 end
+                                        end
 
-                                    --local iFactoryToAirRatio = iLandFactories / math.max(1, iAirFactories)
-                                    --local iDesiredFactoryToAirRatio = aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir])
-                                    --if iFactoryToAirRatio > iDesiredFactoryToAirRatio then
-                                    if iAirFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then
-                                        iActionToAssign = refActionBuildAirFactory
-                                    else iActionToAssign = refActionBuildLandFactory
+                                        --local iFactoryToAirRatio = iLandFactories / math.max(1, iAirFactories)
+                                        --local iDesiredFactoryToAirRatio = aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] / math.max(1, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir])
+                                        --if iFactoryToAirRatio > iDesiredFactoryToAirRatio then
+                                        if iAirFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then
+                                            iActionToAssign = refActionBuildAirFactory
+                                        else iActionToAssign = refActionBuildLandFactory
+                                        end
                                     end
+                                    iMaxEngisWanted = math.min(iNetCurEnergyIncome * 5, iMaxEngisWanted)
                                 end
-                                iMaxEngisWanted = math.min(iNetCurEnergyIncome * 5, iMaxEngisWanted)
                             end
                         end
                     elseif iCurrentConditionToTry == 20 then --More reclaim (lower priority locations)
@@ -3858,7 +3877,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     --SPARE ACTIONS BELOW
                     else
                         bAreOnSpareActions = true
-                        if iCurrentConditionToTry == 19 then
+                        if iCurrentConditionToTry == 21 then
                             if bHaveVeryLowPower == false and bHaveLowMass == false then
                                 if bWantMorePower then
                                     if iHighestFactoryOrEngineerTechAvailable == 1 then
@@ -3872,7 +3891,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 21 then
+                        elseif iCurrentConditionToTry == 22 then
                             if bHaveLowMass == false and bHaveLowPower == false then
                                 if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                                 if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
@@ -3882,7 +3901,12 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     iMaxEngisWanted = 10
                                 end
                             end
-                        elseif iCurrentConditionToTry == 22 then
+                        elseif iCurrentConditionToTry == 23 then
+                            if bHaveLowMass == false and iHighestFactoryOrEngineerTechAvailable == 1 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+                                iActionToAssign = refActionBuildThirdPower
+                                iMaxEngisWanted = 4
+                            end
+                        elseif iCurrentConditionToTry == 24 then
                             if bHaveLowMass == false and bHaveLowPower == false then
                                if (iMassStoredRatio > 0.6 or iMassStored > 3500) then --About to overflow so try to build something
                                    --local iFactoryToAirRatio = iLandFactories / math.max(1, iAirFactories)
@@ -3942,7 +3966,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             --Set minimum engineer tech level if not specified and no existing engineers assigned to the action
                             if (iHighestFactoryOrEngineerTechAvailable > 1 or iHighestFactoryOrEngineerTechAvailable > 1) and iMinEngiTechLevelWanted == nil then
                                 --Are we building power or factory? If so then only build with the highest tech engi unless action is already in progress
-                                if iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildLandFactory then
+                                if iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower or iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildLandFactory then
                                     --Have we already got an engineer assigned to this action?
                                     if iExistingEngineersAssigned == 0 then
                                         if iActionToAssign == refActionBuildPower then iMinEngiTechLevelWanted = math.max(iHighestFactoryOrEngineerTechAvailable, iHighestFactoryOrEngineerTechAvailable)

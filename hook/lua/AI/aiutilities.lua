@@ -13,7 +13,7 @@ function EngineerTryReclaimCaptureArea(aiBrain, eng, pos, iAreaSize)
         end
         local Reclaiming = false
         -- Check if enemy units are at location
-        local checkUnits = aiBrain:GetUnitsAroundPoint( (categories.STRUCTURE + categories.MOBILE) - categories.AIR, pos, iAreaSize, 'Enemy')
+        local checkUnits = aiBrain:GetUnitsAroundPoint( (M27UnitInfo.refCategoryStructure + categories.MOBILE) - categories.AIR, pos, iAreaSize, 'Enemy')
         -- reclaim units near our building place.
         if checkUnits and table.getn(checkUnits) > 0 then
             for num, unit in checkUnits do

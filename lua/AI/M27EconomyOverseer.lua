@@ -726,14 +726,20 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': bWantMoreFactories='..tostring(bWantMoreFactories)..'; iLandFactoryCount='..iLandFactoryCount..'; iMexesOnOurSideOfMap='..iMexesOnOurSideOfMap..'; bHaveHighMass='..tostring(bHaveHighMass)..'; iMassStored='..iMassStored..'; iMassNetIncome='..iMassNetIncome) end
 
         if bHaveHighMass == true then
-            if  iEnergyChangeFromLastCycle > 0 then
-                if iEnergyNetIncome > 4 and iEnergyStored > 1500 and iEnergyPercentStorage > 0.4 then bHaveEnoughEnergy = true
-                elseif iEnergyNetIncome > 2 and iEnergyStored > 2500 and iEnergyPercentStorage > 0.5 then bHaveEnoughEnergy = true
+            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+                --Want more energy if in air dominance to avoid risk we start upgrading and cant produce bombers
+                if iEnergyPercentStorage > 0.8 and iEnergyStored > 3500 and iEnergyNetIncome > 4 and iEnergyChangeFromLastCycle > 0 then bHaveEnoughEnergy = true
+                elseif iEnergyPercentStorage >= 0.99 then bHaveEnoughEnergy = true end
+            else
+                if  iEnergyChangeFromLastCycle > 0 then
+                    if iEnergyNetIncome > 4 and iEnergyStored > 1500 and iEnergyPercentStorage > 0.4 then bHaveEnoughEnergy = true
+                    elseif iEnergyNetIncome > 2 and iEnergyStored > 2500 and iEnergyPercentStorage > 0.5 then bHaveEnoughEnergy = true
+                    end
+                elseif iEnergyNetIncome > 5 and iEnergyStored > 2500 and iEnergyPercentStorage > 0.8 then bHaveEnoughEnergy = true
+                elseif iEnergyPercentStorage >= 0.99 then bHaveEnoughEnergy = true
                 end
-            elseif iEnergyNetIncome > 5 and iEnergyStored > 2500 and iEnergyPercentStorage > 0.8 then bHaveEnoughEnergy = true
-            elseif iEnergyPercentStorage >= 0.99 then bHaveEnoughEnergy = true
             end
-
+            if bDebugMessages == true then LOG(sFunctionRef..': Have high mass, bHaveEnoughEnergy='..tostring(bHaveEnoughEnergy)) end
             if bHaveEnoughEnergy then
                 local iGameTime = GetGameTimeSeconds()
                 --Do we have lots of resources?

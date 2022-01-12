@@ -1552,10 +1552,10 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
                 iTargetPathingGroup = GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
                 if iTargetPathingGroup == iUnitPathingGroup then
                     --Check if any structures near here
-                    tNearbyStructures = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tTargetLocation, iAreaRadius, 'Enemy')
+                    tNearbyStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tTargetLocation, iAreaRadius, 'Enemy')
                     if M27Utilities.IsTableEmpty(tNearbyStructures) == true then
-                        if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tTargetLocation, iAreaRadius, 'Ally')) == true then
-                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tTargetLocation, iAreaRadius, 'Neutral')) == true then
+                        if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tTargetLocation, iAreaRadius, 'Ally')) == true then
+                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tTargetLocation, iAreaRadius, 'Neutral')) == true then
                                 iValidLocationCount = iValidLocationCount + 1
                                 tValidLocation[1] = tTargetLocation[1]
                                 tValidLocation[2] = tTargetLocation[2]

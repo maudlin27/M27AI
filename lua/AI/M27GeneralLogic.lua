@@ -1502,7 +1502,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                         elseif EntityCategoryContains(categories.SHIELD, oUnit) then iMassMod = 1
                         end
                     end
-                    if EntityCategoryContains(categories.STRUCTURE, oUnit) then iMassMod = iMassMod * 2 end
+                    if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit) then iMassMod = iMassMod * 2 end
                     iMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
                     iHealthPercentage = oUnit:GetHealthPercent()
                     --Reduce threat by health, with the amount depending on if its an ACU and if its an enemy
@@ -2996,7 +2996,7 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
         if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
         local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
         for iUnit, oUnit in tNearbyShields do
-            if not(oUnit.Dead) and oUnit:GetFractionComplete() <= 0.75 then
+            if not(oUnit.Dead) and oUnit:GetFractionComplete() >= 0.95 then
                 oCurUnitBP = oUnit:GetBlueprint()
                 iCurShieldRadius = 0
                 if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
@@ -3005,7 +3005,7 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
                     if iCurShieldRadius > 0 then
                         iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius) end
-                        if iCurDistanceFromTarget <= iCurShieldRadius then
+                        if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
                             if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target') end
                             bUnderShield = true
                             break

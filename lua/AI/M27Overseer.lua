@@ -1160,8 +1160,8 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                             break
                                         end
                                         if aiBrain == nil then M27Utilities.ErrorHandler('aiBrain is nil') end
-                                        tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.MOBILE + categories.STRUCTURE, tSubPathPosition, iIntelPathEnemySearchRange, 'Enemy')
-                                        tNearbyAllies = aiBrain:GetUnitsAroundPoint(categories.MOBILE + categories.STRUCTURE, tSubPathPosition, 35, 'Ally')
+                                        tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPosition, iIntelPathEnemySearchRange, 'Enemy')
+                                        tNearbyAllies = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPosition, 35, 'Ally')
                                         if bDebugMessages == true then LOG(sFunctionRef..'; iSubPath='..iSubPath..'; about to get enemy and ally threat around point') end
                                         if bDebugMessages == true then LOG(sFunctionRef..': tSubPathPosition='..repr(tSubPathPosition)) end
                                         if bDebugMessages == true then LOG(sFunctionRef..': is tNearbyEnemies empty?='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemies))) end
@@ -1278,16 +1278,16 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                 if iNextMaxIncrease > iMaxIncreaseInSubpath then iMaxIncreaseInSubpath = iNextMaxIncrease end
                                 if bDebugMessages == true then LOG(sFunctionRef..': iSubPath='..iSubPath..'; iMaxIncreaseInSubpath ='..iMaxIncreaseInSubpath) end
 
-                                tNearbyEnemiesBase = aiBrain:GetUnitsAroundPoint(categories.MOBILE + categories.STRUCTURE, tSubPathPosition, iIntelPathEnemySearchRange, 'Enemy')
+                                tNearbyEnemiesBase = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPosition, iIntelPathEnemySearchRange, 'Enemy')
                                 if M27Utilities.IsTableEmpty(tNearbyEnemiesBase) == true then
                                     tSubPathPlus1 = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + 1][iSubPath]
                                     if M27Utilities.IsTableEmpty(tSubPathPlus1) == false then
-                                        tNearbyEnemiesPlus1 = aiBrain:GetUnitsAroundPoint(categories.MOBILE + categories.STRUCTURE, tSubPathPlus1, iIntelPathEnemySearchRange, 'Enemy')
+                                        tNearbyEnemiesPlus1 = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPlus1, iIntelPathEnemySearchRange, 'Enemy')
                                         if M27Utilities.IsTableEmpty(tNearbyEnemiesPlus1) == true then
                                             iIncreaseInSubpath = 1
                                             tSubPathPlus2 = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + 2][iSubPath]
                                             if M27Utilities.IsTableEmpty(tSubPathPlus2) == false then
-                                                tNearbyEnemiesPlus2 = aiBrain:GetUnitsAroundPoint(categories.MOBILE + categories.STRUCTURE, tSubPathPlus2, iIntelPathEnemySearchRange, 'Enemy')
+                                                tNearbyEnemiesPlus2 = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPlus2, iIntelPathEnemySearchRange, 'Enemy')
                                                 if M27Utilities.IsTableEmpty(tNearbyEnemiesPlus2) == true then
                                                     iIncreaseInSubpath = 2
                                                 end
@@ -2063,7 +2063,7 @@ function ThreatAssessAndRespond(aiBrain)
     local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
 
     local refCategoryMobileLand = categories.LAND * categories.MOBILE
-    local refCategoryPointDefence = categories.DIRECTFIRE * categories.STRUCTURE
+    local refCategoryPointDefence = M27UnitInfo.refCategoryPD
 
     if bDebugMessages == true then LOG(sFunctionRef..': About to reset enemy threat groups') end
     if bDebugMessages == true then LOG(sFunctionRef..': Getting ACU platoon and action') DebugPrintACUPlatoon(aiBrain) end
@@ -2767,7 +2767,7 @@ function ThreatAssessAndRespond(aiBrain)
                                     oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
                                     IssueClearCommands(tTorpSubtable[refoTorpUnit])
                                     IssueAttack({tTorpSubtable[refoTorpUnit]}, oUnit)
-                                    M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit)
+                                    M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1)
                                     for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
                                         IssueAttack({tTorpSubtable[refoTorpUnit]}, oUnit)
                                     end

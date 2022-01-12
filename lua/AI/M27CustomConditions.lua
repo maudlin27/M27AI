@@ -60,7 +60,7 @@ function SafeToUpgradeUnit(oUnit)
             if bHaveIntelCoverage then
                 --Check for nearby enemies
 
-                bNoNearbyEnemies = M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - M27UnitInfo.refCategoryAirScout, tUnitLocation, iEnemySearchRange, 'Enemy'))
+                bNoNearbyEnemies = M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllNonAirScoutUnits, tUnitLocation, iEnemySearchRange, 'Enemy'))
                 if bNoNearbyEnemies == false then
                     --Exception - Unit is ACU with gun with low enemy threat and have shield coverage and high health
                     if oUnit.PlatoonHandle and M27Utilities.IsACU(oUnit) then
@@ -115,7 +115,7 @@ function SafeToGetACUUpgrade(aiBrain)
             if M27UnitInfo.IsUnitUnderwater(oACU) then bIsSafe = true
             elseif M27UnitInfo.IsUnitValid(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]) and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]:GetPosition(), tACUPos) <= M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]:GetBlueprint().Intel.RadarRadius - iSearchRange or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iSearchRange) == true then
                 --Are there enemies near the ACU with a threat value?
-                tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND, tACUPos, iSearchRange, 'Enemy')
+                tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllNonAirScoutUnits, tACUPos, iSearchRange, 'Enemy')
                 local iThreat = M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemies, true, nil, 50)
                 if iThreat <= 15 then bIsSafe = true end
                 if bDebugMessages == true then LOG(sFunctionRef..': Have intel coverage, iThreat='..iThreat..'; bIsSafe='..tostring(bIsSafe)) end
@@ -242,7 +242,7 @@ function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
     if M27UnitInfo.IsUnitValid(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]) and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]:GetPosition(), tACUPos) <= M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelper]:GetBlueprint().Intel.RadarRadius - iMinSearchRange or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iMinSearchRange) == true then bHaveIntelCoverage = true end
     if bHaveIntelCoverage == false then bNoEnemyUnits = false
     else
-        local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND, tACUPos, iMaxSearchRange, 'Enemy')
+        local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, tACUPos, iMaxSearchRange, 'Enemy')
         bNoEnemyUnits = M27Utilities.IsTableEmpty(tNearbyEnemies)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -303,7 +303,7 @@ function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
         if bDebugMessages == true then LOG(sFunctionRef..'; bWantToGetGun='..tostring(bWantToGetGun)) end
     end
     if bWantToGetGun and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
-        if aiBrain:GetEconomyStoredRatio('Energy') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantToGetGun = false end
+        if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantToGetGun = false end
     end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -362,7 +362,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
         end
     end
     if bWantUpgrade and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
-        if aiBrain:GetEconomyStoredRatio('Energy') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantUpgrade = false end
+        if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantUpgrade = false end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantUpgrade, bSafeToGetUpgrade
@@ -588,6 +588,7 @@ function AtLeastXMassStored(aiBrain, iResourceStored)
 end
 
 function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
+    --Returns true if have built >= iBuiltThreshold
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'LifetimeBuildCountLessThan'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -665,7 +666,7 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
     if bTreatQueuedBuildingsAsUnclaimed == nil then bTreatQueuedBuildingsAsUnclaimed = bTreatOurOrAllyBuildingAsUnclaimed end
     local iBuildingSizeRadius = 0.5
     if bMexNotHydro == false then iBuildingSizeRadius = M27UnitInfo.GetBuildingSize('UAB1102')[1]*0.5 end
-    local tNearbyAllyUnits = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tResourcePosition, iBuildingSizeRadius, 'Ally')
+    local tNearbyAllyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Ally')
     local bResourceIsUnclaimed = true
 
     if M27Utilities.IsTableEmpty(tNearbyAllyUnits) == false then
@@ -688,7 +689,7 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
         else
             if bTreatEnemyBuildingAsUnclaimed == true then bResourceIsUnclaimed = true
             else
-                local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tResourcePosition, iBuildingSizeRadius, 'Enemy')
+                local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Enemy')
                 if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
                     for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
                         if not(oBuilding.Dead) then
@@ -706,7 +707,7 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
             bResourceIsUnclaimed = true
             if bDebugMessages == true then LOG(sFunctionRef..': 3c bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
         else
-            local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE, tResourcePosition, iBuildingSizeRadius, 'Enemy')
+            local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Enemy')
             if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
                 for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
                     if not(oEnemyBuilding.Dead) then
