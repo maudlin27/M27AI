@@ -1199,7 +1199,9 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                     end
                                 end
                             else
-                                M27Utilities.ErrorHandler('iEnemyStartNumber is nil')
+                                if not(M27Logic.iTimeOfLastBrainAllDefeated) or M27Logic.iTimeOfLastBrainAllDefeated < 10 then
+                                    M27Utilities.ErrorHandler('iEnemyStartNumber is nil')
+                                end
                             end
                         else --Dont have enough scouts to cover any path, to stick with initial base path
                             if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough scouts to cover any intel path, stay at base path; aiBrain[refiMinScoutsNeededForAnyPath]='..aiBrain[refiMinScoutsNeededForAnyPath]..'; iIntelPlatoons='..iIntelPlatoons) end

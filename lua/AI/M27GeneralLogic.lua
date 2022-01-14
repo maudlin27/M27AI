@@ -378,8 +378,8 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                     if bHaveBrains and bAllDefeated == true then
                         LOG('All enemies defeated, ACU death count='..M27Overseer.iACUDeathCount..'; will ignore errors with nearest enemy index and wait 1 second1')
                         if M27Overseer.iACUDeathCount == 0 then
-                            if GetGameTimeSeconds() - iTimeOfLastBrainAllDefeated >= 1 then
-                                M27Utilities.ErrorHandler('All brains are showing as dead but we havent recorded any ACU deaths.  Assuming all enemies are dead and aborting all code')
+                            if GetGameTimeSeconds() - iTimeOfLastBrainAllDefeated >= 5 then
+                                M27Utilities.ErrorHandler('All brains are showing as dead but we havent recorded any ACU deaths.  Assuming all enemies are dead and aborting all code; will show this message every 5s')
                                 iTimeOfLastBrainAllDefeated = GetGameTimeSeconds()
                             end
                         end
@@ -445,14 +445,15 @@ function IndexToStartNumber(iArmyIndex)
     end
     iStartPoint = tPlayerStartPointByIndex[iArmyIndex]
     if iStartPoint == nil then
-        M27Utilities.ErrorHandler('Dont have start position for iArmyIndex='..(iArmyIndex or 'nil')..'; will now enable logs and try to figure out why')
-        for iCurBrain, aiBrain in ArmyBrains do
-            LOG('iCurBrain='..iCurBrain..'; ArmyIndex='..aiBrain:GetArmyIndex()..'; M27StartPositionNumber='..(aiBrain.M27StartPositionNumber or 'nil'))
-            if not(aiBrain.M27StartPositionNumber) then
-                LOG('M27Utilities.GetAIBrainArmyNumber(aiBrain)='..(M27Utilities.GetAIBrainArmyNumber(aiBrain) or 'nil'))
+        if not(iTimeOfLastBrainAllDefeated) or iTimeOfLastBrainAllDefeated<10 then
+            M27Utilities.ErrorHandler('Dont have start position for iArmyIndex='..(iArmyIndex or 'nil')..'; will now enable logs and try to figure out why')
+            for iCurBrain, aiBrain in ArmyBrains do
+                LOG('iCurBrain='..iCurBrain..'; ArmyIndex='..aiBrain:GetArmyIndex()..'; M27StartPositionNumber='..(aiBrain.M27StartPositionNumber or 'nil'))
+                if not(aiBrain.M27StartPositionNumber) then
+                    LOG('M27Utilities.GetAIBrainArmyNumber(aiBrain)='..(M27Utilities.GetAIBrainArmyNumber(aiBrain) or 'nil'))
+                end
             end
         end
-
     end
     return iStartPoint
 end
@@ -465,7 +466,11 @@ end
 function GetUnitNearestEnemy(aiBrain, tUnits)
     --returns the unit nearest the enemy start location (or nil if there is none); only considers units that are not dead
     --(note - probably better to have just used GetNearestUnit from M27Utilities)
-    return M27Utilities.GetNearestUnit(tUnits, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], aiBrain, false)
+    if (iTimeOfLastBrainAllDefeated or 0) > 10 then
+        return nil
+    else
+        return M27Utilities.GetNearestUnit(tUnits, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], aiBrain, false)
+    end
     --[[
     local iNearestDistance = 100000
     local oNearestUnit
@@ -2867,9 +2872,12 @@ function IsLineBlocked(tShotStartPosition, tShotEndPosition)
             if bDebugMessages == true then LOG(sFunctionRef..': iPointToTarget='..iPointToTarget..'; tTerrainPositionAtPoint='..repr(tTerrainPositionAtPoint)) end
             iShotHeightAtPoint = math.tan(iAngle) * iPointToTarget + tShotStartPosition[2]
             if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
-                if bDebugMessages == true then LOG(sFunctionRef..': Shot blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Shot blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2])
+                    M27Utilities.DrawLocation(tTerrainPositionAtPoint, nil, 5, 10)
+                end
                 bShotIsBlocked = true
-                M27Utilities.DrawLocation(tTerrainPositionAtPoint, nil, 5, 10)
+
                 break
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Shot not blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end

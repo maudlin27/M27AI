@@ -414,8 +414,8 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
     end
     local aiBrain = oBomber:GetAIBrain()
     if not(bOneOff) then WaitSeconds(1) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     while M27UnitInfo.IsUnitValid(oBomber) do
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
             if bDebugMessages == true then
                 LOG(sFunctionRef..': Bomber target list isnt empty. oBomber[refiCurTargetNumber]='..oBomber[refiCurTargetNumber])
@@ -469,11 +469,16 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
             end
         end
 
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        if not(bOneOff) then WaitSeconds(1) else
+
+        if not(bOneOff) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            WaitSeconds(1)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+        else
             break --redundancy - shouldnt need but dont want infinite loop
             end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetMaxStrikeDamageWanted(oUnit)

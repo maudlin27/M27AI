@@ -1045,160 +1045,161 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
 
         if bProceed == true then
             if bDebugMessages == true then LOG(sFunctionRef..': We can proceed, clearing unit commands unless we have an air or acu unit') end
-
-            local bIssueTemporaryMoveOrder = true
-            local bReissueMovementPath = true
-            --Clear unit commands
-            if bDebugMessages == true then
-                local iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oNewUnit)
-                if iLifetimeCount == nil then iLifetimeCount = 0 end
-                LOG(sFunctionRef..': About to clear commands to unit with lifetime count='..iLifetimeCount..' and ID='..sUnitID)
-            end
-            local tUnitsToClear = EntityCategoryFilterDown(categories.ALLUNITS - categories.AIR - categories.COMMAND, tNewUnits)
-            if M27Utilities.IsTableEmpty(tUnitsToClear) == false then
-                IssueClearCommands(tUnitsToClear)
-            else
-                bIssueTemporaryMoveOrder = false
-                bReissueMovementPath = false
-            end
-
-            local bAbortPlatoonFormation = false
-
-            if oNewUnit.PlatoonHandle and not(bNotJustBuiltByFactory) then
-                local sPlatoonName = 'Nil or pool'
-                if oNewUnit.PlatoonHandle.GetPlan then sPlatoonName = oNewUnit.PlatoonHandle:GetPlan() if sPlatoonName == nil then sPlatoonName = 'PlanWithNilName' end end
-
-                if iLifetimeCount == nil then iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oNewUnit) end
-
-                --Sometimes (not often) can have this happen e.g. if unit was assigned to defenders then removed as a spare unit so it went to army pool
-                if bDebugMessages == true then LOG('oNewUnit was just built by a factory but has a platoon handle already with name='..sPlatoonName..'; unit name='..sUnitID..iLifetimeCount..'; oNewUnit[refbJustCleared]='..tostring(oNewUnit[refbJustCleared])..'; oNewUnit[refbJustBuilt] ='..tostring(oNewUnit[refbJustBuilt])) end
-                if oNewUnit[refbJustBuilt] == false and not(oNewUnit.PlatoonHandle[M27PlatoonTemplates.refbIdlePlatoon] == nil) and oNewUnit.PlatoonHandle[M27PlatoonTemplates.refbIdlePlatoon] == false then
-                    bAbortPlatoonFormation = true
-                    if M27Utilities.IsTableEmpty(oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath]) == false then
-                        bIssueTemporaryMoveOrder = false
-                    end
+            if (M27Logic.iTimeOfLastBrainAllDefeated or 0) < 10 then
+                local bIssueTemporaryMoveOrder = true
+                local bReissueMovementPath = true
+                --Clear unit commands
+                if bDebugMessages == true then
+                    local iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oNewUnit)
+                    if iLifetimeCount == nil then iLifetimeCount = 0 end
+                    LOG(sFunctionRef..': About to clear commands to unit with lifetime count='..iLifetimeCount..' and ID='..sUnitID)
                 end
-            end
-
-            if bIssueTemporaryMoveOrder == true then
-                --Give the new unit a move command to try and make sure its away from the factory
-                --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
-                if tStartPosition then
-                    local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
-                    --local tRallyPoint = M27Utilities.MoveTowardsTarget(tStartPosition, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], 10, 0)
-                    if EntityCategoryContains(refCategoryLandCombat, sUnitID) then
-                        IssueAggressiveMove(tNewUnits, tRallyPoint)
-                    elseif not(EntityCategoryContains(M27UnitInfo.refCategoryEngineer, sUnitID)) then IssueMove(tNewUnits, tRallyPoint) end
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef..': Issuing move to rally point')
-                        --M27Utilities.DrawLocation(tRallyPoint)
-                    end
-
+                local tUnitsToClear = EntityCategoryFilterDown(categories.ALLUNITS - categories.AIR - categories.COMMAND, tNewUnits)
+                if M27Utilities.IsTableEmpty(tUnitsToClear) == false then
+                    IssueClearCommands(tUnitsToClear)
+                else
+                    bIssueTemporaryMoveOrder = false
+                    bReissueMovementPath = false
                 end
-            else
-                --Reissue platoon movement path if there is one
-                if bReissueMovementPath == true and oNewUnit.PlatoonHandle and M27Utilities.IsTableEmpty(oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath]) == false then
-                    local tPlatoonUnits = oNewUnit.PlatoonHandle:GetPlatoonUnits()
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef..': About to reissue movement path')
-                        LOG('Platoon name='..oNewUnit.PlatoonHandle:GetPlan())
-                        LOG('UnitId='..oNewUnit:GetUnitId())
-                        LOG('movement path='..repr(oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath]))
-                    end
-                    for iMovementPath, tMovementTarget in oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath] do
-                        IssueMove(tPlatoonUnits, tMovementTarget)
-                    end
-                end
-            end
 
-            if bAbortPlatoonFormation == false then
-                oNewUnit[refbJustCleared] = true
-                oNewUnit[refbJustBuilt] = false
-                --Is it a combat unit?
-                local sUnitBP
-                --local refCategoryDFTank = M27UnitInfo.refCategoryDFTank
-                --local refCategoryAttackBot = M27UnitInfo.refCategoryDFTank
-                --local refCategoryIndirect = M27UnitInfo.refCategoryIndirect
-                local tMobileShieldUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
-                local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
-                local tEngineerUnits = EntityCategoryFilterDown(refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
-                local tAirUnits = EntityCategoryFilterDown(categories.AIR - refCategoryEngineer, tNewUnits)
-                local tNavalUnits = EntityCategoryFilterDown(categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat, tNewUnits)
-                local tIndirectT2Plus = EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
-                local tMAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryMAA  - M27UnitInfo.refCategoryIndirectT2Plus - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
+                local bAbortPlatoonFormation = false
 
-                local tNeedingAssigningCombatUnits = {}
-                local iValidCombatUnitCount = 0
+                if oNewUnit.PlatoonHandle and not(bNotJustBuiltByFactory) then
+                    local sPlatoonName = 'Nil or pool'
+                    if oNewUnit.PlatoonHandle.GetPlan then sPlatoonName = oNewUnit.PlatoonHandle:GetPlan() if sPlatoonName == nil then sPlatoonName = 'PlanWithNilName' end end
 
+                    if iLifetimeCount == nil then iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oNewUnit) end
 
-                if M27Utilities.IsTableEmpty(tEngineerUnits) == false then M27EngineerOverseer.ReassignEngineers(aiBrain, false, tEngineerUnits) end
-                if M27Utilities.IsTableEmpty(tCombatUnits) == false then
-                    for iUnit, oUnit in tCombatUnits do
-                        if not(oUnit[refbWaitingForAssignment]) then
-                            iValidCombatUnitCount = iValidCombatUnitCount + 1
-                           tNeedingAssigningCombatUnits[iValidCombatUnitCount] = oUnit
+                    --Sometimes (not often) can have this happen e.g. if unit was assigned to defenders then removed as a spare unit so it went to army pool
+                    if bDebugMessages == true then LOG('oNewUnit was just built by a factory but has a platoon handle already with name='..sPlatoonName..'; unit name='..sUnitID..iLifetimeCount..'; oNewUnit[refbJustCleared]='..tostring(oNewUnit[refbJustCleared])..'; oNewUnit[refbJustBuilt] ='..tostring(oNewUnit[refbJustBuilt])) end
+                    if oNewUnit[refbJustBuilt] == false and not(oNewUnit.PlatoonHandle[M27PlatoonTemplates.refbIdlePlatoon] == nil) and oNewUnit.PlatoonHandle[M27PlatoonTemplates.refbIdlePlatoon] == false then
+                        bAbortPlatoonFormation = true
+                        if M27Utilities.IsTableEmpty(oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath]) == false then
+                            bIssueTemporaryMoveOrder = false
                         end
                     end
-                    local iCombatUnits = iValidCombatUnitCount
-                    if bDebugMessages == true then LOG(sFunctionRef..': Dealing with combat units, iCombatUnits='..iCombatUnits) end
-                    if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] == nil then aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] = {} end
-                    if aiBrain[reftoCombatUnitsWaitingForAssignment] == nil then aiBrain[reftoCombatUnitsWaitingForAssignment] = {} end
-                    if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == true then
-                        if bDebugMessages == true then LOG(sFunctionRef..': No existing units waiting for assignment, will set current units as waiting') end
-                        aiBrain[reftoCombatUnitsWaitingForAssignment] = tNeedingAssigningCombatUnits
-                    else
-                        local iUnitsWaiting = table.getn(aiBrain[reftoCombatUnitsWaitingForAssignment])
-                        if bDebugMessages == true then LOG(sFunctionRef..': iUnitsWaiting='..iUnitsWaiting..'; iCombatUnits='..iCombatUnits) end
-                        local iCount
-                        local tTableToAddToOther
-                        local tTableToBeAddedTo
-                        local bReplaceCombatUnitsWaiting = false
-                        if iCombatUnits > iUnitsWaiting then
-                            iCount = iCombatUnits
-                            tTableToAddToOther = aiBrain[reftoCombatUnitsWaitingForAssignment]
-                            tTableToBeAddedTo = tNeedingAssigningCombatUnits
-                            bReplaceCombatUnitsWaiting = true
-                        else
-                            iCount = iUnitsWaiting
-                            tTableToAddToOther = tNeedingAssigningCombatUnits
-                            tTableToBeAddedTo = aiBrain[reftoCombatUnitsWaitingForAssignment]
+                end
+
+                if bIssueTemporaryMoveOrder == true then
+                    --Give the new unit a move command to try and make sure its away from the factory
+                    --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
+                    if tStartPosition then
+                        local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                        --local tRallyPoint = M27Utilities.MoveTowardsTarget(tStartPosition, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], 10, 0)
+                        if EntityCategoryContains(refCategoryLandCombat, sUnitID) then
+                            IssueAggressiveMove(tNewUnits, tRallyPoint)
+                        elseif not(EntityCategoryContains(M27UnitInfo.refCategoryEngineer, sUnitID)) then IssueMove(tNewUnits, tRallyPoint) end
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': Issuing move to rally point')
+                            --M27Utilities.DrawLocation(tRallyPoint)
                         end
-                        for iUnit, oUnit in tTableToAddToOther do
-                            iCount = iCount + 1
-                            tTableToBeAddedTo[iCount] = oUnit
-                        end
-                        if bReplaceCombatUnitsWaiting == true then aiBrain[reftoCombatUnitsWaitingForAssignment] = tTableToBeAddedTo end
+
                     end
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef..': About to list out every unit in aiBrain[reftoCombatUnitsWaitingForAssignment]')
-                        if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == true then LOG('Table is empty')
-                        else
-                            for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
-                                local iUniqueID = M27UnitInfo.GetUnitLifetimeCount(oNewUnit)
-                                LOG('iUnit='..iUnit..'; Blueprint+UniqueCount='..oUnit:GetUnitId()..iUniqueID)
+                else
+                    --Reissue platoon movement path if there is one
+                    if bReissueMovementPath == true and oNewUnit.PlatoonHandle and M27Utilities.IsTableEmpty(oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath]) == false then
+                        local tPlatoonUnits = oNewUnit.PlatoonHandle:GetPlatoonUnits()
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': About to reissue movement path')
+                            LOG('Platoon name='..oNewUnit.PlatoonHandle:GetPlan())
+                            LOG('UnitId='..oNewUnit:GetUnitId())
+                            LOG('movement path='..repr(oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath]))
+                        end
+                        for iMovementPath, tMovementTarget in oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath] do
+                            IssueMove(tPlatoonUnits, tMovementTarget)
+                        end
+                    end
+                end
+
+                if bAbortPlatoonFormation == false then
+                    oNewUnit[refbJustCleared] = true
+                    oNewUnit[refbJustBuilt] = false
+                    --Is it a combat unit?
+                    local sUnitBP
+                    --local refCategoryDFTank = M27UnitInfo.refCategoryDFTank
+                    --local refCategoryAttackBot = M27UnitInfo.refCategoryDFTank
+                    --local refCategoryIndirect = M27UnitInfo.refCategoryIndirect
+                    local tMobileShieldUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
+                    local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
+                    local tEngineerUnits = EntityCategoryFilterDown(refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
+                    local tAirUnits = EntityCategoryFilterDown(categories.AIR - refCategoryEngineer, tNewUnits)
+                    local tNavalUnits = EntityCategoryFilterDown(categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat, tNewUnits)
+                    local tIndirectT2Plus = EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
+                    local tMAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryMAA  - M27UnitInfo.refCategoryIndirectT2Plus - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
+
+                    local tNeedingAssigningCombatUnits = {}
+                    local iValidCombatUnitCount = 0
+
+
+                    if M27Utilities.IsTableEmpty(tEngineerUnits) == false then M27EngineerOverseer.ReassignEngineers(aiBrain, false, tEngineerUnits) end
+                    if M27Utilities.IsTableEmpty(tCombatUnits) == false then
+                        for iUnit, oUnit in tCombatUnits do
+                            if not(oUnit[refbWaitingForAssignment]) then
+                                iValidCombatUnitCount = iValidCombatUnitCount + 1
+                               tNeedingAssigningCombatUnits[iValidCombatUnitCount] = oUnit
                             end
                         end
+                        local iCombatUnits = iValidCombatUnitCount
+                        if bDebugMessages == true then LOG(sFunctionRef..': Dealing with combat units, iCombatUnits='..iCombatUnits) end
+                        if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] == nil then aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] = {} end
+                        if aiBrain[reftoCombatUnitsWaitingForAssignment] == nil then aiBrain[reftoCombatUnitsWaitingForAssignment] = {} end
+                        if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == true then
+                            if bDebugMessages == true then LOG(sFunctionRef..': No existing units waiting for assignment, will set current units as waiting') end
+                            aiBrain[reftoCombatUnitsWaitingForAssignment] = tNeedingAssigningCombatUnits
+                        else
+                            local iUnitsWaiting = table.getn(aiBrain[reftoCombatUnitsWaitingForAssignment])
+                            if bDebugMessages == true then LOG(sFunctionRef..': iUnitsWaiting='..iUnitsWaiting..'; iCombatUnits='..iCombatUnits) end
+                            local iCount
+                            local tTableToAddToOther
+                            local tTableToBeAddedTo
+                            local bReplaceCombatUnitsWaiting = false
+                            if iCombatUnits > iUnitsWaiting then
+                                iCount = iCombatUnits
+                                tTableToAddToOther = aiBrain[reftoCombatUnitsWaitingForAssignment]
+                                tTableToBeAddedTo = tNeedingAssigningCombatUnits
+                                bReplaceCombatUnitsWaiting = true
+                            else
+                                iCount = iUnitsWaiting
+                                tTableToAddToOther = tNeedingAssigningCombatUnits
+                                tTableToBeAddedTo = aiBrain[reftoCombatUnitsWaitingForAssignment]
+                            end
+                            for iUnit, oUnit in tTableToAddToOther do
+                                iCount = iCount + 1
+                                tTableToBeAddedTo[iCount] = oUnit
+                            end
+                            if bReplaceCombatUnitsWaiting == true then aiBrain[reftoCombatUnitsWaitingForAssignment] = tTableToBeAddedTo end
+                        end
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': About to list out every unit in aiBrain[reftoCombatUnitsWaitingForAssignment]')
+                            if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == true then LOG('Table is empty')
+                            else
+                                for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
+                                    local iUniqueID = M27UnitInfo.GetUnitLifetimeCount(oNewUnit)
+                                    LOG('iUnit='..iUnit..'; Blueprint+UniqueCount='..oUnit:GetUnitId()..iUniqueID)
+                                end
+                            end
+                        end
+                        CombatPlatoonFormer(aiBrain)
                     end
-                    CombatPlatoonFormer(aiBrain)
-                end
-                if M27Utilities.IsTableEmpty(tMobileShieldUnits) == false then
-                    MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
-                end
-                if M27Utilities.IsTableEmpty(tIndirectT2Plus) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have indirect T2+ units, will assign to idle platoon for now, number of units='..table.getn(tIndirectT2Plus)) end
-                    AllocateUnitsToIdlePlatoons(aiBrain, tIndirectT2Plus)
-                end
-                if M27Utilities.IsTableEmpty(tMAA) == false then
-                    MAAPlatoonFormer(aiBrain, tMAA)
-                end
-                if M27Utilities.IsTableEmpty(tAirUnits) == false then
-                   AllocateUnitsToIdlePlatoons(aiBrain, tAirUnits)
-                end
-                if M27Utilities.IsTableEmpty(tNavalUnits) == false then
-                    AllocateUnitsToIdlePlatoons(aiBrain, tNavalUnits)
-                end
+                    if M27Utilities.IsTableEmpty(tMobileShieldUnits) == false then
+                        MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
+                    end
+                    if M27Utilities.IsTableEmpty(tIndirectT2Plus) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have indirect T2+ units, will assign to idle platoon for now, number of units='..table.getn(tIndirectT2Plus)) end
+                        AllocateUnitsToIdlePlatoons(aiBrain, tIndirectT2Plus)
+                    end
+                    if M27Utilities.IsTableEmpty(tMAA) == false then
+                        MAAPlatoonFormer(aiBrain, tMAA)
+                    end
+                    if M27Utilities.IsTableEmpty(tAirUnits) == false then
+                       AllocateUnitsToIdlePlatoons(aiBrain, tAirUnits)
+                    end
+                    if M27Utilities.IsTableEmpty(tNavalUnits) == false then
+                        AllocateUnitsToIdlePlatoons(aiBrain, tNavalUnits)
+                    end
 
-                M27Utilities.DelayChangeVariable(oNewUnit, refbJustCleared, false, 1, nil, nil)
+                    M27Utilities.DelayChangeVariable(oNewUnit, refbJustCleared, false, 1, nil, nil)
+                end
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

@@ -870,53 +870,55 @@ function UpgradeMainLoop(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if (M27Logic.iTimeOfLastBrainAllDefeated or 0) < 10 then
 
-    local iCategoryToUpgrade, oUnitToUpgrade
-    local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    local iMaxToBeUpgrading, iAmountToUpgradeAfterUnpausing
+        local iCategoryToUpgrade, oUnitToUpgrade
+        local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        local iMaxToBeUpgrading, iAmountToUpgradeAfterUnpausing
 
 
-    aiBrain[refbWantToUpgradeMoreBuildings] = false --default
+        aiBrain[refbWantToUpgradeMoreBuildings] = false --default
 
-    iMaxToBeUpgrading = DecideMaxAmountToBeUpgrading(aiBrain)
-    if bDebugMessages == true then LOG(sFunctionRef..': iMaxToBeUpgrading='..iMaxToBeUpgrading) end
+        iMaxToBeUpgrading = DecideMaxAmountToBeUpgrading(aiBrain)
+        if bDebugMessages == true then LOG(sFunctionRef..': iMaxToBeUpgrading='..iMaxToBeUpgrading) end
 
-    if iMaxToBeUpgrading >= 1 then
-        --Unpause any already upgrading units first
-        iAmountToUpgradeAfterUnpausing = math.max(iMaxToBeUpgrading - aiBrain[refiPausedUpgradeCount],0)
-        if bDebugMessages == true then LOG(sFunctionRef..': Checking if upgrades to be unpaused') end
-        UnpauseUpgrades(aiBrain, iMaxToBeUpgrading)
-        if bDebugMessages == true then LOG(sFunctionRef..'; iAmountToUpgradeAfterUnpausing='..iAmountToUpgradeAfterUnpausing) end
-        if iAmountToUpgradeAfterUnpausing > 0 then
+        if iMaxToBeUpgrading >= 1 then
+            --Unpause any already upgrading units first
+            iAmountToUpgradeAfterUnpausing = math.max(iMaxToBeUpgrading - aiBrain[refiPausedUpgradeCount],0)
+            if bDebugMessages == true then LOG(sFunctionRef..': Checking if upgrades to be unpaused') end
+            UnpauseUpgrades(aiBrain, iMaxToBeUpgrading)
+            if bDebugMessages == true then LOG(sFunctionRef..'; iAmountToUpgradeAfterUnpausing='..iAmountToUpgradeAfterUnpausing) end
+            if iAmountToUpgradeAfterUnpausing > 0 then
 
-            iCategoryToUpgrade = DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
+                iCategoryToUpgrade = DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
 
-            if iCategoryToUpgrade then
-                if bDebugMessages == true then LOG(sFunctionRef..': Got category to upgrade') end
-                oUnitToUpgrade = GetUnitToUpgrade(aiBrain, iCategoryToUpgrade, tStartPosition)
-                if oUnitToUpgrade == nil then
-                    --One likely explanation for htis is that there are enemies near the units of the category wanted
-                    if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find unit to upgrade, will revert to default categories, starting with T1 mex') end
-                    oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT1Mex, tStartPosition)
+                if iCategoryToUpgrade then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Got category to upgrade') end
+                    oUnitToUpgrade = GetUnitToUpgrade(aiBrain, iCategoryToUpgrade, tStartPosition)
                     if oUnitToUpgrade == nil then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Will look for T1 land factory') end
-                        oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory * categories.TECH1, tStartPosition)
+                        --One likely explanation for htis is that there are enemies near the units of the category wanted
+                        if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find unit to upgrade, will revert to default categories, starting with T1 mex') end
+                        oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT1Mex, tStartPosition)
                         if oUnitToUpgrade == nil then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Will look for T1 air factory') end
-                            oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryAirFactory * categories.TECH1, tStartPosition)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will look for T1 land factory') end
+                            oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory * categories.TECH1, tStartPosition)
                             if oUnitToUpgrade == nil then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 mex') end
-                                oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT2Mex, tStartPosition)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will look for T1 air factory') end
+                                oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryAirFactory * categories.TECH1, tStartPosition)
                                 if oUnitToUpgrade == nil then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 land factory') end
-                                    oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory * categories.TECH2, tStartPosition)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 mex') end
+                                    oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT2Mex, tStartPosition)
                                     if oUnitToUpgrade == nil then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 air factory') end
-                                        oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryAirFactory * categories.TECH2, tStartPosition)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 land factory') end
+                                        oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory * categories.TECH2, tStartPosition)
                                         if oUnitToUpgrade == nil then
-                                            --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
-                                            if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 100 then
-                                                M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; nearest enemy to base='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat],nil, true)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 air factory') end
+                                            oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryAirFactory * categories.TECH2, tStartPosition)
+                                            if oUnitToUpgrade == nil then
+                                                --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
+                                                if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 100 then
+                                                    M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; nearest enemy to base='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat],nil, true)
+                                                end
                                             end
                                         end
                                     end
@@ -924,23 +926,23 @@ function UpgradeMainLoop(aiBrain)
                             end
                         end
                     end
-                end
-                if oUnitToUpgrade and not(oUnitToUpgrade.Dead) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': About to try and upgrade unit ID='..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)) end
-                    UpgradeUnit(oUnitToUpgrade, true)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Finished sending order to upgrade unit') end
+                    if oUnitToUpgrade and not(oUnitToUpgrade.Dead) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to try and upgrade unit ID='..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)) end
+                        UpgradeUnit(oUnitToUpgrade, true)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished sending order to upgrade unit') end
+                    else
+                        if bDebugMessages == true then LOG('Couldnt get a unit to upgrade despite trying alternative categories.  Likely cause is that we have enemies near our base meaning poor defence coverage. UnitToUpgrade='..(oUnitToUpgrade:GetUnitId() or 'nil')) end
+                    end
                 else
-                    if bDebugMessages == true then LOG('Couldnt get a unit to upgrade despite trying alternative categories.  Likely cause is that we have enemies near our base meaning poor defence coverage. UnitToUpgrade='..(oUnitToUpgrade:GetUnitId() or 'nil')) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have anything to upgrade') end
                 end
-            else
-                if bDebugMessages == true then LOG(sFunctionRef..': Dont have anything to upgrade') end
+                if iAmountToUpgradeAfterUnpausing > 2 then aiBrain[refbWantToUpgradeMoreBuildings] = true end
             end
-            if iAmountToUpgradeAfterUnpausing > 2 then aiBrain[refbWantToUpgradeMoreBuildings] = true end
+        elseif iMaxToBeUpgrading < 0 then
+            --Need to pause
+            if bDebugMessages == true then LOG(sFunctionRef..': We need to pause an upgrade') end
+            PauseLastUpgrade(aiBrain)
         end
-    elseif iMaxToBeUpgrading < 0 then
-        --Need to pause
-        if bDebugMessages == true then LOG(sFunctionRef..': We need to pause an upgrade') end
-        PauseLastUpgrade(aiBrain)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 

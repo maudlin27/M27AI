@@ -2133,7 +2133,6 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                             else
                                 --ACU action for nearby naval units when no ground threats - move towards them to get in range
                                 if oPlatoon[refbACUInPlatoon] == true and M27Conditions.CanUnitUseOvercharge(aiBrain, M27Utilities.GetACU(aiBrain)) then
-                                    bDebugMessages = true
                                     if bDebugMessages == true then LOG(sFunctionRef..': Can use overcharge; about to check if have nearby naval units in which case will move towards them so are in range') end
                                     local tNearbyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, GetPlatoonFrontPosition(oPlatoon), iPlatoonMaxRange + 8, 'Enemy')
                                     if M27Utilities.IsTableEmpty(tNearbyNavy) == false then
@@ -6845,6 +6844,11 @@ function ProcessPlatoonAction(oPlatoon)
                                 oACU[M27UnitInfo.refsUpgradeRef] = sUpgrade
                                 --IssueUpgrade({oACU}, sUpgrade)
                                 if bDebugMessages == true then LOG(sFunctionRef..'ACU state after sending issueupgrade='..M27Logic.GetUnitState(oACU)) end
+
+                                --Add the ACU's current position as its destination, so once it finishes the upgrade it iwll get a new one
+                                oPlatoon[reftMovementPath] = {}
+                                oPlatoon[reftMovementPath][1] = oACU:GetPosition()
+                                oPlatoon[refiCurrentPathTarget] = 1
                             end
                         end
                     end
@@ -7170,8 +7174,10 @@ end
 function RunPlatoonSingleCycle(oPlatoon)
     local sFunctionRef = 'RunPlatoonSingleCycle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    DeterminePlatoonAction(oPlatoon)
-    ProcessPlatoonAction(oPlatoon)
+    if M27Logic.iTimeOfLastBrainAllDefeated < 10 then
+        DeterminePlatoonAction(oPlatoon)
+        ProcessPlatoonAction(oPlatoon)
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
