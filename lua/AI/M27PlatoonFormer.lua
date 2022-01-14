@@ -191,21 +191,25 @@ function CombatPlatoonFormer(aiBrain)
     if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then
         --Check if ACU is one of the units
         local iCurCount = 0
-        local iMaxLoop = 2
-        local tACU = EntityCategoryFilterDown(categories.COMMAND, tUnitsWaiting)
+        local tUnitsToExclude = EntityCategoryFilterDown(categories.COMMAND + M27UnitInfo.refCategoryLandExperimental, tUnitsWaiting)
+        local iMaxLoop = table.getn(tUnitsToExclude) + 1
 
-        while M27Utilities.IsTableEmpty(tACU) == false do
+        while M27Utilities.IsTableEmpty(tUnitsToExclude) == false do
             iCurCount = iCurCount + 1
             if iCurCount > iMaxLoop then M27Utilities.ErrorHandler('Likely infinite loop') break end
             for iUnit, oUnit in tUnitsWaiting do
                 if EntityCategoryContains(categories.COMMAND, oUnit:GetUnitId()) then
                     table.remove(aiBrain[reftoCombatUnitsWaitingForAssignment], iUnit)
                     tUnitsWaiting = aiBrain[reftoCombatUnitsWaitingForAssignment]
-                    tACU = EntityCategoryFilterDown(categories.COMMAND, tUnitsWaiting)
+                    break
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnit:GetUnidId()) then
+                    local oNewPlatoon = CreatePlatoon(aiBrain, 'M27GroundExperimental', {oUnit})
+                    table.remove(aiBrain[reftoCombatUnitsWaitingForAssignment], iUnit)
+                    tUnitsWaiting = aiBrain[reftoCombatUnitsWaitingForAssignment]
                     break
                 end
             end
-
+            tUnitsToExclude = EntityCategoryFilterDown(categories.COMMAND + M27UnitInfo.refCategoryLandExperimental, tUnitsWaiting)
         end
 
         iUnitsWaiting = table.getn(tUnitsWaiting)
@@ -501,6 +505,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
         local tMAA = {}
         local tACU = {}
         local tCombat = {}
+        local tLandExperimentals = {}
         local tIndirect = {}
         local tEngi = {}
         local tStructures = {}
@@ -530,6 +535,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                         elseif EntityCategoryContains(categories.COMMAND, sUnitID) then table.insert(tACU, oUnit)
                         elseif EntityCategoryContains(refCategoryEngineer, sUnitID) then table.insert(tEngi, oUnit)
                         elseif EntityCategoryContains(categories.STRUCTURE, sUnitID) then table.insert(tStructures, oUnit)
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, sUnitID) then table.insert(tLandExperimentals, oUnit)
                         elseif EntityCategoryContains(refCategoryLandCombat, sUnitID) then table.insert(tCombat, oUnit)
                         elseif EntityCategoryContains(refCategoryIndirectT2Plus, sUnitID) then table.insert(tIndirect, oUnit)
                         elseif EntityCategoryContains(refCategoryAllAir, sUnitID) then table.insert(tAir, oUnit)
@@ -553,6 +559,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                 end
             end
             if M27Utilities.IsTableEmpty(tEngi) == false then AddIdleUnitsToPlatoon(aiBrain, tEngi, aiBrain[M27PlatoonTemplates.refoAllEngineers]) end
+            if M27Utilities.IsTableEmpty(tLandExperimentals) == false then local oNewPlatoon = CreatePlatoon(aiBrain, 'M27GroundExperimental', tLandExperimentals) end
             if M27Utilities.IsTableEmpty(tCombat) == false then
                 AddIdleUnitsToPlatoon(aiBrain, tCombat, aiBrain[M27PlatoonTemplates.refoIdleCombat])
                 AllocateNewUnitsToPlatoonNotFromFactory(tCombat)

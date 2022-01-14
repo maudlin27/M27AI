@@ -125,7 +125,9 @@ function SafeToGetACUUpgrade(aiBrain)
                     --Are we near to enemy base and not near ours?
                     local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
                     if iDistToEnemy > 90 or iDistToEnemy > M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
-                        if (oACU[M27Overseer.refoUnitsScoutHelperPlatoon] and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoUnitsScoutHelperPlatoon]), tACUPos) <= math.max(8, M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelperPlatoon][M27PlatoonUtilities.refoFrontUnit]:GetBlueprint().Intel.RadarRadius - iSearchRange)) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iSearchRange) == true then
+                        local bNearbyScout = false
+                        if oACU[M27Overseer.refoUnitsScoutHelperPlatoon] and M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoUnitsScoutHelperPlatoon][M27PlatoonUtilities.refoFrontUnit]) and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoUnitsScoutHelperPlatoon]), tACUPos) <= math.max(8, oACU[M27Overseer.refoUnitsScoutHelperPlatoon][M27PlatoonUtilities.refoFrontUnit]:GetBlueprint().Intel.RadarRadius - iSearchRange) then bNearbyScout = true end
+                        if bNearbyScout or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iSearchRange) == true then
                             --Are there enemies near the ACU with a threat value?
                             tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllNonAirScoutUnits, tACUPos, iSearchRange, 'Enemy')
                             local iThreat = M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemies, true, nil, 50)

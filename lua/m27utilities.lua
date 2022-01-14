@@ -319,16 +319,19 @@ function DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bS
     --fork thread doesnt seem to work - can't see the circle, even though teh code itself is called; using steppingstone seems to fix this
     --ForkThread(DrawTableOfLocations, tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation)
     --DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation)
+    ErrorHandler('Shouldnt be drawing anything')
     ForkThread(SteppingStoneForDrawLocations, tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
 end
 
 function DrawLocation(tLocation, relativeStart, iColour, iDisplayCount, iCircleSize)
     --ForkThread(DrawTableOfLocations, tableLocations, relativeStart, iColour, iDisplayCount, true)
     --DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, true)
+    ErrorHandler('Shouldnt be drawing anything')
     ForkThread(SteppingStoneForDrawLocations, tLocation, relativeStart, iColour, iDisplayCount, true, iCircleSize)
 end
 
 function DrawRectangle(rRect, iColour, iDisplayCount)
+    ErrorHandler('Shouldnt be drawing anything')
     ForkThread(SteppingStoneForDrawRect, rRect, iColour, iDisplayCount)
 end
 

@@ -2383,18 +2383,21 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                     end
                                     --No upgrading ACU or nearby enemies so want to retreat:
                                     if not(bAttackACU) then
-                                        if oPlatoon[refiEnemyStructuresInRange] > 0 then oPlatoon[refiCurrentAction] = refActionAttack
-                                        elseif oPlatoon[refiEnemiesInRange] > 0 then oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
+                                        local iFrontUnitRange = M27UnitInfo.GetUnitIndirectRange(oPlatoon[refoFrontUnit])
+                                        if oPlatoon[refiEnemyStructuresInRange] > 0 and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil):GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iFrontUnitRange then oPlatoon[refiCurrentAction] = refActionAttack
+                                        elseif oPlatoon[refiEnemiesInRange] > 0 and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(oPlatoon[reftEnemiesInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil):GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iFrontUnitRange then oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
                                         else
-                                            --Are there still structures near our end destination?
-                                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, oPlatoon[reftMovementPath][table.getn(oPlatoon[reftMovementPath])], oPlatoon[refiEnemySearchRadius], 'Enemy')) == true then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby structures so disbanding') end
+                                            --Are there still structures near our end destination? (defender only)
+                                            if sPlatoonName == 'M27IndirectDefender' and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, oPlatoon[reftMovementPath][table.getn(oPlatoon[reftMovementPath])], oPlatoon[refiEnemySearchRadius], 'Enemy')) == true then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': No structures around end destination') end
                                                 oPlatoon[refiCurrentAction] = refActionDisband
                                             else
                                                 --Do we have an escort that still has units in it (if not then there may be nearby enemies even if we cant see them)
-                                                if oPlatoon[refiCurrentEscortThreat] < oPlatoon[refiEscortThreatWanted] * 0.3 then
-                                                    oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
-                                                    oPlatoon[reftTemporaryMoveTarget] = aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiCurIntelLineTarget]][1]
+                                                if (oPlatoon[refiCurrentEscortThreat] or 0) <= (oPlatoon[refiEscortThreatWanted] or 0) * 0.3 then
+                                                    --Do we have intel coverage?
+                                                    if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), math.min(40, iFrontUnitRange), false)) then
+                                                        oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
+                                                    end
                                                 end
                                             end
                                         end
@@ -2939,13 +2942,26 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
 
                 --Does the platoon contain underwater or overwater land units? (for now assumes will only have 1 or the other)
                 if oPlatoon[refiCurrentUnits] > 0 then
-
-                    if oPlatoon[refiDFUnits] > 0 then
-                        if oPlatoon[reftPlatoonDFTargettingCategories] == nil then oPlatoon[reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityNormal end
+                    if oPlatoon[refiDFUnits] > 0 or sPlatoonName == 'M27GroundExperimental' then
+                        if oPlatoon[reftPlatoonDFTargettingCategories] == nil then
+                            if sPlatoonName == 'M27GroundExperimental' then
+                                oPlatoon[reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityOurGroundExperimental
+                            else --Default
+                                oPlatoon[reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityNormal
+                            end
+                        end
                         for iUnit, oUnit in oPlatoon[reftDFUnits] do
                             M27UnitInfo.SetUnitTargetPriorities(oUnit, oPlatoon[reftPlatoonDFTargettingCategories])
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Finished setting unit target priorities for all units in platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
+
+                        if sPlatoonName == 'M27GroundExperimental' then
+                            local iRange = GetUnitMaxGroundRange(oPlatoon[refiCurrentUnits])
+                            if iRange >= 60 or (M27UnitInfo.IsUnitValid(oPlatoon[refiCurrentUnits][1]) and EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refiCurrentUnits][1]:GetUnitId())) then
+                                oPlatoon[M27PlatoonTemplates.refbAttackMove] = true
+                            end
+                        end
+
                     end
                     if bPlatoonIsAUnit == true then
                         oPlatoon[refoPathingUnit] = oPlatoon
@@ -4439,12 +4455,21 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                     oPlatoon[reftMovementPath][1] = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
                 else
                     local tTargetBase = M27MapInfo.PlayerStartPoints[iEnemyStartNumber]
-                    if oPlatoon[reftMovementPath][1] == tTargetBase then
+                    if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath][1]) == true or not(oPlatoon[reftMovementPath][1][1] == tTargetBase[1] and oPlatoon[reftMovementPath][1][3] == tTargetBase[3]) then
+                        oPlatoon[reftMovementPath][1] = tTargetBase
+                    else
                         --Already targeting nearest enemy - go back to own base instead
                         oPlatoon[reftMovementPath][1] = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-                    else
-                        oPlatoon[reftMovementPath][1] = tTargetBase
                     end
+                end
+                oPlatoon[refiCurrentPathTarget] = 1
+            elseif sPlatoonName == 'M27GroundExperimental' then
+                oPlatoon[reftMovementPath] = {}
+                local tTargetBase = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tTargetBase) >= 50 then
+                    oPlatoon[reftMovementPath][1] = tTargetBase
+                else
+                    oPlatoon[reftMovementPath][1] = aiBrain[M27Overseer.reftLastNearestACU]
                 end
                 oPlatoon[refiCurrentPathTarget] = 1
             elseif sPlatoonName == 'M27IndirectSpareAttacker' then
@@ -6241,6 +6266,20 @@ function ProcessPlatoonAction(oPlatoon)
                     end
 
                 elseif oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionTemporaryRetreat then
+                    --Specific to indirect platoons - exclude T3 mobile artillery since they can take a while to redeploy so may be better just carrying on firing
+                    if oPlatoon[refiIndirectUnits] > 0 then
+                        local tNewCurrentUnits = {}
+                        local iNewCurrentUnits = 0
+                        for iUnit, oUnit in oPlatoon[reftCurrentUnits] do
+                            if M27UnitInfo.IsUnitValid(oUnit) then
+                                if not(EntityCategoryContains(M27UnitInfo.refCategoryT3MobileArtillery, oUnit:GetUnitId())) then
+                                    iNewCurrentUnits = iNewCurrentUnits + 1
+                                    tNewCurrentUnits[iNewCurrentUnits] = oUnit
+                                end
+                            end
+                        end
+                        if iNewCurrentUnits > 0 then tCurrentUnits = tNewCurrentUnits end
+                    end
                     local bTemporaryRetreat = false
                     if oPlatoon[refiCurrentAction] == refActionTemporaryRetreat then bTemporaryRetreat = true end
                     if bPlatoonNameDisplay == true then

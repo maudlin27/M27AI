@@ -950,19 +950,17 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
     if iScouts >= 25 then
         local iNonScouts = aiBrain:GetCurrentUnits(categories.MOBILE * categories.LAND - categories.SCOUT)
         if iScouts > 80 then
-            LOG('Have 80 scouts, seems higher than would expect so enabling logs')
-            bDebugMessages = true --For error identification
-        end
-        if (iScouts > 50 and iScouts > iNonScouts) or iScouts >= 120 then
-            bDebugMessages = true --For errors
-            M27Utilities.ErrorHandler('Warning possible error unless large map or lots of small platoons - more than 25 scouts, but only '..iNonScouts..' non-scouts; iScouts='..iScouts..'; turning on debug messages.  Still stop producing scouts if get to 100')
-            aiBrain[refiScoutShortfallInitialRaider] = 0
-            aiBrain[refiScoutShortfallACU] = 0
-            aiBrain[refiScoutShortfallIntelLine] = 0
-            aiBrain[refiScoutShortfallLargePlatoons] = 0
-            aiBrain[refiScoutShortfallAllPlatoons] = 0
-            aiBrain[refiScoutShortfallMexes] = 0
-            bAbort = true
+            LOG('Have 80 scouts, seems higher than would expect')
+            if iScouts > 120 and iScouts > iNonScouts then
+                M27Utilities.ErrorHandler('Warning possible error unless large map or lots of small platoons - more than 25 scouts, but only '..iNonScouts..' non-scouts; iScouts='..iScouts..'; turning on debug messages.  Still stop producing scouts if get to 100')
+                aiBrain[refiScoutShortfallInitialRaider] = 0
+                aiBrain[refiScoutShortfallACU] = 0
+                aiBrain[refiScoutShortfallIntelLine] = 0
+                aiBrain[refiScoutShortfallLargePlatoons] = 0
+                aiBrain[refiScoutShortfallAllPlatoons] = 0
+                aiBrain[refiScoutShortfallMexes] = 0
+                bAbort = true
+            end
         end
     end
     if bAbort == false then
@@ -3734,11 +3732,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         end
         local iAllUnclaimedMexesInPathingGroup = 0
 
-        local tAllUnclaimedMexesInPathingGroup = M27EngineerOverseer.GetUnclaimedMexes(aiBrain, oACU, sPathing, iPathingGroup, false, false, true)
+        local tAllUnclaimedMexesInPathingGroup = M27EngineerOverseer.GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, false, false, true)
         if M27Utilities.IsTableEmpty(tAllUnclaimedMexesInPathingGroup) == false then iAllUnclaimedMexesInPathingGroup = table.getn(tAllUnclaimedMexesInPathingGroup) end
         if bDebugMessages == true then LOG(sFunctionRef..': About to get all mexes in pathing group that we havent claimed') end
         --GetUnclaimedMexes(aiBrain, oPathingUnitBackup, sPathing, iPathingGroup, bTreatEnemyMexAsUnclaimed, bTreatOurOrAllyMexAsUnclaimed, bTreatQueuedBuildingAsUnclaimed)
-        local tAllMexesInPathingGroupWeHaventClaimed = M27EngineerOverseer.GetUnclaimedMexes(aiBrain, oACU, sPathing, iPathingGroup, true, false, true)
+        local tAllMexesInPathingGroupWeHaventClaimed = M27EngineerOverseer.GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, true, false, true)
         local iAllMexesInPathingGroupWeHaventClaimed = 0
         if M27Utilities.IsTableEmpty(tAllMexesInPathingGroupWeHaventClaimed) == false then iAllMexesInPathingGroupWeHaventClaimed = table.getn(tAllMexesInPathingGroupWeHaventClaimed) end
 

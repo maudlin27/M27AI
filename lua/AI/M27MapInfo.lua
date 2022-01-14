@@ -1082,7 +1082,7 @@ end
 
 --GetUnclaimedMexes - contained within EngineerOverseer
 
-function GetHydroLocationsForPathingGroup(oPathingUnit, sPathingType, iPathingGroup)
+function GetHydroLocationsForPathingGroup(sPathingType, iPathingGroup)
     --Return table of hydro locations for iPathingGroup
     --Return {} if no such table
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
