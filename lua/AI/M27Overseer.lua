@@ -3226,6 +3226,7 @@ function ACUManager(aiBrain)
 
                 --Did we start the upgrade <10s ago but have lost a significant amount of health?
                 if oACU[reftACURecentUpgradeProgress][iCurTime - 10] == nil and oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] > 1000 and oACU[reftACURecentUpgradeProgress][iCurTime] < 0.7 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': ACU has lost a lot of health recently, oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]) end
                     bCancelUpgradeAndRun = true
                 elseif oACU[reftACURecentUpgradeProgress][iCurTime] < 0.9 then
 
@@ -3237,7 +3238,10 @@ function ACUManager(aiBrain)
                             --ACU will be really low health or die if it keeps upgrading
                             bCancelUpgradeAndRun = true
                         end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec..'; iTimeToComplete='..iTimeToComplete..'; iTimeToComplete * iHealthLossPerSec='..iTimeToComplete * iHealthLossPerSec..'; oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]) end
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec)
                     end
+
                 end
                 if bCancelUpgradeAndRun == false then
                     --if >=3 TML nearby, then cancel upgrade
@@ -3267,6 +3271,7 @@ function ACUManager(aiBrain)
                     end
 
                     if bCancelUpgradeAndRun then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want to cancel upgrade and run') end
                         --Only actually cancel if we're not close to our base as if we're close to base then will probably die if cancel as well
                         if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[iPlayerStartNumber]) > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
                             IssueClearCommands({M27Utilities.GetACU(aiBrain)})
@@ -3381,6 +3386,20 @@ function ACUManager(aiBrain)
                                     aiBrain:AssignUnitsToPlatoon(oEscortingPlatoon, tNearbyOwnedCombat, 'Attack', 'GrowthFormation')
                                 end
                             end
+                        end
+                    end
+                end
+                --Reset flag for ACU having run (normally platoons reset when they reach their destination, but for ACU it will revert to going to enemy start)
+                if oACU:GetHealthPercent() >= 0.95 and oACU.PlatoonHandle[M27PlatoonUtilities.refbHavePreviouslyRun] then
+                    local iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
+                    if iACUMaxShield == 0 or iACUCurShield >= iACUMaxShield * 0.7 then
+                        --Large threat near ACU?
+                        local iNearbyThreat = 0
+                                                                                --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
+                        if oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] then iNearbyThreat = iNearbyThreat + M27Logic.GetCombatThreatRating(aiBrain,oACU.PlatoonHandle[M27PlatoonUtilities.reftEnemiesInRange], true) end
+                        if oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemyStructuresInRange] then iNearbyThreat = iNearbyThreat + M27Logic.GetCombatThreatRating(aiBrain,oACU.PlatoonHandle[M27PlatoonUtilities.reftEnemyStructuresInRange], true) end
+                        if iNearbyThreat <= oACU.PlatoonHandle[M27PlatoonUtilities.refiPlatoonThreatValue] * 0.5 then
+                            oACU.PlatoonHandle[M27PlatoonUtilities.refbHavePreviouslyRun] = false
                         end
                     end
                 end

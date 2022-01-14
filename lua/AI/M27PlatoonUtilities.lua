@@ -19,7 +19,7 @@ local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 --1) Action related
 refiCurrentAction = 'M27CurrentAction'
 reftPrevAction = 'M27PrevAction'
-refbHavePreviouslyRun = 'M27HavePreviouslyRun' --True if platoon has been given refactionrun, or in most cases when it's been told to go to a rally point (if its due to enemy threats); Resets to false if platoon completes its movement path
+refbHavePreviouslyRun = 'M27HavePreviouslyRun' --True if platoon has been given refactionrun, or in most cases when it's been told to go to a rally point (if its due to enemy threats); Resets to false if platoon completes its movement path (or in the case of ACU if it looks like ACU is safe)
 refbForceActionRefresh = 'M27ForceActionRefresh' --E.g. used by overseer the first time a platoon is given a command
 refiGameTimeOfLastRefresh = 'M27ForceActionRefresh' --so other code can reference to avoid forcing a refresh too often
 refActionAttack = 1
@@ -314,6 +314,7 @@ function MoveAlongPath(oPlatoon, tMovementPath, bAttackMove, iPathStartPoint, bD
         local tLocation = {}
         if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Start of function; iPathStartPoint='..iPathStartPoint..'; tMovementPath size='..table.getn(tMovementPath)..'; currentunits='..table.getn(oPlatoon[reftCurrentUnits])) end
         local bMoveInFormation = ShouldPlatoonMoveInFormation(oPlatoon, bAttackMove)
+        if bDebugMessages == true then LOG(sFunctionRef..': iPathStartPoint='..iPathStartPoint..'; Size of movementpath='..table.getn(tMovementPath)) end
         for iCurPath = iPathStartPoint, table.getn(tMovementPath) do
             --for iLoc, tLocation in tMovementPath do
             tLocation = tMovementPath[iCurPath]
@@ -2256,9 +2257,10 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 if bDontChangeCurrentAction == false then
                     if oPlatoon[refbACUInPlatoon] == true then
                         if oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] > 0 and oPlatoon[refiCurrentAction] == nil then
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to issue attack order to ACU as bDontChangeCurrentAction is false') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to issue attack order to ACU as bDontChangeCurrentAction is false, unless have previously run; oPlatoon[refbHavePreviouslyRun]='..tostring(oPlatoon[refbHavePreviouslyRun])) end
                             if oPlatoon[refbHavePreviouslyRun] == false then
                                 oPlatoon[refiCurrentAction] = refActionAttack
+                            elseif bDebugMessages == true then LOG(sFunctionRef..': Have previously run so dont actually want to attack')
                             end
                         end
                     else
@@ -4487,6 +4489,11 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                     end
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': setting new movement path for M27ACUMain') end
+
+                    oPlatoon[reftMovementPath] = {}
+                    oPlatoon[reftMovementPath][1] = {}
+                    oPlatoon[refiCurrentPathTarget] = 1
+
                     --Do we want to assist a hydro?
                     local bMoveToHydro = false
                     --Check if is a hydro near the ACU
@@ -4515,9 +4522,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                         local iHydroSize = M27UnitInfo.GetBuildingSize('UAB1102')[1]
                         if iMinHydroDistance <= (iBuildDistance + iHydroSize*0.5) then
                             --Give a dummy path so dont call this again immediately
-                            oPlatoon[reftMovementPath] = {}
                             oPlatoon[reftMovementPath][1] = tCurPosition
-                            oPlatoon[refiCurrentPathTarget] = 1
                             if M27Utilities.GetACU(aiBrain):IsUnitState('Building') == true or M27Utilities.GetACU(aiBrain):IsUnitState('Repairing') == true then
                                 --Do nothing
                                 bDontActuallyMove = true
@@ -4535,9 +4540,6 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                 bDontActuallyMove = true
                             end
                         else
-                            oPlatoon[reftMovementPath] = {}
-                            oPlatoon[reftMovementPath][1] = {}
-
                             if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..': about to call MoveNearConstruction') end
                             --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
                             oPlatoon[reftMovementPath][1] = MoveNearConstruction(aiBrain, M27Utilities.GetACU(aiBrain), tNearestHydro, 'UAB1102', 0, true, false, false)
@@ -4573,9 +4575,9 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                 else oPlatoon[reftMovementPath][1] = tTargetBase
                                 end
                             end
-                            oPlatoon[refiCurrentPathTarget] = 1
                         end
                     end
+                    if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath]) == true then M27Utilities.ErrorHandler('Platoon containing ACU has no movement path') end
                 end
             elseif sPlatoonName == 'M27RetreatingShieldUnits' then
                 oPlatoon[reftMovementPath][1] = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]

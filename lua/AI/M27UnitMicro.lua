@@ -340,12 +340,46 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and oUnit:GetHealthPercent() > 0.3 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) > (M27Logic.GetUnitMaxGroundRange({oUnit}) - 8) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) < 32 then
                                     --Dont dodge in case we can no longer attack ACU
                                 else
-                                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then iTimeToRun = math.max(iTimeToRun, 2) end
-                                    if oUnit[M27UnitInfo.refbSpecialMicroActive] then
-                                        MoveInCircleTemporarily(oUnit, iTimeToRun)
-                                    else
-                                        MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tBombTarget)
-                                        oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
+                                    --If ACU is upgrading might not want to cancel
+                                    local bIgnoreAsUpgrading = false
+                                    if oUnit:IsUnitState('Upgrading') then
+                                        --Are we facing a T1 bomb?
+                                        if EntityCategoryContains(categories.TECH1, oBomber:GetUnitId()) then
+                                            bIgnoreAsUpgrading = true
+                                        else
+                                            --Facing T2+ bomb, so greater risk if we dont try and dodge; dont dodge if are almost complete
+                                            if oUnit:GetWorkProgress() >= 0.9 then
+                                                bIgnoreAsUpgrading = true
+                                            else
+                                                --Is it a T2 bomber, and there arent many bombers nearby?
+                                                if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then
+                                                    local tNearbyBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oUnit:GetPosition(), 100, 'Enemy')
+                                                    if M27Utilities.IsTableEmpty(tNearbyBombers) == true then
+                                                        bIgnoreAsUpgrading = true
+                                                    else
+                                                        local iEnemyBomberCount = 0
+                                                        for iEnemy, oEnemy in tNearbyBombers do
+                                                            if M27UnitInfo.IsUnitValid(oEnemy) then
+                                                                iEnemyBomberCount = iEnemyBomberCount + 1
+                                                                if iEnemyBomberCount >= 4 then break end
+                                                            end
+                                                        end
+                                                        if iEnemyBomberCount < 4 then bIgnoreAsUpgrading = true end
+
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': bIgnoreAsUpgrading='..tostring(bIgnoreAsUpgrading)) end
+                                    if not(bIgnoreAsUpgrading) then
+                                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then iTimeToRun = math.max(iTimeToRun, 2) end
+                                        if oUnit[M27UnitInfo.refbSpecialMicroActive] then
+                                            MoveInCircleTemporarily(oUnit, iTimeToRun)
+                                        else
+                                            MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tBombTarget)
+                                            oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
+                                        end
                                     end
                                 end
                             else
