@@ -7,7 +7,6 @@ local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27FactoryOverseer = import('/mods/M27AI/lua/AI/M27FactoryOverseer.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
-local AIBuildStructures = import('/lua/AI/aibuildstructures.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 
@@ -941,47 +940,68 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
     if bDebugMessages == true then
         LOG(sFunctionRef..': About to start checking for spare engi actions for engi with unique ref='..GetEngineerUniqueCount(oEngineer)..'; iMassStoredRatio='..iMassStoredRatio)
     end
-    if iMassStoredRatio < 0.60 and aiBrain:GetEconomyStored('MASS') < 5000 then
-        local oReclaim = M27MapInfo.GetNearestReclaim(tEngineerPosition, iCurSearchDistance, 2)
-        --Setting min value to 1 caused issue with wall segment
-        if not(oReclaim == nil) then
+
+    local tLocationToSearchFrom
+    local iDistToStart = M27Utilities.GetDistanceBetweenPositions(tEngineerPosition,M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+    if iDistToStart <= 30 then tLocationToSearchFrom = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] else tLocationToSearchFrom = tEngineerPosition end
+
+    --Check if we have a reasonable amount of power
+    local iNetCurEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]
+    local iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
+    local iEnergyPercentStorage = aiBrain:GetEconomyStoredRatio('ENERGY')
+    local bHaveLowPower = false
+    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+        iCurSearchDistance = 70
+        if iNetCurEnergyIncome < 2 or iEnergyPercentStorage < 0.98 then bHaveLowPower = true end
+    else
+        if iNetCurEnergyIncome < 0 and iEnergyPercentStorage < 0.9 then bHaveLowPower = true
+        elseif iEnergyPercentStorage < 0.2 then bHaveLowPower = true end
+    end
+
+    local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
+    local bACUIsUpgrading = false
+    local oACU = M27Utilities.GetACU(aiBrain)
+    if oACU:IsUnitState('Upgrading') then bACUIsUpgrading = true end
+    local iCategoryToSearchFor = M27UnitInfo.refCategoryStructure
+    if bHaveLowPower then
+        iCurSearchDistance = math.max(iCurSearchDistance, 50)
+        iCategoryToSearchFor = refCategoryPower
+    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iCategoryToSearchFor = refCategoryPower + refCategoryAirFactory
+    end
+
+    --Help ACU if its nearby and upgrading
+    if bACUIsUpgrading and not(bHaveLowPower) then
+        local iDistToACU = M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), oACU:GetPosition())
+        local iSpeed = oEngineer:GetBlueprint().Physics.MaxSpeed
+        local iTimeToGetToACU = iDistToACU / iSpeed
+        local iCurGameTime = math.floor(GetGameTimeSeconds())
+        local iTimeForACUToCompleteUpgrade
+        if oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 11] then
+            iTimeForACUToCompleteUpgrade = (1 - oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 1]) / (oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 1] - oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 11]) / 10
+        else
+            --ACU must have only just started, so assume it will complete based on its build power
+            iTimeForACUToCompleteUpgrade = (M27UnitInfo.GetUpgradeBuildTime(oACU, oACU[M27UnitInfo.refsUpgradeRef]) or 1) / oACU:GetBlueprint().Economy.BuildRate
+        end
+        if iTimeToGetToACU * 1.1 < iTimeForACUToCompleteUpgrade then
+            --Help ACU
             bHaveAction = true
-            tTempTarget = oReclaim:GetPosition()
-            IssueAggressiveMove({oEngineer}, tTempTarget )
-            if bDebugMessages == true then LOG(sFunctionRef..': Have nearby reclaim, at location '..repr(tTempTarget)) end
+            IssueGuard({oEngineer}, oACU)
         end
     end
-    local iDistToStart = M27Utilities.GetDistanceBetweenPositions(tEngineerPosition,M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
 
     if bHaveAction == false then
-
-        local tLocationToSearchFrom
-        if iDistToStart <= 30 then tLocationToSearchFrom = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] else tLocationToSearchFrom = tEngineerPosition end
-
-        --Check if we have a reasonable amount of power
-        local iNetCurEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]
-        local iEnergyStored = aiBrain:GetEconomyStored('ENERGY')
-        local iEnergyPercentStorage = aiBrain:GetEconomyStoredRatio('ENERGY')
-        local bHaveLowPower = false
-        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
-            iCurSearchDistance = 70
-            if iNetCurEnergyIncome < 2 or iEnergyPercentStorage < 0.98 then bHaveLowPower = true end
-        else
-            if iNetCurEnergyIncome < 0 and iEnergyPercentStorage < 0.9 then bHaveLowPower = true
-            elseif iEnergyPercentStorage < 0.2 then bHaveLowPower = true end
+        if iMassStoredRatio < 0.60 and aiBrain:GetEconomyStored('MASS') < 5000 then
+            local oReclaim = M27MapInfo.GetNearestReclaim(tEngineerPosition, iCurSearchDistance, 2)
+            --Setting min value to 1 caused issue with wall segment
+            if not(oReclaim == nil) then
+                bHaveAction = true
+                tTempTarget = oReclaim:GetPosition()
+                IssueAggressiveMove({oEngineer}, tTempTarget )
+                if bDebugMessages == true then LOG(sFunctionRef..': Have nearby reclaim, at location '..repr(tTempTarget)) end
+            end
         end
-
-        local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
-        local bACUIsUpgrading = false
-        local oACU = M27Utilities.GetACU(aiBrain)
-        if oACU:IsUnitState('Upgrading') then bACUIsUpgrading = true end
-        local iCategoryToSearchFor = M27UnitInfo.refCategoryStructure
-        if bHaveLowPower then
-            iCurSearchDistance = math.max(iCurSearchDistance, 50)
-            iCategoryToSearchFor = refCategoryPower
-        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iCategoryToSearchFor = refCategoryPower + refCategoryAirFactory
-        end
-
+    end
+    if bHaveAction == false then
         if not(bACUIsUpgrading and bHaveLowMass) then
             tNearbyBuildings = aiBrain:GetUnitsAroundPoint(iCategoryToSearchFor, tLocationToSearchFrom, iCurSearchDistance, 'Ally')
             if M27Utilities.IsTableEmpty(tNearbyBuildings) == false then
@@ -2109,6 +2129,7 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
     --returns true if it triggers an issuereclaim order
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateActionForNearbyReclaim'
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Considering for E'..GetEngineerUniqueCount(oEngineer)..' LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' with unit state='..M27Logic.GetUnitState(oEngineer)) end
@@ -3192,8 +3213,11 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
             if iHighestFactoryOrEngineerTechAvailable >= 3 then
                 iLowPowerThreshold = 40
-                iEnergyBufferMassFactorWanted = 30--t3 mex needs 7 power for every 1 mass; titan needs 11, t3 strat 69
-                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iEnergyBufferMassFactorWanted = 50 end
+                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iEnergyBufferMassFactorWanted = 50
+                else
+                    --Increase based on number of T3 air factories we have - --t3 mex needs 7 power for every 1 mass; titan needs 11, t3 strat 69
+                    iEnergyBufferMassFactorWanted = math.min(50,15 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH3) * 5)
+                end
                 iAbsolutePowerBufferWanted = 250 --2500
                 iExtraEngisForPowerBasedOnTech = 5
             elseif iHighestFactoryOrEngineerTechAvailable == 2 then
@@ -3219,6 +3243,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 --is true by default
                 if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > iPowerWantedPerTick then bWantMorePower = false end
             end
+
+            if bDebugMessages == true then LOG(sFunctionRef..': Power calcs: bHaveLowPower='..tostring(bHaveLowPower)..'; bWantMorePower='..tostring(bWantMorePower)..'; iPowerWantedPerTick='..iPowerWantedPerTick..'; iNetCurEnergyIncome='..iNetCurEnergyIncome..'; % energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; iEnergyBufferMassFactorWanted='..iEnergyBufferMassFactorWanted..'; iGrossMassIncome='..iGrossMassIncome) end
 
 
 

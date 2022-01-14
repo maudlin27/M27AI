@@ -24,6 +24,7 @@ refbSpecialMicroActive = 'M27UnitSpecialMicroActive' --e.g. if dodging bombers
 refiGameTimeToResetMicroActive = 'M27UnitGameTimeToResetMicro'
 refiGameTimeMicroStarted = 'M27UnitGameTimeMicroStarted'
 refbOverchargeOrderGiven = 'M27UnitOverchargeOrderGiven'
+refsUpgradeRef = 'M27UnitUpgradeRef' --If ACU starts an upgrade, it records the string reference here
 
 --Factions
 refFactionUEF = 1
@@ -391,6 +392,10 @@ function GetCurrentAndMaximumShield(oUnit)
             iCurShield = (oUnit:GetShieldRatio(false) or 0) * iMaxShield
         end
     end
+    if iCurShield > 0 then
+        --GetHealth doesnt look like it factors in power stall
+        if oUnit:GetAIBrain():GetEconomyStored('ENERGY') == 0 then iCurShield = 0 end
+    end
     if bDebugMessages == true then
         LOG(sFunctionRef..': iCurShield='..iCurShield..'; iMaxShield='..iMaxShield..'; ShieldRatio False='..oUnit:GetShieldRatio(false)..'; ShieldRatio true='..oUnit:GetShieldRatio(true)..' iCurShield='..iCurShield)
         if oUnit.MyShield then LOG('Unit has MyShield; IsUp='..tostring(oUnit.MyShield:IsUp())..'; shield health='..oUnit.MyShield:GetHealth()) end
@@ -460,4 +465,17 @@ function GetUnitAARange(oUnit)
         end
     end
     return iMaxRange
+end
+
+function GetUpgradeBuildTime(oUnit, sUpgradeRef)
+    local oBP = oUnit:GetBlueprint()
+    local iUpgradeTime
+    for sUpgradeID, tUpgrade in oBP.Enhancements do
+        if sUpgradeID == sUpgradeRef then
+            iUpgradeTime = tUpgrade.BuildTime
+        end
+
+    end
+    if not(iUpgradeTime) then M27Utilities.ErrorHandler('oUnit '..oUnit:GetUnitId()..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
+    return iUpgradeTime
 end

@@ -895,7 +895,7 @@ function UpgradeMainLoop(aiBrain)
                 if bDebugMessages == true then LOG(sFunctionRef..': Got category to upgrade') end
                 oUnitToUpgrade = GetUnitToUpgrade(aiBrain, iCategoryToUpgrade, tStartPosition)
                 if oUnitToUpgrade == nil then
-                    M27Utilities.ErrorHandler('Couldnt find unit to upgrade, will try searching for other options as backup',nil, true)
+                    --One likely explanation for htis is that there are enemies near the units of the category wanted
                     if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find unit to upgrade, will revert to default categories, starting with T1 mex') end
                     oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryT1Mex, tStartPosition)
                     if oUnitToUpgrade == nil then
@@ -913,6 +913,12 @@ function UpgradeMainLoop(aiBrain)
                                     if oUnitToUpgrade == nil then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Will look for T2 air factory') end
                                         oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryAirFactory * categories.TECH2, tStartPosition)
+                                        if oUnitToUpgrade == nil then
+                                            --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
+                                            if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 100 then
+                                                M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; nearest enemy to base='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat],nil, true)
+                                            end
+                                        end
                                     end
                                 end
                             end

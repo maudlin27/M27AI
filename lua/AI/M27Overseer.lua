@@ -34,6 +34,8 @@ iDistanceFromBaseWhenVeryLowHealthToBeSafe = 25 --As above but when ACU on lower
 refiACUHealthToRunOn = 'M27ACUHealthToRunOn'
 iACUEmergencyHealthPercentThreshold = 0.3
 iACUGetHelpPercentThreshold = 0.6
+reftACURecentHealth = 'M27ACURecentHealth' --Records the ACU health every second - attached to ACU object
+reftACURecentUpgradeProgress = 'M27ACURecentUpgradeProgress' --[gametimesecond] - Records the % upgrade every second the ACU is upgrading, by gametimesecond
 
 --Threat groups:
 
@@ -142,7 +144,7 @@ refiOurHighestAirFactoryTech = 'M27OverseerOurHighestAirFactoryTech'
 
 
 --Helper related
-refoUnitsScoutHelper = 'M27UnitsScoutHelper'
+refoUnitsScoutHelperPlatoon = 'M27UnitsScoutHelper'
 refoUnitsMAAHelper = 'M27UnitsMAAHelper' --MAA platoon assigned to help a unit (e.g. the ACU)
 
 
@@ -535,7 +537,7 @@ function GetNearestMAAOrScout(aiBrain, tPosition, bScoutNotMAA, bDontTakeFromIni
     local iUnitCategoryWanted, sPlatoonHelperRef
     if bScoutNotMAA == true then
         iUnitCategoryWanted = M27UnitInfo.refCategoryLandScout
-        sPlatoonHelperRef = refoUnitsScoutHelper
+        sPlatoonHelperRef = refoUnitsScoutHelperPlatoon
     else
         iUnitCategoryWanted = M27UnitInfo.refCategoryMAA
         sPlatoonHelperRef = refoUnitsMAAHelper
@@ -669,7 +671,7 @@ function AssignHelperToPlatoonOrUnit(oHelperToAssign, oPlatoonOrUnitNeedingHelp,
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local aiBrain = oHelperToAssign:GetAIBrain()
     local sPlanWanted = 'M27ScoutAssister'
-    local refHelper = refoUnitsScoutHelper
+    local refHelper = refoUnitsScoutHelperPlatoon
     local bUnitNotPlatoon = false
     if oPlatoonOrUnitNeedingHelp.PlatoonHandle or oPlatoonOrUnitNeedingHelp.GetUnitId then bUnitNotPlatoon = true end
     if bScoutNotMAA == false then
@@ -997,8 +999,8 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                             local tRaiderScouts = EntityCategoryFilterDown(refCategoryLandScout, tRaiders)
                                             local bHaveScout = false
                                             if M27Utilities.IsTableEmpty(tRaiderScouts) == false then bHaveScout = true
-                                            elseif oPlatoon[refoUnitsScoutHelper] then
-                                                tRaiderScouts = oPlatoon[refoUnitsScoutHelper]:GetPlatoonUnits()
+                                            elseif oPlatoon[refoUnitsScoutHelperPlatoon] then
+                                                tRaiderScouts = oPlatoon[refoUnitsScoutHelperPlatoon]:GetPlatoonUnits()
                                                 if M27Utilities.IsTableEmpty(tRaiderScouts) == false then bHaveScout = true end
                                             end
                                             if bHaveScout == false then
@@ -1045,14 +1047,14 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                     --===========ACU Scout helper--------------------------
                     --We have more than enough scouts to cover initial raiders; next priority is the ACU
                     local bACUNeedsScoutHelper = true
-                    if not(M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelper] == nil) then
+                    if not(M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon] == nil) then
                         --A scout helper was assigned, check if it still exists
-                        if M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelper] and aiBrain:PlatoonExists(M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelper]) then
+                        if M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon] and aiBrain:PlatoonExists(M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon]) then
                             --Platoon still exists; does it have the right aiplan?
-                            local sScoutHelperName = M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelper]:GetPlan()
+                            local sScoutHelperName = M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon]:GetPlan()
                             if sScoutHelperName and sScoutHelperName == 'M27ScoutAssister' then
                                 --does it have a scout in it?
-                                local tACUScout = M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelper]:GetPlatoonUnits()
+                                local tACUScout = M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon]:GetPlatoonUnits()
                                 if M27Utilities.IsTableEmpty(tACUScout) == false then
                                     if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(refCategoryLandScout, tACUScout)) == false then
                                         bACUNeedsScoutHelper = false
@@ -1475,8 +1477,8 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                         local bPlatoonHasScouts = false
                                         tPlatoonCurrentScouts = EntityCategoryFilterDown(refCategoryLandScout, tPlatoonUnits)
                                         if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then bPlatoonHasScouts = true
-                                        elseif oPlatoon[refoUnitsScoutHelper] and oPlatoon[refoUnitsScoutHelper].GetPlatoonUnits then
-                                            tPlatoonCurrentScouts = oPlatoon[refoUnitsScoutHelper]:GetPlatoonUnits()
+                                        elseif oPlatoon[refoUnitsScoutHelperPlatoon] and oPlatoon[refoUnitsScoutHelperPlatoon].GetPlatoonUnits then
+                                            tPlatoonCurrentScouts = oPlatoon[refoUnitsScoutHelperPlatoon]:GetPlatoonUnits()
                                             if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then bPlatoonHasScouts = true end
                                         end
                                         if bPlatoonHasScouts == false then
@@ -2861,6 +2863,13 @@ function ACUManager(aiBrain)
 
     if not(aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)
+
+        --Track ACU health over time
+        if not(oACU[reftACURecentHealth]) then oACU[reftACURecentHealth] = {} end
+        local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
+        local iCurTime = math.floor(GetGameTimeSeconds())
+        oACU[reftACURecentHealth][iCurTime] = oACU:GetHealth() + iCurShield
+
         if oACU[refbACUOnInitialBuildOrder] == false then
             if bDebugMessages == true then LOG(sFunctionRef..': Start of code - ACU isnt on initial build order') end
             --Config related
@@ -3208,28 +3217,58 @@ function ACUManager(aiBrain)
 
 
 
-                    --==========ACU Run away logic
+    --==========ACU Run away and cancel upgrade logic
+            --Is the ACU upgrading?
+            if oACU:IsUnitState('Upgrading') then
+                local bCancelUpgradeAndRun = false
+                if not(oACU[reftACURecentUpgradeProgress]) then oACU[reftACURecentUpgradeProgress] = {} end
+                oACU[reftACURecentUpgradeProgress][iCurTime] = oACU:GetWorkProgress()
 
-            --If ACU upgrading and >=3 TML nearby, then cancel upgrade
-            if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false and oACU:IsUnitState('Upgrading') then
-                --Abort ACU upgrade if >=3 TML and its not safe to upgrade
-                local iEnemyTML = 0
-                for iUnit, oUnit in aiBrain[reftEnemyTML] do
-                    if M27UnitInfo.IsUnitValid(oUnit) then
-                        iEnemyTML = iEnemyTML + 1
+                --Did we start the upgrade <10s ago but have lost a significant amount of health?
+                if oACU[reftACURecentUpgradeProgress][iCurTime - 10] == nil and oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] > 1000 and oACU[reftACURecentUpgradeProgress][iCurTime] < 0.7 then
+                    bCancelUpgradeAndRun = true
+                elseif oACU[reftACURecentUpgradeProgress][iCurTime] < 0.9 then
+
+                    --Based on how our health has changed over the last 10s vs the upgrade progress, are we likely to die?
+                    local iHealthLossPerSec = (oACU[reftACURecentHealth][iCurTime-10] - oACU[reftACURecentHealth][iCurTime])/10
+                    if iHealthLossPerSec > 50 then --If changing these values, consider updating the SafeToGetACUUpgrade thresholds
+                        local iTimeToComplete = (1 - oACU[reftACURecentUpgradeProgress][iCurTime]) / ((oACU[reftACURecentUpgradeProgress][iCurTime] - oACU[reftACURecentUpgradeProgress][iCurTime - 10]) / 10)
+                        if iTimeToComplete * iHealthLossPerSec > math.min(oACU[reftACURecentHealth][iCurTime] * 0.9, oACU:GetMaxHealth() * 0.7) then
+                            --ACU will be really low health or die if it keeps upgrading
+                            bCancelUpgradeAndRun = true
+                        end
                     end
                 end
-                if iEnemyTML >= 3 then
-                    if M27Conditions.SafeToGetACUUpgrade(aiBrain) == false and oACU:GetWorkProgress() < 0.85 then
-                        --Double-check all 3 TML are in-range, since safetoget upgrade only uses threshold of 2
-                        iEnemyTML = 0
+                if bCancelUpgradeAndRun == false then
+                    --if >=3 TML nearby, then cancel upgrade
+                    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false then
+                        --Abort ACU upgrade if >=3 TML and its not safe to upgrade
+                        local iEnemyTML = 0
                         for iUnit, oUnit in aiBrain[reftEnemyTML] do
-                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tACUPos) <= 259 then
+                            if M27UnitInfo.IsUnitValid(oUnit) then
                                 iEnemyTML = iEnemyTML + 1
                             end
                         end
                         if iEnemyTML >= 3 then
-                            --Abort upgrade
+                            if M27Conditions.SafeToGetACUUpgrade(aiBrain) == false and oACU:GetWorkProgress() < 0.85 then
+                                --Double-check all 3 TML are in-range, since safetoget upgrade only uses threshold of 2
+                                iEnemyTML = 0
+                                for iUnit, oUnit in aiBrain[reftEnemyTML] do
+                                    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tACUPos) <= 259 then
+                                        iEnemyTML = iEnemyTML + 1
+                                    end
+                                end
+                                if iEnemyTML >= 3 then
+                                    --Abort upgrade
+                                    bCancelUpgradeAndRun = true
+                                end
+                            end
+                        end
+                    end
+
+                    if bCancelUpgradeAndRun then
+                        --Only actually cancel if we're not close to our base as if we're close to base then will probably die if cancel as well
+                        if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[iPlayerStartNumber]) > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
                             IssueClearCommands({M27Utilities.GetACU(aiBrain)})
                             IssueMove({oACU}, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos))
                         end
@@ -3237,16 +3276,18 @@ function ACUManager(aiBrain)
                 end
             end
 
+
             local iHealthPercentage = oACU:GetHealthPercent()
-            local bRunAway = false
+            --[[local bRunAway = false
             local bNewPlatoon = true
-            local oNewPlatoon
-
-
+            local oNewPlatoon--]]
 
             if bIncludeACUInAttack == false and iHealthPercentage <= iACUGetHelpPercentThreshold then
                 bWantEscort = true
                 bEmergencyRequisition = true
+            end
+            --Below code superceded now that we use ACUMainAI for everything which has its built in logic to run
+            --[[
                 if bDebugMessages == true then LOG(sFunctionRef..': ACU low on health so forcing it to run to base unless its already there') end
 
                 local iPlayerStartNumber = aiBrain.M27StartPositionNumber
@@ -3259,13 +3300,8 @@ function ACUManager(aiBrain)
                     end
                 end
             else
-                --Not low health
-                if oACU:IsUnitState('Upgrading') then bWantEscort = true
-                else
-                    if iHealthPercentage >= 0.8 then
-                        if oACUPlatoon then oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = false end
-                    end
-                end
+                --Not low health so no longer want escort
+                if not(oACU:IsUnitState('Upgrading')) and iHealthPercentage >= 0.8 and oACUPlatoon then oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = false end
             end
 
             if bRunAway == true and not(sACUPlan == 'M27ACUMain') then --M27ACUMain now has logic for the ACU to run built into it (so this isnt needed if runing M27ACUMain); have also replaced almost all uses of non-M27Main logic for ACU (including defender and initial build order) so below likely no longer relevant
@@ -3302,7 +3338,7 @@ function ACUManager(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Forcing action refresh') end
                     M27PlatoonUtilities.ForceActionRefresh(oNewPlatoon, 5)
                 end
-            end
+            end--]]
             if oACUPlatoon then
                 oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = bWantEscort
                 if bEmergencyRequisition and not(bAllInAttack) then
@@ -3705,6 +3741,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         else
             aiBrain[refiOurHighestAirFactoryTech] = 1
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Number of tech2 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2)..'; Number of tech3 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3)..'; iHighestTechLevel='..iHighestTechLevel..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]..'; aiBrain[refiOurHighestAirFactoryTech]='..aiBrain[refiOurHighestAirFactoryTech]) end
 
         --Want below variables for both the game state table and to decide whether to eco:
         local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
@@ -3787,7 +3824,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                     local tNearbyGroundAA, iShieldRadius
                     for iShield, oShield in tEnemyFixedShields do
                         if M27UnitInfo.IsUnitValid(oShield) then
-                            tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, oShield:GetPosition(), oShield:GetBlueprint().Defense.Shield.ShieldSize, 'Enemy')
+                            tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, oShield:GetPosition(), oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5 + 1, 'Enemy')
                             if M27Utilities.IsTableEmpty(tNearbyGroundAA) == false then
                                 for iGroundAA, oGroundAA in tNearbyGroundAA do
                                     if M27UnitInfo.IsUnitValid(oGroundAA) then
@@ -3835,12 +3872,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                                 bWantToEco = true
                             else
                                 if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
-                                    --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks
-                                    if iLandCombatUnits >= 40 then
-                                        if bWantToEco == false or aiBrain[refiOurHighestFactoryTechLevel] <= 2 then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have tech 3 and/or have lots of land with no big threats and not making use of land factories so will eco') end
-                                            bWantToEco = true
-                                        end
+                                    --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
+                                    if iLandCombatUnits >= 40 and aiBrain[refiOurHighestFactoryTechLevel] <= 2 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have tech 3 and/or have lots of land with no big threats and not making use of land factories so will eco') end
+                                        bWantToEco = true
                                     end
                                 end
                             end

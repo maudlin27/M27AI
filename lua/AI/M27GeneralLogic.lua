@@ -1462,9 +1462,18 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                             if bDebugMessages == true then LOG('iUnit='..iUnit..'; IsSeenEver is false; have a structure so will be reduced threat') end
                                             iCurThreat = 0
                                         else
-                                            if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not') end
-                                            if iTotalUnits <= 1 then iCurThreat = (iSoloBlipMassOverride or 10)
-                                            else iCurThreat = (iMassValueOfBlipsOverride or 54) end
+                                            --Specific speed checks
+                                            if oUnit.GetBlueprint and oUnit:GetBlueprint().Physics.MaxSpeed == 1.9 then
+                                                --Unit is same speed as engineer so more likely tahn not its an engineer
+                                                iCurThreat = 10
+                                            elseif oUnit.GetBlueprint and oUnit:GetBlueprint().Physics.MaxSpeed == 1.7 then
+                                                --Unit is same speed as ACU so more likely than not its an ACU
+                                                iCurThreat = 800
+                                            else
+                                                if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not') end
+                                                if iTotalUnits <= 1 then iCurThreat = (iSoloBlipMassOverride or 54)
+                                                else iCurThreat = (iMassValueOfBlipsOverride or 54) end
+                                            end
                                         end
                                     end
                                 end
@@ -1545,7 +1554,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     --bIncludeNonCombatAir - adds threat value for transports and scouts
     --bIncludeAirTorpedo - Adds threat for torpedo bombers
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'GetCombatThreatRating'
+    local sFunctionRef = 'GetAirThreatLevel'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iStructureBlipThreat = 0 --Assumes an unrevealed structure has no threat rating
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
@@ -1625,6 +1634,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
             if bDebugMessages == true then LOG(sFunctionRef..': About to check if unit is dead') end
             if not(oUnit.Dead) then
                 sCurUnitPathing = M27UnitInfo.GetUnitPathingType(oUnit)
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering threat calculation for oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                 if oUnit:GetAIBrain() == aiBrain then
                     bOurUnits = true
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and has same ai brain so will determine actual threat') end
@@ -2859,6 +2869,7 @@ function IsLineBlocked(tShotStartPosition, tShotEndPosition)
             if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
                 if bDebugMessages == true then LOG(sFunctionRef..': Shot blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
                 bShotIsBlocked = true
+                M27Utilities.DrawLocation(tTerrainPositionAtPoint, nil, 5, 10)
                 break
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Shot not blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
@@ -3001,14 +3012,25 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
                 iCurShieldRadius = 0
                 if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
                     if bDebugMessages == true then LOG(sFunctionRef..': Target has a shield, will check its shield size and how close that is to the target') end
-                    iCurShieldRadius = oCurUnitBP.Defense.Shield.ShieldSize
+                    iCurShieldRadius = oCurUnitBP.Defense.Shield.ShieldSize * 0.5
                     if iCurShieldRadius > 0 then
                         iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
-                        if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius..'; shield position='..repr(oUnit:GetPosition())..'; target position='..repr(tTargetPos)) end
                         if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
-                            if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target') end
-                            bUnderShield = true
-                            break
+                            if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check if its active (if its under construction will assume it will be active') end
+                            if oUnit:GetFractionComplete() < 1 then
+                                bUnderShield = true
+                                break
+                            else
+                                local iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+
+                                if bDebugMessages == true then LOG(sFunctionRef..': Shield curhealth='..iShieldCurHealth..'; ShieldMaxHealth='..iShieldMaxHealth) end
+                                if iShieldCurHealth > 100 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Shield health more than 100 so is active') end
+                                    bUnderShield = true
+                                    break
+                                end
+                            end
                         end
                     elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
                     end

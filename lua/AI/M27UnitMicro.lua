@@ -520,6 +520,14 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                                 break
                             end
                         end
+                    else
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': No T2PlusOrNavy in range of '..iACURange)
+                            local tNearbyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, tUnitPosition, iACURange, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tNearbyNavy) == false then
+                                M27Utilities.ErrorHandler('Have nearby navy despite not showing up in tEnemyT2Plus')
+                            end
+                        end
                     end
                     if oOverchargeTarget == nil then
                         local tEnemyPossibleTargets = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE + categories.STRUCTURE - categories.COMMAND - categories.FACTORY * categories.STRUCTURE, tUnitPosition, iACURange, 'Enemy')

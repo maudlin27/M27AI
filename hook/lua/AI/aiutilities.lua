@@ -1,4 +1,5 @@
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
+local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 
 local M27EngineerTryReclaimCaptureArea = EngineerTryReclaimCaptureArea
 function EngineerTryReclaimCaptureArea(aiBrain, eng, pos, iAreaSize)

@@ -45,9 +45,9 @@ end
 
 function OnUnitDeath(oUnit)
     --NOTE: This is called by the death of any unit of any player, so careful with what commands are given
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
     local sFunctionRef = 'OnUnitDeath'
-    if bDebugMessages == true then LOG(sFunctionRef..'Hook successful') end
+    --if bDebugMessages == true then LOG(sFunctionRef..'Hook successful') end
     --Is it an ACU?
     if M27Utilities.IsACU(oUnit) then
         M27Overseer.iACUDeathCount = M27Overseer.iACUDeathCount + 1
@@ -93,7 +93,7 @@ end
 
 function OnDamaged(self, instigator)
 
-
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if self.GetUnitId then
         if self.GetAIBrain and not(self.Dead) then
             local aiBrain = self:GetAIBrain()
@@ -104,6 +104,7 @@ function OnDamaged(self, instigator)
                 if M27Utilities.IsACU(self) and self == M27Utilities.GetACU(aiBrain) then
                     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
                     local sFunctionRef = 'OnDamage'
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU has just taken damage, checking if can see the unit that damaged it') end
                     --Do we have a unit that damaged us?
                     local oUnitCausingDamage
@@ -145,6 +146,7 @@ function OnDamaged(self, instigator)
                             end
                         end
                     end
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 end
                 --General logic for shields so are very responsive with micro
                 if self.MyShield and self.MyShield.GetHealth and self.MyShield:GetHealth() < 100 and EntityCategoryContains((M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryPersonalShield) * categories.MOBILE, self) then
