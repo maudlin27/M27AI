@@ -55,6 +55,7 @@ refCategoryT1Radar = refCategoryRadar * categories.TECH1
 refCategoryT2Radar = refCategoryRadar * categories.TECH2
 refCategoryT3Radar = refCategoryRadar * categories.TECH3 --+ categories.OMNI * categories.TECH3 (dont need this as refcategoryradar already includes omni)
 refCategoryStructure = categories.STRUCTURE - categories.WALL
+refCategoryUnitsWithOmni = categories.OMNI + categories.COMMAND + categories.OVERLAYOMNI
 
 
 --Building - factory
@@ -92,6 +93,7 @@ refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCate
 refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
 refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
+refCategoryIndirectT2Below = categories.MOBILE * categories.INDIRECTFIRE * categories.LAND * categories.TECH1 + categories.MOBILE * categories.INDIRECTFIRE * categories.LAND * categories.TECH2
 refCategoryIndirectT3 = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH3 - categories.DIRECTFIRE
 --Obsidian special case with shields due to inconsistent categories:
 refCategoryObsidian = categories.AEON * categories.TECH2 * categories.SHIELD * categories.DIRECTFIRE * categories.MOBILE * categories.LAND * categories.TANK --
@@ -129,7 +131,7 @@ refCategoryAllNonAirScoutUnits = categories.MOBILE + refCategoryStructure + refC
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure}
 refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure}
-refWeaponPriorityOurGroundExperimental = {refCategoryFixedT2Arti, categories.COMMAND, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat, categories.MOBILE, refCategoryStructure}
+refWeaponPriorityOurGroundExperimental = {refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, categories.COMMAND, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat, categories.MOBILE, refCategoryStructure}
 
 function GetUnitLifetimeCount(oUnit)
     local sCount = oUnit.M27LifetimeUnitCount
@@ -473,9 +475,10 @@ function GetUnitAARange(oUnit)
 end
 
 function GetUnitIndirectRange(oUnit)
+
     local iMaxRange = 0
     for iCurWeapon, oCurWeapon in oUnit:GetBlueprint().Weapon do
-        if oCurWeapon.WeaponCategory == 'Missile' or oCurWeapon.WeaponCategory == 'Artillery' then
+        if oCurWeapon.WeaponCategory == 'Missile' or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
             if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
         end
     end

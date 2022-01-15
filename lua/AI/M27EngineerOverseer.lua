@@ -916,7 +916,6 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
     local sFunctionRef = 'IssueSpareEngineerAction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if GetGameTimeSeconds() >= 2040 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
     --Action already cleared in previous code
@@ -1260,7 +1259,8 @@ function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprint
     return tTargetLocation
 end
 
-function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug)
+function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride)
+    --Returns nil if cant find anywhere
     --tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
     --Can also be used for general movement
     --very similar to FindEmptyPathableAreaNearTarget, but now with added code to ignore if blocking mex
@@ -1284,7 +1284,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     local iCurSizeCycleCount = 0
     local iCycleSize = 8
     local iSignageX, iSignageZ
-    local iMaxCycles = 5
+    local iMaxCycles = (iOptionalMaxCycleOverride or 5)
     local iCurCycle = 0
     local iValidLocationCount = 0
     local tValidLocations = {}
@@ -1295,7 +1295,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     local iMaxDistanceToEnemy = 0
     local iCurDistanceToEnemy, iCurDistanceToBuilder
     local iCurPriority = 0
-    local iMaxPriority = 0
+    local iMaxPriority = -1000000
     local tBuilderPosition
     local oBuilderBP, iBuilderRange
     if oBuilder and oBuilder.GetPosition then
@@ -1319,29 +1319,38 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     local fSizeMod = 0.5
     local iNewBuildingRadius = tNewBuildingSize[1] * fSizeMod
     local iMaxDistanceToBuildWithoutMoving = iBuilderRange + iNewBuildingRadius
-    local sPathing
-    local iBuilderSegmentX, iBuilderSegmentZ
-    local iBuilderPathingGroup, iCurPathingGroup
+    local sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
+    local iBuilderPathingGroup = M27MapInfo.GetUnitSegmentGroup(oBuilder)
+    local iCurPathingGroup
     local iCurSegmentX, iCurSegmentZ
     local iGroupCycleCount = 0
 
     local tSignageX = {1, 1, 1, 0, -1, -1, -1, 0}
     local tSignageZ = {1, 0, -1, -1, -1, 0, 1, 1}
     local iRandomDistance
+    --[[local tPathingAdjust = {    {0, 0},
+                                {-iNewBuildingRadius, -iNewBuildingRadius},
+                                {iNewBuildingRadius, -iNewBuildingRadius},
+                                {-iNewBuildingRadius, iNewBuildingRadius},
+                                {iNewBuildingRadius, iNewBuildingRadius},
+                            }--]]
+
 
     while iValidLocationCount == 0 do
         iGroupCycleCount = iGroupCycleCount + 1
-        if bDebugMessages == true then LOG(sFunctionRef..': Start of main loop grouping, iGroupCycleCount='..iGroupCycleCount..'; iCycleSize='..iCycleSize) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Start of main loop grouping, iGroupCycleCount='..iGroupCycleCount..'; iCycleSize='..iCycleSize..'; iValidLocationCount='..iValidLocationCount) end
         if iGroupCycleCount > iMaxCycles then
-
-            M27Utilities.ErrorHandler('Possible infinite loop - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax)
-            if bDebugMessages == true and not(bForcedDebug) then
-                LOG(sFunctionRef..': Will redo the function with forced logs enabled')
-                tTargetLocation = FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, true)
+            if iMaxCycles >= 5 then --Sometimes we may be ok with not finding anywhere to build, e.g. for rally points
+                M27Utilities.ErrorHandler('Possible infinite loop - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax..'; aiBrain index='..aiBrain:GetArmyIndex()..'; start number='..aiBrain.M27StartPositionNumber..'; sBlueprintToBuild='..(sBlueprintToBuild or 'nil')..'; Builder='..oBuilder:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBuilder)..'; UC='..GetEngineerUniqueCount(oBuilder))
+                if bDebugMessages == true and not(bForcedDebug) then
+                    LOG(sFunctionRef..': Will redo the function with forced logs enabled')
+                    tTargetLocation = FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, true)
+                end
             end
             break
         end
         iRandomDistance = math.random(iSearchSizeMin, iSearchSizeMax)
+        if bDebugMessages == true then LOG(sFunctionRef..': Picking random distance='..iRandomDistance..'; iSearchSizeMin='..iSearchSizeMin..'; iSearchSizeMax='..iSearchSizeMax..'; iGroupCycleCount='..iGroupCycleCount) end
         for iCurSizeCycleCount = 1, iCycleSize do
             iSignageX = tSignageX[iCurSizeCycleCount]
             iSignageZ = tSignageZ[iCurSizeCycleCount]
@@ -1353,18 +1362,39 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
             elseif iRandomZ > (iMapBoundMaxZ - iNewBuildingRadius) then iRandomZ = iMapBoundMaxZ - iNewBuildingRadius end
 
             tTargetLocation = {iRandomX, GetTerrainHeight(iRandomX, iRandomZ), iRandomZ}
+            if bDebugMessages == true then LOG(sFunctionRef..': Checking if can build at location '..repr(tTargetLocation)) end
             if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) == true then
                 --Check not blocking a mex
+                if bDebugMessages == true then LOG(sFunctionRef..': Can build structure at the location, checking if will block mex') end
                 if WillBuildingBlockMex(sBlueprintToBuild, tTargetLocation) == false then
-                    iValidLocationCount = iValidLocationCount + 1
-                    tValidLocations[iValidLocationCount] = tTargetLocation
-                    iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tTargetLocation)
-                    tValidDistanceToEnemy[iValidLocationCount] = iCurDistanceToEnemy
-                    if iCurDistanceToEnemy > iMaxDistanceToEnemy then iMaxDistanceToEnemy = iCurDistanceToEnemy end
+                    --Is it either in range of the engineer or in the same pathing group?
                     iCurDistanceToBuilder = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tBuilderPosition)
-                    tValidDistanceToBuilder[iValidLocationCount] = iCurDistanceToBuilder
-                    if iCurDistanceToBuilder > iMaxDistanceToBuilder then iMaxDistanceToBuilder = iCurDistanceToBuilder end
-                    if iCurDistanceToBuilder < iMinDistanceToBuilder then iMinDistanceToBuilder = iCurDistanceToBuilder end
+                    local bEngineerCanBuild = false
+                    if iCurDistanceToBuilder < iMaxDistanceToBuildWithoutMoving then bEngineerCanBuild = true
+                    else
+                        --Check both target and the build area appear to be in the same group
+                        bEngineerCanBuild = true
+                        if not(iBuilderPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTargetLocation)) then bEngineerCanBuild = false end
+
+                        --[[for iAdjEntry, tAdjust in tPathingAdjust do
+                            if not(iBuilderPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, { tTargetLocation[1] + tAdjust[1], tTargetLocation[2], tTargetLocation[3] + tAdjust[2] })) then
+                                bEngineerCanBuild = false
+                                break
+                            end
+                        end--]]
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Wont block mex, checking if in range of engineer or in same pathing group. bEngineerCanBuild='..tostring(bEngineerCanBuild)) end
+                    if bEngineerCanBuild == true then
+                        iValidLocationCount = iValidLocationCount + 1
+                        tValidLocations[iValidLocationCount] = tTargetLocation
+                        iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tTargetLocation)
+                        tValidDistanceToEnemy[iValidLocationCount] = iCurDistanceToEnemy
+                        if iCurDistanceToEnemy > iMaxDistanceToEnemy then iMaxDistanceToEnemy = iCurDistanceToEnemy end
+                        tValidDistanceToBuilder[iValidLocationCount] = iCurDistanceToBuilder
+                        if iCurDistanceToBuilder > iMaxDistanceToBuilder then iMaxDistanceToBuilder = iCurDistanceToBuilder end
+                        if iCurDistanceToBuilder < iMinDistanceToBuilder then iMinDistanceToBuilder = iCurDistanceToBuilder end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a valid location taht engineers can path to; tTargetLocation='..repr(tTargetLocation)..'; iValidLocationCount='..iValidLocationCount) end
+                    end
                 end
             end
             if iCurSizeCycleCount == iCycleSize then
@@ -1377,12 +1407,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     if bDebugMessages == true then LOG(sFunctionRef..': Finished looping through locations, iValidLocationCount='..iValidLocationCount) end
     if iValidLocationCount > 0 then
         --Pick the best valid location that we have
-        if iMaxDistanceToBuilder > iMaxDistanceToBuildWithoutMoving and oBuilder then
-            sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
-            iBuilderSegmentX, iBuilderSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tBuilderPosition)
-            iBuilderPathingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iBuilderSegmentX, iBuilderSegmentZ)
-        end
-
+        if bDebugMessages == true then LOG(sFunctionRef..': Have a valid location count or '..iValidLocationCount..' so will pick the best location; possible locations to choose from='..repr(tValidLocations)) end
         local rBuildAreaRect
         for iCurLocation, tLocation in tValidLocations do
             rBuildAreaRect = Rect(tLocation[1] - iNewBuildingRadius, tLocation[3] - iNewBuildingRadius, tLocation[1] + iNewBuildingRadius, tLocation[3] + iNewBuildingRadius)
@@ -1392,26 +1417,39 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
             iCurDistanceToBuilder = tValidDistanceToBuilder[iValidLocationCount]
             if iCurDistanceToBuilder <= iMaxDistanceToBuildWithoutMoving then
                 iCurPriority = iCurPriority + 3
-            else
-                iCurSegmentX, iCurSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tLocation)
-                iCurPathingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iCurSegmentX, iCurSegmentZ)
-                if not(iCurPathingGroup == iBuilderPathingGroup) then
-                    iCurPriority = iCurPriority - 40
-                    if iCurDistanceToBuilder == iMinDistanceToBuilder then iCurPriority = iCurPriority + 20 end --If only have places that cant path to, then want the cloest one as are most likely to be able to build
-                end
+            --else
+                --iCurSegmentX, iCurSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tLocation)
+                --iCurPathingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iCurSegmentX, iCurSegmentZ)
+                --if not(iCurPathingGroup == iBuilderPathingGroup) then
+                    --iCurPriority = iCurPriority - 40
+                    --if iCurDistanceToBuilder == iMinDistanceToBuilder then iCurPriority = iCurPriority + 20 end --If only have places that cant path to, then want the cloest one as are most likely to be able to build
+                --end
             end
-            iCurPriority = iCurPriority + 2 * (iCurDistanceToBuilder - iMinDistanceToBuilder) / (iMaxDistanceToBuilder - iMinDistanceToBuilder)
+            if iCurDistanceToEnemy >= iMinDistanceToBuilder then iCurPriority = iCurPriority + 1 end
+            if iMaxDistanceToBuilder - iMinDistanceToBuilder > 0 then
+                iCurPriority = iCurPriority + 2 * (iCurDistanceToBuilder - iMinDistanceToBuilder) / (iMaxDistanceToBuilder - iMinDistanceToBuilder)
+            end
 
             if iCurPriority > iMaxPriority then
                 iMaxPriority = iCurPriority
                 tTargetLocation = tLocation
+                if bDebugMessages == true then LOG(sFunctionRef..': New highest priority location, iCurPriority='..iCurPriority..'; tTargetLocation='..repr(tTargetLocation)) end
             end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished considering iCurLocation='..iCurLocation..'; tLocation='..repr(tLocation)..'; iCurPriority='..iCurPriority..'; iMaxPriority='..iMaxPriority..'; iCurDistanceToBuilder='..iCurDistanceToBuilder..'; iMaxDistanceToBuildWithoutMoving='..iMaxDistanceToBuildWithoutMoving..'; iMinDistanceToBuilder='..iMinDistanceToBuilder) end
         end
+    else
+        if iMaxCycles >= 5 then M27Utilities.ErrorHandler('Failed to find a random place to build that engineer can path to') end
+        tTargetLocation = nil
     end
 
-    if bDebugMessages == true then LOG(sFunctionRef..'; Found random place to build, which is tTargetLocation='..repr(tTargetLocation)..'; aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation)='..tostring(aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation))) end
-    if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
-      M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    if bDebugMessages == true then
+        if M27Utilities.IsTableEmpty(tTargetLocation) == false then
+            LOG(sFunctionRef..'; Found random place to build, which is tTargetLocation='..repr(tTargetLocation)..'; aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation)='..tostring(aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation)))
+        else LOG(sFunctionRef..': Couldnt find anywhere to build')
+        end
+        LOG(sFunctionRef..': End of code')
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tTargetLocation
 end
 
@@ -1944,7 +1982,11 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                         local tEnemyBuildingAtTarget = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tTargetLocation, 1, 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyBuildingAtTarget) == false then
                             M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
-                            oEngineer:IssueReclaim(tEnemyBuildingAtTarget[1])
+                            for iUnit, oUnit in tEnemyBuildingAtTarget do
+                                if oUnit.GetPosition then
+                                    IssueReclaim({oEngineer}, oUnit)
+                                end
+                            end
                             IssueBuildMobile({oEngineer}, tTargetLocation, sBlueprintToBuild, {})
                             bAbortConstruction = true
                             bFoundEnemyInstead = true
@@ -1995,6 +2037,11 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                 end
             end
         end
+        --Switch to random location if an amphibious unit cant path there
+        if not(bFindRandomLocation) and not(bAbortConstruction) then
+           if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tTargetLocation) == M27MapInfo.GetUnitSegmentGroup(oEngineer)) then bFindRandomLocation = true end
+        end
+
         if bFindRandomLocation == true and not(bAbortConstruction) then
             if bDebugMessages == true then LOG(sFunctionRef..': Are finding a random location to build unless current location is valid; sBlueprintToBuild='..sBlueprintToBuild) end
             if M27Utilities.IsTableEmpty(tTargetLocation) == true then tTargetLocation = tEngineerPosition end
@@ -2876,7 +2923,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                             --Do we want to assist the first constructing engineer, or instead clear it of its actions and become the first constructing engineer?
                             bAssistBuildingOrEngineer = true
                             if iMinTechLevelWanted > 1 then
-                                LOG(sFunctionRef..': Checking if unit constructing tech level is below the min wanted')
+                                if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit constructing tech level is below the min wanted') end
                                 if M27UnitInfo.GetUnitTechLevel(oFirstConstructingEngineer) < iMinTechLevelWanted then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Unit constructing tech level is below the min wanted so will mark it to be cleared') end
                                     bAssistBuildingOrEngineer = false

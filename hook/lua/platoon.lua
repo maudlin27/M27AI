@@ -681,6 +681,9 @@ Platoon = Class(M27PlatoonClass) {
         --Intended for large attack which will target enemy base (and run back to base if it comes across a bigger threat)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27GroundExperimental = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
     M27DefenderAI = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,

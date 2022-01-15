@@ -3010,11 +3010,11 @@ function RecordAllRallyPoints(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering if mex is far enoguh away from last rally to consider an intermediate rally point iMex='..iMex..'; Mex distance to base='..aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase]..'; iLastRallyPointDistToStart='..iLastRallyPointDistToStart) end
                     if (aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart) > 100 then
                         --Add rally point inbetween these positions if can find a nearby area large enough to fit a land factory, that is at least 50 from the current mex
-                        --FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug)
+                        --FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride)
                         iCurDistToOurBase = math.min(aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - 50, (aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart)*0.5)
                         tPossibleRallyPoint = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemyBase, iCurDistToOurBase)
                                 ,M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryLandFactory, M27Utilities.GetACU(aiBrain), false, false)
-                                ,0, 10)
+                                ,2, 10, false, 2)
                         --if M27Utilities.IsTableEmpty(tPossibleRallyPoint) == false and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossibleRallyPoint) == iOurBaseGroup then
 
                             --Can path to the location, check if its far enough away from most recently added rally point and if any nearby enemies
@@ -3037,9 +3037,10 @@ function RecordAllRallyPoints(aiBrain)
                 if iFailedRallyPointChecks <= 5 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Difference in distances to start between mex and last rally point='..aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart) end
                     if (aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart) > 40 then
+                        --FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride)
                         tPossibleRallyPoint = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][reftMexLocation]
                         ,M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryLandFactory, M27Utilities.GetACU(aiBrain), false, false)
-                        ,0, 10)
+                        ,2, 10, false, 2)
 
                         --if M27Utilities.IsTableEmpty(tPossibleRallyPoint) == false and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossibleRallyPoint) == iOurBaseGroup then
                             --Can path to the location, check if its far enough away from most recently added rally point and if any nearby enemies

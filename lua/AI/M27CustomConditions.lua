@@ -509,6 +509,7 @@ function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
             end
         end
     end
+    if bACUHasUpgrade == false then bACUHasUpgrade = DoesACUHaveBigGun(aiBrain, oACU) end
     if bDebugMessages == true then LOG(sFunctionRef..': End of check, bACUHasUpgrade='..tostring(bACUHasUpgrade)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bACUHasUpgrade
@@ -927,4 +928,30 @@ function IsLocationWithinDefenceCoverage(aiBrain, tLocation)
     if iModDistanceFromStart <= iDefenceCoverage then bWithinCoverage = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWithinCoverage
+end
+
+function IsLocationNearEnemyOmniRange(aiBrain, tLocation, iMinDistanceOutsideOmniToNotBeInRange)
+    local sFunctionRef = 'IsLocationNearEnemyOmniRange'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --Highest omni range is 200 (omni sensor)
+    local tEnemyOmniUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryUnitsWithOmni, tLocation, iMinDistanceOutsideOmniToNotBeInRange + 201, 'Enemy')
+    local bOmniNearby = false
+    local iCurOmni, iCurDistanceToLocation
+    if M27Utilities.IsTableEmpty(tEnemyOmniUnits) == false then
+        for iUnit, oUnit in tEnemyOmniUnits do
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                iCurDistanceToLocation = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tLocation)
+                iCurOmni = (oUnit:GetBlueprint().Intel.OmniRadius or 0)
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering if oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' with omni radius '..iCurOmni..' and distance to location of '..iCurDistanceToLocation..'; is too close to location '..repr(tLocation)..'; iMinDistanceOutsideOmniToNotBeInRange='..iMinDistanceOutsideOmniToNotBeInRange) end
+                if (iCurOmni + iMinDistanceOutsideOmniToNotBeInRange - iCurDistanceToLocation) > 0 then
+                    bOmniNearby = true
+                    break
+                end
+            end
+        end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return bOmniNearby
 end

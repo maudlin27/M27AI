@@ -160,7 +160,7 @@ refStrategyEcoAndTech = 5 --Focus on upgrading buildings
 refbIncludeACUInAllOutAttack = 'M27OverseerIncludeACUInAllOutAttack'
 refbStopACUKillStrategy = 'M27OverseerStopACUKillStrat'
 refoLastNearestACU = 'M27OverseerLastACUObject'
-reftLastNearestACU = 'M27OverseerLastACUPosition'
+reftLastNearestACU = 'M27OverseerLastACUPosition' --Position of the last ACU we saw
 refiLastNearestACUDistance = 'M27OverseerLastNearestACUDistance'
 refbEnemyACUNearOurs = 'M27OverseerACUNearOurs'
 

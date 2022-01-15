@@ -1221,6 +1221,7 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
     --Cycles through each unit and then each weapon to determine the minimum range
     local sFunctionRef = 'GetDirectFireUnitMinOrMaxRange'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local iCurRange = 0
     local iMinRange = 1000000000
     local iMaxRange = 0
@@ -1232,10 +1233,12 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
         if not(oUnit.Dead) then
             if M27Utilities.IsACU(oUnit) == false then
                 if oUnit.GetBlueprint then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a non-ACU blueprint, adding to the list') end
                     iBPCount = iBPCount + 1
                     tUnitBPs[iBPCount] = oUnit:GetBlueprint()
                 end
             else
+                if bDebugMessages == true then LOG(sFunctionRef..': Have an ACU blueprint, using custom logic to work out DF range') end
                 iMaxRange = GetACUMaxDFRange(oUnit)
                 iMinRange = iMaxRange
             end
@@ -1244,18 +1247,25 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
     local tUniqueBPs = {}
     tUniqueBPs = M27Utilities.ConvertTableIntoUniqueList(tUnitBPs)
     for iCurBP, oBP in tUniqueBPs do
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering blueprint '..oBP.BlueprintId) end
         if not(oBP.Weapon == nil) then
             for iCurWeapon, oCurWeapon in oBP.Weapon do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering weapon '..(oCurWeapon.DisplayName or 'nil')) end
                 if not(oCurWeapon.CannotAttackGround == true) then
                     if not(oCurWeapon.ManualFire == true) then
                         iCurRange = oCurWeapon.MaxRadius
                         if iCurRange > iMaxRange then iMaxRange = iCurRange end
                         if iCurRange < iMinRange then iMinRange = iCurRange end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iCurRange='..iCurRange..'; iMaxRange='..iMaxRange) end
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': Manual fire is true')
                     end
+                elseif bDebugMessages == true then LOG(sFunctionRef..': CannotAttackGround is true')
                 end
             end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': Blueprint has no weapon')
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': MinRange='..iMinRange..'; iMaxRange='..iMaxRange) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iReturnRangeType == 1 then return iMinRange
     elseif iReturnRangeType == 2 then return iMaxRange

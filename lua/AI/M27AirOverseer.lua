@@ -2209,32 +2209,40 @@ function AirBomberManager(aiBrain)
                         if bDebugMessages == true then LOG(sFunctionRef..': iUnassignedTargets='..iUnassignedTargets..' so will get the closest one to the bomber for it to target') end
                         iClosestNewTargetDistance = 10000
                         oClosestNewTarget = nil
-                        for iTarget, tSubtable in aiBrain[reftBomberTargetShortlist] do
-                            tNewTargetPosition = tSubtable[refiShortlistUnit]:GetPosition()
-                            iNewTargetDistance = M27Utilities.GetDistanceBetweenPositions(tNewTargetPosition, tBomberLastTarget)
-                            if iNewTargetDistance < iClosestNewTargetDistance then
-                                iClosestNewTargetDistance = iNewTargetDistance
-                                oClosestNewTarget = tSubtable[refiShortlistUnit]
-                                tClosestNewTargetPos[1] = tNewTargetPosition[1]
-                                tClosestNewTargetPos[2] = tNewTargetPosition[2]
-                                tClosestNewTargetPos[3] = tNewTargetPosition[3]
-                                iClosestTargetShortlistKey = iTarget
+                        if M27Utilities.IsTableEmpty(aiBrain[reftBomberTargetShortlist]) == false then
+                            for iTarget, tSubtable in aiBrain[reftBomberTargetShortlist] do
+                                if tSubtable[refiShortlistUnit].GetPosition then
+                                    tNewTargetPosition = tSubtable[refiShortlistUnit]:GetPosition()
+                                    iNewTargetDistance = M27Utilities.GetDistanceBetweenPositions(tNewTargetPosition, tBomberLastTarget)
+                                    if iNewTargetDistance < iClosestNewTargetDistance then
+                                        iClosestNewTargetDistance = iNewTargetDistance
+                                        oClosestNewTarget = tSubtable[refiShortlistUnit]
+                                        tClosestNewTargetPos[1] = tNewTargetPosition[1]
+                                        tClosestNewTargetPos[2] = tNewTargetPosition[2]
+                                        tClosestNewTargetPos[3] = tNewTargetPosition[3]
+                                        iClosestTargetShortlistKey = iTarget
+                                    end
+                                end
                             end
-                        end
 
-                        --Update the shortlist and bomber targeting
-                        if oClosestNewTarget then
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to Update bomber target to oClosestNewTarget='..oClosestNewTarget:GetUnitId()) end
-                            TrackBomberTarget(oBomber, oClosestNewTarget, aiBrain[reftBomberTargetShortlist][iClosestTargetShortlistKey][refiShortlistPriority]) --Updates the targetted unit with various trackers
-                            --Remove from shortlist if assigend enough strike damage
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to consider removal of the target from the shortlist') end
-                            if ConsiderRemovalFromShortlist(aiBrain, iClosestTargetShortlistKey) then iUnassignedTargets = iUnassignedTargets - 1 end
-                            IssueAttack({oBomber}, oClosestNewTarget)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Just issued attack to oClosestNewTarget='..oClosestNewTarget:GetUnitId()..'; Size of bomber target list='..table.getn(oBomber[reftTargetList])..'; iCurTargetNumber='..oBomber[refiCurTargetNumber]..': Issued attack order for target with position='..repr(tClosestNewTargetPos)..' and unitId='..oClosestNewTarget:GetUnitId()) end
-                            tBomberLastTarget = tClosestNewTargetPos
-                            iBomberRemainingTargetCount = iBomberRemainingTargetCount + 1
-                            if iBomberRemainingTargetCount == iMaxTargetsForBomber then oBomber[refbOnAssignment] = true end
-                            if iUnassignedTargets == 0 then break end
+                            --Update the shortlist and bomber targeting
+                            if oClosestNewTarget then
+                                if bDebugMessages == true then LOG(sFunctionRef..': About to Update bomber target to oClosestNewTarget='..oClosestNewTarget:GetUnitId()) end
+                                TrackBomberTarget(oBomber, oClosestNewTarget, aiBrain[reftBomberTargetShortlist][iClosestTargetShortlistKey][refiShortlistPriority]) --Updates the targetted unit with various trackers
+                                --Remove from shortlist if assigend enough strike damage
+                                if bDebugMessages == true then LOG(sFunctionRef..': About to consider removal of the target from the shortlist') end
+                                if ConsiderRemovalFromShortlist(aiBrain, iClosestTargetShortlistKey) then iUnassignedTargets = iUnassignedTargets - 1 end
+                                IssueAttack({oBomber}, oClosestNewTarget)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Just issued attack to oClosestNewTarget='..oClosestNewTarget:GetUnitId()..'; Size of bomber target list='..table.getn(oBomber[reftTargetList])..'; iCurTargetNumber='..oBomber[refiCurTargetNumber]..': Issued attack order for target with position='..repr(tClosestNewTargetPos)..' and unitId='..oClosestNewTarget:GetUnitId()) end
+                                tBomberLastTarget = tClosestNewTargetPos
+                                iBomberRemainingTargetCount = iBomberRemainingTargetCount + 1
+                                if iBomberRemainingTargetCount == iMaxTargetsForBomber then oBomber[refbOnAssignment] = true end
+                                if iUnassignedTargets == 0 then break end
+                            else
+                                break
+                            end
+                        else
+                            break
                         end
                     elseif iBomberRemainingTargetCount == 0 then iSpareBombers = math.max(1, iSpareBombers + 1)
                     end
