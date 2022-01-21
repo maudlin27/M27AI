@@ -45,6 +45,7 @@ refActionAssistSMD = 18
 refActionAssistAirFactory = 19
 refActionBuildThirdPower = 20
 refActionBuildLandExperimental = 21
+refActionReclaimUnit = 22
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 
 --Build order related variables
@@ -993,7 +994,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
             local iTimeToGetToACU = math.max(0, iDistToACU - 6) / iSpeed
             local iCurGameTime = math.floor(GetGameTimeSeconds())
             local iTimeForACUToCompleteUpgrade
-            if oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 11] then
+            if oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 11] and oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 1] then
                 iTimeForACUToCompleteUpgrade = (1 - oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 1]) / ((oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 1] - oACU[M27Overseer.reftACURecentUpgradeProgress][iCurGameTime - 11]) / 10)
             else
                 --ACU must have only just started, so assume it will complete based on its build power
@@ -2382,24 +2383,31 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                 else
                     if oActionTargetObject then
                         if not(iActionToAssign == refActionReclaimArea) then
-                            bAreAssisting = true
-                            if oActionTargetObject.GetUnitId then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Telling engineer '..GetEngineerUniqueCount(oEngineer)..'to assist enginner '..GetEngineerUniqueCount(oActionTargetObject)..'; ID='..oActionTargetObject:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oActionTargetObject)) end
-                                if oActionTargetObject.GetFractionComplete and oActionTargetObject:GetFractionComplete() < 1 then
-                                    IssueRepair({ oEngineer}, oActionTargetObject)
-                                else
-                                    IssueGuard({ oEngineer}, oActionTargetObject)
-                                end
+                            if iActionToAssign == refActionReclaimUnit then
+                                IssueReclaim({oEngineer}, oActionTargetObject)
                                 --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
                                 UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, nil, true, iConditionNumber, oActionTargetObject)
+                                bAreAssisting = true
                             else
-                                LOG('oActionTargetObject isnt a unit, will see if it has a subtable with a unit and use that (workaround for strange issue)')
-                                if oActionTargetObject[2] and oActionTargetObject[2].GetUnitId then
-                                    LOG(sFunctionRef..': Have a valid unit in a subtable, so will make this the target')
-                                    oActionTargetObject = oActionTargetObject[2]
+                                bAreAssisting = true
+                                if oActionTargetObject.GetUnitId then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Telling engineer '..GetEngineerUniqueCount(oEngineer)..'to assist enginner '..GetEngineerUniqueCount(oActionTargetObject)..'; ID='..oActionTargetObject:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oActionTargetObject)) end
+                                    if oActionTargetObject.GetFractionComplete and oActionTargetObject:GetFractionComplete() < 1 then
+                                        IssueRepair({ oEngineer}, oActionTargetObject)
+                                    else
+                                        IssueGuard({ oEngineer}, oActionTargetObject)
+                                    end
+                                    --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
+                                    UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, nil, true, iConditionNumber, oActionTargetObject)
                                 else
-                                    bAreAssisting = false
-                                    LOG(sFunctionRef..': Dont have a valid unit in a subtable, so will try and perform action without assisting')
+                                    LOG('oActionTargetObject isnt a unit, will see if it has a subtable with a unit and use that (workaround for strange issue)')
+                                    if oActionTargetObject[2] and oActionTargetObject[2].GetUnitId then
+                                        LOG(sFunctionRef..': Have a valid unit in a subtable, so will make this the target')
+                                        oActionTargetObject = oActionTargetObject[2]
+                                    else
+                                        bAreAssisting = false
+                                        LOG(sFunctionRef..': Dont have a valid unit in a subtable, so will try and perform action without assisting')
+                                    end
                                 end
                             end
                         end
@@ -2568,6 +2576,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
                                 UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, false, iConditionNumber)
                             else
+                                if iActionToAssign == refActionReclaimUnit then M27Utilities.ErrorHandler('No reclaim unit logic activated so may be missing a valid target, will issue a spare action', nil, true) end
                                 if bDebugMessages == true then LOG(sFunctionRef..': Nothing to build or reclaim, will issue spare action instead') end
                                 IssueSpareEngineerAction(aiBrain, oEngineer)
                                 UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, nil, false, iConditionNumber)
@@ -2898,6 +2907,13 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
             if iActionRefToAssign == refActionReclaimArea then
                 --Get preferred reclaim position - pick engineer closest to below location (will overwrite the actual target location later on when assigning reclaim action)
                 tActionLocation = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+            elseif iActionRefToAssign == refActionReclaimUnit then
+                --Pick a reclaim unit closest to our start
+                oActionObject = M27Utilities.GetNearestUnit(aiBrain[M27EconomyOverseer.reftUnitsToReclaim], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, false, false)
+                if oActionObject.GetPosition then
+                    tActionLocation = oActionObject:GetPosition()
+                else oActionObject = nil
+                end
             else
                 --First check if we are already building anything under this action (in which case want to assist it instead of building a new one)
                 if aiBrain[reftEngineerAssignmentsByActionRef] then
@@ -3885,7 +3901,13 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     iSearchRangeForNearestEngi = 10000
                                 end
                             end
-                        elseif iCurrentConditionToTry == 15 then --Try to get nearest unclaimed mex (i.e. this will only run if are no mexes within defensive area or our side of map):
+                        elseif iCurrentConditionToTry == 15 then
+                            if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftUnitsToReclaim]) == false then
+                                iActionToAssign = refActionReclaimUnit
+                                iMaxEngisWanted = math.min(4, table.getn(aiBrain[M27EconomyOverseer.reftUnitsToReclaim]))
+                                iSearchRangeForNearestEngi = 200
+                            end
+                        elseif iCurrentConditionToTry == 16 then --Try to get nearest unclaimed mex (i.e. this will only run if are no mexes within defensive area or our side of map):
                             if iAllUnclaimedMexesInPathingGroup == nil then
                                 tAllUnclaimedMexesInPathingGroup = GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, false, false, false)
                                 if M27Utilities.IsTableEmpty(tAllUnclaimedMexesInPathingGroup) == false then iAllUnclaimedMexesInPathingGroup = table.getn(tAllUnclaimedMexesInPathingGroup)
@@ -3898,7 +3920,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 if iMaxEngisWanted > 3 then iMaxEngisWanted = 3 end
                                 tExistingLocationsToPickFrom = tAllUnclaimedMexesInPathingGroup
                             end
-                        elseif iCurrentConditionToTry == 16 then --2nd T1 power construction with low priority engineers
+                        elseif iCurrentConditionToTry == 17 then --2nd T1 power construction with low priority engineers
                             if bHaveVeryLowPower == false and bHaveLowMass == false then --If almost power stalling then want to focus on the first T1 power rather than trying multiple at once
                                 if bDebugMessages == true then LOG(sFunctionRef..': Separate power action; bWantMorePower='..tostring(bWantMorePower)) end
                                 if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
@@ -3915,7 +3937,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 17 then --Radar near base
+                        elseif iCurrentConditionToTry == 18 then --Radar near base
                             if bHaveLowPower == false then
                                 if iCurRadarCount == nil then iCurRadarCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryRadar) end
                                 if iCurRadarCount == 0 and iNetCurEnergyIncome > 5 and iEnergyStored >= 2000 then
@@ -3964,7 +3986,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 18 then
+                        elseif iCurrentConditionToTry == 19 then
                             if bHaveLowPower == false then
                                 if iAirFactories == nil then
                                     iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
@@ -3978,7 +4000,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     iSearchRangeForNearestEngi = 75
                                 end
                             end
-                        elseif iCurrentConditionToTry == 19 then --Build factory or upgrade building if getting close to overflow provided we have enough energy income
+                        elseif iCurrentConditionToTry == 20 then --Build factory or upgrade building if getting close to overflow provided we have enough energy income
                             if bHaveLowPower == false and bHaveLowMass == false then
                                 if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                                 if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
@@ -4013,7 +4035,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 20 then --More reclaim (lower priority locations)
+                        elseif iCurrentConditionToTry == 21 then --More reclaim (lower priority locations)
                             if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                             if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; iMassStoredRatio='..iMassStoredRatio..'; M27MapInfo.iMapTotalMass='..M27MapInfo.iMapTotalMass..'; aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]='..aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]) end
                             if iMassStoredRatio < 0.98 then
@@ -4027,7 +4049,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Reclaim: iMaxEngisWanted='..iMaxEngisWanted) end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 21 then --Experimental if have loads of mass
+                        elseif iCurrentConditionToTry == 22 then --Experimental if have loads of mass
                             if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 25 then --at least 250 gross income ignoring reclaim
                                 if aiBrain:GetEconomyStored('MASS') >= 10000 or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandEarly and aiBrain:GetEconomyStored('MASS') >= 8000) then
                                     iActionToAssign = refActionBuildLandExperimental
@@ -4040,7 +4062,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         --SPARE ACTIONS BELOW
                         else
                             bAreOnSpareActions = true
-                            if iCurrentConditionToTry == 22 then
+                            if iCurrentConditionToTry == 23 then
                                 if bHaveVeryLowPower == false and bHaveLowMass == false then
                                     if bWantMorePower then
                                         if iHighestFactoryOrEngineerTechAvailable == 1 then
@@ -4054,7 +4076,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                         end
                                     end
                                 end
-                            elseif iCurrentConditionToTry == 23 then
+                            elseif iCurrentConditionToTry == 24 then
                                 if bHaveLowMass == false and bHaveLowPower == false then
                                     if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                                     if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
@@ -4064,12 +4086,12 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                         iMaxEngisWanted = 10
                                     end
                                 end
-                            elseif iCurrentConditionToTry == 24 then
+                            elseif iCurrentConditionToTry == 25 then
                                 if bHaveLowMass == false and iHighestFactoryOrEngineerTechAvailable == 1 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
                                     iActionToAssign = refActionBuildThirdPower
                                     iMaxEngisWanted = 4
                                 end
-                            elseif iCurrentConditionToTry == 25 then
+                            elseif iCurrentConditionToTry == 26 then
                                 if bHaveLowMass == false and bHaveLowPower == false then
                                    if (iMassStoredRatio > 0.6 or iMassStored > 12000) then --About to overflow so try to build something
                                        --local iFactoryToAirRatio = iLandFactories / math.max(1, iAirFactories)
@@ -4154,7 +4176,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                                 --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore)
                                 if M27Utilities.IsTableEmpty(tActionTargetLocation) == true and oActionTargetObject == nil then
-                                    M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review as normally shoudlnt have this happen - current examples are if want to assist a building but all of them have nearby enemies. iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry)
+                                    M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review if this happens repeatedly as normally shoudlnt have this happen - current examples are if want to assist a building but all of them have nearby enemies, or if try to reclaim a unit that no longer has a position. iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry)
                                     iCurConditionEngiShortfall = iMaxEngisWanted - iExistingEngineersAssigned
                                 else
                                     if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngineersAssigned='..iExistingEngineersAssigned..'; iMinEngiTechLevelWanted='..iMinEngiTechLevelWanted) end

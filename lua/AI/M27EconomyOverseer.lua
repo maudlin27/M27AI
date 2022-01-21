@@ -18,6 +18,7 @@ reftMassStorageLocations = 'M27UpgraderMassStorageLocations' --List of all locat
 reftStorageSubtableLocation = 'M27UpgraderStorageLocationSubtable'
 refiStorageSubtableModDistance = 'M27UpgraderStorageModDistance'
 local refbWantToUpgradeMoreBuildings = 'M27UpgraderWantToUpgradeMore'
+reftUnitsToReclaim = 'M27UnitReclaimShortlist' --list of units we want engineers to reclaim
 
 local reftUpgrading = 'M27UpgraderUpgrading' --[x] is the nth building upgrading, returns the object upgrading
 local refiPausedUpgradeCount = 'M27UpgraderPausedCount' --Number of units where have paused the upgrade
@@ -25,7 +26,7 @@ local refbUpgradePaused = 'M27UpgraderUpgradePaused' --flags on particular unit 
 
 local refiEnergyStoredLastCycle = 'M27EnergyStoredLastCycle'
 
---ECONOMY VARIABLES - below 4 are to track values based on base production, ignoring reclaim
+--ECONOMY VARIABLES - below 4 are to track values based on base production, ignoring reclaim. Provide per tick values so 10% of per second)
 refiEnergyGrossBaseIncome = 'M27EnergyGrossIncome'
 refiEnergyNetBaseIncome = 'M27EnergyNetIncome'
 refiMassGrossBaseIncome = 'M27MassGrossIncome'
@@ -92,6 +93,95 @@ function GetMexCountOnOurSideOfMap(aiBrain)
     if bDebugMessages == true then LOG(sFunctionRef..': Mexes on our side='..iCount) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iCount
+end
+
+function GetUnitReclaimTargets(aiBrain)
+    --Prepares a shortlist of targets we want engineers to reclaim
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetUnitReclaimTargets'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    aiBrain[reftUnitsToReclaim] = {}
+
+    local tNearbyAdjacencyUnits
+    --NOTE: DONT ADD conditions above here as T2 power assumes the table is empty
+
+    --Add any old power to the table - T1 and T2 if we have lots of power and T3
+    local iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power)
+    if iT3Power >= 1 and aiBrain[refiEnergyGrossBaseIncome] >= 500 then
+        --Add all T2 power
+        aiBrain[reftUnitsToReclaim] = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Power, false, true)
+    end
+
+    --Reclaim T1 power if we have T2+ power and enough gross income, unless we also have T2 arti
+    if (iT3Power >= 1 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power) >= 2) and aiBrain[refiEnergyGrossBaseIncome] >= 110 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) <= 0 then
+        --All T1 power
+        for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT1Power, false, true) do
+            --Check not near to an air factory - will do slightly larger than actual radius needed to be prudent
+            tNearbyAdjacencyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, oUnit:GetPosition(), 6, 'Ally')
+            if M27Utilities.IsTableEmpty(tNearbyAdjacencyUnits) == true then
+                table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+            end
+        end
+    end
+
+    local tT3Radar = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT3Radar, false, true)
+    local tT2Radar = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Radar, false, true)
+    local bRadarInsideOtherRadarRange
+    --T2 radar if in range of T3
+    if M27Utilities.IsTableEmpty(tT3Radar) == false and M27Utilities.IsTableEmpty(tT2Radar) == false then
+        for iUnit, oUnit in tT2Radar do
+            bRadarInsideOtherRadarRange = false
+            for iT3Radar, oT3Radar in tT3Radar do
+                if M27Utilities.GetDistanceBetweenPositions(oT3Radar:GetPosition(), oUnit:GetPosition()) <= (oT3Radar:GetBlueprint().Intel.RadarRadius - oUnit:GetBlueprint().Intel.RadarRadius) then
+                    bRadarInsideOtherRadarRange = true
+                    break
+                end
+            end
+            if bRadarInsideOtherRadarRange then table.insert(aiBrain[reftUnitsToReclaim], oUnit) end
+        end
+    end
+
+    --T1 radar
+    if M27Utilities.IsTableEmpty(tT3Radar) == false or M27Utilities.IsTableEmpty(tT2Radar) == false then
+        for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT1Radar, false, true) do
+            bRadarInsideOtherRadarRange = false
+            if M27Utilities.IsTableEmpty(tT3Radar) == false then
+                for iT3Radar, oT3Radar in tT3Radar do
+                    if M27Utilities.GetDistanceBetweenPositions(oT3Radar:GetPosition(), oUnit:GetPosition()) <= (oT3Radar:GetBlueprint().Intel.RadarRadius - oUnit:GetBlueprint().Intel.RadarRadius) then
+                        bRadarInsideOtherRadarRange = true
+                        break
+                    end
+                end
+            end
+            if bRadarInsideOtherRadarRange == false and M27Utilities.IsTableEmpty(tT2Radar) == false then
+                for iT2Radar, oT2Radar in tT2Radar do
+                    if M27Utilities.GetDistanceBetweenPositions(oT2Radar:GetPosition(), oUnit:GetPosition()) <= (oT2Radar:GetBlueprint().Intel.RadarRadius - oUnit:GetBlueprint().Intel.RadarRadius) then
+                        bRadarInsideOtherRadarRange = true
+                        break
+                    end
+                end
+            end
+            if bRadarInsideOtherRadarRange then table.insert(aiBrain[reftUnitsToReclaim], oUnit) end
+        end
+    end
+
+    --Civilian buildings on our side of the map that can be pathed to amphibiously with no enemy units nearby
+    local tCivilianBuildings = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 500, 'Neutral')
+    local iBasePathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+    if M27Utilities.IsTableEmpty(tCivilianBuildings) == false then
+        for iUnit, oUnit in tCivilianBuildings do
+            --Are we closer to our base than enemy?
+            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) then
+                --Can we path here with an amphibious unit?
+                if iBasePathingGroup == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) then
+                    table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+                end
+            end
+
+        end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetMassStorageTargets(aiBrain)
@@ -957,7 +1047,7 @@ function UpgradeMainLoop(aiBrain)
 end
 
 function ManageEnergyStalls(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageEnergyStalls'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -1066,7 +1156,11 @@ function ManageEnergyStalls(aiBrain)
                                 if bPauseNotUnpause and M27UnitInfo.IsUnitShieldEnabled(oUnit) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, oUnit:GetPosition(), 40, 'Enemy')) == false then bApplyActionToUnit = false end
                             end
                             if iCategoryRef == categories.COMMAND then --want in addition to above as ACU might have personal shield
-                                if bPauseNotUnpause and not(oUnit:IsUnitState('Upgrading')) then bApplyActionToUnit = false end
+                                if bPauseNotUnpause then
+                                    if not(oUnit:IsUnitState('Upgrading')) then bApplyActionToUnit = false
+                                    elseif oUnit.GetWorkProgress and oUnit:GetWorkProgress() >= 0.85 then bApplyActionToUnit = false
+                                    end
+                                end
                             end
 
                             if bApplyActionToUnit then
@@ -1173,6 +1267,7 @@ function UpgradeManager(aiBrain)
     aiBrain[refbWantToUpgradeMoreBuildings] = false
     aiBrain[reftPausedUnits] = {}
     aiBrain[refbStallingEnergy] = false
+    aiBrain[reftUnitsToReclaim] = {}
 
     --Initial wait:
     WaitTicks(300)
@@ -1184,6 +1279,7 @@ function UpgradeManager(aiBrain)
         if aiBrain[refbWantToUpgradeMoreBuildings] then iCurCycleTime = iReducedWaitTime end
 
         ForkThread(GetMassStorageTargets, aiBrain)
+        ForkThread(GetUnitReclaimTargets, aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': End of loop about to wait '..iCycleWaitTime..' ticks') end
 
         ForkThread(ManageEnergyStalls, aiBrain)

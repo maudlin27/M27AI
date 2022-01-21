@@ -193,35 +193,39 @@ function GetPreferredArtiProportion(aiBrain, bAreSeraphimT1LandFactory)
     if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and bAreSeraphimT1LandFactory and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then
         iArtiProportion = 1
     else
-        local iOurStartPosition = aiBrain.M27StartPositionNumber
-        local tOurStart = M27MapInfo.PlayerStartPoints[iOurStartPosition]
-        local iRange = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
-        local tEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.DIRECTFIRE + categories.INDIRECTFIRE, tOurStart, iRange, 'Enemy')
-        local iEnemyTotalThreat = 0
-        local iEnemyPDThreat = 0
-        if tEnemyUnits then
-            local tEnemyPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tEnemyUnits)
-                    --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride)
-            if tEnemyPD then iEnemyPDThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyPD, true) end
-            iEnemyTotalThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnits, true)
+        --Can we path to enemy with land? If not dont build spare arti
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false then iArtiProportion = 0
+        else
+            local iOurStartPosition = aiBrain.M27StartPositionNumber
+            local tOurStart = M27MapInfo.PlayerStartPoints[iOurStartPosition]
+            local iRange = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
+            local tEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.DIRECTFIRE + categories.INDIRECTFIRE, tOurStart, iRange, 'Enemy')
+            local iEnemyTotalThreat = 0
+            local iEnemyPDThreat = 0
+            if tEnemyUnits then
+                local tEnemyPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tEnemyUnits)
+                        --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride)
+                if tEnemyPD then iEnemyPDThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyPD, true) end
+                iEnemyTotalThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnits, true)
+            end
+
+
+
+            if iEnemyPDThreat == 0 then iArtiProportion = 0.1
+            elseif iEnemyPDThreat <= 500 then iArtiProportion = 0.15
+            elseif iEnemyPDThreat <= 1500 then iArtiProportion = 0.2
+            elseif iEnemyPDThreat <= 2500 then iArtiProportion = 0.3
+            else iArtiProportion = 0.6 end
+            --Reduce % based on proportion:
+            if iArtiProportion > 0.1 and iEnemyPDThreat > 0 then
+                local iCap = 2 * iEnemyPDThreat / iEnemyTotalThreat
+                if iCap < 0.15 then iCap = 0.15 end
+                if iCap < iArtiProportion then iArtiProportion = iCap end
+            end
+            --Are we at tech 3 yet?  If so go for higher % of T3 arti; if at tech2 then go for lower % if no PD since MMLs arent as good
+            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 3 then iArtiProportion = iArtiProportion + 0.05
+            elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and iEnemyPDThreat <= 100 then iArtiProportion = iArtiProportion - 0.025 end
         end
-
-
-
-        if iEnemyPDThreat == 0 then iArtiProportion = 0.1
-        elseif iEnemyPDThreat <= 500 then iArtiProportion = 0.15
-        elseif iEnemyPDThreat <= 1500 then iArtiProportion = 0.2
-        elseif iEnemyPDThreat <= 2500 then iArtiProportion = 0.3
-        else iArtiProportion = 0.6 end
-        --Reduce % based on proportion:
-        if iArtiProportion > 0.1 and iEnemyPDThreat > 0 then
-            local iCap = 2 * iEnemyPDThreat / iEnemyTotalThreat
-            if iCap < 0.15 then iCap = 0.15 end
-            if iCap < iArtiProportion then iArtiProportion = iCap end
-        end
-        --Are we at tech 3 yet?  If so go for higher % of T3 arti; if at tech2 then go for lower % if no PD since MMLs arent as good
-        if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 3 then iArtiProportion = iArtiProportion + 0.05
-        elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and iEnemyPDThreat <= 100 then iArtiProportion = iArtiProportion - 0.025 end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iArtiProportion

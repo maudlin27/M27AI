@@ -228,7 +228,7 @@ function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocationTarget
         local tStartPosition = M27MapInfo.PlayerStartPoints[iOurStartNumber]
         local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartNumber]
         local iDistanceFromEnemyToUs = aiBrain[refiDistanceToNearestEnemyBase]
-        --function MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
+        --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
         local tMidpointBetweenUsAndEnemy = M27Utilities.MoveTowardsTarget(tStartPosition, tEnemyStartPosition, iDistanceFromEnemyToUs / 2, 0)
         local iActualDistance = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tLocationTarget)
         local iDistanceToMid = M27Utilities.GetDistanceBetweenPositions(tMidpointBetweenUsAndEnemy, tLocationTarget)
@@ -1213,7 +1213,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                         if bDebugMessages == true then LOG(sFunctionRef..': iTotalEnemyNetThreat='..iTotalEnemyNetThreat..'; If 0 or less and scouts are in position then will increase intel base path') end
                                         if iTotalEnemyNetThreat <= 0 then
                                             --Are all scouts in position?
-                                            if bScoutNearAllMexes == true then
+                                            if bScoutNearAllMexes == true and table.getn(aiBrain[reftIntelLinePositions]) > aiBrain[refiCurIntelLineTarget] then
                                                 --If we move the intel line up by 1 will we have too much enemy threat?
                                                 iTotalEnemyNetThreat = GetEnemyNetThreatAlongIntelPath(aiBrain, aiBrain[refiCurIntelLineTarget] + 1, iIntelPathEnemySearchRange, 35)
                                                 if bDebugMessages == true then LOG(sFunctionRef..': If we increase the intel path by 1, then the total enemy net threat is '..iTotalEnemyNetThreat..'; will only increase if this is <= 0') end
@@ -3425,8 +3425,8 @@ function ACUManager(aiBrain)
                         end
                     end
                 end
-                --Reset flag for ACU having run (normally platoons reset when they reach their destination, but for ACU it will revert to going to enemy start)
-                if oACU:GetHealthPercent() >= 0.95 and oACU.PlatoonHandle[M27PlatoonUtilities.refbHavePreviouslyRun] then
+                --Reset flag for ACU having run (normally platoons reset when they reach their destination, but for ACU it will revert to going to enemy start if we have gun upgrade)
+                if oACU:GetHealthPercent() >= 0.95 and oACU.PlatoonHandle[M27PlatoonUtilities.refbHavePreviouslyRun] and M27Conditions.DoesACUHaveGun(aiBrain, false) then
                     local iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
                     if iACUMaxShield == 0 or iACUCurShield >= iACUMaxShield * 0.7 then
                         --Large threat near ACU?
@@ -3664,6 +3664,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             if bDebugMessages == true then LOG(sFunctionRef..': Looking for enemy TML') end
         elseif iCategory == M27UnitInfo.refCategoryLandExperimental then
             tReferenceTable = aiBrain[reftEnemyLandExperimentals]
+        elseif iCategory == M27UnitInfo.M27UnitInfo.refCategoryFixedT3Arti or iCategory == M27UnitInfo.refCategoryExperimentalStructure then
+            tReferenceTable = aiBrain[reftEnemyArti]
         else
             M27Utilities.ErrorHandler('Unrecognised enemy super threat category, wont be recorded')
             break
@@ -3909,7 +3911,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 local bWantToEco = false
                 --How far away is the enemy?
                 local bBigEnemyThreat = false
-                if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(reftEnemyArti) == false then bBigEnemyThreat = true end
+                if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArti]) == false then bBigEnemyThreat = true end
 
 
 
@@ -4248,6 +4250,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[reftEnemyNukeLaunchers] = {}
     aiBrain[reftEnemyLandExperimentals] = {}
     aiBrain[reftEnemyTML] = {}
+    aiBrain[reftEnemyArti] = {}
     aiBrain[refbEnemyTMLSightedBefore] = false
     aiBrain[refbStopACUKillStrategy] = false
 

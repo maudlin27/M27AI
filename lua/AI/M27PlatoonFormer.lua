@@ -370,7 +370,7 @@ function CombatPlatoonFormer(aiBrain)
                     if oPlatoonOrUnitToEscort then
                         --Determine if we want all of the units that are waiting for assignment
                         --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride)
-                        local iThreatOfUnitsWaitingForAssignment = M27Logic.GetCombatThreatRating(aiBrain, aiBrain[reftoCombatUnitsWaitingForAssignment], false, nil, nil)
+                        local iThreatOfUnitsWaitingForAssignment = M27Logic.GetCombatThreatRating(aiBrain, tUnitsWaiting, false, nil, nil)
                         local iExcessThreat = math.max(0, iThreatOfUnitsWaitingForAssignment + oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiCurrentEscortThreat] - oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiEscortThreatWanted])
                         local oUnitToAddToEscort
                         if iExcessThreat > 100 then

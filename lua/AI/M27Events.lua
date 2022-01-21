@@ -161,6 +161,11 @@ function OnDamaged(self, instigator)
             end
         end
     end
+    if instigator and IsUnit(instigator) and instigator.GetAIBrain and instigator:GetAIBrain().M27AI then
+        instigator[M27UnitInfo.refbRecentlyDealtDamage] = true
+        instigator[M27UnitInfo.refiGameTimeDamageLastDealt] = math.floor(GetGameTimeSeconds())
+        M27Utilities.DelayChangeVariable(instigator, M27UnitInfo.refbRecentlyDealtDamage, false, 5, M27UnitInfo.refiGameTimeDamageLastDealt, instigator[M27UnitInfo.refiGameTimeDamageLastDealt] + 1, nil, nil)
+    end
 end
 
 function OnBombFired(oWeapon, projectile)
@@ -200,13 +205,26 @@ end
 function OnMissileBuilt(self, weapon)
     if self.GetAIBrain and self:GetAIBrain().M27AI then
         --Pause if we already have 2 missiles
-        local iMissiles = 0
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local sFunctionRef = 'OnMissileBuilt'
+        if bDebugMessages == true then
+            if M27UnitInfo.IsUnitValid(self) then
+                LOG(sFunctionRef..': Have valid unit='..self:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(self))
+            else
+                LOG(sFunctionRef..': self='..DebugArray(self))
+            end
+        end
+
+        local iMissiles = 1 --For some reason the count is off by 1, presumably a slight delay between the event being called and the below ammo counts working
         if self.GetTacticalSiloAmmoCount then iMissiles = iMissiles + self:GetTacticalSiloAmmoCount() end
+        if bDebugMessages == true then LOG(sFunctionRef..': iMissiles based on tactical silo ammo='..iMissiles) end
         if self.GetNukeSiloAmmoCount then iMissiles = iMissiles + self:GetNukeSiloAmmoCount() end
+        if bDebugMessages == true then LOG(sFunctionRef..': iMissiles after Nuke silo ammo='..iMissiles) end
         if iMissiles >= 2 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Have at least 2 missiles so will set paused to true') end
             self:SetPaused(true)
             --Recheck every minute
-            M27Logic.CheckIfWantToBuildAnotherMissile(self)
+            ForkThread(M27Logic.CheckIfWantToBuildAnotherMissile, self)
         end
     end
 end

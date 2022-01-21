@@ -2709,7 +2709,7 @@ function GetPositionToFollowTargets(tUnitsToFollow, oFollowingUnit, iFollowDista
     if oFollowingUnit and not(oFollowingUnit.Dead) then
         if iFollowDistance == nil then iFollowDistance = 5 end
 
-        --function MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
+        --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
         --[[local iCount = 0
         local iMaxCount = 40
         local tFollowMovePosition = {}
@@ -2999,6 +2999,36 @@ function IssueDelayedMove(tUnits, tTarget, iDelay)
     ForkThread(IssueDelayMoveBase, tUnits, tTarget, iDelay)
 end
 
+function GetNearestActiveFixedEnemyShield(aiBrain, tLocation)
+    --True if the target location has an enemy hsield structure which has active health
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IsTargetUnderShield'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, tLocation, 46, 'Enemy')
+    local oNearestShield
+    local iNearestShield = 10000
+    local iCurShieldDistance
+
+    if M27Utilities.IsTableEmpty(tNearbyShields) == false then
+        local iShieldCurHealth, iShieldMaxHealth
+        for iShield, oShield in tNearbyShields do
+            if M27UnitInfo.IsUnitValid(oShield) then
+                iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oShield)
+                if iShieldCurHealth > 50 then
+                     iCurShieldDistance = M27Utilities.GetDistanceBetweenPositions(oShield:GetPosition(), tLocation)
+                    if iCurShieldDistance < iNearestShield then
+                        oNearestShield = oShield
+                        iNearestShield = iCurShieldDistance
+                    end
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return oNearestShield
+end
+
 function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetUnderShield'
@@ -3023,8 +3053,8 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
     local sSearchType = 'Ally'
     if bEnemy then sSearchType = 'Enemy' end
     local tTargetPos = oTarget:GetPosition()
-    local iShieldCategory = categories.SHIELD
-    if bIgnoreMobileShield == true then iShieldCategory = categories.SHIELD * categories.STRUCTURE end
+    local iShieldCategory = M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryFixedShield
+    if bIgnoreMobileShield == true then iShieldCategory = M27UnitInfo.refCategoryFixedShield end
     local tNearbyShields = aiBrain:GetUnitsAroundPoint(iShieldCategory, tTargetPos, iShieldSearchRange, sSearchType)
     if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repr(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
     if M27Utilities.IsTableEmpty(tNearbyShields) == false then
@@ -3286,25 +3316,36 @@ function GetPositionToSideOfTarget(oUnit, tTargetLocation, iBaseAngleToTarget, i
 end
 
 function ForkedCheckForAnotherMissile(oUnit)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ForkedCheckForAnotherMissile'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if not(oUnit['M27MissileChecker'] == true) then
+        WaitSeconds(1) --make sure we have an accurate number for missiles
         local iMissiles = 0
         if oUnit.GetTacticalSiloAmmoCount then iMissiles = iMissiles + oUnit:GetTacticalSiloAmmoCount() end
         if oUnit.GetNukeSiloAmmoCount then iMissiles = iMissiles + oUnit:GetNukeSiloAmmoCount() end
         if iMissiles >= 2 then
             oUnit['M27MissileChecker'] = true
             while M27UnitInfo.IsUnitValid(oUnit) do
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitSeconds(10)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 iMissiles = 0
                 if oUnit.GetTacticalSiloAmmoCount then iMissiles = iMissiles + oUnit:GetTacticalSiloAmmoCount() end
                 if oUnit.GetNukeSiloAmmoCount then iMissiles = iMissiles + oUnit:GetNukeSiloAmmoCount() end
+                if bDebugMessages == true then LOG(sFunctionRef..': iMissiles='..iMissiles) end
                 if iMissiles < 2 then
                     oUnit:SetPaused(false)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will change unit state so it isnt paused') end
                     break
                 end
 
             end
+        else
+            if M27UnitInfo.IsUnitValid(oUnit) then oUnit:SetPaused(false) end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 function CheckIfWantToBuildAnotherMissile(oUnit)
     ForkThread(ForkedCheckForAnotherMissile, oUnit)

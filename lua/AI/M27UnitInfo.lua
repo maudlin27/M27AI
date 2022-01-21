@@ -26,6 +26,8 @@ refiGameTimeMicroStarted = 'M27UnitGameTimeMicroStarted'
 refbOverchargeOrderGiven = 'M27UnitOverchargeOrderGiven'
 refsUpgradeRef = 'M27UnitUpgradeRef' --If ACU starts an upgrade, it records the string reference here
 refbPaused = 'M27UnitPaused' --true if paused due to poewr stall manager
+refbRecentlyDealtDamage = 'M27UnitRecentlyDealtDamage' --true if dealt damage in last 5s
+refiGameTimeDamageLastDealt = 'M27UnitTimeLastDealtDamage'
 
 --Factions
 refFactionUEF = 1
