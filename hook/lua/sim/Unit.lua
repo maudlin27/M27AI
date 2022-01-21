@@ -19,6 +19,10 @@ Unit = Class(M27Unit) {
         M27Unit.OnDamage(self, instigator, amount, vector, damageType)
         M27Events.OnDamaged(self, instigator) --Want this after just incase our code messes things up
     end,
+    OnSiloBuildEnd = function(self, weapon)
+        M27Events.OnMissileBuilt(self, weapon)
+        M27Unit.OnMissileBuilt(self, weapon)
+    end
 
     --[[CreateEnhancementEffects = function(self, enhancement)
         local bp = self:GetBlueprint().Enhancements[enhancement]

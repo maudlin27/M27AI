@@ -132,22 +132,30 @@ function MoveInHalfCircleTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     ForkThread(ForkedMoveInHalfCircle, oUnit, iTimeToRun, tPositionToRunFrom)
 end
 
-function ForkedMoveInCircle(oUnit, iTimeToRun)
+function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontClearCommandsFirst, iCircleSizeOverride, iTickWaitOverride)
     --More intensive version of MoveAwayFromTargetTemporarily, intended e.g. for ACUs
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ForkedMoveInCircle'
 
     --KEY CONFIG SETTINGS: (these will work sometimes but not always against an aeon strat)
     local iInitialAngleAdj = 15
-    local iAngleMaxSingleAdj = 45
     local iInitialDistanceAdj = -1
-    local iDistanceAwayToMove = 2
-    local iTicksBetweenOrders = 4
+    local iDistanceAwayToMove = (iCircleSizeOverride or 2)
+    local iAngleMaxSingleAdj = 45
+    local iTicksBetweenOrders = (iTickWaitOverride or 4)
+
+    if iDistanceAwayToMove > oUnit:GetBlueprint().Physics.MaxSpeed * 1.5 then
+        iAngleMaxSingleAdj = math.max(25, iAngleMaxSingleAdj * 2.5 / iDistanceAwayToMove)
+    end
+
+
 
     local iStartTime = GetGameTimeSeconds()
     oUnit[M27UnitInfo.refiGameTimeMicroStarted] = iStartTime
     local iLoopCount = 0
     local iMaxLoop = iTimeToRun * 10 + 1
+    --Distance from point A to point B will be much less than distanceaway to move, since that is the distance from the centre (radius) rather than the distance between 1 points on the circle edge; for simplicity will assume that distance is 0.25 of the distance from the centre
+    if bDontTreatAsMicroAction then iMaxLoop = math.ceil(iTimeToRun / (iDistanceAwayToMove / oUnit:GetBlueprint().Physics.MaxSpeed)) * 4 end
     local tUnitStartPosition = oUnit:GetPosition()
     --local iAngleToTargetToEscape = M27Utilities.GetAngleFromAToB(tUnitStartPosition, tPositionToRunFrom)
     local iCurFacingDirection = M27UnitInfo.GetUnitFacingAngle(oUnit)
@@ -164,24 +172,31 @@ function ForkedMoveInCircle(oUnit, iTimeToRun)
 
     local tTempLocationToMove
 
-    oUnit[M27UnitInfo.refbSpecialMicroActive] = true
-    if oUnit.PlatoonHandle then
-        oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+
+    if not(bDontTreatAsMicroAction) then
+        oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+        if oUnit.PlatoonHandle then
+            oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+        end
+        M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
     end
-    M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
     local bRecentMicro = false
     local iRecentMicroThreshold = 1
     local iGameTime = GetGameTimeSeconds()
     if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
 
-    if bRecentMicro == false then IssueClearCommands({oUnit}) end
+    if bRecentMicro == false and not(bDontClearCommandsFirst) then IssueClearCommands({oUnit}) end
     if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; tUnitStartPosition='..repr(tUnitStartPosition)) end
     local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
     local iTempDistanceAwayToMove
-    while (oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun) do
+    local bTimeToStop = false
+    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbSpecialMicroActive='..tostring((oUnit[M27UnitInfo.refbSpecialMicroActive] or false))..'; iMaxLoop='..iMaxLoop) end
+    while bTimeToStop == false do
     --while not(iTempAngleDirectionToMove == iFacingAngleWanted) do
         iLoopCount = iLoopCount + 1
-        if iLoopCount > iMaxLoop then M27Utilities.ErrorHandler('Loop has gone on for too long, likely infinite') break end
+        if iLoopCount > iMaxLoop then break
+        elseif M27UnitInfo.IsUnitValid(oUnit) == false then break end --No longer give error message as may be calling this for intel scouts now
+            --M27Utilities.ErrorHandler('Loop has gone on for too long, likely infinite') break end
 
         --iCurAngleDif = math.abs(iTempAngleDirectionToMove - iFacingAngleWanted)
         --if iCurAngleDif < iAngleMaxSingleAdj then iTempAngleDirectionToMove = iFacingAngleWanted
@@ -194,6 +209,7 @@ function ForkedMoveInCircle(oUnit, iTimeToRun)
         tTempLocationToMove = M27Utilities.MoveInDirection(tUnitStartPosition, iTempAngleDirectionToMove, iTempDistanceAwayToMove)
         IssueMove({oUnit}, tTempLocationToMove)
         WaitTicks(iTicksBetweenOrders)
+        if not(bDontTreatAsMicroAction) and not((oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun)) then bTimeToStop = true end
     end
 
     --[[while (oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun) do
@@ -212,8 +228,8 @@ function ForkedMoveInCircle(oUnit, iTimeToRun)
     end --]]
 end
 
-function MoveInCircleTemporarily(oUnit, iTimeToRun)
-    ForkThread(ForkedMoveInCircle, oUnit, iTimeToRun)
+function MoveInCircleTemporarily(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontClearCommandsFirst, iCircleSizeOverride, iTickWaitOverride)
+    ForkThread(ForkedMoveInCircle, oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontClearCommandsFirst, iCircleSizeOverride, iTickWaitOverride)
 end
 
 

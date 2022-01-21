@@ -25,6 +25,7 @@ refiGameTimeToResetMicroActive = 'M27UnitGameTimeToResetMicro'
 refiGameTimeMicroStarted = 'M27UnitGameTimeMicroStarted'
 refbOverchargeOrderGiven = 'M27UnitOverchargeOrderGiven'
 refsUpgradeRef = 'M27UnitUpgradeRef' --If ACU starts an upgrade, it records the string reference here
+refbPaused = 'M27UnitPaused' --true if paused due to poewr stall manager
 
 --Factions
 refFactionUEF = 1
@@ -78,17 +79,17 @@ refCategoryTML = categories.SILO * categories.STRUCTURE * categories.TECH2 - cat
 --refCategorySAM = categories.ANTIAIR * categories.STRUCTURE * categories.TECH3
 
 --Land units
-refCategoryGroundExperimental = categories.LAND * categories.EXPERIMENTAL + categories.STRUCTURE * categories.EXPERIMENTAL
+refCategoryExperimentalStructure = categories.CYBRAN * categories.ARTILLERY * categories.EXPERIMENTAL + categories.STRUCTURE * categories.EXPERIMENTAL
 refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY
 refCategoryMobileLand = categories.LAND * categories.MOBILE
-refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND
+refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
 refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT - categories.ANTIAIR --NOTE: Need to specify fastest (for cybran who have mantis and LAB)
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA --NOTE: Need to specify slowest (so dont pick LAB)
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
 refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE - refCategoryLandExperimental
 refCategoryT3MobileArtillery = categories.ARTILLERY * categories.LAND * categories.MOBILE
-refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - refCategoryEngineer -refCategoryLandScout -refCategoryMAA
+refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER - refCategoryEngineer -refCategoryLandScout -refCategoryMAA
 refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS - categories.ANTISHIELD * categories.AEON --Dont include aeon T3 anti-shield here as it sucks unless against shields
 refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
@@ -126,6 +127,8 @@ refCategoryAntiNavy = categories.ANTINAVY * categories.STRUCTURE + categories.AN
 --Dangerous to land units, e.g. engieners look for these when deciding reclaim area
 refCategoryDangerousToLand = refCategoryLandCombat + refCategoryIndirect + refCategoryAllNavy + refCategoryBomber + refCategoryGunship + refCategoryPD + refCategoryFixedT2Arti
 refCategoryAllNonAirScoutUnits = categories.MOBILE + refCategoryStructure + refCategoryAirNonScout
+refCategoryStealthGenerator = categories.STEALTHFIELD
+refCategoryStealthAndCloakPersonal = categories.STEALTH
 
 
 --Weapon target priorities
@@ -436,6 +439,47 @@ function EnableUnitShield(oUnit)
     oUnit[refbShieldIsDisabled] = false
 end
 
+function DisableUnitIntel(oUnit)
+    --[[
+    if oUnit.DisableUnitIntel then
+        oUnit:DisableUnitIntel('ToggleBit3', 'Sonar')
+        oUnit:DisableUnitIntel('ToggleBit3', 'Omni')
+        oUnit:DisableUnitIntel('ToggleBit3', 'Radar')
+    end--]]
+    oUnit:OnScriptBitSet(3)
+end
+function EnableUnitIntel(oUnit)
+    --[[if oUnit.EnableUnitIntel then
+        oUnit:EnableUnitIntel('ToggleBit3', 'Sonar')
+        oUnit:EnableUnitIntel('ToggleBit3', 'Omni')
+        oUnit:EnableUnitIntel('ToggleBit3', 'Radar')
+    end--]]
+    oUnit:OnScriptBitClear(3)
+end
+
+function DisableUnitJamming(oUnit)
+    --[[if oUnit.DisableUnitIntel then
+        oUnit:DisableUnitIntel('ToggleBit3', 'Jammer')
+    end--]]
+    oUnit:OnScriptBitSet(2)
+end
+function EnableUnitJamming(oUnit)
+    --if oUnit.EnableUnitIntel then oUnit:EnableUnitIntel('ToggleBit3', 'Jammer') end
+    oUnit:OnScriptBitClear(2)
+end
+
+function DisableUnitStealth(oUnit)
+    --[[if oUnit.DisableUnitIntel then
+        oUnit:DisableUnitIntel('ToggleBit3', 'RadarStealth')--]]
+    oUnit:OnScriptBitSet(5) --stealth
+    oUnit:OnScriptBitSet(8) --cloak
+end
+function EnableUnitStealth(oUnit)
+    oUnit:OnScriptBitClear(5)
+    oUnit:OnScriptBitClear(8)
+end
+
+
 function GetUnitFacingAngle(oUnit)
     --0/360 = north, 90 = west, 180 = south, 270 = east
     return 180 - oUnit:GetHeading() / math.pi * 180
@@ -477,9 +521,11 @@ end
 function GetUnitIndirectRange(oUnit)
 
     local iMaxRange = 0
-    for iCurWeapon, oCurWeapon in oUnit:GetBlueprint().Weapon do
-        if oCurWeapon.WeaponCategory == 'Missile' or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
-            if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
+    if oUnit.GetBlueprint then
+        for iCurWeapon, oCurWeapon in oUnit:GetBlueprint().Weapon do
+            if oCurWeapon.WeaponCategory == 'Missile' or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
+                if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
+            end
         end
     end
     return iMaxRange
@@ -496,4 +542,17 @@ function GetUpgradeBuildTime(oUnit, sUpgradeRef)
     end
     if not(iUpgradeTime) then M27Utilities.ErrorHandler('oUnit '..oUnit:GetUnitId()..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeTime
+end
+
+function GetUpgradeEnergyCost(oUnit, sUpgradeRef)
+    local oBP = oUnit:GetBlueprint()
+    local iUpgradeEnergy
+    for sUpgradeID, tUpgrade in oBP.Enhancements do
+        if sUpgradeID == sUpgradeRef then
+            iUpgradeEnergy = tUpgrade.BuildCostEnergy
+        end
+
+    end
+    if not(iUpgradeEnergy) then M27Utilities.ErrorHandler('oUnit '..oUnit:GetUnitId()..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
+    return iUpgradeEnergy
 end

@@ -30,6 +30,7 @@ refiTimeLastCheckedForIdleShields = 'M27PlatoonFormerTimeCheckedIdleShields' --G
 
 refoMAABasePatrolPlatoon = 'M27PlatoonFormerMAABasePatrol'
 refoMAARallyPatrolPlatoon = 'M27PlatoonFormerMAARallyPatrol'
+refoCombatPatrolPlatoon = 'M27PlatoonCombatPatrol'
 
 local iIdleUnitSearchThreshold = 10
 
@@ -188,7 +189,32 @@ function CombatPlatoonFormer(aiBrain)
     RefreshUnitsWaitingForAssignment(aiBrain)
     local iUnitsWaiting = 0
     local tUnitsWaiting = aiBrain[reftoCombatUnitsWaitingForAssignment]
+    local bAreUsingCombatPatrolUnits = false
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Is tUnitsWaiting empty='..tostring(M27Utilities.IsTableEmpty(tUnitsWaiting))..'; does the combat patrol platoon exist?')
+        if aiBrain[refoCombatPatrolPlatoon] then
+            LOG('It exists, now seeing if aiBrain check returns true')
+            if aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) then
+                LOG('aiBrain says it exists, number of units in it='..(aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] or 'nil'))
+            end
+        end
+    end
+    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) and aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] > 0 then
+        if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then iUnitsWaiting = table.getn(tUnitsWaiting) end
+        for iUnit, oUnit in aiBrain[refoCombatPatrolPlatoon]:GetPlatoonUnits() do
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                iUnitsWaiting = iUnitsWaiting + 1
+                tUnitsWaiting[iUnitsWaiting] = oUnit
+            end
+        end
+        bAreUsingCombatPatrolUnits = true
+        if bDebugMessages == true then LOG(sFunctionRef..': Have combat patrol units so setting units waiting to be the units in the combat patrol platoon. IsTableEmpty='..tostring(M27Utilities.IsTableEmpty(tUnitsWaiting))) end
+    end
     if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then
+        --Exclude ACU and experimentals
+        if bDebugMessages == true then LOG(sFunctionRef..': Removing any ACUs and experimentals from the units to form platoons with as backup as these are dealt with separately') end
+        tUnitsWaiting = EntityCategoryFilterDown(categories.ALLUNITS - categories.COMMAND -M27UnitInfo.refCategoryLandExperimental, tUnitsWaiting)
+        --[[
         --Check if ACU is one of the units
         local iCurCount = 0
         local tUnitsToExclude = EntityCategoryFilterDown(categories.COMMAND + M27UnitInfo.refCategoryLandExperimental, tUnitsWaiting)
@@ -210,17 +236,17 @@ function CombatPlatoonFormer(aiBrain)
                 end
             end
             tUnitsToExclude = EntityCategoryFilterDown(categories.COMMAND + M27UnitInfo.refCategoryLandExperimental, tUnitsWaiting)
-        end
+        end--]]
 
         iUnitsWaiting = table.getn(tUnitsWaiting)
-        local tDFUnitsWaiting, tIndirectT1UnitsWaiting, tIndirectT2PlusUnitsWaiting, iDFUnitsWaiting, iIndirectT1UnitsWaiting, iIndirectT2PlusUnitsWaiting
+        --local tDFUnitsWaiting, tIndirectT1UnitsWaiting, tIndirectT2PlusUnitsWaiting, iDFUnitsWaiting, iIndirectT1UnitsWaiting, iIndirectT2PlusUnitsWaiting
 
         if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then
             if bDebugMessages == true then
-                LOG(sFunctionRef..': iUnitsWaiting='..iUnitsWaiting..'; About to list out every unit in aiBrain[reftoCombatUnitsWaitingForAssignment]')
-                if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == true then LOG('Table is empty')
+                LOG(sFunctionRef..': iUnitsWaiting='..iUnitsWaiting..'; About to list out every unit in tUnitsWaiting')
+                if M27Utilities.IsTableEmpty(tUnitsWaiting) == true then LOG('Table is empty')
                 else
-                    for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
+                    for iUnit, oUnit in tUnitsWaiting do
                         local iUniqueID = M27UnitInfo.GetUnitLifetimeCount(oUnit)
                         if iUniqueID == nil then iUniqueID = 0 end
                         LOG('iUnit='..iUnit..'; Blueprint+UniqueCount='..oUnit:GetUnitId()..iUniqueID)
@@ -239,6 +265,7 @@ function CombatPlatoonFormer(aiBrain)
                 oPlatoonOrUnitToEscort = nil
                 iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
                 if iStrategy == M27Overseer.refStrategyLandEarly then
+                    if bDebugMessages == true then LOG(sFunctionRef..'We are using early land strategy, decide what platoon to form') end
                     aiBrain[refbUsingTanksForPlatoons] = true
                     if iCurrentConditionToTry == 1 then --Initial land raiders
                         if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] < aiBrain[M27Overseer.refiInitialRaiderPlatoonsWanted] then
@@ -328,12 +355,14 @@ function CombatPlatoonFormer(aiBrain)
                 iCurrentConditionToTry = iCurrentConditionToTry + 1
             end
 
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished looping throug hplatoon former conditions to work out what platoon to form. aiBrain[refbUsingTanksForPlatoons]='..tostring(aiBrain[refbUsingTanksForPlatoons])..'; sPlatoonToForm='..(sPlatoonToForm or 'nil')) end
+
             if sPlatoonToForm == nil then
                 M27Utilities.ErrorHandler('Werent able to figure out a platoon for a combat unit to go into')
             else
                 --Do we have enough units for this platoon?
                 local iMinSize = M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize]
-                if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; sPlatoonWanted='..sPlatoonToForm..'; iMinSize='..iMinSize..'; iUnitsWaiting='..iUnitsWaiting) end
+                if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry after increasing by 1='..iCurrentConditionToTry..'; sPlatoonWanted='..sPlatoonToForm..'; iMinSize='..iMinSize..'; iUnitsWaiting='..iUnitsWaiting) end
                 if iUnitsWaiting >= iMinSize then
                     --Are we an escort platoon?
                     local tTemporaryUnitsWaitingForAssignment = {}
@@ -343,50 +372,66 @@ function CombatPlatoonFormer(aiBrain)
                         --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride)
                         local iThreatOfUnitsWaitingForAssignment = M27Logic.GetCombatThreatRating(aiBrain, aiBrain[reftoCombatUnitsWaitingForAssignment], false, nil, nil)
                         local iExcessThreat = math.max(0, iThreatOfUnitsWaitingForAssignment + oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiCurrentEscortThreat] - oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiEscortThreatWanted])
-                        if iExcessThreat > 120 then
-                            --Temporarily move spare units waiting for assignment into a different platoon until we've finished allocating
+                        local oUnitToAddToEscort
+                        if iExcessThreat > 100 then
+                            --Temporarily move spare units waiting for assignment into a different platoon until we've removing all spare units/threat
                             local iCurLoopCount = 0
-                            while iExcessThreat > 120 do
+                            local iCurUnitRef
+                            while iExcessThreat > 100 do
                                 iCurLoopCount = iCurLoopCount + 1
                                 if iCurLoopCount > 100 then M27Utilities.ErrorHandler('Likely infinite loop as have been through 100 units waiting for assignment') break
                                 else
-                                    --Move the cur unit waiting for assignment into the temporary table
-                                    local iUnitsWaitingForAssignment = table.getn(aiBrain[reftoCombatUnitsWaitingForAssignment])
-                                    local iLastTableUnitThreat = M27Logic.GetCombatThreatRating(aiBrain, {aiBrain[reftoCombatUnitsWaitingForAssignment][iUnitsWaitingForAssignment]}, false, nil, nil)
-                                    if iLastTableUnitThreat > iExcessThreat then
-                                        break
-                                    else
-                                        iTemporaryUnitsWaitingForAssignment = iTemporaryUnitsWaitingForAssignment + 1
-                                        tTemporaryUnitsWaitingForAssignment[iTemporaryUnitsWaitingForAssignment] = aiBrain[reftoCombatUnitsWaitingForAssignment][iUnitsWaitingForAssignment]
-                                        table.remove(aiBrain[reftoCombatUnitsWaitingForAssignment], iUnitsWaitingForAssignment)
-                                        iExcessThreat = iExcessThreat - iLastTableUnitThreat
+                                    iCurUnitRef = table.getn(tUnitsWaiting)
+                                    if tUnitsWaiting[iCurUnitRef] then
+                                        local iLastTableUnitThreat = M27Logic.GetCombatThreatRating(aiBrain, {tUnitsWaiting[iCurUnitRef]}, false, nil, nil)
+                                        if iLastTableUnitThreat > iExcessThreat then
+                                            break
+                                        else
+                                            iTemporaryUnitsWaitingForAssignment = iTemporaryUnitsWaitingForAssignment + 1
+                                            tTemporaryUnitsWaitingForAssignment[iTemporaryUnitsWaitingForAssignment] = tUnitsWaiting[iCurUnitRef]
+                                            table.remove(tUnitsWaiting, iCurUnitRef)
+                                            iExcessThreat = iExcessThreat - iLastTableUnitThreat
+                                            if iExcessThreat <= 0 then break
+                                            elseif M27Utilities.IsTableEmpty(tUnitsWaiting) == true then
+                                                break
+                                            end
+                                        end
+                                    else break
                                     end
                                 end
                             end
                         end
                     end
-
-                    if oPlatoonOrUnitToEscort and oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon] and aiBrain:PlatoonExists(oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon]) then
-                        --Add to existing platoon
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have a platoon or unit to escort that already has an assigned escort so will assign units to existing escort') end
-                        aiBrain:AssignUnitsToPlatoon(oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon], aiBrain[reftoCombatUnitsWaitingForAssignment], 'Attack', 'GrowthFormation')
-                    else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Creating new platoon and assigning units to it') end
-                        local oNewPlatoon = CreatePlatoon(aiBrain, sPlatoonToForm, aiBrain[reftoCombatUnitsWaitingForAssignment])
-                        if oPlatoonOrUnitToEscort then
-                            if bDebugMessages == true then LOG(sFunctionRef..': oPlatoonOrUnitToEscort doesnt have an escorting platoon assigned to it') end
-                            oNewPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oPlatoonOrUnitToEscort
-                            oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon] = oNewPlatoon
+                    if not(bAreUsingCombatPatrolUnits) or not(sPlatoonToForm == 'M27CombatPatrolAI') then
+                        if oPlatoonOrUnitToEscort and oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon] and aiBrain:PlatoonExists(oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon]) then
+                            --Add to existing platoon
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have a platoon or unit to escort that already has an assigned escort so will assign units to existing escort') end
+                            aiBrain:AssignUnitsToPlatoon(oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon], tUnitsWaiting, 'Attack', 'GrowthFormation')
+                        elseif sPlatoonToForm == 'M27CombatPatrolAI' then
+                            if aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) then
+                                aiBrain:AssignUnitsToPlatoon(aiBrain[refoCombatPatrolPlatoon], tUnitsWaiting, 'Attack', 'GrowthFormation')
+                            else aiBrain[refoCombatPatrolPlatoon] = CreatePlatoon(aiBrain, sPlatoonToForm, tUnitsWaiting)
+                            end
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': Creating new platoon and assigning units to it') end
+                            local oNewPlatoon = CreatePlatoon(aiBrain, sPlatoonToForm, tUnitsWaiting)
+                            if oPlatoonOrUnitToEscort then
+                                if bDebugMessages == true then LOG(sFunctionRef..': oPlatoonOrUnitToEscort doesnt have an escorting platoon assigned to it') end
+                                oNewPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oPlatoonOrUnitToEscort
+                                oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon] = oNewPlatoon
+                            end
                         end
-                    end
-                    for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
-                        oUnit[refbWaitingForAssignment] = false
-                    end
-                    aiBrain[reftoCombatUnitsWaitingForAssignment] = {}
-                    --Did we have too many units for assignment? If so then move spare ones back to be waiting for assignment
-                    if iTemporaryUnitsWaitingForAssignment > 0 then
-                        for iUnit, oUnit in tTemporaryUnitsWaitingForAssignment do
-                            aiBrain[reftoCombatUnitsWaitingForAssignment][iUnit] = oUnit
+                        for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
+                            oUnit[refbWaitingForAssignment] = false
+                        end
+                        aiBrain[reftoCombatUnitsWaitingForAssignment] = {}
+                        --Did we have too many units for assignment? If so then move spare ones back to be waiting for assignment
+                        if iTemporaryUnitsWaitingForAssignment > 0 then
+                            if not(bAreUsingCombatPatrolUnits) then
+                                for iUnit, oUnit in tTemporaryUnitsWaitingForAssignment do
+                                    aiBrain[reftoCombatUnitsWaitingForAssignment][iUnit] = oUnit
+                                end
+                            end
                         end
                     end
                 else
@@ -460,6 +505,11 @@ function CombatPlatoonFormer(aiBrain)
                     end
                 end
             end
+        end
+        --Are we still using units, but are using them from the combat patrol platoon and still ahve units left in this platoon?
+        if bAreUsingCombatPatrolUnits and aiBrain[refbUsingTanksForPlatoons] == true and aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) and M27Utilities.IsTableEmpty(aiBrain[refoCombatPatrolPlatoon]:GetPlatoonUnits()) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are using combat patrol units and still have units left in the patrol platoon so will say we arent actually using tanks that we build') end
+            aiBrain[refbUsingTanksForPlatoons] = false
         end
     else if bDebugMessages == true then LOG(sFunctionRef..': No units waiting for assigment to a platoon') end
     end

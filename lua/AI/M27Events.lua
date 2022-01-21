@@ -14,6 +14,7 @@ local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
+local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -192,6 +193,20 @@ function OnWeaponFired(oWeapon)
         if oWeapon.GetBlueprint and oWeapon:GetBlueprint().Overcharge then
             oUnit[M27UnitInfo.refbOverchargeOrderGiven] = false
             if bDebugMessages == true then LOG('Overcharge weapon was just fired') end
+        end
+    end
+end
+
+function OnMissileBuilt(self, weapon)
+    if self.GetAIBrain and self:GetAIBrain().M27AI then
+        --Pause if we already have 2 missiles
+        local iMissiles = 0
+        if self.GetTacticalSiloAmmoCount then iMissiles = iMissiles + self:GetTacticalSiloAmmoCount() end
+        if self.GetNukeSiloAmmoCount then iMissiles = iMissiles + self:GetNukeSiloAmmoCount() end
+        if iMissiles >= 2 then
+            self:SetPaused(true)
+            --Recheck every minute
+            M27Logic.CheckIfWantToBuildAnotherMissile(self)
         end
     end
 end

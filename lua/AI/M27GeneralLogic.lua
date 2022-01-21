@@ -131,7 +131,7 @@ function ChooseReclaimTarget(oEngineer)
             for iCount, tSegmentXAndZ in aiBrain[M27MapInfo.reftReclaimAreasOfInterest][iCurPriority] do
                 tCurMidpoint = M27MapInfo.tReclaimAreas[tSegmentXAndZ[1]][tSegmentXAndZ[2]][M27MapInfo.refReclaimSegmentMidpoint]
                 sLocationRef = M27Utilities.ConvertLocationToReference(tCurMidpoint)
-                if not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) or not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim]) or not(M27UnitInfo.IsUnitValid(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim])) then
+                if not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) or not(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaimArea]) or not(M27UnitInfo.IsUnitValid(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaimArea])) then
                     iCurDistanceToEngi = M27Utilities.GetDistanceBetweenPositions(tEngiPosition, tCurMidpoint)
                     if iCurDistanceToEngi < iClosestDistanceToEngi and iCurDistanceToEngi > M27MapInfo.iReclaimSegmentSizeX then --Need to be a certain distance away or else risk the same location being given to the engineer repeatedly
                         iClosestDistanceToEngi = iCurDistanceToEngi
@@ -238,8 +238,8 @@ function ChooseReclaimTarget(oEngineer)
                         iCurPriority = iCurPriority - 3 * iCurOtherPlayerDistance / iAbsClosestOtherPlayerDistance -- Reduces priority if closer to enemy than to us; increases priority if closer to us than enemy
                         sLocationRef = M27Utilities.ConvertLocationToReference(M27MapInfo.tReclaimAreas[iCurSegmentX][iCurSegmentZ][2])
                         iAlreadyAssignedEngis = 0
-                        if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation] and aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim]) == false then
-                            iAlreadyAssignedEngis = table.getn(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaim])
+                        if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation] and aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaimArea]) == false then
+                            iAlreadyAssignedEngis = table.getn(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaimArea])
                         end
                         iCurPriority = iCurPriority - 2 * iAlreadyAssignedEngis
 
@@ -1222,6 +1222,7 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
     local sFunctionRef = 'GetDirectFireUnitMinOrMaxRange'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
     local iCurRange = 0
     local iMinRange = 1000000000
     local iMaxRange = 0
@@ -1253,10 +1254,14 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering weapon '..(oCurWeapon.DisplayName or 'nil')) end
                 if not(oCurWeapon.CannotAttackGround == true) then
                     if not(oCurWeapon.ManualFire == true) then
-                        iCurRange = oCurWeapon.MaxRadius
-                        if iCurRange > iMaxRange then iMaxRange = iCurRange end
-                        if iCurRange < iMinRange then iMinRange = iCurRange end
-                        if bDebugMessages == true then LOG(sFunctionRef..': iCurRange='..iCurRange..'; iMaxRange='..iMaxRange) end
+                        --Exclude indirect fire weapons
+                        if not(oCurWeapon.WeaponCategory == 'Artillery') and not(oCurWeapon.WeaponCategory == 'Missile') and not(oCurWeapon.WeaponCategory == 'Indirect Fire') then
+                            iCurRange = oCurWeapon.MaxRadius
+                            if iCurRange > iMaxRange then iMaxRange = iCurRange end
+                            if iCurRange < iMinRange then iMinRange = iCurRange end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iCurRange='..iCurRange..'; iMaxRange='..iMaxRange) end
+                        elseif bDebugMessages == true then LOG(sFunctionRef..': Have an indirect fire unit')
+                        end
                     elseif bDebugMessages == true then LOG(sFunctionRef..': Manual fire is true')
                     end
                 elseif bDebugMessages == true then LOG(sFunctionRef..': CannotAttackGround is true')
@@ -1478,6 +1483,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                             iCurThreat = 0
                                         else
                                             --Specific speed checks
+                                            if bDebugMessages == true and oUnit.GetBlueprint then LOG('Unit has blueprint with maxpseed='..oUnit:GetBlueprint().Physics.MaxSpeed) end
                                             if oUnit.GetBlueprint and oUnit:GetBlueprint().Physics.MaxSpeed == 1.9 then
                                                 --Unit is same speed as engineer so more likely tahn not its an engineer
                                                 iCurThreat = 10
@@ -1485,7 +1491,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                                 --Unit is same speed as ACU so more likely than not its an ACU
                                                 iCurThreat = 800
                                             else
-                                                if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not') end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not; will be using blip threat override of '..iMassValueOfBlipsOverride..' if more than one blip') end
                                                 if iTotalUnits <= 1 then iCurThreat = (iSoloBlipMassOverride or 54)
                                                 else iCurThreat = (iMassValueOfBlipsOverride or 54) end
                                             end
@@ -3277,4 +3283,29 @@ function GetPositionToSideOfTarget(oUnit, tTargetLocation, iBaseAngleToTarget, i
     local tDestination = M27Utilities.MoveInDirection(tTargetLocation, iPostRebasingAngleToMove, iDistanceToMove) --Should try to move north-west of our ACU (which is what we want)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tDestination
+end
+
+function ForkedCheckForAnotherMissile(oUnit)
+    if not(oUnit['M27MissileChecker'] == true) then
+        local iMissiles = 0
+        if oUnit.GetTacticalSiloAmmoCount then iMissiles = iMissiles + oUnit:GetTacticalSiloAmmoCount() end
+        if oUnit.GetNukeSiloAmmoCount then iMissiles = iMissiles + oUnit:GetNukeSiloAmmoCount() end
+        if iMissiles >= 2 then
+            oUnit['M27MissileChecker'] = true
+            while M27UnitInfo.IsUnitValid(oUnit) do
+                WaitSeconds(10)
+                iMissiles = 0
+                if oUnit.GetTacticalSiloAmmoCount then iMissiles = iMissiles + oUnit:GetTacticalSiloAmmoCount() end
+                if oUnit.GetNukeSiloAmmoCount then iMissiles = iMissiles + oUnit:GetNukeSiloAmmoCount() end
+                if iMissiles < 2 then
+                    oUnit:SetPaused(false)
+                    break
+                end
+
+            end
+        end
+    end
+end
+function CheckIfWantToBuildAnotherMissile(oUnit)
+    ForkThread(ForkedCheckForAnotherMissile, oUnit)
 end

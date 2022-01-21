@@ -34,6 +34,9 @@ refiMassNetBaseIncome = 'M27MassNetIncome'
 refiMexesUpgrading = 'M27EconomyMexesUpgrading'
 refiMexesAvailableForUpgrade = 'M27EconomyMexesAvailableToUpgrade'
 
+refbStallingEnergy = 'M27EconomyStallingEnergy'
+reftPausedUnits = 'M27EconomyPausedUnits'
+
 
 --Other variables:
 local refCategoryLandFactory = M27UnitInfo.refCategoryLandFactory
@@ -636,7 +639,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     local iMexesToBaseFactoryCalcOn = math.min(iMexesOnOurSideOfMap, iMexCount)
 
 
-    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iFactoriesWanted = math.max(2, math.ceil(iMexesToBaseFactoryCalcOn * 0.25))
+    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iFactoriesWanted = math.max(2, math.ceil(iMexesToBaseFactoryCalcOn * 0.2))
     else iFactoriesWanted = math.max(4, 10, iMexesToBaseFactoryCalcOn * 0.7) end
 
     local bNormalLogic = true
@@ -772,11 +775,16 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 iMaxToUpgrade = -1
                 aiBrain[refbPauseForPowerStall] = true
             else
-                --Check for mass stall
-                if iMassStored <= 50 and iMassNetIncome < 0.2 then
-                    --Check the last mex isn't about to complete
-                    aiBrain[refbPauseForPowerStall] = false
-                    iMaxToUpgrade = -1
+                --Check for mass stall if we have more than 1 mex or any factories upgrading, or have nearby enemy
+                local iLandFactoryUpgrading, iLandFactoryAvailable, bAlreadyUpgradingLandHQ = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory, true)
+                local iAirFactoryUpgrading, iAirFactoryAvailable, bAlreadyUpgradingAirHQ = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryAirFactory, true)
+
+                if aiBrain[refiMexesUpgrading] > 1 or iLandFactoryUpgrading + iAirFactoryUpgrading > 0 or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 100 or aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= 0.3 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if stalling mass; iMassStored='..iMassStored..'; aiBrain:GetEconomyStoredRatio(MASS)='..aiBrain:GetEconomyStoredRatio('MASS')..'; iMassNetIncome='..iMassNetIncome) end
+                    if (iMassStored <= 60 or aiBrain:GetEconomyStoredRatio('MASS') <= 0.06) and iMassNetIncome < 0.2 then
+                        aiBrain[refbPauseForPowerStall] = false
+                        iMaxToUpgrade = -1
+                    end
                 end
             end
 
@@ -948,6 +956,205 @@ function UpgradeMainLoop(aiBrain)
 
 end
 
+function ManageEnergyStalls(aiBrain)
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ManageEnergyStalls'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    local bPauseNotUnpause = true
+    local bChangeRequired = false
+    if GetGameTimeSeconds() >= 90 then --Only consider power stall management after 1.5m, otherwise risk pausing things when we would probably be ok
+        if bDebugMessages == true then LOG(sFunctionRef..': About to consider if we have an energy stall or not. aiBrain:GetEconomyStoredRatio(ENERGY)='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; aiBrain[refiEnergyNetBaseIncome]='..aiBrain[refiEnergyNetBaseIncome]..'; aiBrain:GetEconomyTrend(ENERGY)='..aiBrain:GetEconomyTrend('ENERGY')..'; aiBrain[refbStallingEnergy]='..tostring(aiBrain[refbStallingEnergy])) end
+        --First consider unpausing
+        if bDebugMessages == true then LOG(sFunctionRef..': If we have flagged that we are stalling energy then will check if we have enough to start unpausing things') end
+        if aiBrain[refbStallingEnergy] and (aiBrain:GetEconomyStoredRatio('ENERGY') > 0.8 or (aiBrain:GetEconomyStoredRatio('ENERGY') > 0.7 and aiBrain[refiEnergyNetBaseIncome] > 1) or (aiBrain:GetEconomyStoredRatio('ENERGY') > 0.5 and aiBrain[refiEnergyNetBaseIncome] > 4) or (GetGameTimeSeconds() <= 180 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.3)) then
+            --aiBrain[refbStallingEnergy] = false
+            if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy stored or income to start unpausing things') end
+            bChangeRequired = true
+            bPauseNotUnpause = false
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Checking if we shoudl flag that we are energy stalling') end
+        --Check if should manage energy stall
+        if bChangeRequired == false and (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.08 or (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.6 and aiBrain[refiEnergyNetBaseIncome] < 2) or (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.4 and aiBrain[refiEnergyNetBaseIncome] < 0.5)) then
+            if bDebugMessages == true then LOG(sFunctionRef..': We are stalling energy, will look for units to pause') end
+            --If this is early game then add extra check
+            if GetGameTimeSeconds() >= 180 or aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.04 then
+                aiBrain[refbStallingEnergy] = true
+                bChangeRequired = true
+            end
+        end
+
+        if bChangeRequired then
+            --Decide on order to pause/unpause
+
+            local tCategoriesByPriority
+            local tEngineerActionsByPriority
+            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
+                tCategoriesByPriority = {M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, M27UnitInfo.refCategoryEngineer}
+                tEngineerActionsByPriority = {{M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildLandExperimental, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionBuildSMD},
+                                              {M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro} }
+            elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                tCategoriesByPriority = {M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, M27UnitInfo.refCategoryEngineer}
+                tEngineerActionsByPriority = {{M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildLandExperimental, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildLandFactory},
+                                              {M27EngineerOverseer.refActionAssistSMD, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionBuildSecondPower},
+                                              {M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro}}
+            elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+                tCategoriesByPriority = {M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryEngineer}
+                tEngineerActionsByPriority = {{M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildLandExperimental, M27EngineerOverseer.refActionBuildMassStorage},
+                                              {M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionAssistSMD},
+                                              {M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro}}
+            else --Land attack mode/normal logic
+                tCategoriesByPriority = {M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, M27UnitInfo.refCategoryEngineer}
+                tEngineerActionsByPriority = {{M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildLandExperimental, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionUpgradeBuilding},
+                                              {M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionBuildSMD},
+                                              {M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro} }
+            end
+
+            local iEnergyPerTickSavingNeeded
+            if aiBrain[refbStallingEnergy] then iEnergyPerTickSavingNeeded = math.max(1, -aiBrain[refiEnergyNetBaseIncome])
+            else iEnergyPerTickSavingNeeded = math.min(-1, -aiBrain[refiEnergyNetBaseIncome]) end
+
+            local iEnergySavingManaged = 0
+            local iEngineerSubtableCount = 0
+            local tEngineerActionSubtable
+            local tRelevantUnits, oUnit
+
+            local bAbort = false
+            local iTotalUnits = 0
+            local iCategoryStartPoint, iIntervalChange, iCategoryEndPoint, iCategoryRef
+            if bPauseNotUnpause then iCategoryStartPoint = 1 iIntervalChange = 1 iCategoryEndPoint = table.getn(tCategoriesByPriority)
+            else iCategoryStartPoint = table.getn(tCategoriesByPriority) iIntervalChange = -1 iCategoryEndPoint = 1 end
+
+            if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through every category, bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; iCategoryStartPoint='..iCategoryStartPoint..'; iCategoryEndPoint='..iCategoryEndPoint..'; strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]) end
+            for iCategoryCount = iCategoryStartPoint, iCategoryEndPoint, iIntervalChange do
+                iCategoryRef =  tCategoriesByPriority[iCategoryCount]
+                if bPauseNotUnpause then tRelevantUnits = aiBrain:GetListOfUnits(iCategoryRef, false, true)
+                else tRelevantUnits = EntityCategoryFilterDown(iCategoryRef, aiBrain[reftPausedUnits])
+                end
+
+                local iCurUnitEnergyUsage
+                local bApplyActionToUnit
+                if M27Utilities.IsTableEmpty(tRelevantUnits) == false then
+                    iTotalUnits = table.getn(tRelevantUnits)
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCategoryCount='..iCategoryCount..'; iTotalUnits='..iTotalUnits..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)) end
+                    if iCategoryRef == M27UnitInfo.refCategoryEngineer then
+                        iEngineerSubtableCount = iEngineerSubtableCount + 1
+                        tEngineerActionSubtable = tEngineerActionsByPriority[iEngineerSubtableCount]
+                    end
+                    for iUnit = iTotalUnits, 1, -1 do
+                        oUnit = tRelevantUnits[iUnit]
+                        --for iUnit, oUnit in tRelevantUnits do
+                        bApplyActionToUnit = false
+                        iCurUnitEnergyUsage = 0
+                        if M27UnitInfo.IsUnitValid(oUnit) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to pause/unpause unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; will first check category specific logic for if we want to go ahead with pausing4') end
+                            --Do we want to pause the unit? check any category specific logic
+                            bApplyActionToUnit = true
+                            --SMD LOGIC - Check if already have 1 missile loaded before pausing
+                            if iCategoryRef == M27UnitInfo.refCategorySMD and oUnit.GetTacticalSiloAmmoCount and oUnit:GetTacticalSiloAmmoCount() >= 1 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have SMD with at least 1 missile so will pause it') end
+                                bApplyActionToUnit = false
+                            elseif iCategoryRef == M27UnitInfo.refCategoryEngineer then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have an engineer with action='..(oUnit[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')..'; tEngineerActionSubtable='..repr(tEngineerActionSubtable)) end
+                                bApplyActionToUnit = false
+                                for iActionCount, iActionRef in tEngineerActionSubtable do
+                                    if iActionRef == oUnit[M27EngineerOverseer.refiEngineerCurrentAction] then bApplyActionToUnit = true break end
+                                end
+                            elseif iCategoryRef == M27UnitInfo.refCategoryPersonalShield or iCategoryRef == M27UnitInfo.refCategoryFixedShield or iCategoryRef == M27UnitInfo.refCategoryMobileLandShield then
+                                --Dont disable shield if unit has enemies nearby
+                                if bPauseNotUnpause and M27UnitInfo.IsUnitShieldEnabled(oUnit) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, oUnit:GetPosition(), 40, 'Enemy')) == false then bApplyActionToUnit = false end
+                            end
+                            if iCategoryRef == categories.COMMAND then --want in addition to above as ACU might have personal shield
+                                if bPauseNotUnpause and not(oUnit:IsUnitState('Upgrading')) then bApplyActionToUnit = false end
+                            end
+
+                            if bApplyActionToUnit then
+                                iCurUnitEnergyUsage = oUnit:GetBlueprint().Economy.MaintenanceConsumptionPerSecondEnergy
+                                if (iCurUnitEnergyUsage or 0) == 0 or iCategoryRef == M27UnitInfo.refCategoryEngineer or iCategoryRef == M27UnitInfo.refCategoryMex or iCategoryRef == categories.COMMAND then
+                                    --Approximate energy usage based on build rate as a very rough guide
+                                    --examples: Upgrading mex to T3 costs 11E per BP; T3 power is 8.4; T1 power is 6; Guncom is 30; Laser is 178; Strat bomber is 15
+                                    local iEnergyPerBP = 9
+                                    if iCategoryRef == categories.COMMAND and oUnit[M27UnitInfo.refsUpgradeRef] then
+                                        --Determine energy cost per BP
+                                        iEnergyPerBP = M27UnitInfo.GetUpgradeEnergyCost(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) / M27UnitInfo.GetUpgradeBuildTime(oUnit, oUnit[M27UnitInfo.refsUpgradeRef])
+                                    end
+                                    if oUnit:GetBlueprint().Economy.BuildRate then iCurUnitEnergyUsage = oUnit:GetBlueprint().Economy.BuildRate * iEnergyPerBP end
+                                end
+                                --We're working in ticks so adjust energy usage accordingly
+                                iCurUnitEnergyUsage = iCurUnitEnergyUsage * 0.1
+                                if bDebugMessages == true then LOG(sFunctionRef..': Estimated energy usage='..iCurUnitEnergyUsage) end
+
+                                --Jamming - check via blueprint since no reliable category
+                                if oUnit:GetBlueprint().Intel.JamRadius then
+                                    if bPauseNotUnpause then M27UnitInfo.DisableUnitJamming(oUnit)
+                                    else M27UnitInfo.EnableUnitJamming(oUnit)
+                                    end
+                                end
+
+                                --Want to pause unit, check for any special logic for pausing
+                                oUnit[M27UnitInfo.refbPaused] = bPauseNotUnpause
+                                if iCategoryRef == M27UnitInfo.refCategoryPersonalShield or iCategoryRef == M27UnitInfo.refCategoryFixedShield or iCategoryRef == M27UnitInfo.refCategoryMobileLandShield then
+                                    if M27UnitInfo.IsUnitShieldEnabled(oUnit) == bPauseNotUnpause then
+                                        if bPauseNotUnpause then M27UnitInfo.DisableUnitShield(oUnit)
+                                        else M27UnitInfo.EnableUnitShield(oUnit) end
+                                    end
+                                elseif iCategoryRef == M27UnitInfo.refCategoryRadar then
+                                    if bPauseNotUnpause then M27UnitInfo.DisableUnitIntel(oUnit)
+                                    else M27UnitInfo.EnableUnitIntel(oUnit)
+                                    end
+                                elseif iCategoryRef == M27UnitInfo.refCategoryStealthGenerator or iCategoryRef == M27UnitInfo.refCategoryStealthAndCloakPersonal then
+                                    if bPauseNotUnpause then M27UnitInfo.DisableUnitStealth(oUnit)
+                                    else M27UnitInfo.EnableUnitStealth(oUnit)
+                                    end
+                                else
+                                    --Normal logic - just pause unit
+                                    oUnit:SetPaused(bPauseNotUnpause)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
+                                end
+                                if bPauseNotUnpause then
+                                    table.insert(aiBrain[reftPausedUnits], oUnit)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Added unit to tracker table, size='..table.getn(aiBrain[reftPausedUnits])) end
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will remove unit from reftPausedUnits. Size of table before removal='..table.getn(aiBrain[reftPausedUnits])) end
+                                    for iPausedUnit, oPausedUnit in aiBrain[reftPausedUnits] do
+                                        if oPausedUnit == oUnit then table.remove(aiBrain[reftPausedUnits], iPausedUnit) end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Size of table after removal ='..table.getn(aiBrain[reftPausedUnits])) end
+                                end
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iEnergySavingManaged='..iEnergySavingManaged..'; iEnergyPerTickSavingNeeded='..iEnergyPerTickSavingNeeded..'; aiBrain[refbStallingEnergy]='..tostring(aiBrain[refbStallingEnergy])) end
+                        if aiBrain[refbStallingEnergy] then
+                            iEnergySavingManaged = iEnergySavingManaged + iCurUnitEnergyUsage
+                            if iEnergySavingManaged > iEnergyPerTickSavingNeeded then
+                                bAbort = true
+                                break
+                            end
+                        else
+                            iEnergySavingManaged = iEnergySavingManaged - iCurUnitEnergyUsage
+
+                            if iEnergySavingManaged < iEnergyPerTickSavingNeeded then
+                                bAbort = true
+                                break
+                            end
+                        end
+                    end
+                elseif bDebugMessages == true then LOG(sFunctionRef..': We have no units for iCategoryCount='..iCategoryCount)
+                end
+                if bAbort then break end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..'If we have no paused units then will set us as not having an energy stall') end
+            if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == true then
+                aiBrain[refbStallingEnergy] = false
+                if bDebugMessages == true then LOG(sFunctionRef..': We are no longer stalling energy') end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Size of table='..table.getn(aiBrain[reftPausedUnits]))
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function UpgradeManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
@@ -964,6 +1171,9 @@ function UpgradeManager(aiBrain)
     aiBrain[refbPauseForPowerStall] = false
     aiBrain[reftMassStorageLocations] = {}
     aiBrain[refbWantToUpgradeMoreBuildings] = false
+    aiBrain[reftPausedUnits] = {}
+    aiBrain[refbStallingEnergy] = false
+
     --Initial wait:
     WaitTicks(300)
     while(not(aiBrain:IsDefeated())) do
@@ -976,6 +1186,7 @@ function UpgradeManager(aiBrain)
         ForkThread(GetMassStorageTargets, aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': End of loop about to wait '..iCycleWaitTime..' ticks') end
 
+        ForkThread(ManageEnergyStalls, aiBrain)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(iCycleWaitTime)
         if bDebugMessages == true then LOG(sFunctionRef..': End of loop after waiting ticks') end
