@@ -707,88 +707,101 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
     if bTreatOurOrAllyBuildingAsUnclaimed == nil then bTreatOurOrAllyBuildingAsUnclaimed = false end
     if bTreatQueuedBuildingsAsUnclaimed == nil then bTreatQueuedBuildingsAsUnclaimed = bTreatOurOrAllyBuildingAsUnclaimed end
     local iBuildingSizeRadius = 0.5
-    if bMexNotHydro == false then iBuildingSizeRadius = M27UnitInfo.GetBuildingSize('UAB1102')[1]*0.5 end
-    local tNearbyAllyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Ally')
     local bResourceIsUnclaimed = true
+    local sLocationRef = M27Utilities.ConvertLocationToReference(tResourcePosition)
+    if bMexNotHydro == false then
+        iBuildingSizeRadius = M27UnitInfo.GetBuildingSize('UAB1102')[1]*0.5
+    else
+        --Mex specific - if we just ctrlKd our mex then would have an engi nearby so treat mex as claimed
+        if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation] and aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27EngineerOverseer.refActionBuildT3MexOverT2] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27EngineerOverseer.refActionBuildT3MexOverT2][sLocationRef]) == false then
+            bResourceIsUnclaimed = false
+        end
+    end
 
-    if M27Utilities.IsTableEmpty(tNearbyAllyUnits) == false then
-        if bDebugMessages == true then LOG(sFunctionRef..': Detected an allied building, checking its fractioncomplete') end
-        if bTreatOurOrAllyBuildingAsUnclaimed == false then
-            --Check if mex is part-built
-            for iBuilding, oBuilding in tNearbyAllyUnits do
-                if not(oBuilding.Dead) then
-                    if oBuilding.GetFractionComplete then
-                        if oBuilding:GetFractionComplete() >= 1 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Fraction complete>=1 so building marked as complete') end
-                            bResourceIsUnclaimed = false break end
-                    else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Fractioncomplete='..oBuilding.GetFractionComplete()) end
-                    end
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': 1 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-            end
-            if bDebugMessages == true then LOG(sFunctionRef..': 2 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-        else
-            if bTreatEnemyBuildingAsUnclaimed == true then bResourceIsUnclaimed = true
-            else
-                local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Enemy')
-                if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
-                    for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
-                        if not(oBuilding.Dead) then
-                            bResourceIsUnclaimed = false break
+    if bResourceIsUnclaimed then
+
+        local tNearbyAllyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Ally')
+
+
+        if M27Utilities.IsTableEmpty(tNearbyAllyUnits) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Detected an allied building, checking its fractioncomplete') end
+            if bTreatOurOrAllyBuildingAsUnclaimed == false then
+                --Check if mex is part-built
+                for iBuilding, oBuilding in tNearbyAllyUnits do
+                    if not(oBuilding.Dead) then
+                        if oBuilding.GetFractionComplete then
+                            if oBuilding:GetFractionComplete() >= 1 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Fraction complete>=1 so building marked as complete') end
+                                bResourceIsUnclaimed = false break end
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': Fractioncomplete='..oBuilding.GetFractionComplete()) end
                         end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': 1 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
                 end
-            end
-            if bDebugMessages == true then LOG(sFunctionRef..': 3 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-        end
-        if bDebugMessages == true then LOG(sFunctionRef..': 3a bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-    else
-        if bDebugMessages == true then LOG(sFunctionRef..': 3b bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-        if bTreatEnemyBuildingAsUnclaimed == true then
-            bResourceIsUnclaimed = true
-            if bDebugMessages == true then LOG(sFunctionRef..': 3c bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-        else
-            local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Enemy')
-            if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
-                for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
-                    if not(oEnemyBuilding.Dead) then
-                        bResourceIsUnclaimed = false break
-                    end
-                end
-            end
-            if bDebugMessages == true then LOG(sFunctionRef..': 3d bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-        end
-        if bDebugMessages == true then LOG(sFunctionRef..': 4 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-    end
-    if bDebugMessages == true then LOG(sFunctionRef..': bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)..'; about to check if we should consider building queues bTreatQueuedBuildingsAsUnclaimed='..tostring(bTreatQueuedBuildingsAsUnclaimed)) end
-    if bResourceIsUnclaimed == true and bTreatQueuedBuildingsAsUnclaimed == false then
-        --Do we have an entry in the mex queue?
-        local sLocationRef = M27Utilities.ConvertLocationToReference(tResourcePosition)
-        if bDebugMessages == true then LOG(sFunctionRef..': Checking if queued up anything for sLocationRef='..sLocationRef) end
-        --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location
-        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation]) == false then
-            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false then
-                if bDebugMessages == true then LOG(sFunctionRef..': Have queued something for sLocationRef='..sLocationRef..'; checking if any builders are still alive') end
-                --Check that any queued engineer is still alive
-                local oBuilder
-                local bClearedSomething = false
-                for iActionRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] do
-                    if M27Utilities.IsTableEmpty(tSubtable) == false then
-                        for iUniqueRef, oBuilder in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
-                            if oBuilder.Dead then
-                                if bDebugMessages == true then LOG(sFunctionRef..': oBuilder for iAction='..iAction..' is dead so clearing its actions') end
-                                M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oBuilder)
-                                bClearedSomething = true
-                            else
-                                bResourceIsUnclaimed = false
-                                break
+
+                if bDebugMessages == true then LOG(sFunctionRef..': 2 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+            else
+                if bTreatEnemyBuildingAsUnclaimed == true then bResourceIsUnclaimed = true
+                else
+                    local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Enemy')
+                    if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
+                        for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
+                            if not(oBuilding.Dead) then
+                                bResourceIsUnclaimed = false break
                             end
                         end
                     end
                 end
-                if bClearedSomething == true and bResourceIsUnclaimed == true then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Resource was claimed but all builders are dead so treating as unclaimed') end
+                if bDebugMessages == true then LOG(sFunctionRef..': 3 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': 3a bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..': 3b bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+            if bTreatEnemyBuildingAsUnclaimed == true then
+                bResourceIsUnclaimed = true
+                if bDebugMessages == true then LOG(sFunctionRef..': 3c bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+            else
+                local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Enemy')
+                if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
+                    for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
+                        if not(oEnemyBuilding.Dead) then
+                            bResourceIsUnclaimed = false break
+                        end
+                    end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': 3d bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': 4 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)..'; about to check if we should consider building queues bTreatQueuedBuildingsAsUnclaimed='..tostring(bTreatQueuedBuildingsAsUnclaimed)) end
+        if bResourceIsUnclaimed == true and bTreatQueuedBuildingsAsUnclaimed == false then
+            --Do we have an entry in the mex queue?
+            if bDebugMessages == true then LOG(sFunctionRef..': Checking if queued up anything for sLocationRef='..sLocationRef) end
+            --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location
+            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation]) == false then
+                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have queued something for sLocationRef='..sLocationRef..'; checking if any builders are still alive') end
+                    --Check that any queued engineer is still alive
+                    local oBuilder
+                    local bClearedSomething = false
+                    for iActionRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] do
+                        if M27Utilities.IsTableEmpty(tSubtable) == false then
+                            for iUniqueRef, oBuilder in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
+                                if oBuilder.Dead then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oBuilder for iAction='..iAction..' is dead so clearing its actions') end
+                                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oBuilder)
+                                    bClearedSomething = true
+                                else
+                                    bResourceIsUnclaimed = false
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    if bClearedSomething == true and bResourceIsUnclaimed == true then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Resource was claimed but all builders are dead so treating as unclaimed') end
+                    end
                 end
             end
         end

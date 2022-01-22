@@ -1806,6 +1806,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
+        --Note this is increased for engineers with an action to build a T3 mex
     local refiIdleCount = 'M27UnitIdleCount'
     if oUnit[M27UnitInfo.refbSpecialMicroActive] then bIsIdle = false
     else
@@ -1896,6 +1897,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
             bIsIdle = true
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': bIsIdle='..tostring(bIsIdle)) end
     if bIsIdle == false then
         oUnit[refiIdleCount] = 0
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -1903,7 +1905,10 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     else
         if oUnit[refiIdleCount] == nil then oUnit[refiIdleCount] = 1
         else oUnit[refiIdleCount] = oUnit[refiIdleCount] + 1 end
-        if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..oUnit[refiIdleCount]..'; Idle threshold='..iIdleCountThreshold) end
+        if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildT3MexOverT2 and not(oUnit[M27EngineerOverseer.rebToldToStartBuildingT3Mex]) then
+            iIdleCountThreshold = 60
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..oUnit[refiIdleCount]..'; Idle threshold='..iIdleCountThreshold..'; if >= idle threshold then will return true') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if oUnit[refiIdleCount] >=  iIdleCountThreshold then
             return true

@@ -199,7 +199,7 @@ function CombatPlatoonFormer(aiBrain)
             end
         end
     end
-    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) and aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] > 0 then
+    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) and aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] > 0 and (aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiEnemiesInRange] or 0) <= 0 then
         if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then iUnitsWaiting = table.getn(tUnitsWaiting) end
         for iUnit, oUnit in aiBrain[refoCombatPatrolPlatoon]:GetPlatoonUnits() do
             if M27UnitInfo.IsUnitValid(oUnit) then

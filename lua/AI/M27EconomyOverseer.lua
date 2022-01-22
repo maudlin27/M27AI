@@ -19,6 +19,10 @@ reftStorageSubtableLocation = 'M27UpgraderStorageLocationSubtable'
 refiStorageSubtableModDistance = 'M27UpgraderStorageModDistance'
 local refbWantToUpgradeMoreBuildings = 'M27UpgraderWantToUpgradeMore'
 reftUnitsToReclaim = 'M27UnitReclaimShortlist' --list of units we want engineers to reclaim
+reftMexesToCtrlK = 'M27EconomyMexesToCtrlK' --Mexes that we want to destroy to rebuild with better ones
+reftT2MexesNearBase = 'M27EconomyT2MexesNearBase' --Amphib pathable near base and not upgrading; NOTE - this isnt kept up to date, instead engineer will only refresh the mexes in this if its empty; for now just used by engineer overseer but makes sense to have variable in this code
+refoNearestT2MexToBase = 'M27EconomyNearestT2MexToBase' --As per t2mexesnearbase
+refbWillCtrlKMex = 'M27EconomyWillCtrlKMex' --true if mex is marked for ctrl-k
 
 local reftUpgrading = 'M27UpgraderUpgrading' --[x] is the nth building upgrading, returns the object upgrading
 local refiPausedUpgradeCount = 'M27UpgraderPausedCount' --Number of units where have paused the upgrade
@@ -311,6 +315,62 @@ function GetMassStorageTargets(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function RefreshT2MexesNearBase(aiBrain)
+    --Updates list of T2 mexes that are near to base and pathable by amphibious units, and arent upgrading, along with the varaible with the nearest one to our base
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RefreshT2MexesNearBase'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    aiBrain[reftT2MexesNearBase] = {}
+    aiBrain[reftMexesToCtrlK] = {} --Not ideal that reset here, but for now hopefully the scenario where we order an engineer to ctrl-K a mex, and then change our mind about wanting to do that and it leads to the mex being upgraded is low?
+    local iT2MexCount = 0
+    local iT2NearBaseCount = 0
+    local tAllT2Mexes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Mex, false, true)
+    local iCurDistToBase
+    local iMinDistToBase = 10000
+    local iBasePathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+    aiBrain[refoNearestT2MexToBase] = nil
+    if bDebugMessages == true then LOG(sFunctionRef..': Is tAllT2Mexes empty='..tostring(M27Utilities.IsTableEmpty(tAllT2Mexes))) end
+    if M27Utilities.IsTableEmpty(tAllT2Mexes) == false then
+        if bDebugMessages == true then LOG(sFunctionRef..': Size of tAllT2Mexes='..table.getn(tAllT2Mexes)) end
+        for iMex, oMex in tAllT2Mexes do
+            if M27UnitInfo.IsUnitValid(oMex) then
+                iT2MexCount = iT2MexCount + 1
+                tAllT2Mexes[iT2MexCount] = oMex
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Considering mex with position='..repr(oMex:GetPosition()))
+                    LOG('Player start position='..repr(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+                    LOG('VDist2 between these positions='..VDist2(oMex:GetPosition()[1], oMex:GetPosition()[3], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]))
+                end
+
+
+                iCurDistToBase = M27Utilities.GetDistanceBetweenPositions(oMex:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering mex '..oMex:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oMex)..'; iCurDistanceToBase='..iCurDistToBase) end
+                if iCurDistToBase <= 80 then
+                    --Ignore mexes which are upgrading
+                    if not(oMex:IsUnitState('Upgrading') or (oMex.GetWorkProgress and oMex:GetWorkProgress() < 1 and oMex:GetWorkProgress() > 0.01)) then
+                        --Mex must be in same pathing group
+                        if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oMex:GetPosition()) == iBasePathingGroup then
+                            iT2NearBaseCount = iT2NearBaseCount + 1
+                            aiBrain[reftT2MexesNearBase][iT2NearBaseCount] = oMex
+                            if bDebugMessages == true then LOG(sFunctionRef..': Added mex to table of T2 mexes near base, iT2NearBaseCount='..iT2NearBaseCount) end
+                            if iCurDistToBase < iMinDistToBase then
+                                aiBrain[refoNearestT2MexToBase] = oMex
+                                iMinDistToBase = iCurDistToBase
+                                if bDebugMessages == true then LOG(sFunctionRef..': Mex is the current closest to base') end
+                            end
+                        elseif bDebugMessages == true then LOG(sFunctionRef..': Mex isnt in same pathing group')
+                        end
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': Mex is upgrading or workprogress<1')
+                    end
+                end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Mex isnt valid')
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCategory)
     --Doesnt factor in if a unit is paused
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -334,7 +394,7 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
                 iUpgradingCount = iUpgradingCount + 1
                 if iCurTech > iHighestFactoryBeingUpgraded then iHighestFactoryBeingUpgraded = iCurTech end
             else
-                if M27Conditions.SafeToUpgradeUnit(oUnit) then
+                if M27Conditions.SafeToUpgradeUnit(oUnit) and not(oUnit[refbWillCtrlKMex]) then
                     iAvailableToUpgradeCount = iAvailableToUpgradeCount + 1
                     if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; iAvailableToUpgradeCount='..iAvailableToUpgradeCount..'; Have unit available to upgrading whose unit state isnt upgrading.  UnitId='..oUnit:GetUnitId()..'; Unit State='..M27Logic.GetUnitState(oUnit)..': Upgradesto='..(oUnitBP.General.UpgradesTo or 'nil')) end
                 end
@@ -407,7 +467,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
             if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; checking if its valid') end
             if M27UnitInfo.IsUnitValid(oUnit) and not(M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, true) == nil) and not(oUnit:IsUnitState('Upgrading')) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a unit that is available for upgrading; iUnit='..iUnit..'; Unit ref='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
-                if M27Conditions.SafeToUpgradeUnit(oUnit) then
+                if M27Conditions.SafeToUpgradeUnit(oUnit) and not(oUnit[refbWillCtrlKMex]) then
                     iPotentialUnits = iPotentialUnits + 1
                     tPotentialUnits[iPotentialUnits] = oUnit
                     if bDebugMessages == true then LOG(sFunctionRef..': Have a potential unit to upgrade, iPotentialUnits='..iPotentialUnits) end
@@ -811,12 +871,22 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             end
         end
 
+        --Increase thresholds if we are trying to ctrl-K a mex
+        if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == false then
+            for iThresholdRef, tThreshold in tMassThresholds do
+                tMassThresholds[iThresholdRef][1] = tMassThresholds[iThresholdRef][1] + 2000
+            end
+        end
+
         aiBrain[refbWantMoreFactories] = bWantMoreFactories
 
         for _, tThreshold in tMassThresholds do
             if iMassStored >= tThreshold[1] and iMassNetIncome >= tThreshold[2] then bHaveHighMass = true break end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': bWantMoreFactories='..tostring(bWantMoreFactories)..'; iLandFactoryCount='..iLandFactoryCount..'; iMexesOnOurSideOfMap='..iMexesOnOurSideOfMap..'; bHaveHighMass='..tostring(bHaveHighMass)..'; iMassStored='..iMassStored..'; iMassNetIncome='..iMassNetIncome) end
+
+        --Low mass override
+        if M27Conditions.HaveLowMass(aiBrain) == true and aiBrain[refiMexesUpgrading] >= 2 then bHaveHighMass = false end
 
         if bHaveHighMass == true then
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
@@ -871,7 +941,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
 
                 if aiBrain[refiMexesUpgrading] > 1 or iLandFactoryUpgrading + iAirFactoryUpgrading > 0 or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 100 or aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= 0.3 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Checking if stalling mass; iMassStored='..iMassStored..'; aiBrain:GetEconomyStoredRatio(MASS)='..aiBrain:GetEconomyStoredRatio('MASS')..'; iMassNetIncome='..iMassNetIncome) end
-                    if (iMassStored <= 60 or aiBrain:GetEconomyStoredRatio('MASS') <= 0.06) and iMassNetIncome < 0.2 then
+                    if (M27Conditions.HaveLowMass(aiBrain) and aiBrain[refiMexesUpgrading] + iLandFactoryUpgrading + iAirFactoryUpgrading >= 2) or (iMassStored <= 60 or aiBrain:GetEconomyStoredRatio('MASS') <= 0.06) and iMassNetIncome < 0.2 then
                         aiBrain[refbPauseForPowerStall] = false
                         iMaxToUpgrade = -1
                     end
@@ -1268,6 +1338,9 @@ function UpgradeManager(aiBrain)
     aiBrain[reftPausedUnits] = {}
     aiBrain[refbStallingEnergy] = false
     aiBrain[reftUnitsToReclaim] = {}
+    aiBrain[reftMexesToCtrlK] = {}
+    aiBrain[reftT2MexesNearBase] = {}
+    aiBrain[refoNearestT2MexToBase] = nil
 
     --Initial wait:
     WaitTicks(300)
