@@ -413,8 +413,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                                     else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                                 end
+                            elseif iCurrentConditionToTry == 14 then --Min of 3 engineers of the current tech level
+                                if iFactoryTechLevel >= 2 and iFactoryTechLevel >= aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) < 3 then
+                                    iCategoryToBuild = refCategoryEngineer
+                                    iTotalWanted = 1
+                                end
                             elseif aiBrain:GetEconomyStored('MASS') > 10 then
-                                if iCurrentConditionToTry == 14 then--Mobile shields
+                                if iCurrentConditionToTry == 15 then--Mobile shields
                                     local iPowerWanted = 25
                                     if iFactoryTechLevel > 2 then iPowerWanted = 120 end
                                     if not(M27Conditions.DoesACUHaveGun(aiBrain, true)) then iPowerWanted = math.max(iPowerWanted, 40) end
@@ -426,32 +431,32 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = 1
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 15 then --Intel line scouts
+                                elseif iCurrentConditionToTry == 16 then --Intel line scouts
                                     if aiBrain[M27Overseer.refiScoutShortfallIntelLine] > 0 then
                                         iCategoryToBuild = refCategoryLandScout
                                         iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallIntelLine]
                                     end
-                                elseif iCurrentConditionToTry == 16 then --Core engis
+                                elseif iCurrentConditionToTry == 17 then --Core engis
                                     if aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 then
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
                                     end
-                                elseif iCurrentConditionToTry == 17 then --MAA main
+                                elseif iCurrentConditionToTry == 18 then --MAA main
                                     if aiBrain[M27Overseer.refbNeedMAABuilt] == true then
                                         iCategoryToBuild = refCategoryMAA
                                         iTotalWanted = math.max(1, aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution] + math.ceil(aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] * 0.25))
                                     end
-                                elseif iCurrentConditionToTry == 18 then --Scouts for large platoons
+                                elseif iCurrentConditionToTry == 19 then --Scouts for large platoons
                                     if aiBrain[M27Overseer.refiScoutShortfallLargePlatoons] > 0 then
                                         iCategoryToBuild = refCategoryLandScout
                                         iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallLargePlatoons]
                                     end
-                                elseif iCurrentConditionToTry == 19 then --Pre-spare engis
+                                elseif iCurrentConditionToTry == 20 then --Pre-spare engis
                                     if aiBrain[M27Overseer.refiPercentageOutstandingThreat] >= 0.4 and aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] > 0 then
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
                                     end
-                                elseif iCurrentConditionToTry == 20 then --Threat range
+                                elseif iCurrentConditionToTry == 21 then --Threat range
                                     if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= 0.5 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                                         if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                             iCategoryToBuild = refCategoryIndirect
@@ -462,12 +467,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                     end
                                 elseif M27Conditions.HaveLowMass(aiBrain) == false then
-                                    if iCurrentConditionToTry == 21 then --More MAA
+                                    if iCurrentConditionToTry == 22 then --More MAA
                                         if aiBrain[M27Overseer.refbNeedMAABuilt] == true then
                                             iCategoryToBuild = refCategoryMAA
                                             iTotalWanted = aiBrain[M27Overseer.refiMAAShortfallBase] + aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] + aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution]
                                         end
-                                    elseif iCurrentConditionToTry == 22 then --Arti ratio
+                                    elseif iCurrentConditionToTry == 23 then --Arti ratio
                                         local iCurrentArti = aiBrain:GetCurrentUnits(refCategoryIndirect)
                                         local iCurrentTanks = aiBrain:GetCurrentUnits(refCategoryDFTank)
                                         local iArtiProportion = GetPreferredArtiProportion(aiBrain, bSeraphimT1LandFactory)
@@ -476,7 +481,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         if iCurProportion < iArtiProportion then
                                             iCategoryToBuild = refCategoryIndirect
                                         end
-                                    elseif iCurrentConditionToTry == 23 then
+                                    elseif iCurrentConditionToTry == 24 then
                                         if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]='..aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]) end
                                         if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                                             if aiBrain[M27Overseer.refbNeedIndirect] == true then
@@ -488,22 +493,22 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
 
-                                    elseif iCurrentConditionToTry == 24 then --Want at least 2 spare engis
+                                    elseif iCurrentConditionToTry == 25 then --Want at least 2 spare engis
                                         if aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 2 then
                                             iCategoryToBuild = refCategoryEngineer
                                             iTotalWanted = 2 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
                                         end
-                                    elseif iCurrentConditionToTry == 25 then --Scouts for small platoons
+                                    elseif iCurrentConditionToTry == 26 then --Scouts for small platoons
                                         if aiBrain[M27Overseer.refiScoutShortfallAllPlatoons] > 0 then
                                             iCategoryToBuild = refCategoryLandScout
                                             iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallAllPlatoons]
                                         end
-                                    elseif iCurrentConditionToTry == 26 then --Scouts for mexes
+                                    elseif iCurrentConditionToTry == 27 then --Scouts for mexes
                                         if aiBrain[M27Overseer.refiScoutShortfallMexes] > 0 then
                                             iCategoryToBuild = refCategoryLandScout
                                             iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallMexes]
                                         end
-                                    elseif iCurrentConditionToTry == 27 then --Spare engis
+                                    elseif iCurrentConditionToTry == 28 then --Spare engis
                                         if aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 5 then
                                             iCategoryToBuild = refCategoryEngineer
                                             iTotalWanted = 5 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
@@ -590,8 +595,14 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                                     else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                                 end
+                            elseif iCurrentConditionToTry == 11 then --Min of 3 engineers of the current tech level
+                                if iFactoryTechLevel >= 2 and iFactoryTechLevel >= aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) < 3 then
+                                    iCategoryToBuild = refCategoryEngineer
+                                    iTotalWanted = 1
+                                end
+
                             elseif aiBrain:GetEconomyStored('MASS') > 10 then
-                                if iCurrentConditionToTry == 11 then--Mobile shields but just for ACU
+                                if iCurrentConditionToTry == 12 then--Mobile shields but just for ACU
                                     local iPowerWanted = 25
                                     if iFactoryTechLevel > 2 then iPowerWanted = 120 end
                                     if not(M27Conditions.DoesACUHaveGun(aiBrain, true)) then iPowerWanted = math.max(iPowerWanted, 40) end
@@ -606,32 +617,32 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                     end
 
-                                elseif iCurrentConditionToTry == 12 then --Intel line scouts
+                                elseif iCurrentConditionToTry == 13 then --Intel line scouts
                                     if aiBrain[M27Overseer.refiScoutShortfallIntelLine] > 0 then
                                         iCategoryToBuild = refCategoryLandScout
                                         iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallIntelLine]
                                     end
-                                elseif iCurrentConditionToTry == 13 then --Core engis
+                                elseif iCurrentConditionToTry == 14 then --Core engis
                                     if aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 then
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
                                     end
-                                elseif iCurrentConditionToTry == 14 then --MAA main - reduced level vs normal logic since are ecoing
+                                elseif iCurrentConditionToTry == 15 then --MAA main - reduced level vs normal logic since are ecoing
                                     if aiBrain[M27Overseer.refbNeedMAABuilt] == true then
                                         iCategoryToBuild = refCategoryMAA
                                         iTotalWanted = math.max(1, aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution] + math.floor(aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] * 0.2))
                                     end
-                                elseif iCurrentConditionToTry == 15 then --Scouts for large platoons
+                                elseif iCurrentConditionToTry == 16 then --Scouts for large platoons
                                     if aiBrain[M27Overseer.refiScoutShortfallLargePlatoons] > 0 then
                                         iCategoryToBuild = refCategoryLandScout
                                         iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallLargePlatoons]
                                     end
-                                elseif iCurrentConditionToTry == 16 then --Pre-spare engis
+                                elseif iCurrentConditionToTry == 17 then --Pre-spare engis
                                     if aiBrain[M27Overseer.refiPercentageOutstandingThreat] >= 0.4 and aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] > 0 then
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
                                     end
-                                elseif iCurrentConditionToTry == 17 then --Threat range
+                                elseif iCurrentConditionToTry == 18 then --Threat range
                                     if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] then
                                         if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                             iCategoryToBuild = refCategoryIndirect
@@ -639,17 +650,17 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false) end
                                     end
                                 elseif M27Conditions.HaveLowMass(aiBrain) == false then
-                                    if iCurrentConditionToTry == 18 then --More MAA (reduced level vs main strategy)
+                                    if iCurrentConditionToTry == 19 then --More MAA (reduced level vs main strategy)
                                         if aiBrain[M27Overseer.refbNeedMAABuilt] == true then
                                             iCategoryToBuild = refCategoryMAA
                                             iTotalWanted = math.ceil(aiBrain[M27Overseer.refiMAAShortfallBase] * 0.5 + aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] * 0.5 + aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution])
                                         end
-                                    elseif iCurrentConditionToTry == 19 then --Spare engis
+                                    elseif iCurrentConditionToTry == 20 then --Spare engis
                                         if aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 2 then
                                             iCategoryToBuild = refCategoryEngineer
                                             iTotalWanted = 2 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
                                         end
-                                    elseif iCurrentConditionToTry == 20 then --Mobile shields
+                                    elseif iCurrentConditionToTry == 21 then --Mobile shields
                                         local iPowerWanted = 25
                                         if iFactoryTechLevel > 2 then iPowerWanted = 120 end
                                         if not(M27Conditions.DoesACUHaveGun(aiBrain, true)) then iPowerWanted = math.max(iPowerWanted, 40) end
@@ -660,13 +671,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iTotalWanted = 1
                                             end
                                         end
-                                    elseif iCurrentConditionToTry == 21 then --Scouts for mexes
+                                    elseif iCurrentConditionToTry == 22 then --Scouts for mexes
                                         if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiScoutShortfallMexes]='..aiBrain[M27Overseer.refiScoutShortfallMexes]) end
                                         if aiBrain[M27Overseer.refiScoutShortfallMexes] > 0 then
                                             iCategoryToBuild = refCategoryLandScout
                                             iTotalWanted = aiBrain[M27Overseer.refiScoutShortfallMexes]
                                         end
-                                    elseif iCurrentConditionToTry == 22 then --Spare engis
+                                    elseif iCurrentConditionToTry == 23 then --Spare engis
                                         if aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 5 then
                                             iCategoryToBuild = refCategoryEngineer
                                             iTotalWanted = 5 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
@@ -839,34 +850,39 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     iTotalWanted = 2
                                 end
                             end
+                        elseif iCurrentConditionToTry == 13 then --Min of 3 engineers of the current tech level
+                            if iFactoryTechLevel >= 2 and iFactoryTechLevel >= aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) < 3 then
+                                iCategoryToBuild = refCategoryEngineer
+                                iTotalWanted = 1
+                            end
                         elseif aiBrain:GetEconomyStored('MASS') > 10 then
-                            if iCurrentConditionToTry == 13 then
+                            if iCurrentConditionToTry == 14 then
                                 if bHavePowerForAir and aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] > 0 then
                                     iCategoryToBuild = refCategoryAirScout
                                     iTotalWanted = aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]
                                 end
-                            elseif iCurrentConditionToTry == 14 then
+                            elseif iCurrentConditionToTry == 15 then
                                 if bHavePowerForAir and aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 then
                                     iCategoryToBuild = refCategoryEngineer
                                     iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
                                 end
-                            elseif iCurrentConditionToTry == 15 then
+                            elseif iCurrentConditionToTry == 16 then
                                 if bHavePowerForAir and aiBrain[M27AirOverseer.refiBombersWanted] > 0 and (aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel] == true or aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[M27AirOverseer.refiBomberDefencePercentRange]) then
                                     iCategoryToBuild = refCategoryBomber
                                     iTotalWanted = aiBrain[M27AirOverseer.refiBombersWanted]
                                 end
-                            elseif iCurrentConditionToTry == 16 then
+                            elseif iCurrentConditionToTry == 17 then
                                 if aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] > 0 then
                                     iCategoryToBuild = refCategoryEngineer
                                     iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
                                 end
                             elseif M27Conditions.HaveLowMass(aiBrain) == false then
-                                if iCurrentConditionToTry == 17 then
+                                if iCurrentConditionToTry == 18 then
                                     if aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]] < 2 then
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = 2 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
                                     end
-                                elseif iCurrentConditionToTry == 18 then
+                                elseif iCurrentConditionToTry == 19 then
                                     if bHavePowerForAir and aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel] == true then
                                         local iSpareBombers = 0
                                         if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then iSpareBombers = table.getn(aiBrain[M27AirOverseer.reftAvailableBombers]) end
@@ -1074,7 +1090,7 @@ function FactoryMainOverseerLoop(aiBrain)
                                 if oFactory:GetFractionComplete() >= 1 and not(oFactory:IsPaused()) then
                                     if oLastUnit and not(oLastUnit.Dead) then
                                         local sUnitID = oLastUnit:GetUnitId()
-                                        if not(oLastUnit[M27PlatoonFormer.refbProcessedForPlatoon]) then M27PlatoonFormer.AllocateNewUnitToPlatoonFromFactory(oLastUnit)
+                                        if not(oLastUnit[M27PlatoonFormer.refbProcessedForPlatoon]) then M27PlatoonFormer.AllocateNewUnitToPlatoonFromFactory(oLastUnit, oFactory)
                                         else
                                             if oFactory[refFactoryIdleCount] == nil then oFactory[refFactoryIdleCount] = 0 end
                                             oFactory[refFactoryIdleCount] = oFactory[refFactoryIdleCount] + 1
@@ -1140,7 +1156,7 @@ function FactoryMainOverseerLoop(aiBrain)
                                     else LOG('refbProcessedForPlatoon='..tostring(oLastUnit[M27PlatoonFormer.refbProcessedForPlatoon])) end
                                 end
                                 if oLastUnit and not(oLastUnit.Dead) and not(oLastUnit[M27PlatoonFormer.refbProcessedForPlatoon]) then
-                                    M27PlatoonFormer.AllocateNewUnitToPlatoonFromFactory(oLastUnit)
+                                    M27PlatoonFormer.AllocateNewUnitToPlatoonFromFactory(oLastUnit, oFactory)
                                 end
                                 oFactory[refFactoryIdleCount] = 0
                                 if bDebugMessages == true then LOG(sFunctionRef..': iFactory='..iFactory..': Has an empty command queue') end

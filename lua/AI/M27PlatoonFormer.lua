@@ -186,9 +186,42 @@ function CombatPlatoonFormer(aiBrain)
     local sFunctionRef = 'CombatPlatoonFormer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, about to refresh units waiting for assignment') end
+
+
     RefreshUnitsWaitingForAssignment(aiBrain)
     local iUnitsWaiting = 0
+
+    --Remove any duplicate units from reftoCombatUnitsWaitingForAssignment
+    if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
+        local tUniqueUnitListing = {}
+        local sUniqueRef, oUnit, bRemoveFromTable
+        for iUnit = table.getn(aiBrain[reftoCombatUnitsWaitingForAssignment]), 1, -1 do
+            bRemoveFromTable = false
+            oUnit = aiBrain[reftoCombatUnitsWaitingForAssignment][iUnit]
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                sUniqueRef = oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                if tUniqueUnitListing[sUniqueRef] then bRemoveFromTable = true
+                else tUniqueUnitListing[sUniqueRef] = true
+                end
+            else bRemoveFromTable = true
+            end
+            if bRemoveFromTable then
+                if bDebugMessages == true then LOG(sFunctionRef..': Removing duplicate entry from table of units waiting for assignment') end
+                table.remove(aiBrain[reftoCombatUnitsWaitingForAssignment], iUnit)
+            end
+        end
+    end
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': About to list out every unit in aiBrain[reftoCombatUnitsWaitingForAssignment]')
+        if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
+            for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
+                LOG(oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+            end
+        end
+    end
+
     local tUnitsWaiting = aiBrain[reftoCombatUnitsWaitingForAssignment]
+
     local bAreUsingCombatPatrolUnits = false
     if bDebugMessages == true then
         LOG(sFunctionRef..': Is tUnitsWaiting empty='..tostring(M27Utilities.IsTableEmpty(tUnitsWaiting))..'; does the combat patrol platoon exist?')
@@ -382,8 +415,10 @@ function CombatPlatoonFormer(aiBrain)
                                 if iCurLoopCount > 100 then M27Utilities.ErrorHandler('Likely infinite loop as have been through 100 units waiting for assignment') break
                                 else
                                     iCurUnitRef = table.getn(tUnitsWaiting)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurLoopCount='..iCurLoopCount..'; iCurUnitRef='..iCurUnitRef) end
                                     if tUnitsWaiting[iCurUnitRef] then
                                         local iLastTableUnitThreat = M27Logic.GetCombatThreatRating(aiBrain, {tUnitsWaiting[iCurUnitRef]}, false, nil, nil)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iLastTableUnitThreat='..iLastTableUnitThreat..'; iExcessThreat='..iExcessThreat) end
                                         if iLastTableUnitThreat > iExcessThreat then
                                             break
                                         else
@@ -391,6 +426,7 @@ function CombatPlatoonFormer(aiBrain)
                                             tTemporaryUnitsWaitingForAssignment[iTemporaryUnitsWaitingForAssignment] = tUnitsWaiting[iCurUnitRef]
                                             table.remove(tUnitsWaiting, iCurUnitRef)
                                             iExcessThreat = iExcessThreat - iLastTableUnitThreat
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Removed unit from tUnitsWaiting, iExcessThreat after reducing for this='..iExcessThreat) end
                                             if iExcessThreat <= 0 then break
                                             elseif M27Utilities.IsTableEmpty(tUnitsWaiting) == true then
                                                 break
@@ -1032,28 +1068,33 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                     end
                     if oNewUnit and not(oNewUnit.Dead) then
                         WaitTicks(1)
-                        tCurPosition = oNewUnit:GetPosition()
-                        iCurDistanceFromStartPosition = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tStartPosition)
-                        if bDebugMessages == true then LOG(sFunctionRef..': '..' iCurCycleCount='..iCurCycleCount..'; iCurDistanceFromStartPosition='..iCurDistanceFromStartPosition) end
-                        if iCurDistanceFromStartPosition >= iMinDistanceNeeded then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Unit is far enough away that wont be part of land factory') end
+                        if M27UnitInfo.IsUnitValid(oNewUnit[M27UnitInfo.refoFactoryThatBuildThis]) and M27Logic.IsUnitIdle(oNewUnit[M27UnitInfo.refoFactoryThatBuildThis]) == false then
                             bProceed = true
-                        elseif iCurDistanceFromStartPosition > iDistToLookAtRect then
-                            --See if the unit is one of those in a rect of the land factory
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef..': Checking all units in a rect of the land factory='..repr(rRect))
-                                --M27Utilities.DrawRectangle(rRect, 2, 10)
-                            end
-                            tUnitsInRect = GetUnitsInRect(rRect)
-                            if M27Utilities.IsTableEmpty(tUnitsInRect) == true then
+                            break
+                        else
+                            tCurPosition = oNewUnit:GetPosition()
+                            iCurDistanceFromStartPosition = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tStartPosition)
+                            if bDebugMessages == true then LOG(sFunctionRef..': '..' iCurCycleCount='..iCurCycleCount..'; iCurDistanceFromStartPosition='..iCurDistanceFromStartPosition) end
+                            if iCurDistanceFromStartPosition >= iMinDistanceNeeded then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Unit is far enough away that wont be part of land factory') end
                                 bProceed = true
-                            else
-                                bProceed = true
-                                for iUnit, oUnit in tUnitsInRect do
-                                    if oUnit == oNewUnit then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Unit is in a rect of land factory still') end
-                                        bProceed = false
-                                        break
+                            elseif iCurDistanceFromStartPosition > iDistToLookAtRect then
+                                --See if the unit is one of those in a rect of the land factory
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef..': Checking all units in a rect of the land factory='..repr(rRect))
+                                    --M27Utilities.DrawRectangle(rRect, 2, 10)
+                                end
+                                tUnitsInRect = GetUnitsInRect(rRect)
+                                if M27Utilities.IsTableEmpty(tUnitsInRect) == true then
+                                    bProceed = true
+                                else
+                                    bProceed = true
+                                    for iUnit, oUnit in tUnitsInRect do
+                                        if oUnit == oNewUnit then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Unit is in a rect of land factory still') end
+                                            bProceed = false
+                                            break
+                                        end
                                     end
                                 end
                             end
@@ -1112,7 +1153,18 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                     LOG(sFunctionRef..': About to clear commands to unit with lifetime count='..iLifetimeCount..' and ID='..sUnitID)
                 end
                 local tUnitsToClear = EntityCategoryFilterDown(categories.ALLUNITS - categories.AIR - categories.COMMAND, tNewUnits)
+                --Is the factory unit state building or upgrading? If so then dont need to worry about clearing
+                local bFactoryNotBuilding = false
                 if M27Utilities.IsTableEmpty(tUnitsToClear) == false then
+                    for iUnit, oUnit in tUnitsToClear do
+                        if M27UnitInfo.IsUnitValid(oUnit[M27UnitInfo.refoFactoryThatBuildThis]) and M27Logic.IsUnitIdle(oUnit[M27UnitInfo.refoFactoryThatBuildThis]) then
+                            bFactoryNotBuilding = true
+                            break
+                        end
+                    end
+                end
+
+                if bFactoryNotBuilding then
                     IssueClearCommands(tUnitsToClear)
                 else
                     bIssueTemporaryMoveOrder = false
@@ -1188,7 +1240,17 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                     local iValidCombatUnitCount = 0
 
 
-                    if M27Utilities.IsTableEmpty(tEngineerUnits) == false then M27EngineerOverseer.ReassignEngineers(aiBrain, false, tEngineerUnits) end
+                    if M27Utilities.IsTableEmpty(tEngineerUnits) == false then
+                        --Is this an engineer that has been assigned to build a T3 mex on a delay? If so then reissue its command instead of reassigning it
+
+                        if table.getn(tEngineerUnits) == 1 and M27UnitInfo.IsUnitValid(tEngineerUnits[1]) and tEngineerUnits[1][M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildT3MexOverT2 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])]) == false and aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.refbPrimaryBuilder] == true then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have just cleared actions and were going to call reassignengineers for engineer '..M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])..'; however its action is to build a T3 mex over T2, given the time delay on this will tell it to move to its old target and also to build a mex there so should work either way. reftActualTargetLocationRef='..repr(aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.reftActualTargetLocationRef])) end
+                            IssueMove({tEngineerUnits[1]}, aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.reftActualTargetLocationRef])
+                            M27EngineerOverseer.BuildStructureAtLocation(aiBrain, tEngineerUnits[1], M27UnitInfo.refCategoryT3Mex, 1, nil, aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.reftActualTargetLocationRef], true, false)
+                        else
+                            M27EngineerOverseer.ReassignEngineers(aiBrain, false, tEngineerUnits)
+                        end
+                    end
                     if M27Utilities.IsTableEmpty(tCombatUnits) == false then
                         for iUnit, oUnit in tCombatUnits do
                             if not(oUnit[refbWaitingForAssignment]) then
@@ -1268,10 +1330,11 @@ function AllocateNewUnitsToPlatoonNotFromFactory(tNewUnits)
 end
 
 
-function AllocateNewUnitToPlatoonFromFactory(oNewUnit)
+function AllocateNewUnitToPlatoonFromFactory(oNewUnit, oFactory)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG('AllocateNewUnitToPlatoonFromFactory About to fork thread') end
     if not(oNewUnit.Dead) and not(oNewUnit.GetUnitId) then M27Utilities.ErrorHandler('oNewUnit doesnt have a unit ID so likely isnt a unit') end
+    oNewUnit[M27UnitInfo.refoFactoryThatBuildThis] = oFactory
     ForkThread(AllocateNewUnitToPlatoonBase, {oNewUnit}, false)
 end
 

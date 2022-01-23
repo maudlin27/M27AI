@@ -17,7 +17,7 @@ FactoryBuilderManager = Class(M27FactoryBuilderManager) {
             else
                 factory[M27FactoryOverseer.refoLastUnitBuilt] = finishedUnit
                 if M27Config.M27ShowUnitNames == true then M27PlatoonUtilities.UpdateUnitNames({ finishedUnit }, 'SentForAllocation') end
-                M27PlatoonFormer.AllocateNewUnitToPlatoonFromFactory(finishedUnit)
+                M27PlatoonFormer.AllocateNewUnitToPlatoonFromFactory(finishedUnit, factory)
 
                 --[[if EntityCategoryContains(categories.ENGINEER, finishedUnit) then
                     self.Brain.BuilderManagers[self.LocationType].EngineerManager:AddUnit(finishedUnit)

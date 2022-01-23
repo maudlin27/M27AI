@@ -1821,6 +1821,20 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                             if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false then
                                 local iPDThreshold = 3
                                 if M27Conditions.DoesACUHaveBigGun(aiBrain) then iPDThreshold = 5 end
+                                local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
+                                local iMaxHealth = 1
+                                if oACU:GetHealthPercent() > 0 then iMaxHealth = oACU:GetHealth() / oACU:GetHealthPercent() end
+                                iMaxHealth = iMaxShield + iMaxHealth
+
+                                if iMaxHealth >= 20000 then
+                                    if iMaxHealth >= 30000 then
+                                        iPDThreshold = iPDThreshold + 2
+                                    else iPDThreshold = iPDThreshold + 1
+                                    end
+                                end
+
+
+
                                 if table.getn(tEnemyT2PlusPD) >= iPDThreshold then
                                     --Are we cloaked and enemy has no omni and no spy planes, and we are still at least 10 away from the nearest PD?
                                     if bDebugMessages == true then LOG(sFunctionRef..': ACU against at least 3 T2 PD so need to run') end
@@ -6058,7 +6072,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
                     oPlatoon[refoSupportHelperPlatoonTarget] = nil
                     oPlatoon[refoPlatoonOrUnitToEscort] = nil
                     oPlatoon[refoSupportHelperUnitTarget] = nil
-                    ReturnToBaseOrRally(oPlatoon, GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), nil, false, false)
+                    ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), nil, false, false)
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonRef..': Have '..iFollowingUnitCount..' units that are following') end
                     local oUnitPather = oPlatoon[reftCurrentUnits][1]

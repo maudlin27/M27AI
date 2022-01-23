@@ -1808,6 +1808,9 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
         --Note this is increased for engineers with an action to build a T3 mex
     local refiIdleCount = 'M27UnitIdleCount'
+    --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit) and (M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 59) then bDebugMessages = true end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is idle; unit state='..(GetUnitState(oUnit) or 'nil')) end
     if oUnit[M27UnitInfo.refbSpecialMicroActive] then bIsIdle = false
     else
 
@@ -1897,18 +1900,22 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
             bIsIdle = true
         end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': bIsIdle='..tostring(bIsIdle)) end
-    if bIsIdle == false then
+    if bDebugMessages == true then LOG(sFunctionRef..': bIsIdle='..tostring(bIsIdle)..'; if true then will check against idle count first') end
+    if not(bIsIdle) then
         oUnit[refiIdleCount] = 0
+        if bDebugMessages == true then LOG(sFunctionRef..': Unit not idle so returning false') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return false
     else
-        if oUnit[refiIdleCount] == nil then oUnit[refiIdleCount] = 1
-        else oUnit[refiIdleCount] = oUnit[refiIdleCount] + 1 end
+        if oUnit[refiIdleCount] == nil then
+            oUnit[refiIdleCount] = 1
+        else
+            oUnit[refiIdleCount] = oUnit[refiIdleCount] + 1
+        end
         if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildT3MexOverT2 and not(oUnit[M27EngineerOverseer.rebToldToStartBuildingT3Mex]) then
             iIdleCountThreshold = 60
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..oUnit[refiIdleCount]..'; Idle threshold='..iIdleCountThreshold..'; if >= idle threshold then will return true') end
+        if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..oUnit[refiIdleCount]..'; Idle threshold='..iIdleCountThreshold..'; if >= idle threshold then will return true. Engineer action (nil for non engineers)='..(oUnit[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if oUnit[refiIdleCount] >=  iIdleCountThreshold then
             return true

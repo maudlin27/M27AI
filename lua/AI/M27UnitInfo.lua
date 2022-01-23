@@ -28,6 +28,7 @@ refsUpgradeRef = 'M27UnitUpgradeRef' --If ACU starts an upgrade, it records the 
 refbPaused = 'M27UnitPaused' --true if paused due to poewr stall manager
 refbRecentlyDealtDamage = 'M27UnitRecentlyDealtDamage' --true if dealt damage in last 5s
 refiGameTimeDamageLastDealt = 'M27UnitTimeLastDealtDamage'
+refoFactoryThatBuildThis = 'M27UnitFactoryThatBuildThis'
 
 --Factions
 refFactionUEF = 1
@@ -324,6 +325,14 @@ function GetUnitTechLevel(oUnit)
     elseif EntityCategoryContains(categories.EXPERIMENTAL, sUnitId) then iTechLevel = 4
     end
     return iTechLevel
+end
+
+function ConvertTechLevelToCategory(iTechLevel)
+    if iTechLevel == 2 then return categories.TECH2
+    elseif iTechLevel == 3 then return categories.TECH3
+    elseif iTechLevel == 4 then return categories.EXPERIMENTAL
+    else return categories.TECH1
+    end
 end
 
 function GetUnitStrikeDamage(oUnit)

@@ -38,6 +38,7 @@ refiMassNetBaseIncome = 'M27MassNetIncome'
 
 refiMexesUpgrading = 'M27EconomyMexesUpgrading'
 refiMexesAvailableForUpgrade = 'M27EconomyMexesAvailableToUpgrade'
+reftActiveHQUpgrades = 'M27EconomyHQActiveUpgrades'
 
 refbStallingEnergy = 'M27EconomyStallingEnergy'
 reftPausedUnits = 'M27EconomyPausedUnits'
@@ -407,6 +408,58 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
     return iUpgradingCount, iAvailableToUpgradeCount, bAreAlreadyUpgradingToHQ
 end
 
+function TrackHQUpgrade(oUnitUpgradingToHQ)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'TrackHQUpgrade'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for unit '..oUnitUpgradingToHQ:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitUpgradingToHQ)..'; Game time='..GetGameTimeSeconds()) end
+
+    local aiBrain = oUnitUpgradingToHQ:GetAIBrain()
+    --Check not already in the table
+    local bAlreadyRecorded = false
+    if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == false then
+        for iHQ, oHQ in  aiBrain[reftActiveHQUpgrades] do
+            if oHQ == oUnitUpgradingToHQ then
+                bAlreadyRecorded = true
+                break
+            end
+        end
+    end
+
+    if not(bAlreadyRecorded) then table.insert(aiBrain[reftActiveHQUpgrades], oUnitUpgradingToHQ) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished checking if already recorded unit, bAlreadyRecorded='..tostring(bAlreadyRecorded)..'; Size of activeHQUpgrades='..table.getn(aiBrain[reftActiveHQUpgrades])) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    WaitTicks(10)
+    while M27UnitInfo.IsUnitValid(oUnitUpgradingToHQ) do
+        if not(oUnitUpgradingToHQ.GetWorkProgress) or oUnitUpgradingToHQ:GetWorkProgress() == 1 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnitUpgradingToHQ:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitUpgradingToHQ)..' either has no work progress or it is 1') end
+            break
+        else
+            WaitTicks(1)
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --Remove from table of upgrading HQs
+    if bDebugMessages == true then LOG(sFunctionRef..': Unit has finished upgrading, so will remove from the list of active HQ upgrades; size of table before removal='..table.getn(aiBrain[reftActiveHQUpgrades])..'; is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]))..'; Game time='..GetGameTimeSeconds()) end
+    local oHQ
+    if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == false then
+        for iHQ = table.getn(aiBrain[reftActiveHQUpgrades]), 1, -1 do
+            oHQ = aiBrain[reftActiveHQUpgrades][iHQ]
+            if not(M27UnitInfo.IsUnitValid(oHQ)) then
+                table.remove(aiBrain[reftActiveHQUpgrades], iHQ)
+            else
+                if not(oUnitUpgradingToHQ:IsUnitState('Upgrading')) and (not(oUnitUpgradingToHQ.GetWorkProgress) or oUnitUpgradingToHQ:GetWorkProgress() == 1) then
+                    table.remove(aiBrain[reftActiveHQUpgrades], iHQ)
+                end
+            end
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished removal from the table, is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]))) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
     --Work out the upgrade ID wanted; if bUpdateUpgradeTracker is true then records upgrade against unit's aiBrain
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -430,8 +483,19 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
         if bUpdateUpgradeTracker then
             local aiBrain = oUnitToUpgrade:GetAIBrain()
             table.insert(aiBrain[reftUpgrading], oUnitToUpgrade)
-            if bDebugMessages == true then LOG(sFunctionRef..': Have issued upgrade to unit and recorded it') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Have issued upgrade '..sUpgradeID..' to unit '..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..' and recorded it') end
         end
+        --Are we upgrading to a factory HQ? If so then record this as will prioritise it with spare engineers
+        --oBlueprint = __blueprints[string.lower(sBlueprintID)]
+        --EntityCategoryContains
+        if EntityCategoryContains(M27UnitInfo.refCategoryAllFactories, sUpgradeID) then
+            if bDebugMessages == true then LOG(sFunctionRef..': sUpgradeID is a factory') end
+            if not(EntityCategoryContains(categories.SUPPORTFACTORY, sUpgradeID)) then
+                if bDebugMessages == true then LOG(sFunctionRef..': sUpgradeID is not a support factory') end
+                TrackHQUpgrade(oUnitToUpgrade)
+            end
+        end
+
     else M27Utilities.ErrorHandler('Dont have a valid upgrade ID; UnitID='..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade))
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -815,52 +879,47 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
         local tMassThresholds = {}
         aiBrain[refiMexesUpgrading], aiBrain[refiMexesAvailableForUpgrade] = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex + refCategoryT2Mex, true)
 
-        if aiBrain[refiPausedUpgradeCount] == 1 and table.getn(aiBrain[reftUpgrading]) <= 1 then --Want to resume unless we're energy stalling
+        local iT1MexesNearBase = 0
+        local tAllT1Mexes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT1Mex, false, true)
+        if M27Utilities.IsTableEmpty(tAllT1Mexes) == false then
+           for iT1Mex, oT1Mex in tAllT1Mexes do
+               if M27UnitInfo.IsUnitValid(oT1Mex) and M27Utilities.GetDistanceBetweenPositions(oT1Mex:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 90 and M27Conditions.SafeToUpgradeUnit(oT1Mex) then
+                   iT1MexesNearBase = iT1MexesNearBase + 1
+               end
+           end
+        end
+
+
+
+        if aiBrain[refiPausedUpgradeCount] >= 1 and table.getn(aiBrain[reftUpgrading]) <= 1 then --Want to resume unless we're energy stalling
             tMassThresholds[1] = {0, -2.0}
-            tMassThresholds[2] = {2000, -20}
-            tMassThresholds[3] = {4000, -40}
-            tMassThresholds[4] = {5000,-200}
-        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refiMexesUpgrading] == 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 then
-            tMassThresholds[1] = {0, -2.0}
-            tMassThresholds[2] = {2000, -20}
-            tMassThresholds[3] = {4000, -40}
-            tMassThresholds[4] = {5000,-200}
-        elseif aiBrain[refiPausedUpgradeCount] > 1 or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
-            tMassThresholds[1] = {100, 0.1}
-            tMassThresholds[2] = {150, 0}
-            tMassThresholds[3] = {750, -0.5}
-            tMassThresholds[4] = {1500, -1.5}
-            tMassThresholds[5] = {3000, -2.5}
-            tMassThresholds[6] = {4000, -5}
-            tMassThresholds[7] = {5000,-200}
+            tMassThresholds[2] = {500, -8}
+            tMassThresholds[3] = {1000, -25}
+            tMassThresholds[4] = {2500,-200}
+        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refiMexesUpgrading] <= 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true then
+            tMassThresholds[1] = {0, -100.0}
+            tMassThresholds[2] = {1000, -200}
+        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refiMexesUpgrading] <= iT1MexesNearBase and aiBrain[refiMexesAvailableForUpgrade] > 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true then
+            local iFullStorageAmount = 1000 --Base value for if we have 0% stored ratio
+            tMassThresholds[1] = {math.min(400, iFullStorageAmount * 0.1), 0.0}
+            tMassThresholds[2] = {math.min(800, iFullStorageAmount * 0.15), -0.3}
+            tMassThresholds[3] = {math.min(1300, iFullStorageAmount * 0.35), -1}
+            tMassThresholds[4] = {math.min(1500, iFullStorageAmount * 0.45), -2}
+            tMassThresholds[5] = {math.min(2000, iFullStorageAmount * 0.55), -3}
+            tMassThresholds[6] = {iFullStorageAmount * 0.8, -10}
+            tMassThresholds[7] = {iFullStorageAmount * 0.98,-20}
         else
-            if bHaveLotsOfFactories == false and bWantMoreFactories == true then
-                tMassThresholds[1] = {300, 0.3}
-                tMassThresholds[2] = {700, 0}
-                tMassThresholds[3] = {1500, -0.4}
-                tMassThresholds[4] = {2000, -1.0}
-                tMassThresholds[5] = {3000, -2.5}
-                tMassThresholds[6] = {4000, -5}
-                tMassThresholds[7] = {5000,-200}
-            else
-                if bHaveLotsOfFactories == true and bWantMoreFactories == false then
-                    tMassThresholds[1] = {100, 0.2}
-                    tMassThresholds[2] = {200, 0}
-                    tMassThresholds[3] = {800, -0.5}
-                    tMassThresholds[4] = {1600, -1.4}
-                    tMassThresholds[5] = {3000, -2.5}
-                    tMassThresholds[6] = {4000, -5}
-                    tMassThresholds[7] = {5000,-200}
-                else
-                    tMassThresholds[1] = {150, 0.2}
-                    tMassThresholds[2] = {350, 0}
-                    tMassThresholds[3] = {900, -0.4}
-                    tMassThresholds[4] = {1600, -1.3}
-                    tMassThresholds[5] = {3000, -2.5}
-                    tMassThresholds[6] = {4000, -5}
-                    tMassThresholds[7] = {5000,-200}
-                end
-            end
+            local iFullStorageAmount = 1000 --Base value for if we have 0% stored ratio
+            if aiBrain:GetEconomyStoredRatio('MASS') > 0 then iFullStorageAmount = aiBrain:GetEconomyStored('MASS') / aiBrain:GetEconomyStoredRatio('MASS') end
+
+            --if aiBrain[refiPausedUpgradeCount] > 1 or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
+            tMassThresholds[1] = {math.min(500, iFullStorageAmount * 0.1), 0.1}
+            tMassThresholds[2] = {math.min(1000, iFullStorageAmount * 0.15), 0}
+            tMassThresholds[3] = {math.min(1500, iFullStorageAmount * 0.35), -0.5}
+            tMassThresholds[4] = {math.min(1750, iFullStorageAmount * 0.45), -1.5}
+            tMassThresholds[5] = {math.min(3000, iFullStorageAmount * 0.55), -2.5}
+            tMassThresholds[6] = {iFullStorageAmount * 0.8, -10}
+            tMassThresholds[7] = {iFullStorageAmount * 0.98,-20}
         end
 
         --Increase thresholds if we're trying to build a missile
@@ -1024,10 +1083,11 @@ function RefreshEconomyData(aiBrain)
     local iPerTickFactor = 0.1
 
 
-
-    aiBrain[refiEnergyGrossBaseIncome] = (iACUEnergy + iT3PowerCount * iEnergyT3Power + iT2PowerCount * iEnergyT2Power + iT1PowerCount * iEnergyT1Power + iHydroCount * iEnergyHydro)*iPerTickFactor
+    local iCheatMod = 1
+    if aiBrain.CheatEnabled then iCheatMod = tonumber(ScenarioInfo.Options.CheatMult) or 2 end
+    aiBrain[refiEnergyGrossBaseIncome] = (iACUEnergy + iT3PowerCount * iEnergyT3Power + iT2PowerCount * iEnergyT2Power + iT1PowerCount * iEnergyT1Power + iHydroCount * iEnergyHydro)*iPerTickFactor*iCheatMod
     aiBrain[refiEnergyNetBaseIncome] = aiBrain[refiEnergyGrossBaseIncome] - iEnergyUsage
-    aiBrain[refiMassGrossBaseIncome] = (iACUMass + iT3MexMass * iT3MexCount + iT2MexMass * iT2MexCount + iT1MexMass * iT1MexCount + iStorageIncomeBoost)*iPerTickFactor
+    aiBrain[refiMassGrossBaseIncome] = (iACUMass + iT3MexMass * iT3MexCount + iT2MexMass * iT2MexCount + iT1MexMass * iT1MexCount + iStorageIncomeBoost)*iPerTickFactor*iCheatMod
     aiBrain[refiMassNetBaseIncome] = aiBrain[refiMassGrossBaseIncome] - iMassUsage
 
     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiEnergyGrossBaseIncome]='..aiBrain[refiEnergyGrossBaseIncome]..'; aiBrain[refiEnergyNetBaseIncome]='..aiBrain[refiEnergyNetBaseIncome]..'; iT2PowerCount='..iT2PowerCount..'; iEnergyT1Power='..iEnergyT1Power..'; iEnergyUsage='..iEnergyUsage) end
@@ -1341,6 +1401,7 @@ function UpgradeManager(aiBrain)
     aiBrain[reftMexesToCtrlK] = {}
     aiBrain[reftT2MexesNearBase] = {}
     aiBrain[refoNearestT2MexToBase] = nil
+    aiBrain[reftActiveHQUpgrades] = {}
 
     --Initial wait:
     WaitTicks(300)
