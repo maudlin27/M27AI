@@ -15,6 +15,8 @@ refiNearestEnemyStartPoint = 'M27NearestEnemyStartPoint'
 tPlayerStartPointByIndex = {}
 iTimeOfLastBrainAllDefeated = 0 --Used to avoid massive error spamming if all brains defeated
 
+refiEnemyScoutSpeed = 'M27LogicEnemyScoutSpeed' --expected speed of the nearest enemy's land scouts
+
 function GetUnitState(oUnit)
     --Returns a string containing oUnit's unit state
     local sUnitState = ''
@@ -1422,6 +1424,27 @@ function GetVisibleUnitsOnly(aiBrain, tUnits)
     else return tVisibleUnits end
 end
 
+function DetermineEnemyScoutSpeed(aiBrain)
+    aiBrain[refiEnemyScoutSpeed] = nil --resets incase our nearest enemy has changed
+    local iNearestEnemyFaction
+    for iCurBrain, oEnemyBrain in ArmyBrains do
+        if oEnemyBrain:GetArmyIndex() == GetNearestEnemyIndex(aiBrain) then
+            iNearestEnemyFaction = oEnemyBrain:GetFactionIndex()
+            break
+        end
+    end
+    if iNearestEnemyFaction and iNearestEnemyFaction <= 4 then --Standard 4 factions
+        if not(iNearestEnemyFaction == M27UnitInfo.refFactionSeraphim) then --Seraphim have combat scouts
+            local tPossibleBlueprints = EntityCategoryGetUnitList(M27UnitInfo.refCategoryLandScout * M27Utilities.FactionIndexToCategory(iNearestEnemyFaction))
+            if M27Utilities.IsTableEmpty(tPossibleBlueprints) == false then
+                for _, sUnitID in tPossibleBlueprints do
+                    aiBrain[refiEnemyScoutSpeed] = __blueprints[sUnitID].Physics.MaxSpeed
+                end
+            end
+        end
+    end
+end
+
 function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
     --Determines threat rating for tUnits; if bMustBeVisibleToIntelOrSight is true then will assume threat where dont have visual
     --bMustBeVisibleToIntelOrSight - Set to false to get threat information regardless of visibility; automatically done where the unit's owner is equal to aiBrain
@@ -1490,6 +1513,8 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                             elseif oUnit.GetBlueprint and oUnit:GetBlueprint().Physics.MaxSpeed == 1.7 then
                                                 --Unit is same speed as ACU so more likely than not its an ACU
                                                 iCurThreat = 800
+                                            elseif oUnit.GetBlueprint and oUnit:GetBlueprint().Physics.MaxSpeed == aiBrain[refiEnemyScoutSpeed] then
+                                                iCurThreat = 10
                                             else
                                                 if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not; will be using blip threat override of '..iMassValueOfBlipsOverride..' if more than one blip') end
                                                 if iTotalUnits <= 1 then iCurThreat = (iSoloBlipMassOverride or 54)
@@ -1515,7 +1540,12 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                 else
                     iMassMod = 0
                     if not(bIndirectFireThreatOnly) then
-                        if EntityCategoryContains(categories.DIRECTFIRE, oUnit) then iMassMod = 1
+                        if EntityCategoryContains(categories.DIRECTFIRE, oUnit) then
+                            if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit) then
+                                iMassMod = 0.6 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
+                            else
+                                iMassMod = 1
+                            end
                         elseif EntityCategoryContains(categories.SUBCOMMANDER, oUnit) then iMassMod = 1 --SACUs dont have directfire category for some reason (they have subcommander and overlaydirectfire)
                         elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.STRUCTURE * categories.TECH2, oUnit) then iMassMod = 0.1 --Gets doubled as its a structure
                         elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH1, oUnit) then iMassMod = 0.9
@@ -1923,26 +1953,6 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
         end
     end
 end
-
---Moved below to customconditions
---[[function DoesACUHaveGun(aiBrain)
-    --UCBC includes simialr code but for some reason referencing it (or using a direct copy) causes error
-    local oACU = M27Utilities.GetACU(aiBrain)
-    local tGunUpgrades = { 'HeavyAntiMatterCannon',
-                           'CrysalisBeam',
-                           'HeatSink',
-                           'CoolingUpgrade',
-                           'RateOfFire'
-    }
-    local bACUHasUpgrade = false
-
-    for iUpgrade, sUpgrade in tGunUpgrades do
-        if oACU:HasEnhancement(sUpgrade) == true then
-            bACUHasUpgrade = true break
-        end
-    end
-    return bACUHasUpgrade
-end]]--
 
 function GetReclaimDetourLocation(tCurStartPosition, tEndPosition, iMaxDetourAbsolute, iMinDistanceFromStartAndEnd)
     --Returns either nil or a reclaim location that doesnt represent a big detour

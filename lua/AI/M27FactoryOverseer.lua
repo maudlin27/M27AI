@@ -706,15 +706,26 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         else
                             break
                         end
-                    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
                         bGetFastest = true
                         if bDebugMessages == true then LOG(sFunctionRef..': Are doing ACUKill strategy, decide what to build') end
-                        if iCurrentConditionToTry == 1 then --Antinavy because enemy ACU is underwater
+                        if iCurrentConditionToTry == 1 then --Mobile shields if protecting ACU
+                            if iFactoryTechLevel >= 2 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 10 and aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.6 then
+                                local oPlatoonWithACU = M27Utilities.GetACU(aiBrain).PlatoonHandle
+                                if oPlatoonWithACU and M27PlatoonFormer.DoesPlatoonWantAnotherMobileShield(oPlatoonWithACU, 200) then
+                                    if iMobileShields == nil then iMobileShields = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMobileLandShield) end
+                                    if iMobileShields <= 20 then
+                                        iCategoryToBuild = M27UnitInfo.refCategoryMobileLandShield
+                                        iTotalWanted = 1
+                                    end
+                                end
+                            end
+                        elseif iCurrentConditionToTry == 2 then --Antinavy because enemy ACU is underwater
                             if aiBrain[M27Overseer.refoLastNearestACU] and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) then
                                 iCategoryToBuild = M27UnitInfo.refCategoryAntiNavy
                                 iTotalWanted = 1000
                             end
-                        elseif iCurrentConditionToTry == 2 then --Amphibious if cant path with land to enemy base or ACU
+                        elseif iCurrentConditionToTry == 3 then --Amphibious if cant path with land to enemy base or ACU
                             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then
                                 iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat
                                 iTotalWanted = 1000
@@ -731,7 +742,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     iTotalWanted = 1000
                                 end
                             end
-                        elseif iCurrentConditionToTry == 3 then
+                        elseif iCurrentConditionToTry == 4 then
                             if bDebugMessages == true then LOG(sFunctionRef..': Will build normal land combat') end
                             iCategoryToBuild = M27UnitInfo.refCategoryLandCombat
                             iTotalWanted = 1000
@@ -756,13 +767,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         bHavePowerForAir = true
                         if aiBrain[M27EconomyOverseer.refbStallingEnergy] then
                             bHavePowerForAir = false
-                            if  aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                            if  aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
                                 if aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.5 then
                                     bHavePowerForAir = true
                                 end
                             end
                         end
-                    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
                         if iFactoryTechLevel == 1 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.5 then
                             bHavePowerForAir = true
                         elseif iFactoryTechLevel == 2 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9 then bHavePowerForAir = true
@@ -776,8 +787,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     end
 
 
-                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and bHavePowerForAir then
-                        if M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) then
+                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU) and bHavePowerForAir then
+
+                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) then
                             iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                         else iCategoryToBuild = M27UnitInfo.refCategoryBomber
                         end

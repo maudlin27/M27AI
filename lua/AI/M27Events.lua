@@ -134,15 +134,20 @@ function OnDamaged(self, instigator)
                             end
                             --If we're upgrading consider cancelling
 
-                            if self.IsUnitState and self:IsUnitState('Upgrading') and self:GetWorkProgress() <= 0.3 and EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage:GetUnitId()) and M27Conditions.DoesACUHaveGun(aiBrain, false, self) then
-                                --Do we have nearby friendly units?
-                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
-                                    --Is the unit within range of us?
-                                    local iOurMaxRange = GetUnitMaxGroundRange({self})
-                                    if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
-                                        IssueClearCommands({self})
-                                        IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            if self.IsUnitState and self:IsUnitState('Upgrading') and EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage:GetUnitId()) and not(M27Conditions.DoesACUHaveGun(aiBrain, false, self)) then
+                                if self:GetWorkProgress() <= 0.25 then
+                                    --Do we have nearby friendly units?
+                                    if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
+                                        --Is the unit within range of us?
+                                        local iOurMaxRange = GetUnitMaxGroundRange({self})
+                                        if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
+                                            IssueClearCommands({self})
+                                            IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                        end
                                     end
+                                end
+                                if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill) then
+                                    aiBrain[M27Overseer.refiAIBrainCurrentStrategy] = M27Overseer.refStrategyProtectACU
                                 end
                             end
                         end

@@ -449,10 +449,10 @@ function TrackHQUpgrade(oUnitUpgradingToHQ)
             oHQ = aiBrain[reftActiveHQUpgrades][iHQ]
             if not(M27UnitInfo.IsUnitValid(oHQ)) then
                 table.remove(aiBrain[reftActiveHQUpgrades], iHQ)
-            else
+            --[[else
                 if not(oUnitUpgradingToHQ:IsUnitState('Upgrading')) and (not(oUnitUpgradingToHQ.GetWorkProgress) or oUnitUpgradingToHQ:GetWorkProgress() == 1) then
                     table.remove(aiBrain[reftActiveHQUpgrades], iHQ)
-                end
+                end--]]
             end
         end
     end
@@ -492,7 +492,7 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
             if bDebugMessages == true then LOG(sFunctionRef..': sUpgradeID is a factory') end
             if not(EntityCategoryContains(categories.SUPPORTFACTORY, sUpgradeID)) then
                 if bDebugMessages == true then LOG(sFunctionRef..': sUpgradeID is not a support factory') end
-                TrackHQUpgrade(oUnitToUpgrade)
+                ForkThread(TrackHQUpgrade, oUnitToUpgrade)
             end
         end
 
@@ -1184,7 +1184,7 @@ function ManageEnergyStalls(aiBrain)
 
     local bPauseNotUnpause = true
     local bChangeRequired = false
-    if GetGameTimeSeconds() >= 90 then --Only consider power stall management after 1.5m, otherwise risk pausing things when we would probably be ok
+    if GetGameTimeSeconds() >= 120 or (GetGameTimeSeconds() >= 40 and aiBrain[refiEnergyGrossBaseIncome] >= 15) then --Only consider power stall management after 2m, otherwise risk pausing things such as early microbots when we would probably be ok after a couple of seconds; lower time limit put in as a theroetical possibility due to AIX
         if bDebugMessages == true then LOG(sFunctionRef..': About to consider if we have an energy stall or not. aiBrain:GetEconomyStoredRatio(ENERGY)='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; aiBrain[refiEnergyNetBaseIncome]='..aiBrain[refiEnergyNetBaseIncome]..'; aiBrain:GetEconomyTrend(ENERGY)='..aiBrain:GetEconomyTrend('ENERGY')..'; aiBrain[refbStallingEnergy]='..tostring(aiBrain[refbStallingEnergy])) end
         --First consider unpausing
         if bDebugMessages == true then LOG(sFunctionRef..': If we have flagged that we are stalling energy then will check if we have enough to start unpausing things') end

@@ -385,7 +385,7 @@ PlatoonTemplate = {
     ['M27RetreatingShieldUnits'] =
     {
         [refbIdlePlatoon] = false,
-        [refbRequiresUnitToFollow] = true,
+        [refbRequiresUnitToFollow] = false,
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'GrowthFormation',

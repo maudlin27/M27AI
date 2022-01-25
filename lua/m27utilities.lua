@@ -696,6 +696,7 @@ function FactionIndexToCategory(iFactionIndex)
 end
 
 function GetFactionNameByIndex(iFactionIndex)
+    --NOTE: Largely replaced by M27UnitInfo globally defining variables for each number, e.g. refFactionUEF = 1
     --e.g. if have oUnitBP, then can check faction name with .General.FactionName
     local tFactionNameByIndex = {[1] = 'UEF', [2]= 'Aeon', [3] = 'Cybran', [4] = 'Seraphim', [5] = 'Nomads'}
     return tFactionNameByIndex[iFactionIndex]

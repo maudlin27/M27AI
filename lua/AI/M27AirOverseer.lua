@@ -1761,6 +1761,15 @@ function GetBomberTargetShortlist(aiBrain)
         iMaxLifetimeAssignment = 1000
         iMaxLifetimeMassMod = 1000
         if bDebugMessages == true then LOG(sFunctionRef..': Want to target enemy ACU only') end
+    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
+        reftPriorityTargetCategories = {M27UnitInfo.refCategoryIndirect * categories.TECH1, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryLandCombat - categories.COMMAND, M27UnitInfo.refCategoryDangerousToLand}
+        iTypeLowPriority = 4
+        bIgnoreMobileShield = true
+        iFriendlyUnitNormalSearchRange = 0
+        iMaxLifetimeAssignment = 5
+        iMaxLifetimeMassMod = 5
+        tStartPosition = M27Utilities.GetACU(aiBrain):GetPosition()
+        iMaxSearchRange = 60
     elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
         aiBrain[refiBomberDefencePercentRange] = 0.15
         iMaxLifetimeAssignment = 5

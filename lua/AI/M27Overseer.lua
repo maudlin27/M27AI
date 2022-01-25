@@ -154,6 +154,7 @@ refoUnitsMAAHelper = 'M27UnitsMAAHelper' --MAA platoon assigned to help a unit (
 refiAIBrainCurrentStrategy = 'M27GrandStrategyRef'
 refStrategyLandEarly = 1 --initial build order and pre-ACU gun upgrade approach
 refStrategyAirDominance = 2 --All-out air attack on enemy, targetting any AA they have first
+refStrategyProtectACU = 3 --Similar to ACUKill, but will focus units on our ACU
 --refStrategyLandAttackBase = 2 --e.g. for when have got gun upgrade on ACU
 --refStrategyLandConsolidate = 3 --e.g. for if ACU retreating after gun upgrade and want to get map control and eco
 refStrategyACUKill = 4 --all-out attack on enemy ACU
@@ -3192,13 +3193,13 @@ function ACUManager(aiBrain)
                 --Extra health buffer for some of below checks
                 local iExtraHealthCheck = 0
                 if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tACUPos) > M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tACUPos) then iExtraHealthCheck = 1000 end
+                local iACURange = M27Logic.GetUnitMaxGroundRange({ oACU })
                 --Do we have a big gun, or is the enemy ACU low on health?
                 if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true then
                     if bDebugMessages == true then LOG(sFunctionRef..': Our ACU has a big gun') end
                     bAllInAttack = true
                     bIncludeACUInAttack = true
                 else
-                    local iACURange = M27Logic.GetUnitMaxGroundRange({ oACU })
                     --Attack if we're close to ACU and have a notable health advantage, and are on our side of the map or are already in attack mode
                     if iLastDistanceToACU <= (iACURange + 15) and aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.5 + iHealthThresholdAdjIfAlreadyAllIn) and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck + 2500 < (oACU:GetHealth() + iHealthAbsoluteThresholdIfAlreadyAllIn) and (M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) or aiBrain[refbIncludeACUInAllOutAttack] == true) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is almost in range of us and is on low health so will do all out attack') end
@@ -3218,7 +3219,31 @@ function ACUManager(aiBrain)
                     end
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': bAllInAttack after considering our ACU vs their ACU='..tostring(bAllInAttack)) end
-            else aiBrain[refbEnemyACUNearOurs] = false
+
+                if bAllInAttack == false and aiBrain[refbEnemyACUNearOurs] and iLastDistanceToACU <= (iACURange + 15) then
+                    --Do we need to request emergency help?
+                    local iHealthModForGun = 0
+                    local iHealthPercentModForGun = 0
+                    if M27Conditions.DoesACUHaveGun(aiBrain, false, aiBrain[refoLastNearestACU]) then
+                        if not(M27Conditions.DoesACUHaveGun(aiBrain, false, oACU)) then
+                            iHealthModForGun = -6000
+                            iHealthPercentModForGun = 0.2
+                        end
+                    else
+                        if M27Conditions.DoesACUHaveGun(aiBrain, false, oACU) then
+                            iHealthModForGun = math.min(2000, oACU:GetHealth() * 0.25)
+                            iHealthPercentModForGun = -0.1
+                        end
+                    end
+
+                    if aiBrain[refoLastNearestACU]:GetHealth() > (oACU:GetHealth() + iHealthModForGun) and aiBrain[refoLastNearestACU]:GetHealth() > 2500 and oACU:GetHealthPercent() < (0.75 + iHealthPercentModForGun) then
+                        bWantEscort = true
+                        bEmergencyRequisition = true
+                        if not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) then
+                            aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
+                        end
+                    end
+                end
             end
             if bAllInAttack == false and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Will consider if want all out attack even if our ACU isnt in much stronger position') end
@@ -3305,15 +3330,22 @@ function ACUManager(aiBrain)
                             end
                         end
                     end
-
-                    if bCancelUpgradeAndRun then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Want to cancel upgrade and run') end
-                        --Only actually cancel if we're not close to our base as if we're close to base then will probably die if cancel as well
-                        if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[iPlayerStartNumber]) > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
-                            IssueClearCommands({M27Utilities.GetACU(aiBrain)})
-                            IssueMove({oACU}, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos))
-                        end
+                else
+                    --Want to cancel but not because of TML
+                    if not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) then
+                        aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
                     end
+                end
+
+                if bCancelUpgradeAndRun then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want to cancel upgrade and run') end
+                    --Only actually cancel if we're not close to our base as if we're close to base then will probably die if cancel as well
+                    if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
+                        IssueClearCommands({M27Utilities.GetACU(aiBrain)})
+                        IssueMove({oACU}, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos))
+                    end
+
+
                 end
             end
 
@@ -3382,9 +3414,23 @@ function ACUManager(aiBrain)
             end--]]
             if oACUPlatoon then
                 oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = bWantEscort
+
+                --If we dont want an escort and we last wanted an escort 15+ seconds ago, then disband the escort platoon
+                if bWantEscort then oACUPlatoon[M27PlatoonUtilities.refiLastTimeWantedEscort] = math.floor(GetGameTimeSeconds())
+                else
+                    if oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon] and oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentUnits] > 1 then
+                        if GetGameTimeSeconds() - oACUPlatoon[M27PlatoonUtilities.refiLastTimeWantedEscort] >= 15 then
+                            oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
+                        end
+                    end
+                end
                 if bEmergencyRequisition and not(bAllInAttack) then
                     --Is the ACU close to our base? If so then only do emergency response if very low health
                     if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iRangeForACUToBeNearBase or iHealthPercentage < iACUEmergencyHealthPercentThreshold then
+                        if not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) then
+                            aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
+                        end
+
                         --Get all nearby combat units we own
                         local tNearbyCombat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tACUPos, iRangeForEmergencyEscort, 'Ally')
                         if M27Utilities.IsTableEmpty(tNearbyCombat) == false then
@@ -3591,7 +3637,7 @@ function SetMaximumFactoryLevels(aiBrain)
     aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4)))
     if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 
-    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then
+    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill or aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
         --Just build air factories if we have mass (assuming we have enough energy)
         aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
         if aiBrain:GetEconomyStoredRatio('MASS') > 0.1 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 1 then
@@ -3729,6 +3775,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         local iNearestEnemyArmyIndex = M27Logic.GetNearestEnemyIndex(aiBrain)
         if not(iNearestEnemyArmyIndex == iPreviousNearestEnemyIndex) then
             aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyArmyIndex)])
+            ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain)
         end
         iPreviousNearestEnemyIndex = iNearestEnemyArmyIndex
 
@@ -3818,7 +3865,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
         aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
 
-
+        local iPrevStrategy = aiBrain[refiAIBrainCurrentStrategy]
         --Are we in ACU kill mode and want to stay in it (determined b y ACU manager)?
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and not(aiBrain[refbStopACUKillStrategy]) then --set as part of ACU manager
             --Stick with this strategy
@@ -3905,59 +3952,83 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 if bDebugMessages == true then LOG(sFunctionRef..': Setting strategy as air dominance') end
                 aiBrain[refiAIBrainCurrentStrategy] = refStrategyAirDominance
             else
-
+                --Are we protecting the ACU? If so then stay in this mode unless we think ACU is safe
+                local bKeepProtectingACU = false
+                if aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
+                    bKeepProtectingACU = true
+                    local oACU = M27Utilities.GetACU(aiBrain)
+                    --Stop protecting ACU if it has gun upgrade and ok health, or isnt upgrading and has good health, or is near our base
+                    if M27Conditions.DoesACUHaveGun(aiBrain, false, oACU) and oACU:GetHealthPercent() >= 0.5 then
+                        bKeepProtectingACU = false
+                    elseif oACU:GetHealthPercent() >= 0.8 and not(oACU:IsUnitState('Upgrading')) and not(oACU.GetWorkProgress and oACU:GetWorkProgress() > 0 and oACU:GetWorkProgress() < 1) and not(oACU.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionUpgrade) then
+                        bKeepProtectingACU = false
+                    elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iDistanceFromBaseToBeSafe then
+                        bKeepProtectingACU = false
+                    end
+                end
 
                 --Should we switch to eco?
                 local bWantToEco = false
-                --How far away is the enemy?
-                local bBigEnemyThreat = false
-                if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArti]) == false then bBigEnemyThreat = true end
+                if bKeepProtectingACU == false then
+                    --How far away is the enemy?
+                    local bBigEnemyThreat = false
+                    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArti]) == false then bBigEnemyThreat = true end
 
 
 
 
 
-                --Dont eco if enemy ACU near ours as likely will need backup
-                if aiBrain[refbEnemyACUNearOurs] == false then
-                    if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 8000 then
-                        if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.6 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': No big enemy threats and good defence and mex coverage so will eco') end
-                            bWantToEco = true
-                        else
-                            if bDebugMessages == true then LOG(sFunctionRef..': Dont want to eco based on initial tests: bBigEnemyThreat='..tostring(bBigEnemyThreat)..'; %threat='..aiBrain[refiPercentageOutstandingThreat]..'; UnclaimedMex%='..iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup..'; EnemyDist='..aiBrain[refiDistanceToNearestEnemyBase]) end
-                            --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
-                            if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Ok defence coverage and income not changed in a while so will eco') end
+                    --Dont eco if enemy ACU near ours as likely will need backup
+                    if aiBrain[refbEnemyACUNearOurs] == false then
+                        if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 8000 then
+                            if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.6 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': No big enemy threats and good defence and mex coverage so will eco') end
                                 bWantToEco = true
                             else
-                                if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
-                                    --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
-                                    local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
-                                    if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco') end
-                                        bWantToEco = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Dont want to eco based on initial tests: bBigEnemyThreat='..tostring(bBigEnemyThreat)..'; %threat='..aiBrain[refiPercentageOutstandingThreat]..'; UnclaimedMex%='..iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup..'; EnemyDist='..aiBrain[refiDistanceToNearestEnemyBase]) end
+                                --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
+                                if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Ok defence coverage and income not changed in a while so will eco') end
+                                    bWantToEco = true
+                                else
+                                    if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
+                                        --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
+                                        local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
+                                        if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco') end
+                                            bWantToEco = true
+                                        end
                                     end
                                 end
                             end
                         end
                     end
-                end
-                if bWantToEco == true then
-                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then bWantToEco = false end
+                    if bWantToEco == true then
+                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then bWantToEco = false end
 
-                    --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
-                    if oACU:GetHealthPercent() < 0.45 then bWantToEco = false end
-                end
-                if bWantToEco == true then
-                    aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = nil
-                    aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
-                else
-                    aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryDFTank
-                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryAmphibiousCombat end
-                    aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandEarly
+                        --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
+                        if oACU:GetHealthPercent() < 0.45 then bWantToEco = false end
+                    end
+                    if bWantToEco == true then
+                        aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = nil
+                        aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
+                    else
+                        aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryDFTank
+                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryAmphibiousCombat end
+                        aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandEarly
+                    end
                 end
             end
         end
+
+        --Are we no longer protecting the ACU? If so then disband any escort it has - decided to take this out and just rely on acu manager's flag for if ACU needs an escort
+        --[[if iPrevStrategy == refStrategyProtectACU and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU) then
+            if oACU.PlatoonHandle then
+                oACU.PlatoonHandle[M27PlatoonUtilities.refbShouldHaveEscort] = false
+                if oACU.PlatoonHandle[M27PlatoonUtilities.refoEscortingPlatoon] then oACU.PlatoonHandle[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband end
+            end
+        end--]]
+
 
         --Max target defence coverage for strategy
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then aiBrain[refiMaxDefenceCoverageWanted] = 0.65
@@ -4294,6 +4365,8 @@ function OverseerInitialisation(aiBrain)
 
     ForkThread(ACUInitialisation, aiBrain) --Gets ACU to build its first building and then form ACUMain platoon once its done
 
+    ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain) --Will figure out the speed of scouts (except seraphim)
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -4448,6 +4521,7 @@ function OverseerManager(aiBrain)
 
 
     while(not(aiBrain:IsDefeated())) do
+
         if aiBrain.M27IsDefeated then break end
         --ForkThread(TestNewMovementCommands, aiBrain)
 
