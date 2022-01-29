@@ -482,12 +482,19 @@ end
 function DisableUnitStealth(oUnit)
     --[[if oUnit.DisableUnitIntel then
         oUnit:DisableUnitIntel('ToggleBit3', 'RadarStealth')--]]
-    oUnit:OnScriptBitSet(5) --stealth
-    oUnit:OnScriptBitSet(8) --cloak
+
+    --[[oUnit:OnScriptBitSet(5) --stealth
+    oUnit:OnScriptBitSet(8) --cloak--]]
+    oUnit:SetScriptBit('RULEUTC_StealthToggle', true)
+    oUnit:SetScriptBit('RULEUTC_CloakToggle', true)
 end
+
 function EnableUnitStealth(oUnit)
-    oUnit:OnScriptBitClear(5)
+    --[[oUnit:OnScriptBitClear(5)
     oUnit:OnScriptBitClear(8)
+    oUnit:EnableUnitIntel('ToggleBit3', 'RadarStealth')--]]
+    oUnit:SetScriptBit('RULEUTC_StealthToggle', false)
+    oUnit:SetScriptBit('RULEUTC_CloakToggle', false)
 end
 
 

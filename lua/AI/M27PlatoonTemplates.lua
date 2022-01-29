@@ -399,6 +399,23 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = false,
     },
+    ['M27SuicideSquad'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = true,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbUsedByThreatDefender] = true,
+    },
 
 
     --Note when adding more - see above re any functions that will need specific behaviour if dont want default

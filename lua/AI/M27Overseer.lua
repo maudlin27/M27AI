@@ -30,6 +30,7 @@ iACUDeathCount = 0
 iACUAlternativeFailureCount = 0
 iDistanceFromBaseToBeSafe = 55 --If ACU wants to run (<50% health) then will think its safe once its this close to our base
 iDistanceFromBaseWhenVeryLowHealthToBeSafe = 25 --As above but when ACU on lower health
+iDistanceToEnemyEcoThreshold = 450 --Point to nearest enemy base after which will be more likely to favour eco based actions
 
 refiACUHealthToRunOn = 'M27ACUHealthToRunOn'
 iACUEmergencyHealthPercentThreshold = 0.3
@@ -60,6 +61,7 @@ refiUnitNavalAAThreat = 'M27OverseerUnitThreat' --Recored against individual oEn
 local reftUnitGroupPreviousReferences = 'M27UnitGroupPreviousReferences'
 refiModDistFromStartNearestOutstandingThreat = 'M27NearestOutstandingThreat' --Mod distance of the closest enemy threat (using GetDistanceFromStartAdjustedForDistanceFromMid)
 refiModDistFromStartNearestThreat = 'M27OverseerNearestThreat' --Mod distance of the closest enemy, even if we have enough defenders to deal with it
+reftLocationFromStartNearestThreat = 'M27OverseerLocationNearestLandThreat' --Distance of closest enemy
 refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddistance
 refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
 refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
@@ -307,6 +309,7 @@ function RecordIntelPaths(aiBrain)
                         local bCanPathToLocation = false
                         aiBrain[reftIntelLinePositions] = {}
                         aiBrain[refiCurIntelLineTarget] = 1
+                        local tStartingPointForSearch
 
                         local tbStopMovingInDirection = {[0]=false, [90]=false, [270] = false}
 
@@ -323,63 +326,67 @@ function RecordIntelPaths(aiBrain)
                                 break
                             end
                             iBaseDistanceAlongPath = (iValidIntelPaths + 1) * iDefaultScoutRange * 0.5
-                            tPossibleBasePosition = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy, iBaseDistanceAlongPath + tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
+                            tStartingPointForSearch = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy, iBaseDistanceAlongPath + tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
+                            tPossibleBasePosition = {tStartingPointForSearch[1], tStartingPointForSearch[2], tStartingPointForSearch[3]}
                             if bDebugMessages == true then
-                                LOG('Base path attempt that cant path to; Will draw tPossibleBasePosition='..repr(tPossibleBasePosition)..' in red')
-                                M27Utilities.DrawLocation(tPossibleBasePosition, nil, 2, 200)
+                                LOG('Base path attempt that cant path to; Will draw tStartingPointForSearch='..repr(tStartingPointForSearch)..' in red')
+                                M27Utilities.DrawLocation(tStartingPointForSearch, nil, 2, 200)
                             end --red
                             iAltCount = 0
                             iAdjustIncrement = 0
                             bCanPathToLocation = false
+                            if M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then bCanPathToLocation = true end
                             --Check if we can path to the target; if we cant then search at 0, 90 and 270 degrees to the normal direction in ever increasing distances until we either go off-map or get near an enemy base
                             while bCanPathToLocation == false do
-                                if bDebugMessages == true then LOG(sFunctionRef..': iValidIntelPaths='..iValidIntelPaths..'; tPossibleBasePosition='..repr(tPossibleBasePosition)..'; tbStopMovingInDirection[iCurAngleAdjust]='..tostring(tbStopMovingInDirection[iCurAngleAdjust])..'; iCurAngleAdjust='..iCurAngleAdjust..'; iBaseDistanceAlongPath='..iBaseDistanceAlongPath..'; tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]='..tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iValidIntelPaths='..iValidIntelPaths..'; tStartingPointForSearch='..repr(tStartingPointForSearch)..'; tPossibleBasePosition='..repr(tPossibleBasePosition)..' tbStopMovingInDirection[iCurAngleAdjust]='..tostring(tbStopMovingInDirection[iCurAngleAdjust])..'; iCurAngleAdjust='..iCurAngleAdjust..'; iBaseDistanceAlongPath='..iBaseDistanceAlongPath..'; tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]='..tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]) end
                                 if tbStopMovingInDirection[iCurAngleAdjust] == false then
-                                    if M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Can path to location') end
-                                        bCanPathToLocation = true
-                                    else
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Cant path to location so will consider alternative points; iAltCount='..iAltCount) end
-                                        iAltCount = iAltCount + 1
-                                        if iAltCount > iMaxAltCount then
-                                            M27Utilities.ErrorHandler('Likely infinite loop')
-                                            bStillDeterminingBaseIntelPaths = false
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Cant path to location so will consider alternative points; iAltCount='..iAltCount) end
+                                    iAltCount = iAltCount + 1
+                                    if iAltCount > iMaxAltCount then
+                                        M27Utilities.ErrorHandler('Likely infinite loop')
+                                        bStillDeterminingBaseIntelPaths = false
+                                        break
+                                    end
+
+                                    --alternate between moving from this position, first forwards by 1, then to the side by 1, then the other side by 1; then by 3; then by 6, then by 10, then 15, then 21, then 28
+                                    if iCurAngleAdjust == 0 then
+                                        iAdjustIncrement = math.min(iAdjustIncrement + 1, 30)
+                                    end
+                                    tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iAdjustIncrement
+                                    tPossibleBasePosition = M27Utilities.MoveInDirection(tStartingPointForSearch, iAngleToEnemy + iCurAngleAdjust, tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef..': tPossibleBasePosition='..repr(tPossibleBasePosition)..'; iCurAngleAdjust='..iCurAngleAdjust..'; iBaseDistanceAlongPath='..iBaseDistanceAlongPath..'; tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]='..tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]..'; will draw in red')
+                                        M27Utilities.DrawLocation(tPossibleBasePosition, nil, 2, 200)
+                                    end --red
+
+                                    --Check we're still within map bounds
+                                    if tPossibleBasePosition[1] <= iMinX or tPossibleBasePosition[1] >= iMaxX or tPossibleBasePosition[3] <= iMinZ or tPossibleBasePosition[3] >= iMaxZ then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': tPossibleBasePosition='..repr(tPossibleBasePosition)..'; are out of map bounds so will stop looking in this direction. iCurAngleAdjust='..iCurAngleAdjust) end
+                                        --Out of map bounds, flag to ignore angles of this type in the future
+                                        tbStopMovingInDirection[iCurAngleAdjust] = true
+                                        --Are all the others flagged to be true?
+                                        bStillDeterminingBaseIntelPaths = false
+                                        for _, bValue in tbStopMovingInDirection do
+                                            if bValue == false then bStillDeterminingBaseIntelPaths = true break end
+                                        end
+                                        if bStillDeterminingBaseIntelPaths == false then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Are stopping looking for all angles so will abort; tbStopMovingInDirection='..repr(tbStopMovingInDirection)) end
                                             break
-                                        end
-
-                                        --alternate between moving from this position, first forwards by 1, then to the side by 1, then the other side by 1; then by 3; then by 6, then by 10, then 15, then 21, then 28
-                                        if iCurAngleAdjust == 0 then
-                                            iAdjustIncrement = math.min(iAdjustIncrement + 1, 30)
-                                        end
-                                        tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iAdjustIncrement
-                                        tPossibleBasePosition = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy + iCurAngleAdjust, iBaseDistanceAlongPath + tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef..': tPossibleBasePosition='..repr(tPossibleBasePosition)..'; iCurAngleAdjust='..iCurAngleAdjust..'; iBaseDistanceAlongPath='..iBaseDistanceAlongPath..'; tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]='..tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]..'; will draw in red')
-                                            M27Utilities.DrawLocation(tPossibleBasePosition, nil, 2, 200)
-                                        end --red
-
-                                        --Check we're still within map bounds
-                                        if tPossibleBasePosition[1] <= iMinX or tPossibleBasePosition[1] >= iMaxX or tPossibleBasePosition[3] <= iMinZ or tPossibleBasePosition[3] >= iMaxZ then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': tPossibleBasePosition='..repr(tPossibleBasePosition)..'; are out of map bounds so will stop looking in this direction. iCurAngleAdjust='..iCurAngleAdjust) end
-                                            --Out of map bounds, flag to ignore angles of this type in the future
-                                            tbStopMovingInDirection[iCurAngleAdjust] = true
-                                            --Are all the others flagged to be true?
-                                            bStillDeterminingBaseIntelPaths = false
-                                            for _, bValue in tbStopMovingInDirection do
-                                                if bValue == false then bStillDeterminingBaseIntelPaths = true break end
-                                            end
-                                            if bStillDeterminingBaseIntelPaths == false then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Are stopping looking for all angles so will abort; tbStopMovingInDirection='..repr(tbStopMovingInDirection)) end
-                                                break
-                                            end
                                         end
                                     end
                                 end
 
-                                --Change angle for next attempt
-                                if iCurAngleAdjust == 0 then iCurAngleAdjust = 90
-                                elseif iCurAngleAdjust == 90 then iCurAngleAdjust = 270
-                                else iCurAngleAdjust = 0
+                                if not(tbStopMovingInDirection[iCurAngleAdjust]) and M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Can path to location') end
+                                    bCanPathToLocation = true
+                                    break
+                                else
+
+                                    --Change angle for next attempt
+                                    if iCurAngleAdjust == 0 then iCurAngleAdjust = 90
+                                    elseif iCurAngleAdjust == 90 then iCurAngleAdjust = 270
+                                    else iCurAngleAdjust = 0
+                                    end
                                 end
                             end
                             if bCanPathToLocation == false then
@@ -423,83 +430,155 @@ function RecordIntelPaths(aiBrain)
                         --Determine subpaths for each main path
                         local tiCyclesSinceLastMatch
                         local iInitialInterval = 2
-                        local iPointToSwitchToPositiveAdj = (iScoutRange * 0.5) / iInitialInterval
-                        for iIntelPath = 1, iValidIntelPaths do
-                            bStillDeterminingSubpaths = true
-                            iCount = 0
+                        local iPointToSwitchToPositiveAdj = (iScoutRange * 0.7)
+                        local iSubpathDistAdjust
+                        local iSubpathAngleAdjust
+                        local tbSubpathOptionOffMap = {}
+
+
+                        for iIntelPath = 1, iValidIntelPaths, 1  do
                             iValidSubpaths = 0
-
-                            iCurAngleAdjust = 90
-                            tiAdjToDistanceAlongPathByAngle = {[90]=iSubpathGap,[270]=iSubpathGap}
-                            tbStopMovingInDirection = {[90]=false, [270] = false}
-
+                            bStillDeterminingSubpaths = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': Start of loop, iIntelPath='..iIntelPath) end
+                            tiAdjToDistanceAlongPathByAngle = {[90] = 0, [270] = 0}
                             iAltCount = 0
-                            iAdjustIncrement = 0
-                            bCanPathToLocation = false
-                            tiCyclesSinceLastMatch = {[90]=0, [270]=0}
+                            tbStopMovingInDirection = {[90] = false, [270] = false}
+                            tiCyclesSinceLastMatch = {[90] = 0, [270] = 0}
 
-                            --Start by alternating left and right; if find a match then increase the adjustment for that direction by the relevant scout range and continue with logic
                             while bStillDeterminingSubpaths == true do
-                                iAltCount = iCount + 1
-                                if bDebugMessages == true then LOG(sFunctionRef..': iIntelPath='..iIntelPath..'; Subpath altcount='..iAltCount..'; tiCyclesSinceLastMatch='..repr(tiCyclesSinceLastMatch)..'; our aiBrain ArmyIndex='..aiBrain:GetArmyIndex()) end
-                                tiCyclesSinceLastMatch[iCurAngleAdjust] = tiCyclesSinceLastMatch[iCurAngleAdjust] + 1
-                                if iAltCount > iMaxAltCount then
-                                    M27Utilities.ErrorHandler('Likely infinite loop')
+                                iAltCount = iAltCount + 1
+                                if iAltCount >= 1000 then
+                                    M27Utilities.ErrorHandler('Infinite loop, iIntelPath='..iIntelPath)
                                     bStillDeterminingSubpaths = false
                                     break
                                 end
-                                if tbStopMovingInDirection[iCurAngleAdjust] == false then
-
-                                    tPossibleBasePosition = M27Utilities.MoveInDirection(aiBrain[reftIntelLinePositions][iIntelPath][1], iAngleToEnemy + iCurAngleAdjust, tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
-                                    --Check we're still within map bounds
-                                    if tPossibleBasePosition[1] <= iMinX or tPossibleBasePosition[1] >= iMaxX or tPossibleBasePosition[3] <= iMinZ or tPossibleBasePosition[3] >= iMaxZ then
-                                        --Out of map bounds, flag to ignore angles of this type in the future
-                                        tbStopMovingInDirection[iCurAngleAdjust] = true
-                                        --Are all the others flagged to be true?
-                                        bStillDeterminingSubpaths = false
-                                        for _, bValue in tbStopMovingInDirection do
-                                            if bValue == false then bStillDeterminingSubpaths = true break end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iIntelPath='..iIntelPath..'; iAltCount='..iAltCount) end
+                                for iCurAngleAdjust = 90, 270, 180 do
+                                    if not(tbStopMovingInDirection[iCurAngleAdjust]) then
+                                        tbSubpathOptionOffMap = { [1] = false, [2] = false }
+                                        if tiCyclesSinceLastMatch[iCurAngleAdjust] > 1000 then
+                                            M27Utilities.ErrorHandler('Infinite loop, iCurAngleAdjust='..iCurAngleAdjust..'; iIntelPath='..iIntelPath)
+                                            bStillDeterminingSubpaths = false
+                                            break
                                         end
-                                        if bStillDeterminingSubpaths == false then break end
-                                    end
 
-                                    --Can we path to the location? if so then record as a subpath entry
-                                    if tbStopMovingInDirection[iCurAngleAdjust] == false and M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then
-                                        iValidSubpaths = iValidSubpaths + 1
-                                        aiBrain[reftIntelLinePositions][iValidIntelPaths][iValidSubpaths + 1] = {tPossibleBasePosition[1], tPossibleBasePosition[2], tPossibleBasePosition[3]}
-                                        tiCyclesSinceLastMatch[iCurAngleAdjust] = 0
-                                        tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iSubpathGap
-                                        if bDebugMessages == true then
-                                            LOG('Subpath that can path to; Will draw tPossibleBasePosition='..repr(tPossibleBasePosition)..' in Dark blue')
-                                            M27Utilities.DrawLocation(tPossibleBasePosition, nil, 1, 200)
-                                        end --Dark blue
-                                    elseif bDebugMessages == true then
-                                        LOG('Attempted subpath that cant path to; Will draw tPossibleBasePosition='..repr(tPossibleBasePosition)..' in gold')
-                                        M27Utilities.DrawLocation(tPossibleBasePosition, nil, 4, 200) --Gold
-                                    end
+                                        tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iScoutRange * 1.7
+                                        tStartingPointForSearch = M27Utilities.MoveInDirection(aiBrain[reftIntelLinePositions][iIntelPath][1], iAngleToEnemy + iCurAngleAdjust, tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust])
+                                        tPossibleBasePosition = {tStartingPointForSearch[1], tStartingPointForSearch[2], tStartingPointForSearch[3]}
+                                        if M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then
+                                            bCanPathToLocation = true
+                                        else bCanPathToLocation = false
+                                        end
+                                        iSubpathDistAdjust = 0
 
-                                    --Increase distance adjustment for next attempt (look in bigger intervals for performance reasons if its been a while since a match, since e.g. might be dealing with a large ocean)
-                                    if tiCyclesSinceLastMatch[iCurAngleAdjust] < iPointToSwitchToPositiveAdj then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust]  - iInitialInterval
-                                    elseif tiCyclesSinceLastMatch[iCurAngleAdjust] == iPointToSwitchToPositiveAdj then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iInitialInterval * iPointToSwitchToPositiveAdj
-                                    else
-                                        tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
-                                        if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 17 then
-                                            tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
-                                            if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 22 then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
-                                                if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 27 then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2
-                                                    if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 32 then tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] = tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + 2 end
+                                        --Check we're still within map bounds for the starting point
+                                        if tPossibleBasePosition[1] <= iMinX or tPossibleBasePosition[1] >= iMaxX or tPossibleBasePosition[3] <= iMinZ or tPossibleBasePosition[3] >= iMaxZ then
+                                            --Out of map bounds, flag to ignore angles of this type in the future
+                                            tbStopMovingInDirection[iCurAngleAdjust] = true
+                                            --Are all the others flagged to be true (i.e. is any one flagged as false)?
+                                            bStillDeterminingSubpaths = false
+                                            for _, bValue in tbStopMovingInDirection do
+                                                if bValue == false then bStillDeterminingSubpaths = true break end
+                                            end
+                                            if bStillDeterminingSubpaths == false then break end
+                                        end
+                                        if bCanPathToLocation == false then
+                                            --Check if we dont go as far in the normal direction first, can we find somwhere to path to
+                                            for iOppositeAngleDistAdjust = -1, -iPointToSwitchToPositiveAdj, -1 do
+                                                tPossibleBasePosition = M27Utilities.MoveInDirection(aiBrain[reftIntelLinePositions][iIntelPath][1], iAngleToEnemy + iCurAngleAdjust, tiAdjToDistanceAlongPathByAngle[iCurAngleAdjust] + iOppositeAngleDistAdjust)
+                                                if M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then
+                                                    bCanPathToLocation = true
                                                 end
                                             end
                                         end
+
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Just finished checking starting point for search is within map bounds; iCurAngleAdjust='..iCurAngleAdjust..'; tiAdjToDistanceAlongPathByAngle='..repr(tiAdjToDistanceAlongPathByAngle)..'; tStartingPointForSearch='..repr(tStartingPointForSearch)..'; bCanPathToLocation='..tostring(bCanPathToLocation)) end
+
+                                        while bCanPathToLocation == false do
+                                            for iSubpathAngleOption = 1, 2 do
+                                                if tiCyclesSinceLastMatch[iCurAngleAdjust] > 1000 then M27Utilities.ErrorHandler('Infinite loop, iIntelPath='..iIntelPath..'; iCurAngleAdjust='..iCurAngleAdjust) bStillDeterminingSubpaths = false break end
+                                                if iSubpathAngleOption == 1 then
+                                                    tiCyclesSinceLastMatch[iCurAngleAdjust] = tiCyclesSinceLastMatch[iCurAngleAdjust] + 1
+                                                    iSubpathAngleAdjust = iCurAngleAdjust
+                                                    iSubpathDistAdjust = iSubpathDistAdjust + 1
+                                                    --Increase distance if been searhcing a while for performance reasons, e.g. might be dealing with large ocean
+                                                    if tiCyclesSinceLastMatch[iCurAngleAdjust] >= 5 then
+                                                        iSubpathDistAdjust = iSubpathDistAdjust + math.min(35, iSubpathDistAdjust + tiCyclesSinceLastMatch[iCurAngleAdjust] * 0.4)
+                                                    end
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Increased iSubpathDistAdjust to '..iSubpathDistAdjust) end
+                                                else iSubpathAngleAdjust = 180
+                                                end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': iSubpathAngleOption='..iSubpathAngleOption..'; iSubpathDistAdjust='..iSubpathDistAdjust..'; tbSubpathOptionOffMap[iSubpathAngleOption]='..tostring(tbSubpathOptionOffMap[iSubpathAngleOption])) end
+                                                if not(tbSubpathOptionOffMap[iSubpathAngleOption]) then
+                                                    tPossibleBasePosition = M27Utilities.MoveInDirection(tStartingPointForSearch, iAngleToEnemy + iSubpathAngleAdjust, iSubpathDistAdjust)
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': tPossibleBasePosition='..repr(tPossibleBasePosition)..'; will check if within map bounds; iSubpathAngleAdjust='..iSubpathAngleAdjust..'; iSubpathDistAdjust='..iSubpathDistAdjust) end
+                                                    --Check we're still within map bounds
+                                                    if tPossibleBasePosition[1] <= iMinX or tPossibleBasePosition[1] >= iMaxX or tPossibleBasePosition[3] <= iMinZ or tPossibleBasePosition[3] >= iMaxZ then
+                                                        --Out of map bounds, flag to ignore angles of this type in the future
+                                                        tbSubpathOptionOffMap[iSubpathAngleOption] = true
+                                                        --Are all the others flagged to be true? (i.e. is any one flagged as false)?
+                                                        tbStopMovingInDirection[iCurAngleAdjust] = true
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': iSubpathAngleOption '..iSubpathAngleOption..' is out of map bounds; if other one is as well then will abort. tbSubpathOptionOffMap='..repr(tbSubpathOptionOffMap)) end
+                                                        for _, bValue in tbSubpathOptionOffMap do
+                                                            if bValue == false then
+                                                                tbStopMovingInDirection[iCurAngleAdjust] = false
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': _='.._..'; not true so continue with main loop') end
+                                                                break
+                                                            end
+                                                        end
+                                                        if tbStopMovingInDirection[iCurAngleAdjust] == true then
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Both angle options are offmap so abort main loop; will check if should abort entire loop') end
+                                                            bStillDeterminingSubpaths = false
+                                                            for _, bValue in tbStopMovingInDirection do
+                                                                if bValue == false then bStillDeterminingSubpaths = true end
+                                                            end
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': tbStopMovingInDirection='..repr(tbStopMovingInDirection)..'; bStillDeterminingSubpaths='..tostring(bStillDeterminingSubpaths)) end
+                                                            break
+                                                        end
+                                                    end
+
+                                                    --Can we path to the location? if so then record as a subpath entry
+                                                    if M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleBasePosition) == iStartingGroup then
+                                                        bCanPathToLocation = true
+                                                        break
+                                                    elseif bDebugMessages == true then
+                                                        LOG('Attempted subpath that cant path to; Will draw tPossibleBasePosition='..repr(tPossibleBasePosition)..' in gold')
+                                                        M27Utilities.DrawLocation(tPossibleBasePosition, nil, 4, 200) --Gold
+                                                    end
+                                                elseif bDebugMessages == true then LOG(sFunctionRef..': tbSubpathOptionOffMap for '..iSubpathAngleOption..'='..tostring(tbSubpathOptionOffMap[iSubpathAngleOption]))
+                                                end
+                                            end
+                                            if bStillDeterminingSubpaths == false then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': No longer determining subpaths so will abort') end
+                                                break
+                                            elseif tbStopMovingInDirection[iCurAngleAdjust] == true then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Dont want to keep going in this direction so exiting this part of loop') end
+                                                break
+                                            end
+                                        end
+                                        if bCanPathToLocation and not(tbStopMovingInDirection[iCurAngleAdjust]) then
+                                            iValidSubpaths = iValidSubpaths + 1
+                                            aiBrain[reftIntelLinePositions][iIntelPath][iValidSubpaths + 1] = {tPossibleBasePosition[1], tPossibleBasePosition[2], tPossibleBasePosition[3]}
+                                            tiCyclesSinceLastMatch[iCurAngleAdjust] = 0
+                                            if bDebugMessages == true then
+                                                LOG('Subpath that can path to; Will draw tPossibleBasePosition='..repr(tPossibleBasePosition)..' in Dark blue')
+                                                M27Utilities.DrawLocation(tPossibleBasePosition, nil, 1, 200)
+                                            end --Dark blue
+                                        end
+                                    elseif bDebugMessages == true then LOG(sFunctionRef..': tbStopMovingInDirection is true for iCurAngleAdjust='..iCurAngleAdjust..'; tbStopMovingInDirection='..repr(tbStopMovingInDirection)..'; bStillDeterminingSubpaths='..tostring(bStillDeterminingSubpaths))
+                                    end
+                                    if bStillDeterminingSubpaths == false then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': No longer determining subpaths so will abort2') end
+                                        break
                                     end
                                 end
-
-                                --Change angle for next attempt
-                                if iCurAngleAdjust == 90 then iCurAngleAdjust = 270
-                                else iCurAngleAdjust = 90
-                                end
+                            end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': Finished doing intel path '..iIntelPath..'; will move on to next one')
                             end
                         end
+
+
 
 
                         --Record the number of scouts needed for each intel path:
@@ -512,6 +591,14 @@ function RecordIntelPaths(aiBrain)
                         aiBrain[refiMaxIntelBasePaths] = table.getn(aiBrain[reftIntelLinePositions])
                         aiBrain[refbIntelPathsGenerated] = true
                         if bDebugMessages == true then LOG(sFunctionRef..'; just set intelpathsgenerated to be true') end
+
+
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': End of calculating intel paths; aiBrain[refbIntelPathsGenerated]='..tostring(aiBrain[refbIntelPathsGenerated])..'; Full output of intel paths:')
+                            for iIntelPath = 1, table.getn(aiBrain[reftIntelLinePositions]) do
+                                LOG('iIntelPath='..iIntelPath..'; Subpaths Size='..table.getn(aiBrain[reftIntelLinePositions][iIntelPath])..'; Full subpath listing='..repr(aiBrain[reftIntelLinePositions][iIntelPath]))
+                            end
+                        end
                     end
                 end
             end
@@ -522,7 +609,7 @@ function RecordIntelPaths(aiBrain)
             aiBrain[refbNeedScoutPlatoons] = true
         end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': End of code; aiBrain[refbIntelPathsGenerated]='..tostring(aiBrain[refbIntelPathsGenerated])) end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -960,7 +1047,7 @@ function GetEnemyNetThreatAlongIntelPath(aiBrain, iIntelPathBaseNumber, iIntelPa
         --20 is used because the lowest scout intel range is 40, but some are higher
         iLoopCount1 = iLoopCount1 + 1
         if iLoopCount1 > iLoopMax1 then
-            M27Utilities.ErrorHandler('Likely infinite loop, iSubpath='..iSubPath..'; iLoopCount1='..iLoopCount1)
+            M27Utilities.ErrorHandler('Likely infinite loop, iIntelPathBaseNumber='..iIntelPathBaseNumber..'; iSubpath='..iSubPath..'; iLoopCount1='..iLoopCount1..'; size of subpath table='..table.getn(aiBrain[reftIntelLinePositions][iIntelPathBaseNumber]))
             break
         end
         if aiBrain == nil then M27Utilities.ErrorHandler('aiBrain is nil') end
@@ -979,12 +1066,25 @@ function GetEnemyNetThreatAlongIntelPath(aiBrain, iIntelPathBaseNumber, iIntelPa
         iTotalEnemyNetThreat = math.max(iCurEnemyThreat - iCurAllyThreat, 0) + iTotalEnemyNetThreat
         if bDebugMessages == true then LOG(sFunctionRef..'; iSubPath='..iSubPath..'; iCurEnemyThreat='..iCurEnemyThreat..'; iCurAllyThreat='..iCurAllyThreat..'; iTotalEnemyNetThreat='..iTotalEnemyNetThreat) end
         if iTotalEnemyNetThreat > 170 then
+            if bDebugMessages == true then LOG(sFunctionRef..': enemy threat is more than 170 so dont want to advance path, treat it as not having scouts near every location') end
             bScoutNearAllMexes = false
             break
         else
-            tNearbyScouts = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandScout, tSubPathPosition, iIntelPathEnemySearchRange, 'Ally')
-            if tNearbyScouts == nil then bScoutNearAllMexes = false
-            elseif table.getn(tNearbyScouts) == 0 then bScoutNearAllMexes = false
+            --Is the scout assigned to this position on a further subpath?
+            if bDebugMessages == true then LOG(sFunctionRef..': Will see if scout modification is <= 0') end
+            if (aiBrain[reftiSubpathModFromBase][iIntelPathBaseNumber][iSubPath] or 0) <= 0 then
+                tNearbyScouts = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandScout, tSubPathPosition, iIntelPathEnemySearchRange, 'Ally')
+                if M27Utilities.IsTableEmpty(tNearbyScouts) then
+                    --Do we have intel or visual coverage?
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if have intel coverage of tSubPathPosition='..repr(tSubPathPosition)) end
+                    if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, tSubPathPosition, 25, false)) then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': Dont have intel coverage of the target position; will draw gold circle around it')
+                            M27Utilities.DrawLocation(tSubPathPosition, nil, 4, 20, nil)
+                        end
+                        bScoutNearAllMexes = false
+                    end
+                end
             end
         end
     end
@@ -1204,9 +1304,9 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                 else
                                     --Cycle through each point on the current path, and check various conditions:
 
-                                    if bDebugMessages == true then LOG(sFunctionRef..': About to loop through subpath positions. aiBrain[refiCurIntelLineTarget]='..aiBrain[refiCurIntelLineTarget]) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': About to loop through subpath positions to see if we can move the line forward. aiBrain[refiCurIntelLineTarget]='..aiBrain[refiCurIntelLineTarget]) end
                                     local iTotalEnemyNetThreat, bScoutNearAllMexes = GetEnemyNetThreatAlongIntelPath(aiBrain, aiBrain[refiCurIntelLineTarget], iIntelPathEnemySearchRange, 35)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Finished looping through subpath positions, iTotalEnemyNetThreat='..iTotalEnemyNetThreat) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Finished looping through subpath positions, iTotalEnemyNetThreat='..iTotalEnemyNetThreat..'; bScoutNearAllMexes='..tostring(bScoutNearAllMexes)) end
                                     if iTotalEnemyNetThreat > 170 then
                                         aiBrain[refiCurIntelLineTarget] = aiBrain[refiCurIntelLineTarget] - 1
                                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy net threat of '..iTotalEnemyNetThreat..' exceeds 170 so reducing current intel line target by 1 to '..aiBrain[refiCurIntelLineTarget]) end
@@ -1214,6 +1314,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                         if bDebugMessages == true then LOG(sFunctionRef..': iTotalEnemyNetThreat='..iTotalEnemyNetThreat..'; If 0 or less and scouts are in position then will increase intel base path') end
                                         if iTotalEnemyNetThreat <= 0 then
                                             --Are all scouts in position?
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if all scouts are in position. bScoutNearAllMexes='..tostring(bScoutNearAllMexes)..'; table.getn(aiBrain[reftIntelLinePositions])='..table.getn(aiBrain[reftIntelLinePositions])..'; aiBrain[refiCurIntelLineTarget='..aiBrain[refiCurIntelLineTarget]) end
                                             if bScoutNearAllMexes == true and table.getn(aiBrain[reftIntelLinePositions]) > aiBrain[refiCurIntelLineTarget] then
                                                 --If we move the intel line up by 1 will we have too much enemy threat?
                                                 iTotalEnemyNetThreat = GetEnemyNetThreatAlongIntelPath(aiBrain, aiBrain[refiCurIntelLineTarget] + 1, iIntelPathEnemySearchRange, 35)
@@ -1239,7 +1340,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                         if aiBrain[refiCurIntelLineTarget] <= 0 then aiBrain[refiCurIntelLineTarget] = 1
                         elseif aiBrain[refiCurIntelLineTarget] > aiBrain[refiMaxIntelBasePaths] then aiBrain[refiCurIntelLineTarget] = aiBrain[refiMaxIntelBasePaths] end
 
-                        if bDebugMessages == true then LOG('aiBrain[refiCurIntelLineTarget]='..aiBrain[refiCurIntelLineTarget]..'; table.getn(aiBrain[reftIntelLinePositions])='..table.getn(aiBrain[reftIntelLinePositions])) end
+                        if bDebugMessages == true then LOG('aiBrain[refiCurIntelLineTarget]='..aiBrain[refiCurIntelLineTarget]..'; table.getn(aiBrain[reftIntelLinePositions])='..table.getn(aiBrain[reftIntelLinePositions])..'; aiBrain[refiMaxIntelBasePaths]='..aiBrain[refiMaxIntelBasePaths]) end
                         local iScoutsWanted = table.getn(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]])
                         local iScoutsForNextPath = aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]+1]
                         if iScoutsForNextPath then iScoutsForNextPath = table.getn(iScoutsForNextPath) end
@@ -1289,6 +1390,8 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                             local tNearbyEnemiesPlus2, tSubPathPlus2
                             local iIncreaseInSubpath, iMaxIncreaseInSubpath, iNextMaxIncrease
                             local iCurIntelLineTarget = aiBrain[refiCurIntelLineTarget]
+                            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiCurIntelLineTarget]='..aiBrain[refiCurIntelLineTarget]..'; size of intel paths='..table.getn(aiBrain[reftIntelLinePositions])) end
+
                             for iSubPath, tSubPathPosition in aiBrain[reftIntelLinePositions][iCurIntelLineTarget] do
                                 iIncreaseInSubpath = 0
                                 iMaxIncreaseInSubpath = 0
@@ -1298,6 +1401,10 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                 if aiBrain[reftiSubpathModFromBase] == nil then aiBrain[reftiSubpathModFromBase] = {} end
                                 if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget] == nil then aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget] = {} end
                                 if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath] == nil then aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath] = 0 end
+                                if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath - 1] == nil then aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath-1] = 0 end
+                                if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath + 1] == nil then aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath+1] = 0 end
+
+                                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget]='..repr(aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget])) end
                                 --Get for -1 subpath:
                                 if iSubPath > 1 then iMaxIncreaseInSubpath = aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath - 1] + 1 end
                                 --Get for +1 subpath if it exists
@@ -1481,12 +1588,14 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
 
 
             if aiBrain[refiScoutShortfallIntelLine] > 0 then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have a shortfall of scouts for intel line='..aiBrain[refiScoutShortfallIntelLine]) end
                 --Defaults for other scouts wanted - just set to 1 for simplicity
                 aiBrain[refiScoutShortfallLargePlatoons] = 1
                 aiBrain[refiScoutShortfallAllPlatoons] = 1
                 aiBrain[refiScoutShortfallMexes] = 0
                 aiBrain[refbNeedScoutPlatoons] = true
             else
+                if bDebugMessages == true then LOG(sFunctionRef..': Dont have a shortfall of scouts for intel line so will consider large platoons') end
                 aiBrain[refbNeedScoutPlatoons] = false
 
                 --=================Large platoons - ensure they have scouts available, and if not then add scout to them
@@ -1733,7 +1842,7 @@ function ResetEnemyThreatGroups(aiBrain, iSearchRange, tCategoriesToSearch)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius, iCategory, bMustBeOnLand, bMustBeOnWater, iNavalBlipThreat)
+function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius, iCategory, bMustBeOnLand, bMustBeOnWater, iNavalBlipThreat, bNotFirstTime)
     --Adds oEnemyUnit to sThreatGroup and calls this function on itself again for any units within iRadius that are visible
     --also updates previous threat group references so they know to refer to this threat group
     --if iRadius is 0 then will only add oEnemyUnit to the threat group
@@ -1747,9 +1856,9 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
     if oEnemyUnit[iArmyIndex] == nil then oEnemyUnit[iArmyIndex] = {} end
     if oEnemyUnit[iArmyIndex][refbUnitAlreadyConsidered] == nil then
 
-        --[[local bNewUnitIsOnRightTerrain
+        local bNewUnitIsOnRightTerrain
         local bIsOnWater
-        local tCurPosition--]]
+        local tCurPosition
 
         if bMustBeOnLand == nil then
             bMustBeOnLand = true
@@ -1808,22 +1917,24 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
             if not(sOldRef == nil) then aiBrain[reftUnitGroupPreviousReferences][sOldRef] = sThreatGroup end
         end
 
-        --look for nearby units: v15 - removed this part of the logic to see if improves CPU performance
-        --[[if iRadius and iRadius > 0 then
-            tCurPosition = oEnemyUnit:GetPosition()
-            local tNearbyUnits = aiBrain:GetUnitsAroundPoint(iCategory, tCurPosition, iRadius, 'Enemy')
-            for iUnit, oUnit in tNearbyUnits do
-                bNewUnitIsOnRightTerrain = true
-                if bMustBeOnLand or bMustBeOnWater then
-                    if GetTerrainHeight(tCurPosition[1], tCurPosition[3]) < M27MapInfo.iMapWaterHeight then bIsOnWater = true else bIsOnWater = false end
-                    if bIsOnWater == true and bMustBeOnLand == true then bNewUnitIsOnRightTerrain = false
-                    elseif bIsOnWater == false and bMustBeOnWater == true then bNewUnitIsOnRightTerrain = false
+        --look for nearby units: v15 - removed the recursive part of the logic to see if improves CPU performance
+        if not(bNotFirstTime) then
+            if iRadius and iRadius > 0 then
+                tCurPosition = oEnemyUnit:GetPosition()
+                local tNearbyUnits = aiBrain:GetUnitsAroundPoint(iCategory, tCurPosition, iRadius, 'Enemy')
+                for iUnit, oUnit in tNearbyUnits do
+                    bNewUnitIsOnRightTerrain = true
+                    if bMustBeOnLand or bMustBeOnWater then
+                        if GetTerrainHeight(tCurPosition[1], tCurPosition[3]) < M27MapInfo.iMapWaterHeight then bIsOnWater = true else bIsOnWater = false end
+                        if bIsOnWater == true and bMustBeOnLand == true then bNewUnitIsOnRightTerrain = false
+                        elseif bIsOnWater == false and bMustBeOnWater == true then bNewUnitIsOnRightTerrain = false
+                        end
                     end
-                end
 
-                if bNewUnitIsOnRightTerrain and M27Utilities.CanSeeUnit(aiBrain, oUnit, true) == true then AddNearbyUnitsToThreatGroup(aiBrain, oUnit, sThreatGroup, iRadius, iCategory, bMustBeOnLand, bMustBeOnWater) end
+                    if bNewUnitIsOnRightTerrain and M27Utilities.CanSeeUnit(aiBrain, oUnit, true) == true then AddNearbyUnitsToThreatGroup(aiBrain, oUnit, sThreatGroup, iRadius, iCategory, bMustBeOnLand, bMustBeOnWater, iNavalBlipThreat, true) end
+                end
             end
-        end --]]
+        end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -2098,11 +2209,14 @@ function ThreatAssessAndRespond(aiBrain)
     local iEnemyStartPoint = M27Logic.GetNearestEnemyStartNumber(aiBrain)
     local iDistanceToEnemyFromStart = aiBrain[refiDistanceToNearestEnemyBase]
     local iNavySearchRange = math.min(iDistanceToEnemyFromStart, aiBrain[refiModDistFromStartNearestOutstandingThreat] + 120)
+    --Do we have air control/immediate air threats? If not, then limit search range to 200
+    if not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
+        iNavySearchRange = math.min(iNavySearchRange, 200)
+    end
 
     local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
 
     local refCategoryMobileLand = categories.LAND * categories.MOBILE
-    local refCategoryPointDefence = M27UnitInfo.refCategoryPD
 
     if bDebugMessages == true then LOG(sFunctionRef..': About to reset enemy threat groups') end
     if bDebugMessages == true then LOG(sFunctionRef..': Getting ACU platoon and action') DebugPrintACUPlatoon(aiBrain) end
@@ -2111,9 +2225,9 @@ function ThreatAssessAndRespond(aiBrain)
     local iTMDAndShieldSearchRange = 25 --If dealing with T2+ PD will look for nearby shields and TMD
     local iT2ArtiSearchRange = 50 --Will look for nearby T2 arti within this range
     local iNavyUnitCategories = M27UnitInfo.refCategoryNavyThatCanBeTorpedoed
-    local tCategoriesToSearch = {refCategoryMobileLand, refCategoryPointDefence}
+    local tCategoriesToSearch = {refCategoryMobileLand, M27UnitInfo.refCategoryPD}
     if M27MapInfo.bMapHasWater == true then
-        tCategoriesToSearch = {refCategoryMobileLand, refCategoryPointDefence, iNavyUnitCategories}
+        tCategoriesToSearch = {refCategoryMobileLand, M27UnitInfo.refCategoryPD, iNavyUnitCategories}
     end
     ResetEnemyThreatGroups(aiBrain, math.max(iNavySearchRange, iLandThreatSearchRange), tCategoriesToSearch)
     local bConsideringNavy
@@ -2124,6 +2238,13 @@ function ThreatAssessAndRespond(aiBrain)
     local iNavalBlipThreat = 300 --Frigate
 
     local bFirstThreatGroup = true
+    local tiOurBasePathingGroup = {[M27UnitInfo.refPathingTypeLand] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), [M27UnitInfo.refPathingTypeAmphibious] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])}
+    if bDebugMessages == true then LOG(sFunctionRef..': tiOurBasePathingGroup='..repr(tiOurBasePathingGroup)) end
+    local sPathingType
+    local bCanPathToTarget
+
+
+
     if aiBrain[refiEnemyHighestTechLevel] > 1 then
         iNavalBlipThreat = 2000 --Cruiser
     end
@@ -2133,6 +2254,13 @@ function ThreatAssessAndRespond(aiBrain)
         if iCategory == iNavyUnitCategories then
             bConsideringNavy = true
             iSearchRange = iNavySearchRange
+        elseif iCategory == M27UnitInfo.refCategoryPD then
+            sPathingType = M27UnitInfo.refPathingTypeLand
+        else
+            if aiBrain[refiOurHighestFactoryTechLevel] >= 2 or aiBrain:GetFactionIndex() == M27UnitInfo.refFactionAeon or aiBrain:GetFactionIndex() == M27UnitInfo.refFactionSeraphim then --shoudl have access to amphibious units
+                sPathingType = M27UnitInfo.refPathingTypeAmphibious
+            else sPathingType = M27UnitInfo.refPathingTypeLand
+            end
         end
         iThreatGroupDistance = iLandThreatGroupDistance
         if bConsideringNavy == true then iThreatGroupDistance = iNavyThreatGroupDistance end
@@ -2148,42 +2276,69 @@ function ThreatAssessAndRespond(aiBrain)
                 if bUnitOnWater == bConsideringNavy then --either on water and considering navy, or not on water and not considering navy
                     --Can we see enemy unit/blip:
                     --function CanSeeUnit(aiBrain, oUnit, bBlipOnly)
-                    if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to see if can see the unit and get its threat. Enemy Unit ID='..oEnemyUnit:GetUnitId()) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to see if can see the unit and get its threat. Enemy Unit ID='..oEnemyUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit)..'; Position='..repr(oEnemyUnit:GetPosition())) end
                     if M27Utilities.CanSeeUnit(aiBrain, oEnemyUnit, true) == true then
                         if oEnemyUnit[iArmyIndex] == nil then oEnemyUnit[iArmyIndex] = {} end
                         if oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] == nil then
                             if bDebugMessages == true then LOG(sFunctionRef..': Enemy unit doesnt have a threat group') end
                             --enemy unit hasn't been assigned a threat group - assign it to one now if it's not already got a threat group:
                             if not(oEnemyUnit[iArmyIndex][refbUnitAlreadyConsidered] == true) then
-                                iCurThreatGroup = iCurThreatGroup + 1
-                                sThreatGroup = 'M27'..iGameTime..'No'..iCurThreatGroup
-                                oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] = sThreatGroup
-                                if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to add unit to threat group '..sThreatGroup) end
-                                AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iThreatGroupDistance, iCategory, not(bConsideringNavy), bConsideringNavy, iNavalBlipThreat)
-                                --Add nearby structures to threat rating if dealing with structures and enemy has T2+ PD near them
-                                if iCategory == refCategoryPointDefence and oEnemyUnit[iArmyIndex][refsEnemyThreatGroup][refiThreatGroupHighestTech] >= 2 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Havent already considered the unit; sPathingType='..sPathingType..'; position='..repr(oEnemyUnit:GetPosition())..'; Pathing group='..M27MapInfo.GetSegmentGroupOfLocation(sPathingType, oEnemyUnit:GetPosition())) end
+                                --Can we path to the threat group?
+                                bCanPathToTarget = false
+                                if bConsideringNavy or tiOurBasePathingGroup[sPathingType] == M27MapInfo.GetSegmentGroupOfLocation(sPathingType, oEnemyUnit:GetPosition()) then bCanPathToTarget = true
+                                elseif iCategory == M27UnitInfo.refCategoryPD then
+                                    --If we travel from the target towards our base and at 45 degree angles (checking 5 points in total) can any of them path there?
+                                    local iRangeToCheck = 30 + 2
+                                    if aiBrain[refiMinIndirectTechLevel] == 2 then iRangeToCheck = 60 + 2
+                                    elseif aiBrain[refiMinIndirectTechLevel] >= 3 then iRangeToCheck = 90 + 2 end
+                                    local iBaseAngle = M27Utilities.GetAngleFromAToB(oEnemyUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                    local tPossibleFiringPoint
 
-                                    local tNearbyDefensiveStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD * categories.STRUCTURE + M27UnitInfo.refCategoryFixedShield, tEnemyUnitPos, iTMDAndShieldSearchRange, 'Enemy')
-                                    if M27Utilities.IsTableEmpty(tNearbyDefensiveStructures) == false then
-                                        for iDefence, oDefenceUnit in tNearbyDefensiveStructures do
-                                            if not(oDefenceUnit.Dead) then
-                                                AddNearbyUnitsToThreatGroup(aiBrain, oDefenceUnit, sThreatGroup, 0, iCategory)
-                                            end
+
+                                    for iAngleOffset = -90, 90, 45 do
+                                        tPossibleFiringPoint = M27Utilities.MoveInDirection(oEnemyUnit:GetPosition(), iBaseAngle + iAngleOffset, iRangeToCheck)
+                                        if M27MapInfo.GetSegmentGroupOfLocation(sPathingType, tPossibleFiringPoint) == tiOurBasePathingGroup[sPathingType] then
+                                            bCanPathToTarget = true
+                                            break
                                         end
-                                    end
-                                    local tNearbyT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, tEnemyUnitPos, iT2ArtiSearchRange, 'Enemy')
-                                    if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
-                                        for iDefence, oDefenceUnit in tNearbyT2Arti do
-                                            if not(oDefenceUnit.Dead) then
-                                                AddNearbyUnitsToThreatGroup(aiBrain, oDefenceUnit, sThreatGroup, 0, iCategory)
-                                            end
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef..': Cant path to tPossibleFiringPoint='..repr(tPossibleFiringPoint))
+                                            M27Utilities.DrawLocation(tPossibleFiringPoint)
                                         end
                                     end
                                 end
-
+                                if bCanPathToTarget then
+                                    iCurThreatGroup = iCurThreatGroup + 1
+                                    sThreatGroup = 'M27'..iGameTime..'No'..iCurThreatGroup
+                                    oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] = sThreatGroup
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to add unit to threat group '..sThreatGroup) end
+                                    AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iThreatGroupDistance, iCategory, not(bConsideringNavy), bConsideringNavy, iNavalBlipThreat)
+                                    --Add nearby structures to threat rating if dealing with structures and enemy has T2+ PD near them
+                                    if iCategory == M27UnitInfo.refCategoryPD and oEnemyUnit[iArmyIndex][refsEnemyThreatGroup][refiThreatGroupHighestTech] >= 2 then
+                                        local tNearbyDefensiveStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD * categories.STRUCTURE + M27UnitInfo.refCategoryFixedShield, tEnemyUnitPos, iTMDAndShieldSearchRange, 'Enemy')
+                                        if M27Utilities.IsTableEmpty(tNearbyDefensiveStructures) == false then
+                                            for iDefence, oDefenceUnit in tNearbyDefensiveStructures do
+                                                if not(oDefenceUnit.Dead) then
+                                                    --AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius, iCategory, bMustBeOnLand, bMustBeOnWater, iNavalBlipThreat, bNotFirstTime)
+                                                    AddNearbyUnitsToThreatGroup(aiBrain, oDefenceUnit, sThreatGroup, 0, iCategory)
+                                                end
+                                            end
+                                        end
+                                        local tNearbyT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, tEnemyUnitPos, iT2ArtiSearchRange, 'Enemy')
+                                        if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
+                                            for iDefence, oDefenceUnit in tNearbyT2Arti do
+                                                if not(oDefenceUnit.Dead) then
+                                                    --AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius, iCategory, bMustBeOnLand, bMustBeOnWater, iNavalBlipThreat, bNotFirstTime)
+                                                    AddNearbyUnitsToThreatGroup(aiBrain, oDefenceUnit, sThreatGroup, 0, iCategory)
+                                                end
+                                            end
+                                        end
+                                    end
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': Cant path to enemy unit='..oEnemyUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit))
+                                end
+                            elseif bDebugMessages == true then LOG(sFunctionRef..': Unit already has a threat group')
                             end
-                            --Can see the unit, if its experimental add to the list of identified experimentals
-
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': Enemy unit already has a threat group='..oEnemyUnit[iArmyIndex][refsEnemyThreatGroup]) end
                         end
@@ -2248,10 +2403,11 @@ function ThreatAssessAndRespond(aiBrain)
             if bFirstThreatGroup then
                 bFirstThreatGroup = false
                 aiBrain[refiModDistFromStartNearestThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
+                aiBrain[reftLocationFromStartNearestThreat] = M27Utilities.GetNearestUnit(tEnemyThreatGroup[refoEnemyGroupUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, nil, nil):GetPosition()
             end
             bIndirectThreatOnly = false
             bConsideringNavy = false
-            if tEnemyThreatGroup[refiThreatGroupCategory] == refCategoryPointDefence then bIndirectThreatOnly = true
+            if tEnemyThreatGroup[refiThreatGroupCategory] == M27UnitInfo.refCategoryPD then bIndirectThreatOnly = true
             elseif tEnemyThreatGroup[refiThreatGroupCategory] == iNavyUnitCategories then bConsideringNavy = true end
             if bConsideringNavy == true or bIgnoreRemainingLandThreats == false then
                 if bDebugMessages == true then LOG(sFunctionRef..': Start of cycle through sorted table of each enemy threat group; iEnemyGroup='..iEnemyGroup..'; distance from our base='..tEnemyThreatGroup[refiModDistanceFromOurStart]..'; bIndirectThreatOnly='..tostring(bIndirectThreatOnly)..'; bConsideringNavy='..tostring(bConsideringNavy)) end
@@ -2270,7 +2426,8 @@ function ThreatAssessAndRespond(aiBrain)
                 iThreatNeeded = tEnemyThreatGroup[refiTotalThreat]
                 iThreatWanted = tEnemyThreatGroup[refiHighestThreatRecorded] * iThreatMaxFactor
                 if bIndirectThreatOnly then
-                    iThreatNeeded = math.min(iThreatNeeded * 0.2, 400) --i.e. 2 MMLs
+
+                    iThreatNeeded = math.max(iThreatNeeded * 0.12, math.min(iThreatNeeded * 0.2, 400)) --i.e. 2 MMLs
                     iThreatWanted = iThreatWanted * 0.7 --Structures are given double threat, so really this is saying send up to 140% of the mass value of enemy PD in indirect fire units
                 elseif bConsideringNavy == true then
                     iThreatWanted = iThreatNeeded * iNavalThreatMaxFactor
@@ -2810,9 +2967,9 @@ function ThreatAssessAndRespond(aiBrain)
                                     for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
                                         IssueAttack({tTorpSubtable[refoTorpUnit]}, oUnit)
                                     end
-                                    IssueMove({tTorpSubtable[refoTorpUnit]}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                    IssueAggressiveMove({tTorpSubtable[refoTorpUnit]}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                     tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing torpp bomber and then Telling torpedo bomber with ID ref='..tTorpSubtable[refoTorpUnit]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..' to attack') end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing torp bomber and then Telling torpedo bomber with ID ref='..tTorpSubtable[refoTorpUnit]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..' to attack') end
                                     break
                                 end
                             end
@@ -2840,6 +2997,7 @@ function ThreatAssessAndRespond(aiBrain)
             aiBrain[refbNeedDefenders] = false
             aiBrain[refbNeedIndirect] = false
             aiBrain[refiModDistFromStartNearestThreat] = 10000
+            aiBrain[reftLocationFromStartNearestThreat] = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
         end
     end -->0 enemy threat groups
 
@@ -3155,7 +3313,11 @@ function ACUManager(aiBrain)
             local iHealthThresholdAdjIfAlreadyAllIn = 0
             local iHealthAbsoluteThresholdIfAlreadyAllIn = 750
             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iHealthThresholdAdjIfAlreadyAllIn = 0.05 end
+            local iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
             local bWantEscort = oACU:IsUnitState('Upgrading')
+            if bWantEscort and oACU:GetHealthPercent() >= 0.95 and iACUCurShield >= iACUMaxShield * 0.95 and M27Conditions.DoesACUHaveGun(aiBrain, false, oACU) then
+                bWantEscort = false
+            end
 
             local bEmergencyRequisition = false
             local iLastDistanceToACU = 10000
@@ -3341,6 +3503,7 @@ function ACUManager(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Want to cancel upgrade and run') end
                     --Only actually cancel if we're not close to our base as if we're close to base then will probably die if cancel as well
                     if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for ACU') end
                         IssueClearCommands({M27Utilities.GetACU(aiBrain)})
                         IssueMove({oACU}, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos))
                     end
@@ -3416,10 +3579,20 @@ function ACUManager(aiBrain)
                 oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = bWantEscort
 
                 --If we dont want an escort and we last wanted an escort 15+ seconds ago, then disband the escort platoon
-                if bWantEscort then oACUPlatoon[M27PlatoonUtilities.refiLastTimeWantedEscort] = math.floor(GetGameTimeSeconds())
+                if bWantEscort then
+                    if bDebugMessages == true then LOG(sFunctionRef..': ACU wants an escort') end
+                    oACUPlatoon[M27PlatoonUtilities.refiLastTimeWantedEscort] = math.floor(GetGameTimeSeconds())
                 else
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': ACU doesnt want an escort any more, will check if it hasnt wanted one for a while now, and if it has an escorting platoon. oACUPlatoon[M27PlatoonUtilities.refiLastTimeWantedEscort]='..(oACUPlatoon[M27PlatoonUtilities.refiLastTimeWantedEscort] or 'nil'))
+                        if oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon] then LOG('Have an escorting platoon, number of units in platoon='..(oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentUnits] or 'nil'))
+                        else LOG('Dont have an escorting platoon')
+                        end
+                    end
+
                     if oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon] and oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentUnits] > 1 then
                         if GetGameTimeSeconds() - oACUPlatoon[M27PlatoonUtilities.refiLastTimeWantedEscort] >= 15 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will tell escorting platoon to disband') end
                             oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
                         end
                     end
@@ -3473,7 +3646,6 @@ function ACUManager(aiBrain)
                 end
                 --Reset flag for ACU having run (normally platoons reset when they reach their destination, but for ACU it will revert to going to enemy start if we have gun upgrade)
                 if oACU:GetHealthPercent() >= 0.95 and oACU.PlatoonHandle[M27PlatoonUtilities.refbHavePreviouslyRun] and M27Conditions.DoesACUHaveGun(aiBrain, false) then
-                    local iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
                     if iACUMaxShield == 0 or iACUCurShield >= iACUMaxShield * 0.7 then
                         --Large threat near ACU?
                         local iNearbyThreat = 0
@@ -3485,6 +3657,7 @@ function ACUManager(aiBrain)
                         end
                     end
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort]='..tostring(oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort])) end
             end
 
             if bAllInAttack == true then
@@ -3690,7 +3863,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local iDistanceToEnemyEcoThreshold = 450 --If enemy is >= this then more likely to switch to eco mode instead of ground attack
     --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
     local iBigThreatSearchRange = 10000
 
@@ -3968,6 +4140,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 end
 
                 --Should we switch to eco?
+
                 local bWantToEco = false
                 if bKeepProtectingACU == false then
                     --How far away is the enemy?
@@ -3980,7 +4153,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
                     --Dont eco if enemy ACU near ours as likely will need backup
                     if aiBrain[refbEnemyACUNearOurs] == false then
-                        if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 8000 then
+                        if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
                             if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.6 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': No big enemy threats and good defence and mex coverage so will eco') end
                                 bWantToEco = true
@@ -3991,9 +4164,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                                     if bDebugMessages == true then LOG(sFunctionRef..': Ok defence coverage and income not changed in a while so will eco') end
                                     bWantToEco = true
                                 else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if we are making use of tanks - if not then will switch to eco if have a decent number of tanks. aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]='..tostring(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons])) end
                                     if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
                                         --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
                                         local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iMinTanksWanted='..iMinTanksWanted..'; iLandCombatUnits='..iLandCombatUnits) end
                                         if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco') end
                                             bWantToEco = true
@@ -4018,6 +4193,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                         aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandEarly
                     end
                 end
+
             end
         end
 
@@ -4337,6 +4513,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = 0.5
     aiBrain[refiModDistFromStartNearestOutstandingThreat] = 1000
     aiBrain[refiModDistFromStartNearestThreat] = 1000
+    aiBrain[reftLocationFromStartNearestThreat] = {0,0,0}
     aiBrain[refiEnemyHighestTechLevel] = 1
 
 

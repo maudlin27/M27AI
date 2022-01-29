@@ -729,6 +729,9 @@ Platoon = Class(M27PlatoonClass) {
     M27RetreatingShieldUnits = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27SuicideSquad = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
     M27IdleScouts = function(self)
         M27PlatoonUtilities.PlatoonInitialSetup(self)
     end,

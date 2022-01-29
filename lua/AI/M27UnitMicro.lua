@@ -343,7 +343,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
 
         local tAllUnitsInArea = GetUnitsInRect(Rect(tBombTarget[1]-iRadiusSize, tBombTarget[3]-iRadiusSize, tBombTarget[1]+iRadiusSize, tBombTarget[3]+iRadiusSize))
         if M27Utilities.IsTableEmpty(tAllUnitsInArea) == false then
-            local tMobileLandInArea = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLand - M27UnitInfo.refCategoryMobileLandShield, tAllUnitsInArea)
+            local tMobileLandInArea = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLand - M27UnitInfo.refCategoryMobileLandShield -categories.EXPERIMENTAL, tAllUnitsInArea)
             if M27Utilities.IsTableEmpty(tMobileLandInArea) == false then
                 local oCurBrain
                 for iUnit, oUnit in tMobileLandInArea do

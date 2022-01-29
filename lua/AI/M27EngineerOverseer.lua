@@ -259,6 +259,7 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
             oEngineer[reftEngineerLastPositionOfReclaimOrder] = nil
             oEngineer[refiTotalActionsAssigned] = 0
             oEngineer[rebToldToStartBuildingT3Mex] = false
+            oEngineer[refbPrimaryBuilder] = false
             if oEngineer[refbHelpingACU] then
                 if M27Utilities.IsTableEmpty(aiBrain[reftEngineersHelpingACU]) == false then
                     for iUnit, oUnit in aiBrain[reftEngineersHelpingACU] do
@@ -507,6 +508,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
     elseif oUnitToAssist and not(bAreAssisting) then
         M27Utilities.ErrorHandler('Have a unit to assist but bAreAssisting isnt true')
     elseif bAreAssisting == true then
+        oEngineer[refbPrimaryBuilder] = false
         if oUnitToAssist[reftGuardedBy] == nil then oUnitToAssist[reftGuardedBy] = {} end
         oUnitToAssist[reftGuardedBy][iUniqueRef] = oEngineer
         if bDebugMessages == true then
@@ -519,6 +521,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
         end
     else
         --Not guarding a unit - check if have an action that means we want an escort
+        oEngineer[refbPrimaryBuilder] = true
         local bWantEscort = false
         if not(oEngineer == M27Utilities.GetACU(aiBrain)) then
             if iActionToAssign == refActionBuildMex or iActionToAssign == refActionBuildHydro or iActionToAssign == refActionReclaimArea then
@@ -2358,13 +2361,14 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Considering for E'..GetEngineerUniqueCount(oEngineer)..' LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' with unit state='..M27Logic.GetUnitState(oEngineer)) end
     local bReclaimWillMoveOutOfRangeSoon = false
     --First check we have space to accept any reclaim - want higher of 1% storage and 50 mass
     local aiBrain = oEngineer:GetAIBrain()
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering for E'..GetEngineerUniqueCount(oEngineer)..' LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' with unit state='..M27Logic.GetUnitState(oEngineer)..' currently at position '..repr(oEngineer:GetPosition())..'; mass stored='..aiBrain:GetEconomyStoredRatio('MASS')) end
     if aiBrain:GetEconomyStoredRatio('MASS') < 0.98 and (1 - aiBrain:GetEconomyStoredRatio('MASS')) * aiBrain:GetEconomyStored('MASS') > 50 then
         local tCurPos = oEngineer:GetPosition()
         --Has the engineer moved from its location when it was last told to reclaim?
+        if bDebugMessages == true then LOG(sFunctionRef..': Checking if engineer has moved, oEngineer[M27UnitInfo.refbSpecialMicroActive]='..tostring((oEngineer[M27UnitInfo.refbSpecialMicroActive] or false))..'; oEngineer[reftEngineerLastPositionOfReclaimOrder]='..repr(oEngineer[reftEngineerLastPositionOfReclaimOrder])..'; oEngineer[reftEngineerCurrentTarget]='..repr(oEngineer[reftEngineerCurrentTarget])) end
         if not(oEngineer[M27UnitInfo.refbSpecialMicroActive]) then
             if not(oEngineer[reftEngineerLastPositionOfReclaimOrder]) or (M27Utilities.GetDistanceBetweenPositions(tCurPos, oEngineer[reftEngineerLastPositionOfReclaimOrder]) > 1 or M27Utilities.GetDistanceBetweenPositions(tCurPos, oEngineer[reftEngineerCurrentTarget]) <= 1) then
                 --Is the engineer part of a segment with iMinReclaimIndividualValue reclaim, or near a segment with this minimum)?
@@ -2373,13 +2377,14 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
                     --DrawRectangle(rRect, iColour, iDisplayCount)
                     local iCurX, iCurZ = M27MapInfo.GetReclaimSegmentsFromLocation(tCurPos)
                     M27Utilities.DrawRectangle(Rect((iCurX - 1) * M27MapInfo.iReclaimSegmentSizeX, (iCurZ - 1) * M27MapInfo.iReclaimSegmentSizeZ, iCurX * M27MapInfo.iReclaimSegmentSizeX, iCurZ * M27MapInfo.iReclaimSegmentSizeZ))
-                    LOG(sFunctionRef..': Have drawn rectangle that the engineer is in, iCurX='..iCurX..'; iCurZ='..iCurZ)
+                    LOG(sFunctionRef..': Have drawn rectangle that the engineer is in, iCurX='..iCurX..'; iCurZ='..iCurZ..'; IsReclaimNearby='..tostring(M27Conditions.IsReclaimNearby(tCurPos, 1, iMinReclaimIndividualValue)))
                 end
+
                 if M27Conditions.IsReclaimNearby(tCurPos, 1, iMinReclaimIndividualValue) then --want to only look at adjacent segments even for ACU, as build range of 10 should still be smaller than 1+bit of segment in almost all cases
                     if bDebugMessages == true then LOG(sFunctionRef..' Is reclaim in current or adjacent segment, will check if any reclaim will move out of range; oEngineer[reftEngineerCurrentTarget]='..repr(oEngineer[reftEngineerCurrentTarget] or {'nil'})) end
                     local oEngBP = oEngineer:GetBlueprint()
                     local iMoveSpeed = oEngBP.Physics.MaxSpeed
-                    local iMaxDistanceToEngineer = oEngBP.Economy.MaxBuildDistance + 0.5
+                    local iMaxDistanceToEngineer = oEngBP.Economy.MaxBuildDistance + math.min(oEngBP.SizeX, oEngBP.SizeZ) * 0.5
                     --local iRadius = iMaxDistanceToEngineer * 0.5
 
                     local iCurDistToEngineer
@@ -2407,9 +2412,18 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
                         local iValidReclaimInRange = 0
                         for iReclaim, oReclaim in tNearbyReclaim do
                             --is this valid reclaim within our build area?
-                            if bDebugMessages == true then LOG(sFunctionRef..': iReclaim='..iReclaim..'; oReclaim.MaxMassReclaim='..(oReclaim.MaxMassReclaim or 0)) end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': iReclaim='..iReclaim..'; oReclaim.MaxMassReclaim='..(oReclaim.MaxMassReclaim or 0))
+                                if oReclaim.MaxMassReclaim >= 100 then
+                                    LOG('Large reclaim, repr of all values='..repr(oReclaim))
+                                    if oReclaim.GetBlueprint then
+                                        LOG('oReclaim has a blueprint='..repr(oReclaim:GetBlueprint()))
+                                    else LOG('oReclaim doesnt have .GetBlueprint')
+                                    end
+                                end--M27Utilities.DebugArray(oReclaim)) end
+                            end
                             if oReclaim.MaxMassReclaim >= iMinReclaimIndividualValue and oReclaim.CachePosition and not(oReclaim:BeenDestroyed()) then
-                                iCurDistToEngineer = M27Utilities.GetDistanceBetweenPositions(tCurPos, oReclaim.CachePosition)
+                                iCurDistToEngineer = math.max(0, M27Utilities.GetDistanceBetweenPositions(tCurPos, oReclaim.CachePosition) - math.min(oReclaim:GetBlueprint().SizeX, oReclaim:GetBlueprint().SizeZ)*0.5)
                                 if iCurDistToEngineer <= iMaxDistanceToEngineer and (iCurDistToEngineer > iMinDistanceToEngineer or oReclaim.MaxMassReclaim > 100) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': iReclaim='..iReclaim..'; Reclaim is in range, iCurDistToEngineer='..iCurDistToEngineer) end
                                     table.insert(tReclaimInRange, oReclaim)
@@ -2423,6 +2437,14 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
                                 end
                             end
                         end
+                        --If we want to reclaim (it will move out of range soon) but we dont have any reclaim flagged as being in-range, then update to include all nearby reclaim as backup
+
+                        if M27Utilities.IsTableEmpty(tReclaimInRange) and M27Utilities.IsTableEmpty(tNearbyReclaim) == false and bReclaimWillMoveOutOfRangeSoon then
+                            tReclaimInRange = tNearbyReclaim
+                        end
+
+
+
 
                         if bDebugMessages == true then LOG(sFunctionRef..'bReclaimWillMoveOutOfRangeSoon='..tostring(bReclaimWillMoveOutOfRangeSoon)) end
                         if bReclaimWillMoveOutOfRangeSoon then
@@ -2632,8 +2654,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                         local iCategoryToBuild
                         local bConsiderAdjacency = false --Only set to true if have manually added code to determine adjacency in the getadjacency function
                         local bConstructBuilding = true
-                        local sBlueprintToBuild
-                        local sBlueprintBuildBy, iCatToBuildBy
+                        local iCatToBuildBy
                         local tTargetLocation = tActionTargetLocation
                         local bQueueUpMultiple = false
                         local iMaxAreaToSearch = 60
@@ -2653,8 +2674,13 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             elseif iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower then
                                 --iCategoryToBuild = refCategoryPower
                                 bConsiderAdjacency = true
-                                iCatToBuildBy = refCategoryLandFactory + refCategoryAirFactory
-                                sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
+                                if M27UnitInfo.GetUnitTechLevel(oEngineer) == 1 then
+                                    iCatToBuildBy = refCategoryLandFactory + refCategoryAirFactory
+                                elseif M27UnitInfo.GetUnitTechLevel(oEngineer) == 2 then
+                                    iCatToBuildBy = refCategoryAirFactory + M27UnitInfo.refCategoryT2Radar
+                                else
+                                    iCatToBuildBy = refCategoryAirFactory + M27UnitInfo.refCategoryT3Radar + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategoryFixedT3Arti
+                                end
                                 bQueueUpMultiple = true
                                 iMaxAreaToSearch = 20
                                 if iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower then iMaxAreaToSearch = 50 end
@@ -2662,7 +2688,6 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 --iCategoryToBuild = refCategoryLandFactory
                                 bConsiderAdjacency = true
                                 iCatToBuildBy = refCategoryT1Mex
-                                sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
                             elseif iActionToAssign == refActionBuildAirFactory then
                                 --iCategoryToBuild = refCategoryAirFactory
                                 --HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable)
@@ -2673,7 +2698,6 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                     if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power) > 0 then
                                         iCatToBuildBy = M27UnitInfo.refCategoryT3Power
                                     else iCatToBuildBy = refCategoryHydro + M27UnitInfo.refCategoryT2Power end
-                                    sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
                                 else
                                     if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power) > 0 then
                                         iCatToBuildBy = M27UnitInfo.refCategoryT3Power
@@ -4048,7 +4072,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     local bProceedWithT3 = true
                                     if M27Utilities.IsTableEmpty(tAllT1Mexes) == false then
                                         for iT1Mex, oT1Mex in tAllT1Mexes do
-                                            if M27UnitInfo.IsUnitValid(oT1Mex) and M27Utilities.GetDistanceBetweenPositions(oT1Mex:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 90 and M27Logic.SafeToUpgradeUnit(oT1Mex) then
+                                            if M27UnitInfo.IsUnitValid(oT1Mex) and M27Utilities.GetDistanceBetweenPositions(oT1Mex:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 90 and M27Conditions.SafeToUpgradeUnit(oT1Mex) then
                                                 iT1MexesNearBase = iT1MexesNearBase + 1
                                             end
                                         end
@@ -4188,12 +4212,15 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         elseif iCurrentConditionToTry == 14 then --Air staging if we need one for low fuel air units
+                            if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..': bHaveLowPower='..tostring(bHaveLowPower)..'; aiBrain[M27AirOverseer.refiAirStagingWanted]='..(aiBrain[M27AirOverseer.refiAirStagingWanted] or 'nil')) end
                             if bHaveLowPower == false and aiBrain[M27AirOverseer.refiAirStagingWanted] and aiBrain[M27AirOverseer.refiAirStagingWanted] > 0 then
                                 local iCurAirStaging = aiBrain:GetCurrentUnits(refCategoryAirStaging)
-                                if iCurAirStaging < 2 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurAirStaging='..iCurAirStaging) end
+                                if iCurAirStaging < 3 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough air staging so will build more') end
                                     iActionToAssign = refActionBuildAirStaging
                                     iSearchRangeForNearestEngi = 100
-                                    iMaxEngisWanted = 2 - iCurAirStaging
+                                    iMaxEngisWanted = 2
                                 end
                             end
                             --end
@@ -4408,9 +4435,17 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                             iSearchRangeForNearestEngi = 100
                                             iMaxEngisWanted = 8
                                         else
-                                            iActionToAssign = refActionBuildPower
+                                            if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
+                                            if iT2Power == nil then iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2) end
+
+                                            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 and ((aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 and iT3Power >= 2) or (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and iT2Power >=2)) then
+                                                iActionToAssign = refActionBuildSecondPower
+                                                iMaxEngisWanted = 5
+                                            else
+                                                iActionToAssign = refActionBuildPower
+                                                iMaxEngisWanted = 15
+                                            end
                                             iSearchRangeForNearestEngi = 100
-                                            iMaxEngisWanted = 15
                                         end
                                     end
                                 end
@@ -4461,6 +4496,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                     bWillBeAssigning = false
                     if iActionToAssign then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have an action to assign='..iActionToAssign..', will adjust the number of engineers we want if we are building power; iMaxEngisWanted before adj='..iMaxEngisWanted) end
                         --Increase engis to assign to power based on tech level
                         if iActionToAssign == refActionBuildPower then iMaxEngisWanted = iMaxEngisWanted + iExtraEngisForPowerBasedOnTech end
                         iExistingEngineersAssigned = 0
@@ -4470,6 +4506,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 iExistingEngineersAssigned = iExistingEngineersAssigned + 1
                             end
                         end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngineersAssigned='..iExistingEngineersAssigned..'; iMaxEngisWanted='..iMaxEngisWanted) end
                         if iExistingEngineersAssigned <= iMaxEngisWanted then
                             if iExistingEngineersAssigned == iMaxEngisWanted then
                                 --Check if ACU is one of the units assigned to this action
@@ -4510,6 +4547,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                                 if iMinEngiTechLevelWanted == nil then iMinEngiTechLevelWanted = 1 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iMinEngiTechLevelWanted='..iMinEngiTechLevelWanted) end
                                 tActionTargetLocation, oActionTargetObject, bClearCurrentlyAssignedEngineer = GetActionTargetAndObject(aiBrain, iActionToAssign, tExistingLocationsToPickFrom, tIdleEngineers, iCurrentConditionToTry, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinEngiTechLevelWanted)
 
                                 --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore)
