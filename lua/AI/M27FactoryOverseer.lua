@@ -1094,14 +1094,14 @@ end
 function RemoveTemporaryFactoryPause(aiBrain, oFactory)
     --Call via forkthread
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'FactoryMainOverseerLoop'
+    local sFunctionRef = 'RemoveTemporaryFactoryPause'
     WaitSeconds(iFactoryDelayBeforeConsiderBuildingAgain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary pause to false for factory '..oFactory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; GameTIme='..GetGameTimeSeconds()) end
 
     aiBrain[refiFactoriesTemporarilyPaused] = aiBrain[refiFactoriesTemporarilyPaused] - 1
     if oFactory then oFactory[refbFactoryTemporaryPauseActive] = false end
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function FactoryMainOverseerLoop(aiBrain)

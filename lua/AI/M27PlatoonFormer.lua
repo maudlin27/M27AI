@@ -223,16 +223,23 @@ function CombatPlatoonFormer(aiBrain)
     local tUnitsWaiting = {}
     local iUnitsWaiting = 0
     local tSuicideUnits = {}
-    if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH2 + M27UnitInfo.refCategoryEngineer * categories.TECH3) >= 3  then
-        for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
-            if EntityCategoryContains(categories.ALLUNITS - categories.COMMAND -M27UnitInfo.refCategoryLandExperimental, oUnit:GetUnitId()) then
-                --Consider if should assign to suicide squad instead
-                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true and EntityCategoryContains(categories.TECH1 * M27UnitInfo.refCategoryDFTank, oUnit:GetUnitId()) then
-                    table.insert(tSuicideUnits, oUnit)
-                else
-                    iUnitsWaiting = iUnitsWaiting + 1
-                    tUnitsWaiting[iUnitsWaiting] = oUnit
+    if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
+        if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH2 + M27UnitInfo.refCategoryEngineer * categories.TECH3) >= 3  then
+            for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
+                if EntityCategoryContains(categories.ALLUNITS - categories.COMMAND -M27UnitInfo.refCategoryLandExperimental, oUnit:GetUnitId()) then
+                    --Consider if should assign to suicide squad instead
+                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true and EntityCategoryContains(categories.TECH1 * M27UnitInfo.refCategoryDFTank, oUnit:GetUnitId()) then
+                        table.insert(tSuicideUnits, oUnit)
+                    else
+                        iUnitsWaiting = iUnitsWaiting + 1
+                        tUnitsWaiting[iUnitsWaiting] = oUnit
+                    end
                 end
+            end
+        else
+            for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
+                iUnitsWaiting = iUnitsWaiting + 1
+                tUnitsWaiting[iUnitsWaiting] = oUnit
             end
         end
     end
