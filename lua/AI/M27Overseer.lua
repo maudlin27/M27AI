@@ -91,10 +91,10 @@ refbEmergencyMAANeeded = 'M27OverseerNeedEmergencyMAA'
 refbUnclaimedMexNearACU = 'M27UnclaimedMexNearACU'
 refoReclaimNearACU = 'M27ReclaimObjectNearACU'
 refiScoutShortfallInitialRaider = 'M27ScoutShortfallRaider'
-refiScoutShortfallACU = 'M27ScoutShortfallRaider'
-refiScoutShortfallIntelLine = 'M27ScoutShortfallRaider'
-refiScoutShortfallLargePlatoons = 'M27ScoutShortfallRaider'
-refiScoutShortfallAllPlatoons = 'M27ScoutShortfallRaider'
+refiScoutShortfallACU = 'M27ScoutShortfallACU'
+refiScoutShortfallIntelLine = 'M27ScoutShortfallIntelLine'
+refiScoutShortfallLargePlatoons = 'M27ScoutShortfallLargePlatoon'
+refiScoutShortfallAllPlatoons = 'M27ScoutShortfallAllPlatoon'
 refiScoutShortfallMexes = 'M27ScoutShortfallMexes'
 
 refiMAAShortfallACUPrecaution = 'M27MAAShortfallACUPrecaution'
@@ -603,6 +603,7 @@ function RecordIntelPaths(aiBrain)
                 end
             end
         else
+            if bDebugMessages == true then LOG(sFunctionRef..': Pathing not complete yet, so will assume we need a scout for every category') end
             aiBrain[refiScoutShortfallInitialRaider] = 1
             aiBrain[refiScoutShortfallACU] = 1
             aiBrain[refiScoutShortfallIntelLine] = 1
@@ -1140,7 +1141,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                 aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] = 0
             end
             --local iMinScoutsWantedInPool = 0 --This is also changed several times below
-            if bDebugMessages == true then LOG(sFunctionRef..': About to check if raiders have been checked for scouts; iScouts='..iScouts..'; iRaiderCount='..iRaiderCount..'; aiBrain[refbConfirmedInitialRaidersHaveScouts]='..tostring(aiBrain[refbConfirmedInitialRaidersHaveScouts])) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Have iScouts='..iScouts..'; About to check if raiders have been checked for scouts; iScouts='..iScouts..'; iRaiderCount='..iRaiderCount..'; aiBrain[refbConfirmedInitialRaidersHaveScouts]='..tostring(aiBrain[refbConfirmedInitialRaidersHaveScouts])) end
 
             local iAvailableScouts = iScouts
             local iRaiderScoutsMissing = 0
@@ -1197,15 +1198,19 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
             end
             iAvailableScouts = iAvailableScouts - iRaiderScoutsMissing
             if iAvailableScouts < 0 then
+                if bDebugMessages == true then LOG(sFunctionRef..': iAvailableScouts='..iAvailableScouts..'; not enough for intiial raider so will flag as having shortfall') end
                 if aiBrain[refiScoutShortfallInitialRaider] < 1 then aiBrain[refiScoutShortfallInitialRaider] = -iAvailableScouts end --redundancy/backup - shouldnt need due to above
                 aiBrain[refiScoutShortfallACU] = 1
                 aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
             else
+                if bDebugMessages == true then LOG(sFunctionRef..': Have enough scouts for initial raiders so will set shortfall to 0; if available scouts is 0 then will flag acu has shortfall. iAvailableScouts='..iAvailableScouts) end
                 aiBrain[refiScoutShortfallInitialRaider] = 0
                 if iAvailableScouts == 0 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont ahve any more available scouts so setting shortfall to 1 for ACU') end
                     aiBrain[refiScoutShortfallACU] = 1
                     aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
                 else --Have at least 1 available scout
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have at least 1 available scout so will assign to ACU') end
 
                     --===========ACU Scout helper--------------------------
                     --We have more than enough scouts to cover initial raiders; next priority is the ACU
@@ -1237,12 +1242,15 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                     end
                     iAvailableScouts = iAvailableScouts - 1
                     aiBrain[refiScoutShortfallACU] = 0
+                    if bDebugMessages == true then LOG(sFunctionRef..': Finished assining to ACU, aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]) end
 
 
                     --==========Intel Line manager
                     if iAvailableScouts <= 0 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': No available scouts so will flag intel path shortfall') end
                         aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
                     else
+                        if bDebugMessages == true then LOG(sFunctionRef..': iAvailableScouts='..iAvailableScouts..'; will now assign to intel path') end
                         --Do we have an intel platoon yet?
                         local tIntelPlatoons = {}
                         local iIntelPlatoons = 0
@@ -1250,7 +1258,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                         local tCurIntelScouts = {}
                         local iCurIntelScouts = 0
                         local iIntelScouts = 0
-                        if bDebugMessages == true then LOG(sFunctionRef..': Cycling through all platoons to identify intel platoons') end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Cycling through all platoons to identify intel platoons. aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]) end
                         for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
                             if oPlatoon:GetPlan() == sIntelPlatoonRef then
                                 tCurIntelScouts = EntityCategoryFilterDown(refCategoryLandScout, oPlatoon:GetPlatoonUnits())
@@ -1264,7 +1272,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                 end
                             end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Intel platoons identified='..iIntelPlatoons) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Intel platoons identified; aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; iIntelPlatoons='..iIntelPlatoons) end
                         --if iIntelPlatoons > 0 then
 
                         --First determine what intel path line we want, and if we have enough scouts to achieve this
@@ -1340,7 +1348,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                         if aiBrain[refiCurIntelLineTarget] <= 0 then aiBrain[refiCurIntelLineTarget] = 1
                         elseif aiBrain[refiCurIntelLineTarget] > aiBrain[refiMaxIntelBasePaths] then aiBrain[refiCurIntelLineTarget] = aiBrain[refiMaxIntelBasePaths] end
 
-                        if bDebugMessages == true then LOG('aiBrain[refiCurIntelLineTarget]='..aiBrain[refiCurIntelLineTarget]..'; table.getn(aiBrain[reftIntelLinePositions])='..table.getn(aiBrain[reftIntelLinePositions])..'; aiBrain[refiMaxIntelBasePaths]='..aiBrain[refiMaxIntelBasePaths]) end
+                        if bDebugMessages == true then LOG('aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; aiBrain[refiCurIntelLineTarget]='..aiBrain[refiCurIntelLineTarget]..'; table.getn(aiBrain[reftIntelLinePositions])='..table.getn(aiBrain[reftIntelLinePositions])..'; aiBrain[refiMaxIntelBasePaths]='..aiBrain[refiMaxIntelBasePaths]) end
                         local iScoutsWanted = table.getn(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]])
                         local iScoutsForNextPath = aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]+1]
                         if iScoutsForNextPath then iScoutsForNextPath = table.getn(iScoutsForNextPath) end
@@ -1353,7 +1361,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                             aiBrain[refiScoutShortfallIntelLine] = iScoutsToBuild
                         else aiBrain[refiScoutShortfallIntelLine] = 0
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': iScoutsWanted='..iScoutsWanted..'; iScoutsForNextPath='..iScoutsForNextPath..'aiBrain[refiScoutShortfallIntelLine]='..aiBrain[refiScoutShortfallIntelLine]) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; iScoutsWanted='..iScoutsWanted..'; iScoutsForNextPath='..iScoutsForNextPath..'aiBrain[refiScoutShortfallIntelLine]='..aiBrain[refiScoutShortfallIntelLine]) end
 
                         local iLoopCount = 0
                         local iLoopMax = 100
@@ -1383,6 +1391,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                         if aiBrain[refiCurIntelLineTarget] <= 0 then aiBrain[refiCurIntelLineTarget] = 1
                         elseif aiBrain[refiCurIntelLineTarget] > aiBrain[refiMaxIntelBasePaths] then aiBrain[refiCurIntelLineTarget] = aiBrain[refiMaxIntelBasePaths] end
 
+
                         --If we have enough scouts for the current path, then consider each individual point on the path and whether it can go further forwards than the base, provided we have enough scouts to
                         if aiBrain[refiScoutShortfallIntelLine] == 0 then
                             local tNearbyEnemiesBase
@@ -1390,7 +1399,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                             local tNearbyEnemiesPlus2, tSubPathPlus2
                             local iIncreaseInSubpath, iMaxIncreaseInSubpath, iNextMaxIncrease
                             local iCurIntelLineTarget = aiBrain[refiCurIntelLineTarget]
-                            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiCurIntelLineTarget]='..aiBrain[refiCurIntelLineTarget]..'; size of intel paths='..table.getn(aiBrain[reftIntelLinePositions])) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; aiBrain[refiCurIntelLineTarget]='..aiBrain[refiCurIntelLineTarget]..'; size of intel paths='..table.getn(aiBrain[reftIntelLinePositions])) end
 
                             for iSubPath, tSubPathPosition in aiBrain[reftIntelLinePositions][iCurIntelLineTarget] do
                                 iIncreaseInSubpath = 0
@@ -1434,7 +1443,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                         end
                                     end
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': iSubPath='..iSubPath..'; iMaxIncreaseInSubpath ='..iMaxIncreaseInSubpath..'; iIncrease wnated before applying max='..iIncreaseInSubpath) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiScoutShortfallACU='..aiBrain[refiScoutShortfallACU]..'; iSubPath='..iSubPath..'; iMaxIncreaseInSubpath ='..iMaxIncreaseInSubpath..'; iIncrease wnated before applying max='..iIncreaseInSubpath) end
                                 if iIncreaseInSubpath > iMaxIncreaseInSubpath then iIncreaseInSubpath = iMaxIncreaseInSubpath end
                                 local tCurPathPos
                                 tCurPathPos = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + iIncreaseInSubpath][iSubPath]
@@ -1477,7 +1486,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                         if iPlatoonCount == nil then iPlatoonCount = 1
                                         else iPlatoonCount = iPlatoonCount + 1 end
                                     end
-                                    LOG(sFunctionRef..': Created new platoon with Plan name and count='..oNewScoutPlatoon:GetPlan()..iPlatoonCount)
+                                    LOG(sFunctionRef..': aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; Created new platoon with Plan name and count='..oNewScoutPlatoon:GetPlan()..iPlatoonCount)
                                 end
                             else
                                 --Any remaining scouts must still be being constructed
@@ -1495,7 +1504,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                         local iClosestPlatoon
                         local tCurPathPos
                         local iSubpathMod
-                        if bDebugMessages == true then LOG(sFunctionRef..': About to loop subpaths in current target') end
+                        if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; About to loop subpaths in current target') end
                         if iIntelPlatoons >= 1 then
                             for iCurSubpath = 1, table.getn(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]]) do
                                 iMinDistFromCurPath = 100000
@@ -1562,7 +1571,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                 local iLastPathToCheck = math.min(table.getn(aiBrain[reftIntelLinePositions]), aiBrain[refiCurIntelLineTarget] + 2)
                                 local iCurScoutsWanted
                                 --Cycle through previous and next intel paths to see if they need more scouts than current path
-                                if bDebugMessages == true then LOG(sFunctionRef..': About to loop through previous and next intel paths') end
+                                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; About to loop through previous and next intel paths') end
                                 for iCurPathToCheck = iFirstPathToCheck, iLastPathToCheck do
                                     iCurScoutsWanted = table.getn(aiBrain[reftIntelLinePositions][iCurPathToCheck])
                                     if iCurScoutsWanted > iMaxScoutsWanted then iMaxScoutsWanted = iCurScoutsWanted end
@@ -1588,14 +1597,15 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
 
 
             if aiBrain[refiScoutShortfallIntelLine] > 0 then
-                if bDebugMessages == true then LOG(sFunctionRef..': Have a shortfall of scouts for intel line='..aiBrain[refiScoutShortfallIntelLine]) end
+                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; Have a shortfall of scouts for intel line='..aiBrain[refiScoutShortfallIntelLine]) end
                 --Defaults for other scouts wanted - just set to 1 for simplicity
+
                 aiBrain[refiScoutShortfallLargePlatoons] = 1
                 aiBrain[refiScoutShortfallAllPlatoons] = 1
                 aiBrain[refiScoutShortfallMexes] = 0
                 aiBrain[refbNeedScoutPlatoons] = true
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': Dont have a shortfall of scouts for intel line so will consider large platoons') end
+                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; Dont have a shortfall of scouts for intel line so will consider large platoons') end
                 aiBrain[refbNeedScoutPlatoons] = false
 
                 --=================Large platoons - ensure they have scouts available, and if not then add scout to them
@@ -1736,11 +1746,13 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                 end
             end
         else
+            if bDebugMessages == true then LOG(sFunctionRef..': No scouts so will set as needing more scouts for ACU and initial raider') end
             aiBrain[refiScoutShortfallInitialRaider] = aiBrain[refiInitialRaiderPlatoonsWanted]
             aiBrain[refiScoutShortfallACU] = 1
             aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..':End of code, gametime='..GetGameTimeSeconds()..'; aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; aiBrain[refiScoutShortfallInitialRaider]='..aiBrain[refiScoutShortfallInitialRaider]..'; aiBrain[refiScoutShortfallIntelLine]='..aiBrain[refiScoutShortfallIntelLine]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -3789,7 +3801,13 @@ function SetMaximumFactoryLevels(aiBrain)
     local iAirFactoriesOwned = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory)
     local iPrimaryFactoriesWanted
     local iPrimaryFactoryType = refFactoryTypeLand
-    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then iPrimaryFactoryType = refFactoryTypeAir end
+    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then
+        iPrimaryFactoryType = refFactoryTypeAir
+        aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+    elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
+        iPrimaryFactoryType = refFactoryTypeAir
+        aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+    end
     --local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
     local iMexesOnOurSideOfMap = M27EconomyOverseer.GetMexCountOnOurSideOfMap(aiBrain)
     if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then iPrimaryFactoriesWanted = math.max(3, math.ceil(iMexesOnOurSideOfMap * 0.25))
@@ -3801,12 +3819,19 @@ function SetMaximumFactoryLevels(aiBrain)
     local iTorpBomberShortfall = aiBrain[M27AirOverseer.refiTorpBombersWanted]
     if aiBrain[refiOurHighestAirFactoryTech] < 2 then
         if iTorpBomberShortfall > 0 then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
-        iTorpBomberShortfall = 0
+        iTorpBomberShortfall = 0 --Dont want to build more factories for torp bombers until have access to T2 (since T1 cant build them)
     end
     if iPrimaryFactoryType == refFactoryTypeAir then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
     if bDebugMessages== true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]='..aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]..'; aiBrain[M27AirOverseer.refiBombersWanted]='..aiBrain[M27AirOverseer.refiBombersWanted]..'; iTorpBomberShortfall='..iTorpBomberShortfall) end
-
-    local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(1, aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]) + aiBrain[M27AirOverseer.refiBombersWanted] + iTorpBomberShortfall
+    local iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 3)
+    --reftBomberEffectiveness = 'M27AirBomberEffectiveness' --[x][y]: x = unit tech level, y = nth entry; returns subtable {refiBomberMassCost}{refiBomberMassKilled}
+    if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]]) == false then
+        if aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassKilled] >= aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassCost] then
+            --Last bomber that died at this tech levle killed more than it cost
+            iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 6)
+        end
+    end
+    local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(3, math.ceil(aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]/10)) + math.min(5, aiBrain[M27AirOverseer.refiBombersWanted]) + iTorpBomberShortfall
     aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4)))
     if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 
@@ -3824,6 +3849,9 @@ function SetMaximumFactoryLevels(aiBrain)
 end
 
 function DetermineInitialBuildOrder(aiBrain)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'DetermineInitialBuildOrder'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true then
         aiBrain[refiInitialRaiderPlatoonsWanted] = 2
         aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
@@ -3841,10 +3869,19 @@ function DetermineInitialBuildOrder(aiBrain)
         end
         if iNearbyMexCount >= 12 then
             aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 7
-        elseif iNearbyMexCount >= 8 then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 5
+        elseif iNearbyMexCount >= 8 or aiBrain[refiDistanceToNearestEnemyBase] >= 300 then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 5
         else
             aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 4
         end
+
+        if aiBrain[refiDistanceToNearestEnemyBase] > iDistanceToEnemyEcoThreshold then
+            if aiBrain[refiDistanceToNearestEnemyBase] > iDistanceToEnemyEcoThreshold * 2 then
+                aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = math.max(aiBrain[M27FactoryOverseer.refiInitialEngineersWanted], 12)
+            else
+                aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = math.max(aiBrain[M27FactoryOverseer.refiInitialEngineersWanted], 8)
+            end
+        end
+
 
         --Calc dist to enemy base - dont manually here rather than referencing the variable as not sure on timing whether the variable will be calcualted yet - ideally want to go 2nd air on larger maps
         if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) >= 350 then
@@ -3854,8 +3891,32 @@ function DetermineInitialBuildOrder(aiBrain)
         aiBrain[refiInitialRaiderPlatoonsWanted] = 0
         aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
         aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 10
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 12 end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]='..aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
 
+function UpdateHighestFactoryTechTracker(aiBrain)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'UpdateHighestFactoryTechTracker'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iHighestTechLevel = 1
+    if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3) > 0 then iHighestTechLevel = 3
+    elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2) > 0 then iHighestTechLevel = 2 end
+    aiBrain[refiOurHighestFactoryTechLevel] = iHighestTechLevel
+    if iHighestTechLevel > 1 then
+        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH3) > 0 then aiBrain[refiOurHighestAirFactoryTech] = 3
+        elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH2) > 0 then aiBrain[refiOurHighestAirFactoryTech] = 2
+        else
+            aiBrain[refiOurHighestAirFactoryTech] = 1
+        end
+    else
+        aiBrain[refiOurHighestAirFactoryTech] = 1
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Number of tech2 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2)..'; Number of tech3 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3)..'; iHighestTechLevel='..iHighestTechLevel..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]..'; aiBrain[refiOurHighestAirFactoryTech]='..aiBrain[refiOurHighestAirFactoryTech]) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of game' logs
@@ -4006,20 +4067,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
 
         --Our highest tech level
-        local iHighestTechLevel = 1
-        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3) > 0 then iHighestTechLevel = 3
-        elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2) > 0 then iHighestTechLevel = 2 end
-        aiBrain[refiOurHighestFactoryTechLevel] = iHighestTechLevel
-        if iHighestTechLevel > 1 then
-            if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH3) > 0 then aiBrain[refiOurHighestAirFactoryTech] = 3
-            elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH2) > 0 then aiBrain[refiOurHighestAirFactoryTech] = 2
-            else
-                aiBrain[refiOurHighestAirFactoryTech] = 1
-            end
-        else
-            aiBrain[refiOurHighestAirFactoryTech] = 1
-        end
-        if bDebugMessages == true then LOG(sFunctionRef..': Number of tech2 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2)..'; Number of tech3 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3)..'; iHighestTechLevel='..iHighestTechLevel..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]..'; aiBrain[refiOurHighestAirFactoryTech]='..aiBrain[refiOurHighestAirFactoryTech]) end
+        UpdateHighestFactoryTechTracker(aiBrain)
 
         --Want below variables for both the game state table and to decide whether to eco:
         local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
@@ -4242,7 +4290,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             if M27Utilities.IsTableEmpty(tTempUnitList) == false then iTempUnitCount = table.getn(tTempUnitList) end
             tsGameState['iLandFactories'] = iTempUnitCount
 
-            tsGameState['Highest factory tech level'] = iHighestTechLevel
+            tsGameState['Highest factory tech level'] = aiBrain[refiOurHighestFactoryTechLevel]
 
             tTempUnitList = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer, false, true)
             iTempUnitCount = 0
@@ -4645,6 +4693,11 @@ function TestNewMovementCommands(aiBrain)
     LOG('tMapMidPointMethod1='..repr(tMapMidPointMethod1)..'; tMapMidPointMethod2='..repr(tMapMidPointMethod2))
 end
 
+function TestCustom(aiBrain)
+    LOG('Distance between bomber target and approx position where bomber fires bomb='..M27Utilities.GetDistanceBetweenPositions({ 419.5, 25, 153.5 }, {362.65914916992, 60.107395172119, 202.89239501953}))
+    LOG('Distance if ignore the height difference='..M27Utilities.GetDistanceBetweenPositions({ 419.5, 25, 153.5 }, {362.65914916992, 25, 202.89239501953}))
+end
+
 
 function OverseerManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -4694,6 +4747,7 @@ function OverseerManager(aiBrain)
     if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
     ForkThread(DetermineInitialBuildOrder, aiBrain)
     local iTempProfiling
+    --TestCustom(aiBrain)
 
 
 

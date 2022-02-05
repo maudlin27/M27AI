@@ -65,6 +65,10 @@ function OnUnitDeath(oUnit)
         if oUnit.GetAIBrain then
             local aiBrain = oUnit:GetAIBrain()
             if aiBrain.M27AI then
+                --Flag for the platoon count of units to be updated:
+                if oUnit.PlatoonHandle then oUnit.PlatoonHandle[M27PlatoonUtilities.refbUnitHasDiedRecently] = true end
+
+                --Run unit type specific on death logic
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 local sUnitBP = oUnit:GetUnitId()
                 if EntityCategoryContains(refCategoryEngineer, sUnitBP) then
@@ -180,10 +184,14 @@ function OnBombFired(oWeapon, projectile)
     local oUnit = oWeapon.unit
     if oUnit and oUnit.GetUnitId then
         local sUnitID = oUnit:GetUnitId()
+        if bDebugMessages == true then LOG(sFunctionRef..': bomber position when firing bomb='..repr(oUnit:GetPosition())) end
         if EntityCategoryContains(M27UnitInfo.refCategoryBomber - categories.EXPERIMENTAL, sUnitID) then
             M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
             if oUnit.GetAIBrain and oUnit:GetAIBrain().M27AI then
-                ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, 1)
+                if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repr(projectile:GetPosition())) end
+                local iDelay = M27UnitInfo.GetUnitTechLevel(oUnit)
+                if EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionUEF) - categories.TECH3, oUnit:GetUnitId()) then iDelay = iDelay + 1 end
+                ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, iDelay)
             end
         end
     end

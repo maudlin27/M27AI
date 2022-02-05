@@ -11,6 +11,7 @@ FactoryBuilderManager = Class(M27FactoryBuilderManager) {
     FactoryFinishBuilding = function(self,factory,finishedUnit)
         if not self.Brain.M27AI then
             M27FactoryBuilderManager.FactoryFinishBuilding(self,factory,finishedUnit)
+            if M27Config.M27ShowEnemyUnitNames then M27PlatoonUtilities.UpdateUnitNames({ finishedUnit }, finishedUnit:GetUnitId(), true) end
         else
             if EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, factory) then
                 --Do nothing - this function doesnt always trigger so have incorporated a 'unit finished building' test into factory overseer

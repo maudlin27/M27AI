@@ -34,7 +34,7 @@ refiReclaimTotalPrev = 7 --Previous total reclaim in a segment
 --tLastReclaimRefreshByGroup = {} --time that last refreshed reclaim positions for [x] group
 iLastReclaimRefresh = 0 --stores time that last refreshed reclaim positions
 refiLastRefreshOfReclaimAreasOfInterest = 'M27MapLastRefreshOfReclaim'
-refiTotalReclaimAreasOfInterestByPriority = 'M27MapReclaimAreasOfInterestCount' --[1] = total for priority 1, etc.
+refiTotalReclaimAreasOfInterestByPriority = 'M27MapReclaimAreasOfInterestCount' --[1] = total for priority 1, etc.; up to 4 priority
 reftReclaimAreasOfInterest = 'M27MapReclaimAreasOfInterest' --assigned to aiBrain, [1] = priority (1, 2, 3); [2] = {segmentx, segmentz}
 reftReclaimAreaPriorityByLocationRef = 'M27MapReclaimAreaPriorityByLocationRef' --key is location ref
 iReclaimSegmentSizeX = 0 --Updated separately
@@ -450,9 +450,9 @@ function FixSegmentPathingGroup(sPathingType, tLocation, iCorrectPathingGroup)
     tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(tLocation)] = true
 end
 
-function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis, bAlsoReturnAmountOfHighestIndividualReclaim)
+function GetReclaimablesResourceValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis, bAlsoReturnAmountOfHighestIndividualReclaim, bEnergyNotMass)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'GetReclaimablesMassValue'
+    local sFunctionRef = 'GetReclaimablesResourceValue'
     --V14 and earlier would modify total mass value to reduce it by 25% if its small, and 50% if its medium; v15 removed this
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bAlsoReturnLargestReclaimPosition == nil then bAlsoReturnLargestReclaimPosition = false end
@@ -462,25 +462,28 @@ function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPositi
     --local iLargeMassThreshold = 150 --any mass with a value more than iLargeMassTreshold gets increased in weighted value by iLargeMassMod
     --local iMedMassMod = 2 --increases value of mass over a particular threshold by this
     --local iLargeMassMod = 2 --increases value of mass over a particular threshold by this (multiplicative with iMedMassMod)
+    local sResourceRef = 'MaxMassReclaim'
+    if bEnergyNotMass then sResourceRef = 'MaxEnergyReclaim' end
 
     local tWreckPos = {}
     local iCurMassValue
-    local iTotalMassValue = 0
+    local iTotalResourceValue = 0
     local iLargestCurReclaim = 0
     local tReclaimPos = {}
     if tReclaimables and table.getn( tReclaimables ) > 0 then
         for _, v in tReclaimables do
             tWreckPos = v.CachePosition
             if not (tWreckPos[1]==nil) then
-                if v.MaxMassReclaim > iIgnoreReclaimIfNotMoreThanThis then
+                --if v.MaxMassReclaim > iIgnoreReclaimIfNotMoreThanThis then
+                if v[sResourceRef] > iIgnoreReclaimIfNotMoreThanThis then
                     if not(v:BeenDestroyed()) then
                         -- Determine mass - reduce low value mass value for weighting purposes (since it takes longer to get):
                         --if bDebugMessages == true then LOG('Have wrecks with a valid position and positive mass value within the segment iCurXZ='..iCurX..'-'..iCurZ..'; iWreckNo='.._) end
                         --iCurMassValue = v.MaxMassReclaim / (iMedMassMod * iLargeMassMod)
                         --if iCurMassValue >= iMedMassThreshold then iCurMassValue = iCurMassValue * iMedMassMod end
                         --if iCurMassValue >= iLargeMassThreshold then iCurMassValue = iCurMassValue * iLargeMassMod end
-                        --iTotalMassValue = iTotalMassValue + iCurMassValue
-                        iTotalMassValue = iTotalMassValue + v.MaxMassReclaim
+                        --iTotalResourceValue = iTotalResourceValue + iCurMassValue
+                        iTotalResourceValue = iTotalResourceValue + v.MaxMassReclaim
                         if v.MaxMassReclaim > iLargestCurReclaim then
                             iLargestCurReclaim = v.MaxMassReclaim
                             tReclaimPos = {tWreckPos[1], tWreckPos[2], tWreckPos[3]}
@@ -499,11 +502,11 @@ function GetReclaimablesMassValue(tReclaimables, bAlsoReturnLargestReclaimPositi
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if bAlsoReturnLargestReclaimPosition then
-        if bAlsoReturnAmountOfHighestIndividualReclaim then return iTotalMassValue, tReclaimPos, iLargestCurReclaim
-        else return iTotalMassValue, tReclaimPos end
+        if bAlsoReturnAmountOfHighestIndividualReclaim then return iTotalResourceValue, tReclaimPos, iLargestCurReclaim
+        else return iTotalResourceValue, tReclaimPos end
     else
-        if bAlsoReturnAmountOfHighestIndividualReclaim then return iTotalMassValue, iLargestCurReclaim
-        else return iTotalMassValue end
+        if bAlsoReturnAmountOfHighestIndividualReclaim then return iTotalResourceValue, iLargestCurReclaim
+        else return iTotalResourceValue end
     end
 end
 
@@ -555,25 +558,36 @@ function GetNearestReclaim(tLocation, iSearchRadius, iMinReclaimValue)
         return tReclaimables[iClosestWreck] end
 end
 
-function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
-    --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass, 4 = valid wrecks
+function GetReclaimInRectangle(iReturnType, rRectangleToSearch, bForceDebug)
+    --iReturnType: 1 = true/false; 2 = number of wrecks; 3 = total mass, 4 = valid wrecks, 5 = energy
     local sFunctionRef = 'GetReclaimInRectangle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = bForceDebug if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    --NOTE: Best to try and debug via forcedebug, as dont want to run for everything due to how intensive the log of reclaim is
+    --Have also commented out one of the logs to help with performance
+
     local tReclaimables = GetReclaimablesInRect(rRectangleToSearch)
     local iCurMassValue = 0
     local iWreckCount = 0
-    local iTotalMassValue
+    local iTotalResourceValue
     local bHaveReclaim = false
     local tValidWrecks = {}
     if M27Utilities.IsTableEmpty(tReclaimables) == false then
-        if iReturnType == 3 then
-            iTotalMassValue = GetReclaimablesMassValue(tReclaimables, false, 0)
+        if bDebugMessages == true then LOG(sFunctionRef..': iReturnType='..iReturnType..'; rRectangleToSearch='..repr(rRectangleToSearch)) end
+        if iReturnType == 3 or iReturnType == 5 then
+            --GetReclaimablesResourceValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis, bAlsoReturnAmountOfHighestIndividualReclaim, bEnergyNotMass)
+            if iReturnType == 3 then iTotalResourceValue = GetReclaimablesResourceValue(tReclaimables, false, 0, false, false)
+            else iTotalResourceValue = GetReclaimablesResourceValue(tReclaimables, false, 0, false, true)
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': iTotalResourceValue='..iTotalResourceValue) end
         else
             for _, v in tReclaimables do
+                --if bDebugMessages == true then LOG(sFunctionRef..': _='.._..'; repr of reclaimable='..repr(tReclaimables)) end
                 local WreckPos = v.CachePosition
                 if not(WreckPos[1]==nil) then
-                    iCurMassValue = v.MaxMassReclaim
-                    if iCurMassValue > 0 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': _='.._..'; Cur mass value='..(v.MaxMassReclaim or 0)..'; Energy value='..(v.MaxEnergyReclaim or 0)) end
+                    if (v.MaxMassReclaim or 0) > 0 or (v.MaxEnergyReclaim or 0) > 0 then
+                        if bDebugMessages == true then LOG('Been destroyed='..tostring(v:BeenDestroyed())) end
                         if not(v:BeenDestroyed()) then
                             iWreckCount = iWreckCount + 1
                             bHaveReclaim = true
@@ -587,11 +601,13 @@ function GetReclaimInRectangle(iReturnType, rRectangleToSearch)
                 end
             end
         end
+    elseif bDebugMessages == true then LOG(sFunctionRef..': tReclaimables is empty')
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': rRectangleToSearch='..repr(rRectangleToSearch)..'; bHaveReclaim='..tostring(bHaveReclaim)..'; iWreckCount='..iWreckCount) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iReturnType == 1 then return bHaveReclaim
         elseif iReturnType == 2 then return iWreckCount
-        elseif iReturnType == 3 then return iTotalMassValue
+        elseif iReturnType == 3 or iReturnType == 5 then return iTotalResourceValue
         elseif iReturnType == 4 then return tValidWrecks
         else M27Utilities.ErrorHandler('Invalid return type')
     end
@@ -694,10 +710,10 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
                                 iCurDistToBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                 iCurDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[iNearestEnemyStartNumber])
                                 --if bDebugMessages == true then LOG(sFunctionRef..': No nearby T2 arti detected; iCurDistToBase='..iCurDistToBase..'; iCurDistToEnemyBase='..iCurDistToEnemyBase..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase='..iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase)..'; M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)..'; iDistanceFromStartToEnemy='..iDistanceFromStartToEnemy) end
-                                --Within defence and front unit coverage?
-                                if aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] - 0.1 > iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase) then
+                                --Within defence and front unit coverage or just very close to base?
+                                if iCurDistToBase <= 100 or aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] - 0.1 > iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Are more than 10% closer to base than furthest front unit') end
-                                    if aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - 0.1 * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false) then
+                                    if iCurDistToBase <= 100 or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - 0.1 * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Are more than 10% closer to base than defence coverage') end
                                         --On our side of the map?
                                         if iCurDistToBase < iCurDistToEnemyBase then
@@ -848,7 +864,7 @@ function UpdateReclaimMarkers()
                     -- local iWreckCount = 0
                     --local bIsProp = nil  --only used for log/testing
                     if bDebugMessages == true then LOG('Have wrecks within the segment iCurXZ='..iCurX..'-'..iCurZ) end
-                    iTotalMassValue, tReclaimPos, iLargestCurReclaim = GetReclaimablesMassValue(tReclaimables, true, iMinValueOfIndividualReclaim, true)
+                    iTotalMassValue, tReclaimPos, iLargestCurReclaim = GetReclaimablesResourceValue(tReclaimables, true, iMinValueOfIndividualReclaim, true)
 
                     --Record this table:
                     if tReclaimAreas[iCurX] == nil then

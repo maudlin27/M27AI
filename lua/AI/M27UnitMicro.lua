@@ -343,11 +343,13 @@ function DodgeBomb(oBomber, oWeapon, projectile)
 
         local tAllUnitsInArea = GetUnitsInRect(Rect(tBombTarget[1]-iRadiusSize, tBombTarget[3]-iRadiusSize, tBombTarget[1]+iRadiusSize, tBombTarget[3]+iRadiusSize))
         if M27Utilities.IsTableEmpty(tAllUnitsInArea) == false then
-            local tMobileLandInArea = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLand - M27UnitInfo.refCategoryMobileLandShield -categories.EXPERIMENTAL, tAllUnitsInArea)
+            local tMobileLandInArea = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLand - categories.EXPERIMENTAL, tAllUnitsInArea)
+            local bDontActuallyDodge
             if M27Utilities.IsTableEmpty(tMobileLandInArea) == false then
                 local oCurBrain
                 for iUnit, oUnit in tMobileLandInArea do
                     if not(oUnit.Dead) and oUnit.GetUnitId and oUnit.GetPosition and oUnit.GetAIBrain then
+                        if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit:GetUnitId()) then bDebugMessages = true end
                         oCurBrain = oUnit:GetAIBrain()
                         if oCurBrain.M27AI and not(oCurBrain.M27IsDefeated) and not(oCurBrain:IsDefeated()) and M27Logic.iTimeOfLastBrainAllDefeated < 10 and IsEnemy(oCurBrain:GetArmyIndex(), iBomberArmyIndex) then
                             --ACU specific
@@ -399,15 +401,21 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                                     end
                                 end
                             else
-                                --if iBombSize <=5 or iBombSize >= 5.75 or not(M27Utilities.IsACU(oUnit)) then --If <=5 then should be able to dodge; if >5.5 then no poitn trying extra micro as wont be able to dodge (but there's a chance units may move out of the aoe so we still try the normal go in opposite direction)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': about to call moveawayfromtargettemporarily') end
-                                    MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tBombTarget)
-                                    oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
-                                --else --NOTE: Although manually moving in half circle dodges strats, for AI it's not possible due to issueclearcommands stopping the unit for about half a second
-                                    --if bDebugMessages == true then LOG(sFunctionRef..': about to call moveainhalfcircletemporarily') end
-                                    --MoveInHalfCircleTemporarily(oUnit, iTimeToRun, tBombTarget)
-                                    --MoveInCircleTemporarily(oUnit, iTimeToRun)
-                                --end
+                                --Are we a mobile shield that isn't on the same team as the bomber? If so, then dont worry about dodging
+                                --if not(EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit:GetUnitId())) then
+                                    --if IsEnemy(oCurBrain:GetArmyIndex(), oBomber:GetAIBrain():GetArmyIndex()) and oUnit.MyShield and oUnit.MyShield:GetHealth() > 0 and (M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBombTarget) - oUnit:GetBlueprint().Defense.Shield.ShieldSize * 0.5) <= -4 then
+                                        --Dont actually want to dodge as highly unlikely to avoid due to size of our shield bubble
+                                    --else
+
+                                    --if iBombSize <=5 or iBombSize >= 5.75 or not(M27Utilities.IsACU(oUnit)) then --If <=5 then should be able to dodge; if >5.5 then no poitn trying extra micro as wont be able to dodge (but there's a chance units may move out of the aoe so we still try the normal go in opposite direction)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': about to call moveawayfromtargettemporarily') end
+                                        MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tBombTarget)
+                                        oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
+                                    --else --NOTE: Although manually moving in half circle dodges strats, for AI it's not possible due to issueclearcommands stopping the unit for about half a second
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': about to call moveainhalfcircletemporarily') end
+                                        --MoveInHalfCircleTemporarily(oUnit, iTimeToRun, tBombTarget)
+                                        --MoveInCircleTemporarily(oUnit, iTimeToRun)
+                                    --end
                             end
                         end
                     end

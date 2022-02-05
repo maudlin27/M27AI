@@ -228,7 +228,7 @@ function CombatPlatoonFormer(aiBrain)
             for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
                 if EntityCategoryContains(categories.ALLUNITS - categories.COMMAND -M27UnitInfo.refCategoryLandExperimental, oUnit:GetUnitId()) then
                     --Consider if should assign to suicide squad instead
-                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true and EntityCategoryContains(categories.TECH1 * M27UnitInfo.refCategoryDFTank, oUnit:GetUnitId()) then
+                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true and EntityCategoryContains(categories.TECH1 * M27UnitInfo.refCategoryDFTank, oUnit:GetUnitId()) and M27UnitInfo.GetUnitPathingType(oUnit) == M27UnitInfo.refPathingTypeLand then
                         table.insert(tSuicideUnits, oUnit)
                     else
                         iUnitsWaiting = iUnitsWaiting + 1
@@ -279,7 +279,7 @@ function CombatPlatoonFormer(aiBrain)
                     table.remove(aiBrain[reftoCombatUnitsWaitingForAssignment], iUnit)
                     tUnitsWaiting = aiBrain[reftoCombatUnitsWaitingForAssignment]
                     break
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnit:GetUnidId()) then
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnit:GetUnitId()) then
                     local oNewPlatoon = CreatePlatoon(aiBrain, 'M27GroundExperimental', {oUnit})
                     table.remove(aiBrain[reftoCombatUnitsWaitingForAssignment], iUnit)
                     tUnitsWaiting = aiBrain[reftoCombatUnitsWaitingForAssignment]

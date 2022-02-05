@@ -90,6 +90,7 @@ refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFI
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA --NOTE: Need to specify slowest (so dont pick LAB)
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
+refCategoryCombatScout = categories.SERAPHIM * categories.SCOUT * categories.DIRECTFIRE
 refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE - refCategoryLandExperimental
 refCategoryT3MobileArtillery = categories.ARTILLERY * categories.LAND * categories.MOBILE
 refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER - refCategoryEngineer -refCategoryLandScout -refCategoryMAA
@@ -138,6 +139,7 @@ refCategoryStealthAndCloakPersonal = categories.STEALTH
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure}
 refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure}
 refWeaponPriorityOurGroundExperimental = {refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, categories.COMMAND, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat, categories.MOBILE, refCategoryStructure}
+
 
 function GetUnitLifetimeCount(oUnit)
     local sCount = oUnit.M27LifetimeUnitCount
@@ -573,4 +575,72 @@ function GetUpgradeEnergyCost(oUnit, sUpgradeRef)
     end
     if not(iUpgradeEnergy) then M27Utilities.ErrorHandler('oUnit '..oUnit:GetUnitId()..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeEnergy
+end
+
+function GetBomberAOEAndStrikeDamage(oUnit)
+    local oBP = oUnit:GetBlueprint()
+    local iAOE = 0
+    local iStrikeDamage
+    for sWeaponRef, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' then
+            if (tWeapon.DamageRadius or 0) > iAOE then
+                iAOE = tWeapon.DamageRadius
+                iStrikeDamage = tWeapon.Damage * tWeapon.MuzzleSalvoSize
+            end
+        end
+    end
+    return iAOE, iStrikeDamage
+end
+
+function GetBomberRange(oUnit)
+    local oBP = oUnit:GetBlueprint()
+    local iRange = 0
+    for sWeaponRef, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' then
+            if (tWeapon.MaxRadius or 0) > iRange then
+                iRange = tWeapon.MaxRadius
+            end
+        end
+    end
+    return iRange
+end
+
+function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'PauseOrUnpauseEnergyUsage'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    --Jamming - check via blueprint since no reliable category
+    local oBP = oUnit:GetBlueprint()
+    if oBP.Intel.JamRadius then
+        if bPauseNotUnpause then DisableUnitJamming(oUnit)
+        else EnableUnitJamming(oUnit)
+        end
+    end
+    
+    --Want to pause unit, check for any special logic for pausing
+    local bWasUnitPaused = (oUnit[refbPaused] or false)
+    oUnit[refbPaused] = bPauseNotUnpause
+    if oUnit.MyShield and oUnit.MyShield:GetMaxHealth() > 0 then
+        if IsUnitShieldEnabled(oUnit) == bPauseNotUnpause then
+            if bPauseNotUnpause then DisableUnitShield(oUnit)
+            else EnableUnitShield(oUnit) end
+        end
+    elseif oBP.Intel.ReactivateTime and (oBP.Intel.SonarRadius or oBP.Intel.RadarRadius) then
+        if bPauseNotUnpause then DisableUnitIntel(oUnit)
+        else EnableUnitIntel(oUnit)
+        end
+    elseif oBP.Intel.Cloak or oBP.Intel.RadarStealth or oBP.Intel.RadarStealthFieldRadius then
+        if bPauseNotUnpause then DisableUnitStealth(oUnit)
+        else EnableUnitStealth(oUnit)
+        end
+    else
+        --Normal logic - just pause unit
+        oUnit:SetPaused(bPauseNotUnpause)
+        if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
 end
