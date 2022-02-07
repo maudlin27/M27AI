@@ -148,8 +148,8 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                 end
                 if M27Utilities.IsTableEmpty(tClosestLocationToEngi) == true then
                     M27Utilities.ErrorHandler('Couldnt find any energy reclaim, only scenario where expected is if lots of very tiny energy reclaim; will just pick a random location', nil, true)
-                    tClosestLocationToEngi = {tEngiPosition + math.random(iSearchRadius - 10, iSearchRadius), nil, tEngiPosition + math.random(iSearchRadius - 10, iSearchRadius)}
-                    tNearbyReclaim[2] = GetSurfaceHeight(tClosestLocationToEngi[1], tClosestLocationToEngi[2])
+                    tClosestLocationToEngi = {tEngiPosition[1] + math.random(iSearchRadius - 10, iSearchRadius), nil, tEngiPosition[3] + math.random(iSearchRadius - 10, iSearchRadius)}
+                    tClosestLocationToEngi[2] = GetSurfaceHeight(tClosestLocationToEngi[1], tClosestLocationToEngi[3])
                 end
                 break
             end

@@ -4121,7 +4121,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                         if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA] then
                             if bDebugMessages == true then LOG(sFunctionRef..': Dont want to go for air dominance due to enemy highest ever air threat being >75% of ours') end
                             bEnemyHasEnoughAA = true
-                        elseif not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[refiAirAANeeded] > 0 then
+                        elseif not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
                             if bDebugMessages == true then LOG(sFunctionRef..': Dont want air dominance as still need airAA') end
                             bEnemyHasEnoughAA = true
                         end

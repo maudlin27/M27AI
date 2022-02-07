@@ -3585,7 +3585,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 if bDebugMessages == true then LOG(sFunctionRef..': iEngineersToConsider ='..iEngineersToConsider..'; about to get unclaimed mexes') end
                 local tAllUnclaimedHydroInPathingGroup
                 --NOTE: For optimisation reasons, variables are declared here but are first defined in the first condition that uses them (so dont obtain the condition value if not enough engineers in the first place)
-                local tAllUnclaimedMexesInPathingGroup, iAllUnclaimedMexesInPathingGroup
+                local tAllUnclaimedMexesInPathingGroup, iAllUnclaimedMexesInPathingGroup, tAllUnclaimedMexesInLandPathingGroup, iAllUnclaimedMexesInLandPathingGroup
                 local tUnclaimedMexesOnOurSideOfMap, iUnclaimedMexesOnOurSideOfMap
                 local tUnclaimedMexesWithinDefenceCoverage, iUnclaimedMexesWithinDefenceCoverage
                 local iUnclaimedHydroWithinDefenceCoverage, tUnclaimedHydroWithinDefenceCoverage
@@ -3593,7 +3593,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 local iGrossCurEnergyIncome, iNetCurEnergyIncome
                 local iLandFactories, iAirFactories, iMassStored, iEnergyStored, iEnergyStorageMax, iEnergyStoredRatio, iMassStoredRatio
                 local tExistingLocationsToPickFrom
-                local iMexesAndFactoriesCurrentlyUpgrading
 
                 local iMaxEngisWanted
                 local iActionToAssign
@@ -4067,20 +4066,35 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 if M27Utilities.IsTableEmpty(tAllUnclaimedMexesInPathingGroup) == false then iAllUnclaimedMexesInPathingGroup = table.getn(tAllUnclaimedMexesInPathingGroup)
                                 else iAllUnclaimedMexesInPathingGroup = 0 end
                             end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Looking if unclaimed mexes within defence coverage, iAllUnclaimedMexesInPathingGroup='..iAllUnclaimedMexesInPathingGroup) end
                             if iAllUnclaimedMexesInPathingGroup > 0 then
                                 if iUnclaimedMexesWithinDefenceCoverage == nil then
                                     tUnclaimedMexesWithinDefenceCoverage = FilterLocationsBasedOnDefenceCoverage(aiBrain, tAllUnclaimedMexesInPathingGroup, true)
                                     if M27Utilities.IsTableEmpty(tUnclaimedMexesWithinDefenceCoverage) == false then iUnclaimedMexesWithinDefenceCoverage = table.getn(tUnclaimedMexesWithinDefenceCoverage)
                                     else iUnclaimedMexesWithinDefenceCoverage = 0 end
                                 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have unclaimed mexes in pathing group, iUnclaimedMexesWithinDefenceCoverage='..iUnclaimedMexesWithinDefenceCoverage) end
                                 if iUnclaimedMexesWithinDefenceCoverage > 2 then
                                     iActionToAssign = refActionBuildMex
                                     iMaxEngisWanted = math.ceil(iUnclaimedMexesWithinDefenceCoverage / 1.35) + 1
                                     tExistingLocationsToPickFrom = tUnclaimedMexesWithinDefenceCoverage
                                     iSearchRangeForNearestEngi = 10000
                                 elseif not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) then
-                                    iActionToAssign = refActionBuildMex
-                                    iMaxEngisWanted = math.min(2, math.max(1, math.ceil(iAllUnclaimedMexesInPathingGroup / 3)))
+                                    --Do we have mexes that are land pathable from our base?
+                                    if iAllUnclaimedMexesInLandPathingGroup == nil then
+                                        --Include enemy mexes in this list since if theyre on our land pathable mass it could just be a lucky engi got through
+                                        tAllUnclaimedMexesInLandPathingGroup = GetUnclaimedMexes(aiBrain, M27UnitInfo.refPathingTypeLand, M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), true, false, false)
+                                        if M27Utilities.IsTableEmpty(tAllUnclaimedMexesInLandPathingGroup) then iAllUnclaimedMexesInLandPathingGroup = 0
+                                        else iAllUnclaimedMexesInLandPathingGroup = table.getn(tAllUnclaimedMexesInLandPathingGroup)
+                                        end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iAllUnclaimedMexesInLandPathingGroup='..iAllUnclaimedMexesInLandPathingGroup) end
+                                    if iAllUnclaimedMexesInLandPathingGroup > 0 then
+                                        iActionToAssign = refActionBuildMex
+                                        iMaxEngisWanted = math.min(2, math.max(1, math.ceil(iAllUnclaimedMexesInPathingGroup / 3)))
+                                        tExistingLocationsToPickFrom = tAllUnclaimedMexesInLandPathingGroup
+                                        iSearchRangeForNearestEngi = 10000
+                                    end
                                 end
                             end
 
