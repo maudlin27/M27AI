@@ -349,7 +349,6 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                 local oCurBrain
                 for iUnit, oUnit in tMobileLandInArea do
                     if not(oUnit.Dead) and oUnit.GetUnitId and oUnit.GetPosition and oUnit.GetAIBrain then
-                        if EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit:GetUnitId()) then bDebugMessages = true end
                         oCurBrain = oUnit:GetAIBrain()
                         if oCurBrain.M27AI and not(oCurBrain.M27IsDefeated) and not(oCurBrain:IsDefeated()) and M27Logic.iTimeOfLastBrainAllDefeated < 10 and IsEnemy(oCurBrain:GetArmyIndex(), iBomberArmyIndex) then
                             --ACU specific

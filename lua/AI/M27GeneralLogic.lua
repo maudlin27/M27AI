@@ -1559,7 +1559,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                             elseif oUnit.GetBlueprint and oUnit:GetBlueprint().Physics.MaxSpeed == aiBrain[refiEnemyScoutSpeed] then
                                                 iCurThreat = 10
                                             else
-                                                if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not; will be using blip threat override of '..iMassValueOfBlipsOverride..' if more than one blip') end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not; will be using blip threat override of '..(iMassValueOfBlipsOverride or 54)..' if more than one blip') end
                                                 if iTotalUnits <= 1 then iCurThreat = (iSoloBlipMassOverride or 54)
                                                 else iCurThreat = (iMassValueOfBlipsOverride or 54) end
                                             end
@@ -3068,7 +3068,7 @@ end
 function GetNearestActiveFixedEnemyShield(aiBrain, tLocation)
     --True if the target location has an enemy hsield structure which has active health
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'IsTargetUnderShield'
+    local sFunctionRef = 'GetNearestActiveFixedEnemyShield'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, tLocation, 46, 'Enemy')
@@ -3095,14 +3095,14 @@ function GetNearestActiveFixedEnemyShield(aiBrain, tLocation)
     return oNearestShield
 end
 
-function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
+function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetUnderShield'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Determines if target is under a shield
-    if bIgnoreMobileShield == nil then bIgnoreMobileShield = false end
+    if iIgnoreShieldsWithLessThanThisHealth == nil then iIgnoreShieldsWithLessThanThisHealth = 0 end
     local bUnderShield = false
-    local iShieldSearchRange = 46 --T3 sera shield is 46; bulwark is 120; will go with sera t3 for now
+    local iShieldSearchRange = 46 --T3 sera shield is 46; bulwark is 120; will go with sera t3 for now; if changing here then also change reference in getmaxstrikedamage
     --Is the target an enemy?
     local oTBrain = oTarget:GetAIBrain()
     local bEnemy
@@ -3120,9 +3120,10 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
     if bEnemy then sSearchType = 'Enemy' end
     local tTargetPos = oTarget:GetPosition()
     local iShieldCategory = M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryFixedShield
-    if bIgnoreMobileShield == true then iShieldCategory = M27UnitInfo.refCategoryFixedShield end
     local tNearbyShields = aiBrain:GetUnitsAroundPoint(iShieldCategory, tTargetPos, iShieldSearchRange, sSearchType)
     if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repr(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
+    local iShieldCurHealth, iShieldMaxHealth
+    local iTotalShieldCurHealth = 0
     if M27Utilities.IsTableEmpty(tNearbyShields) == false then
         if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
         local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
@@ -3137,19 +3138,15 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
                         iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius..'; shield position='..repr(oUnit:GetPosition())..'; target position='..repr(tTargetPos)) end
                         if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
-                            if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check if its active (if its under construction will assume it will be active') end
-                            if oUnit:GetFractionComplete() < 1 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
+                            iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                            iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth
+                            if oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1 then iShieldCurHealth = iShieldMaxHealth end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iShieldCurHealth='..iShieldCurHealth..'; iIgnoreShieldsWithLessThanThisHealth='..iIgnoreShieldsWithLessThanThisHealth) end
+                            if iShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth then
                                 bUnderShield = true
-                                break
-                            else
-                                local iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
-
-                                if bDebugMessages == true then LOG(sFunctionRef..': Shield curhealth='..iShieldCurHealth..'; ShieldMaxHealth='..iShieldMaxHealth) end
-                                if iShieldCurHealth > 100 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Shield health more than 100 so is active') end
-                                    bUnderShield = true
-                                    break
-                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Shield health more than threshold so unit is under a shield') end
+                                if not(bReturnShieldHealthInstead) then break end
                             end
                         end
                     elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
@@ -3164,7 +3161,9 @@ function IsTargetUnderShield(aiBrain, oTarget, bIgnoreMobileShield)
         if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return bUnderShield
+    if bReturnShieldHealthInstead then return iTotalShieldCurHealth
+    else return bUnderShield
+    end
 end
 
 function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoint, iMaxDistance, iMinDistance)
@@ -3236,14 +3235,14 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
 
             end
             if iLoopCount > iMaxLoop2 then
-                M27Utilities.ErrorHandler('Couldnt find random point in area after looking '..iLoopCount..' times, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathingType='..sPathingType..'; iSegmentGroup='..iSegmentGroup..'; will return midpoint instead')
+                M27Utilities.ErrorHandler('Couldnt find random point in area after looking '..iLoopCount..' times, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathingType='..sPathingType..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[1]))
                 if bDebugMessages == true then
                     --Draw midpoint in white, draw last place checked in gold
                     M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 4, 20)
                     M27Utilities.DrawLocation(tMidpoint, nil, 7, 20)
                 end
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                return tMidpoint
+                return nil
             end
         end
         if bTryManualAlterantive == false then
@@ -3435,8 +3434,8 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
                oCurBP = oUnit:GetBlueprint()
                --Is the unit within range of the aoe?
                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation) <= (iAOE + math.min(oCurBP.SizeX, oCurBP.SizeZ)) then
-                   --Is the unit shielded?
-                   if not(IsTargetUnderShield(aiBrain, oUnit, false)) then
+                   --Is the unit shielded by more than 90% of our damage?
+                   if not(IsTargetUnderShield(aiBrain, oUnit, iDamage * 0.9)) then
                        iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                        iCurHealth = iCurShield + oUnit:GetHealth()
                        iMaxHealth = iMaxShield + oUnit:GetMaxHealth()

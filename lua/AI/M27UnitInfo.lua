@@ -318,6 +318,16 @@ function IsUnitUnderwaterAmphibious(oUnit)
     return bIsUnderwater
 end
 
+function GetUnitIDTechLevel(sUnitId)
+    local iTechLevel = 1
+    if EntityCategoryContains(categories.TECH1, sUnitId) then iTechLevel = 1
+    elseif EntityCategoryContains(categories.TECH2, sUnitId) then iTechLevel = 2
+    elseif EntityCategoryContains(categories.TECH3, sUnitId) then iTechLevel = 3
+    elseif EntityCategoryContains(categories.EXPERIMENTAL, sUnitId) then iTechLevel = 4
+    end
+    return iTechLevel
+end
+
 function GetUnitTechLevel(oUnit)
     local sUnitId = oUnit:GetUnitId()
     local iTechLevel = 1
@@ -344,25 +354,13 @@ function GetUnitStrikeDamage(oUnit)
     local sBP = oUnit:GetUnitId()
     local iStrikeDamage = 0
 
-    if oBP.Weapon and oBP.Weapon[1] then
-        iStrikeDamage = oBP.Weapon[1].Damage
-    end
 
     if EntityCategoryContains(refCategoryBomber, sBP) then
-        --Check if manual override is higher, as some weapons will fire lots of shots so above method wont be accurate
-        local iFaction = GetFactionFromBP(oBP)
-        local iTech = GetUnitTechLevel(oUnit)
-        local tiBomberStrikeDamageByFactionAndTech =
-        {
-            --UEF, Aeon, Cybran, Sera, Nomads (are using default), Default
-            { 125, 200, 125, 250, 150, 150 }, --Tech 1
-            { 350, 1, 850, 1175, 550, 550 }, --Tech 2
-            { 2500, 2500, 2500, 2500, 2500, 2500}, --Tech 3 - the strike damage calculation above should be accurate so this is just as a backup, and set at a low level due to potential for more balance changes affecting this
-            { 11000,11000,11000,11000,11000,11000} --Tech 4 - again as a backup
-        }
-        iStrikeDamage = math.max(iStrikeDamage, tiBomberStrikeDamageByFactionAndTech[iTech][iFaction])
-
-
+        --Doublecheck strike damage based on if it references a bomb
+        local iAOE
+        iAOE, iStrikeDamage = GetBomberAOEAndStrikeDamage(oUnit)
+    elseif oBP.Weapon and oBP.Weapon[1] then
+        iStrikeDamage = oBP.Weapon[1].Damage
     end
     return iStrikeDamage
 end
@@ -589,6 +587,20 @@ function GetBomberAOEAndStrikeDamage(oUnit)
             end
         end
     end
+
+    --Manual floor for strike damage due to complexity of some bomber calculations
+    --Check if manual override is higher, as some weapons will fire lots of shots so above method wont be accurate
+    local tiBomberStrikeDamageByFactionAndTech =
+    {
+        --UEF, Aeon, Cybran, Sera, Nomads (are using default), Default
+        { 125, 200, 125, 250, 150, 150 }, --Tech 1
+        { 350, 300, 850, 1175, 550, 550 }, --Tech 2
+        { 2500, 2500, 2500, 2500, 2500, 2500}, --Tech 3 - the strike damage calculation above should be accurate so this is just as a backup, and set at a low level due to potential for more balance changes affecting this
+        { 11000,11000,11000,11000,11000,11000} --Tech 4 - again as a backup
+    }
+    iStrikeDamage = math.max(iStrikeDamage, tiBomberStrikeDamageByFactionAndTech[GetUnitTechLevel(oUnit)][GetFactionFromBP(oBP)])
+
+
     return iAOE, iStrikeDamage
 end
 

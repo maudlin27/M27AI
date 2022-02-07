@@ -669,8 +669,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                             if M27Utilities.IsTableEmpty(tEnemyMexes) == false then
                                 local iPriorityTargets = 0
                                 for iMex, oMex in tEnemyMexes do
-                                    --Ignore mobile shields:
-                                    if M27Logic.IsTargetUnderShield(aiBrain, oMex, true) == false then
+                                    if M27Logic.IsTargetUnderShield(aiBrain, oMex, 4000) == false then
                                         iPriorityTargets = iPriorityTargets + 1
                                         if iPriorityTargets >= 5 then bGetAirNotLand = true break end
                                     end
@@ -1088,11 +1087,11 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             tMassThresholds[7] = {iFullStorageAmount * 0.98,-10}
         else
             if aiBrain[refiMassGrossBaseIncome] <= 15 then
-                tMassThresholds[1] = 400, 1
-                tMassThresholds[2] = 500, 0.5
-                tMassThresholds[3] = 600, 0.1
-                tMassThresholds[4] = 700, -0.1
-                tMassThresholds[5] = 750, -0.2
+                tMassThresholds[1] = {400, 1}
+                tMassThresholds[2] = {500, 0.5}
+                tMassThresholds[3] = {600, 0.1}
+                tMassThresholds[4] = {700, -0.1}
+                tMassThresholds[5] = {750, -0.2}
             else
                 local iFullStorageAmount = 1000 --Base value for if we have 0% stored ratio
                 if aiBrain:GetEconomyStoredRatio('MASS') > 0 then iFullStorageAmount = aiBrain:GetEconomyStored('MASS') / aiBrain:GetEconomyStoredRatio('MASS') end
@@ -1129,6 +1128,14 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
 
         --Increase thresholds if we are trying to ctrl-K a mex
         if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == false then
+            bDebugMessages = true
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Trying to ctrlK a mex so increasing mass thresholds; will produce tMassThresholds below')
+                if M27Utilities.IsTableEmpty(tMassThresholds) then M27Utilities.ErrorHandler('tMassThresholds is empty')
+                else LOG(repr(tMassThresholds))
+                end
+            end
+
             for iThresholdRef, tThreshold in tMassThresholds do
                 tMassThresholds[iThresholdRef][1] = tMassThresholds[iThresholdRef][1] + 2000
             end
@@ -1647,12 +1654,17 @@ function ManageEnergyStalls(aiBrain)
                         if iLoopCountCheck >= 20 then M27Utilities.ErrorHandler('Infinite loop likely') break end
                         if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == false then
                             for iUnit, oUnit in aiBrain[reftPausedUnits] do
-                                M27UnitInfo.PauseOrUnpauseEnergyUsage(aiBrain, oUnit, false)
+                                if bDebugMessages == true then
+                                    if M27UnitInfo.IsUnitValid(oUnit) then LOG(sFunctionRef..': About to unpause '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                                    else LOG('Removing iUnit='..iUnit..' which is no longer valid')
+                                end
+                                if M27UnitInfo.IsUnitValid(oUnit) then M27UnitInfo.PauseOrUnpauseEnergyUsage(aiBrain, oUnit, false) end
                                 table.remove(aiBrain[reftPausedUnits], iUnit)
                                 break
                             end
                         end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': FInished unpausing units') end
                 end
             end
         end

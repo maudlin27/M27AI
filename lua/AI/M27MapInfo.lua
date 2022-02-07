@@ -442,12 +442,141 @@ end
 
 function FixSegmentPathingGroup(sPathingType, tLocation, iCorrectPathingGroup)
     --Called if CanPathTo identifies an inconsistency in our pathing logic - basic fix
+    --Try using RecheckPathingOfLocation in future which incorporates this
+
+    --have commented out code re updating amphibious pathing based on land pathing check, as its flawed since the correctpathinggroup might be different for teh amphibious pathing
     local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tLocation)
-    local bUpdateAmphibiousWithSameGroup = false
-    if sPathingType == M27UnitInfo.refPathingTypeLand and tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] == tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] then bUpdateAmphibiousWithSameGroup = true end
+    --local bUpdateAmphibiousWithSameGroup = false
+    local iOldPathingGroup = tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ]
+    --if sPathingType == M27UnitInfo.refPathingTypeLand and tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] == tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] then bUpdateAmphibiousWithSameGroup = true end
     tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] = iCorrectPathingGroup
-    if bUpdateAmphibiousWithSameGroup then tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] = iCorrectPathingGroup end
+    --if bUpdateAmphibiousWithSameGroup then tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] = iCorrectPathingGroup end
     tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(tLocation)] = true
+    if M27Utilities.IsTableEmpty(tSegmentBySegmentGroup[sPathingType][iOldPathingGroup]) == false then
+        for iEntry, tSegments in tSegmentBySegmentGroup[sPathingType][iOldPathingGroup] do
+            --table.insert into this is tSegmentBySegmentGroup[sPathingType][iPathingGroup], {iSegmentX, iSegmentZ}
+            if tSegments == {iSegmentX, iSegmentZ} then
+                table.remove(tSegmentBySegmentGroup[sPathingType][iOldPathingGroup], iEntry)
+                break
+            end
+        end
+    end
+    if not(tSegmentBySegmentGroup[sPathingType][iCorrectPathingGroup]) then tSegmentBySegmentGroup[sPathingType][iCorrectPathingGroup] = {} end
+    table.insert(tSegmentBySegmentGroup[sPathingType][iCorrectPathingGroup], {iSegmentX, iSegmentZ})
+end
+
+function RecheckPathingAroundLocationIfUnitIsCorrect(sPathingType, oPathingUnit, iUnitCorrectPathingGroup, tTargetLocation, iSegmentSizeAdjust)
+    --Intended to be called if we identify an incorrect pathing, so the area around that pathing can also be checked/updated
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RecheckPathingAroundLocationIfUnitIsCorrect'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if iSegmentSizeAdjust == nil then iSegmentSizeAdjust = 4 end
+
+    if iSegmentSizeAdjust > 0 then
+
+
+        local iBaseSegmentX, iBaseSegmentZ = GetPathingSegmentFromPosition(tTargetLocation)
+        local tCurTargetLocation
+
+        for iSegmentX = -iSegmentSizeAdjust + iBaseSegmentX, iSegmentSizeAdjust + iBaseSegmentX, 1 do
+            for iSegmentZ = -iSegmentSizeAdjust + iBaseSegmentZ, iSegmentSizeAdjust + iBaseSegmentZ, 1 do
+                if not(iSegmentX == iBaseSegmentX and iSegmentZ == iBaseSegmentZ) then
+                    if not(GetSegmentGroupOfTarget(sPathingType, iSegmentX, iSegmentZ) == iUnitCorrectPathingGroup) then
+                        tCurTargetLocation = GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
+                        if not(tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(tCurTargetLocation)]) then
+                            if oPathingUnit:CanPathTo(tCurTargetLocation) then
+                                FixSegmentPathingGroup(sPathingType, tCurTargetLocation, iUnitCorrectPathingGroup)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+
+function RecheckPathingOfLocation(sPathingType, oPathingUnit, tTargetLocation, tKnownCorrectPoint)
+    --E.g. set tKnownCorrectPoint to the player start position; will update the pathing
+    --return true if pathing has changed, or false if no change
+
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RecheckPathingOfLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iUnitPathingGroup = GetSegmentGroupOfLocation(sPathingType, oPathingUnit:GetPosition())
+    local iTargetPathingGroup = GetSegmentGroupOfLocation(sPathingType, tTargetLocation)
+    local iBasePathingGroup = GetSegmentGroupOfLocation(sPathingType, tKnownCorrectPoint)
+    local bCanPathToTarget = oPathingUnit:CanPathTo(tTargetLocation)
+    local bCanPathToBase = oPathingUnit:CanPathTo(tKnownCorrectPoint)
+    local bExpectedToPathToTarget = false
+    if iUnitPathingGroup == iTargetPathingGroup then bExpectedToPathToTarget = true end
+    local bExpectedToPathToBase = false
+    if iUnitPathingGroup == iBasePathingGroup then bExpectedToPathToBase = true end
+    local bTargetIsBase = false
+    if tTargetLocation[1] == tKnownCorrectPoint[1] and tTargetLocation[3] == tKnownCorrectPoint[3] then bTargetIsBase = true end
+
+    local bHaveChangedPathing = false
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oPathingUnit='..oPathingUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..'; iUnitPathingGroup='..iUnitPathingGroup..'; iTargetPathingGroup='..iTargetPathingGroup..'; iBasePathingGroup='..iBasePathingGroup..'; manual check for engi position='..tostring(tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())] or false)..'; bCanPathToTarget='..tostring(bCanPathToTarget)..'; bCanPathToBase='..tostring(bCanPathToBase)) end
+
+    --Have we not checked the pathing of either the engineer position or the target?
+    if not(tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) or not(tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(tTargetLocation)]) then
+
+        if bCanPathToBase and not(iUnitPathingGroup == iBasePathingGroup) then
+            bHaveChangedPathing = true
+            if bDebugMessages == true then LOG(sFunctionRef..': Can path to base but we didnt think we could, will change unit pathing group to '..iBasePathingGroup) end
+            FixSegmentPathingGroup(sPathingType, oPathingUnit:GetPosition(), iBasePathingGroup)
+            RecheckPathingAroundLocationIfUnitIsCorrect(sPathingType, oPathingUnit, iBasePathingGroup, oPathingUnit:GetPosition(), 4)
+
+            if not(bTargetIsBase) and bCanPathToTarget and not(iTargetPathingGroup == iBasePathingGroup) then
+                if bDebugMessages == true then LOG(sFunctionRef..': target location cna path to base but we didnt think it could, will change target pathing group to '..iBasePathingGroup) end
+                FixSegmentPathingGroup(sPathingType, tTargetLocation, iBasePathingGroup)
+                --Check an area around the target (if its not really far away)
+                RecheckPathingAroundLocationIfUnitIsCorrect(sPathingType, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
+            end
+        else
+            --Cant path to base - below updates to pathing group arent as accurate so will only update the target not the area around it
+            if bExpectedToPathToBase then
+                --Incorrectly think we can path to base, so change our pathing group to something else - add 1 to current size
+                bHaveChangedPathing = true
+                local iNewPathingGroup = table.getn(tSegmentBySegmentGroup[sPathingType]) + 1
+                if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to base, will set engineer position group to '..iNewPathingGroup) end
+                FixSegmentPathingGroup(sPathingType, oPathingUnit:GetPosition(), iNewPathingGroup)
+                --Is there also an issue with the target?
+                if not(bTargetIsBase) and bCanPathToTarget and iTargetPathingGroup == iBasePathingGroup then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think the target can path to base, will set target location group to '..iNewPathingGroup) end
+                    FixSegmentPathingGroup(sPathingType, tTargetLocation, iNewPathingGroup)
+                end
+            else
+                --cant path to base, and we correctly think we cant path to base; is the target ok?
+                if not(bTargetIsBase) then
+                    if bCanPathToTarget then
+                        if bExpectedToPathToTarget then
+                            --Correctly think we can path to target so dont need to change anything
+                        else
+                            --Can path to target but werent expecting to be able to; Will assume our units pathing group is correct and will update target pathing group to be the engineers pathing group
+                            bHaveChangedPathing = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to target, will set target location pathing group to '..iUnitPathingGroup) end
+                            FixSegmentPathingGroup(sPathingType, tTargetLocation, iUnitPathingGroup)
+                        end
+                    else
+                        if bExpectedToPathToTarget then
+                            --Cant path to target but thought we could; increase the targets pathing group
+                            bHaveChangedPathing = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to target, will set target location pathing group to '..(table.getn(tSegmentBySegmentGroup[sPathingType]) + 1)) end
+                            FixSegmentPathingGroup(sPathingType, tTargetLocation, table.getn(tSegmentBySegmentGroup[sPathingType]) + 1)
+                        else
+                            --Dont have enough informatino to say antyhing more, since we cant path to base, or to the target, and we're correctly expecting to not path to either of them
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': bHaveChangedPathing='..tostring(bHaveChangedPathing)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return bHaveChangedPathing
 end
 
 function GetReclaimablesResourceValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis, bAlsoReturnAmountOfHighestIndividualReclaim, bEnergyNotMass)
@@ -2226,7 +2355,9 @@ function RecordBaseLevelPathability()
     
     local function RecordPathingGroup(sPathingType, iSegmentX, iSegmentZ, iPathingGroup)
         tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] = iPathingGroup
-        if tSegmentBySegmentGroup[sPathingType][iPathingGroup] == nil then tSegmentBySegmentGroup[sPathingType][iPathingGroup] = {} end
+        if tSegmentBySegmentGroup[sPathingType][iPathingGroup] == nil then
+            tSegmentBySegmentGroup[sPathingType][iPathingGroup] = {}
+        end
         table.insert(tSegmentBySegmentGroup[sPathingType][iPathingGroup], {iSegmentX, iSegmentZ})
     end
 

@@ -23,7 +23,13 @@ refiFactoriesTemporarilyPaused = 'M27FactoriesTemporarilyPaused' --Number of fac
 
 refiInitialEngineersWanted = 'M27InitialEngineers'
 refiMinimumTanksWanted = 'M27MinimumTanks'
+
+--Unit cap variables - max no. of a unit for a given tech level - set in overseer initialisation
 refiEngineerCap = 'M27EngineerCap'
+refiDFCap = 'M27FactoryDFCap'
+refiIndirectCap = 'M27IndirectCap'
+refiMAACap = 'M27MAAcap'
+
 reftiEngineerLowMassCap = 'M27FactoryEngineerLowMassCap' --Limit on how many engineers to have by tech level if low on mass
 reftFactoryBuildQueue = 'M27FactoryBuildQueue'
 refiFactoryUniqueID = 'M27FactoryUniqueID'
@@ -308,6 +314,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
             local iEnemySearchRange = 60
             local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE, oFactory:GetPosition(), iEnemySearchRange, 'Enemy')
             local iNearbyEnemies = 0
+            local iUnitTechLevelCategory
             if M27Utilities.IsTableEmpty(tNearbyEnemies) == false then iNearbyEnemies = table.getn(tNearbyEnemies) end
             if bDebugMessages == true then
                 if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then LOG(sFunctionRef..': No nearby enemies')
@@ -1041,7 +1048,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     end
                     LOG(sFunctionRef..': Gametime='..GetGameTimeSeconds())
                 end
-                --=======================Adjustments/overrides to initail category - engineers and indirect
+                --=======================Adjustments/overrides to initail category - engineers, indirect and unit cap
+                --See later section for adjustments based on particular blueprints (which includes unit caps other than engi unit cap)
                 --Engineers - Check this is a factory where we want to build engineers and we're not over the cap
                 if iCategoryToBuild == refCategoryEngineer then
                     if oFactory[refbFactoryCanBuildEngis] == false then
@@ -1072,6 +1080,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         end
                     end
                 end
+
+
 
                 if not(iCategoryToBuild == nil) then
                     if bDebugMessages == true then
@@ -1134,12 +1144,32 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     iCurrentConditionToTry = iCurrentConditionToTry + 1
                     if iCurrentConditionToTry > iMaxLoop then break end
                 end
+
+                --=================Overrides based on blueprint or more generalised categories
+                if sBPIDToBuild and bIsLandFactory then
+                    --Unit cap by unit type (engineer is covered above)
+                    iUnitTechLevelCategory = M27UnitInfo.ConvertTechLevelToCategory(M27UnitInfo.GetUnitIDTechLevel(sBPIDToBuild))
+
+                    if EntityCategoryContains(M27UnitInfo.refCategoryDFTank, sBPIDToBuild) then
+                        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryDFTank * iUnitTechLevelCategory) > aiBrain[refiDFCap] then
+                            sBPIDToBuild = nil
+                        end
+                    elseif EntityCategoryContains(M27UnitInfo.refCategoryMAA, sBPIDToBuild) then
+                        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMAA * iUnitTechLevelCategory) > aiBrain[refiMAACap] then
+                            sBPIDToBuild = nil
+                        end
+                    elseif EntityCategoryContains(M27UnitInfo.refCategoryIndirect, sBPIDToBuild) then
+                        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryIndirect * iUnitTechLevelCategory) > aiBrain[refiIndirectCap] then
+                            sBPIDToBuild = nil
+                        end
+                    end
+                end
             end
-            else
+        else
             M27Utilities.ErrorHandler('Blueprint is nil')
-            end
-            if iCategoryToBuild and sBPIDToBuild then RecordUnderConstruction(aiBrain, oFactory, iCategoryToBuild) end
         end
+        if iCategoryToBuild and sBPIDToBuild then RecordUnderConstruction(aiBrain, oFactory, iCategoryToBuild) end
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return sBPIDToBuild
 end

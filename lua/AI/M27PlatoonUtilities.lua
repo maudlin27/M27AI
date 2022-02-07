@@ -48,6 +48,7 @@ refActionGoToNearestRallyPoint = 22
 refActionMoveInCircle = 23 --Tells every unit in platoon to run in a circle
 refActionKitingRetreat = 24 --For use where we think we can kite the enemy, so if we no longer detect enemies we shouldnt treat the platoon as having previously run
 refActionSuicide = 25 --ctrl-K units in platoon
+refActionGoToRandomLocationForAWhile = 26 --Used when units have been stuck for a long time - will force this action until this has been the action for 10s
 
 --Extra actions (i.e. performed in addition to main action)
 refiExtraAction = 'M27ExtraActionRef'
@@ -206,12 +207,14 @@ end
 
 function GetPlatoonFrontPosition(oPlatoon)
     --M27Utilities.ErrorHandler('Temp To help ID crash')
-    if oPlatoon[reftFrontPosition] then return oPlatoon[reftFrontPosition]
-    else
-        if oPlatoon.GetUnitId then return oPlatoon:GetPosition()
+    if not(oPlatoon[reftFrontPosition]) then
+        if oPlatoon.GetUnitId then oPlatoon[reftFrontPosition] = oPlatoon:GetPosition()
         else
-            return oPlatoon:GetPlatoonPosition() end
+            oPlatoon[reftFrontPosition] = oPlatoon:GetPlatoonPosition()
+        end
     end
+
+    return oPlatoon[reftFrontPosition]
 end
 
 function GetPlatoonRearPosition(oPlatoon)
@@ -1458,12 +1461,13 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
                                     else
                                         --Still stuck despite trying preferred 'unstick' strategy; now try to return to base/rally point (unless are a defender)
                                         if oPlatoon[refiCyclesForLastStuckAction] >= iCycleThreshold * 3 then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Have been stuck for 3x the cycle threshold now, will try moving to rally point (or disbanding if are indirect defender)') end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have been stuck for 3x the cycle threshold now, will try moving to a random location (or disbanding if are indirect defender)') end
                                             if sPlatoonName == M27Overseer.sDefenderPlatoonRef or sPlatoonName == 'M27IndirectDefender' then
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Platoon is a defender and is very stuck so disbanding') end
                                                 oPlatoon[refiCurrentAction] = refActionDisband
                                             else
-                                                oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                                                oPlatoon[refiCurrentAction] = refActionGoToRandomLocationForAWhile
+                                                if bDebugMessages == true then LOG(sFunctionRef..': oPlatoon='..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..'want to move to random point when processing this action') end
                                             end
                                         else
                                             if oPlatoon[refiCyclesForLastStuckAction] >= iCycleThreshold * 2 and not(oPlatoon[refiEnemiesInRange] > 0) then
@@ -4335,6 +4339,9 @@ function DeterminePlatoonAction(oPlatoon)
                                                         if oPlatoon[reftPrevAction][1] == refActionDisband then
                                                             if bDebugMessages == true then LOG('Determineplatoon action: Prev action was to disband so making that our current action') end
                                                             oPlatoon[refiCurrentAction] = refActionDisband
+                                                        elseif oPlatoon[reftPrevAction][1] == refActionGoToRandomLocationForAWhile and not(oPlatoon[reftPrevAction][10] == refActionGoToRandomLocationForAWhile) then
+                                                            oPlatoon[refiCurrentAction] = refActionGoToRandomLocationForAWhile
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': oPlatoon='..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..'; platoon position='..repr(oPlatoon:GetPlatoonPosition())..'; moving to random point='..repr(oPlatoon[reftTemporaryMoveTarget][1])) end
                                                         end
                                                     end
                                                     if oPlatoon[refiCurrentAction] == nil then
@@ -4497,93 +4504,97 @@ function DeterminePlatoonAction(oPlatoon)
                 end
             end
             if oPlatoon[reftPrevAction][1] == oPlatoon[refiCurrentAction] then
-                if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then
-                    if oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionTemporaryRetreat or oPlatoon[refiCurrentAction] == refActionKitingRetreat then
-                       iRefreshActionThreshold = 1
-                        if oPlatoon[refbCombatHoverInPlatoon] then iRefreshActionThreshold = 5 end
-                    else
-                        if oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then iRefreshActionThreshold = 20
-                        else
-                            bRefreshAction = true
-                        end
-                    end
+                if oPlatoon[refiCurrentAction] == refActionGoToRandomLocationForAWhile then
+                    iRefreshActionThreshold = 9
                 else
-                    if bDebugMessages == true then LOG('Prev action is same as current action, will set refreshaction to false unless due a refresh') end
-                    if oPlatoon[refiCurrentAction] == refActionContinueMovementPath then
-                        --Don't refresh if are continuing movement path unless are escorting
-                        bRefreshAction = false
-                    else
-                        local bBuildingOrReclaimingLogic = false
-                        --Building and reclaiming - base refresh on whether any units are building/reclaiming
-                        if oPlatoon[refiCurrentAction] == refActionBuildMex or oPlatoon[refiCurrentAction] == refActionAssistConstruction or oPlatoon[refiCurrentAction] == refActionBuildFactory or oPlatoon[refiCurrentAction] == refActionBuildInitialPower then
-                            bBuildingOrReclaimingLogic = true
-                            bRefreshAction = true
-                            if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Checking if any buidlers ahve unit state building') end
-                            for iBuilder, oBuilder in oPlatoon[reftBuilders] do
-                                --Units can build something by 'repairing' it, so check for both unit states:
-                                if oBuilder:IsUnitState('Building') == true or oBuilder:IsUnitState('Repairing') == true then
-                                    oPlatoon[refbMovingToBuild] = false
-                                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Builder is building, so dont refresh action') end
-                                    bRefreshAction = false
-                                    break
-                                elseif oBuilder:IsUnitState('Guarding') == true then
-                                    --might be assisting construction of a unit/building, or just assisting an engineer - bellow will jsut check for the former
-                                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Builder is guarding - check the unit being guarded') end
-                                    if oBuilder.GetGuardedUnit then
-                                        local oBeingBuilt = oBuilder:GetGuardedUnit()
-                                        if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Obtained valid reference to guarded unit') end
-                                        if oBeingBuilt.GetFractionComplete then
-                                            if oBeingBuilt:GetFractionComplete() < 1 then
-                                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Builder is assisting something that is being built, so dont refresh action') end
-                                                bRefreshAction = false
-                                                break
-                                            end
-                                        end
-                                    end
-                                elseif oBuilder:IsUnitState('Moving') == true then
-                                    iRefreshActionThreshold = 10 --Might be trying to build ontop of current position
-                                else
-                                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Considering whether to ignore refresh - unit state='..M27Logic.GetUnitState(oBuilder)) end
-                                end
-                            end
-                        elseif oPlatoon[refiCurrentAction] == refActionReclaimTarget or oPlatoon[refiCurrentAction] == refActionReclaimAllNearby then
-                            if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Action is to reclaim, First reclaimer in platoon status='..M27Logic.GetUnitState(oPlatoon[reftReclaimers][1])) end
-                            bBuildingOrReclaimingLogic = true
-                            bRefreshAction = true
-                            iRefreshActionThreshold = 1
-                            if oPlatoon[refiCurrentAction] == refActionReclaimAllNearby then iRefreshActionThreshold = 0 end --The reclaimallnearby logic already checks if position has moved so dont need a delay
-                            for iReclaimer, oReclaimer in oPlatoon[reftReclaimers] do
-                                if not(oReclaimer.Dead) then
-                                    if oReclaimer:IsUnitState('Reclaiming') == true then
-                                        if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..oPlatoon[refiPlatoonCount]..': Unit is reclaiming so dont want to refresh') end
-                                        bRefreshAction = false
-                                        break
-                                    end
-                                end
-                            end
-                            if bDebugMessages == true then LOG(sFunctionRef..': bRefreshAction after checking if unit state is reclaiming='..tostring(bRefreshAction)) end
-                        elseif oPlatoon[refiCurrentAction] == refActionAttackSpecificUnit then
-                            --Has the unit changed?
-                            if oPlatoon[refoTemporaryAttackTarget] == oPlatoon[refoPrevTemporaryAttackTarget] then
-                                bRefreshAction = false
+                    if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then
+                        if oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionTemporaryRetreat or oPlatoon[refiCurrentAction] == refActionKitingRetreat then
+                           iRefreshActionThreshold = 1
+                            if oPlatoon[refbCombatHoverInPlatoon] then iRefreshActionThreshold = 5 end
+                        else
+                            if oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then iRefreshActionThreshold = 20
                             else
                                 bRefreshAction = true
-                                oPlatoon[refiRefreshActionCount] = iRefreshActionThreshold --to make sure we refresh
                             end
-                        elseif oPlatoon[refiCurrentAction] == refActionMoveInCircle then
-                            iRefreshActionThreshold = 4
-                        else
-                            iRefreshActionThreshold = 5
-                            if oPlatoon[refbCombatHoverInPlatoon] then iRefreshActionThreshold = 10 end
                         end
+                    else
+                        if bDebugMessages == true then LOG('Prev action is same as current action, will set refreshaction to false unless due a refresh') end
+                        if oPlatoon[refiCurrentAction] == refActionContinueMovementPath then
+                            --Don't refresh if are continuing movement path unless are escorting
+                            bRefreshAction = false
+                        else
+                            local bBuildingOrReclaimingLogic = false
+                            --Building and reclaiming - base refresh on whether any units are building/reclaiming
+                            if oPlatoon[refiCurrentAction] == refActionBuildMex or oPlatoon[refiCurrentAction] == refActionAssistConstruction or oPlatoon[refiCurrentAction] == refActionBuildFactory or oPlatoon[refiCurrentAction] == refActionBuildInitialPower then
+                                bBuildingOrReclaimingLogic = true
+                                bRefreshAction = true
+                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Checking if any buidlers ahve unit state building') end
+                                for iBuilder, oBuilder in oPlatoon[reftBuilders] do
+                                    --Units can build something by 'repairing' it, so check for both unit states:
+                                    if oBuilder:IsUnitState('Building') == true or oBuilder:IsUnitState('Repairing') == true then
+                                        oPlatoon[refbMovingToBuild] = false
+                                        if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Builder is building, so dont refresh action') end
+                                        bRefreshAction = false
+                                        break
+                                    elseif oBuilder:IsUnitState('Guarding') == true then
+                                        --might be assisting construction of a unit/building, or just assisting an engineer - bellow will jsut check for the former
+                                        if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Builder is guarding - check the unit being guarded') end
+                                        if oBuilder.GetGuardedUnit then
+                                            local oBeingBuilt = oBuilder:GetGuardedUnit()
+                                            if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Obtained valid reference to guarded unit') end
+                                            if oBeingBuilt.GetFractionComplete then
+                                                if oBeingBuilt:GetFractionComplete() < 1 then
+                                                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Builder is assisting something that is being built, so dont refresh action') end
+                                                    bRefreshAction = false
+                                                    break
+                                                end
+                                            end
+                                        end
+                                    elseif oBuilder:IsUnitState('Moving') == true then
+                                        iRefreshActionThreshold = 10 --Might be trying to build ontop of current position
+                                    else
+                                        if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Considering whether to ignore refresh - unit state='..M27Logic.GetUnitState(oBuilder)) end
+                                    end
+                                end
+                            elseif oPlatoon[refiCurrentAction] == refActionReclaimTarget or oPlatoon[refiCurrentAction] == refActionReclaimAllNearby then
+                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Action is to reclaim, First reclaimer in platoon status='..M27Logic.GetUnitState(oPlatoon[reftReclaimers][1])) end
+                                bBuildingOrReclaimingLogic = true
+                                bRefreshAction = true
+                                iRefreshActionThreshold = 1
+                                if oPlatoon[refiCurrentAction] == refActionReclaimAllNearby then iRefreshActionThreshold = 0 end --The reclaimallnearby logic already checks if position has moved so dont need a delay
+                                for iReclaimer, oReclaimer in oPlatoon[reftReclaimers] do
+                                    if not(oReclaimer.Dead) then
+                                        if oReclaimer:IsUnitState('Reclaiming') == true then
+                                            if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..oPlatoon[refiPlatoonCount]..': Unit is reclaiming so dont want to refresh') end
+                                            bRefreshAction = false
+                                            break
+                                        end
+                                    end
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': bRefreshAction after checking if unit state is reclaiming='..tostring(bRefreshAction)) end
+                            elseif oPlatoon[refiCurrentAction] == refActionAttackSpecificUnit then
+                                --Has the unit changed?
+                                if oPlatoon[refoTemporaryAttackTarget] == oPlatoon[refoPrevTemporaryAttackTarget] then
+                                    bRefreshAction = false
+                                else
+                                    bRefreshAction = true
+                                    oPlatoon[refiRefreshActionCount] = iRefreshActionThreshold --to make sure we refresh
+                                end
+                            elseif oPlatoon[refiCurrentAction] == refActionMoveInCircle then
+                                iRefreshActionThreshold = 4
+                            else
+                                iRefreshActionThreshold = 5
+                                if oPlatoon[refbCombatHoverInPlatoon] then iRefreshActionThreshold = 10 end
+                            end
 
-                        if bRefreshAction == true then
-                            --Refresh every 2 cycles:
-                            if oPlatoon[refiRefreshActionCount] < iRefreshActionThreshold then bRefreshAction = false end
+                            if bRefreshAction == true then
+                                --Refresh every 2 cycles:
+                                if oPlatoon[refiRefreshActionCount] < iRefreshActionThreshold then bRefreshAction = false end
 
-                            if bDebugMessages == true then
-                                if oPlatoon[refiRefreshActionCount] == nil then oPlatoon[refiRefreshActionCount] = 0 end
-                                LOG('RefreshCount='..oPlatoon[refiRefreshActionCount]..'; bRefreshAction='..tostring(bRefreshAction))
+                                if bDebugMessages == true then
+                                    if oPlatoon[refiRefreshActionCount] == nil then oPlatoon[refiRefreshActionCount] = 0 end
+                                    LOG('RefreshCount='..oPlatoon[refiRefreshActionCount]..'; bRefreshAction='..tostring(bRefreshAction))
+                                end
                             end
                         end
                     end
@@ -4772,10 +4783,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
             if not(M27MapInfo.GetSegmentGroupOfLocation(sPathingType, oPlatoon[refoFrontUnit]:GetPosition()) == M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) then
                 if bDebugMessages == true then LOG(sFunctionRef..': platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Front unit position='..repr(oPlatoon[refoFrontUnit]:GetPosition())..'; unit='..oPlatoon[refoFrontUnit]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])..': Showing as a dif pathing group to base, so will do a CanPathTo to see if it really is different') end
                 --Cant path to base - double-check pathing if havent already
-                if not(M27MapInfo.tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(oPlatoon[refoFrontUnit]:GetPosition())]) and oPlatoon[refoFrontUnit]:CanPathTo(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': CanPathTo gives a different result, so will fix segment pathing') end
-                    M27MapInfo.FixSegmentPathingGroup(sPathingType, oPlatoon[refoFrontUnit]:GetPosition(), M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
-                end
+                M27MapInfo.RecheckPathingOfLocation(sPathingType, oPlatoon[refoFrontUnit], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             end
 
 
@@ -5743,10 +5751,8 @@ function GetPositionAtOrNearTargetInPathingGroup(tStartPos, tTargetPos, iDistanc
         if iStartPathingGroup == iPathingGroupWanted then
             --Unit is in a different pathing group; check if it can path to start - double-check its dif pathing group to be sure
             if not(iStartPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())) then
-                if not(M27MapInfo.tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) and oPathingUnit:CanPathTo(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Pathing unit can path to player start point so will fix pathing') end
-                    --Error with map's predetermined pathing logic
-                    M27MapInfo.FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iStartPathingGroup)
+                if M27MapInfo.RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                    --Pathing was wrong and should now be fixed
                     tPossibleTarget = {tTargetPos[1], tTargetPos[2], tTargetPos[3]}
                     bCanPathToTarget = true
                 else
@@ -5761,18 +5767,13 @@ function GetPositionAtOrNearTargetInPathingGroup(tStartPos, tTargetPos, iDistanc
             if iStartPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition()) then
                 --Double-check it really is a different pathing group to be sure before using canpathto
                 --if not(iStartPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTargetPos)) then
-                if not(M27MapInfo.tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) and oPathingUnit:CanPathTo(tTargetPos) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing unit can path to target point so pathing is wrong') end
-                        --Error with map's predetermined pathing logic
-                        M27MapInfo.FixSegmentPathingGroup(sPathing, tTargetPos, iStartPathingGroup)
-                        tPossibleTarget = {tTargetPos[1], tTargetPos[2], tTargetPos[3]}
-                        bCanPathToTarget = true
-                    else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing unit cant path to target point so pathing is correct') end
-                    end
-                --else
-                    M27Utilities.ErrorHandler('Possible flaw in logic as wasnt expecting this to be possible - are we checking we can path to the targe tposition in earlier code?', nil, true)
-                --end
+                if M27MapInfo.RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                    --Error with map's predetermined pathing logic
+                    tPossibleTarget = {tTargetPos[1], tTargetPos[2], tTargetPos[3]}
+                    bCanPathToTarget = true
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Pathing unit cant path to target point so pathing is correct') end
+                end
             end
         end
         if not(bCanPathToTarget) then
@@ -5988,7 +5989,6 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
     --bReturnNilIfAlreadyMovingNearConstruction - will return nil if bReturnMovePathInstead is set to true and unit is already moving towards target, otherwise will return current move target if its close enough, or the builder position if already in position
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveNearConstruction'
-    if M27Utilities.GetACU(aiBrain) == oBuilder then bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
         local sBuilderName = oBuilder:GetUnitId()
@@ -6051,25 +6051,11 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
                 tPossibleTarget = tLocation
             else
                 --Could be our logic for pathing is faulty - use canpathto instead
-                if not(M27MapInfo.tManualPathingChecks[M27UnitInfo.GetUnitPathingType(oBuilder)][M27Utilities.ConvertLocationToReference(tLocation)]) and oBuilder:CanPathTo(tLocation) then
-                    LOG(sFunctionRef..': When pathing from '..repr(oBuilder:GetPosition())..' to '..repr(tLocation)..' we thought we were in different pathing groups, but we can path there using CanPathTo for unit ID='..oBuilder:GetUnitId())
+                if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.GetUnitPathingType(oBuilder), oBuilder, tLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                    --Faulty pathfinding logic
                     tPossibleTarget = tLocation
-                    --Is the current position in the same group as our start? If so then correct the current position; if the target is in the same segment then correct that instead
-                    local sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
-                    local iBaseGrouping = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                    local iTargetGrouping = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tLocation)
-                    local iEngineerGrouping = M27MapInfo.GetSegmentGroupOfLocation(sPathing, oBuilder:GetPosition())
-                    if iBaseGrouping == iTargetGrouping or iBaseGrouping == iEngineerGrouping then
-                        if iBaseGrouping == iTargetGrouping then
-                            --Issue is with the builder's location
-                            M27MapInfo.FixSegmentPathingGroup(sPathing, oBuilder:GetPosition(), iBaseGrouping)
-                        else
-                            --Issue is with the target location
-                            M27MapInfo.FixSegmentPathingGroup(sPathing, tLocation, iBaseGrouping)
-                        end
-                    end
-
                 else
+                    --Correct that we cant path to the location
                     M27Utilities.ErrorHandler('MoveNearConstructions target location cant be pathed to and cant find pathable positions near it, will return nil, may cause future error depending on what has called this')
                 end
             end
@@ -7650,6 +7636,15 @@ function ProcessPlatoonAction(oPlatoon)
                     for iUnit, oUnit in oPlatoon[reftCurrentUnits] do
                         if M27UnitInfo.IsUnitValid(oUnit) then oUnit:Kill() end
                     end
+                elseif oPlatoon[refiCurrentAction] == refActionGoToRandomLocationForAWhile then
+                    IssueClearCommands(oPlatoon[reftCurrentUnits])
+                    local tPlatoonAveragePosition = oPlatoon:GetPlatoonPosition()
+                    local iAngleToMovementPath = M27Utilities.GetAngleFromAToB(tPlatoonAveragePosition, oPlatoon[reftMovementPath][1])
+                    oPlatoon[reftMovementPath] = {}
+                    oPlatoon[reftMovementPath][1] = M27Utilities.MoveInDirection(tPlatoonAveragePosition, iAngleToMovementPath + math.random(-80, 80), math.random(30, 80))
+                    oPlatoon[refiCurrentPathTarget] = 1
+                    if bDebugMessages == true then LOG(sFunctionRef..': oPlatoon='..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..'; platoon position='..repr(tPlatoonAveragePosition)..'; moving to random point='..repr(oPlatoon[reftMovementPath][1])) end
+                    IssueMove(oPlatoon[reftCurrentUnits], oPlatoon[reftMovementPath][1])
                 else
                     --Unrecognised platoon action
                     if oPlatoon[refiCurrentAction]  then M27Utilities.ErrorHandler('Dont recognise the current platoon action='..oPlatoon[refiCurrentAction])

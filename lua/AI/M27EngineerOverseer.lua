@@ -529,6 +529,11 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
         if not(oEngineer == M27Utilities.GetACU(aiBrain)) then
             if iActionToAssign == refActionBuildMex or iActionToAssign == refActionBuildHydro or iActionToAssign == refActionReclaimArea then
                 --Want an escort for the platoon if the target destination is far enough away
+                if M27Utilities.IsTableEmpty(tTargetLocation) then
+                    M27Utilities.ErrorHandler('No target location for iActionToAssign='..iActionToAssign..'; oEngineer='..oEngineer:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UQ='..GetEngineerUniqueCount(oEngineer)..'; gametime='..GetGameTimeSeconds())
+                    tTargetLocation = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                end
+
                 local iTargetDistanceFromOurBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 if iTargetDistanceFromOurBase > 100 then bWantEscort = true
                 elseif iTargetDistanceFromOurBase > 50 then
@@ -1411,7 +1416,7 @@ function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprint
     return tTargetLocation
 end
 
-function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride)
+function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride, bAlreadyRecheckedPathing)
     --Returns nil if cant find anywhere
     --tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
     --Can also be used for general movement
@@ -1493,10 +1498,13 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
         if bDebugMessages == true then LOG(sFunctionRef..': Start of main loop grouping, iGroupCycleCount='..iGroupCycleCount..'; iCycleSize='..iCycleSize..'; iValidLocationCount='..iValidLocationCount) end
         if iGroupCycleCount > iMaxCycles then
             if iMaxCycles >= 5 then --Sometimes we may be ok with not finding anywhere to build, e.g. for rally points
-                M27Utilities.ErrorHandler('Possible infinite loop - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax..'; aiBrain index='..aiBrain:GetArmyIndex()..'; start number='..aiBrain.M27StartPositionNumber..'; sBlueprintToBuild='..(sBlueprintToBuild or 'nil')..'; Builder='..oBuilder:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBuilder)..'; UC='..GetEngineerUniqueCount(oBuilder))
-                if bDebugMessages == true and not(bForcedDebug) then
-                    LOG(sFunctionRef..': Will redo the function with forced logs enabled')
-                    tTargetLocation = FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, true)
+                M27Utilities.ErrorHandler('Possible infinite loop - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax..'; aiBrain index='..aiBrain:GetArmyIndex()..'; start number='..aiBrain.M27StartPositionNumber..'; sBlueprintToBuild='..(sBlueprintToBuild or 'nil')..'; Builder='..oBuilder:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBuilder)..'; UC='..GetEngineerUniqueCount(oBuilder)..'; will check pathing and rerun if pathing changes if not already checked, bAlreadyRecheckedPathing='..tostring(bAlreadyRecheckedPathing or false))
+                if not(bAlreadyRecheckedPathing) and M27MapInfo.RecheckPathingOfLocation(sPathing, oBuilder, tStartPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                    LOG(sFunctionRef..': Pathing was incorrect and has now changed so will refun function')
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                    return FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, false, nil, true)
+                else
+                    LOG('Pathing='..sPathing..'; Engineer pathing group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, oBuilder:GetPosition())..'; target position group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTargetLocation)..'; our base group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
                 end
             end
             break
@@ -1590,8 +1598,12 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
             if bDebugMessages == true then LOG(sFunctionRef..': Finished considering iCurLocation='..iCurLocation..'; tLocation='..repr(tLocation)..'; iCurPriority='..iCurPriority..'; iMaxPriority='..iMaxPriority..'; iCurDistanceToBuilder='..iCurDistanceToBuilder..'; iMaxDistanceToBuildWithoutMoving='..iMaxDistanceToBuildWithoutMoving..'; iMinDistanceToBuilder='..iMinDistanceToBuilder) end
         end
     else
-        if iMaxCycles >= 5 then M27Utilities.ErrorHandler('Failed to find a random place to build that engineer can path to') end
         tTargetLocation = nil
+        if iMaxCycles >= 5 then
+            M27Utilities.ErrorHandler('Failed to find a random place to build that engineer can path to, will check pathing and re-run this function if this is the first time')
+        end
+
+
     end
 
     if bDebugMessages == true then
@@ -2515,22 +2527,31 @@ function AttackMoveToRandomPositionAroundBase(aiBrain, oEngineer, iMaxDistance, 
     local sPathingType = M27UnitInfo.GetUnitPathingType(oEngineer)
     local tActionTargetLocation = {M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][2], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]}
     if not(iEngiPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) then
-        --Engi cant path to base based on segment pathing - check if this is correct
-        if not(M27MapInfo.tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(oEngineer:GetPosition())]) and oEngineer:CanPathTo(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
-            --Can actually path to base, so use normal logic but with the base starting group
-            M27MapInfo.FixSegmentPathingGroup(sPathingType, oEngineer:GetPosition(), M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
-            iEngiPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-        else
+        --Engi not expected to be able to path to base based on segment pathing - check if this is correct
+        if not(M27MapInfo.RecheckPathingOfLocation(sPathingType, oEngineer, tActionTargetLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) or not(iEngiPathingGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) then
             --Engi cant path to base, so instead look for somwhere randomly from where it currently is and reduce min and max distance
             tActionTargetLocation = oEngineer:GetPosition()
             iMinDistance = math.min(5, iMinDistance)
             iMaxDistance = math.min(iMinDistance + 5, iMaxDistance)
         end
     end
-    tActionTargetLocation = M27Logic.GetRandomPointInAreaThatCanPathTo(sPathingType, iEngiPathingGroup, tActionTargetLocation, iMaxDistance, iMinDistance)
-    IssueAggressiveMove({ oEngineer }, tActionTargetLocation)
+    if bDebugMessages == true then LOG(sFunctionRef..': About to get random point in area that can path to') end
+    local tRandomTargetLocation = M27Logic.GetRandomPointInAreaThatCanPathTo(sPathingType, iEngiPathingGroup, tActionTargetLocation, iMaxDistance, iMinDistance)
+    if tRandomTargetLocation == nil then
+        --Couldnt find anywhere that can path to, check if pathing is correct for our current position; if it is then just go for the location itself
+        --We cant path to the target, check if its correct to think this
+        if M27MapInfo.RecheckPathingOfLocation(sPathingType, oEngineer, tActionTargetLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+            --Have changed the pathing so retry
+            tRandomTargetLocation = M27Logic.GetRandomPointInAreaThatCanPathTo(sPathingType, iEngiPathingGroup, tActionTargetLocation, iMaxDistance, iMinDistance)
+            if tRandomTargetLocation == nil then tRandomTargetLocation = tActionTargetLocation end
+        else
+            --Its correct that we cant path to the target, so just resort to backup of trying to go there anywhere
+            tRandomTargetLocation = tActionTargetLocation
+        end
+    end
+    IssueAggressiveMove({ oEngineer }, tRandomTargetLocation)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return tActionTargetLocation
+    return tRandomTargetLocation
 end
 
 function ReplaceT2WithT3Monitor(aiBrain, oEngineer, oActionTargetObject)
@@ -2688,12 +2709,12 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 bConsiderAdjacency = true
                                 if M27UnitInfo.GetUnitTechLevel(oEngineer) == 1 then
                                     iCatToBuildBy = refCategoryLandFactory + refCategoryAirFactory
+                                    bQueueUpMultiple = true
                                 elseif M27UnitInfo.GetUnitTechLevel(oEngineer) == 2 then
                                     iCatToBuildBy = refCategoryAirFactory + M27UnitInfo.refCategoryT2Radar
                                 else
                                     iCatToBuildBy = refCategoryAirFactory + M27UnitInfo.refCategoryT3Radar + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategoryFixedT3Arti
                                 end
-                                bQueueUpMultiple = true
                                 iMaxAreaToSearch = 20
                                 if iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower then iMaxAreaToSearch = 50 end
                             elseif iActionToAssign == refActionBuildLandFactory then
@@ -2760,10 +2781,13 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                             --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings)
                             tTargetLocation = BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tTargetLocation)
                             if M27Utilities.IsTableEmpty(tTargetLocation) == true then
-                                M27Utilities.ErrorHandler('Failed to find a location to build at, switching to backup engineer logic')
+                                M27Utilities.ErrorHandler('Failed to find a location to build at for oEngineer UC='..GetEngineerUniqueCount(oEngineer)..'; Action='..iActionToAssign..'; , switching to backup engineer logic')
+                                tTargetLocation = oEngineer:GetPosition()
+                                iActionToAssign = refActionSpare
                                 IssueSpareEngineerAction(aiBrain, oEngineer)
                                 --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
                                 UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, nil, false, iConditionNumber)
+                                bQueueUpMultiple = false
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': About to call update tracker for tTargetLocation='..repr(tTargetLocation)) end
                                 UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, false, iConditionNumber)
@@ -4333,11 +4357,13 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             if bHaveLowPower == false and aiBrain[M27AirOverseer.refiAirStagingWanted] and aiBrain[M27AirOverseer.refiAirStagingWanted] > 0 then
                                 local iCurAirStaging = aiBrain:GetCurrentUnits(refCategoryAirStaging)
                                 if bDebugMessages == true then LOG(sFunctionRef..': iCurAirStaging='..iCurAirStaging) end
-                                if iCurAirStaging < 3 then
+                                if iCurAirStaging < 5 then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough air staging so will build more') end
                                     iActionToAssign = refActionBuildAirStaging
                                     iSearchRangeForNearestEngi = 100
-                                    iMaxEngisWanted = 2
+                                    if iCurAirStaging < 3 then iMaxEngisWanted = 2
+                                    else iMaxEngisWanted = 1
+                                    end
                                 end
                             end
                             --end

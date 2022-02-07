@@ -3845,6 +3845,7 @@ function SetMaximumFactoryLevels(aiBrain)
         end
         aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]..'; aiBrain[refiMinLandFactoryBeforeOtherTypes]='..aiBrain[refiMinLandFactoryBeforeOtherTypes]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -3893,7 +3894,7 @@ function DetermineInitialBuildOrder(aiBrain)
         aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 10
         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 12 end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]='..aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]) end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]='..aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -4087,6 +4088,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
         local iPrevStrategy = aiBrain[refiAIBrainCurrentStrategy]
         --Are we in ACU kill mode and want to stay in it (determined b y ACU manager)?
+        bDebugMessages = true
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and not(aiBrain[refbStopACUKillStrategy]) then --set as part of ACU manager
             --Stick with this strategy
         else
@@ -4116,8 +4118,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                         end
                     else
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy air threat='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; our air threat='..aiBrain[M27AirOverseer.refiOurMassInAirAA]) end
-                        if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] / 0.75 > aiBrain[M27AirOverseer.refiOurMassInAirAA] then
+                        if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA] then
                             if bDebugMessages == true then LOG(sFunctionRef..': Dont want to go for air dominance due to enemy highest ever air threat being >75% of ours') end
+                            bEnemyHasEnoughAA = true
+                        elseif not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[refiAirAANeeded] > 0 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont want air dominance as still need airAA') end
                             bEnemyHasEnoughAA = true
                         end
                     end
@@ -4244,6 +4249,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
             end
         end
+        bDebugMessages = false
 
         --Are we no longer protecting the ACU? If so then disband any escort it has - decided to take this out and just rely on acu manager's flag for if ACU needs an escort
         --[[if iPrevStrategy == refStrategyProtectACU and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU) then
@@ -4518,6 +4524,9 @@ function OverseerInitialisation(aiBrain)
 
     aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 4
     aiBrain[M27FactoryOverseer.refiEngineerCap] = 70 --Max engis of any 1 tech level even if have spare mass
+    aiBrain[M27FactoryOverseer.refiDFCap] = 150 --Max direct fire units of any 1 tech level
+    aiBrain[M27FactoryOverseer.refiIndirectCap] = 150 --Max indirect fire units of any 1 tech level
+    aiBrain[M27FactoryOverseer.refiMAACap] = 150 --Max MAA of any 1 tech level
     aiBrain[M27FactoryOverseer.reftiEngineerLowMassCap] = {35, 20, 20, 20} --Max engis to get if have low mass
     aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5
     aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
@@ -4752,6 +4761,7 @@ function OverseerManager(aiBrain)
 
 
     while(not(aiBrain:IsDefeated())) do
+        --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
 
         if aiBrain.M27IsDefeated then break end
         --ForkThread(TestNewMovementCommands, aiBrain)
