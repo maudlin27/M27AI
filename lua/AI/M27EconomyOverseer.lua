@@ -176,6 +176,23 @@ function GetUnitReclaimTargets(aiBrain)
         end
     end
 
+    --T1 Sonar
+    if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Sonar) > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Sonar + M27UnitInfo.refCategoryT3Sonar) > 0 then
+        --Do we have T1 sonar within range of T2 sonar?
+        local tT1Sonar
+        for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Sonar + M27UnitInfo.refCategoryT3Sonar) do
+            if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; .Intel='..repr((oUnit:GetBlueprint().Intel or {'nil'}))..'; .Intel.SonarRadius='..(oUnit:GetBlueprint().Intel.SonarRadius or 'nil')) end
+            tT1Sonar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Sonar, oUnit:GetPosition(), oUnit:GetBlueprint().Intel.SonarRadius - 115, 'Ally')
+            if M27Utilities.IsTableEmpty(tT1Sonar) == false then
+                for iT1Sonar, oT1Sonar in tT1Sonar do
+                    if oT1Sonar:GetAIBrain() == aiBrain then
+                        table.insert(aiBrain[reftUnitsToReclaim], oT1Sonar)
+                    end
+                end
+            end
+        end
+    end
+
     --Civilian buildings on our side of the map that can be pathed to amphibiously with no enemy units nearby
     local tCivilianBuildings = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 500, 'Neutral')
     local iBasePathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -1128,7 +1145,6 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
 
         --Increase thresholds if we are trying to ctrl-K a mex
         if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == false then
-            bDebugMessages = true
             if bDebugMessages == true then
                 LOG(sFunctionRef..': Trying to ctrlK a mex so increasing mass thresholds; will produce tMassThresholds below')
                 if M27Utilities.IsTableEmpty(tMassThresholds) then M27Utilities.ErrorHandler('tMassThresholds is empty')

@@ -3324,6 +3324,10 @@ function ACUManager(aiBrain)
             local bIncludeACUInAttack = false
             local iHealthThresholdAdjIfAlreadyAllIn = 0
             local iHealthAbsoluteThresholdIfAlreadyAllIn = 750
+            local bCheckThreatBeforeCommitting = true
+            local iEnemyThreat, iAlliedThreat, tEnemyUnitsNearEnemy, tAlliedUnitsNearEnemy
+            local iThreatFactor = 1.1 --We need this much more threat than threat around enemy ACU to commit to ACU kill
+            local iNearbyThreatSearchRange = 60 --Search range for threat around enemy ACU
             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iHealthThresholdAdjIfAlreadyAllIn = 0.05 end
             local iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
             local bWantEscort = oACU:IsUnitState('Upgrading')
@@ -3379,6 +3383,7 @@ function ACUManager(aiBrain)
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is almost in range of us and is on low health so will do all out attack') end
                         bAllInAttack = true
                         bIncludeACUInAttack = true
+                        bCheckThreatBeforeCommitting = true
                     --Attack if enemy ACU is in range and could die to an explosion (so we either win or draw)
                     elseif iLastDistanceToACU <= iACURange and aiBrain[refoLastNearestACU]:GetHealth() < (1800 + iHealthAbsoluteThresholdIfAlreadyAllIn) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU will die to explaosion so want to stay close to ensure draw or win') end
@@ -3390,6 +3395,7 @@ function ACUManager(aiBrain)
                         if bDebugMessages == true then LOG(sFunctionRef..': We have gun, enemy ACU doesnt, and we haver more health') end
                         bAllInAttack = true
                         bIncludeACUInAttack = true
+                        bCheckThreatBeforeCommitting = true
                     end
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': bAllInAttack after considering our ACU vs their ACU='..tostring(bAllInAttack)) end
@@ -3426,15 +3432,16 @@ function ACUManager(aiBrain)
                     bAllInAttack = true
                 elseif aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.75 + iHealthThresholdAdjIfAlreadyAllIn) then
                     --Do we have more threat near the ACU than the ACU has?
-                    local iSearchRange = 60
-                    local tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iSearchRange, 'Ally')
+                    tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Ally')
 
                     if M27Utilities.IsTableEmpty(tAlliedUnitsNearEnemy) == false then
-                        local tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iSearchRange, 'Enemy')
-                        local iThreatFactor = 2.5
+                        tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Enemy')
+                        iThreatFactor = 2.5
                         if aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.4 + iHealthThresholdAdjIfAlreadyAllIn) then iThreatFactor = 1.25 end
                         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iThreatFactor = 1 end
-                        if M27Logic.GetCombatThreatRating(aiBrain, tAlliedUnitsNearEnemy, false, nil, nil, false, false) > (M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnitsNearEnemy, false, nil, nil, false, false) * iThreatFactor) then
+                        iAlliedThreat = M27Logic.GetCombatThreatRating(aiBrain, tAlliedUnitsNearEnemy, false, nil, nil, false, false)
+                        iEnemyThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnitsNearEnemy, false, nil, nil, false, false)
+                        if iAlliedThreat > (iEnemyThreat * iThreatFactor) then
                             if bDebugMessages == true then LOG(sFunctionRef..': We have much more threat than the enemy ACU') end
                             bAllInAttack = true
                         end
@@ -3448,6 +3455,27 @@ function ACUManager(aiBrain)
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': bAllInAttack='..tostring(bAllInAttack)) end
             end
+
+            --Override decision if enemy ACU has significantly more threat than us
+            if bAllInAttack then
+                if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iThreatFactor = 0.9 end
+                if not(iAlliedThreat) then
+                    tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Ally')
+                    iAlliedThreat =  M27Logic.GetCombatThreatRating(aiBrain, tAlliedUnitsNearEnemy, false, nil, nil, false, false)
+                end
+
+                if not(iEnemyThreat) then
+                    tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Enemy')
+                    iEnemyThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnitsNearEnemy, false, nil, nil, false, false)
+                end
+                if iAlliedThreat < (iEnemyThreat * iThreatFactor) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': iAlliedThreat='..iAlliedThreat..'; iEnemyThreat='..iEnemyThreat..'; iThreatFactor='..iThreatFactor..'; therefore aborting All in attack') end
+                    bAllInAttack = false
+                    bIncludeACUInAttack = false
+                end
+            end
+
+
 
 
 
@@ -4088,7 +4116,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
         local iPrevStrategy = aiBrain[refiAIBrainCurrentStrategy]
         --Are we in ACU kill mode and want to stay in it (determined b y ACU manager)?
-        bDebugMessages = true
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and not(aiBrain[refbStopACUKillStrategy]) then --set as part of ACU manager
             --Stick with this strategy
         else
@@ -4249,7 +4276,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
             end
         end
-        bDebugMessages = false
 
         --Are we no longer protecting the ACU? If so then disband any escort it has - decided to take this out and just rely on acu manager's flag for if ACU needs an escort
         --[[if iPrevStrategy == refStrategyProtectACU and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU) then

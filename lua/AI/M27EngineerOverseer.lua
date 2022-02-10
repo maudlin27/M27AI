@@ -50,6 +50,8 @@ refActionReclaimUnit = 22
 refActionBuildT3MexOverT2 = 23
 refActionUpgradeHQ = 24 --Assists an HQ with its upgrade
 refActionReclaimTrees = 25
+refActionBuildT1Sonar = 26
+refActionBuildT2Sonar = 27
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 
 --Build order related variables
@@ -1125,12 +1127,16 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
                         elseif bHaveLowMass and iHighestTechUnits >= 5 then
                             iMaxEngisOfThisTechLevelWanted = 12
                         end
-                        if iHighestTechUnits >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iCurTechLevel)) > iMaxEngisOfThisTechLevelWanted then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have too many engineers of the current tech level so will kill engineer '..oEngineer:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' with UC='..GetEngineerUniqueCount(oEngineer)) end
-                            ClearEngineerActionTrackers(aiBrain, oEngineer, true)
-                            oEngineer:Kill()
-                            bDestroy = true
-                            bHaveAction = true
+                        local iEngisOfTechLevel = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iCurTechLevel))
+                        if iHighestTechUnits >= 3 and iEngisOfTechLevel > iMaxEngisOfThisTechLevelWanted then
+                            --Double threshold if we have any factories below tech3
+                            if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * M27UnitInfo.ConvertTechLevelToCategory(iCurTechLevel)) == 0 or iEngisOfTechLevel < iMaxEngisOfThisTechLevelWanted * 2 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have too many engineers of the current tech level so will kill engineer '..oEngineer:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' with UC='..GetEngineerUniqueCount(oEngineer)) end
+                                ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+                                oEngineer:Kill()
+                                bDestroy = true
+                                bHaveAction = true
+                            end
                         end
                     end
                 end
@@ -1676,7 +1682,6 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     local sFunctionRef = 'GetBestBuildLocationForTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
 
@@ -2019,7 +2024,7 @@ end
 
 function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings)
     --Determines the blueprint and location for oEngineer to build at; also returns the location
-    --iCatToBuildBy: Optional, specify if want to look for adjacency locations
+    --iCatToBuildBy: Optional, specify if want to look for adjacency locations; Note to factor in 50% of the builder's size and 50% of the likely adjacency building size
     --bLookForQueuedBuildings: Optional, if true, then doesnt choose a target if another engineer already has that target function ref assigned to build something
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
@@ -2045,7 +2050,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
         LOG('oEngineer='..oEngineer:GetUnitId()..GetEngineerUniqueCount(oEngineer))
     else
 
-        local iBuilderRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
+        local iBuilderRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance + math.min(oEngineer:GetBlueprint().SizeX, oEngineer:GetBlueprint().SizeZ)*0.5
         local iDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
         local bBuildNearToEnemy = false
         if iDistanceFromStart <= 80 then bBuildNearToEnemy = true end
@@ -2075,6 +2080,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
             if not(bMexHydroOrStorage) then
                 if iCatToBuildBy then
                     sBlueprintBuildBy = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCatToBuildBy, oEngineer)--, false, false)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Engineer position='..repr(oEngineer:GetPosition())..'; tTargetLocation='..repr(tTargetLocation)..'; iMaxAreaToSearch='..iMaxAreaToSearch) end
                     local oPossibleBuildingsToBuildBy = aiBrain:GetUnitsAroundPoint(iCatToBuildBy, tTargetLocation, iMaxAreaToSearch, 'Ally')
                     local iBuildingCount = 0
                     local tPossibleTargets = {}
@@ -2096,8 +2102,17 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                                 end
                             end
                         end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Found iBuildingCount='..iBuildingCount..' to build by') end
                     else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Cant find any buildings for adjacency, getting random location to build unless we want to build by a mex/hydro and have an unbuilt one nearby') end
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': Cant find any buildings for adjacency, getting random location to build unless we want to build by a mex/hydro and have an unbuilt one nearby')
+                            local tNearestBuildingOfCategory = aiBrain:GetUnitsAroundPoint(iCatToBuildBy, tTargetLocation, 10000, 'Ally')
+                            if M27Utilities.IsTableEmpty(tNearestBuildingOfCategory) then LOG(sFunctionRef..': Dont have any units of the desired category anywhere on map')
+                            else
+                                local oNearestBuildingOfCategory = M27Utilities.GetNearestUnit(tNearestBuildingOfCategory, oEngineer:GetPosition(), aiBrain)
+                                LOG(sFunctionRef..': Nearest unit of desired category is '..oNearestBuildingOfCategory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNearestBuildingOfCategory)..' which is '..M27Utilities.GetDistanceBetweenPositions(oNearestBuildingOfCategory:GetPosition(), oEngineer:GetPosition())..' away from the engineer')
+                            end
+                        end
                         bFindRandomLocation = true
                     end
                     --Also check for unbuilt buildings if dealing with a mex or hydro
@@ -2348,6 +2363,10 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel)
         iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
     elseif iActionToAssign == refActionSpare then
         iCategoryToBuild = nil
+    elseif iActionToAssign == refActionBuildT1Sonar then
+        iCategoryToBuild = M27UnitInfo.refCategoryT1Sonar
+    elseif iActionToAssign == refActionBuildT2Sonar then
+        iCategoryToBuild = M27UnitInfo.refCategoryT2Sonar
     else
         M27Utilities.ErrorHandler('Need to add code for action='..iActionToAssign)
     end
@@ -2767,6 +2786,8 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             elseif iActionToAssign == refActionBuildLandExperimental then
                                 bConsiderAdjacency = false
                             elseif iActionToAssign == refActionBuildMassStorage then
+                                bConsiderAdjacency = false
+                            elseif iActionToAssign == refActionBuildT1Sonar or iActionToAssign == refActionBuildT2Sonar then
                                 bConsiderAdjacency = false
                             else
                                 M27Utilities.ErrorHandler('Need to add code for action='..iActionToAssign)
@@ -3203,7 +3224,6 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
             M27Utilities.ErrorHandler('Couldnt find any buildings for Action '..(iActionRefToAssign or 'nil'))
         end
     else
-
         if M27Utilities.IsTableEmpty(tLocationsToGoThrough) == true then --No locations to go through
             if iActionRefToAssign == refActionBuildMex then M27Utilities.ErrorHandler('Likely error - should have mex location determined before calling the action') end
             if bDebugMessages == true then LOG(sFunctionRef..': Dont have existing locations to choose from, so pick location based on action') end
@@ -3220,6 +3240,47 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                 end
             elseif iActionRefToAssign == refActionReclaimTrees then
                 tActionLocation = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+            elseif iActionRefToAssign == refActionBuildT1Sonar or iActionRefToAssign == refActionBuildT2Sonar then
+                if bDebugMessages == true then LOG(sFunctionRef..': Want to build sonar, will try and find a water location along a line from us to enemy base') end
+                --Find water along the way from our base to the midpoint of the map that is pathable by an amphibious unit
+                local tPossiblePosition
+                local iT2SonarAdjust = 5
+                --local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                for iCurPath = 1, math.floor(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.05) do
+                    --Debug mode - draw valid location in gold, invalid locations in red
+                    tPossiblePosition = M27Utilities.MoveTowardsTarget(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], iCurPath * 10 + iT2SonarAdjust, 0)
+                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossiblePosition) == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] and not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossiblePosition) == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeLand]) then
+                        --Can path there amphibiously but not with land, is the locaiton water?
+                        if GetTerrainHeight(tPossiblePosition[1], tPossiblePosition[3]) < M27MapInfo.iMapWaterHeight then
+                            --Is underwater, so want to build around here
+                            if bDebugMessages == true then M27Utilities.DrawLocation(tPossiblePosition, nil, 4) end
+                            tActionLocation = tPossiblePosition
+                            break
+                        end
+                    end
+                    if bDebugMessages == true then M27Utilities.DrawLocation(tPossiblePosition, nil, 2) end
+                end
+                if M27Utilities.IsTableEmpty(tActionLocation) then
+                    --Try a (sort of) random location
+                    if bDebugMessages == true then LOG(sFunctionRef..': COuldnt find a location moving in a straight line so will try a random location') end
+                    local tBasePoint = M27Utilities.MoveTowardsTarget(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25, 0)
+                    for iDistanceAdjust = 50, 250, 50 do
+                        for iAngleAdjust = -2, 6 do
+                            tPossiblePosition = M27Utilities.MoveTowardsTarget(tBasePoint, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], iDistanceAdjust + iT2SonarAdjust, iAngleAdjust * 45)
+                            if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossiblePosition) == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] and not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossiblePosition) == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeLand]) then
+                                --Can path there amphibiously but not with land, is the locaiton water?
+                                if GetTerrainHeight(tPossiblePosition[1], tPossiblePosition[3]) < M27MapInfo.iMapWaterHeight then
+                                    --Is underwater, so want to build around here
+                                    if bDebugMessages == true then M27Utilities.DrawLocation(tPossiblePosition, nil, 4) end
+                                    tActionLocation = tPossiblePosition
+                                    break
+                                end
+                            end
+                            if bDebugMessages == true then M27Utilities.DrawLocation(tPossiblePosition, nil, 2) end
+                        end
+                    end
+                    if M27Utilities.IsTableEmpty(tActionLocation) then M27Utilities.ErrorHandler('Unable to find any water to build sonar on despite being able to path to enemy base only with amphibious units') end
+                end
             else
                 --First check if we are already building anything under this action (in which case want to assist it instead of building a new one)
                 if aiBrain[reftEngineerAssignmentsByActionRef] then
@@ -4529,8 +4590,27 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     iSearchRangeForNearestEngi = 75
                                 end
                             end
-                        elseif iCurrentConditionToTry == 26 then --SPARE ACTION
-                            --SPARE
+                        elseif iCurrentConditionToTry == 26 then --Sonar
+                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if we want sonar, aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 1)='..tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 1))) end
+                            if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 1)) then
+                                --Can get to enemy via amphib not land so must be a water map, so want sonar to detect subs if we dont already have it
+                                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySonar)='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySonar)) end
+                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySonar) == 0 then
+                                    iActionToAssign = refActionBuildT1Sonar
+                                    iMinEngiTechLevelWanted = 1
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiOurHighestAirFactoryTech]='..aiBrain[M27Overseer.refiOurHighestAirFactoryTech]..'; aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiTorpBombersWanted]='..aiBrain[M27AirOverseer.refiTorpBombersWanted]..'; aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Sonar)='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Sonar)) end
+                                    if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Sonar) == 0 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and aiBrain[M27AirOverseer.refiAirAANeeded] <= 0 and aiBrain[M27AirOverseer.refiTorpBombersWanted] <= 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Sonar) > 0 then
+                                        iActionToAssign = refActionBuildT2Sonar
+                                        iMinEngiTechLevelWanted = 2
+                                    end
+                                end
+                                if iActionToAssign then
+                                    iMaxEngisWanted = 1
+                                    iSearchRangeForNearestEngi = 1000
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will build sonar, action='..iActionToAssign) end
+                                end
+                            end
                         elseif iCurrentConditionToTry == 27 then --More reclaim (lower priority locations)
                             if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                             if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; iMassStoredRatio='..iMassStoredRatio..'; M27MapInfo.iMapTotalMass='..M27MapInfo.iMapTotalMass..'; aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]='..aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]) end

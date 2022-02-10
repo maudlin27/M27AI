@@ -58,6 +58,10 @@ refCategoryRadar = categories.STRUCTURE * categories.RADAR + categories.STRUCTUR
 refCategoryT1Radar = refCategoryRadar * categories.TECH1
 refCategoryT2Radar = refCategoryRadar * categories.TECH2
 refCategoryT3Radar = refCategoryRadar * categories.TECH3 --+ categories.OMNI * categories.TECH3 (dont need this as refcategoryradar already includes omni)
+refCategorySonar = categories.STRUCTURE * categories.SONAR
+refCategoryT1Sonar = refCategorySonar * categories.TECH1
+refCategoryT2Sonar = refCategorySonar * categories.TECH2
+refCategoryT3Sonar = refCategorySonar * categories.TECH3
 refCategoryStructure = categories.STRUCTURE - categories.WALL
 refCategoryUnitsWithOmni = categories.OMNI + categories.COMMAND + categories.OVERLAYOMNI
 

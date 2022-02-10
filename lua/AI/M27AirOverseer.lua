@@ -83,6 +83,8 @@ local refoAirAATarget = 'M27AirAirAATarget' --Interceptor target
 local reftTargetedByList = 'M27AirTargetedByList' --for interceptor target so can track mass value assigned to it, each entry is an air AA object assigned to target the unit
 local refbPartOfLargeAttack = 'M27AirPartOfLargeAttack' --True if part of large attack platoon (so dont want to treat it as available)
 local refiStrikeDamageAssigned = 'M27AirStrikeDamageAssigned'
+refoAirStagingAssigned = 'M27AirStagingAssigned' --Store against an air unit send to refuel, and it will track the air staging unit its been ordered to refuel at
+reftAssignedRefuelingUnits = 'M27AirRefuelingUnitsAssigned' --[x]  = UnitID + lifetimecount, returns air unit told to refuel here;Store against air staging unit to track the units assigned to refuel
 
 --Build order related
 refiExtraAirScoutsWanted = 'M27AirExtraAirScoutsWanted'
@@ -126,7 +128,6 @@ local reftLowFuelAir = 'M27AirLowFuelAir'
 
 refbOnAssignment = 'M27AirOnAssignment'
 reftIdleChecker = 'M27AirIdleChecker' --[x] is gametimeseconds where has been idle, so if its been idle but on assignment for >=2s then will treat as not on assignment
-local refbWillBeRefueling = 'M27AirWillBeRefueling'
 local refbSentRefuelCommand = 'M27AirSentRefuelCommand' --set to true when send an order to go into air staging; set to false 5s after sent an order to be unloaded
 local refiCyclesOnGroundWaitingToRefuel = 'M27AirCyclesOnGroundWaitingToRefuel' --if a unit was sent a refuel command and is sat on the ground then update this
 
@@ -274,7 +275,15 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
         IssueClearCommands({oAirUnit})
         IssueMove({oAirUnit}, M27Logic.GetNearestRallyPoint(aiBrain, oAirUnit:GetPosition()))
     end
+    --Refueling trackers:
+    oAirUnit[refbSentRefuelCommand] = false
+    if oAirUnit[refoAirStagingAssigned] then
+        if oAirUnit[refoAirStagingAssigned][reftAssignedRefuelingUnits] then oAirUnit[refoAirStagingAssigned][reftAssignedRefuelingUnits][oAirUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)] = nil end
+        oAirUnit[refoAirStagingAssigned] = nil
+    end
+
     if bDebugMessages == true then LOG(sFunctionRef..': refbOnAssignment='..tostring(oAirUnit[refbOnAssignment])) end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
 end
@@ -1055,7 +1064,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             for iUnit, oUnit in tAllAirOfType do
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
                 bUnitIsUnassigned = false
-                if bDebugMessages == true then LOG(sFunctionRef..'; iUnitType='..iUnitType..'; iUnit='..iUnit..'; LC='..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; checking if unit is dead and has fuel and whether its on assignment') end
+                if bDebugMessages == true then LOG(sFunctionRef..'; iUnitType='..iUnitType..'; iUnit='..iUnit..'; ID and LC='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; checking if unit is dead and has fuel and whether its on assignment; oUnit[refbSentRefuelCommand]='..tostring(oUnit[refbSentRefuelCommand] or false)) end
                 if not(oUnit.Dead) and oUnit.GetFractionComplete and oUnit:GetFractionComplete() == 1 then
                     if not(oUnit[refbSentRefuelCommand]) then
                         iFuelPercent = 0
@@ -1283,14 +1292,14 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                 end
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': Unit doesnt have an assignment') end
-                                if not(oUnit[refbWillBeRefueling]) then
+                                if not(oUnit[refbSentRefuelCommand]) then
                                     bUnitIsUnassigned = true
                                 else
                                     --Error check in case unit somehow gained full health and fuel
                                     if iFuelPercent >= 0.99 then
                                         if oUnit:GetHealthPercent() >= 0.99 then
                                             if bDebugMessages == true then LOG('Warning - Unit has its status as refueling, but its health and fuel percent are >=99%.  Will remove its status as refueling') end
-                                            oUnit[refbWillBeRefueling] = false
+                                            oUnit[refbSentRefuelCommand] = false
                                         end
                                     end
                                 end
@@ -1302,7 +1311,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                         ((M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy'))) or (M27UnitInfo.GetUnitTechLevel(oUnit) <=2 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oUnit:GetPosition(), 100, 'Enemy'))))  then
                                     iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
                                     aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
-                                    if bDebugMessages == true then LOG(sFunctionRef..': unit has low health or fuel so wont make it available; instead will add to list of units with low fuel; iCurUnitsWithLowFuel='..iCurUnitsWithLowFuel) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has low health or fuel so wont make it available; instead will add to list of units with low fuel; iCurUnitsWithLowFuel='..iCurUnitsWithLowFuel) end
                                 else
                                     iCurUnitsWithFuel = iCurUnitsWithFuel + 1
                                     aiBrain[sAvailableUnitRef][iCurUnitsWithFuel] = oUnit
@@ -1321,11 +1330,12 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                             oUnit[refbSentRefuelCommand] = false
                         else
                             --Is the unit sat on the ground for a while near air staging? If so then clear its flag as likely it got overridden
-                            if oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3]) <= 3 then
+                            --Air staging size z varies between 2.75 to 3
+                            if oUnit:GetPosition()[2] - GetSurfaceHeight(oUnit:GetPosition()[1], oUnit:GetPosition()[3]) <= 1 then
                                 oUnit[refiCyclesOnGroundWaitingToRefuel] = (oUnit[refiCyclesOnGroundWaitingToRefuel] or 0) + 1
-                                if oUnit[refiCyclesOnGroundWaitingToRefuel] >= 10 then
+                                if oUnit[refiCyclesOnGroundWaitingToRefuel] >= 20 then
                                     --Clear flag but also send unit back for refueling
-                                    oUnit[refbSentRefuelCommand] = false
+                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
                                     iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
                                     aiBrain[reftLowFuelAir][iCurUnitsWithLowFuel] = oUnit
                                 end
@@ -1362,96 +1372,94 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
             --Find nearest available air staging unit
             if bDebugMessages == true then LOG(sFunctionRef..': We have air staging so getting unit to refuel') end
             local bAlreadyTryingToRefuel = false
-            local bWaitBeforeRefueling
             local oNavigator, tCurTarget, tNearbyAirStaging
-            local tTargetPos, tUnitPosition, iDistanceToTarget, iDistanceToBase
-            local tOurStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+            local iAssignedUnits
+            local iCapacity
+            local bUpdateRefuelingUnits
+            local iLoopCount = 0
             for iStaging, oStaging in tAirStaging do
-                if not(oStaging.Dead) then
-                    local roomAvailable = false
-                    if not EntityCategoryContains(categories.CARRIER, oStaging) then
-                        roomAvailable = oStaging:TransportHasSpaceFor(tUnitsToRefuel[1])
+                if M27UnitInfo.IsUnitValid(oStaging) then
+                    --Estimate capacity (cant see in blueprint)
+                    if EntityCategoryContains(categories.STRUCTURE, oStaging) then iCapacity = 4
+                    elseif EntityCategoryContains(categories.EXPERIMENTAL * categories.CARRIER, oStaging) then iCapacity = 40
+                    else iCapacity = 1
                     end
-                    if roomAvailable then
 
-                        if bDebugMessages == true then LOG(sFunctionRef..': Air staging '..oStaging:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oStaging)..' has space; First refueling unit state='..M27Logic.GetUnitState(tUnitsToRefuel[1])) end
-                        for iUnit, oUnit in tUnitsToRefuel do
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit out of units to refuel, oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
-                            bWaitBeforeRefueling = false
-                            if EntityCategoryContains(refCategoryBomber, oUnit:GetUnitId()) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have a bomber, will update its targets, target number before update='..oUnit[refiCurTargetNumber]) end
-                                UpdateBomberTargets(oUnit)
-                                if bDebugMessages == true then LOG(sFunctionRef..': Bomber target number after update='..oUnit[refiCurTargetNumber]) end
-                                if oUnit[refiCurTargetNumber] > 0 then
-                                    --Is the target a long way away?
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Bomber has a target; refiCurTargetNumber='..oUnit[refiCurTargetNumber]..'; target list size='..table.getn(oUnit[reftTargetList])) end
-
-                                    tTargetPos = oUnit[reftTargetList][oUnit[refiCurTargetNumber]][refiShortlistUnit]:GetPosition()
-                                    tUnitPosition = oUnit:GetPosition()
-                                    iDistanceToTarget = M27Utilities.GetDistanceBetweenPositions(tTargetPos, tUnitPosition)
-                                    bWaitBeforeRefueling = true
-                                    if iDistanceToTarget >= 200 then
-                                        --Bombers have fuel use time of 400s, and max air speed of 10s; threshold for refueling is currently 25%, or 100s, meaning max distance in theory should be 1000
-                                        --Want margin of error though, so consider distance from target to our start
-                                        iDistanceToBase = M27Utilities.GetDistanceBetweenPositions(tTargetPos, tOurStartPosition)
-                                        if iDistanceToTarget + iDistanceToBase >= 500 then
-                                            bWaitBeforeRefueling = false
-                                        end
-                                    end
-                                end
-
-                                if bWaitBeforeRefueling then
-                                    --First time we're telling the bomber to refuel so send it home as a final action
-                                    IssueMove({oUnit}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                end
-                                if bDebugMessages == true then LOG(sFunctionRef..': bWaitBeforeRefueling='..tostring(bWaitBeforeRefueling)) end
-                            end
-                            oUnit[refbWillBeRefueling] = true
-
-                            if bWaitBeforeRefueling == false then
-                                bAlreadyTryingToRefuel = false
-                                if oUnit[refbSentRefuelCommand] and oUnit:IsUnitState('MovingDown') and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oStaging:GetPosition()) <= 80 then
-                                    bAlreadyTryingToRefuel = true
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Unit state indicates it is already refueling') end
+                    iAssignedUnits = 0
+                    if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) == false then
+                        for iRefuelingUnit, oRefuelingUnit in oStaging[reftAssignedRefuelingUnits] do
+                            if M27UnitInfo.IsUnitValid(oRefuelingUnit) == false or oRefuelingUnit[refbSentRefuelCommand] == false then
+                                oStaging[reftAssignedRefuelingUnits][iRefuelingUnit] = nil
+                            else
+                                --Is the unit already refueled and isnt flagged as being in air staging?
+                                if oRefuelingUnit:GetFuelRatio() >= 0.95 and oRefuelingUnit:GetHealthPercent() >= 0.98 and not(oRefuelingUnit:IsUnitState('Attached')) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oRefuelingUnit='..oRefuelingUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oRefuelingUnit)..'; appears to have refueld and isnt attached, unit state='..M27Logic.GetUnitState(oRefuelingUnit)..' so will clear refueling trakcers') end
+                                    oRefuelingUnit[refbSentRefuelCommand] = false
+                                    oStaging[reftAssignedRefuelingUnits][iRefuelingUnit] = nil
+                                    oRefuelingUnit[refoAirStagingAssigned] = nil
                                 else
-                                    --Check if current target is the refueling location
-                                    if oUnit.GetNavigator then
-                                        oNavigator = oUnit:GetNavigator()
-                                        if oNavigator.GetCurrentTargetPos then
-                                            tCurTarget = oNavigator:GetCurrentTargetPos()
-                                            tNearbyAirStaging = M27Utilities.GetOwnedUnitsAroundPoint(aiBrain, categories.AIRSTAGINGPLATFORM, tCurTarget, 2)
-                                            if M27Utilities.IsTableEmpty(tNearbyAirStaging) == false then
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef..' tCurTarget='..repr(tCurTarget))
-                                                    M27Utilities.DrawLocation(tCurTarget)
-                                                end
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Units target is the same as an air staging platform so think it is already trying to refuel') end
-                                                bAlreadyTryingToRefuel = true
-                                            end
-                                        end
-                                    end
-                                end
-                                if bDebugMessages == true then LOG(sFunctionRef..': bAlreadyTryingToRefuel='..tostring(bAlreadyTryingToRefuel)) end
-                                if not(bAlreadyTryingToRefuel) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' before telling it to go into the air staging unit') end
-                                    if M27Config.M27ShowUnitNames == true and oUnit.GetUnitId then M27PlatoonUtilities.UpdateUnitNames({oUnit}, oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..':Refueling') end
-                                    IssueClearCommands({ oUnit})
-                                    IssueTransportLoad({ oUnit }, oStaging)
-                                    oUnit[refbSentRefuelCommand] = true
-
-                                    --Reset trackers on the unit
-                                    for iUnit, oUnit in tUnitsToRefuel do
-                                        ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                                    end
+                                    iAssignedUnits = iAssignedUnits + 1
                                 end
                             end
                         end
-                    elseif bDebugMessages == true then LOG(sFunctionRef..': Air staging unit '..oStaging:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oStaging)..' has no space available')
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Air staging unit '..oStaging:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oStaging)..': iCapacity='..iCapacity..'; iAssignedUnits='..iAssignedUnits) end
+
+                    if iAssignedUnits < iCapacity then
+                        for iUnit, oUnit in tUnitsToRefuel do
+                            bAlreadyTryingToRefuel = false
+                            if M27UnitInfo.IsUnitValid(oUnit) then
+                                --Does the unit already have a target of the air staging and isnt flagged as having been sent a refuel command?
+                                if not(oUnit[refbSentRefuelCommand]) and oUnit.GetNavigator then
+                                    oNavigator = oUnit:GetNavigator()
+                                    if oNavigator.GetCurrentTargetPos then
+                                        tCurTarget = oNavigator:GetCurrentTargetPos()
+                                        tNearbyAirStaging = M27Utilities.GetOwnedUnitsAroundPoint(aiBrain, categories.AIRSTAGINGPLATFORM, tCurTarget, 1)
+                                        if M27Utilities.IsTableEmpty(tNearbyAirStaging) == false then
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef..' tCurTarget='..repr(tCurTarget))
+                                                M27Utilities.DrawLocation(tCurTarget)
+                                            end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Units target is the same as an air staging platform so think it is already trying to refuel') end
+                                            bAlreadyTryingToRefuel = true
+                                        end
+                                    end
+                                end
+                                if not(bAlreadyTryingToRefuel) then
+                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                                    IssueClearCommands({ oUnit})
+                                    IssueTransportLoad({ oUnit }, oStaging)
+                                    oUnit[refbSentRefuelCommand] = true
+                                    oUnit[refoAirStagingAssigned] = oStaging
+                                    if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) then oStaging[reftAssignedRefuelingUnits] = {} end
+                                    oStaging[reftAssignedRefuelingUnits][oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+                                    iAssignedUnits = iAssignedUnits + 1
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Sent command for oUnit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to refuel, iAssignedUnits='..iAssignedUnits) end
+                                    if iAssignedUnits >= iCapacity then break end
+                                end
+                            end
+                        end
+                        --Update units to refuel
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to update tUnitsToRefuel to remove units that have now been sent for refueling') end
+                        bUpdateRefuelingUnits = true
+                        while bUpdateRefuelingUnits do
+                            iLoopCount = iLoopCount + 1
+                            if iLoopCount >= 100 then M27Utilities.ErrorHandler('Infinite loop, iLoopCount='..iLoopCount) break end
+                            bUpdateRefuelingUnits = false
+                            for iUnit, oUnit in tUnitsToRefuel do
+                                if M27UnitInfo.IsUnitValid(oUnit) == false or oUnit[refbSentRefuelCommand] then
+                                    bUpdateRefuelingUnits = true
+                                    table.remove(tUnitsToRefuel, iUnit) break
+                                end
+                            end
+                        end
+                        if M27Utilities.IsTableEmpty(tUnitsToRefuel) then break end
                     end
                 end
             end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code; Is tUnitsToRefuel empty='..tostring(M27Utilities.IsTableEmpty(tUnitsToRefuel))) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -1475,7 +1483,7 @@ function RefuelIdleAirUnits(aiBrain)
         for _, oUnit in tAllAirUnits do
             bRefuelUnit = false
             if bDebugMessages == true then LOG(sFunctionRef..': Unit ID='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; unit fraction complete='..oUnit:GetFractionComplete()..'; oUnit[refbOnAssignment]='..tostring((oUnit[refbOnAssignment] or false))) end
-            if M27UnitInfo.IsUnitValid(oUnit) and not(oUnit[refbOnAssignment]) and M27Utilities.IsTableEmpty(oUnit[reftTargetList]) == true and M27Utilities.IsTableEmpty(oUnit[refiCurMovementPath]) == true and oUnit.GetFuelRatio and not(oUnit:IsUnitState('Attached')) then
+            if M27UnitInfo.IsUnitValid(oUnit) and not(oUnit[refbOnAssignment]) and not(oUnit[refbSentRefuelCommand]) and M27Utilities.IsTableEmpty(oUnit[reftTargetList]) == true and M27Utilities.IsTableEmpty(oUnit[refiCurMovementPath]) == true and oUnit.GetFuelRatio and not(oUnit:IsUnitState('Attached')) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Unit is available, will check its fuel and health; Fuel='..oUnit:GetFuelRatio()..'; Health='..oUnit:GetHealthPercent()) end
                 if oUnit:GetFuelRatio() <= iFuelThreshold then bRefuelUnit = true
                 elseif oUnit:GetHealthPercent() <= iHealthThreshold then bRefuelUnit = true end
@@ -1483,7 +1491,7 @@ function RefuelIdleAirUnits(aiBrain)
 
                 if bRefuelUnit == true then
                     --Are we on our side of the map?
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have a unit to refuel, checking if its on our side of the map; distance to our start='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Distance to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a unit to refuel='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..', checking if its on our side of the map; distance to our start='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Distance to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])) end
                     if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) then
                         iUnitsToRefuel = iUnitsToRefuel + 1
                         tUnitsToRefuel[iUnitsToRefuel] = oUnit
@@ -1499,7 +1507,8 @@ function RefuelIdleAirUnits(aiBrain)
         end
     end
     if iUnitsToRefuel > 0 then
-        OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
+        if bDebugMessages == true then LOG(sFunctionRef..': iUnitsToRefuel='..iUnitsToRefuel..'; calling function to order them to refuel') end
+        ForkThread(OrderUnitsToRefuel, aiBrain, tUnitsToRefuel)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -1539,7 +1548,7 @@ function ReleaseRefueledUnits(aiBrain)
                 if M27Utilities.IsTableEmpty(tRefuelingUnits) == false then
                     for iRefuelingUnit, oRefuelingUnit in tRefuelingUnits do
                         if not(oRefuelingUnit.Dead) then
-                            oRefuelingUnit[refbWillBeRefueling] = false
+                            oRefuelingUnit[refbSentRefuelCommand] = false
                             if bDebugMessages == true then LOG(sFunctionRef..': Have a unit refueling, checking tracker') end
                             bReadyToLeave = true
                             if bDebugMessages == true then LOG(sFunctionRef..': Have a unit refueling, checking its health and fuel') end
@@ -2376,7 +2385,7 @@ function IssueLargeBomberAttack(aiBrain, tBombers)
                         iAliveBombers = iAliveBombers + 1
                         UpdateBomberTargets(oBomber) --Checks if target is dead
                         if oBomber[refiCurTargetNumber] == nil or oBomber[refiCurTargetNumber] == 0 then
-                            if not(oBomber[refbWillBeRefueling]) then
+                            if not(oBomber[refbSentRefuelCommand]) then
                                 iBombersNeedingTargets = iBombersNeedingTargets + 1
                                 tBombersNeedingTargetsTracker[iBombersNeedingTargets] = {}
                                 tBombersNeedingTargetsTracker[iBombersNeedingTargets][refoTrackerUnit] = oBomber

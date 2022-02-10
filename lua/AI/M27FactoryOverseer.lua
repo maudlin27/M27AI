@@ -768,12 +768,29 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 2 then --Antinavy because enemy ACU is underwater
-                            if aiBrain[M27Overseer.refoLastNearestACU] and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) then
+                        elseif iCurrentConditionToTry == 2 then --Anti-air for ACU if there are enemy air units near it and we want to protect our ACU
+                            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and aiBrain[M27Overseer.refiMAAShortfallACUCore] > 0 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, M27Utilities.GetACU(aiBrain):GetPosition(), 100, 'Enemy')) == false then
+                                --want MAA for ACU
+                                --Can we path to ACU with amphib but not land? If so then only build MAA if it is amphibious
+                                local iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
+                                local iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+                                local iACUAmphibGroup, iACULandGroup
+                                iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27Utilities.GetACU(aiBrain):GetPosition())
+                                iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27Utilities.GetACU(aiBrain):GetPosition())
+                                if not(iOurBaseLandGroup == iACULandGroup) and iOurBaseAmphibGroup == iACUAmphibGroup then
+                                    iCategoryToBuild = M27UnitInfo.refCategoryAllAmphibiousAndNavy * M27UnitInfo.refCategoryMAA
+                                    iTotalWanted = aiBrain[M27Overseer.refiMAAShortfallACUCore]
+                                else
+                                    iCategoryToBuild = M27UnitInfo.refCategoryMAA
+                                    iTotalWanted = aiBrain[M27Overseer.refiMAAShortfallACUCore]
+                                end
+                            end
+                        elseif iCurrentConditionToTry == 3 then --Antinavy because enemy ACU/our ACU is underwater
+                            if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refoLastNearestACU] and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
                                 iCategoryToBuild = M27UnitInfo.refCategoryAntiNavy
                                 iTotalWanted = 1000
                             end
-                        elseif iCurrentConditionToTry == 3 then --Amphibious if cant path with land to enemy base or ACU
+                        elseif iCurrentConditionToTry == 4 then --Amphibious if cant path with land to enemy base or ACU
                             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then
                                 iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat
                                 iTotalWanted = 1000
@@ -782,20 +799,46 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 --GetSegmentGroupOfLocation(sPathing, tLocation)
                                 local iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
                                 local iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
-                                local iEnemyACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
-                                local iEnemyACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
-
-                                if not(iOurBaseLandGroup == iEnemyACULandGroup) and iOurBaseAmphibGroup == iEnemyACUAmphibGroup then
+                                local iACUAmphibGroup, iACULandGroup
+                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                                    iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
+                                    iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+                                else
+                                    iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27Utilities.GetACU(aiBrain):GetPosition())
+                                    iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27Utilities.GetACU(aiBrain):GetPosition())
+                                end
+                                --Get amphibious units if cant path with land to the ACU
+                                if not(iOurBaseLandGroup == iACULandGroup) and iOurBaseAmphibGroup == iACUAmphibGroup then
                                     iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat
+                                    iTotalWanted = 1000
+                                else
+                                    iCategoryToBuild = M27UnitInfo.refCategoryLandCombat
                                     iTotalWanted = 1000
                                 end
                             end
-                        elseif iCurrentConditionToTry == 4 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Will build normal land combat') end
+                        elseif iCurrentConditionToTry == 5 then --Land combat if protecting our ACU and its near our base, even if cant path to it yet
+                            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27Utilities.GetACU(aiBrain):GetPosition()) <= 150 then
+                                iCategoryToBuild = M27UnitInfo.refCategoryLandCombat
+                                iTotalWanted = 1000
+                            end
+                        elseif iCurrentConditionToTry == 6 then --Antiair
+                            if aiBrain[M27Overseer.refbNeedMAABuilt] or aiBrain[M27Overseer.refiMAAShortfallBase] + aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] + aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution] > 0 then
+                                iCategoryToBuild = M27UnitInfo.refCategoryMAA
+                                iTotalWanted = math.max(1, aiBrain[M27Overseer.refiMAAShortfallBase] + aiBrain[M27Overseer.refiMAAShortfallLargePlatoons] + aiBrain[M27Overseer.refiMAAShortfallACUCore] + aiBrain[M27Overseer.refiMAAShortfallACUPrecaution])
+                            end
+                        elseif iCurrentConditionToTry == 7 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will build engineers if we have lots of mass') end
+                            if M27Conditions.HaveLowMass(aiBrain) == false and aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 then
+                                iCategoryToBuild = M27UnitInfo.refCategoryEngineer
+                                iTotalWanted = math.max(1, aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted])
+                            end
+                        elseif iCurrentConditionToTry == 8 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
+                            --Even if cant path to ACU, can path to enemy base, so build land combat as ACU may just be in water near land
                             iCategoryToBuild = M27UnitInfo.refCategoryLandCombat
-                            iTotalWanted = 1000
+                            iTotalWanted = 10000
                         else
-                            M27Utilities.ErrorHandler('Somehow cant build anything')
+                            if bDebugMessages == true then LOG(sFunctionRef..': Cant build anything when in protect ACU mode') end
+                            if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then M27Utilities.ErrorHandler('Somehow cant build anything despite enemy base being land pathable') end
                             break
                         end
                     else
@@ -1067,9 +1110,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         if iExistingEngis > aiBrain[refiEngineerCap] then iCategoryToBuild = nil
                         elseif iExistingEngis > aiBrain[reftiEngineerLowMassCap][iFactoryTechLevel] and aiBrain:GetEconomyStored('MASS') <= 50 then iCategoryToBuild = nil
                         elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1 and iFactoryTechLevel < aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] then
-                            if iFactoryTechLevel == 1 then
-                                if iExistingEngis > aiBrain[refiEngineerCap] * 0.5 then iCategoryToBuild = nil end
-                            elseif iExistingEngis > aiBrain[refiEngineerCap] * 0.75 then iCategoryToBuild = nil end
+                            --Dealing with factory below our highest level; Use an engineer cap of the current cap or if lower 20 (i.e. 20 of current and higher tech level)
+                            if iExistingEngis > math.min(aiBrain[refiEngineerCap] * 0.5, 20) then iCategoryToBuild = nil end
                         end
                     end
                 elseif iCategoryToBuild == refCategoryIndirect then
