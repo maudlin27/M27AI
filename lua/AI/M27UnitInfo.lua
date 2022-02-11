@@ -29,6 +29,8 @@ refbPaused = 'M27UnitPaused' --true if paused due to poewr stall manager
 refbRecentlyDealtDamage = 'M27UnitRecentlyDealtDamage' --true if dealt damage in last 5s
 refiGameTimeDamageLastDealt = 'M27UnitTimeLastDealtDamage'
 refoFactoryThatBuildThis = 'M27UnitFactoryThatBuildThis'
+refbFullyUpgraded = 'M27UnitFullyUpgraded' --used on ACU to avoid running some checks every time it wants an upgrade
+refbRecentlyRemovedHealthUpgrade = 'M27UnitRecentlyRemovedHealthUpgrade' --Used on ACU to flag if e.g. we removed T2 which will decrease our health
 
 --Factions
 refFactionUEF = 1

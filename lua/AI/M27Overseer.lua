@@ -26,6 +26,7 @@ tAllAIBrainsByArmyIndex = {} --Stores table of all aiBrains, used as sometimes a
 refiDistanceToNearestEnemyBase = 'M27DistanceToNearestEnemy' --Distance from our base to the nearest enemy base
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
+toAllyBrains = 'M27OverseerAllyBrains'
 iACUDeathCount = 0
 iACUAlternativeFailureCount = 0
 iDistanceFromBaseToBeSafe = 55 --If ACU wants to run (<50% health) then will think its safe once its this close to our base
@@ -92,10 +93,12 @@ refbUnclaimedMexNearACU = 'M27UnclaimedMexNearACU'
 refoReclaimNearACU = 'M27ReclaimObjectNearACU'
 refiScoutShortfallInitialRaider = 'M27ScoutShortfallRaider'
 refiScoutShortfallACU = 'M27ScoutShortfallACU'
+refiScoutShortfallPriority = 'M27ScoutShortfallPriority'
 refiScoutShortfallIntelLine = 'M27ScoutShortfallIntelLine'
 refiScoutShortfallLargePlatoons = 'M27ScoutShortfallLargePlatoon'
 refiScoutShortfallAllPlatoons = 'M27ScoutShortfallAllPlatoon'
 refiScoutShortfallMexes = 'M27ScoutShortfallMexes'
+reftPriorityLandScoutTargets = 'M27ScoutPriorityTargets'
 
 refiMAAShortfallACUPrecaution = 'M27MAAShortfallACUPrecaution'
 refiMAAShortfallACUCore = 'M27MAAShortfallACUCore'
@@ -147,7 +150,7 @@ refiOurHighestAirFactoryTech = 'M27OverseerOurHighestAirFactoryTech'
 
 
 --Helper related
-refoUnitsScoutHelperPlatoon = 'M27UnitsScoutHelper'
+refoScoutHelper = 'M27UnitsScoutHelper'
 refoUnitsMAAHelper = 'M27UnitsMAAHelper' --MAA platoon assigned to help a unit (e.g. the ACU)
 
 
@@ -606,6 +609,7 @@ function RecordIntelPaths(aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': Pathing not complete yet, so will assume we need a scout for every category') end
             aiBrain[refiScoutShortfallInitialRaider] = 1
             aiBrain[refiScoutShortfallACU] = 1
+            aiBrain[refiScoutShortfallPriority] = 1
             aiBrain[refiScoutShortfallIntelLine] = 1
             aiBrain[refbNeedScoutPlatoons] = true
         end
@@ -627,7 +631,7 @@ function GetNearestMAAOrScout(aiBrain, tPosition, bScoutNotMAA, bDontTakeFromIni
     local iUnitCategoryWanted, sPlatoonHelperRef
     if bScoutNotMAA == true then
         iUnitCategoryWanted = M27UnitInfo.refCategoryLandScout
-        sPlatoonHelperRef = refoUnitsScoutHelperPlatoon
+        sPlatoonHelperRef = refoScoutHelper
     else
         iUnitCategoryWanted = M27UnitInfo.refCategoryMAA
         sPlatoonHelperRef = refoUnitsMAAHelper
@@ -761,7 +765,7 @@ function AssignHelperToPlatoonOrUnit(oHelperToAssign, oPlatoonOrUnitNeedingHelp,
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local aiBrain = oHelperToAssign:GetAIBrain()
     local sPlanWanted = 'M27ScoutAssister'
-    local refHelper = refoUnitsScoutHelperPlatoon
+    local refHelper = refoScoutHelper
     local bUnitNotPlatoon = false
     if oPlatoonOrUnitNeedingHelp.PlatoonHandle or oPlatoonOrUnitNeedingHelp.GetUnitId then bUnitNotPlatoon = true end
     if bScoutNotMAA == false then
@@ -1121,6 +1125,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                 M27Utilities.ErrorHandler('Warning possible error unless large map or lots of small platoons - more than 25 scouts, but only '..iNonScouts..' non-scouts; iScouts='..iScouts..'; turning on debug messages.  Still stop producing scouts if get to 100')
                 aiBrain[refiScoutShortfallInitialRaider] = 0
                 aiBrain[refiScoutShortfallACU] = 0
+                aiBrain[refiScoutShortfallPriority] = 0
                 aiBrain[refiScoutShortfallIntelLine] = 0
                 aiBrain[refiScoutShortfallLargePlatoons] = 0
                 aiBrain[refiScoutShortfallAllPlatoons] = 0
@@ -1132,6 +1137,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
     if bAbort == false then
         local oArmyPoolPlatoon, tArmyPoolScouts
         if iScouts > 0 then
+            local oScoutToGive
             --============Initial mex raider scouts-----------------------
             --Check initial raiders have scouts (1-off at start of game)
             if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] == nil then aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] = {} end
@@ -1163,15 +1169,15 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                             local tRaiderScouts = EntityCategoryFilterDown(refCategoryLandScout, tRaiders)
                                             local bHaveScout = false
                                             if M27Utilities.IsTableEmpty(tRaiderScouts) == false then bHaveScout = true
-                                            elseif oPlatoon[refoUnitsScoutHelperPlatoon] then
-                                                tRaiderScouts = oPlatoon[refoUnitsScoutHelperPlatoon]:GetPlatoonUnits()
+                                            elseif oPlatoon[refoScoutHelper] then
+                                                tRaiderScouts = oPlatoon[refoScoutHelper]:GetPlatoonUnits()
                                                 if M27Utilities.IsTableEmpty(tRaiderScouts) == false then bHaveScout = true end
                                             end
                                             if bHaveScout == false then
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Raider platoon'..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]..' doesnt have any scouts, seeing if we can give it a scout') end
                                                 --Platoon doesnt have a scout - can we give it one?
                                                 local tPlatoonPosition = M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)
-                                                local oScoutToGive = GetNearestMAAOrScout(aiBrain, tPlatoonPosition, true, true, true)
+                                                oScoutToGive = GetNearestMAAOrScout(aiBrain, tPlatoonPosition, true, true, true)
                                                 if oScoutToGive == nil then oScoutToGive = GetNearestMAAOrScout(aiBrain, tPlatoonPosition, true, true, false) end
                                                 if oScoutToGive == nil then iRaiderScoutsMissing = iRaiderScoutsMissing + 1
                                                 else
@@ -1201,6 +1207,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                 if bDebugMessages == true then LOG(sFunctionRef..': iAvailableScouts='..iAvailableScouts..'; not enough for intiial raider so will flag as having shortfall') end
                 if aiBrain[refiScoutShortfallInitialRaider] < 1 then aiBrain[refiScoutShortfallInitialRaider] = -iAvailableScouts end --redundancy/backup - shouldnt need due to above
                 aiBrain[refiScoutShortfallACU] = 1
+                aiBrain[refiScoutShortfallPriority] = 1
                 aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Have enough scouts for initial raiders so will set shortfall to 0; if available scouts is 0 then will flag acu has shortfall. iAvailableScouts='..iAvailableScouts) end
@@ -1208,6 +1215,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                 if iAvailableScouts == 0 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont ahve any more available scouts so setting shortfall to 1 for ACU') end
                     aiBrain[refiScoutShortfallACU] = 1
+                    aiBrain[refiScoutShortfallPriority] = 1
                     aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
                 else --Have at least 1 available scout
                     if bDebugMessages == true then LOG(sFunctionRef..': Have at least 1 available scout so will assign to ACU') end
@@ -1215,14 +1223,14 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                     --===========ACU Scout helper--------------------------
                     --We have more than enough scouts to cover initial raiders; next priority is the ACU
                     local bACUNeedsScoutHelper = true
-                    if not(M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon] == nil) then
+                    if not(M27Utilities.GetACU(aiBrain)[refoScoutHelper] == nil) then
                         --A scout helper was assigned, check if it still exists
-                        if M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon] and aiBrain:PlatoonExists(M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon]) then
+                        if M27Utilities.GetACU(aiBrain)[refoScoutHelper] and aiBrain:PlatoonExists(M27Utilities.GetACU(aiBrain)[refoScoutHelper]) then
                             --Platoon still exists; does it have the right aiplan?
-                            local sScoutHelperName = M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon]:GetPlan()
+                            local sScoutHelperName = M27Utilities.GetACU(aiBrain)[refoScoutHelper]:GetPlan()
                             if sScoutHelperName and sScoutHelperName == 'M27ScoutAssister' then
                                 --does it have a scout in it?
-                                local tACUScout = M27Utilities.GetACU(aiBrain)[refoUnitsScoutHelperPlatoon]:GetPlatoonUnits()
+                                local tACUScout = M27Utilities.GetACU(aiBrain)[refoScoutHelper]:GetPlatoonUnits()
                                 if M27Utilities.IsTableEmpty(tACUScout) == false then
                                     if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(refCategoryLandScout, tACUScout)) == false then
                                         bACUNeedsScoutHelper = false
@@ -1233,7 +1241,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                     end
                     if bACUNeedsScoutHelper == true then
                         --Assign a scout if we have any available; as its the ACU we want the nearest scout of any platoon (except initial raiders with count of 1 or 2)
-                        local oScoutToGive = GetNearestMAAOrScout(aiBrain, M27Utilities.GetACU(aiBrain):GetPosition(), true, true, false)
+                        oScoutToGive = GetNearestMAAOrScout(aiBrain, M27Utilities.GetACU(aiBrain):GetPosition(), true, true, false)
 
                         if not(oScoutToGive == nil) then
                             AssignHelperToPlatoonOrUnit(oScoutToGive, M27Utilities.GetACU(aiBrain), true)
@@ -1244,6 +1252,41 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                     aiBrain[refiScoutShortfallACU] = 0
                     if bDebugMessages == true then LOG(sFunctionRef..': Finished assining to ACU, aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]) end
 
+                    --Priority scout locations (e.g. mexes under attack from unseen enemy) - update the list
+                    local iPriorityTargets = 0
+                    if M27Utilities.IsTableEmpty(aiBrain[reftPriorityLandScoutTargets]) == false then
+                        for iPriorityTarget, oPriorityTarget in aiBrain[reftPriorityLandScoutTargets] do
+                            if M27UnitInfo.IsUnitValid(oPriorityTarget) then
+                                iPriorityTargets = iPriorityTargets + 1
+                            else
+                                aiBrain[reftPriorityLandScoutTargets][iPriorityTarget] = nil
+                            end
+                        end
+                    end
+
+
+                    if iAvailableScouts > 0 then
+                        if iPriorityTargets == 0 then aiBrain[refiScoutShortfallPriority] = 0
+                        else
+                            --do all of the priority targets have a scout assigned?
+                            for iPriorityTarget, oPriorityTarget in aiBrain[reftPriorityLandScoutTargets] do
+                                if not(M27UnitInfo.IsUnitValid(oPriorityTarget[refoScoutHelper])) then
+                                    --Need a scout, can take from most places
+                                    oScoutToGive = GetNearestMAAOrScout(aiBrain, oPriorityTarget:GetPosition(), true, true, false)
+                                    if oScoutToGive then
+                                        AssignHelperToPlatoonOrUnit(oScoutToGive, oPriorityTarget, true)
+                                        iAvailableScouts = iAvailableScouts - 1
+                                        iPriorityTargets = iPriorityTargets - 1
+                                    else
+                                        aiBrain[refiScoutShortfallPriority] = iPriorityTargets
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    else
+                        aiBrain[refiScoutShortfallPriority] = iPriorityTargets
+                    end
 
                     --==========Intel Line manager
                     if iAvailableScouts <= 0 then
@@ -1464,7 +1507,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                         local tBasePathPosition = aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]][1]
                         local iNewIntelPlatoonsNeeded = iScoutsWanted - iIntelPlatoons
                         if iNewIntelPlatoonsNeeded > iAvailableScouts then iNewIntelPlatoonsNeeded = iAvailableScouts end
-                        local oScoutToGive, oNewScoutPlatoon
+                        local oNewScoutPlatoon
                         local iCount = 0
                         while iNewIntelPlatoonsNeeded > 0 do
                             iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
@@ -1633,8 +1676,8 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                         local bPlatoonHasScouts = false
                                         tPlatoonCurrentScouts = EntityCategoryFilterDown(refCategoryLandScout, tPlatoonUnits)
                                         if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then bPlatoonHasScouts = true
-                                        elseif oPlatoon[refoUnitsScoutHelperPlatoon] and oPlatoon[refoUnitsScoutHelperPlatoon].GetPlatoonUnits then
-                                            tPlatoonCurrentScouts = oPlatoon[refoUnitsScoutHelperPlatoon]:GetPlatoonUnits()
+                                        elseif oPlatoon[refoScoutHelper] and oPlatoon[refoScoutHelper].GetPlatoonUnits then
+                                            tPlatoonCurrentScouts = oPlatoon[refoScoutHelper]:GetPlatoonUnits()
                                             if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then bPlatoonHasScouts = true end
                                         end
                                         if bPlatoonHasScouts == false then
@@ -1677,7 +1720,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                 if iLargePlatoonsMissingScouts + iSmallPlatoonMissingScouts > 0 then
                     aiBrain[refiScoutShortfallMexes] = 1
                 else
---========MEXES
+--========MEXES (non-urgent)
                     --Assign scouts to every mex on our side of the map that is land pathable to our start
                     --local iStartPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                     --local sLocationRef
@@ -1749,6 +1792,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': No scouts so will set as needing more scouts for ACU and initial raider') end
             aiBrain[refiScoutShortfallInitialRaider] = aiBrain[refiInitialRaiderPlatoonsWanted]
             aiBrain[refiScoutShortfallACU] = 1
+            aiBrain[refiScoutShortfallPriority] = 1
             aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
         end
     end
@@ -3491,6 +3535,12 @@ function ACUManager(aiBrain)
                 if oACU[reftACURecentUpgradeProgress][iCurTime - 10] == nil and oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] > 1000 and oACU[reftACURecentUpgradeProgress][iCurTime] < 0.7 then
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU has lost a lot of health recently, oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]) end
                     bCancelUpgradeAndRun = true
+                    --Is the reason for the health loss because we removed T2 upgrade (e.g. sera)? Note - if changing the time frame from 10s above, need to change the delay variable reset on the upgrade in platoonutilities (currently 11s)
+                    if oACU[M27UnitInfo.refbRecentlyRemovedHealthUpgrade] and (oACU:GetHealthPercent() >= 0.99 or oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] < 3000) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': We recently removed an upgrade that increased our health and have good health or health loss less than 3k') end
+                        bCancelUpgradeAndRun = false
+                    end
+
                 elseif oACU[reftACURecentUpgradeProgress][iCurTime] < 0.9 then
 
                     --Based on how our health has changed over the last 10s vs the upgrade progress, are we likely to die?
@@ -4444,16 +4494,19 @@ function SwitchSoMexesAreNeverIgnored(aiBrain, iDelayInSeconds)
     aiBrain[refiIgnoreMexesUntilThisManyUnits] = 0
 end
 
-function RecordAllEnemies(aiBrain)
+function RecordAllEnemiesAndAllies(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'RecordAllEnemies'
+    local sFunctionRef = 'RecordAllEnemiesAndAllies'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of attempt to get backup list of enemies, will wait 5 seconds first') end
     WaitSeconds(5)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iOurIndex = aiBrain:GetArmyIndex()
     local iEnemyCount = 0
+    local iAllyCount = 0
     local iArmyIndex
     if M27Utilities.IsTableEmpty(ArmyBrains) == false then
+        aiBrain[toEnemyBrains] = {}
+        aiBrain[toAllyBrains] = {}
         for iCurBrain, oBrain in ArmyBrains do
             iArmyIndex = oBrain:GetArmyIndex()
             tAllAIBrainsByArmyIndex[iArmyIndex] = oBrain
@@ -4461,6 +4514,9 @@ function RecordAllEnemies(aiBrain)
                 iEnemyCount = iEnemyCount + 1
                 aiBrain[toEnemyBrains][iArmyIndex] = oBrain
                 if bDebugMessages == true then LOG(sFunctionRef..': aiBrain Index='..aiBrain:GetArmyIndex()..'; enemy index='..iArmyIndex..'; recording as an enemy; start position number='..oBrain.M27StartPositionNumber..'; start position='..repr(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])) end
+            elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not(oBrain == aiBrain) then
+                iAllyCount = iAllyCount + 1
+                aiBrain[toAllyBrains][iArmyIndex] = oBrain
             end
         end
     else
@@ -4469,6 +4525,9 @@ function RecordAllEnemies(aiBrain)
                 iEnemyCount = iEnemyCount + 1
                 aiBrain[toEnemyBrains][oBrain:GetArmyIndex()] = oBrain
                 if bDebugMessages == true then LOG(sFunctionRef..': aiBrain Index='..aiBrain:GetArmyIndex()..'; enemy index='..iArmyIndex..'; recording as an enemy; start position number='..oBrain.M27StartPositionNumber..'; start position='..repr(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])) end
+            elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not(oBrain == aiBrain) then
+                iAllyCount = iAllyCount + 1
+                aiBrain[toAllyBrains][iArmyIndex] = oBrain
             end
         end
     end
@@ -4534,6 +4593,7 @@ function OverseerInitialisation(aiBrain)
     --Intel BO related:
     aiBrain[refiScoutShortfallInitialRaider] = 1
     aiBrain[refiScoutShortfallACU] = 1
+    aiBrain[refiScoutShortfallPriority] = 1
     aiBrain[refiScoutShortfallIntelLine] = 1
     aiBrain[refiScoutShortfallLargePlatoons] = 1
     aiBrain[refiScoutShortfallAllPlatoons] = 1
@@ -4586,6 +4646,7 @@ function OverseerInitialisation(aiBrain)
 
     --Nearest enemy and ACU and threat
     aiBrain[toEnemyBrains] = {}
+    aiBrain[toAllyBrains] = {}
     iPreviousNearestEnemyIndex = M27Logic.GetNearestEnemyIndex(aiBrain, false)
     aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iPreviousNearestEnemyIndex)])
     aiBrain[reftLastNearestACU] = M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iPreviousNearestEnemyIndex)]
@@ -4615,7 +4676,7 @@ function OverseerInitialisation(aiBrain)
 
     ForkThread(SwitchSoMexesAreNeverIgnored, aiBrain, 210) --e.g. on theta passage around the 3m mark raiders might still be coming across engis, so this gives extra 30s of engi hunting time
 
-    ForkThread(RecordAllEnemies, aiBrain)
+    ForkThread(RecordAllEnemiesAndAllies, aiBrain)
 
     ForkThread(RefreshMexPositions, aiBrain)
 

@@ -587,6 +587,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                         end
                     end
                     if oOverchargeTarget == nil then
+                        --NOTE: Not using unitinfo category below as want to include walls (as realised inadvertently introduced anti-wall protection for ACU)
                         local tEnemyPossibleTargets = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE + categories.STRUCTURE - categories.COMMAND - categories.FACTORY * categories.STRUCTURE, tUnitPosition, iACURange, 'Enemy')
                         local tNearbyEnemiesToTarget
                         local iMaxUnitsInArea = 0

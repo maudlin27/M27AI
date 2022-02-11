@@ -126,7 +126,7 @@ function SafeToGetACUUpgrade(aiBrain)
                     local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
                     if iDistToEnemy > 90 or iDistToEnemy > M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                         local bNearbyScout = false
-                        if oACU[M27Overseer.refoUnitsScoutHelperPlatoon] and M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoUnitsScoutHelperPlatoon][M27PlatoonUtilities.refoFrontUnit]) and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoUnitsScoutHelperPlatoon]), tACUPos) <= math.max(8, oACU[M27Overseer.refoUnitsScoutHelperPlatoon][M27PlatoonUtilities.refoFrontUnit]:GetBlueprint().Intel.RadarRadius - iSearchRange) then bNearbyScout = true end
+                        if oACU[M27Overseer.refoScoutHelper] and M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoScoutHelper][M27PlatoonUtilities.refoFrontUnit]) and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoScoutHelper]), tACUPos) <= math.max(8, oACU[M27Overseer.refoScoutHelper][M27PlatoonUtilities.refoFrontUnit]:GetBlueprint().Intel.RadarRadius - iSearchRange) then bNearbyScout = true end
                         if bNearbyScout or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iSearchRange) == true then
                             --Are there enemies near the ACU with a threat value?
                             tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllNonAirScoutUnits, tACUPos, iSearchRange, 'Enemy')
@@ -135,8 +135,8 @@ function SafeToGetACUUpgrade(aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': Have intel coverage, iThreat='..iThreat..'; bIsSafe='..tostring(bIsSafe)) end
                         elseif bDebugMessages == true then
                             LOG(sFunctionRef..': Dont have intel coverage of ACU')
-                            if oACU[M27Overseer.refoUnitsScoutHelperPlatoon] then
-                                LOG('Distance of assigned scout to ACU='..M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoUnitsScoutHelperPlatoon]), tACUPos))
+                            if oACU[M27Overseer.refoScoutHelper] then
+                                LOG('Distance of assigned scout to ACU='..M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoScoutHelper]), tACUPos))
                             else
                                 LOG('Scout helper isnt a valid platoon')
                             end
@@ -271,7 +271,7 @@ function NoEnemyUnitsNearACU(aiBrain, iMaxSearchRange, iMinSearchRange)
     local bHaveIntelCoverage = false
     --Do we have a nearby scout, or if not do we have intel coverage of the position?
 
-    if (oACU[M27Overseer.refoUnitsScoutHelperPlatoon] and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoUnitsScoutHelperPlatoon]), tACUPos) <= math.max(2, M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitsScoutHelperPlatoon][M27PlatoonUtilities.refoFrontUnit]:GetBlueprint().Intel.RadarRadius - iMinSearchRange)) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iMinSearchRange) == true then bHaveIntelCoverage = true end
+    if (oACU[M27Overseer.refoScoutHelper] and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoScoutHelper]), tACUPos) <= math.max(2, M27Utilities.GetACU(aiBrain)[M27Overseer.refoScoutHelper][M27PlatoonUtilities.refoFrontUnit]:GetBlueprint().Intel.RadarRadius - iMinSearchRange)) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iMinSearchRange) == true then bHaveIntelCoverage = true end
     if bHaveIntelCoverage == false then bNoEnemyUnits = false
     else
         local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, tACUPos, iMaxSearchRange, 'Enemy')

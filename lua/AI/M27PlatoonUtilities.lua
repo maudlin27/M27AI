@@ -2245,7 +2245,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                     else
                                                         local iIntelCoverage
                                                         --If ACU in platoon, then check if it has a scout assigned that is close enough (for CPU performance reasons only want to call getintelcoverage if we dont)
-                                                        if oPlatoon[refbACUInPlatoon] and oPlatoon[refoFrontUnit] and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit][M27Overseer.refoUnitsScoutHelperPlatoon]) then iIntelCoverage = oPlatoon[refoFrontUnit][M27Overseer.refoUnitsScoutHelperPlatoon]:GetBlueprint().Intel.RadarRadius - M27Utilities.GetDistanceBetweenPositions(oPlatoon[refoFrontUnit][M27Overseer.refoUnitsScoutHelperPlatoon]:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) end
+                                                        if oPlatoon[refbACUInPlatoon] and oPlatoon[refoFrontUnit] and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit][M27Overseer.refoScoutHelper]) then iIntelCoverage = oPlatoon[refoFrontUnit][M27Overseer.refoScoutHelper]:GetBlueprint().Intel.RadarRadius - M27Utilities.GetDistanceBetweenPositions(oPlatoon[refoFrontUnit][M27Overseer.refoScoutHelper]:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) end
                                                         if not(iIntelCoverage) or iIntelCoverage < math.max(iEnemyMaxRange, 22) then iIntelCoverage = M27Logic.GetIntelCoverageOfPosition(aiBrain, tPlatoonPosition, nil) end
                                                         if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..': We outrange nearest enemy, checking our intel coverage, iIntelCoverage='..iIntelCoverage) end
                                                         if iIntelCoverage >= math.max(iEnemyMaxRange, 22) then --ACU has range of 22 (no gun) and vision of 26, so want to have intel coverage of at least this before consider other actions
@@ -3726,23 +3726,28 @@ function DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-    if M27Conditions.DoesACUHaveGun(aiBrain, true) == false then
-        if bDebugMessages == true then LOG(sFunctionRef..': ACU doesnt have gun, checking if we want to get the upgrade now') end
-        if M27Conditions.WantToGetGunUpgrade(aiBrain) == true then
-            if bDebugMessages == true then LOG(sFunctionRef..': Want to get the gun upgrade now') end
-            oPlatoon[refiCurrentAction] = refActionUpgrade
+    if not(M27Utilities.GetACU(aiBrain)[M27UnitInfo.refbFullyUpgraded]) then
+        if bDebugMessages == true then LOG(sFunctionRef..': ACU not fully upgraded; does ACU have enhancement blastattack='..tostring(M27Utilities.GetACU(aiBrain):HasEnhancement('BlastAttack'))) end
+        if M27Conditions.DoesACUHaveGun(aiBrain, true) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': ACU doesnt have gun, checking if we want to get the upgrade now') end
+            if M27Conditions.WantToGetGunUpgrade(aiBrain) == true then
+                if bDebugMessages == true then LOG(sFunctionRef..': Want to get the gun upgrade now') end
+                oPlatoon[refiCurrentAction] = refActionUpgrade
+            end
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..': Have gun upgrade, checking if we want to get the next upgrade') end
+            local bWantUpgrade, bSafeToUpgrade = M27Conditions.WantToGetAnotherACUUpgrade(aiBrain)
+            if bWantUpgrade then
+                if bDebugMessages == true then LOG(sFunctionRef..': Want to get the next upgrade') end
+                oPlatoon[refiCurrentAction] = refActionUpgrade
+            elseif bSafeToUpgrade == false then
+                --Only reason we're not upgrading is because its not safe - return towards nearest rally point
+                oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                oPlatoon[refbHavePreviouslyRun] = true
+            end
         end
     else
-        if bDebugMessages == true then LOG(sFunctionRef..': Have gun upgrade, checking if we want to get the next upgrade') end
-        local bWantUpgrade, bSafeToUpgrade = M27Conditions.WantToGetAnotherACUUpgrade(aiBrain)
-        if bWantUpgrade then
-            if bDebugMessages == true then LOG(sFunctionRef..': Want to get the next upgrade') end
-            oPlatoon[refiCurrentAction] = refActionUpgrade
-        elseif bSafeToUpgrade == false then
-            --Only reason we're not upgrading is because its not safe - return towards nearest rally point
-            oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
-            oPlatoon[refbHavePreviouslyRun] = true
-        end
+        if bDebugMessages == true then LOG(sFunctionRef..': ACU is fully upgraded so wont try and get an upgrade') end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -3783,35 +3788,48 @@ function GetACUUpgradeWanted(aiBrain, oACU)
         elseif iFactionRef == M27UnitInfo.refFactionAeon then
             tUpgradesWanted = {'Shield'}
         elseif iFactionRef == M27UnitInfo.refFactionSeraphim then
-            --Want damagestabilization before blast attack, as blast attack removes advanced engineering
-            tUpgradesWanted = {'AdvancedEngineering', 'DamageStabilization', 'DamageStabilizationAdvanced', 'BlastAttack'}
+            --Want damagestabilization before blast attack, as blast attack removes advanced engineering; dont want advanced engineering if we already have blast attack
+            --[[if oACU:HasEnhancement('BlastAttack') then
+                tUpgradesWanted = nil
+            else--]]
+                tUpgradesWanted = {'AdvancedEngineering', 'DamageStabilization', 'DamageStabilizationAdvanced', 'BlastAttack'}
+            --end
         else M27Utilities.ErrorHandler('Dont recognise the ACU faction so wont be getting any further upgrades', nil, true)
         end
 
         if bDebugMessages == true then LOG(sFunctionRef..': ACU has gun; tUpgradesWanted='..repr(tUpgradesWanted)..'; iFactionRef='..iFactionRef) end
         local bHaveLaterUpgrade
-        for iUpgrade, sPossibleUpgrade in tUpgradesWanted do
-            --Do we already have the upgrade?
-            if not(oACU:HasEnhancement(sPossibleUpgrade)) then
-                bHaveLaterUpgrade = false
-                --Does ACU have another enhancement which lists this as a prerequisite?
-                for iBPUpgrade, tBPUpgrade in oACU:GetBlueprint().Enhancements do
-                    if tBPUpgrade.Prerequisite == sPossibleUpgrade and oACU:HasEnhancement(iBPUpgrade) then
-                        bHaveLaterUpgrade = true
+        if tUpgradesWanted then
+            for iUpgrade, sPossibleUpgrade in tUpgradesWanted do
+                --Do we already have the upgrade?
+                if not(oACU:HasEnhancement(sPossibleUpgrade)) then
+                    bHaveLaterUpgrade = false
+                    --Does ACU have another enhancement which lists this as a prerequisite?
+                    for iBPUpgrade, tBPUpgrade in oACU:GetBlueprint().Enhancements do
+                        if tBPUpgrade.Prerequisite == sPossibleUpgrade and oACU:HasEnhancement(iBPUpgrade) then
+                            bHaveLaterUpgrade = true
+                            break
+                        end
+                    end
+                    if bHaveLaterUpgrade == false then
+                        --Manually check certain categories
+                        --Sera ACU - dont get T2 if we have later upgrade as e.g. we may have removed T2 so we could get blast attack
+                        if sPossibleUpgrade == 'AdvancedEngineering' and (oACU:HasEnhancement('DamageStabilizationAdvanced') or oACU:HasEnhancement('BlastAttack')) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont want to get T2 as already have later upgrades so want gun splash instead if we dont already have it') end
+                            bHaveLaterUpgrade = true
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': ACU doesnt have the upgrade '..sPossibleUpgrade..'; bHaveLaterUpgrade='..tostring(bHaveLaterUpgrade)) end
+                    if not(bHaveLaterUpgrade) then
+                        sUpgradeID = sPossibleUpgrade
                         break
                     end
                 end
-                if bHaveLaterUpgrade == false then
-                    --Manually check certain categories
-                    if sPossibleUpgrade == 'AdvancedEngineering' and oACU:HasEnhancement('BlastAttack') then bHaveLaterUpgrade = true end
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': ACU doesnt have the upgrade '..sPossibleUpgrade..'; bHaveLaterUpgrade='..tostring(bHaveLaterUpgrade)) end
-                if not(bHaveLaterUpgrade) then
-                    sUpgradeID = sPossibleUpgrade
-                    break
-                end
             end
         end
+    end
+    if sUpgradeID == nil then
+        oACU[M27UnitInfo.refbFullyUpgraded] = true
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return sUpgradeID
@@ -6549,7 +6567,6 @@ function ProcessPlatoonAction(oPlatoon)
 
 
                 if oPlatoon[refiCurrentAction] == refActionAttack then
-                    if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': A'..refActionAttack) end
 
                     --Clearing actions - do manually for each scenario to improve DPS by minimising clearing
@@ -7122,7 +7139,7 @@ function ProcessPlatoonAction(oPlatoon)
                             end
                         end
                         --Was there a helper assigned to this platoon? If so clear its target and tell it to return to the nearest rally point
-                        local refHelper = M27Overseer.refoUnitsScoutHelperPlatoon
+                        local refHelper = M27Overseer.refoScoutHelper
                         local oHelperPlatoon
                         for iHelperType = 1, 2 do
                             if iHelperType == 2 then
@@ -7509,7 +7526,11 @@ function ProcessPlatoonAction(oPlatoon)
                                 --Check for conflicting upgrades - for now just done manually
                                 if sUpgrade == 'BlastAttack' and oACU:HasEnhancement('AdvancedEngineering') then
                                     IssueScript({oACU}, {TaskName = 'EnhanceTask', Enhancement = 'AdvancedEngineeringRemove'})
+                                    oACU[M27UnitInfo.refbRecentlyRemovedHealthUpgrade] = true
+                                    M27Utilities.DelayChangeVariable(oACU, M27UnitInfo.refbRecentlyRemovedHealthUpgrade, false, 11)
+                                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                                     WaitTicks(1)
+                                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                                 end
                                 IssueScript({oACU}, {TaskName = 'EnhanceTask', Enhancement = sUpgrade})
                                 oACU[M27UnitInfo.refsUpgradeRef] = sUpgrade

@@ -689,8 +689,8 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
         local bKeepBuilding = true
 
 
-        local tNearbyEnemiesLong = aiBrain:GetUnitsAroundPoint(categories.LAND + M27UnitInfo.refCategoryStructure - categories.BENIGN, tEngPosition, iSearchRangeLong, 'Enemy')
-        local bNearbyMobileEnemies = not(M27Utilities.IsTableEmpty(tNearbyEnemiesLong))
+        local tNearbyEnemiesLong = aiBrain:GetUnitsAroundPoint(categories.LAND + M27UnitInfo.refCategoryStructure, tEngPosition, iSearchRangeLong, 'Enemy')
+        local bNearbyMobileEnemies = not(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.MOBILE, tNearbyEnemiesLong)))
         local bNearbyPD, tNearbyPD
         if bNearbyMobileEnemies == false and aiBrain[M27Overseer.refiSearchRangeForEnemyStructures] > iSearchRangeLong then
             tNearbyPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, tEngPosition, math.min(aiBrain[M27Overseer.refiSearchRangeForEnemyStructures], 73), 'Enemy')
@@ -703,9 +703,12 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             elseif bNearbyPD then LOG(sFunctionRef..': bNearbyPD is true; NearbyPDSize='..table.getn(tNearbyPD))
             end
         end
-        if bNearbyMobileEnemies == true or bNearbyPD == true then
+        if bNearbyMobileEnemies == true or bNearbyPD == true or M27Utilities.IsTableEmpty(tNearbyEnemiesLong) == false then
             --Mark nearby reclaim segments as having nearby enemy so will avoid
-            UpdateReclaimSegmentsForEngineerDeathOrNearbyEnemy(aiBrain, oEngineer, true)
+
+            if bNearbyMobileEnemies == true or bNearbyPD == true then
+                UpdateReclaimSegmentsForEngineerDeathOrNearbyEnemy(aiBrain, oEngineer, true)
+            end
 
 
             bKeepBuilding = false --default if enemies nearby, will change in some cases
@@ -717,12 +720,17 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             local bCaptureNotReclaim = false
             local iThreatOfEnemies
             if M27Utilities.IsTableEmpty(tNearbyEnemiesShort) == true and M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemiesLong, true, nil, nil, false, false) <= 10 then
-                --Liekly enemy engineer or scout, so just ignore until it gets close to us
-                if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies but the threat of all enemies in longer range is less than 10 so likely land scout or engi') end
-                bKeepBuilding = true
+                --Liekly enemy engineer or scout, so just ignore until it gets close to us; if its a building then instead try to reclaim
+                if EntityCategoryContains(categories.STRUCTURE, tNearbyEnemiesLong) then
+                    oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesLong, tEngPosition, aiBrain, true)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will try and reclaim the nearest enemy unit='..oReclaimTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oReclaimTarget)) end
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies but the threat of all enemies in longer range is less than 10 so likely land scout or engi') end
+                    bKeepBuilding = true
+                end
             elseif M27Utilities.IsTableEmpty(tNearbyEnemiesShort) == false then
                 oReclaimTarget = M27Utilities.GetNearestUnit(tNearbyEnemiesShort, tEngPosition, aiBrain, true)
-                if oReclaimTarget.GetFractionComplete and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oReclaimTarget:GetUnitId()) and oReclaimTarget:GetFractionComplete() == 1 and oReclaimTarget:GetHealthPercent() >= 0.8 then bCaptureNotReclaim = true end
+                if oReclaimTarget.GetFractionComplete and EntityCategoryContains(M27UnitInfo.refCategoryStructure - categories.BENIGN, oReclaimTarget:GetUnitId()) and oReclaimTarget:GetFractionComplete() == 1 and oReclaimTarget:GetHealthPercent() >= 0.8 then bCaptureNotReclaim = true end
                 if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tNearbyEnemiesShort)..' nearby enemies; bCaptureNotReclaim='..tostring(bCaptureNotReclaim)..'; contains structure='..tostring(EntityCategoryContains(categories.STRUCTURE, oReclaimTarget:GetUnitId()))..'; fraction complete='..oReclaimTarget:GetHealthPercent()) end
             else
                 --Have nearby enemies but they're not close, and they have a threat of at least 10 - ignore if we're almost done building
@@ -741,6 +749,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': Have far away enemies that arent close, bKeepBuilding='..tostring(bKeepBuilding)) end
                 if bKeepBuilding == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont want to keep building') end
                     --otherwise, run unless it's an enemy engineer in which case try to reclaim, or a mex in which case capture
                     local bOnlyNearbyEngisOrStructure = true
                     if bNearbyMobileEnemies == true then
@@ -789,6 +798,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                     end
                 end
             else
+                if bDebugMessages == true then LOG(sFunctionRef..': No reclaim target; bKeepBuilding='..tostring(bKeepBuilding)) end
                 if bKeepBuilding == false then
                     --Nearby enemy but we dont know if its an engineer so we want to run back towards base
                     if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for engi with count='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' and unique ref='..GetEngineerUniqueCount(oEngineer)) end

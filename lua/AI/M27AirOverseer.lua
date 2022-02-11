@@ -2884,8 +2884,17 @@ function AirAAManager(aiBrain)
                 end
             end
 
+            --Is any teammate ACU far enough away from their base that we want to check for air threats near it?
             local iDistanceFromACUToStart = 0
-            if aiBrain[refiNearToACUThreshold] > 0 then iDistanceFromACUToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tACUPos) end
+            if aiBrain[refiNearToACUThreshold] > 0 then
+                iDistanceFromACUToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tACUPos)
+                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+                    for iAllyBrain, aiAllyBrain in aiBrain[M27Overseer.toAllyBrains] do
+                        iDistanceFromACUToStart = math.max(iDistanceFromACUToStart, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition()))
+                        if bDebugMessages == true then LOG(sFunctionRef..': Brain start number='..aiAllyBrain.M27StartPositionNumber..'; distance from enemy air unit to ACU of this player='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition())) end
+                    end
+                end
+            end
             local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
             local iDistanceFromEnemyStartToOurStart = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
             local iMapMidpointDistance = iDistanceFromEnemyStartToOurStart * 0.5
@@ -2915,12 +2924,21 @@ function AirAAManager(aiBrain)
                     tUnitCurPosition = oUnit:GetPosition()
                     iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tUnitCurPosition)
                     if iDistanceFromACUToStart > aiBrain[refiNearToACUThreshold] then
+                        --Check if enemy air unit is near our ACU or a friendly ACU
                         --if iCurDistanceToStart > iDistanceFromACUToStart then
-                            iDistanceToACU = M27Utilities.GetDistanceBetweenPositions(tACUPos, tUnitCurPosition)
-                            if iDistanceToACU <= aiBrain[refiNearToACUThreshold] then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have enemy air unit near our ACU; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iDistanceToACU='..iDistanceToACU..'; iDistanceToStart='..iCurDistanceToStart) end
-                                iCurDistanceToStart = math.min(iCurDistanceToStart, iDistanceToACU)
+                        iDistanceToACU = M27Utilities.GetDistanceBetweenPositions(tACUPos, tUnitCurPosition)
+                        if iDistanceToACU <= aiBrain[refiNearToACUThreshold] then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have enemy air unit near our ACU; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iDistanceToACU='..iDistanceToACU..'; iDistanceToStart='..iCurDistanceToStart) end
+                            iCurDistanceToStart = math.min(iCurDistanceToStart, iDistanceToACU)
+                        end
+                        --Check if enemy air is near allied ACU (but prioritise enemies really close to our base instead)
+                        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+                            for iAllyBrain, aiAllyBrain in aiBrain[M27Overseer.toAllyBrains] do
+                                iDistanceToACU = math.min(iDistanceToACU, M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, M27Utilities.GetACU(aiAllyBrain):GetPosition()))
                             end
+                            iCurDistanceToStart = math.min(iCurDistanceToStart, iDistanceToACU + 75)
+                            --Note - hardcoded adj - will increase dist on enemy near ally ACU by 75, and will consider helping against air units near ally ACU if within 150 (so within 75) without doing AA check at all
+                        end
                         --end
                     end
                     iCurTargetModDistanceFromStart = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tUnitCurPosition)
@@ -2929,8 +2947,8 @@ function AirAAManager(aiBrain)
                         --Dont care about AA or distance, just want to kill any air unit
                         bShouldAttackThreat = true
                     else
-                        if iCurDistanceToStart <= aiBrain[refiNearToACUThreshold] then
-                            if bDebugMessages == true then LOG(sFunctionRef..': We want to attack this unit because its close to our ACU') end
+                        if iCurDistanceToStart <= math.max(aiBrain[refiNearToACUThreshold], 150) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': We want to attack this unit because its close to our ACU or base or ally ACU') end
                             bShouldAttackThreat = true
                             iCurTargetModDistanceFromStart = iCurDistanceToStart
                         else
