@@ -375,6 +375,13 @@ function IsUnitUnderwater(oUnit)
     return M27MapInfo.IsUnderwater(oUnit:GetPosition(), false)
 end
 
+function IsUnitOnOrUnderWater(oUnit)
+    if M27MapInfo.GetSegmentGroupOfLocation(refPathingTypeLand, oUnit:GetPosition()) == M27MapInfo.iLandPathingGroupForWater then
+        return true
+    else return false
+    end
+end
+
 function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsEnemyUnitAnEngineer'

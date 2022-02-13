@@ -75,7 +75,7 @@ refiLastRallyPointRefresh = 'M27MapLastRallyPointRefresh' --gametimeseconds that
 refiNearestEnemyIndexWhenLastCheckedRallyPoints = 'M27MapNearestEnemyLastRallyPointCheck'
 
 --v3 Pathfinding specific
-local iLandPathingGroupForWater = 1
+iLandPathingGroupForWater = 1
 bMapHasWater = true --true or false based on water % of map
 bPathfindingAlreadyCommenced = false
 bMapDrawingAlreadyCommenced = {}

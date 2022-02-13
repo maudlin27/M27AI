@@ -1904,7 +1904,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
     --also updates previous threat group references so they know to refer to this threat group
     --if iRadius is 0 then will only add oEnemyUnit to the threat group
     --Add oEnemyUnit to sThreatGroup:
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddNearbyUnitsToThreatGroup'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -1912,6 +1912,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
     --Only call this if haven't already called this on a unit:
     if oEnemyUnit[iArmyIndex] == nil then oEnemyUnit[iArmyIndex] = {} end
     if oEnemyUnit[iArmyIndex][refbUnitAlreadyConsidered] == nil then
+        if bDebugMessages == true then LOG(sFunctionRef..': sThreatGroup='..sThreatGroup..': oEnemyUnit='..oEnemyUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit)) end
 
         local bNewUnitIsOnRightTerrain
         local bIsOnWater
@@ -1993,6 +1994,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
             end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code; threat group threat='..(aiBrain[reftEnemyThreatGroup][sThreatGroup][refiTotalThreat] or 'nil')) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -2222,7 +2224,7 @@ end
 function ThreatAssessAndRespond(aiBrain)
     --Identifies enemy threats, and organises platoons which are sent to deal with them
     --NOTE: Doesnt handle naval units
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ThreatAssessAndRespond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Key config variables:
@@ -2425,6 +2427,7 @@ function ThreatAssessAndRespond(aiBrain)
             if bConsideringNavy == true then
                 --Already recorded naval AA threat when added individual units to the threat group
                 iCurThreat = tEnemyThreatGroup[refiTotalThreat]
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering navy, so will use the enemy threat group total threat already recorded='..(tEnemyThreatGroup[refiTotalThreat] or 0)) end
             else
                 iCurThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyThreatGroup[refoEnemyGroupUnits], true)
             end
@@ -3018,7 +3021,7 @@ function ThreatAssessAndRespond(aiBrain)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Enemy Unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iAssignedThreat='..(oUnit[iArmyIndex][refiAssignedThreat] or 0)..'; oUnit[iArmyIndex][refiUnitNavalAAThreat]='..(oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0)..'; iNavalThreatMaxFactor='..iNavalThreatMaxFactor) end
                                 if oUnit[iArmyIndex][refiAssignedThreat] <= iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat] then
                                     oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
-                                    IssueClearCommands(tTorpSubtable[refoTorpUnit])
+                                    IssueClearCommands({tTorpSubtable[refoTorpUnit]})
                                     IssueAttack({tTorpSubtable[refoTorpUnit]}, oUnit)
                                     M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1)
                                     for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
@@ -3026,7 +3029,7 @@ function ThreatAssessAndRespond(aiBrain)
                                     end
                                     IssueAggressiveMove({tTorpSubtable[refoTorpUnit]}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                     tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing torp bomber and then Telling torpedo bomber with ID ref='..tTorpSubtable[refoTorpUnit]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..' to attack') end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing torp bomber and then Telling torpedo bomber with ID ref='..tTorpSubtable[refoTorpUnit]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..' to attack '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; GameTime='..GetGameTimeSeconds()) end
                                     break
                                 end
                             end

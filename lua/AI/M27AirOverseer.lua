@@ -252,11 +252,11 @@ end
 
 function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
     --Clears a units commands and trackers and tells it to move ot the nearest rally point; if bDontIssueCommands is true then instead just clears trackers and nothing else
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearAirUnitAssignmentTrackers'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27UnitInfo.GetUnitTechLevel(oAirUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 1 then bDebugMessages = true end
-    if bDebugMessages == true then LOG(sFunctionRef..': oAirUnit='..oAirUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': oAirUnit='..oAirUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)..'; Gametime='..GetGameTimeSeconds()) end
     local iMaxMovementPaths = 0
     if oAirUnit[reftMovementPath] then iMaxMovementPaths = table.getn(oAirUnit[reftMovementPath]) end
     if iMaxMovementPaths > 0 then
@@ -275,7 +275,11 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
     ClearTrackersOnUnitsTargets(oAirUnit)
     if not(bDontIssueCommands) then
         IssueClearCommands({oAirUnit})
-        IssueMove({oAirUnit}, M27Logic.GetNearestRallyPoint(aiBrain, oAirUnit:GetPosition()))
+        if EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oAirUnit:GetUnitId()) then
+            IssueAggressiveMove({oAirUnit}, M27Logic.GetNearestRallyPoint(aiBrain, oAirUnit:GetPosition()))
+        else
+            IssueMove({oAirUnit}, M27Logic.GetNearestRallyPoint(aiBrain, oAirUnit:GetPosition()))
+        end
     end
     --Refueling trackers:
     oAirUnit[refbSentRefuelCommand] = false
@@ -607,8 +611,8 @@ end
 function TrackBomberTarget(oBomber, oTarget, iPriority)
     local sFunctionRef = 'TrackBomberTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oBomber='..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; oTarget='..oTarget:GetUnitId()..'; iPriority='..(iPriority or 'nil')..'; bomber cur target='..oBomber[refiCurTargetNumber]) end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oBomber='..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; oTarget='..oTarget:GetUnitId()..'; iPriority='..(iPriority or 'nil')..'; bomber cur target number='..(oBomber[refiCurTargetNumber] or 'nil')) end
     if oBomber[reftTargetList] == nil then oBomber[reftTargetList] = {} end
     table.insert(oBomber[reftTargetList], {[refiShortlistPriority] = iPriority, [refiShortlistUnit] = oTarget})
 
@@ -659,6 +663,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateBomberTargets'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oBomber:GetUnitId()) then bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
     local bRemoveCurTarget
     local tTargetPos
@@ -680,172 +685,220 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
             local tNearbyPriorityAATargets = {}
             local iNearbyPriorityShieldTargets = 0
             local iNearbyPriorityAATargets = 0
+            
+            local bIsTorpBomber = EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oBomber:GetUnitId())
 
             local bTargetACU = false
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
                 local bACUUnderwater = M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])
-                local bTorpBomber = EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oBomber:GetUnitId())
-                if bTorpBomber and bACUUnderwater then bTargetACU = true
-                elseif not(bTorpBomber) and not(bACUUnderwater) then bTargetACU = true end
+                if bIsTorpBomber and bACUUnderwater then bTargetACU = true
+                elseif not(bIsTorpBomber) and not(bACUUnderwater) then bTargetACU = true end
             end
 
-            while bBomberHasDeadOrShieldedTarget == true do
-                iDeadLoopCount = iDeadLoopCount + 1
-                if iDeadLoopCount > iMaxDeadLoopCount then M27Utilities.ErrorHandler('Infinite loop, will abort') break end
+            if bIsTorpBomber then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have a torp bomber, will consider whether to clear its targets') end
+                --Torp bombers - retarget any nearby enemy AA units if we are targetting a non-AA unit
                 oBomberCurTarget = oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]
-                if bDebugMessages == true then LOG(sFunctionRef..': iDeadLoopCount='..iDeadLoopCount..'; iMaxDeadLoopCount='..iMaxDeadLoopCount) end
-                bRemoveCurTarget = false
-                --Dont use isunitvalid as that checks if its completed and we may want to target part-complete buildings
-                if oBomberCurTarget == nil or oBomberCurTarget.Dead or not(oBomberCurTarget.GetPosition) then bRemoveCurTarget = true
-                elseif bTargetACU == true and not(oBomberCurTarget == aiBrain[M27Overseer.refoLastNearestACU]) then
-                    bRemoveCurTarget = true
-                elseif bRemoveIfOnLand then
-                    tTargetPos = oBomberCurTarget:GetPosition()
-                    if GetTerrainHeight(tTargetPos[1], tTargetPos[2]) >= M27MapInfo.iMapWaterHeight then bRemoveCurTarget = true end
-                end
-
-                --Is the target hard to hit and wasnt when first assigned? If so then reassign target
-                if bRemoveCurTarget == false and oBomberCurTarget[refiFailedHitCount] >= 2 and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill) then
-                    --have we either switched from hard to hit to hard to hit, or had a significant increase in how hard to hit?
-                    if (oBomberCurTarget[refiFailedHitCount] or 0) - (oBomber[refiTargetFailedHitCount] or 0) >= 2 then
-                        if (oBomberCurTarget[refiFailedHitCount] or 0) < 2 or (oBomberCurTarget[refiFailedHitCount] or 0) - (oBomber[refiTargetFailedHitCount] or 0) >= 5 then
-                            bRemoveCurTarget = true
-                        end
-                    end
-                end
-
-                if bRemoveCurTarget == false then
-                    --Air dominance - switch to target part-complete shields and AA; more generally switch to target part complete fixed shields
-                    if bDebugMessages == true then LOG(sFunctionRef..': If in air dom mode will search for nearby part-constructed shields and any AA; otherwise just search for part-constructed shields. Bomber cur targetID='..oBomberCurTarget:GetUnitId()) end
-                    local iCategoriesToSearch
-                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryGroundAA
-                    else iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield
-                    end
-                    if not(EntityCategoryContains(iCategoriesToSearch, oBomberCurTarget:GetUnitId())) then
-                        local tNearbyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategoriesToSearch, oBomber:GetPosition(), 125, 'Enemy')
-                        if M27Utilities.IsTableEmpty(tNearbyUnitsOfInterest) == false then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have nearby shields or AA to consider') end
-                            for iUnit, oUnit in tNearbyUnitsOfInterest do
-                                --Fixed shield - only target if <75% done
-                                if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oUnit:GetUnitId()) and oUnit:GetFractionComplete() <= 0.8 and M27Logic.IsTargetUnderShield(aiBrain, oUnit, M27UnitInfo.GetUnitStrikeDamage(oUnit)*0.5) == false then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Shield being constructed, fraction complete='..oUnit:GetFractionComplete()) end
-                                    iNearbyPriorityShieldTargets = iNearbyPriorityShieldTargets + 1
-                                    tNearbyPriorityShieldTargets[iNearbyPriorityShieldTargets] = oUnit
-                                elseif EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit:GetUnitId()) then
-                                    --Check no nearby shield
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Ground AA detected, checking if under shield') end
-                                    if M27Logic.IsTargetUnderShield(aiBrain, oBomberCurTarget, M27UnitInfo.GetUnitStrikeDamage(oUnit) * 0.8) == false then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': AA not under shield, adding as priority target') end
-                                        iNearbyPriorityAATargets = iNearbyPriorityAATargets + 1
-                                        tNearbyPriorityAATargets[iNearbyPriorityAATargets] = oUnit
-                                    elseif bDebugMessages == true then LOG(sFunctionRef..': AA under shield')
+                if not(M27UnitInfo.IsUnitValid(oBomberCurTarget)) then
+                    ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
+                else
+                    --Have a valid target, does it have AA?
+                    if bDebugMessages == true then LOG(sFunctionRef..': BomberCurTarget='..oBomberCurTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomberCurTarget)) end
+                    if not(EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oBomberCurTarget:GetUnitId())) then
+                        --Is there nearby ground AA that isnt hover and is on water?
+                        if bDebugMessages == true then LOG(sFunctionRef..': Our current target doesnt have AA, checking if nearby enemy that does') end
+                        local tNonHoverGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.HOVER, oBomber:GetPosition(), 90, 'Enemy')
+                        local oNearestGroundAA
+                        local iCurDistanceFromGroundAA
+                        local iNearestGroundAA = 10000
+                        local tAllValidAATargets = {}
+                        if M27Utilities.IsTableEmpty(tNonHoverGroundAA) == false then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have enemy groundAA nearby, will see if its underwater') end
+                            for iGroundAA, oGroundAA in tNonHoverGroundAA do
+                                --Is the unit on water?
+                                if M27UnitInfo.IsUnitOnOrUnderWater(oGroundAA) then
+                                    iCurDistanceFromGroundAA = M27Utilities.GetDistanceBetweenPositions(oGroundAA:GetPosition(), oBomber:GetPosition())
+                                    if iCurDistanceFromGroundAA < iNearestGroundAA then
+                                        oNearestGroundAA = oGroundAA
+                                        iNearestGroundAA = iCurDistanceFromGroundAA
+                                        table.insert(tAllValidAATargets, oGroundAA)
                                     end
                                 end
                             end
-                        else
-                            if bDebugMessages == true then LOG(sFunctionRef..': No nearby shields or AA to consider') end
                         end
-                        if iNearbyPriorityShieldTargets + iNearbyPriorityAATargets > 0 then
-                            --Switch target to this
-                            bHaveAssignedNewTarget = true
-                            local oTargetToSwitchTo
-                            if iNearbyPriorityShieldTargets > 0 then
-                                oTargetToSwitchTo = M27Utilities.GetNearestUnit(tNearbyPriorityShieldTargets, oBomber:GetPosition(), aiBrain, false, false)
-                            else
-                                oTargetToSwitchTo = M27Utilities.GetNearestUnit(tNearbyPriorityAATargets, oBomber:GetPosition(), aiBrain, false, false)
-                            end
-                            if bDebugMessages == true then LOG(sFunctionRef..': Want to switch target to high priority AA or shield') end
+                        if oNearestGroundAA then
                             ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
-                            TrackBomberTarget(oBomber, oTargetToSwitchTo, 1)
                             IssueClearCommands({oBomber})
-                            --T3+ bombers - consider moving away from target first to make sure have a clear shot
-                            if M27UnitInfo.GetUnitTechLevel(oBomber) >= 3 or M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTargetToSwitchTo:GetPosition()) >= 100 then
-                                TellBomberToAttackTarget(oBomber, oTargetToSwitchTo)
-                            else
-                                IssueAttack({oBomber}, oTargetToSwitchTo)
+                            IssueAttack({ oBomber }, oNearestGroundAA)
+                            for iGroundAA, oGroundAA in tAllValidAATargets do
+                               IssueAttack({oBomber}, oGroundAA)
                             end
-                        end
-                    elseif bDebugMessages == true then LOG(sFunctionRef..': Bomber cur target is already a shield or AA')
-                    end
-
-                    if bLookForHigherPriorityShortlist and not(bHaveAssignedNewTarget) then
-                       --Does the shortlist contain a higher priority unit?
-                        if bDebugMessages == true then LOG(sFunctionRef..': Want to look for higher priority targets in the shortlist (as have just fired a bomb) and dont already have a higher priority target assigned') end
-                        CheckForBetterBomberTargets(oBomber, true)
-                    end
-
-                    if not(oBomber[refbPartOfLargeAttack]) and not(bHaveAssignedNewTarget) then
-                        --Check if shielded unless part of large attack
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef..': Checking if current target is shielded')
-                            if oBomber[refiCurTargetNumber] == 1 then
-                                LOG(sFunctionRef..': Position of first target is '..repr(oBomberCurTarget:GetPosition()))
-                                M27Utilities.DrawLocation(oBomberCurTarget:GetPosition(), nil, 3)
-                            end --draw black circle around target
-                        end
-
-                        if M27Logic.IsTargetUnderShield(aiBrain, oBomberCurTarget, math.max((oBomber[refiShieldIgnoreValue] or 0) * 1.1, (oBomber[refiShieldIgnoreValue] or 0) + 100)) == true then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Current target is shielded so will remove') end
-                            bRemoveCurTarget = true
+                            TrackBomberTarget(oBomber, oNearestGroundAA, 1)
+                            IssueAggressiveMove({oBomber}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            oBomber[refbOnAssignment] = true
                         end
                     end
                 end
-
-
-
-                if bRemoveCurTarget == true and not(bHaveAssignedNewTarget) then
-                    if oBomber[refiCurTargetNumber] == nil then
-                        M27Utilities.ErrorHandler('Bomber cur target number is nil; reftTargetList size='..table.getn(oBomber[reftTargetList]))
+            else
+                --Logic for bombers
+                while bBomberHasDeadOrShieldedTarget == true do
+                    iDeadLoopCount = iDeadLoopCount + 1
+                    if iDeadLoopCount > iMaxDeadLoopCount then M27Utilities.ErrorHandler('Infinite loop, will abort') break end
+                    oBomberCurTarget = oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]
+                    if bDebugMessages == true then LOG(sFunctionRef..': iDeadLoopCount='..iDeadLoopCount..'; iMaxDeadLoopCount='..iMaxDeadLoopCount) end
+                    bRemoveCurTarget = false
+                    --Dont use isunitvalid as that checks if its completed and we may want to target part-complete buildings
+                    if oBomberCurTarget == nil or oBomberCurTarget.Dead or not(oBomberCurTarget.GetPosition) then bRemoveCurTarget = true
+                    elseif bTargetACU == true and not(oBomberCurTarget == aiBrain[M27Overseer.refoLastNearestACU]) then
+                        bRemoveCurTarget = true
+                    elseif bRemoveIfOnLand then
+                        tTargetPos = oBomberCurTarget:GetPosition()
+                        if GetTerrainHeight(tTargetPos[1], tTargetPos[2]) >= M27MapInfo.iMapWaterHeight then bRemoveCurTarget = true end
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Removing bombers current target as it is nil or dead, iCurTargetNumber='..oBomber[refiCurTargetNumber]) end
-                    --Dont want to use the normal clearairunitassignmenttrackers, as are only clearing the current entry
-                    oBomber[refbOnAssignment] = false
-                    --Only remove trackers on the first target of the bomber
-                    ClearTrackersOnUnitsTargets(oBomber, true)
-                    table.remove(oBomber[reftTargetList], oBomber[refiCurTargetNumber])
-                    --Clear current target
-                    IssueClearCommands({oBomber})
-                    --Reissue orders to attack each subsequent target
-                    if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
-                        for iTarget, tTarget in oBomber[reftTargetList] do
-                            if M27UnitInfo.IsUnitValid(tTarget[refiShortlistUnit]) then
-                                TellBomberToAttackTarget(oBomber, tTarget[refiShortlistUnit])
+
+                    --Is the target hard to hit and wasnt when first assigned? If so then reassign target
+                    if bRemoveCurTarget == false and oBomberCurTarget[refiFailedHitCount] >= 2 and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill) then
+                        --have we either switched from hard to hit to hard to hit, or had a significant increase in how hard to hit?
+                        if (oBomberCurTarget[refiFailedHitCount] or 0) - (oBomber[refiTargetFailedHitCount] or 0) >= 2 then
+                            if (oBomberCurTarget[refiFailedHitCount] or 0) < 2 or (oBomberCurTarget[refiFailedHitCount] or 0) - (oBomber[refiTargetFailedHitCount] or 0) >= 5 then
+                                bRemoveCurTarget = true
+                            end
+                        end
+                    end
+
+                    if bRemoveCurTarget == false then
+                        --Air dominance - switch to target part-complete shields and AA; more generally switch to target part complete fixed shields
+                        if bDebugMessages == true then LOG(sFunctionRef..': If in air dom mode will search for nearby part-constructed shields and any AA; otherwise just search for part-constructed shields. Bomber cur targetID='..oBomberCurTarget:GetUnitId()) end
+                        local iCategoriesToSearch
+                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryGroundAA
+                        else iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield
+                        end
+                        if not(EntityCategoryContains(iCategoriesToSearch, oBomberCurTarget:GetUnitId())) then
+                            local tNearbyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategoriesToSearch, oBomber:GetPosition(), 125, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tNearbyUnitsOfInterest) == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have nearby shields or AA to consider') end
+                                for iUnit, oUnit in tNearbyUnitsOfInterest do
+                                    --Fixed shield - only target if <75% done
+                                    if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oUnit:GetUnitId()) and oUnit:GetFractionComplete() <= 0.8 and M27Logic.IsTargetUnderShield(aiBrain, oUnit, M27UnitInfo.GetUnitStrikeDamage(oUnit)*0.5) == false then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Shield being constructed, fraction complete='..oUnit:GetFractionComplete()) end
+                                        iNearbyPriorityShieldTargets = iNearbyPriorityShieldTargets + 1
+                                        tNearbyPriorityShieldTargets[iNearbyPriorityShieldTargets] = oUnit
+                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit:GetUnitId()) then
+                                        --Check no nearby shield
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Ground AA detected, checking if under shield') end
+                                        if M27Logic.IsTargetUnderShield(aiBrain, oBomberCurTarget, M27UnitInfo.GetUnitStrikeDamage(oUnit) * 0.8) == false then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': AA not under shield, adding as priority target') end
+                                            iNearbyPriorityAATargets = iNearbyPriorityAATargets + 1
+                                            tNearbyPriorityAATargets[iNearbyPriorityAATargets] = oUnit
+                                        elseif bDebugMessages == true then LOG(sFunctionRef..': AA under shield')
+                                        end
+                                    end
+                                end
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby shields or AA to consider') end
+                            end
+                            if iNearbyPriorityShieldTargets + iNearbyPriorityAATargets > 0 then
+                                --Switch target to this
+                                bHaveAssignedNewTarget = true
+                                local oTargetToSwitchTo
+                                if iNearbyPriorityShieldTargets > 0 then
+                                    oTargetToSwitchTo = M27Utilities.GetNearestUnit(tNearbyPriorityShieldTargets, oBomber:GetPosition(), aiBrain, false, false)
+                                else
+                                    oTargetToSwitchTo = M27Utilities.GetNearestUnit(tNearbyPriorityAATargets, oBomber:GetPosition(), aiBrain, false, false)
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Want to switch target to high priority AA or shield') end
+                                ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
+                                TrackBomberTarget(oBomber, oTargetToSwitchTo, 1)
+                                IssueClearCommands({oBomber})
+                                --T3+ bombers - consider moving away from target first to make sure have a clear shot
+                                if M27UnitInfo.GetUnitTechLevel(oBomber) >= 3 or M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTargetToSwitchTo:GetPosition()) >= 100 then
+                                    TellBomberToAttackTarget(oBomber, oTargetToSwitchTo)
+                                else
+                                    IssueAttack({oBomber}, oTargetToSwitchTo)
+                                end
+                            end
+                        elseif bDebugMessages == true then LOG(sFunctionRef..': Bomber cur target is already a shield or AA')
+                        end
+
+                        if bLookForHigherPriorityShortlist and not(bHaveAssignedNewTarget) then
+                           --Does the shortlist contain a higher priority unit?
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want to look for higher priority targets in the shortlist (as have just fired a bomb) and dont already have a higher priority target assigned') end
+                            CheckForBetterBomberTargets(oBomber, true)
+                        end
+
+                        if not(oBomber[refbPartOfLargeAttack]) and not(bHaveAssignedNewTarget) then
+                            --Check if shielded unless part of large attack
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': Checking if current target is shielded')
+                                if oBomber[refiCurTargetNumber] == 1 then
+                                    LOG(sFunctionRef..': Position of first target is '..repr(oBomberCurTarget:GetPosition()))
+                                    M27Utilities.DrawLocation(oBomberCurTarget:GetPosition(), nil, 3)
+                                end --draw black circle around target
+                            end
+
+                            if M27Logic.IsTargetUnderShield(aiBrain, oBomberCurTarget, math.max((oBomber[refiShieldIgnoreValue] or 0) * 1.1, (oBomber[refiShieldIgnoreValue] or 0) + 100)) == true then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Current target is shielded so will remove') end
+                                bRemoveCurTarget = true
                             end
                         end
                     end
 
 
-                    if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == true then
-                        oBomber[refiCurTargetNumber] = 0
+
+                    if bRemoveCurTarget == true and not(bHaveAssignedNewTarget) then
+                        if oBomber[refiCurTargetNumber] == nil then
+                            M27Utilities.ErrorHandler('Bomber cur target number is nil; reftTargetList size='..table.getn(oBomber[reftTargetList]))
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Removing bombers current target as it is nil or dead, iCurTargetNumber='..oBomber[refiCurTargetNumber]) end
+                        --Dont want to use the normal clearairunitassignmenttrackers, as are only clearing the current entry
+                        oBomber[refbOnAssignment] = false
+                        --Only remove trackers on the first target of the bomber
+                        ClearTrackersOnUnitsTargets(oBomber, true)
+                        table.remove(oBomber[reftTargetList], oBomber[refiCurTargetNumber])
+                        --Clear current target
+                        IssueClearCommands({oBomber})
+                        --Reissue orders to attack each subsequent target
+                        if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
+                            for iTarget, tTarget in oBomber[reftTargetList] do
+                                if M27UnitInfo.IsUnitValid(tTarget[refiShortlistUnit]) then
+                                    TellBomberToAttackTarget(oBomber, tTarget[refiShortlistUnit])
+                                end
+                            end
+                        end
+
+
+                        if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == true then
+                            oBomber[refiCurTargetNumber] = 0
+                            bBomberHasDeadOrShieldedTarget = false
+                            --Will clear the trackers below
+                            break
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Bomber target list size='..table.getn(oBomber[reftTargetList])) end
+                    else
+                        --Consider reissuing movement target for cliff blocking
+                        if bReissueIfBlocked then  --Should only set this to true in rare cases e.g. after bomb fired, as below test not perfect - we're using the bomber unit target position rather than the ground location the bomber has targetted
+                            local tPreTargetViaPoint = GetBomberPreTargetViaPoint(oBomber, oBomberCurTarget:GetPosition())
+                            if bDebugMessages == true then LOG(sFunctionRef..'Recently fired bomb, checking if we think we are blocked when attacking target; tPreTargetViaPoint='..repr((tPreTargetViaPoint or {'nil'}))) end
+                            if M27Utilities.IsTableEmpty(tPreTargetViaPoint) == false then
+                                --Expect to be blocked so want to reissue
+                                IssueClearCommands({oBomber})
+                                if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
+                                    for iTarget, tTarget in oBomber[reftTargetList] do
+                                        if M27UnitInfo.IsUnitValid(tTarget[refiShortlistUnit]) then
+                                            TellBomberToAttackTarget(oBomber, tTarget[refiShortlistUnit])
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': Bomber current target isnt dead, UnitId='..oBomberCurTarget:GetUnitId()..'; will draw circle around target position '..repr(oBomberCurTarget:GetPosition()))
+                            M27Utilities.DrawLocation(oBomberCurTarget:GetPosition(), nil, 4, 100)
+                        end
                         bBomberHasDeadOrShieldedTarget = false
-                        --Will clear the trackers below
                         break
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Bomber target list size='..table.getn(oBomber[reftTargetList])) end
-                else
-                    --Consider reissuing movement target for cliff blocking
-                    if bReissueIfBlocked then  --Should only set this to true in rare cases e.g. after bomb fired, as below test not perfect - we're using the bomber unit target position rather than the ground location the bomber has targetted
-                        local tPreTargetViaPoint = GetBomberPreTargetViaPoint(oBomber, oBomberCurTarget:GetPosition())
-                        if bDebugMessages == true then LOG(sFunctionRef..'Recently fired bomb, checking if we think we are blocked when attacking target; tPreTargetViaPoint='..repr((tPreTargetViaPoint or {'nil'}))) end
-                        if M27Utilities.IsTableEmpty(tPreTargetViaPoint) == false then
-                            --Expect to be blocked so want to reissue
-                            IssueClearCommands({oBomber})
-                            if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
-                                for iTarget, tTarget in oBomber[reftTargetList] do
-                                    if M27UnitInfo.IsUnitValid(tTarget[refiShortlistUnit]) then
-                                        TellBomberToAttackTarget(oBomber, tTarget[refiShortlistUnit])
-                                    end
-                                end
-                            end
-                        end
-                    end
-
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef..': Bomber current target isnt dead, UnitId='..oBomberCurTarget:GetUnitId()..'; will draw circle around target position '..repr(oBomberCurTarget:GetPosition()))
-                        M27Utilities.DrawLocation(oBomberCurTarget:GetPosition(), nil, 4, 100)
-                    end
-                    bBomberHasDeadOrShieldedTarget = false
-                    break
                 end
             end
         end
@@ -853,7 +906,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
         if bDebugMessages == true then LOG(sFunctionRef..': Bomber has no target list') end
     end
     if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == true then
-        if bDebugMessages == true then LOG(sFunctionRef..': Bombers target list is empty so making it available and sending it to the nearest rally point') end
+        if bDebugMessages == true then LOG(sFunctionRef..': Bombers target list is empty so making it available and sending it to the nearest rally point; GameTime='..GetGameTimeSeconds()) end
         ClearAirUnitAssignmentTrackers(oBomber:GetAIBrain(), oBomber)
         --oBomber[refbOnAssignment] = false
         --oBomber[reftTargetList] = {}
@@ -1016,7 +1069,7 @@ function AirThreatChecker(aiBrain)
 end
 
 function RecordAvailableAndLowFuelAirUnits(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAvailableAndLowFuelAirUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Updates aiBrain trackers to record units with and without enough fuel
@@ -1098,7 +1151,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                     oUnit[reftIdleChecker][iIdleTime] = true
                                     if oUnit[reftIdleChecker][iIdleTime-1] then
                                         if bDebugMessages == true then
-                                            LOG(sFunctionRef..': AirAA unit is idle so clearing its commands')
+                                            LOG(sFunctionRef..': Air unit is idle so clearing its commands')
                                             if oUnit[refoAirAATarget] and oUnit[refoAirAATarget].GetUnitId then
                                                 LOG('Units target that will be cleared='..oUnit[refoAirAATarget]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAirAATarget]))
                                             end
@@ -1172,6 +1225,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                     end
                                                     if bConsiderForReset == true then
                                                         --Reset scout to prevent risk of it reaching a movement path but not registering in above code
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Reseting scout trackers and clearing its orders') end
                                                         ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
                                                     end
                                                 end

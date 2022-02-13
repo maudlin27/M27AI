@@ -197,12 +197,12 @@ function OnBombFired(oWeapon, projectile)
     if oUnit and oUnit.GetUnitId then
         local sUnitID = oUnit:GetUnitId()
         if bDebugMessages == true then LOG(sFunctionRef..': bomber position when firing bomb='..repr(oUnit:GetPosition())) end
-        if EntityCategoryContains(M27UnitInfo.refCategoryBomber - categories.EXPERIMENTAL, sUnitID) then
+        if EntityCategoryContains(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber - categories.EXPERIMENTAL, sUnitID) then
             M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
             if oUnit.GetAIBrain and oUnit:GetAIBrain().M27AI then
                 if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repr(projectile:GetPosition())) end
                 local iDelay = M27UnitInfo.GetUnitTechLevel(oUnit)
-                if EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionUEF) - categories.TECH3, oUnit:GetUnitId()) then iDelay = iDelay + 1 end
+                if EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionUEF) - categories.TECH3, oUnit:GetUnitId()) or EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionAeon) * M27UnitInfo.refCategoryTorpBomber * categories.TECH2, oUnit:GetUnitId()) then iDelay = iDelay + 1 end
                 ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, iDelay)
                 if not(oUnit[M27AirOverseer.refiLastFiredBomb]) or GetGameTimeSeconds() - oUnit[M27AirOverseer.refiLastFiredBomb] > 2.5 then
                     oUnit[M27AirOverseer.refiLastFiredBomb] = GetGameTimeSeconds()
