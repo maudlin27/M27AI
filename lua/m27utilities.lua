@@ -490,6 +490,14 @@ function MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
     return { iXPos, GetTerrainHeight(iXPos, iZPos), iZPos }
 end
 
+function ConvertM27AngleToFAFAngle(iM27Angle)
+    --Per FAF documentation on issueformmove:
+    -- @param degrees The orientation the platoon should take when it reaches the position. South is 0 degrees, east is 90 degrees, etc.
+    --Meanwhile M27: 0 is north, 90 is east, etc.
+    local iFAFAngle = 180 - iM27Angle
+    if iFAFAngle < 0 then iFAFAngle = iFAFAngle + 360 end
+    return iFAFAngle
+end
 
 function GetAngleFromAToB(tLocA, tLocB)
     --Returns an angle 0 = north, 90 = east, etc. based on direction of tLocB from tLocA
@@ -507,9 +515,10 @@ function GetAngleFromAToB(tLocA, tLocB)
     end
 end
 
-function MoveInDirection(tStart, iAngle, iDistance)
+function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
     --iAngle: 0 = north, 90 = east, etc.; use GetAngleFromAToB if need angle from 2 positions
     --tStart = {x,y,z} (y isnt used)
+    --if bKeepInMapBounds is true then will limit to map bounds
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveInDirection'
     local iTheta
@@ -527,8 +536,47 @@ function MoveInDirection(tStart, iAngle, iDistance)
     local iXAdj = math.cos(iTheta) * iDistance * iFactor[1]
     local iZAdj = math.sin(iTheta) * iDistance * iFactor[2]
 
-    if bDebugMessages == true then LOG(sFunctionRef..': tStart='..repr(tStart)..'; iAngle='..iAngle..'; iDistance='..iDistance..'; tStart='..repr(tStart)..'; iXAdj='..iXAdj..'; iZAdj='..iZAdj..'; iTheta='..iTheta) end
-    return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+
+    if not(bKeepInMapBounds) then
+        return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+    else
+        local tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        --Get actual distance required to keep within map bounds
+        local iMaxDistanceFlat = 0
+        local iNewDistWanted = 10000
+        --rMapPlayableArea = 2 --{x1,z1, x2,z2} - Set at start of the game, use instead of the scenarioinfo method
+        if tTargetPosition[1] < M27MapInfo.rMapPlayableArea[1] then iNewDistWanted = iDistance * (tStart[1] - M27MapInfo.rMapPlayableArea[1]) / (tStart[1] - tTargetPosition[1]) end
+        if tTargetPosition[3] < M27MapInfo.rMapPlayableArea[2] then iNewDistWanted = math.min(iNewDistWanted, iDistance * (tStart[3] - M27MapInfo.rMapPlayableArea[2]) / (tStart[3] - tTargetPosition[3])) end
+        if tTargetPosition[1] > M27MapInfo.rMapPlayableArea[3] then iNewDistWanted = math.min(iNewDistWanted, iDistance * (M27MapInfo.rMapPlayableArea[3] - tStart[1]) / (tTargetPosition[1] - tStart[1])) end
+        if tTargetPosition[3] > M27MapInfo.rMapPlayableArea[4] then iNewDistWanted = math.min(iNewDistWanted, iDistance * (M27MapInfo.rMapPlayableArea[4] - tStart[3]) / (tTargetPosition[3] - tStart[3])) end
+
+        if iNewDistWanted == 10000 then
+            return tTargetPosition
+        else
+            --Are out of playable area, so adjust the position; Can use the ratio of the amount we have moved left/right or top/down vs the long line length to work out the long line length if we reduce the left/right so its within playable area
+            return MoveInDirection(tStart, iAngle, iNewDistWanted - 0.1, false)
+        end
+        --Failed attempt below - mustve got maths wrong as didnt work properly
+        --[[local tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        --Get actual distance required to keep within map bounds
+        local iOverBoundDistance = 0
+        --rMapPlayableArea = 2 --{x1,z1, x2,z2} - Set at start of the game, use instead of the scenarioinfo method
+        if tTargetPosition[1] < M27MapInfo.rMapPlayableArea[1] then iOverBoundDistance = tTargetPosition[1] - M27MapInfo.rMapPlayableArea[1] end
+        if tTargetPosition[3] < M27MapInfo.rMapPlayableArea[2] then  iOverBoundDistance = math.min(tTargetPosition[3] - M27MapInfo.rMapPlayableArea[2], iOverBoundDistance) end
+        if iOverBoundDistance == 0 then
+            if tTargetPosition[1] > M27MapInfo.rMapPlayableArea[3] then iOverBoundDistance = tTargetPosition[1] - M27MapInfo.rMapPlayableArea[3] end
+            if tTargetPosition[3] > M27MapInfo.rMapPlayableArea[4] then iOverBoundDistance = math.min(iOverBoundDistance, tTargetPosition[3] - M27MapInfo.rMapPlayableArea[4]) end
+        end
+
+        if iOverBoundDistance == 0 then
+            return tTargetPosition
+        else
+            --Are out of playable area, so adjust the position; see diagram in v25 release notes which uses an example of moving 200 degrees from A to B by 14, and ending up 3 out of the map distance on the x axis
+            local iNewAngle = (90-(180-(360-iAngle)))
+            if iNewAngle < 0 then iNewAngle = iNewAngle+360 elseif iNewAngle > 360 then iNewAngle = iNewAngle - 360 end
+            return MoveInDirection(tTargetPosition, iNewAngle, iOverBoundDistance + 0.1, false)
+        end--]]
+    end
 end
 
 function GetAIBrainArmyNumber(aiBrain)

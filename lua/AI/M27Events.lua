@@ -204,6 +204,10 @@ function OnBombFired(oWeapon, projectile)
                 local iDelay = M27UnitInfo.GetUnitTechLevel(oUnit)
                 if EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionUEF) - categories.TECH3, oUnit:GetUnitId()) then iDelay = iDelay + 1 end
                 ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, iDelay)
+                if not(oUnit[M27AirOverseer.refiLastFiredBomb]) or GetGameTimeSeconds() - oUnit[M27AirOverseer.refiLastFiredBomb] > 2.5 then
+                    oUnit[M27AirOverseer.refiLastFiredBomb] = GetGameTimeSeconds()
+                    oUnit[M27AirOverseer.refiBombsDropped] = (oUnit[M27AirOverseer.refiBombsDropped] or 0) + 1
+                end
             end
         end
     end

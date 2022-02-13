@@ -694,7 +694,12 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                     if not(oUnit[refbWaitingForAssignment]) then
                         bHaveValidUnit = true
                         sUnitID = oUnit:GetUnitId()
-                        if EntityCategoryContains(refCategoryLandScout, sUnitID) then table.insert(tScouts, oUnit)
+                        if EntityCategoryContains(refCategoryLandScout, sUnitID) then
+                            table.insert(tScouts, oUnit)
+                            --Enable stealth on cybran moles (but not selens)
+                            if oUnit:GetBlueprint().Intel.Cloak and (oUnit:GetBlueprint().Intel.StealthWaitTime or 0) == 0 then
+                                M27UnitInfo.EnableUnitStealth(oUnit)
+                            end
                         elseif EntityCategoryContains(refCategoryMAA, sUnitID) then table.insert(tMAA, oUnit)
                         elseif EntityCategoryContains(categories.COMMAND, sUnitID) then table.insert(tACU, oUnit)
                         elseif EntityCategoryContains(refCategoryEngineer, sUnitID) then table.insert(tEngi, oUnit)

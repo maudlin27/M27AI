@@ -1122,8 +1122,8 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
     end
     if bHaveAction == false then
         if not(bACUIsUpgrading and bHaveLowMass) then
-            --Do we have too many engineers of this tech level? If so ctrl-K if are near base
-            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 then
+            --Do we have too many engineers of this tech level and have low mass? If so ctrl-K if are near base
+            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and M27Conditions.HaveLowMass(aiBrain) then
                 local iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oEngineer)
                 if iCurTechLevel < aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] then
                     local iCurTime = math.floor(GetGameTimeSeconds())
@@ -2036,34 +2036,41 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     --Determines the blueprint and location for oEngineer to build at; also returns the location
     --iCatToBuildBy: Optional, specify if want to look for adjacency locations; Note to factor in 50% of the builder's size and 50% of the likely adjacency building size
     --bLookForQueuedBuildings: Optional, if true, then doesnt choose a target if another engineer already has that target function ref assigned to build something
+    --Returns nil if dealing with a non-resource based building
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'BuildStructureAtLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetEngineerUniqueCount(oEngineer) == 59 then bDebugMessages = true end
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Engineer UC='..GetEngineerUniqueCount(oEngineer)..'; Engineer LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Engineer UC='..GetEngineerUniqueCount(oEngineer)..'; Engineer LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; Techlevel='..M27UnitInfo.GetUnitTechLevel(oEngineer)) end
 
 
 
     local bAbortConstruction = false
     local sBlueprintToBuild = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oEngineer)--, false, false)
+    --if GetGameTimeSeconds() >= 1234 and sBlueprintToBuild == 'urb1103' then bDebugMessages = true end
+    if bDebugMessages == true then LOG(sFunctionRef..': sBlueprintToBuild='..(sBlueprintToBuild or 'nil')) end
     local sBlueprintBuildBy
     local bFindRandomLocation = false
     local tTargetLocation = tAlternativePositionToLookFrom
     local tEngineerPosition = oEngineer:GetPosition()
     if not(tTargetLocation) then tTargetLocation = tEngineerPosition end
     local bFoundEnemyInstead = false
-    local iNewBuildingRadius = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)[1] * 0.5
 
     if sBlueprintToBuild == nil then
         M27Utilities.ErrorHandler('sBlueprintToBuild is nil, could happen e.g. if try and get sparky to build sxomething it cant - refer to log for more details')
         LOG('oEngineer='..oEngineer:GetUnitId()..GetEngineerUniqueCount(oEngineer))
     else
-
+        local iNewBuildingRadius = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)[1] * 0.5
         local iBuilderRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance + math.min(oEngineer:GetBlueprint().SizeX, oEngineer:GetBlueprint().SizeZ)*0.5
         local iDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
         local bBuildNearToEnemy = false
         if iDistanceFromStart <= 80 then bBuildNearToEnemy = true end
+
+        --Check we're not trying to buidl a mex or hydro or mass storage
+        local bMexHydroOrStorage = false
+        if EntityCategoryContains(refCategoryMex, sBlueprintToBuild) or EntityCategoryContains(refCategoryHydro, sBlueprintToBuild) or EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, sBlueprintToBuild) then bMexHydroOrStorage = true end
 
         --Check if is an existing building of the type wanted first:
         local oPartCompleteBuilding
@@ -2081,9 +2088,6 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                 local sEngUniqueRef = GetEngineerUniqueCount(oEngineer)
                 LOG(sFunctionRef..': Eng builder unique ref='..sEngUniqueRef..'; builder range='..iBuilderRange)
             end
-            --Check we're not trying to buidl a mex or hydro or mass storage
-            local bMexHydroOrStorage = false
-            if EntityCategoryContains(refCategoryMex, sBlueprintToBuild) or EntityCategoryContains(refCategoryHydro, sBlueprintToBuild) or EntityCategoryContains(M27UnitInfo.refCategoryMassStorage, sBlueprintToBuild) then bMexHydroOrStorage = true end
 
 
 
@@ -2235,6 +2239,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                                                 LOG(sFunctionRef..': Cnat build at TargetLocation='..repr(tTargetLocation)..'; RectangleSearched='..repr(rTargetRect))
                                             end
                                         end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will just move to the target location') end
                                         M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
                                         bAbortConstruction = true
                                     end
@@ -2245,9 +2250,25 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                 end
             end
         end
-        --Switch to random location if an amphibious unit cant path there
-        if not(bFindRandomLocation) and not(bAbortConstruction) then
-           if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tTargetLocation) == M27MapInfo.GetUnitSegmentGroup(oEngineer)) then bFindRandomLocation = true end
+        --Switch to random location if an amphibious unit cant path there and its not a resource based location
+        if not(bFindRandomLocation) and not(bAbortConstruction) then -- and not(bMexHydroOrStorage) then
+            if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tTargetLocation) == M27MapInfo.GetUnitSegmentGroup(oEngineer)) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Pathing group of the target is different to where we are, so will try and get a random location if its not a resource based building; Target amphibious pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tTargetLocation)..'; Pathing group of unit='..M27MapInfo.GetUnitSegmentGroup(oEngineer)..'; Amphibious pathing group of engineer current position='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer:GetPosition())..'; pathing group of base='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+                --Recheck pathing
+                if not(M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer, tTargetLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) and not(bMexHydroOrStorage) then
+                    bFindRandomLocation = true
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Pathing was wrong or are trying to build on a resource location so wont try and get random location but will proceed with current location') end
+                end
+            end
+        end
+
+        if bFindRandomLocation and bMexHydroOrStorage and not(bAbortConstruction) then
+            --Backup - Trying to build a mex or hydro so no point getting random location
+            M27Utilities.ErrorHandler('Are trying to build in a random place for am ex/hydro/mass storage - figure out why as this shouldnt trigger; Engineer with UC='..GetEngineerUniqueCount(oEngineer)..'='..oEngineer:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; trying to build blueprint='..sBlueprintToBuild)
+            if bDebugMessages == true then LOG(sFunctionRef..': Trying to build mex or hydro so cant choose a random location') end
+            bFindRandomLocation = false
+            bAbortConstruction = true
         end
 
         if bFindRandomLocation == true and not(bAbortConstruction) then
@@ -2282,24 +2303,31 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
             end
         else
             if bDebugMessages == true then LOG('Warning - couldnt find any places to build after looking randomly nearby, will abort construction. bFoundEnemyInstead='..tostring(bFoundEnemyInstead)) end
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Aborted construction, will draw target location in red')
+                M27Utilities.DrawLocation(tTargetLocation, nil, 2, 100)
+            end
+            if not(bMexHydroOrStorage) then tTargetLocation = nil end
         end
     end
     if bDebugMessages == true then
         if sBlueprintToBuild == nil then LOG('sBlueprintToBuild is nil')
         else
-            LOG(sFunctionRef..': tTargetLocation='..repr(tTargetLocation)..'; aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation)='..tostring(aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation))..'; sBlueprintToBuild='..(sBlueprintToBuild or 'nil'))
-            M27Utilities.DrawLocation(tTargetLocation, nil, 7, 100) --show in white (colour 7)
-            LOG(sFunctionRef..': About to list any units in 1x1 rectangle around targetlocation')
-            local iSizeAdj = 3
-            local rBuildAreaRect = Rect(tTargetLocation[1] - iSizeAdj, tTargetLocation[3] - iSizeAdj, tTargetLocation[1] + iSizeAdj, tTargetLocation[3] + iSizeAdj)
-            local tUnitsInRect = GetUnitsInRect(rBuildAreaRect)
-            local tsUnitRefs = {}
-            if M27Utilities.IsTableEmpty(tUnitsInRect) == false then
-                for iUnit, oUnit in tUnitsInRect do
-                    table.insert(tsUnitRefs, iUnit, oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+            if tTargetLocation then
+                LOG(sFunctionRef..': tTargetLocation='..repr(tTargetLocation)..'; aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation)='..tostring(aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation))..'; sBlueprintToBuild='..(sBlueprintToBuild or 'nil'))
+                if not(bAbortConstruction) then M27Utilities.DrawLocation(tTargetLocation, nil, 7, 100) end --show in white (colour 7)
+                LOG(sFunctionRef..': About to list any units in 1x1 rectangle around targetlocation')
+                local iSizeAdj = 3
+                local rBuildAreaRect = Rect(tTargetLocation[1] - iSizeAdj, tTargetLocation[3] - iSizeAdj, tTargetLocation[1] + iSizeAdj, tTargetLocation[3] + iSizeAdj)
+                local tUnitsInRect = GetUnitsInRect(rBuildAreaRect)
+                local tsUnitRefs = {}
+                if M27Utilities.IsTableEmpty(tUnitsInRect) == false then
+                    for iUnit, oUnit in tUnitsInRect do
+                        table.insert(tsUnitRefs, iUnit, oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                    end
                 end
+                LOG('tsUnitRefs='..repr(tsUnitRefs))
             end
-            LOG('tsUnitRefs='..repr(tsUnitRefs))
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -2412,6 +2440,7 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateActionForNearbyReclaim'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     --if GetEngineerUniqueCount(oEngineer) == 59 then bDebugMessages = true end
 
     local bReclaimWillMoveOutOfRangeSoon = false
@@ -2496,6 +2525,20 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
                             tReclaimInRange = tNearbyReclaim
                         end
 
+                        --Also reclaim if lots of enemy walls nearby if dealing with ACU (dont need to do for engis as their 'nearby enemy' logic should have them reclaim walls anyway)
+                        if M27Utilities.IsACU(oEngineer) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Looking for how many walls we have nearby; tCurPos='..repr(tCurPos)..'; iMaxDistanceToEngineer='..iMaxDistanceToEngineer) end
+                            local tNearbyWalls = aiBrain:GetUnitsAroundPoint(categories.WALL, tCurPos, iMaxDistanceToEngineer, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tNearbyWalls) == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have walls nearby, size of table='..table.getn(tNearbyWalls)) end
+                                for iWall, oWall in tNearbyWalls do
+                                    table.insert(tReclaimInRange, oWall)
+                                end
+                                if table.getn(tNearbyWalls) >= 3 then bReclaimWillMoveOutOfRangeSoon = true end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Finished adding nearby walls to reclaiminrange, size of tReclaimInRange='..table.getn(tReclaimInRange)..'; bReclaimWillMoveOutOfRangeSoon='..tostring(bReclaimWillMoveOutOfRangeSoon)) end
+                            end
+                        end
+
 
 
 
@@ -2505,7 +2548,7 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
                             oEngineer[reftEngineerLastPositionOfReclaimOrder] = {tCurPos[1], tCurPos[2], tCurPos[3]}
                             IssueClearCommands({oEngineer})
                             for iValidReclaim, oValidReclaim in tReclaimInRange do
-                                if bDebugMessages == true then LOG(sFunctionRef..'Issuing reclaim command') end
+                                if bDebugMessages == true then LOG(sFunctionRef..'Issuing reclaim command to iValidReclaim='..iValidReclaim) end
                                 IssueReclaim({oEngineer}, oValidReclaim)
                             end
                             if not(bDontIssueMoveAfter) then IssueMove({oEngineer}, oEngineer[reftEngineerCurrentTarget]) end
@@ -3990,7 +4033,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
                         elseif iCurrentConditionToTry == 8 then --Low power action part 1
                             if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
-                            if bHaveLowPower or (iMassStoredRatio >= 0.05 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 40) then
+                            if bHaveLowPower or (iMassStoredRatio >= 0.05 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 40) or (aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 275 and M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryAirFactory * categories.TECH2, aiBrain[M27EconomyOverseer.reftActiveHQUpgrades])) == false) then
                                 --Build power unless early game hydro under construction in which case assist it instead
                                 local bAssistHydroInstead = false
                                 if iUnclaimedHydroNearBase > 0 and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildHydro]) == false then
@@ -4030,9 +4073,11 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                         iActionToAssign = refActionBuildPower
                                     end
                                 end
+
                                 iSearchRangeForNearestEngi = 75
                                 iMaxEngisWanted = 3
                                 if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > 20 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 40 then iMaxEngisWanted = 4 end
+                                if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 275 and M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryAirFactory * categories.TECH2, aiBrain[M27EconomyOverseer.reftActiveHQUpgrades])) == false then iMaxEngisWanted = 6 end
                             end
                         elseif iCurrentConditionToTry == 9 then --Initial land factories (high priority with low resource conditions)
                             if iLandFactories == nil then

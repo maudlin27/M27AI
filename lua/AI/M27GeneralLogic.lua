@@ -2936,8 +2936,8 @@ function GetDirectFireWeaponPosition(oFiringUnit)
     return tShotStartPosition
 end
 
-function IsLineBlocked(tShotStartPosition, tShotEndPosition, iStartDistance)
-    --If iStartDistance is specified then will start from the floor of this far along the path
+function IsLineBlocked(tShotStartPosition, tShotEndPosition, iAOE)
+    --If iAOE is specified then will end once reach the iAOE range
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLineBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -2948,19 +2948,24 @@ function IsLineBlocked(tShotStartPosition, tShotEndPosition, iStartDistance)
         local iAngle = math.atan((tShotEndPosition[2] - tShotStartPosition[2]) / iFlatDistance)
         local iShotHeightAtPoint
         if bDebugMessages == true then LOG(sFunctionRef..': About to check if at any point on path shot will be lower than terrain; iAngle='..iAngle..'; startshot height='..tShotStartPosition[2]..'; target height='..tShotEndPosition[2]..'; iFlatDistance='..iFlatDistance) end
-        for iPointToTarget = math.min(math.floor(iFlatDistance), math.max(math.floor(iStartDistance or 1),1)), math.floor(iFlatDistance) do
+        local iEndPoint = math.max(1, math.floor(iFlatDistance - (iAOE or 0)))
+        for iPointToTarget = 1, iEndPoint do
+        --math.min(math.floor(iFlatDistance), math.max(math.floor(iStartDistance or 1),1)), math.floor(iFlatDistance) do
             --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
             tTerrainPositionAtPoint = M27Utilities.MoveTowardsTarget(tShotStartPosition, tShotEndPosition, iPointToTarget, 0)
             if bDebugMessages == true then LOG(sFunctionRef..': iPointToTarget='..iPointToTarget..'; tTerrainPositionAtPoint='..repr(tTerrainPositionAtPoint)) end
             iShotHeightAtPoint = math.tan(iAngle) * iPointToTarget + tShotStartPosition[2]
             if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
-                if bDebugMessages == true then
-                    LOG(sFunctionRef..': Shot blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2])
-                    M27Utilities.DrawLocation(tTerrainPositionAtPoint, nil, 5, 10)
-                end
-                bShotIsBlocked = true
+                if not(iPointToTarget == iEndPoint and iShotHeightAtPoint == tTerrainPositionAtPoint[2]) then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Shot blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2])
+                        M27Utilities.DrawLocation(tTerrainPositionAtPoint, nil, 5, 10)
+                    end
+                    bShotIsBlocked = true
 
-                break
+                    break
+                elseif bDebugMessages == true then LOG(sFunctionRef..': Are at end point and terrain height is identical, so will assume we will actually reach the target')
+                end
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Shot not blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
             end

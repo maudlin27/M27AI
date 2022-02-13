@@ -856,7 +856,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     local bHavePowerForAir = false
                     if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= iMinPowerPerTickWantedForAir then
                         bHavePowerForAir = true
-                        if aiBrain[M27EconomyOverseer.refbStallingEnergy] and aiBrain:GetEconomyStoredRatio('ENERGY') < 0.9 then
+                        if aiBrain[M27EconomyOverseer.refbStallingEnergy] or (iFactoryTechLevel == 3 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 275) then
                             bHavePowerForAir = false
                             if  aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
                                 if aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.5 then
@@ -880,7 +880,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
 
                     if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU) and bHavePowerForAir then
-                        bDebugMessages = true
                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, M27Utilities.GetACU(aiBrain):GetPosition(), 110, 'Enemy')) == false then
                             if bDebugMessages == true then LOG(sFunctionRef..': Air units near our ACU so want to build airAA') end
                             iCategoryToBuild = M27UnitInfo.refCategoryAirAA
@@ -922,11 +921,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 iCategoryToBuild = refCategoryBomber
                                 iTotalWanted = 1
                             elseif iFactoryTechLevel >= 3 then
-                                if M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout * categories.TECH3, 1) == true then
-                                    iCategoryToBuild = refCategoryAirScout
+                                --Want either c. 1 T3 or 5 T2 power before try building these ahead of engineers
+                                if (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 250) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout * categories.TECH3, 1) == true then
+                                    iCategoryToBuild = refCategoryAirScout * categories.TECH3
                                     iTotalWanted = 1
-                                elseif M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber * categories.TECH3, 1) == true and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA * categories.TECH3 + M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')) == true then
-                                    iCategoryToBuild = refCategoryBomber
+                                elseif (bHavePowerForAir or aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 275) and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber * categories.TECH3, 1) == true and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA * categories.TECH3 + M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')) == true then
+                                    iCategoryToBuild = refCategoryBomber * categories.TECH3
                                     iTotalWanted = 1
                                 end
                                 if bDebugMessages == true then

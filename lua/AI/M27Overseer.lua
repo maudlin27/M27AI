@@ -146,6 +146,7 @@ refbEnemyHasTech2PD = 'M27EnemyHasTech2PD'
 
 refiOurHighestFactoryTechLevel = 'M27OverseerOurHighestFactoryTech'
 refiOurHighestAirFactoryTech = 'M27OverseerOurHighestAirFactoryTech'
+refiOurHighestLandFactoryTech = 'M27OverseerOurHighestLandFactoryTech'
 
 
 
@@ -3408,6 +3409,7 @@ function ACUManager(aiBrain)
             end
 
             --Are we near the last ACU's known position?
+            aiBrain[refbEnemyACUNearOurs] = false
             if iLastDistanceToACU <= iEnemyACUSearchRange and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Are near last ACU known position, iLastDistanceToACU='..iLastDistanceToACU..'; iEnemyACUSearchRange='..iEnemyACUSearchRange) end
                 aiBrain[refbEnemyACUNearOurs] = true
@@ -3991,8 +3993,13 @@ function UpdateHighestFactoryTechTracker(aiBrain)
         else
             aiBrain[refiOurHighestAirFactoryTech] = 1
         end
+        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3) > 0 then aiBrain[refiOurHighestFactoryTechLevel] = 3
+        elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH2) > 0 then aiBrain[refiOurHighestLandFactoryTech] = 2
+        else aiBrain[refiOurHighestLandFactoryTech] = 1
+        end
     else
         aiBrain[refiOurHighestAirFactoryTech] = 1
+        aiBrain[refiOurHighestLandFactoryTech] = 1
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Number of tech2 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2)..'; Number of tech3 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3)..'; iHighestTechLevel='..iHighestTechLevel..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]..'; aiBrain[refiOurHighestAirFactoryTech]='..aiBrain[refiOurHighestAirFactoryTech]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -4267,6 +4274,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                     elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iDistanceFromBaseToBeSafe then
                         bKeepProtectingACU = false
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': In protect ACU mode, bKeepProtectingACU='..tostring(bKeepProtectingACU)) end
                 end
 
                 --Should we switch to eco?
@@ -4276,6 +4284,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                     --How far away is the enemy?
                     local bBigEnemyThreat = false
                     if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArti]) == false then bBigEnemyThreat = true end
+                    if bDebugMessages == true then LOG(sFunctionRef..'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat='..tostring(bBigEnemyThreat)..'; aiBrain[refbEnemyACUNearOurs]='..tostring(aiBrain[refbEnemyACUNearOurs])) end
 
 
 
