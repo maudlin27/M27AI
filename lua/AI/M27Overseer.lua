@@ -1588,15 +1588,13 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                             if bDebugMessages == true and oClosestPlatoon.GetPlan then LOG(sFunctionRef..': Giving override action to oClosestPlatoon '..oClosestPlatoon:GetPlan()..(oClosestPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil')..': tCurPathPosition='..repr(tCurPathPos)..'; movement path='..repr((oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1] or {'nil'}))..' unless its prev action was to run; platoon prevaction='..(oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] or 'nil')) end
                                             if not(oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] == M27PlatoonUtilities.refActionRun) and not(oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] == M27PlatoonUtilities.refActionTemporaryRetreat) and not(oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] == M27PlatoonUtilities.refActionReturnToBase) then
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Prev action wasnt to run so updating movement path, will force a refresh of this if we havent given an override in last 5s; oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride]='..(oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] or 'nil')) end
-                                                oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tCurPathPos
-                                                --Force the platoon to refresh its movement path if we havent told it to in the last 5s and its not running
-                                                if oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] >= 5 then
+                                                if oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] >= 5 and M27Utilities.GetDistanceBetweenPositions(((oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] or {0,0,0})[(oClosestPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] or 1)] or {0,0,0}), tCurPathPos) > 10 then
                                                     if bDebugMessages == true then LOG(sFunctionRef..': Forcing a refresh of the platoon') end
-                                                    oClosestPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
-                                            --oClosestPlatoon[M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionReissueMovementPath
                                                     M27PlatoonUtilities.ForceActionRefresh(oClosestPlatoon)
-                                                    oClosestPlatoon[M27PlatoonUtilities.refbOverseerAction] = true
+                                                    oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                                    oClosestPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
                                                 end
+                                                oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tCurPathPos
                                             end
                                         end
                                         iIntelPlatoons = iIntelPlatoons - 1
@@ -1904,7 +1902,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
     --also updates previous threat group references so they know to refer to this threat group
     --if iRadius is 0 then will only add oEnemyUnit to the threat group
     --Add oEnemyUnit to sThreatGroup:
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddNearbyUnitsToThreatGroup'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -2190,7 +2188,7 @@ function RecordAvailablePlatoonAndReturnValues(aiBrain, oPlatoon, iAvailableThre
         --if oRecordedPlatoon[M27PlatoonTemplates.refbIdlePlatoon] then bIgnore = true end
     end
 
-    if bIgnore == false then
+    if bIgnore == false and oPlatoon and aiBrain:PlatoonExists(oPlatoon) then
                                                  --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly)
         oRecordedPlatoon[refiTotalThreat] = M27Logic.GetCombatThreatRating(aiBrain, oRecordedPlatoon:GetPlatoonUnits(), false, nil, nil, bIndirectThreatOnly) --returns 0 rather than nil if no threat/any issue
         if bDebugMessages == true then LOG(sFunctionRef..'; Platoon='..oPlatoon:GetPlan()..': Total threat of platoon='..oRecordedPlatoon[refiTotalThreat]..'; number of units in platoon='..table.getn(oRecordedPlatoon:GetPlatoonUnits())) end
@@ -2224,7 +2222,7 @@ end
 function ThreatAssessAndRespond(aiBrain)
     --Identifies enemy threats, and organises platoons which are sent to deal with them
     --NOTE: Doesnt handle naval units
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ThreatAssessAndRespond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Key config variables:
@@ -2726,8 +2724,11 @@ function ThreatAssessAndRespond(aiBrain)
                             oPlatoon[refsEnemyThreatGroup] = nil
                             if not(oPlatoon==oArmyPoolPlatoon) then --redundancy/from old code - armypool shouldnt be in availableplatoons any more
                                 oPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
-                                M27PlatoonUtilities.ForceActionRefresh(oPlatoon)
-                                oPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                if M27Utilities.IsTableEmpty(oPlatoon[M27PlatoonUtilities.reftMovementPath]) == false and M27Utilities.GetDistanceBetweenPositions((oPlatoon[M27PlatoonUtilities.reftMovementPath][(oPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] or 1)] or {0,0,0}), (tRallyPoint or {0,0,0})) > 10 then
+                                    M27PlatoonUtilities.ForceActionRefresh(oPlatoon)
+                                    oPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                elseif M27Utilities.IsTableEmpty(oPlatoon[M27PlatoonUtilities.reftMovementPath]) then oPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                end
                                 oPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tRallyPoint
                                 oPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
                                 --oPlatoon[M27PlatoonUtilities.refiLastPathTarget] = 1
@@ -2907,6 +2908,7 @@ function ThreatAssessAndRespond(aiBrain)
                                     if bDebugMessages == true then LOG(sFunctionRef..': BasePlatoonRef='..sPlatoonRef..': Considering whether base platoon should have an overseer action override. bAddedUnitsToPlatoon='..tostring(bAddedUnitsToPlatoon)..'; base platoon size='..table.getn(oBasePlatoon:GetPlatoonUnits())) end
                                     --if not(bAddedUnitsToPlatoon) then
                                     local iOverseerRefreshCountThreshold = 4
+                                    if oBasePlatoon[M27PlatoonUtilities.refbHoverInPlatoon] then iOverseerRefreshCountThreshold = iOverseerRefreshCountThreshold + 5 end
                                     if bIndirectThreatOnly == true then iOverseerRefreshCountThreshold = 9 end
                                     if M27Utilities.IsTableEmpty(oBasePlatoon[M27PlatoonUtilities.reftPrevAction]) == false then
                                         local iPrevAction = oBasePlatoon[M27PlatoonUtilities.reftPrevAction][1]
@@ -3928,6 +3930,20 @@ function SetMaximumFactoryLevels(aiBrain)
         end
         aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
     end
+
+    --Cap the number of land factories if we are building an experimental
+    local bActiveExperimental = false
+    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildLandExperimental]) == false then
+        for iRef, tSubtable in  aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildLandExperimental] do
+            if tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]:IsUnitState('Building') then
+                bActiveExperimental = true
+                break
+            end
+        end
+    end
+    if bActiveExperimental then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 4) end
+    if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(2, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
+
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]..'; aiBrain[refiMinLandFactoryBeforeOtherTypes]='..aiBrain[refiMinLandFactoryBeforeOtherTypes]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -4376,6 +4392,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             tsGameState['iEnergyNetIncome'] = aiBrain:GetEconomyTrend('ENERGY')
             tsGameState['iMassStored'] = aiBrain:GetEconomyStored('MASS')
             tsGameState['iEnergyStored'] = aiBrain:GetEconomyStored('ENERGY')
+            tsGameState['PausedUpgrades'] = aiBrain[M27EconomyOverseer.refiPausedUpgradeCount]
+            tsGameState['PowerStall active'] = tostring(aiBrain[M27EconomyOverseer.refbStallingEnergy])
 
 
             --Key unit counts:
@@ -4586,6 +4604,24 @@ function ACUInitialisation(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function RevealCiviliansToAI(aiBrain)
+    --On some maps like burial mounds civilians are revealed to human players but not AI; meanwhile on other maps even if theyre not revealed to humans, the humans will likely know where the buildings are having played the map before
+    --Thanks to Relent0r for providing code that achieved this
+
+    local iOurIndex = aiBrain:GetArmyIndex()
+    local iBrainIndex
+    local sRealState
+    for i,v in ArmyBrains do
+        iBrainIndex = v:GetArmyIndex()
+        if ArmyIsCivilian(iBrainIndex) then
+            sRealState = IsAlly(iOurIndex, iBrainIndex) and 'Ally' or IsEnemy(iOurIndex, iBrainIndex) and 'Enemy' or 'Neutral'
+            SetAlliance(iOurIndex, iBrainIndex, 'Ally')
+            WaitTicks(5)
+            SetAlliance(iOurIndex, iBrainIndex, sRealState)
+        end
+    end
+end
+
 function OverseerInitialisation(aiBrain)
     --Below may get overwritten by later functions - this is just so we have a default/non nil value
     local sFunctionRef = 'OverseerInitialisation'
@@ -4621,7 +4657,7 @@ function OverseerInitialisation(aiBrain)
 
 
     aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 4
-    aiBrain[M27FactoryOverseer.refiEngineerCap] = 70 --Max engis of any 1 tech level even if have spare mass
+    aiBrain[M27FactoryOverseer.refiEngineerCap] = 70 --Max engis of any 1 tech level even if have spare mass (note will manually increase for tech3)
     aiBrain[M27FactoryOverseer.refiDFCap] = 150 --Max direct fire units of any 1 tech level
     aiBrain[M27FactoryOverseer.refiIndirectCap] = 150 --Max indirect fire units of any 1 tech level
     aiBrain[M27FactoryOverseer.refiMAACap] = 150 --Max MAA of any 1 tech level
@@ -4697,6 +4733,8 @@ function OverseerInitialisation(aiBrain)
     ForkThread(M27MapInfo.RecordStartingPathingGroups, aiBrain)
 
     ForkThread(ACUInitialisation, aiBrain) --Gets ACU to build its first building and then form ACUMain platoon once its done
+
+    ForkThread(RevealCiviliansToAI, aiBrain)
 
     ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain) --Will figure out the speed of scouts (except seraphim)
 
@@ -4802,8 +4840,18 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
-    LOG('Distance between bomber target and approx position where bomber fires bomb='..M27Utilities.GetDistanceBetweenPositions({ 419.5, 25, 153.5 }, {362.65914916992, 60.107395172119, 202.89239501953}))
-    LOG('Distance if ignore the height difference='..M27Utilities.GetDistanceBetweenPositions({ 419.5, 25, 153.5 }, {362.65914916992, 25, 202.89239501953}))
+    --Locate Zthue with LC 35
+    local tT1Arti = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryIndirect * categories.TECH1, false, true)
+    if M27Utilities.IsTableEmpty(tT1Arti) == false then
+       for iArti, oArti in tT1Arti do
+          if M27UnitInfo.IsUnitValid(oArti) and M27UnitInfo.GetUnitLifetimeCount(oArti) == 34 then
+              LOG('Located T1 arti with LC=34; UnitState='..M27Logic.GetUnitState(oArti))
+              if oArti.PlatoonHandle then LOG('Has platoon handle with plan and count='..oArti.PlatoonHandle:GetPlan()..oArti.PlatoonHandle[M27PlatoonUtilities.refiPlatoonCount]..'; PlatoonUC='..oArti.PlatoonHandle[M27PlatoonUtilities.refiPlatoonUniqueCount]..'; Shoudl the platoon have an active cycler='..tostring(oArti.PlatoonHandle[M27PlatoonUtilities.refbPlatoonLogicActive]))
+              else LOG('Doesnt have a platoon handle')
+              end
+          end
+       end
+    end
 end
 
 
@@ -4863,6 +4911,7 @@ function OverseerManager(aiBrain)
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
 
         if aiBrain.M27IsDefeated then break end
+        TestCustom(aiBrain)
         --ForkThread(TestNewMovementCommands, aiBrain)
 
         if bDebugMessages == true then

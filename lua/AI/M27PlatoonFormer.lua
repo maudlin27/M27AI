@@ -42,7 +42,6 @@ function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately
     if sPlatoonPlan == nil then
         M27Utilities.ErrorHandler('sPlatoonPlan is nil')
     else
-        if sPlatoonPlan == 'M27MobileShield' then bDebugMessages = false end
         local tPlatoonTemplate = M27PlatoonTemplates.PlatoonTemplate[sPlatoonPlan]
         if M27Utilities.IsTableEmpty(tPlatoonTemplate) == true then
             M27Utilities.ErrorHandler('Dont have a platoon template for sPlatoonPlan='..sPlatoonPlan)
@@ -1457,7 +1456,7 @@ function AssignIdlePlatoonUnitsToPlatoons(aiBrain)
 end
 
 function CheckForIdleMobileLandUnits(aiBrain)
-    --Assigns any units without a platoon to the relevant platoon handle
+    --Assigns any units without a platoon to the relevant platoon handle; also checks for idle platoons
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CheckForIdleMobileLandUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1480,7 +1479,20 @@ function CheckForIdleMobileLandUnits(aiBrain)
         end
     end
     aiBrain[refbUsingMobileShieldsForPlatoons] = not(bHaveIdleMobileShield)
+
+    for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
+        --Do we have a platoon that still exists, and is flagged as having run a platoon cycle at least once, but which hasnt run it for some time
+        --e.g. rare bug when merging platoons that causes the platoon units are merged into to stop its cycler from working - not able to figure out why, so this is a basic patch instead
+        if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) and aiBrain:PlatoonExists(oPlatoon) and oPlatoon[M27PlatoonUtilities.refiTimeOfLastRefresh] then
+            if GetGameTimeSeconds() - oPlatoon[M27PlatoonUtilities.refiTimeOfLastRefresh] > 5 then
+                --Have an idle platoon, try to restart its logic
+                oPlatoon[M27PlatoonUtilities.refbPlatoonLogicActive] = false
+                ForkThread(M27PlatoonUtilities.PlatoonCycler, oPlatoon)
+            end
+        end
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
 end
 
 function SetupIdlePlatoon(aiBrain, sPlan)

@@ -120,7 +120,8 @@ function SafeToGetACUUpgrade(aiBrain)
                 --Does ACU have an assigned scout that is nearby, or does it have sufficient intel coverage
                 local tNearbyEnemies
 
-                if M27UnitInfo.IsUnitUnderwater(oACU) then bIsSafe = true
+                --Are we either underwater, or are a cloaked ACU not in enemy omni range?
+                if M27UnitInfo.IsUnitUnderwater(oACU) or (oACU:HasEnhancement('CloakingGenerator') and not(IsLocationNearEnemyOmniRange(aiBrain, oACU:GetPosition(), 3))) then bIsSafe = true
                 else
                     --Are we near to enemy base and not near ours?
                     local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
@@ -208,7 +209,7 @@ function SafeToGetACUUpgrade(aiBrain)
                                 end
 
 
-                                if M27Logic.IsLineBlocked(tACUPos, tCurPositionToCheck) then
+                                if M27Logic.IsLineBlocked(aiBrain, tACUPos, tCurPositionToCheck) then
                                     iBlockedShots = iBlockedShots + 1
                                     if bDebugMessages == true then LOG(sFunctionRef..': expect a shot is blocked, iBlockedShots='..iBlockedShots..'; iMaxBlockedShots='..iMaxBlockedShots) end
                                     if iBlockedShots >= iMaxBlockedShots then

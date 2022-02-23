@@ -252,7 +252,7 @@ end
 
 function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
     --Clears a units commands and trackers and tells it to move ot the nearest rally point; if bDontIssueCommands is true then instead just clears trackers and nothing else
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearAirUnitAssignmentTrackers'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27UnitInfo.GetUnitTechLevel(oAirUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 1 then bDebugMessages = true end
@@ -611,7 +611,7 @@ end
 function TrackBomberTarget(oBomber, oTarget, iPriority)
     local sFunctionRef = 'TrackBomberTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oBomber='..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; oTarget='..oTarget:GetUnitId()..'; iPriority='..(iPriority or 'nil')..'; bomber cur target number='..(oBomber[refiCurTargetNumber] or 'nil')) end
     if oBomber[reftTargetList] == nil then oBomber[reftTargetList] = {} end
     table.insert(oBomber[reftTargetList], {[refiShortlistPriority] = iPriority, [refiShortlistUnit] = oTarget})
@@ -663,7 +663,6 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateBomberTargets'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oBomber:GetUnitId()) then bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
     local bRemoveCurTarget
     local tTargetPos
@@ -1069,7 +1068,7 @@ function AirThreatChecker(aiBrain)
 end
 
 function RecordAvailableAndLowFuelAirUnits(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAvailableAndLowFuelAirUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Updates aiBrain trackers to record units with and without enough fuel
@@ -1498,7 +1497,7 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
                                         end
                                     end
                                 end
-                                if not(bAlreadyTryingToRefuel) then
+                                if not(bAlreadyTryingToRefuel) and not(oUnit:IsUnitState('Attached')) then
                                     ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
                                     IssueClearCommands({ oUnit})
                                     IssueTransportLoad({ oUnit }, oStaging)
@@ -2144,7 +2143,12 @@ function GetBomberTargetShortlist(aiBrain)
     else
         --Do we have enemies near our base? If so then target only these for now
         if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[refiBomberDefencePercentRange] or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= 150 then
-            reftPriorityTargetCategories = {M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+            --Ignore enemy AA buildings if we only have T1 bombers
+            if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 then
+                reftPriorityTargetCategories = {M27UnitInfo.refCategoryGroundAA - categories.STRUCTURE, M27UnitInfo.refCategoryMobileLand - categories.COMMAND, M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryGroundAA, categories.COMMAND}
+            else
+                reftPriorityTargetCategories = {M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand - categories.COMMAND, M27UnitInfo.refCategoryStructure, categories.COMMAND}
+            end
             iMaxSearchRange = math.max(150, aiBrain[M27Overseer.refiPercentageOutstandingThreat] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) + 25
             aiBrain[refiLowPriorityStart] = 4
             iFriendlyUnitNormalSearchRange = 0
@@ -2178,16 +2182,16 @@ function GetBomberTargetShortlist(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T3 power so will focus on mexes') end
                 end
             else
-                --T1 air fac - target anything, but dont go too far onto enemy side of the map
+                --T1 air fac - target anything except ACU, but dont go too far onto enemy side of the map
                 if aiBrain[M27Overseer.refiScoutShortfallIntelLine] > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryRadar - categories.TECH1) == 0 then
                     iMaxPercentDistance = 0.6
                 end
 
                 if GetGameTimeSeconds() <= 360 then
-                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryT1Mex, M27UnitInfo.refCategoryRadar + M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryMAA}
+                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryLandCombat - categories.COMMAND + M27UnitInfo.refCategoryMAA, M27UnitInfo.refCategoryMex}
                     aiBrain[refiLowPriorityStart] = 3
                 else
-                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryMex + M27UnitInfo.refCategoryGroundAA + M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryLandCombat - categories.COMMAND, M27UnitInfo.refCategoryStructure, categories.COMMAND}
+                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryMex + M27UnitInfo.refCategoryGroundAA + M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryLandCombat - categories.COMMAND - M27UnitInfo.refCategoryStructureAA, M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryStructureAA, categories.COMMAND}
                     aiBrain[refiLowPriorityStart] = 2
                 end
 
@@ -2366,7 +2370,7 @@ function GetBomberTargetShortlist(aiBrain)
                                             end
                                         end
                                     end
-                                elseif bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistanceToEnemy='..iCurDistanceToEnemy..'; is a mex/factory too close to enemy base')
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistanceToEnemy='..(iCurDistanceToEnemy or 'nil')..'; is a mex/factory too close to enemy base')
                                 end
                             end
                         end
@@ -2574,7 +2578,8 @@ function GetBomberPreTargetViaPoint(oBomber, tGroundTarget)
         if bDebugMessages == true then LOG(sFunctionRef..': Via point if dont limit to map area='..repr(M27Utilities.MoveInDirection(tGroundTarget, iAngleFromTargetToBomber, iDistanceWanted))..'; via point if limit to map area='..repr(M27Utilities.MoveInDirection(tGroundTarget, iAngleFromTargetToBomber, iDistanceWanted, true))) end
         tPossibleViaPoint = M27Utilities.MoveInDirection(tGroundTarget, iAngleFromTargetToBomber, iDistanceWanted, true)
         tPossibleViaPoint = {tPossibleViaPoint[1], tGroundTarget[2] + 25, tPossibleViaPoint[3]}
-        if GetSurfaceHeight(tPossibleViaPoint[1], tPossibleViaPoint[3]) >= tPossibleViaPoint[2] or M27Logic.IsLineBlocked(tPossibleViaPoint, tGroundTarget, iAOE) then
+        local aiBrain = oBomber:GetAIBrain()
+        if GetSurfaceHeight(tPossibleViaPoint[1], tPossibleViaPoint[3]) >= tPossibleViaPoint[2] or M27Logic.IsLineBlocked(aiBrain, tPossibleViaPoint, tGroundTarget, iAOE) then
             --Need to find a new via point to make sure our shot isnt blocked
             if bDebugMessages == true then LOG(sFunctionRef..': Ground target='..repr(tGroundTarget)..'; initial expected position='..repr(tPossibleViaPoint)..'; line is blocked so will try alternative positions') end
 
@@ -2582,7 +2587,7 @@ function GetBomberPreTargetViaPoint(oBomber, tGroundTarget)
                 for iAngleFactor = -1, 1, 2 do
                     tPossibleViaPoint = M27Utilities.MoveInDirection(tGroundTarget, iAngleFromTargetToBomber + iAngleAdjust * iAngleFactor, iDistanceWanted, true)
                     tPossibleViaPoint = {tPossibleViaPoint[1], tGroundTarget[2] + 25, tPossibleViaPoint[3]}
-                    if not(M27Logic.IsLineBlocked(tPossibleViaPoint, tGroundTarget, iAOE)) then
+                    if not(M27Logic.IsLineBlocked(aiBrain, tPossibleViaPoint, tGroundTarget, iAOE)) then
                         tViaPoint = tPossibleViaPoint
                         if bDebugMessages == true then
                             LOG(sFunctionRef..': Found a valid via point='..repr(tViaPoint)..'; will draw in gold')
@@ -2857,7 +2862,7 @@ function AirBomberManager(aiBrain)
         aiBrain[refiTimesThatHaveMetLargeAttackThreshold] = 0
     else
         aiBrain[refiBombersWanted] = 0
-        if iSpareBombers >= aiBrain[refiLargeBomberAttackThreshold] and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) then
+        if iSpareBombers >= aiBrain[refiLargeBomberAttackThreshold] and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) and GetGameTimeSeconds() >= 600 then
             if bDebugMessages == true then LOG(sFunctionRef..': Have enough bombers for a large attack') end
             --Get the number of completely unassigned bombers
             local iIdleBomberCount = 0

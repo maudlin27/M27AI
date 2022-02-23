@@ -17,6 +17,8 @@ iTimeOfLastBrainAllDefeated = 0 --Used to avoid massive error spamming if all br
 
 refiEnemyScoutSpeed = 'M27LogicEnemyScoutSpeed' --expected speed of the nearest enemy's land scouts
 
+refiIdleCount = 'M27UnitIdleCount' --Used to track how long a unit has been idle with the isunitidle check
+
 function GetUnitState(oUnit)
     --Returns a string containing oUnit's unit state
     local sUnitState = ''
@@ -1877,10 +1879,10 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsUnitIdle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
         --Note this is increased for engineers with an action to build a T3 mex
-    local refiIdleCount = 'M27UnitIdleCount'
     --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit) and (M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 59) then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is idle; unit state='..(GetUnitState(oUnit) or 'nil')) end
@@ -1986,7 +1988,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
             oUnit[refiIdleCount] = oUnit[refiIdleCount] + 1
         end
         if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildT3MexOverT2 and not(oUnit[M27EngineerOverseer.rebToldToStartBuildingT3Mex]) then
-            iIdleCountThreshold = 60
+            iIdleCountThreshold = 60 --can take a long time to start building if units nearby blocking the mex or if pathfinding issues due to units
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..oUnit[refiIdleCount]..'; Idle threshold='..iIdleCountThreshold..'; if >= idle threshold then will return true. Engineer action (nil for non engineers)='..(oUnit[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -2936,8 +2938,44 @@ function GetDirectFireWeaponPosition(oFiringUnit)
     return tShotStartPosition
 end
 
-function IsLineBlocked(tShotStartPosition, tShotEndPosition, iAOE)
+function IsLineBlockedAborted(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
+    --NOTE: Attempted use of new function CheckBlockingTerrain but it just seemed to return that there was blocking terrain every time when there wasnt, unless documentation is wrong; have left code as will want to investigate at a future point when look to optimise more
     --If iAOE is specified then will end once reach the iAOE range
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IsLineBlocked'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bShotIsBlocked = false
+    local iFlatDistance = M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition)
+    local tTerrainPositionAtPoint = {}
+    if iFlatDistance > 1 then
+        --[[Returns true in case terrain is not blocking weapon fire from attackPosition to targetPosition.
+        -- @param attackPosition  Table with position {x, y z}
+        -- @param targetPosition position Table with position {x, y z}
+        -- @param arcType Types: 'high', 'low', 'none'.
+        -- @return true/false
+        function CAiBrain:CheckBlockingTerrain(attackPosition, targetPosition, arcType)--]]
+        if iAOE and iAOE > 0 then
+            local iDistanceFromStartToEnd = M27Utilities.GetDistanceBetweenPositions(tShotEndPosition, tShotStartPosition)
+            if iDistanceFromStartToEnd > iAOE then
+                tShotEndPosition = M27Utilities.MoveTowardsTarget(tShotEndPosition, tShotStartPosition,  iAOE, 0)
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..': AOE is greater than distance between positions so returning false') end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return false
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': bShotIsBlocked pre checking for blocking terrain='..tostring(bShotIsBlocked)) end
+        bShotIsBlocked = not(aiBrain:CheckBlockingTerrain(tShotStartPosition, tShotEndPosition, 'none'))
+        if bDebugMessages == true then LOG(sFunctionRef..': bShotIsBlocked post checking for blocking terrain='..tostring(bShotIsBlocked)) end
+    else bShotIsBlocked = false
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return bShotIsBlocked
+end
+
+function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
+    --If iAOE is specified then will end once reach the iAOE range
+    --(aiBrain included as argument as want to retry CheckBlockingTerrain in the future)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLineBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -3044,8 +3082,13 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
                 tShotEndPosition = tTargetUnitDefaultPosition
                 if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a bone to target for target unit, so using its position instaed='..repr(tShotEndPosition)) end
             else
-                if tTargetUnitDefaultPosition[2] > tShotStartPosition[2] then tShotEndPosition = oTargetUnit:GetPosition(sLowestBone)
-                else tShotEndPosition = oTargetUnit:GetPosition(sHighestBone) end
+                if tTargetUnitDefaultPosition[2] > tShotStartPosition[2] then
+                    tShotEndPosition = oTargetUnit:GetPosition(sLowestBone)
+                    --if tShotEndPosition[2] - GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) > 0.1 then tShotEndPosition[2] = math.max(GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) + 0.1, tShotEndPosition[2] - 0.2) end
+                else
+                    tShotEndPosition = oTargetUnit:GetPosition(sHighestBone)
+                    --if tShotEndPosition[2] - GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) > 0.1 then tShotEndPosition[2] = math.max(GetSurfaceHeight(tShotEndPosition[1], tShotEndPosition[3]) + 0.1, tShotEndPosition[2] - 0.2) end
+                end
                 if bDebugMessages == true then LOG(sFunctionRef..': HighestBone='..sHighestBone..'; lowest bone='..sLowestBone..'; tShotEndPosition='..repr(tShotEndPosition)) end
             end
             --Have the shot end and start positions; Now check that not firing at underwater target
@@ -3053,7 +3096,7 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
                 bShotIsBlocked = true
             else
                 --Have the shot end and start positions; now want to move along a line between the two and work out if terrain will block the shot
-                bShotIsBlocked = IsLineBlocked(tShotStartPosition, tShotEndPosition)
+                bShotIsBlocked = IsLineBlocked(oFiringUnit:GetAIBrain(), tShotStartPosition, tShotEndPosition)
             end
         end
     end

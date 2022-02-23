@@ -555,12 +555,26 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any T2 PD further away') end
                         tEnemyPointDefence = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH2 + categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH3, tUnitPosition, iInitialT2PDSearchRange, 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyPointDefence) == false then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have enemy T2 defence that can hit us but is out of our range - considering if shot is blocked') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have enemy T2 defence that can hit us but is out of our range - considering if OC it will bring us in range of T1 PD, and/or if shot is blocked') end
+                            local tNearbyT1PD
+                            local iNearestT1PD = 10000
+                            local iCurDistance
+                            if iInitialT2PDSearchRange - iACURange > 0 then tNearbyT1PD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryPD * categories.TECH1, tUnitPosition, iInitialT2PDSearchRange - iACURange, 'Enemy') end
+                            if M27Utilities.IsTableEmpty(tNearbyT1PD) == false then
+                                for iT1PD, oT1PD in tNearbyT1PD do
+                                    iCurDistance = M27Utilities.GetDistanceBetweenPositions(oT1PD:GetPosition(), tUnitPosition)
+                                    if iCurDistance < iNearestT1PD then iNearestT1PD = iCurDistance end
+                                end
+                            end
+
                             for iUnit, oEnemyT2PD in tEnemyPointDefence do
-                                if M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT2PD) == false then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Setting target to T2 PD') end
-                                    oOverchargeTarget = oEnemyT2PD
-                                    break
+                                --Can we get in range of the T2 PD without getting in range of the T1 PD? (approximates just based on distances rather than considering the likely path to take)
+                                if M27Utilities.GetDistanceBetweenPositions(oEnemyT2PD:GetPosition(), tUnitPosition) - iACURange + 2 < iNearestT1PD then
+                                    if M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT2PD) == false then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Setting target to T2 PD') end
+                                        oOverchargeTarget = oEnemyT2PD
+                                        break
+                                    end
                                 end
                             end
                         end

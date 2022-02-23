@@ -25,7 +25,7 @@ refoNearestT2MexToBase = 'M27EconomyNearestT2MexToBase' --As per t2mexesnearbase
 refbWillCtrlKMex = 'M27EconomyWillCtrlKMex' --true if mex is marked for ctrl-k
 
 local reftUpgrading = 'M27UpgraderUpgrading' --[x] is the nth building upgrading, returns the object upgrading
-local refiPausedUpgradeCount = 'M27UpgraderPausedCount' --Number of units where have paused the upgrade
+refiPausedUpgradeCount = 'M27UpgraderPausedCount' --Number of units where have paused the upgrade
 local refbUpgradePaused = 'M27UpgraderUpgradePaused' --flags on particular unit if upgrade has been paused or not
 
 local refiEnergyStoredLastCycle = 'M27EnergyStoredLastCycle'
@@ -572,6 +572,20 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
                 end
             end
         end
+        --Re-do without the safe to upgrade check if we are overflowing mass
+        if iPotentialUnits == 0 and M27Utilities.IsTableEmpty(tAllUnits) == false and aiBrain:GetEconomyStoredRatio('MASS') >= 0.9 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not(aiBrain[refbStallingEnergy]) and aiBrain[refiEnergyNetBaseIncome] >= 10 * aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain[refiMassNetBaseIncome] >= 0.5 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are overflowing mass so will redo check without checking if its safe to upgrade the mex') end
+            for iUnit, oUnit in tAllUnits do
+                if M27UnitInfo.IsUnitValid(oUnit) and not(M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, true) == nil) and not(oUnit:IsUnitState('Upgrading')) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a unit that is available for upgrading; iUnit='..iUnit..'; Unit ref='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                    if not(oUnit[refbWillCtrlKMex]) then
+                        iPotentialUnits = iPotentialUnits + 1
+                        tPotentialUnits[iPotentialUnits] = oUnit
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a potential unit to upgrade, iPotentialUnits='..iPotentialUnits) end
+                    end
+                end
+            end
+        end
         if iPotentialUnits > 0 then
             --FilterLocationsBasedOnDefenceCoverage(aiBrain, tLocationsToFilter, bAlsoNeedIntelCoverage, bNOTYETCODEDAlsoReturnClosest, bTableOfObjectsNotLocations)
             if bDebugMessages == true then LOG(sFunctionRef..': About to check if we have any safe units; defence coverage='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]) end
@@ -587,7 +601,11 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
                     if bDebugMessages == true then LOG(sFunctionRef..': no tech 1 safe units so will just get the nearest safe unit to our start') end
                 end
 
-            elseif bDebugMessages == true then LOG(sFunctionRef..': No safe units based on intel and defence coverage')
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..': No safe units based on intel and defence coverage; will only include nearest unit if we are overflowing mass') end
+                if aiBrain:GetEconomyStoredRatio('MASS') >= 0.9 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not(aiBrain[refbStallingEnergy]) and aiBrain[refiEnergyNetBaseIncome] >= 10 * aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain[refiMassNetBaseIncome] >= 0.5 then
+                    oUnitToUpgrade = M27Utilities.GetNearestUnit(tPotentialUnits, tOurStartPosition, aiBrain, false)
+                end
             end
         end
     else
@@ -659,13 +677,19 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                 if bDebugMessages == true then LOG(sFunctionRef..': Deciding whether to upgrade from T1 to T2; aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]='..aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]..'; aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) end
                 if iT1AirFactories <= 0 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade land factory as no T1 factories available to upgrade') end
-                    iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1 + M27UnitInfo.refCategoryLandFactory * categories.TECH2
+                    iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1
+                elseif iT1LandFactories <= 0 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade air factory as no T1 land factories available to upgrade') end
+                    iFactoryToUpgrade = M27UnitInfo.refCategoryAirFactory * categories.TECH1
                 else
-                    if aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 then
+                    if aiBrain[refiEnergyGrossBaseIncome] <= 42 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Energy income too low to support air fac') end
+                        iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1
+                    elseif aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade air factory as need torp bombers') end
                         iFactoryToUpgrade = M27UnitInfo.refCategoryAirFactory * categories.TECH1 + M27UnitInfo.refCategoryAirFactory * categories.TECH2
                     else
-                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain[refiEnergyGrossBaseIncome] <= 45 or aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] > 1 or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= math.min(400, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5) or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= math.min(300, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35)) then
+                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain[refiEnergyGrossBaseIncome] <= 46 or aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] > 1 or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= math.min(400, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5) or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= math.min(300, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35)) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade land factory as no T1 factories available to upgrade') end
                             iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1 + M27UnitInfo.refCategoryLandFactory * categories.TECH2
                         else
@@ -917,7 +941,7 @@ function UnpauseUpgrades(aiBrain, iMaxToUnpause)
             --First unpause any HQs that are paused
             if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == false then
                 for iHQ, oHQ in aiBrain[reftActiveHQUpgrades] do
-                    if M27UnitInfo.IsUnitValid(oHQ) then
+                    if M27UnitInfo.IsUnitValid(oHQ) and oHQ[refbUpgradePaused] then
                         InternalUnpauseUpgrade(oHQ)
                     end
                 end
@@ -1064,13 +1088,6 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     if iLandFactoryCount < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] then bWantMoreFactories = true
     elseif iAirFactoryCount < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then bWantMoreFactories = true end
 
-    local iFactoriesWanted
-    local iMexesToBaseFactoryCalcOn = math.min(iMexesOnOurSideOfMap, iMexCount)
-
-
-    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iFactoriesWanted = math.max(2, math.ceil(iMexesToBaseFactoryCalcOn * 0.2))
-    else iFactoriesWanted = math.max(4, 10, iMexesToBaseFactoryCalcOn * 0.7) end
-
     local bNormalLogic = true
     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
         bNormalLogic = false
@@ -1085,12 +1102,6 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
         end
     end
     if bNormalLogic then
-        if iLandFactoryCount < iFactoriesWanted then
-            if bDebugMessages == true then LOG(sFunctionRef..': We want more land factories; iLandFactoryCount='..iLandFactoryCount..'; iFactoriesWanted='..iFactoriesWanted) end
-            bWantMoreFactories = true
-            -- if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then bWantMoreFactories = false end
-        end
-
         local tMassThresholds = {}
         aiBrain[refiMexesUpgrading], aiBrain[refiMexesAvailableForUpgrade] = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex + refCategoryT2Mex, true)
 
@@ -1425,7 +1436,17 @@ function UpgradeMainLoop(aiBrain)
                                             if oUnitToUpgrade == nil then
                                                 --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
                                                 if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 100 then
-                                                    M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; nearest enemy to base='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat],nil, true)
+                                                    --Do we have any T1 or T2 factories or mexes within 100 of our base? If not, then we have presumably run out of units to upgrade
+                                                    local tNearbyUpgradables = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryMex - categories.TECH3 - categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 100, 'Ally')
+                                                    if M27Utilities.IsTableEmpty(tNearbyUpgradables) == false then
+                                                        --Do we own any of these
+                                                        for iUpgradable, oUpgradable in tNearbyUpgradables do
+                                                            if oUpgradable:GetAIBrain() == aiBrain and not(oUpgradable:IsUnitState('Upgrading')) then
+                                                                M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; nearest enemy to base='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; Have a T2 or below mex or factory within 100 of our base, which includes '..oUpgradable:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUpgradable),nil, true)
+                                                                break
+                                                            end
+                                                        end
+                                                    end
                                                 end
                                             end
                                         end
@@ -1439,7 +1460,7 @@ function UpgradeMainLoop(aiBrain)
                         UpgradeUnit(oUnitToUpgrade, true)
                         if bDebugMessages == true then LOG(sFunctionRef..': Finished sending order to upgrade unit') end
                     else
-                        if bDebugMessages == true then LOG('Couldnt get a unit to upgrade despite trying alternative categories.  Likely cause is that we have enemies near our base meaning poor defence coverage. UnitToUpgrade='..(oUnitToUpgrade:GetUnitId() or 'nil')) end
+                        if bDebugMessages == true then LOG('Couldnt get a unit to upgrade despite trying alternative categories.  Likely cause is that we have enemies near our base meaning poor defence coverage') end
                     end
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have anything to upgrade') end

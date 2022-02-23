@@ -54,7 +54,7 @@ PlatoonTemplate = {
             [refbAttackMove] = true,
             [reftPlatoonsToAmalgamate] = { 'M27AttackNearestUnits' },
             [refiPlatoonAmalgamationRange] = 20,
-            [refiPlatoonAmalgamationMaxSize] = 20,
+            [refiPlatoonAmalgamationMaxSize] = 10,
             [refbUsedByThreatDefender] = true,
             [refbWantsShieldEscort] = true,
         },
@@ -114,7 +114,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = { 'M27CombatPatrolAI' },
         [refiPlatoonAmalgamationRange] = 50,
         [refbUsedByThreatDefender] = true,
-        [refiPlatoonAmalgamationMaxSize] = 50,
+        [refiPlatoonAmalgamationMaxSize] = 20,
         [refbWantsShieldEscort] = true,
     },
     ['M27LargeAttackForce'] =
@@ -134,7 +134,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = { 'M27MexLargerRaiderAI', 'M27MexRaiderAI', 'M27AttackNearestUnits' },
         [refiPlatoonAmalgamationRange] = 28,
-        [refiPlatoonAmalgamationMaxSize] = 65,
+        [refiPlatoonAmalgamationMaxSize] = 40,
         [refbWantsShieldEscort] = true,
     },
     ['M27GroundExperimental'] =
