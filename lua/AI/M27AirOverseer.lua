@@ -922,6 +922,7 @@ end
 function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
     local sFunctionRef = 'DelayedBomberTargetRecheck'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    CheckIfTargetHardToHit(oBomber, oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit])
     WaitSeconds(iDelayInSeconds)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27UnitInfo.IsUnitValid(oBomber) then
@@ -943,41 +944,43 @@ end
 function CheckIfTargetHardToHitBase(oBomber, oTarget)
     local sFunctionRef = 'CheckIfTargetHardToHitBase'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --Ignore if dealing with experimental bomber
-    if not(EntityCategoryContains(categories.EXPERIMENTAL, oBomber:GetUnitId())) then
-        local iUnitCurHealth, iMaxShield = GetCurrentAndMaximumShield(oTarget)
-        iUnitCurHealth = iUnitCurHealth + oTarget:GetHealth()
-        local iUnitPrevMaxHealth = oTarget:GetMaxHealth() + iMaxShield
-        local iPrevHealth = iUnitCurHealth
-        local bFailedAttack = false
-        --Have used 0.5s longer than micro time as not a precise measure
-        local iTimeToRun = 1.25
-        if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then
-            iTimeToRun = 2
-        elseif EntityCategoryContains(categories.TECH3, oBomber:GetUnitId()) then
-            iTimeToRun = 3
-        end --Some t2 bombers do damage in a spread (cybran, uef)
-        WaitSeconds(iTimeToRun)
-        if M27Utilities.IsUnitValid(oBomber) and oTarget and not(oTarget.Dead) then
-            iUnitCurHealth, iMaxShield = GetCurrentAndMaximumShield(oTarget)
+    if M27UnitInfo.IsUnitValid(oBomber) and M27UnitInfo.IsUnitValid(oTarget) then
+        --Ignore if dealing with experimental bomber
+        if not(EntityCategoryContains(categories.EXPERIMENTAL, oBomber:GetUnitId())) then
+            local iUnitCurHealth, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oTarget)
             iUnitCurHealth = iUnitCurHealth + oTarget:GetHealth()
-            --has the target not gained veterancy (as if it has this may have caused health to increase)?
-            if iMaxShield + oTarget:GetMaxHealth() <= iUnitPrevMaxHealth then
-                --Has the target taken damage that hasnt been fully repaired by our attack?
-                if iUnitCurHealth >= iPrevHealth + 1 then
-                    --Are there nearby shields that might have protected the target?
-                    if M27Logic.IsTargetUnderShield(oBomber:GetAIBrain(), oTarget, 0) == false then
-                        bFailedAttack = true
+            local iUnitPrevMaxHealth = oTarget:GetMaxHealth() + iMaxShield
+            local iPrevHealth = iUnitCurHealth
+            local bFailedAttack = false
+            --Have used 1s longer than micro time as not a precise measure
+            local iTimeToRun = 1.75
+            if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then
+                iTimeToRun = 2.5
+            elseif EntityCategoryContains(categories.TECH3, oBomber:GetUnitId()) then
+                iTimeToRun = 3.5
+            end --Some t2 bombers do damage in a spread (cybran, uef)
+            WaitSeconds(iTimeToRun)
+            if M27UnitInfo.IsUnitValid(oTarget) then
+                iUnitCurHealth, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oTarget)
+                iUnitCurHealth = iUnitCurHealth + oTarget:GetHealth()
+                --has the target not gained veterancy (as if it has this may have caused health to increase)?
+                if iMaxShield + oTarget:GetMaxHealth() <= iUnitPrevMaxHealth then
+                    --Has the target taken damage that hasnt been fully repaired by our attack?
+                    if iUnitCurHealth >= iPrevHealth + 1 then
+                        --Are there nearby shields that might have protected the target?
+                        if M27Logic.IsTargetUnderShield(oBomber:GetAIBrain(), oTarget, 0) == false then
+                            bFailedAttack = true
+                        end
                     end
                 end
-            end
-            if bFailedAttack == true then
-                oTarget[refiFailedHitCount] = (oTarget[refiFailedHitCount] or 0) + 1
-            else oTarget[refiFailedHitCount] = 0
-            end
-            if oTarget[refiFailedHitCount] >= 2 then
-                --Reassign targets
-                ForkThread(UpdateBomberTargets, oBomber, false)
+                if bFailedAttack == true then
+                    oTarget[refiFailedHitCount] = (oTarget[refiFailedHitCount] or 0) + 1
+                else oTarget[refiFailedHitCount] = 0
+                end
+                if oTarget[refiFailedHitCount] >= 2 then
+                    --Reassign targets
+                    ForkThread(UpdateBomberTargets, oBomber, false)
+                end
             end
         end
     end
@@ -2171,16 +2174,26 @@ function GetBomberTargetShortlist(aiBrain)
                     iEnemyT3Power = iEnemyT3Power + math.floor(oBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) / 6)
                     if iEnemyT3Power > 0 then break end
                 end
+                --Target enemy T3 MAA if they have land experimental, or else risk suiciding all bombers at the land experimental
+                local iLandExperimentalCat = M27UnitInfo.refCategoryLandExperimental
+                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then iLandExperimentalCat = iLandExperimentalCat + M27UnitInfo.refCategoryMAA * categories.TECH3 end
 
                 if iEnemyT3Power == 0 then --Enemies dont have any T3 power constructed, so if we target T2 power we might power stall them
-                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
-                    aiBrain[refiLowPriorityStart] = 12
+                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                    aiBrain[refiLowPriorityStart] = 11 --if changing this also change the poitn at which to insert
                     if bDebugMessages == true then LOG(sFunctionRef..': Enemy has no T3 power so will focus down any T2 power first') end
                 else --Enemy has T3 power so focus on mexes rather than power
-                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
-                    aiBrain[refiLowPriorityStart] = 8
+                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                    aiBrain[refiLowPriorityStart] = 7 --if changing this also change the poitn at which to insert
                     if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T3 power so will focus on mexes') end
                 end
+                --Insert priority targeting of mobile T3 MAA and land experimentals if they ahve land experimental
+                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
+                    table.insert(reftPriorityTargetCategories, 2 + (11 - 7), M27UnitInfo.refCategoryLandExperimental)
+                    table.insert(reftPriorityTargetCategories, 2 + (11 - 7), M27UnitInfo.refCategoryMAA * categories.TECH3)
+                end
+
+
             else
                 --T1 air fac - target anything except ACU, but dont go too far onto enemy side of the map
                 if aiBrain[M27Overseer.refiScoutShortfallIntelLine] > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryRadar - categories.TECH1) == 0 then

@@ -4911,7 +4911,7 @@ function OverseerManager(aiBrain)
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
 
         if aiBrain.M27IsDefeated then break end
-        TestCustom(aiBrain)
+
         --ForkThread(TestNewMovementCommands, aiBrain)
 
         if bDebugMessages == true then

@@ -1524,6 +1524,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
         local iHealthPercentage
         local bOurUnits = false
         local iHealthFactor --if unit has 40% health, then threat reduced by (1-40%)*iHealthFactor
+        local iCurShield, iMaxShield
 
         for iUnit, oUnit in tUnits do
             iCurThreat = 0
@@ -1609,7 +1610,13 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                     end
                     if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit) then iMassMod = iMassMod * 2 end
                     iMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
+
+
+                    iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                     iHealthPercentage = oUnit:GetHealthPercent()
+                    if iMaxShield > 0 and iHealthPercentage > 0 then
+                        iHealthPercentage = (oUnit:GetHealth() + iCurShield) / (oUnit:GetHealth() / oUnit:GetHealthPercent() + iMaxShield)
+                    end
                     --Reduce threat by health, with the amount depending on if its an ACU and if its an enemy
                     if iMassMod > 0 then
                         if M27Utilities.IsACU(oUnit) == true then
@@ -2256,6 +2263,112 @@ function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPass
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tAllTargetLocations
 
+end
+
+function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathingType, iSegmentGroup)
+    --Considers the value of a location for being targeted by a strong combat unit such as a guncom
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetLocationValue'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local tEnemyUnits
+    local iTotalValue = 0
+
+    --Value of all nearby mexes
+    for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathingType][iSegmentGroup] do
+        if math.abs(tMex[1] - tLocation[1]) <= 30 and math.abs(tMex[3] - tLocation[3]) <= 30 then
+            --have a mex, check who has built on item
+            iTotalValue = iTotalValue + 25
+            tEnemyUnits = GetUnitsInRect(Rect(tLocation[1]-0.2, tLocation[3]-0.2, tLocation[1]+0.2, tLocation[3]+0.2))
+            if M27Utilities.IsTableEmpty(tEnemyUnits) == true then
+                --Noone has the mex so of some value
+                iTotalValue = iTotalValue + 75
+            else
+                tEnemyUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryMex, tEnemyUnits)
+                if M27Utilities.IsTableEmpty(tEnemyUnits) == true then
+                    iTotalValue = iTotalValue + 75
+                else
+                    --Someone has claimed the mex, is it us or enemy?
+                    if IsEnemy(aiBrain:GetArmyIndex(), tEnemyUnits[1]:GetAIBrain():GetArmyIndex()) then
+                        iTotalValue = iTotalValue + 75 + math.max(100, tEnemyUnits[1]:GetBlueprint().Economy.BuildCostMass)
+                    end
+                end
+            end
+        end
+    end
+
+    --Factor in enemy mobile units
+    tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryEngineer, tLocation, 40, 'Enemy')
+    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+        iTotalValue = iTotalValue + GetCombatThreatRating(aiBrain, tEnemyUnits, true, nil, nil, false, false)
+    end
+
+    --Factor in reclaim: 60% of cur segment, 30% of adjacent segments (i.e. would rather target units than reclaim)
+    local iBaseReclaimSegmentX, iBaseReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tLocation)
+    iTotalValue = iTotalValue + 0.3 * M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimTotalMass]
+    for iAdjustX = -1, 1, 1 do
+        for iAdjustZ = -1, 1, 1 do
+            if iBaseReclaimSegmentX + iAdjustX > 0 and iBaseReclaimSegmentZ + iAdjustZ > 0 then
+                iTotalValue = iTotalValue + 0.3 * (M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX + iAdjustX][iBaseReclaimSegmentZ + iAdjustZ][M27MapInfo.refReclaimTotalMass] or 0)
+            end
+        end
+    end
+
+
+    --Adjust value based on distance
+    local iStartToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tStartPoint, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)])
+    local iStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPoint, tLocation)
+    local iTargetToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tLocation, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)])
+
+    --% reduction based on how much of a detour to enemy base
+    iTotalValue = iTotalValue * iStartToEnemyBase / (iStartToTarget + iTargetToEnemyBase)
+
+    --Also prioritise locations close to the ACU
+    iTotalValue = iTotalValue * (1 - 0.5 * (iStartToTarget / iStartToEnemyBase))
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return iTotalValue
+end
+
+function GetPriorityACUDestination(aiBrain, oPlatoon)
+    --Factors in reclaim, enemy units, enemy mexes, and how much of a detour the location would be from the enemy base to decide whether to go somewhere other than the enemy base
+    --Intended for use on ACU when want ACU heading into combat (e.g. it has gun upgrade)
+    --Works off platoon variable in case we want to reuse this function for other units in the future
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetPriorityACUDestination'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local tHighestValueLocation
+
+
+    if oPlatoon[M27PlatoonUtilities.refbNeedToHeal] then
+        tHighestValueLocation = M27MapInfo.GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
+    else
+        --First calculate the value for the enemy start position
+        local sPathingType = M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit])
+        local iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
+        local iHighestValueLocation = GetLocationValue(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathingType, iSegmentGroup)
+        local iCurValueLocation
+
+
+
+
+
+        --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
+        for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathingType][M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))] do
+            if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 then
+                --Check not tried going here here lots before
+                if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathingType, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
+                    iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathingType, iSegmentGroup)
+                    if iCurValueLocation > iHighestValueLocation then
+                        iHighestValueLocation = iCurValueLocation
+                        tHighestValueLocation = tMex
+                    end
+                end
+            end
+        end
+    end
+    if tHighestValueLocation == nil then tHighestValueLocation = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)] end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return tHighestValueLocation
 end
 
 function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOverride, iMaxDistanceOverride)

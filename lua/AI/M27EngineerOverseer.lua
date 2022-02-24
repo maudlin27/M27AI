@@ -3691,6 +3691,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             local iHighestFactoryOrEngineerTechAvailable = math.max(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel], iHighestTechLevelEngi)
 
             if iEngineersToConsider > 0 then
+
+
           --TEMPTEST(aiBrain, sFunctionRef..': After determined have engineers to consider')
                 --Reset action variables for any engineers that are idle (otherwise will end up having an engineer with that action thinking it can assit itself)
                 --[[ Now handled via function called whenever engineer is given action or is being made available for an action
@@ -3823,11 +3825,11 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
 
 
-
+                --Reset the number of engineers wanted
                 aiBrain[refiBOInitialEngineersWanted] = 0
                 aiBrain[refiBOPreReclaimEngineersWanted] = 0
                 aiBrain[refiBOPreSpareEngineersWanted] = 0
-                aiBrain[refiBOActiveSpareEngineers] = {0,0,0,0}
+                aiBrain[refiBOActiveSpareEngineers] = {0,0,0,0} --By tech level
 
                 local bGetInitialEngineer
                 local bAreOnSpareActions = false
@@ -3840,7 +3842,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
 
                 local iCount = 0
-                while iEngineersToConsider > 0 do
+                while iEngineersToConsider >= 0 do --want >= rather than > so get correct calculation of engineers needed
                     iCount = iCount + 1
                     if M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
                     if iCount > 100 then
@@ -4000,7 +4002,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
                                 if iAirFactories == nil then iAirFactories = 0 end
                             end
-                            if iLandFactories+iAirFactories < 3 then
+                            if iLandFactories+iAirFactories < 3 or (iLandFactories+iAirFactories < 5 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandEarly and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) then
                                 if aiBrain:GetEconomyStored('MASS') >= 100 and aiBrain:GetEconomyStored('ENERGY') >= 1000 then
                                     if iLandFactories < aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] then
                                         iActionToAssign = refActionBuildLandFactory
@@ -4900,12 +4902,12 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                                 if iMinEngiTechLevelWanted == nil then iMinEngiTechLevelWanted = 1 end
                                 if bDebugMessages == true then LOG(sFunctionRef..': iMinEngiTechLevelWanted='..iMinEngiTechLevelWanted) end
-                                tActionTargetLocation, oActionTargetObject, bClearCurrentlyAssignedEngineer = GetActionTargetAndObject(aiBrain, iActionToAssign, tExistingLocationsToPickFrom, tIdleEngineers, iCurrentConditionToTry, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinEngiTechLevelWanted)
+                                if iEngineersToConsider > 0 then tActionTargetLocation, oActionTargetObject, bClearCurrentlyAssignedEngineer = GetActionTargetAndObject(aiBrain, iActionToAssign, tExistingLocationsToPickFrom, tIdleEngineers, iCurrentConditionToTry, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinEngiTechLevelWanted) end
 
 
                                 --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore)
                                 if M27Utilities.IsTableEmpty(tActionTargetLocation) == true and oActionTargetObject == nil then
-                                    M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review if this happens repeatedly as normally shoudlnt have this happen - current examples are if want to assist a building but all of them have nearby enemies, or if try to reclaim a unit that no longer has a position. iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry)
+                                    if iEngineersToConsider > 0 then M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review if this happens repeatedly as normally shoudlnt have this happen - current examples are if want to assist a building but all of them have nearby enemies, or if try to reclaim a unit that no longer has a position. iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry) end
                                     iCurConditionEngiShortfall = iMaxEngisWanted - iExistingEngineersAssigned
                                 else
                                     if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngineersAssigned='..iExistingEngineersAssigned..'; iMinEngiTechLevelWanted='..iMinEngiTechLevelWanted) end
@@ -4947,11 +4949,11 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             if bThresholdPreReclaimEngineerCondition == false then
                                 if bThresholdInitialEngineerCondition == false then --Not got through initial conditions
                                     aiBrain[refiBOInitialEngineersWanted] = aiBrain[refiBOInitialEngineersWanted] + iCurConditionEngiShortfall
-                                    aiBrain[refiBOPreReclaimEngineersWanted] = 1
-                                    aiBrain[refiBOPreSpareEngineersWanted] = 1
+                                    aiBrain[refiBOPreReclaimEngineersWanted] = math.max(1, aiBrain[refiBOPreReclaimEngineersWanted])
+                                    aiBrain[refiBOPreSpareEngineersWanted] = math.max(1, aiBrain[refiBOPreSpareEngineersWanted])
                                 else --Have got initial engis
                                     aiBrain[refiBOPreReclaimEngineersWanted] = aiBrain[refiBOPreReclaimEngineersWanted] + iCurConditionEngiShortfall
-                                    aiBrain[refiBOPreSpareEngineersWanted] = 1
+                                    aiBrain[refiBOPreSpareEngineersWanted] = math.max(1, aiBrain[refiBOPreSpareEngineersWanted])
                                 end
                             else --Have got initial engis and pre-reclaim engis
                                 aiBrain[refiBOPreSpareEngineersWanted] = aiBrain[refiBOPreSpareEngineersWanted] + iCurConditionEngiShortfall
@@ -4964,6 +4966,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     if M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryEngineer, aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]) then
                         aiBrain[refiBOInitialEngineersWanted] = math.max(aiBrain[refiBOInitialEngineersWanted], aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] - aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer))
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurConditionEngiShortfall='..iCurConditionEngiShortfall..'; aiBrain[refiBOInitialEngineersWanted]='..aiBrain[refiBOInitialEngineersWanted]..'; aiBrain[refiBOPreReclaimEngineersWanted]='..aiBrain[refiBOPreReclaimEngineersWanted]..'; aiBrain[refiBOPreSpareEngineersWanted]='..aiBrain[refiBOPreSpareEngineersWanted]) end
+
 
 
                     if bWillBeAssigning == true then
@@ -4996,7 +5000,9 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     else
                         iCurrentConditionToTry = iCurrentConditionToTry + 1
                         if iActionToAssign == refActionSpare then
-                            M27Utilities.ErrorHandler('Werent able to assign a spare action to an engineer so likely we think an engineer is idle but we cant then locate that engineer when trying toa ssign the action - investigate')
+                            if iEngineersToConsider > 0 then
+                                M27Utilities.ErrorHandler('Werent able to assign a spare action to an engineer so likely we think an engineer is idle but we cant then locate that engineer when trying toa ssign the action - investigate')
+                            end
                             break
                         end --If we couldnt assign a spare engi action then dont want to keep going as may be in infinite loop territory
                     end

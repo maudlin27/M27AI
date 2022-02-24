@@ -3290,3 +3290,16 @@ function RecordAllRallyPoints(aiBrain)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end
+
+function CanWeMoveInSameGroupInLineToTarget(sPathingType, tStart, tEnd)
+    --If we move in a line to the target, are there any pathing issues? Use front unit rather than pathing unit
+    local iStartingGroup = GetSegmentGroupOfLocation(sPathingType, tStart)
+    local iAngle = M27Utilities.GetAngleFromAToB(tStart, tEnd)
+    for iCurPoint = 1, math.floor(M27Utilities.GetDistanceBetweenPositions(tStart, tEnd)) - 1 do
+        if not(iStartingGroup == GetSegmentGroupOfLocation(sPathingType, M27Utilities.MoveInDirection(tStart, iAngle, iCurPoint, true))) then
+            return false
+        end
+    end
+    return true
+end
+

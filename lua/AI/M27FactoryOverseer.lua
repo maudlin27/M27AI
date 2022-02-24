@@ -357,8 +357,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                 if bIsLandFactory then
                     if iStrategy == M27Overseer.refStrategyLandEarly then
                         if iCurrentConditionToTry == 1 then --Build tank if nearby enemies
+                            if bDebugMessages == true then LOG(sFunctionRef..': Emergency defence - iNearbyEnemies='..iNearbyEnemies) end
                             if iNearbyEnemies > 0 then iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                         elseif iCurrentConditionToTry == 2 then --Emergency MAA (want in priority to everything except really near tank
+                            if bDebugMessages == true then LOG(sFunctionRef..': refbEmergencyMAANeeded='..tostring(aiBrain[M27Overseer.refbEmergencyMAANeeded])..'; aiBrain[M27Overseer.refiMAAShortfallBase]='..(aiBrain[M27Overseer.refiMAAShortfallBase] or 0)) end
                             if aiBrain[M27Overseer.refbEmergencyMAANeeded] == true then
                                 iCategoryToBuild = refCategoryMAA
                                 iTotalWanted = math.max(1, aiBrain[M27Overseer.refiMAAShortfallBase])
@@ -745,19 +747,20 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = 5 - aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers][aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]]
                                             if aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] < 2 then iTotalWanted = iTotalWanted - aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted] end
                                         end
-                                    elseif aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == true then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Are using tanks for platoons so will build a tank') end
-                                        iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
                                     else
                                         bReachedLastOption = true
-                                        --Are we about to overflow mass?
-                                        if aiBrain:GetEconomyStored('MASS') >= 3000 or aiBrain:GetEconomyStoredRatio('MASS') >= 0.9 or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and aiBrain:GetEconomyStored('MASS') >= 1000 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0.1) then
-                                            iCategoryToBuild = refCategoryEngineer
-                                            iTotalWanted = 100
+                                        if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == true then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Are using tanks for platoons so will build a tank') end
+                                            iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
                                         else
-                                            iCategoryToBuild = aiBrain[refiLastPriorityCategoryToBuild]
-                                            bTemporaryPause = true
-
+                                            --Are we about to overflow mass?
+                                            if aiBrain:GetEconomyStored('MASS') >= 3000 or aiBrain:GetEconomyStoredRatio('MASS') >= 0.9 or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and aiBrain:GetEconomyStored('MASS') >= 1000 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0.1) then
+                                                iCategoryToBuild = refCategoryEngineer
+                                                iTotalWanted = 100
+                                            else
+                                                iCategoryToBuild = aiBrain[refiLastPriorityCategoryToBuild]
+                                                bTemporaryPause = true
+                                            end
                                         end
                                     end
                                 else
@@ -1274,7 +1277,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                 else
                     if iCurrentConditionToTry > iMaxLoop then
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurrentCondition exceeds max loop so will abort') end
-                        M27Utilities.ErrorHandler('reached max loop determining what to build, need to try and stop sooner for efficiency; bIsLandFactory='..tostring(bIsLandFactory)..'; bIsAirFactory='..tostring(bIsLandFactory)..'; M27GrandStrategyRef='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy], nil, true)
+                        M27Utilities.ErrorHandler('reached max loop determining what to build, need to try and stop sooner for efficiency; bIsLandFactory='..tostring(bIsLandFactory)..'; bIsAirFactory='..tostring(bIsAirFactory)..'; M27GrandStrategyRef='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy], nil, true)
                         break
                     end
                 end

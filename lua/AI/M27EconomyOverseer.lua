@@ -1001,30 +1001,43 @@ function PauseLastUpgrade(aiBrain)
             if M27UnitInfo.IsUnitValid(oUnit) then
                 if not(oUnit[refbUpgradePaused]) then
                     if oUnit:IsUnitState('Upgrading') == true then
-                        sUnitId = oUnit:GetUnitId()
-                        if bDebugMessages == true then LOG(sFunctionRef..': Unit ID='..sUnitId..'; Unit is valid and not paused so will pause it unless theres a later upgrade or its a mex and almost complete') end
-                        if not(EntityCategoryContains(refCategoryMex, sUnitId)) then
-                            iThresholdToIgnorePausing = iGeneralThresholdToIgnorePausing
-                        else
-                            bHaveMex = true
-                            iThresholdToIgnorePausing = iMexThresholdToIgnorePausing
-                        end
-
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef..': oUnit='..sUnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
-                            if oUnit.UnitBeingBuilt then
-                                LOG(sFunctionRef..': Have a unit being built')
-                                if oUnit.UnitBeingBuilt.GetUnitId then LOG(sFunctionRef..': ID of unit being built='..oUnit.UnitBeingBuilt:GetUnitId()) end
-                                if oUnit.UnitBeingBuilt.GetFractionComplete then LOG(sFunctionRef..': Fraction complete='..oUnit.UnitBeingBuilt:GetFractionComplete()) else LOG('Fraction complete is nil') end
-                            elseif oUnit.unitBeingBuilt then
-                                M27Utilities.ErrorHandler('UnitBeingBuilt sometimes is lower case so need to revise code')
-                            else
-                                if bDebugMessages == true then LOG(sFunctionRef..': unitBeingBuilt is nil') end
+                        local bIsHQUpgrade = false
+                        --Dont pause if is an HQ
+                        if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == false then
+                            for iHQ, oHQ in  aiBrain[reftActiveHQUpgrades] do
+                                if oHQ == oUnit then
+                                    bIsHQUpgrade = true
+                                    break
+                                end
                             end
                         end
-                        if oUnit.UnitBeingBuilt and oUnit.UnitBeingBuilt.GetFractionComplete and oUnit.UnitBeingBuilt:GetFractionComplete() < iThresholdToIgnorePausing then
-                            oLastUnpausedUpgrade = oUnit
-                            if not(bHaveMex) then oLastUnpausedNonMex = oLastUnpausedUpgrade end
+                        if not(bIsHQUpgrade) then
+
+                            sUnitId = oUnit:GetUnitId()
+                            if bDebugMessages == true then LOG(sFunctionRef..': Unit ID='..sUnitId..'; Unit is valid and not paused so will pause it unless theres a later upgrade or its a mex and almost complete') end
+                            if not(EntityCategoryContains(refCategoryMex, sUnitId)) then
+                                iThresholdToIgnorePausing = iGeneralThresholdToIgnorePausing
+                            else
+                                bHaveMex = true
+                                iThresholdToIgnorePausing = iMexThresholdToIgnorePausing
+                            end
+
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': oUnit='..sUnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                if oUnit.UnitBeingBuilt then
+                                    LOG(sFunctionRef..': Have a unit being built')
+                                    if oUnit.UnitBeingBuilt.GetUnitId then LOG(sFunctionRef..': ID of unit being built='..oUnit.UnitBeingBuilt:GetUnitId()) end
+                                    if oUnit.UnitBeingBuilt.GetFractionComplete then LOG(sFunctionRef..': Fraction complete='..oUnit.UnitBeingBuilt:GetFractionComplete()) else LOG('Fraction complete is nil') end
+                                elseif oUnit.unitBeingBuilt then
+                                    M27Utilities.ErrorHandler('UnitBeingBuilt sometimes is lower case so need to revise code')
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': unitBeingBuilt is nil') end
+                                end
+                            end
+                            if oUnit.UnitBeingBuilt and oUnit.UnitBeingBuilt.GetFractionComplete and oUnit.UnitBeingBuilt:GetFractionComplete() < iThresholdToIgnorePausing then
+                                oLastUnpausedUpgrade = oUnit
+                                if not(bHaveMex) then oLastUnpausedNonMex = oLastUnpausedUpgrade end
+                            end
                         end
                     end
                 end
