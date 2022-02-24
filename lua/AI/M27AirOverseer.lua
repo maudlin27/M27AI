@@ -959,7 +959,9 @@ function CheckIfTargetHardToHitBase(oBomber, oTarget)
             elseif EntityCategoryContains(categories.TECH3, oBomber:GetUnitId()) then
                 iTimeToRun = 3.5
             end --Some t2 bombers do damage in a spread (cybran, uef)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitSeconds(iTimeToRun)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             if M27UnitInfo.IsUnitValid(oTarget) then
                 iUnitCurHealth, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oTarget)
                 iUnitCurHealth = iUnitCurHealth + oTarget:GetHealth()

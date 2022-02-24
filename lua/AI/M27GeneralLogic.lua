@@ -708,7 +708,10 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                         bNoBetterTargets = true
                         M27Utilities.ErrorHandler('iTotalMexesInGroup is nil after looking for iUnitSegmentGroup1')
                     end
-                    if bNoBetterTargets == true then return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]} end
+                    if bNoBetterTargets == true then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
+                    end
                 end
             end
             if bDebugMessages == true then LOG(sFunctionRef..': iTotalMexesInGroup='..iTotalMexesInGroup..'; about to do loop') end
@@ -907,7 +910,9 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                         if iLoopCount > iMaxLoopCountBeforeChecks then
                             M27Utilities.ErrorHandler('iLoopCount has exceeded iMaxLoopCountBeforeChecks, likely infinite loop; slowing down script')
                             bDebugMessages = true --for error control - want these enabled to help debugging where get this error arising
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             WaitTicks(5)
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                         end
                         --Cycle through all of the possible targets, and pick the one furthest away that is still closer than the target
                         if bDebugMessages == true then LOG(sFunctionRef..': enemy while loop: Search for mexes: Start  of loop before loping through each mex. iLoopCount='..iLoopCount..'; iPossibleTargetCount='..iPossibleTargetCount) end
@@ -1005,7 +1010,9 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                                 iLoopCount = iLoopCount + 1
                                 if iLoopCount > iMaxLoopCountBeforeChecks then
                                     M27Utilities.ErrorHandler(sFunctionRef..': iLoopCount has exceeded iMaxLoopCountBeforeChecks, likely infinite loop; slowing down script', nil, true)
+                                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                                     WaitTicks(5)
+                                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                                 end
 
                                 if bDebugMessages == true then LOG('Friendly while loop started, iLoopCount='..iLoopCount) end
@@ -1052,9 +1059,9 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                                         break
                                     end
                                 end
-                                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                                WaitTicks(1)
                                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                                WaitTicks(1)
+                                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                                 bAbort = true
                                 if oPlatoonHandle and aiBrain and aiBrain:PlatoonExists(oPlatoonHandle) == true and oUnit and not(oUnit.Dead) then bAbort = false end
                                 if bAbort == true then
@@ -3546,7 +3553,9 @@ function ForkedCheckForAnotherMissile(oUnit)
     local sFunctionRef = 'ForkedCheckForAnotherMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if not(oUnit['M27MissileChecker'] == true) then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitSeconds(1) --make sure we have an accurate number for missiles
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         local iMissiles = 0
         if oUnit.GetTacticalSiloAmmoCount then iMissiles = iMissiles + oUnit:GetTacticalSiloAmmoCount() end
         if oUnit.GetNukeSiloAmmoCount then iMissiles = iMissiles + oUnit:GetNukeSiloAmmoCount() end
