@@ -276,8 +276,9 @@ function OnProjectileFired(oWeapon, oMuzzle)
 end--]]
 
 function OnConstructionStarted(oEngineer, oConstruction, sOrder)
+    --[[
     --Track experimental construction
-    if oEngineer:GetAIBrain().M27AI and oConstruction.GetUnitId and M27Utilities.IsTableEmpty(oEngineer:GetAIBrain()[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
+    if oEngineer.GetAIBrain and oEngineer:GetAIBrain().M27AI and oConstruction.GetUnitId and M27Utilities.IsTableEmpty(oEngineer:GetAIBrain()[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
         local aiBrain = oEngineer:GetAIBrain()
         --Check for construction of nuke
         if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] then
@@ -288,5 +289,5 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                 end
             end
         end
-    end
+    end--]]
 end
