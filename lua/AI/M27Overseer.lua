@@ -3933,8 +3933,8 @@ function SetMaximumFactoryLevels(aiBrain)
 
     --Cap the number of land factories if we are building an experimental
     local bActiveExperimental = false
-    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildLandExperimental]) == false then
-        for iRef, tSubtable in  aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildLandExperimental] do
+    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) == false then
+        for iRef, tSubtable in  aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental] do
             if tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]:IsUnitState('Building') then
                 bActiveExperimental = true
                 break
@@ -3943,6 +3943,7 @@ function SetMaximumFactoryLevels(aiBrain)
     end
     if bActiveExperimental then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 4) end
     if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(2, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
+    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) == false then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(2, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]..'; aiBrain[refiMinLandFactoryBeforeOtherTypes]='..aiBrain[refiMinLandFactoryBeforeOtherTypes]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

@@ -8,6 +8,7 @@ local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
+local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
 refiNearestEnemyIndex = 'M27NearestEnemyIndex'
@@ -3631,7 +3632,7 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
 end
 
 function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
-    --Calcualtes the most damaging location for an aoe target
+    --Calcualtes the most damaging location for an aoe target; also returns the damage dealt
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBestAOETarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -3662,5 +3663,105 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
         M27Utilities.DrawLocation(tBestTarget, nil, 5, 30)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return tBestTarget
+    return tBestTarget, iMaxTargetDamage
+end
+
+
+function ConsiderLaunchingMissile(oLauncher, oWeapon)
+    --Should be called via forkthread when missile created due to creating a loop
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ConsiderLaunchingMissile'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    oLauncher['M27LauncherLoopActive'] = true
+
+    local tTarget
+    local tEnemyUnitsOfInterest
+    local iBestTargetValue
+    local iCurTargetValue
+    local tEnemyCategoriesOfInterest
+    local aiBrain = oLauncher:GetAIBrain()
+    local iMaxRange = oWeapon.MaxRadius
+    local iMinRange = 0
+    local iAOE, iDamage
+
+    local bTML = false
+    local bSML = false
+    local bCheckForSMD = false
+    if EntityCategoryContains(M27UnitInfo.refCategoryTML, oLauncher:GetUnitId()) then bTML = true
+    elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher:GetUnitId()) then bSML = true
+    else M27Utilities.ErrorHandler('Unknown type of launcher, code to fire a missile wont work') end
+
+    if bTML or bSML then
+        if bTML then
+            tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Mex}
+            iMinRange = oWeapon.MinRadius
+            iAOE = oWeapon.DamageRadius
+            iDamage = oWeapon.Damage
+        else
+            tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo. M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL}
+            iAOE = oWeapon.NukeInnerRingRadius
+            iDamage = oWeapon.NukeInnerRingDamage
+        end
+
+        while M27UnitInfo.IsUnitValid(oLauncher) do
+            if bTML then
+                --Just target the nearest enemy unit
+                iBestTargetValue = 1000
+                for iRef, iCategory in tEnemyCategoriesOfInterest do
+                    tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
+                    if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
+                        for iUnit, oUnit in tEnemyUnitsOfInterest do
+                            iCurTargetValue = M27Utilities.GetDistanceBetweenPositions(oLauncher:GetPosition(), oUnit:GetPosition())
+                            if iCurTargetValue < iBestTargetValue and iCurTargetValue > MinRadius then
+                                iBestTargetValue = iCurTargetValue
+                                tTarget = oUnit:GetPosition()
+                            end
+                        end
+                        break
+                    end
+                end
+
+            else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
+                --First get the best location if just target the start position or locations near here
+                tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], iAOE, iDamage)
+                --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
+
+                if iBestTargetValue < 20000 then --If have high value location for nearest enemy start then just go with this
+                    for iRef, iCategory in tEnemyCategoriesOfInterest do
+                        tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
+                        if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
+                            for iUnit, oUnit in tEnemyUnitsOfInterest do
+                                iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                                --Stop looking if tried >=10 targets and have one that is at least 20k of value
+                                if iBestTargetValue > 20000 and iUnit >=10 then break end
+                            end
+                        end
+                    end
+                    if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
+                end
+                if iBestTargetValue < 12000 then tTarget = nil end
+            end
+
+            if tTarget then
+                --Launch missile
+                if bTML then IssueTactical({oLauncher}, tTarget)
+                else
+                    IssueNuke({oLauncher}, tTarget)
+                    --Restart SMD monitor after giving time for missile to fire
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                    WaitSeconds(10)
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                    M27EngineerOverseer.CheckForEnemySMD(aiBrain, oLauncher)
+                    --Send a voice taunt if havent in last 6m
+                    ForkThread(M27Chat.SendGloatingMessage, aiBrain, 10, 360)
+                end
+                break
+            end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            WaitSeconds(10)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+        end
+    end
+    oLauncher['M27LauncherLoopActive'] = false
 end

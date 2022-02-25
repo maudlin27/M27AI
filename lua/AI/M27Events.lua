@@ -255,6 +255,10 @@ function OnMissileBuilt(self, weapon)
             --Recheck every minute
             ForkThread(M27Logic.CheckIfWantToBuildAnotherMissile, self)
         end
+        --Start logic to periodically check for targets to fire the missile at (in case there are no targets initially)
+        ForkThread(M27Logic.ConsiderLaunchingMissile, self, weapon)
+
+
     end
 end
 
@@ -270,3 +274,19 @@ function OnProjectileFired(oWeapon, oMuzzle)
         LOG('Have a unit; unit position='..repr(oWeapon.unit:GetPosition()))
     end
 end--]]
+
+function OnConstructionStarted(oEngineer, oConstruction, sOrder)
+    --Track experimental construction
+    if oEngineer:GetAIBrain().M27AI and oConstruction.GetUnitId and M27Utilities.IsTableEmpty(oEngineer:GetAIBrain()[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
+        local aiBrain = oEngineer:GetAIBrain()
+        --Check for construction of nuke
+        if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] then
+            if EntityCategoryContains(aiBrain[M27EngineerOverseer.refiLastExperimentalCategory], oConstruction:GetUnitId()) then
+                --Are building a focus experimental, start tracker if its a nuke
+                if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] == M27UnitInfo.refCategorySML and not(aiBrain[M27EngineerOverseer.refbActiveSMDChecker]) then
+                    ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oConstruction)
+                end
+            end
+        end
+    end
+end
