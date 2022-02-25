@@ -14,6 +14,7 @@ local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
+local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -45,23 +46,36 @@ end
 
 function OnUnitDeath(oUnit)
     --NOTE: This is called by the death of any unit of any player, so careful with what commands are given
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
     local sFunctionRef = 'OnUnitDeath'
-    if bDebugMessages == true then LOG(sFunctionRef..'Hook successful') end
+    --if bDebugMessages == true then LOG(sFunctionRef..'Hook successful') end
     --Is it an ACU?
     if M27Utilities.IsACU(oUnit) then
         M27Overseer.iACUDeathCount = M27Overseer.iACUDeathCount + 1
         LOG(sFunctionRef..' ACU kill detected; total kills='..M27Overseer.iACUDeathCount)
+        --Update list of brains
+        local iACUBrain = oUnit:GetAIBrain()
+        for iArmyIndex, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
+            if aiBrain == iACUBrain then
+                M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
+            elseif aiBrain.M27AI then
+                ForkThread(M27Overseer.RecordAllEnemiesAndAllies, aiBrain)
+            end
+        end
     else
         --Is the unit owned by M27AI?
         if oUnit.GetAIBrain then
             local aiBrain = oUnit:GetAIBrain()
             if aiBrain.M27AI then
+                --Flag for the platoon count of units to be updated:
+                if oUnit.PlatoonHandle then oUnit.PlatoonHandle[M27PlatoonUtilities.refbUnitHasDiedRecently] = true end
+
+                --Run unit type specific on death logic
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 local sUnitBP = oUnit:GetUnitId()
                 if EntityCategoryContains(refCategoryEngineer, sUnitBP) then
                     --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Pre clear action')
-                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oUnit, true)
+                    M27EngineerOverseer.OnEngineerDeath(aiBrain, oUnit)
                     --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Post clear action')
                 elseif EntityCategoryContains(refCategoryAirScout, sUnitBP) then
                     M27AirOverseer.OnScoutDeath(aiBrain, oUnit)
@@ -86,17 +100,15 @@ end
 
 function OnDamaged(self, instigator)
 
-
     if self.GetUnitId then
         if self.GetAIBrain and not(self.Dead) then
             local aiBrain = self:GetAIBrain()
             if aiBrain.M27AI then
+                local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
                 local sFunctionRef = 'OnDamaged'
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                --Has our ACU been hit by an enemy we have no sight of?
-                if self == M27Utilities.GetACU(aiBrain) then
-                    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-                    local sFunctionRef = 'OnDamage'
+                --Has our ACU been hit by an enemy we have no sight of? Or a mex taking damage?
+                if (M27Utilities.IsACU(self) and self == M27Utilities.GetACU(aiBrain)) or (EntityCategoryContains(M27UnitInfo.refCategoryMex, self:GetUnitId()) and M27UnitInfo.IsUnitValid(self)) then
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU has just taken damage, checking if can see the unit that damaged it') end
                     --Do we have a unit that damaged us?
                     local oUnitCausingDamage
@@ -112,9 +124,18 @@ function OnDamaged(self, instigator)
                             --Can we see the unit?
                             if bDebugMessages == true then LOG(sFunctionRef..': Checking if can see the unit that dealt us damage') end
                             if not(M27Utilities.CanSeeUnit(aiBrain, oUnitCausingDamage, true)) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': cant see unit that caused damage, will ask for an air scout and flag the ACU has taken damage recently') end
-                                self[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] = GetGameTimeSeconds()
-                                self[M27Overseer.refoUnitDealingUnseenDamage] = oUnitCausingDamage
+                                if M27Utilities.IsACU(self) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': cant see unit that caused damage, will ask for an air scout and flag the ACU has taken damage recently') end
+                                    self[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] = GetGameTimeSeconds()
+                                    self[M27Overseer.refoUnitDealingUnseenDamage] = oUnitCausingDamage
+                                else
+                                    --mex taken damage for first time from unseen enemy
+                                    if not(aiBrain[M27Overseer.reftPriorityLandScoutTargets]) then aiBrain[M27Overseer.reftPriorityLandScoutTargets] = {} end
+                                    if not(aiBrain[M27Overseer.reftPriorityLandScoutTargets][self:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(self)]) then
+                                        aiBrain[M27Overseer.reftPriorityLandScoutTargets][self:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(self)] = self
+                                        M27Utilities.DelayChangeVariable(aiBrain[M27Overseer.reftPriorityLandScoutTargets], self:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(self), nil, 120)
+                                    end
+                                end
                                 --Flag that we want the location (and +- 2 segments around it) the shot came from scouted asap
                                 M27AirOverseer.MakeSegmentsAroundPositionHighPriority(aiBrain, oUnitCausingDamage:GetPosition(), 2)
                             else
@@ -125,19 +146,29 @@ function OnDamaged(self, instigator)
                             end
                             --If we're upgrading consider cancelling
 
-                            if self.IsUnitState and self:IsUnitState('Upgrading') and self:GetWorkProgress() <= 0.3 and EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage:GetUnitId()) and M27Conditions.DoesACUHaveGun(aiBrain, false, self) then
-                                --Do we have nearby friendly units?
-                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
-                                    --Is the unit within range of us?
-                                    local iOurMaxRange = GetUnitMaxGroundRange({self})
-                                    if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
-                                        IssueClearCommands({self})
-                                        IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            if self.IsUnitState and self:IsUnitState('Upgrading') and EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage:GetUnitId()) and not(M27Conditions.DoesACUHaveGun(aiBrain, false, self)) then
+                                if self:GetWorkProgress() <= 0.25 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Taken indirect fire, consider cancelling upgrade as onl yat '..self:GetWorkProgress()) end
+                                    --Do we have nearby friendly units?
+                                    if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
+                                        --Is the unit within range of us?
+                                        local iOurMaxRange = GetUnitMaxGroundRange({self})
+                                        if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
+                                            IssueClearCommands({self})
+                                            IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                        end
                                     end
+                                end
+                                if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill) then
+                                    aiBrain[M27Overseer.refiAIBrainCurrentStrategy] = M27Overseer.refStrategyProtectACU
                                 end
                             end
                         end
                     end
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryMex, self:GetUnitId()) and M27UnitInfo.IsUnitValid(self) then
+                    --Can we see the enemy?
+
+
                 end
                 --General logic for shields so are very responsive with micro
                 if self.MyShield and self.MyShield.GetHealth and self.MyShield:GetHealth() < 100 and EntityCategoryContains((M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryPersonalShield) * categories.MOBILE, self) then
@@ -149,8 +180,12 @@ function OnDamaged(self, instigator)
                 end
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             end
-
         end
+    end
+    if instigator and IsUnit(instigator) and instigator.GetAIBrain and instigator:GetAIBrain().M27AI then
+        instigator[M27UnitInfo.refbRecentlyDealtDamage] = true
+        instigator[M27UnitInfo.refiGameTimeDamageLastDealt] = math.floor(GetGameTimeSeconds())
+        M27Utilities.DelayChangeVariable(instigator, M27UnitInfo.refbRecentlyDealtDamage, false, 5, M27UnitInfo.refiGameTimeDamageLastDealt, instigator[M27UnitInfo.refiGameTimeDamageLastDealt] + 1, nil, nil)
     end
 end
 
@@ -161,10 +196,18 @@ function OnBombFired(oWeapon, projectile)
     local oUnit = oWeapon.unit
     if oUnit and oUnit.GetUnitId then
         local sUnitID = oUnit:GetUnitId()
-        if EntityCategoryContains(M27UnitInfo.refCategoryBomber - categories.EXPERIMENTAL, sUnitID) then
+        if bDebugMessages == true then LOG(sFunctionRef..': bomber position when firing bomb='..repr(oUnit:GetPosition())) end
+        if EntityCategoryContains(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber - categories.EXPERIMENTAL, sUnitID) then
             M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
             if oUnit.GetAIBrain and oUnit:GetAIBrain().M27AI then
-                ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, 1)
+                if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repr(projectile:GetPosition())) end
+                local iDelay = M27UnitInfo.GetUnitTechLevel(oUnit)
+                if EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionUEF) - categories.TECH3, oUnit:GetUnitId()) or EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionAeon) * M27UnitInfo.refCategoryTorpBomber * categories.TECH2, oUnit:GetUnitId()) then iDelay = iDelay + 1 end
+                ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, iDelay)
+                if not(oUnit[M27AirOverseer.refiLastFiredBomb]) or GetGameTimeSeconds() - oUnit[M27AirOverseer.refiLastFiredBomb] > 2.5 then
+                    oUnit[M27AirOverseer.refiLastFiredBomb] = GetGameTimeSeconds()
+                    oUnit[M27AirOverseer.refiBombsDropped] = (oUnit[M27AirOverseer.refiBombsDropped] or 0) + 1
+                end
             end
         end
     end
@@ -188,6 +231,37 @@ function OnWeaponFired(oWeapon)
     end
 end
 
+function OnMissileBuilt(self, weapon)
+    if self.GetAIBrain and self:GetAIBrain().M27AI then
+        --Pause if we already have 2 missiles
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local sFunctionRef = 'OnMissileBuilt'
+        if bDebugMessages == true then
+            if M27UnitInfo.IsUnitValid(self) then
+                LOG(sFunctionRef..': Have valid unit='..self:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(self))
+            else
+                LOG(sFunctionRef..': self='..DebugArray(self))
+            end
+        end
+
+        local iMissiles = 1 --For some reason the count is off by 1, presumably a slight delay between the event being called and the below ammo counts working
+        if self.GetTacticalSiloAmmoCount then iMissiles = iMissiles + self:GetTacticalSiloAmmoCount() end
+        if bDebugMessages == true then LOG(sFunctionRef..': iMissiles based on tactical silo ammo='..iMissiles) end
+        if self.GetNukeSiloAmmoCount then iMissiles = iMissiles + self:GetNukeSiloAmmoCount() end
+        if bDebugMessages == true then LOG(sFunctionRef..': iMissiles after Nuke silo ammo='..iMissiles) end
+        if iMissiles >= 2 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Have at least 2 missiles so will set paused to true') end
+            self:SetPaused(true)
+            --Recheck every minute
+            ForkThread(M27Logic.CheckIfWantToBuildAnotherMissile, self)
+        end
+        --Start logic to periodically check for targets to fire the missile at (in case there are no targets initially)
+        ForkThread(M27Logic.ConsiderLaunchingMissile, self, weapon)
+
+
+    end
+end
+
 --[[
 function OnProjectileFired(oWeapon, oMuzzle)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -200,3 +274,19 @@ function OnProjectileFired(oWeapon, oMuzzle)
         LOG('Have a unit; unit position='..repr(oWeapon.unit:GetPosition()))
     end
 end--]]
+
+function OnConstructionStarted(oEngineer, oConstruction, sOrder)
+    --Track experimental construction
+    if oEngineer:GetAIBrain().M27AI and oConstruction.GetUnitId and M27Utilities.IsTableEmpty(oEngineer:GetAIBrain()[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
+        local aiBrain = oEngineer:GetAIBrain()
+        --Check for construction of nuke
+        if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] then
+            if EntityCategoryContains(aiBrain[M27EngineerOverseer.refiLastExperimentalCategory], oConstruction:GetUnitId()) then
+                --Are building a focus experimental, start tracker if its a nuke
+                if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] == M27UnitInfo.refCategorySML and not(aiBrain[M27EngineerOverseer.refbActiveSMDChecker]) then
+                    ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oConstruction)
+                end
+            end
+        end
+    end
+end

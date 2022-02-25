@@ -67,7 +67,7 @@ Platoon = Class(M27PlatoonClass) {
                             local iPlatoonAction = oPlatoonHandle[M27PlatoonUtilities.refiCurrentAction]
                             if iPlatoonAction == nil then iPlatoonAction = 'nil' end
                             if bDebugMessages == true then LOG('ProcessBuildCommand: iPlatoonAction='..iPlatoonAction..'; Platoon plan='..oPlatoonHandle:GetPlan()) end
-                            if iPlatoonAction == M27PlatoonUtilities.refActionReclaimNearby then bDoNothing = true
+                            if iPlatoonAction == M27PlatoonUtilities.refActionReclaimTarget then bDoNothing = true
                             else
 
 
@@ -681,6 +681,9 @@ Platoon = Class(M27PlatoonClass) {
         --Intended for large attack which will target enemy base (and run back to base if it comes across a bigger threat)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27GroundExperimental = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
     M27DefenderAI = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
@@ -711,6 +714,9 @@ Platoon = Class(M27PlatoonClass) {
     M27MAAAssister = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27MAAPatrol = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
     M27MexLargerRaiderAI = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
@@ -721,6 +727,9 @@ Platoon = Class(M27PlatoonClass) {
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27RetreatingShieldUnits = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27SuicideSquad = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27IdleScouts = function(self)

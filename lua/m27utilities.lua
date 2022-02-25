@@ -29,6 +29,9 @@ refiLongestTickAfterStartTime = 0
 bFullOutputAlreadyDone = {} -- true if have done the full output for the nth time; n being based on how long an interval we want
 iFullOutputIntervalInTicks = 3000 --every 5m
 iFullOutputCount = 0 --increased each time do a full output
+tProfilerCountByTickByFunction = {}
+tbProfilerOutputGivenForTick = {} --true if already given output for [iTick]
+IssueCount = 0 --Used to track no. of times issuemove has been sent in game
 
 
 function ErrorHandler(sErrorMessage, iOptionalWaitInSeconds, bWarningNotError)
@@ -201,7 +204,7 @@ function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCo
     elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
     elseif iColour == 4 then sColour = 'fff4a460' --Gold
     elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
-    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan
+    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
     elseif iColour == 7 then sColour = 'ffffffff' --white
     else sColour = 'ffFF6060' --Orangy pink
     end
@@ -210,11 +213,12 @@ function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCo
     if relativeStart == nil then relativeStart = {0,0,0} end
     local iMaxDrawCount = iDisplayCount
     local iCurDrawCount = 0
-    if bDebugMessages == true then LOG('About to draw circle at table locations') end
+    if bDebugMessages == true then LOG('About to draw circle at table locations ='..repr(tableLocations)) end
     local bFirstLocation = true
     local tPrevLocation = {}
     local iCount = 0
     while true do
+        bFirstLocation = true
         iCount = iCount + 1 if iCount > 10000 then ErrorHandler('Infinite loop') break end
         if bSingleLocation then DrawCircle(tableLocations, iCircleSize, sColour)
         else
@@ -246,7 +250,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
     elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
     elseif iColour == 4 then sColour = 'fff4a460' --Gold
     elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
-    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan
+    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
     elseif iColour == 7 then sColour = 'ffffffff' --white
     else sColour = 'ffFF6060' --Orangy pink
     end
@@ -273,7 +277,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
 
     local iCount = 0
     while true do
-        iCount = iCount + 1 if iCount > 200 then ErrorHandler('Infinite loop') break end
+        iCount = iCount + 1 if iCount > 10000 then ErrorHandler('Infinite loop') break end
         for iValX = 1, 2 do
             for iValZ = 1, 2 do
                 if iValX == 1 then
@@ -315,16 +319,19 @@ function DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bS
     --fork thread doesnt seem to work - can't see the circle, even though teh code itself is called; using steppingstone seems to fix this
     --ForkThread(DrawTableOfLocations, tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation)
     --DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation)
+    --ErrorHandler('Shouldnt be drawing anything')
     ForkThread(SteppingStoneForDrawLocations, tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
 end
 
 function DrawLocation(tLocation, relativeStart, iColour, iDisplayCount, iCircleSize)
     --ForkThread(DrawTableOfLocations, tableLocations, relativeStart, iColour, iDisplayCount, true)
     --DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, true)
+    --ErrorHandler('Shouldnt be drawing anything')
     ForkThread(SteppingStoneForDrawLocations, tLocation, relativeStart, iColour, iDisplayCount, true, iCircleSize)
 end
 
 function DrawRectangle(rRect, iColour, iDisplayCount)
+    --ErrorHandler('Shouldnt be drawing anything')
     ForkThread(SteppingStoneForDrawRect, rRect, iColour, iDisplayCount)
 end
 
@@ -352,7 +359,11 @@ function GetRoughDistanceBetweenPositions(tPosition1, tPosition2)
     return math.abs(tPosition1[1] - tPosition2[1]) + math.abs(tPosition1[3] - tPosition2[3])
 end
 
-function GetDistanceBetweenPositions(Position1, Position2, iBuildingSize)
+function GetDistanceBetweenPositions(Position1, Position2)
+    return VDist2(Position1[1], Position1[3], Position2[1], Position2[3])
+end
+
+function GetDistanceBetweenBuildingPositions(Position1, Position2, iBuildingSize)
     -- Returns distance ignoring the y value and taking just x and z values
     --if iBuildingSize is set to a value, then will instead reduce the distance to determine the distance between 1 position and the nearest part of the other position with iBuildingSize
     --iBuildingSize should be the building size from its build location, in 'wall units' - so a land fac is an 8x8 size, and the build position will be the centre of it, making the building size 4, a T1 PGen a size of 1, etc.
@@ -479,6 +490,14 @@ function MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
     return { iXPos, GetTerrainHeight(iXPos, iZPos), iZPos }
 end
 
+function ConvertM27AngleToFAFAngle(iM27Angle)
+    --Per FAF documentation on issueformmove:
+    -- @param degrees The orientation the platoon should take when it reaches the position. South is 0 degrees, east is 90 degrees, etc.
+    --Meanwhile M27: 0 is north, 90 is east, etc.
+    local iFAFAngle = 180 - iM27Angle
+    if iFAFAngle < 0 then iFAFAngle = iFAFAngle + 360 end
+    return iFAFAngle
+end
 
 function GetAngleFromAToB(tLocA, tLocB)
     --Returns an angle 0 = north, 90 = east, etc. based on direction of tLocB from tLocA
@@ -496,13 +515,18 @@ function GetAngleFromAToB(tLocA, tLocB)
     end
 end
 
-function MoveInDirection(tStart, iAngle, iDistance)
+function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
     --iAngle: 0 = north, 90 = east, etc.; use GetAngleFromAToB if need angle from 2 positions
     --tStart = {x,y,z} (y isnt used)
+    --if bKeepInMapBounds is true then will limit to map bounds
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveInDirection'
     local iTheta
     local iFactor
+    if iAngle > 360 then
+        iAngle = iAngle - 360
+    elseif iAngle < 0 then iAngle = iAngle + 360 end
+
     if iAngle >= 270 then iTheta = iAngle - 270 iFactor = {-1,-1}
     elseif iAngle >= 180 then iTheta = 270 - iAngle iFactor = {-1, 1}
     elseif iAngle >= 90 then iTheta = iAngle - 90 iFactor = {1, 1}
@@ -512,16 +536,59 @@ function MoveInDirection(tStart, iAngle, iDistance)
     local iXAdj = math.cos(iTheta) * iDistance * iFactor[1]
     local iZAdj = math.sin(iTheta) * iDistance * iFactor[2]
 
-    if bDebugMessages == true then LOG(sFunctionRef..': tStart='..repr(tStart)..'; iAngle='..iAngle..'; iDistance='..iDistance..'; tStart='..repr(tStart)..'; iXAdj='..iXAdj..'; iZAdj='..iZAdj..'; iTheta='..iTheta) end
-    return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+
+    if not(bKeepInMapBounds) then
+        return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+    else
+        local tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        --Get actual distance required to keep within map bounds
+        local iMaxDistanceFlat = 0
+        local iNewDistWanted = 10000
+        --rMapPlayableArea = 2 --{x1,z1, x2,z2} - Set at start of the game, use instead of the scenarioinfo method
+        if tTargetPosition[1] < M27MapInfo.rMapPlayableArea[1] then iNewDistWanted = iDistance * (tStart[1] - M27MapInfo.rMapPlayableArea[1]) / (tStart[1] - tTargetPosition[1]) end
+        if tTargetPosition[3] < M27MapInfo.rMapPlayableArea[2] then iNewDistWanted = math.min(iNewDistWanted, iDistance * (tStart[3] - M27MapInfo.rMapPlayableArea[2]) / (tStart[3] - tTargetPosition[3])) end
+        if tTargetPosition[1] > M27MapInfo.rMapPlayableArea[3] then iNewDistWanted = math.min(iNewDistWanted, iDistance * (M27MapInfo.rMapPlayableArea[3] - tStart[1]) / (tTargetPosition[1] - tStart[1])) end
+        if tTargetPosition[3] > M27MapInfo.rMapPlayableArea[4] then iNewDistWanted = math.min(iNewDistWanted, iDistance * (M27MapInfo.rMapPlayableArea[4] - tStart[3]) / (tTargetPosition[3] - tStart[3])) end
+
+        if iNewDistWanted == 10000 then
+            return tTargetPosition
+        else
+            --Are out of playable area, so adjust the position; Can use the ratio of the amount we have moved left/right or top/down vs the long line length to work out the long line length if we reduce the left/right so its within playable area
+            return MoveInDirection(tStart, iAngle, iNewDistWanted - 0.1, false)
+        end
+        --Failed attempt below - mustve got maths wrong as didnt work properly
+        --[[local tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        --Get actual distance required to keep within map bounds
+        local iOverBoundDistance = 0
+        --rMapPlayableArea = 2 --{x1,z1, x2,z2} - Set at start of the game, use instead of the scenarioinfo method
+        if tTargetPosition[1] < M27MapInfo.rMapPlayableArea[1] then iOverBoundDistance = tTargetPosition[1] - M27MapInfo.rMapPlayableArea[1] end
+        if tTargetPosition[3] < M27MapInfo.rMapPlayableArea[2] then  iOverBoundDistance = math.min(tTargetPosition[3] - M27MapInfo.rMapPlayableArea[2], iOverBoundDistance) end
+        if iOverBoundDistance == 0 then
+            if tTargetPosition[1] > M27MapInfo.rMapPlayableArea[3] then iOverBoundDistance = tTargetPosition[1] - M27MapInfo.rMapPlayableArea[3] end
+            if tTargetPosition[3] > M27MapInfo.rMapPlayableArea[4] then iOverBoundDistance = math.min(iOverBoundDistance, tTargetPosition[3] - M27MapInfo.rMapPlayableArea[4]) end
+        end
+
+        if iOverBoundDistance == 0 then
+            return tTargetPosition
+        else
+            --Are out of playable area, so adjust the position; see diagram in v25 release notes which uses an example of moving 200 degrees from A to B by 14, and ending up 3 out of the map distance on the x axis
+            local iNewAngle = (90-(180-(360-iAngle)))
+            if iNewAngle < 0 then iNewAngle = iNewAngle+360 elseif iNewAngle > 360 then iNewAngle = iNewAngle - 360 end
+            return MoveInDirection(tTargetPosition, iNewAngle, iOverBoundDistance + 0.1, false)
+        end--]]
+    end
 end
 
 function GetAIBrainArmyNumber(aiBrain)
     --note - this is different to aiBrain:GetArmyIndex() which returns the army index; e.g. if 2 players, will have army index 1 and 2; however if 4 start positions, then might have ARMY_2 and ARMY_4 for those 2 players
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     if aiBrain then
-        if bDebugMessages == true then LOG('GetAIBrainArmyNumber: aiBrain.Name='..aiBrain.Name) end
-        return tonumber(string.sub(aiBrain.Name, (string.len(aiBrain.Name)-7)))
+        --For reference - all the attempts using string.sub to get the last 2 digits - gave up in the end and used gsub
+        --if bDebugMessages == true then LOG('GetAIBrainArmyNumber: aiBrain.Name='..aiBrain.Name..'; string.sub5='..string.sub(aiBrain.Name, (string.len(aiBrain.Name)-5))..'; string.sub7='..string.sub(aiBrain.Name, (string.len(aiBrain.Name)-7))..'; string.sub custom='..string.sub(aiBrain.Name, 6, string.len(aiBrain.Name) - 6)..'string.sub custom2='..string.sub(aiBrain.Name, 6, 1)..'; sub custom3='..string.sub(aiBrain.Name, 6, 2)..'; tostring'..string.sub(tostring(aiBrain.Name), 3, 2)..'; gsub='..string.gsub(aiBrain.Name, 'ARMY_', '')) end
+
+        local sArmyNumber = string.gsub(aiBrain.Name, 'ARMY_', '')
+        if bDebugMessages == true then LOG('GetAIBrainArmyNumber: sArmyNumber='..sArmyNumber) end
+        if string.len(sArmyNumber) <= 2 then return tonumber(sArmyNumber) else return nil end
     else
         ErrorHandler('aiBrain is nil')
         return nil
@@ -570,10 +637,13 @@ function GetACU(aiBrain)
             else
                 --is an error where if return the ACU then causes a hard crash (due to some of hte code that relies on this) - easiest way is to just return nil causing an error message that doesnt cause a hard crash
                 --(have tested without waiting any seconds and it avoids the hard crash, but waiting just to be safe)
-                ErrorHandler('ACU is dead - will wait 30 seconds and then return nil')
-                WaitSeconds(30)
-                ErrorHandler('ACU is dead - finished waiting 30 seconds to try and avoid crash')
-
+                --ErrorHandler('ACU is dead - will wait 1 second and then return nil', nil, true)
+                --WaitSeconds(1)
+                --ErrorHandler('ACU is dead - finished waiting 1 second to try and avoid crash', nil, true)
+                M27Overseer.iACUAlternativeFailureCount = M27Overseer.iACUAlternativeFailureCount + 1
+                aiBrain.M27IsDefeated = true
+                ErrorHandler('ACU is dead, will return nil; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
+                oACU = nil
             end
         end
     end
@@ -663,7 +733,8 @@ function GetNumberOfUnits(aiBrain, category)
 end
 
 function ConvertLocationToStringRef(tLocation)
-    return 'X'..tLocation[1]..';Z'..tLocation[3]
+    return ConvertLocationToReference(tLocation)
+    --return 'X'..tLocation[1]..';Z'..tLocation[3]
 end
 
 function FactionIndexToCategory(iFactionIndex)
@@ -673,6 +744,7 @@ function FactionIndexToCategory(iFactionIndex)
 end
 
 function GetFactionNameByIndex(iFactionIndex)
+    --NOTE: Largely replaced by M27UnitInfo globally defining variables for each number, e.g. refFactionUEF = 1
     --e.g. if have oUnitBP, then can check faction name with .General.FactionName
     local tFactionNameByIndex = {[1] = 'UEF', [2]= 'Aeon', [3] = 'Cybran', [4] = 'Seraphim', [5] = 'Nomads'}
     return tFactionNameByIndex[iFactionIndex]
@@ -809,7 +881,7 @@ end
 
 function FunctionProfiler(sFunctionRef, sStartOrEndRef)
     --sStartOrEndRef: refProfilerStart or refProfilerEnd (0 or 1)
-    local bDebugMessages = true if bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     if M27Config.M27RunProfiling then
 
         if sStartOrEndRef == refProfilerStart then
@@ -832,6 +904,7 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
                 tProfilerTimeTakenInTickByFunction[iGameTimeInTicks] = {}
                 tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = 0
                 sProfilerActiveFunctionForThisTick = 'nil'
+                tProfilerCountByTickByFunction[iGameTimeInTicks] = {}
             end
 
             --Increase unique count
@@ -839,6 +912,8 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
             tProfilerStartCount[sFunctionRef] = iCount
             tProfilerFunctionStart[sFunctionRef][iCount] = GetSystemTimeSecondsOnlyForProfileUse()
             if sProfilerActiveFunctionForThisTick == 'nil' then sProfilerActiveFunctionForThisTick = sFunctionRef end
+            if tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] == nil then tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] = 0 end
+            tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] = tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] + 1
             --if bDebugMessages == true then LOG('FunctionProfiler: '..sFunctionRef..': refProfilerStart; iCount='..iCount..'; iGameTimeInTicks='..iGameTimeInTicks..'; System time at start='..GetSystemTimeSecondsOnlyForProfileUse()..'; tProfilerFunctionStart[sFunctionRef][iCount]='..tProfilerFunctionStart[sFunctionRef][iCount]) end
 
         elseif sStartOrEndRef == refProfilerEnd then
@@ -858,6 +933,7 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
             if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks]) then
                 tProfilerTimeTakenInTickByFunction[iGameTimeInTicks] = {}
                 tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = 0
+                tProfilerCountByTickByFunction[iGameTimeInTicks] = {}
             end
 
             if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef]) then tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] = 0 end
@@ -885,76 +961,114 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
 end
 
 
-function ProfilerActualTimePerTick()
-    if M27Config.M27RunProfiling then
-        local iGameTimeInTicks
-        local iPrevGameTime
-        local iSystemTime = 0
-        while true do
-            iPrevGameTime = iSystemTime
-            iSystemTime = GetSystemTimeSecondsOnlyForProfileUse()
-            WaitTicks(1)
-            iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
-            tProfilerActualTimeTakenInTick[iGameTimeInTicks] = iSystemTime - iPrevGameTime
-        end
-
-    end
-end
-
 function ProfilerOutput()
     local sFunctionRef = 'ProfilerOutput'
-    local bDebugMessages = true if bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
 
     if M27Config.M27RunProfiling then
-        --Cumulative most intensive functions
+        --[[--Cumulative most intensive functions
         local iCount = 0
         for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
             iCount = iCount + 1
-            LOG(sFunctionRef..': Top10Cumulative No.'..iCount..'='..sFunctionName..' Time='..iValue)
+            LOG(sFunctionRef..': Top10Cumulative No.'..iCount..'='..sFunctionName..'; Times run cumulative='..tProfilerStartCount[sFunctionName]..'; Time='..iValue)
             if iCount >= 10 then break end
-        end
+        end--]]
 
-        local iThreshold = 0.01
+        --[[local iThreshold = 0.01
         local iEntireTickThreshold = 0.02
         local iStartTick = math.floor(GetGameTimeSeconds()*10) - 10
         --if bDebugMessages == true then LOG(sFunctionRef..': iStartTick='..iStartTick..'; GetGameTimeSeconds='..GetGameTimeSeconds()..'; math.floor(GetGameTimeSeconds()='..math.floor(GetGameTimeSeconds())..'; same but *10='..math.floor(GetGameTimeSeconds()*10)) end
-        for iCurTick = iStartTick, iStartTick + 1, 1 do
+        for iCurTick = iStartTick, 10 do --]]
             --if bDebugMessages == true then LOG(sFunctionRef..': iCurTick='..iCurTick..'; tProfilerCumulativeTimeTakenInTick[iCurTick]='..(tProfilerCumulativeTimeTakenInTick[iCurTick] or 'Doesnt exist')) end
-            if tProfilerCumulativeTimeTakenInTick[iCurTick] >= iThreshold or iCurTick == refiLongestTickAfterStartRef or tProfilerActualTimeTakenInTick[iCurTick] >= iEntireTickThreshold then
-                local sReason = 'Over threshold of '..iThreshold
-                if iCurTick == refiLongestTickAfterStartRef then sReason = 'Highest tick we have on record'
-                elseif tProfilerActualTimeTakenInTick[iCurTick] >= iEntireTickThreshold then sReason = 'Actual tick time incl wider FAF code over threshold' end
+            --if tProfilerCumulativeTimeTakenInTick[iCurTick] >= iThreshold or iCurTick == refiLongestTickAfterStartRef or tProfilerActualTimeTakenInTick[iCurTick] >= iEntireTickThreshold then
+                --local sReason = 'Over threshold of '..iThreshold
+                --if iCurTick == refiLongestTickAfterStartRef then sReason = 'Highest tick we have on record'
+                --elseif tProfilerActualTimeTakenInTick[iCurTick] >= iEntireTickThreshold then sReason = 'Actual tick time incl wider FAF code over threshold' end
 
-
-                LOG(sFunctionRef..': Tick='..iCurTick..'; '..sReason..' Time taken='..tProfilerCumulativeTimeTakenInTick[iCurTick]..'; Entire time for tick='..(tProfilerActualTimeTakenInTick[iCurTick] or 'nil')..'; About to list out top 10 functions in this tick')
-                local iCount = 0
+        local iCurTick = math.floor(GetGameTimeSeconds()*10) - 1
+        if not(tbProfilerOutputGivenForTick[iCurTick]) then
+            tbProfilerOutputGivenForTick[iCurTick] = true
+            LOG(sFunctionRef..': Tick='..iCurTick..'; Time taken='..(tProfilerCumulativeTimeTakenInTick[iCurTick] or 'nil')..'; Entire time for tick='..(tProfilerActualTimeTakenInTick[iCurTick] or 'nil')..'; About to list out top 10 functions in this tick')
+            local iCount = 0
+            if IsTableEmpty(tProfilerTimeTakenInTickByFunction[iCurTick]) == false then
                 for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenInTickByFunction[iCurTick], true) do
                     iCount = iCount + 1
-                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..' Time='..iValue)
+                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..(tProfilerCountByTickByFunction[iCurTick][sFunctionName] or 'nil')..'; Total Time='..iValue)
                     if iCount >= 10 then break end
                 end
-            else
-                LOG(sFunctionRef..': Tick='..iCurTick..'; Below threshold at '..(tProfilerCumulativeTimeTakenInTick[iCurTick] or 'missing'))
-            end
-        end
 
-        --Include full output of function cumulative time taken every interval
-        local bFullOutputNow = false
-
-        if iStartTick > iFullOutputCount * (iFullOutputIntervalInTicks + 1) then bFullOutputNow = true end
-        if bFullOutputNow then
-            if bFullOutputAlreadyDone[iFullOutputCount] then
-                --Already done
-            else
-                iFullOutputCount = iFullOutputCount + 1
-                bFullOutputAlreadyDone[iFullOutputCount] = true
-                LOG(sFunctionRef..': About to print detailed output of all functions cumulative values')
-                for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
+                LOG(sFunctionRef..': About to list top 10 called functions in this tick')
+                iCount = 0
+                for sFunctionName, iValue in SortTableByValue(tProfilerCountByTickByFunction[iCurTick], true) do
                     iCount = iCount + 1
-                    LOG(sFunctionRef..': No.'..iCount..'='..sFunctionName..' Time='..iValue)
+                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..(tProfilerCountByTickByFunction[iCurTick][sFunctionName] or 'nil')..'; Total Time='..iValue)
+                    if iCount >= 10 then break end
+                end
+                LOG(sFunctionRef..': IssueMove cumulative count='..IssueCount)
+            end
+                --else
+                    --LOG(sFunctionRef..': Tick='..iCurTick..'; Below threshold at '..(tProfilerCumulativeTimeTakenInTick[iCurTick] or 'missing'))
+                --end
+            --end
+
+            --Include full output of function cumulative time taken every interval
+            local bFullOutputNow = false
+
+            if iCurTick > (iFullOutputCount + 1) * iFullOutputIntervalInTicks then bFullOutputNow = true end
+            if bFullOutputNow then
+                if bFullOutputAlreadyDone[iFullOutputCount + 1] then
+                    --Already done
+                else
+                    iFullOutputCount = iFullOutputCount + 1
+                    bFullOutputAlreadyDone[iFullOutputCount] = true
+                    LOG(sFunctionRef..': About to print detailed output of all functions cumulative values')
+                    iCount = 0
+                    for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
+                        iCount = iCount + 1
+                        if tProfilerStartCount[sFunctionName] == nil then LOG('ERROR somehow '..sFunctionName..' hasnt been recorded in the cumulative count despite having its time recorded.  iValue='..iValue)
+                        else
+                            LOG(sFunctionRef..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerStartCount[sFunctionName]..'; Time='..iValue)
+                        end
+                    end
+                    --Give the total time taken to get to this point based on time per tick
+                    local iTotalTimeTakenToGetHere = 0
+                    local iTotalDelayedTime = 0
+                    local iLongestTickTime = 0
+                    local iLongestTickRef
+                    for iTick, iTime in tProfilerActualTimeTakenInTick do
+                        iTotalTimeTakenToGetHere = iTotalTimeTakenToGetHere + iTime
+                        iTotalDelayedTime = iTotalDelayedTime + math.max(0, iTime - 0.1)
+                        if iTime > iLongestTickTime then
+                            iLongestTickTime = iTime
+                            iLongestTickRef = iTick
+                        end
+                    end
+                    LOG(sFunctionRef..': Total time taken to get to '..iCurTick..'= '..iTotalTimeTakenToGetHere..'; Total time of any freezes = '..iTotalDelayedTime..'; Longest tick time='..iLongestTickTime..'; tick ref = '..(iLongestTickRef - 1)..' to '..iLongestTickRef)
+
                 end
             end
         end
+    end
+end
+
+function ProfilerActualTimePerTick()
+    if M27Config.M27RunProfiling then
+        local iGameTimeInTicks
+        local iPrevGameTime = 0
+        local iSystemTime = 0
+        while true do
+            iPrevGameTime = GetSystemTimeSecondsOnlyForProfileUse()
+            WaitTicks(1)
+            iSystemTime = GetSystemTimeSecondsOnlyForProfileUse()
+            iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
+            if M27Config.M27ProfilingIgnoreFirst2Seconds and iGameTimeInTicks <= 20 then
+                --Dont record
+            else
+                tProfilerActualTimeTakenInTick[iGameTimeInTicks] = iSystemTime - iPrevGameTime
+            end
+            ProfilerOutput()
+        end
+
     end
 end
 
@@ -966,19 +1080,78 @@ function ProfilerTimeSinceLastCall(sReference, iStartTime)
     return iTimeNow
 end
 
-function ForkedDelayedChangedVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerTimeRef, iMustBeLessThanThisTimeValue)
+--Softles profiler - thanks to Softles for providing this as an alternative approach
+local TIME_TABLE = {}
+local COUNT_TABLE = {}
+
+local function OnEvent(eventType, lineNo)
+    local t = GetSystemTimeSecondsOnlyForProfileUse()
+    local funcName = tostring(debug.getinfo(2).name)
+    if eventType == "call" then
+        if not COUNT_TABLE[funcName] then
+            COUNT_TABLE[funcName] = 0
+        end
+        COUNT_TABLE[funcName] = COUNT_TABLE[funcName] + 1
+    end
+end
+local amStarted = false
+
+function StartSoftlesProfiling()
+    if not amStarted then
+        amStarted = true
+        ForkThread(
+                function()
+                    coroutine.yield(1)
+                    while true do
+                        local last = GetSystemTimeSecondsOnlyForProfileUse()
+                        debug.sethook(OnEvent,"c")
+                        coroutine.yield(1)
+                        local diff = math.round(1000*(GetSystemTimeSecondsOnlyForProfileUse() - last))/1000
+                        debug.sethook()
+                        local s = "PROFILING:"..tostring(diff)
+                        for k, v in COUNT_TABLE do
+                            s = s.." ("..k..", "..tostring(v)..")"
+                        end
+                        WARN(s)
+                        TIME_TABLE = {}
+                        COUNT_TABLE = {}
+                    end
+                end
+        )
+    end
+end
+
+function ForkedDelayedChangedVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerConditionRef, iMustBeLessThanThisTimeValue, iMustBeMoreThanThisTimeValue, vMustNotEqualThisValue)
+    --After waiting iDelayInSeconds, changes the variable to vVariableValue.
     WaitSeconds(iDelayInSeconds)
     if oVariableOwner then
         local bReset = true
-        if sOptionalOwnerTimeRef then
-            if oVariableOwner[sOptionalOwnerTimeRef] > iMustBeLessThanThisTimeValue then bReset = false end
+        if sOptionalOwnerConditionRef then
+            if iMustBeLessThanThisTimeValue and oVariableOwner[sOptionalOwnerConditionRef] >= iMustBeLessThanThisTimeValue then bReset = false
+            elseif iMustBeMoreThanThisTimeValue and oVariableOwner[sOptionalOwnerConditionRef] <= iMustBeMoreThanThisTimeValue then bReset = false
+            elseif vMustNotEqualThisValue and oVariableOwner[sOptionalOwnerConditionRef] == vMustNotEqualThisValue then bReset = false
+            end
         end
         if bReset then oVariableOwner[sVariableName] = vVariableValue end
     end
 end
 
-function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerTimeRef, iMustBeLessThanThisTimeValue)
-    --sOptionalOwnerTimeRef - can specify a variable for oVariableOwner; if so then the value of this variable must be <= iMustBeLessThanThisTimeValue
+function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerConditionRef, iMustBeLessThanThisTimeValue, iMustBeMoreThanThisTimeValue, vMustNotEqualThisValue)
+    --sOptionalOwnerConditionRef - can specify a variable for oVariableOwner; if so then the value of this variable must be <= iMustBeLessThanThisTimeValue
     --e.g. if delay reset a variable, but are claling multiple times so want to only reset on the latest value, then this allows for that
-    ForkThread(ForkedDelayedChangedVariable, oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerTimeRef, iMustBeLessThanThisTimeValue)
+    ForkThread(ForkedDelayedChangedVariable, oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerConditionRef, iMustBeLessThanThisTimeValue, iMustBeMoreThanThisTimeValue, vMustNotEqualThisValue)
+end
+
+
+function DebugArray(Table)
+    --Thanks to Uveso who gave me this as a solution for doing a repr of a large table such as a unit or aiBrain that would normally crash the game
+    for Index, Array in Table do
+        if type(Array) == 'thread' or type(Array) == 'userdata' then
+            LOG('Index['..Index..'] is type('..type(Array)..'). I wont print that!')
+        elseif type(Array) == 'table' then
+            LOG('Index['..Index..'] is type('..type(Array)..'). I wont print that!')
+        else
+            LOG('Index['..Index..'] is type('..type(Array)..'). "', repr(Array),'".')
+        end
+    end
 end

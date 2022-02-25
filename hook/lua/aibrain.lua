@@ -23,7 +23,10 @@ AIBrain = Class(M27AIBrainClass) {
         end
 
         local personality = ScenarioInfo.ArmySetup[self.Name].AIPersonality
-        if bDebugMessages == true then LOG('* M27AI: aibrain.lua: personality=' .. personality .. ')') end
+        if bDebugMessages == true then
+            LOG('* M27AI: aibrain.lua: personality=' .. personality .. ')')
+            LOG('Start position number='..(iArmyNo or 'nil')..'; ArmyIndex='..self:GetArmyIndex())
+        end
         if string.find(personality, 'm27') or string.find(personality, 'M27') then
             local bDebugMode = true
 

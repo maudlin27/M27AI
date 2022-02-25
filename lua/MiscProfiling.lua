@@ -140,3 +140,62 @@ function OptimisationComparisonDistanceToStart(aiBrain)
     end
     iTimeStart = M27Utilities.ProfilerTimeSinceLastCall('Alt get distance approach All units end', iTimeStart)
 end
+
+
+function GetReclaimInRectVsCheckingTable()
+    --Summary conclusion - checking reclaim segments in a 3x3 grid takes about 10-15% of the time of getting reclaim in the area if there's some low level reclaim that we're ignoring like trees; so if just interested in amount of reclaim then it's more efficient.  If using as a check for whether should do GetReclaimablesInRect then its only more efficient if c.50% or less of the time on the map a 3x3 reclaim segment would return no reclaim
+
+    local iCycleCount = 250000
+    local tReclaim
+    local iSegmentX, iSegmentZ
+    local rRect
+    local iRadius = 6
+    local iTimeStart
+    local iAssumedPercentageOfSegmentsWithReclaim = 0.1
+    local rPlayableArea = M27MapInfo.rMapPlayableArea
+    local iMapSizeX = rPlayableArea[3] - rPlayableArea[1]
+    local iMapSizeZ = rPlayableArea[4] - rPlayableArea[2]
+
+    local tLocation = {math.random(30, iMapSizeX - 30), 0, math.random(30, iMapSizeZ - 30)}
+    tLocation[2] = GetSurfaceHeight(tLocation[1], tLocation[3])
+
+    M27MapInfo.UpdateReclaimMarkers()
+
+    iTimeStart = M27Utilities.ProfilerTimeSinceLastCall('GetReclaimInRectVsCheckingTable GetReclaimInRectangle each time start', iTimeStart)
+
+    for i1 = 1, iCycleCount do
+        tReclaim = M27MapInfo.GetReclaimInRectangle(4, Rect(tLocation[1] - iRadius, tLocation[3] - iRadius, tLocation[1] + iRadius, tLocation[3] + iRadius))
+    end
+    iTimeStart = M27Utilities.ProfilerTimeSinceLastCall('GetReclaimInRectangle each time end; Check of table start', iTimeStart)
+    for i1 = 1, iCycleCount do
+        iSegmentX, iSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tLocation)
+        for iAdjX = -1, 1 do
+            for iAdjZ = -1, 1 do
+                if M27MapInfo.tReclaimAreas[iSegmentX + iAdjX][iSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] > 0 then
+                end
+            end
+        end
+    end
+    iTimeStart = M27Utilities.ProfilerTimeSinceLastCall('Table check end before getting reclaim for '..iAssumedPercentageOfSegmentsWithReclaim..' of the times', iTimeStart)
+    for i1 = 1, math.floor(iCycleCount * iAssumedPercentageOfSegmentsWithReclaim) do
+        tReclaim = M27MapInfo.GetReclaimInRectangle(4, Rect(tLocation[1] - iRadius, tLocation[3] - iRadius, tLocation[1] + iRadius, tLocation[3] + iRadius))
+    end
+    iTimeStart = M27Utilities.ProfilerTimeSinceLastCall('Table check end after getting reclaim', iTimeStart)
+
+    --What percentage of map has reclaim?
+
+    local iReclaimMaxSegmentX = math.ceil(iMapSizeX / M27MapInfo.iReclaimSegmentSizeX)
+    local iReclaimMaxSegmentZ = math.ceil(iMapSizeZ / M27MapInfo.iReclaimSegmentSizeZ)
+    local iMinReclaim = 2.5
+    local iSegmentsWithEnoughReclaim = 0
+    local iSegmentsWithoutEnoughReclaim = 0
+    for iSegmentX = 1, iReclaimMaxSegmentX do
+        for iSegmentZ = 1, iReclaimMaxSegmentZ do
+            if M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass] >= iMinReclaim then
+                iSegmentsWithEnoughReclaim = iSegmentsWithEnoughReclaim + 1
+            else iSegmentsWithoutEnoughReclaim = iSegmentsWithoutEnoughReclaim + 1
+            end
+        end
+    end
+    LOG('% of map with reclaim='..iSegmentsWithEnoughReclaim / (iSegmentsWithEnoughReclaim + iSegmentsWithoutEnoughReclaim)..'; iSegmentsWithEnoughReclaim='..iSegmentsWithEnoughReclaim)
+end

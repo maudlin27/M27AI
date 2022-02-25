@@ -1,4 +1,5 @@
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
+local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 
 local M27EngineerTryReclaimCaptureArea = EngineerTryReclaimCaptureArea
 function EngineerTryReclaimCaptureArea(aiBrain, eng, pos, iAreaSize)
@@ -13,7 +14,7 @@ function EngineerTryReclaimCaptureArea(aiBrain, eng, pos, iAreaSize)
         end
         local Reclaiming = false
         -- Check if enemy units are at location
-        local checkUnits = aiBrain:GetUnitsAroundPoint( (categories.STRUCTURE + categories.MOBILE) - categories.AIR, pos, iAreaSize, 'Enemy')
+        local checkUnits = aiBrain:GetUnitsAroundPoint( (M27UnitInfo.refCategoryStructure + categories.MOBILE) - categories.AIR, pos, iAreaSize, 'Enemy')
         -- reclaim units near our building place.
         if checkUnits and table.getn(checkUnits) > 0 then
             for num, unit in checkUnits do

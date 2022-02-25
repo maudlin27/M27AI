@@ -20,6 +20,7 @@ refbAmalgamateIntoEscort = 'M27PlatoonAmalgamateIntoEscort' --true if any amalga
 refbDontDisplayName = 'M27PlatoonDontDisplayName' --Used for idle platoons so dont overwrite name when arent really using the platoon and are assigning names via separate method (e.g. for engis and air)
 refbUsedByThreatDefender = 'M27PlatoonUsedByThreatDefender' --Overseer's threat assess and respond will consider this platoon if this is set to true
 refbWantsShieldEscort = 'M27PlatoonWantsShieldEscort' --true if should be considered when assigning mobile shields
+refiAirAttackRange = 'M27PlatoonAirAttackRange' --If this is not nil, then will check if the platoon has any MAA in it, and if so will search for enemy air units within this value + the MAA range; if any are detected, the platoon will move towards these air units (assuming there aren't ground units nearby that they're running from)
 
 --AI global idle platoon references (i.e. only have 1 of these per aibrain):
 refoIdleScouts = 'M27IdleScouts'
@@ -53,7 +54,7 @@ PlatoonTemplate = {
             [refbAttackMove] = true,
             [reftPlatoonsToAmalgamate] = { 'M27AttackNearestUnits' },
             [refiPlatoonAmalgamationRange] = 20,
-            [refiPlatoonAmalgamationMaxSize] = 20,
+            [refiPlatoonAmalgamationMaxSize] = 10,
             [refbUsedByThreatDefender] = true,
             [refbWantsShieldEscort] = true,
         },
@@ -113,7 +114,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = { 'M27CombatPatrolAI' },
         [refiPlatoonAmalgamationRange] = 50,
         [refbUsedByThreatDefender] = true,
-        [refiPlatoonAmalgamationMaxSize] = 50,
+        [refiPlatoonAmalgamationMaxSize] = 20,
         [refbWantsShieldEscort] = true,
     },
     ['M27LargeAttackForce'] =
@@ -133,8 +134,26 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = { 'M27MexLargerRaiderAI', 'M27MexRaiderAI', 'M27AttackNearestUnits' },
         [refiPlatoonAmalgamationRange] = 28,
-        [refiPlatoonAmalgamationMaxSize] = 65,
+        [refiPlatoonAmalgamationMaxSize] = 40,
         [refbWantsShieldEscort] = true,
+    },
+    ['M27GroundExperimental'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = false,
+        [refiFormMoveCloseDistanceThreshold] = nil,
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = true,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = true,
+        [refbAttackMove] = false,
+        [refbUsedByThreatDefender] = false,
+        [refbWantsShieldEscort] = false,
     },
     ['M27DefenderAI'] =
     {
@@ -219,6 +238,7 @@ PlatoonTemplate = {
     {
         [refbIdlePlatoon] = false,
         [refbRequiresUnitToFollow] = true,
+        [refbRequiresSingleLocationToGuard] = false,
         [refbIgnoreStuckAction] = true,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'GrowthFormation',
@@ -233,6 +253,29 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
+        [refiAirAttackRange] = 20,
+    },
+    --MAAPatrol - different platoon to MAA assister as the overseer will treat units in MAApatrol as being available for assignment (i.e. its effectively an active 'idle' platoon)
+    ['M27MAAPatrol'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbRequiresSingleLocationToGuard] = true,
+        [refbIgnoreStuckAction] = true,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = false, --Dont want on assister platoons as they refresh too often and cause wierd results
+        [refiFormMoveCloseDistanceThreshold] = 30,
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = true,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = true,
+        [refiAirAttackRange] = 40,
     },
     ['M27ScoutAssister'] =
     {
@@ -342,7 +385,7 @@ PlatoonTemplate = {
     ['M27RetreatingShieldUnits'] =
     {
         [refbIdlePlatoon] = false,
-        [refbRequiresUnitToFollow] = true,
+        [refbRequiresUnitToFollow] = false,
         [refbIgnoreStuckAction] = false,
         [refiMinimumPlatoonSize] = 1,
         [refsDefaultFormation] = 'GrowthFormation',
@@ -355,6 +398,23 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = false,
+    },
+    ['M27SuicideSquad'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = true,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbUsedByThreatDefender] = true,
     },
 
 

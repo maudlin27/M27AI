@@ -29,7 +29,8 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
 
     local tNewTargetIgnoringGrouping = M27Utilities.MoveTowardsTarget(tUnitPosition, tRevisedPositionToRunFrom, iDistanceToMove, 180)
     if bDebugMessages == true then LOG(sFunctionRef..': tNewTargetIgnoringGrouping='..repr(tNewTargetIgnoringGrouping)..'; tUnitPosition='..repr(tUnitPosition)) end
-    local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
+    --local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
+    local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, true, false)
     if tNewTargetInSameGroup then
         if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tNewTargetInSameGroup='..repr(tNewTargetInSameGroup)) end
         IssueClearCommands({oUnit})
@@ -131,22 +132,30 @@ function MoveInHalfCircleTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     ForkThread(ForkedMoveInHalfCircle, oUnit, iTimeToRun, tPositionToRunFrom)
 end
 
-function ForkedMoveInCircle(oUnit, iTimeToRun)
+function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontClearCommandsFirst, iCircleSizeOverride, iTickWaitOverride)
     --More intensive version of MoveAwayFromTargetTemporarily, intended e.g. for ACUs
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ForkedMoveInCircle'
 
     --KEY CONFIG SETTINGS: (these will work sometimes but not always against an aeon strat)
     local iInitialAngleAdj = 15
-    local iAngleMaxSingleAdj = 45
     local iInitialDistanceAdj = -1
-    local iDistanceAwayToMove = 2
-    local iTicksBetweenOrders = 4
+    local iDistanceAwayToMove = (iCircleSizeOverride or 2)
+    local iAngleMaxSingleAdj = 45
+    local iTicksBetweenOrders = (iTickWaitOverride or 4)
+
+    if iDistanceAwayToMove > oUnit:GetBlueprint().Physics.MaxSpeed * 1.5 then
+        iAngleMaxSingleAdj = math.max(25, iAngleMaxSingleAdj * 2.5 / iDistanceAwayToMove)
+    end
+
+
 
     local iStartTime = GetGameTimeSeconds()
     oUnit[M27UnitInfo.refiGameTimeMicroStarted] = iStartTime
     local iLoopCount = 0
     local iMaxLoop = iTimeToRun * 10 + 1
+    --Distance from point A to point B will be much less than distanceaway to move, since that is the distance from the centre (radius) rather than the distance between 1 points on the circle edge; for simplicity will assume that distance is 0.25 of the distance from the centre
+    if bDontTreatAsMicroAction then iMaxLoop = math.ceil(iTimeToRun / (iDistanceAwayToMove / oUnit:GetBlueprint().Physics.MaxSpeed)) * 4 end
     local tUnitStartPosition = oUnit:GetPosition()
     --local iAngleToTargetToEscape = M27Utilities.GetAngleFromAToB(tUnitStartPosition, tPositionToRunFrom)
     local iCurFacingDirection = M27UnitInfo.GetUnitFacingAngle(oUnit)
@@ -163,24 +172,31 @@ function ForkedMoveInCircle(oUnit, iTimeToRun)
 
     local tTempLocationToMove
 
-    oUnit[M27UnitInfo.refbSpecialMicroActive] = true
-    if oUnit.PlatoonHandle then
-        oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+
+    if not(bDontTreatAsMicroAction) then
+        oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+        if oUnit.PlatoonHandle then
+            oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+        end
+        M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
     end
-    M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
     local bRecentMicro = false
     local iRecentMicroThreshold = 1
     local iGameTime = GetGameTimeSeconds()
     if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
 
-    if bRecentMicro == false then IssueClearCommands({oUnit}) end
+    if bRecentMicro == false and not(bDontClearCommandsFirst) then IssueClearCommands({oUnit}) end
     if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; tUnitStartPosition='..repr(tUnitStartPosition)) end
     local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
     local iTempDistanceAwayToMove
-    while (oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun) do
+    local bTimeToStop = false
+    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbSpecialMicroActive='..tostring((oUnit[M27UnitInfo.refbSpecialMicroActive] or false))..'; iMaxLoop='..iMaxLoop) end
+    while bTimeToStop == false do
     --while not(iTempAngleDirectionToMove == iFacingAngleWanted) do
         iLoopCount = iLoopCount + 1
-        if iLoopCount > iMaxLoop then M27Utilities.ErrorHandler('Loop has gone on for too long, likely infinite') break end
+        if iLoopCount > iMaxLoop then break
+        elseif M27UnitInfo.IsUnitValid(oUnit) == false then break end --No longer give error message as may be calling this for intel scouts now
+            --M27Utilities.ErrorHandler('Loop has gone on for too long, likely infinite') break end
 
         --iCurAngleDif = math.abs(iTempAngleDirectionToMove - iFacingAngleWanted)
         --if iCurAngleDif < iAngleMaxSingleAdj then iTempAngleDirectionToMove = iFacingAngleWanted
@@ -193,6 +209,7 @@ function ForkedMoveInCircle(oUnit, iTimeToRun)
         tTempLocationToMove = M27Utilities.MoveInDirection(tUnitStartPosition, iTempAngleDirectionToMove, iTempDistanceAwayToMove)
         IssueMove({oUnit}, tTempLocationToMove)
         WaitTicks(iTicksBetweenOrders)
+        if not(bDontTreatAsMicroAction) and not((oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun)) then bTimeToStop = true end
     end
 
     --[[while (oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun) do
@@ -211,8 +228,8 @@ function ForkedMoveInCircle(oUnit, iTimeToRun)
     end --]]
 end
 
-function MoveInCircleTemporarily(oUnit, iTimeToRun)
-    ForkThread(ForkedMoveInCircle, oUnit, iTimeToRun)
+function MoveInCircleTemporarily(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontClearCommandsFirst, iCircleSizeOverride, iTickWaitOverride)
+    ForkThread(ForkedMoveInCircle, oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontClearCommandsFirst, iCircleSizeOverride, iTickWaitOverride)
 end
 
 
@@ -237,7 +254,8 @@ function MoveInOppositeDirectionTemporarily(oUnit, iTimeToMove)
 
             --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
             local tNewTargetIgnoringGrouping = M27Utilities.MoveTowardsTarget(tUnitPosition, tUnitTarget, iDistanceToMove, 180)
-            local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
+            --local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
+            local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, true, false)
             if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
             local bRecentMicro = false
             local iRecentMicroThreshold = 1
@@ -305,9 +323,15 @@ function DodgeBomb(oBomber, oWeapon, projectile)
     local tBombTarget = GetBombTarget(oWeapon, projectile)
     if tBombTarget then
         local iBombSize = 2.5
-        if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then iBombSize = 3 end --Some t2 bombers do damage in a spread (cybran, uef)
         if oWeapon.GetBlueprint then iBombSize = math.max(iBombSize, (oWeapon:GetBlueprint().DamageRadius or iBombSize)) end
-        local iTimeToRun = math.min(7, iBombSize + 1)
+        local iTimeToRun = 0.75 --T1
+        if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then
+            iBombSize = 3
+            iTimeToRun = 1.5
+        elseif EntityCategoryContains(categories.TECH3, oBomber:GetUnitId()) then
+            iTimeToRun = 2.5
+        end --Some t2 bombers do damage in a spread (cybran, uef)
+        --local iTimeToRun = math.min(7, iBombSize + 1)
         local iRadiusSize = iBombSize + 1
 
         local iBomberArmyIndex = oBomber:GetAIBrain():GetArmyIndex()
@@ -319,37 +343,78 @@ function DodgeBomb(oBomber, oWeapon, projectile)
 
         local tAllUnitsInArea = GetUnitsInRect(Rect(tBombTarget[1]-iRadiusSize, tBombTarget[3]-iRadiusSize, tBombTarget[1]+iRadiusSize, tBombTarget[3]+iRadiusSize))
         if M27Utilities.IsTableEmpty(tAllUnitsInArea) == false then
-            local tMobileLandInArea = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLand - M27UnitInfo.refCategoryMobileLandShield, tAllUnitsInArea)
+            local tMobileLandInArea = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLand - categories.EXPERIMENTAL, tAllUnitsInArea)
+            local bDontActuallyDodge
             if M27Utilities.IsTableEmpty(tMobileLandInArea) == false then
                 local oCurBrain
                 for iUnit, oUnit in tMobileLandInArea do
                     if not(oUnit.Dead) and oUnit.GetUnitId and oUnit.GetPosition and oUnit.GetAIBrain then
                         oCurBrain = oUnit:GetAIBrain()
-                        if oCurBrain.M27AI and IsEnemy(oCurBrain:GetArmyIndex(), iBomberArmyIndex) then
+                        if oCurBrain.M27AI and not(oCurBrain.M27IsDefeated) and not(oCurBrain:IsDefeated()) and M27Logic.iTimeOfLastBrainAllDefeated < 10 and IsEnemy(oCurBrain:GetArmyIndex(), iBomberArmyIndex) then
                             --ACU specific
                             if M27Utilities.IsACU(oUnit) then
                                 local aiBrain = oCurBrain
                                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and oUnit:GetHealthPercent() > 0.3 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) > (M27Logic.GetUnitMaxGroundRange({oUnit}) - 8) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) < 32 then
                                     --Dont dodge in case we can no longer attack ACU
                                 else
-                                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then iTimeToRun = math.max(iTimeToRun, 2) end
-                                    if oUnit[M27UnitInfo.refbSpecialMicroActive] then
-                                        MoveInCircleTemporarily(oUnit, iTimeToRun)
-                                    else
-                                        MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tBombTarget)
-                                        oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
+                                    --If ACU is upgrading might not want to cancel
+                                    local bIgnoreAsUpgrading = false
+                                    if oUnit:IsUnitState('Upgrading') then
+                                        --Are we facing a T1 bomb?
+                                        if EntityCategoryContains(categories.TECH1, oBomber:GetUnitId()) then
+                                            bIgnoreAsUpgrading = true
+                                        else
+                                            --Facing T2+ bomb, so greater risk if we dont try and dodge; dont dodge if are almost complete
+                                            if oUnit:GetWorkProgress() >= 0.9 then
+                                                bIgnoreAsUpgrading = true
+                                            else
+                                                --Is it a T2 bomber, and there arent many bombers nearby?
+                                                if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then
+                                                    local tNearbyBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oUnit:GetPosition(), 100, 'Enemy')
+                                                    if M27Utilities.IsTableEmpty(tNearbyBombers) == true then
+                                                        bIgnoreAsUpgrading = true
+                                                    else
+                                                        local iEnemyBomberCount = 0
+                                                        for iEnemy, oEnemy in tNearbyBombers do
+                                                            if M27UnitInfo.IsUnitValid(oEnemy) then
+                                                                iEnemyBomberCount = iEnemyBomberCount + 1
+                                                                if iEnemyBomberCount >= 4 then break end
+                                                            end
+                                                        end
+                                                        if iEnemyBomberCount < 4 then bIgnoreAsUpgrading = true end
+
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': bIgnoreAsUpgrading='..tostring(bIgnoreAsUpgrading)) end
+                                    if not(bIgnoreAsUpgrading) then
+                                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then iTimeToRun = math.max(iTimeToRun, 2) end
+                                        if oUnit[M27UnitInfo.refbSpecialMicroActive] then
+                                            MoveInCircleTemporarily(oUnit, iTimeToRun)
+                                        else
+                                            MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tBombTarget)
+                                            oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
+                                        end
                                     end
                                 end
                             else
-                                --if iBombSize <=5 or iBombSize >= 5.75 or not(M27Utilities.IsACU(oUnit)) then --If <=5 then should be able to dodge; if >5.5 then no poitn trying extra micro as wont be able to dodge (but there's a chance units may move out of the aoe so we still try the normal go in opposite direction)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': about to call moveawayfromtargettemporarily') end
-                                    MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tBombTarget)
-                                    oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
-                                --else --NOTE: Although manually moving in half circle dodges strats, for AI it's not possible due to issueclearcommands stopping the unit for about half a second
-                                    --if bDebugMessages == true then LOG(sFunctionRef..': about to call moveainhalfcircletemporarily') end
-                                    --MoveInHalfCircleTemporarily(oUnit, iTimeToRun, tBombTarget)
-                                    --MoveInCircleTemporarily(oUnit, iTimeToRun)
-                                --end
+                                --Are we a mobile shield that isn't on the same team as the bomber? If so, then dont worry about dodging
+                                --if not(EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit:GetUnitId())) then
+                                    --if IsEnemy(oCurBrain:GetArmyIndex(), oBomber:GetAIBrain():GetArmyIndex()) and oUnit.MyShield and oUnit.MyShield:GetHealth() > 0 and (M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBombTarget) - oUnit:GetBlueprint().Defense.Shield.ShieldSize * 0.5) <= -4 then
+                                        --Dont actually want to dodge as highly unlikely to avoid due to size of our shield bubble
+                                    --else
+
+                                    --if iBombSize <=5 or iBombSize >= 5.75 or not(M27Utilities.IsACU(oUnit)) then --If <=5 then should be able to dodge; if >5.5 then no poitn trying extra micro as wont be able to dodge (but there's a chance units may move out of the aoe so we still try the normal go in opposite direction)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': about to call moveawayfromtargettemporarily') end
+                                        MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tBombTarget)
+                                        oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
+                                    --else --NOTE: Although manually moving in half circle dodges strats, for AI it's not possible due to issueclearcommands stopping the unit for about half a second
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': about to call moveainhalfcircletemporarily') end
+                                        --MoveInHalfCircleTemporarily(oUnit, iTimeToRun, tBombTarget)
+                                        --MoveInCircleTemporarily(oUnit, iTimeToRun)
+                                    --end
                             end
                         end
                     end
@@ -469,7 +534,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
             if bAbort == false then
 
                 --Is there any enemy point defence nearby? If so then overcharge it (unless are running away in which case just target mobile units)
-                if oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionRun or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionTemporaryRetreat or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReturnToBase then bAreRunning = true end
+                if oPlatoon[M27PlatoonUtilities.refbHavePreviouslyRun] == true or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionRun or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionTemporaryRetreat or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReturnToBase or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionGoToNearestRallyPoint or (M27Utilities.IsACU(oUnitWithOvercharge) and oUnitWithOvercharge:GetHealth() < aiBrain[M27Overseer.refiACUHealthToRunOn]) then bAreRunning = true end
                 if bAreRunning == false then
                     if oOverchargeTarget == nil then
                         local tEnemyPointDefence = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE * categories.DIRECTFIRE, tUnitPosition, iACURange, 'Enemy')
@@ -490,19 +555,33 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any T2 PD further away') end
                         tEnemyPointDefence = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH2 + categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH3, tUnitPosition, iInitialT2PDSearchRange, 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyPointDefence) == false then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have enemy T2 defence that can hit us but is out of our range - considering if shot is blocked') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have enemy T2 defence that can hit us but is out of our range - considering if OC it will bring us in range of T1 PD, and/or if shot is blocked') end
+                            local tNearbyT1PD
+                            local iNearestT1PD = 10000
+                            local iCurDistance
+                            if iInitialT2PDSearchRange - iACURange > 0 then tNearbyT1PD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryPD * categories.TECH1, tUnitPosition, iInitialT2PDSearchRange - iACURange, 'Enemy') end
+                            if M27Utilities.IsTableEmpty(tNearbyT1PD) == false then
+                                for iT1PD, oT1PD in tNearbyT1PD do
+                                    iCurDistance = M27Utilities.GetDistanceBetweenPositions(oT1PD:GetPosition(), tUnitPosition)
+                                    if iCurDistance < iNearestT1PD then iNearestT1PD = iCurDistance end
+                                end
+                            end
+
                             for iUnit, oEnemyT2PD in tEnemyPointDefence do
-                                if M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT2PD) == false then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Setting target to T2 PD') end
-                                    oOverchargeTarget = oEnemyT2PD
-                                    break
+                                --Can we get in range of the T2 PD without getting in range of the T1 PD? (approximates just based on distances rather than considering the likely path to take)
+                                if M27Utilities.GetDistanceBetweenPositions(oEnemyT2PD:GetPosition(), tUnitPosition) - iACURange + 2 < iNearestT1PD then
+                                    if M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT2PD) == false then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Setting target to T2 PD') end
+                                        oOverchargeTarget = oEnemyT2PD
+                                        break
+                                    end
                                 end
                             end
                         end
                     end
                 end
                 if oOverchargeTarget == nil then
-                    local tEnemyT2Plus = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.TECH2 + categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.TECH3 + categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.EXPERIMENTAL - categories.SUBCOMMANDER + M27UnitInfo.refCategoryAllNavy, tUnitPosition, iACURange, 'Enemy')
+                    local tEnemyT2Plus = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.TECH2 + categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.TECH3 + categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.EXPERIMENTAL - categories.SUBCOMMANDER + M27UnitInfo.refCategoryNavalSurface, tUnitPosition, iACURange, 'Enemy')
                     if M27Utilities.IsTableEmpty(tEnemyT2Plus) == false then
                         for iUnit, oEnemyT2Unit in tEnemyT2Plus do
                             if bDebugMessages == true then LOG(sFunctionRef..': Have enemy T2+ mobile land to consider') end
@@ -512,25 +591,38 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                                 break
                             end
                         end
+                    else
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': No T2PlusOrNavy in range of '..iACURange)
+                            local tNearbyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, tUnitPosition, iACURange, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tNearbyNavy) == false then
+                                M27Utilities.ErrorHandler('Have nearby navy despite not showing up in tEnemyT2Plus')
+                            end
+                        end
                     end
                     if oOverchargeTarget == nil then
-                        local tEnemyT1 = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE * categories.TECH1 * categories.DIRECTFIRE + categories.LAND * categories.MOBILE * categories.TECH1 * categories.INDIRECTFIRE, tUnitPosition, iACURange, 'Enemy')
+                        --NOTE: Not using unitinfo category below as want to include walls (as realised inadvertently introduced anti-wall protection for ACU)
+                        local tEnemyPossibleTargets = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE + categories.STRUCTURE - categories.COMMAND - categories.FACTORY * categories.STRUCTURE, tUnitPosition, iACURange, 'Enemy')
                         local tNearbyEnemiesToTarget
                         local iMaxUnitsInArea = 0
                         local iCurUnitsInArea
-                        for iUnit, oEnemyT1Unit in tEnemyT1 do
+                        local iMassValueOfUnitsInArea
+                        for iUnit, oEnemyLandUnit in tEnemyPossibleTargets do
                             if bDebugMessages == true then LOG(sFunctionRef..': Have T1 units to consider, checking how many units are near them for AOE') end
-                            tNearbyEnemiesToTarget = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, oEnemyT1Unit:GetPosition(), iOverchargeArea, 'Enemy')
+                            tNearbyEnemiesToTarget = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, oEnemyLandUnit:GetPosition(), iOverchargeArea, 'Enemy')
                             if M27Utilities.IsTableEmpty(tNearbyEnemiesToTarget) == false then
-                                iCurUnitsInArea = table.getn(tNearbyEnemiesToTarget)if bDebugMessages == true then LOG(sFunctionRef..': Have T1 units with iCurUnitsInArea='..iCurUnitsInArea..' within area effect') end
-                                if iCurUnitsInArea >= iMinT1ForOvercharge then
-                                    --bShotIsBlocked = M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT1Unit)
-                                    bShotIsBlocked = M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT1Unit)
+                                iCurUnitsInArea = table.getn(tNearbyEnemiesToTarget)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have T1 units with iCurUnitsInArea='..iCurUnitsInArea..' within area effect') end
+                                iMassValueOfUnitsInArea = 0
+                                if iCurUnitsInArea < iMinT1ForOvercharge then iMassValueOfUnitsInArea = M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemiesToTarget, true, nil, nil, nil, true) end
+                                if iCurUnitsInArea >= iMinT1ForOvercharge or iMassValueOfUnitsInArea >= iMinT1ForOvercharge * 70 then
+                                    --bShotIsBlocked = M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyLandUnit)
+                                    bShotIsBlocked = M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyLandUnit)
                                     if bShotIsBlocked == false then
                                         if iCurUnitsInArea > iMaxUnitsInArea then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Setting target to t1 unit') end
                                             iMaxUnitsInArea = iCurUnitsInArea
-                                            oOverchargeTarget = oEnemyT1Unit
+                                            oOverchargeTarget = oEnemyLandUnit
                                             if oOverchargeTarget == nil and bDebugMessages == true then LOG(sFunctionRef..': Overcharge target is nil1') end
                                         end
                                         if oOverchargeTarget == nil and bDebugMessages == true then LOG(sFunctionRef..': Overcharge target is nil2') end
