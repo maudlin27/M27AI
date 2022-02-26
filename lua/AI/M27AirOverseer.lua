@@ -40,7 +40,7 @@ reftAirSegmentTracker = 'M27AirSegmentTracker' --[x][z]{a,b,c,d etc.} - x = segm
 refiLastScouted = 'M27AirLastScouted'
 local refiAirScoutsAssigned = 'M27AirScoutsAssigned'
 local refiNormalScoutingIntervalWanted = 'M27AirScoutIntervalWanted' --What to default to if e.g. temporairly increased
-local refiCurrentScoutingInterval = 'M27AirScoutCurrentIntervalWanted' --e.g. can temporarily override this if a unit dies and want to make it higher priority
+refiCurrentScoutingInterval = 'M27AirScoutCurrentIntervalWanted' --e.g. can temporarily override this if a unit dies and want to make it higher priority
 local reftMidpointPosition = 'M27AirSegmentMidpointPosition'
 local refiDeadScoutsSinceLastReveal = 'M27AirDeadScoutsSinceLastReveal'
 local refiLastTimeScoutingIntervalChanged = 'M27AirLastTimeScoutingIntervalChanged'
@@ -3418,7 +3418,7 @@ function SetupAirOverseer(aiBrain)
     aiBrain[refiIntervalMexNotBuiltOn] = 100
     aiBrain[refiIntervaPriorityMex] = 60
     aiBrain[refiIntervalEnemyMex] = 120
-    aiBrain[refiIntervalEnemyBase] = 90
+    aiBrain[refiIntervalEnemyBase] = 80
 
     aiBrain[reftAirSegmentTracker] = {}
     aiBrain[reftScoutingTargetShortlist] = {}
@@ -3471,6 +3471,7 @@ function SetupAirOverseer(aiBrain)
     end
 
     --Higher priorities for enemy start locations
+    --(note - M27Overseer will reduce the threshold for nearest enemy when it thinks we'll be deciding what experimental to be building soon)
     local iOurArmyIndex = aiBrain:GetArmyIndex()
     local iEnemyArmyIndex, tEnemyStartPosition
     local iCurAirSegmentX, iCurAirSegmentZ

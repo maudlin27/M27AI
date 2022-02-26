@@ -570,30 +570,33 @@ function ACUShouldAssistEarlyHydro(aiBrain)
 end
 
 function CanUnitUseOvercharge(aiBrain, oUnit)
-    --For now checks if enough energy and not underwater; separate function used as may want to expand this with rate of fire check in future
+    --For now checks if enough energy and not underwater and not fired in last 5s; separate function used as may want to expand this with rate of fire check in future
     local sFunctionRef = 'CanUnitUseOvercharge'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oBP = oUnit:GetBlueprint()
     local iEnergyNeeded
-    for iWeapon, oWeapon in oBP.Weapon do
-        if oWeapon.OverChargeWeapon then
-            if oWeapon.EnergyRequired then
-                iEnergyNeeded = oWeapon.EnergyRequired
-                break
+    local bCanUseOC = false
+    if GetGameTimeSeconds() - (oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100) >= 5 then
+        for iWeapon, oWeapon in oBP.Weapon do
+            if oWeapon.OverChargeWeapon then
+                if oWeapon.EnergyRequired then
+                    iEnergyNeeded = oWeapon.EnergyRequired
+                    break
+                end
             end
         end
-    end
-    local bCanUseOC = false
-    if aiBrain:GetEconomyStored('ENERGY') >= iEnergyNeeded then bCanUseOC = true end
-    if bCanUseOC == true then
-        --Check if underwater
-        local oUnitPosition = oUnit:GetPosition()
-        local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(oUnitPosition, true) + 0.25 --small margin of error
-        local tFiringPositionStart = M27Logic.GetDirectFireWeaponPosition(oUnit)
-        if tFiringPositionStart then
-            local iFiringHeight = tFiringPositionStart[2]
-            if iFiringHeight <= iHeightAtWhichConsideredUnderwater then
-                bCanUseOC = false
+
+        if aiBrain:GetEconomyStored('ENERGY') >= iEnergyNeeded then bCanUseOC = true end
+        if bCanUseOC == true then
+            --Check if underwater
+            local oUnitPosition = oUnit:GetPosition()
+            local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(oUnitPosition, true) + 0.25 --small margin of error
+            local tFiringPositionStart = M27Logic.GetDirectFireWeaponPosition(oUnit)
+            if tFiringPositionStart then
+                local iFiringHeight = tFiringPositionStart[2]
+                if iFiringHeight <= iHeightAtWhichConsideredUnderwater then
+                    bCanUseOC = false
+                end
             end
         end
     end

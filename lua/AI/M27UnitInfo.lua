@@ -24,6 +24,7 @@ refbSpecialMicroActive = 'M27UnitSpecialMicroActive' --e.g. if dodging bombers
 refiGameTimeToResetMicroActive = 'M27UnitGameTimeToResetMicro'
 refiGameTimeMicroStarted = 'M27UnitGameTimeMicroStarted'
 refbOverchargeOrderGiven = 'M27UnitOverchargeOrderGiven'
+refiTimeOfLastOverchargeShot = 'M27UnitOverchargeShotFired' --gametime of actual firing of overcharge shot
 refsUpgradeRef = 'M27UnitUpgradeRef' --If ACU starts an upgrade, it records the string reference here
 refbPaused = 'M27UnitPaused' --true if paused due to poewr stall manager
 refbRecentlyDealtDamage = 'M27UnitRecentlyDealtDamage' --true if dealt damage in last 5s
@@ -31,6 +32,8 @@ refiGameTimeDamageLastDealt = 'M27UnitTimeLastDealtDamage'
 refoFactoryThatBuildThis = 'M27UnitFactoryThatBuildThis'
 refbFullyUpgraded = 'M27UnitFullyUpgraded' --used on ACU to avoid running some checks every time it wants an upgrade
 refbRecentlyRemovedHealthUpgrade = 'M27UnitRecentlyRemovedHealthUpgrade' --Used on ACU to flag if e.g. we removed T2 which will decrease our health
+refbActiveMissileChecker = 'M27UnitMissileTracker' --True if are actively checking for missile targets
+refbActiveSMDChecker = 'M27UnitSMDChecker' -- true if unit is checking for enemy SMD (use on nuke)
 
 --Factions
 refFactionUEF = 1
@@ -615,6 +618,28 @@ function GetBomberAOEAndStrikeDamage(oUnit)
 
 
     return iAOE, iStrikeDamage
+end
+
+function GetLauncherAOEStrikeDamageMinAndMaxRange(oUnit)
+    local oBP = oUnit:GetBlueprint()
+    local iAOE = 0
+    local iStrikeDamage
+    local iMinRange = 0
+    local iMaxRange = 0
+    for sWeaponRef, tWeapon in oBP.Weapon do
+        if not(tWeapon.WeaponCategory == 'Death') then
+            if (tWeapon.DamageRadius or 0) > iAOE then
+                iAOE = tWeapon.DamageRadius
+                iStrikeDamage = tWeapon.Damage * tWeapon.MuzzleSalvoSize
+            elseif (tWeapon.NukeInnerRingRadius or 0) > iAOE then
+                iAOE = tWeapon.NukeInnerRingRadius
+                iStrikeDamage = tWeapon.NukeInnerRingDamage
+            end
+            if (tWeapon.MinRadius or 0) > iMinRange then iMinRange = tWeapon.MinRadius end
+            if (tWeapon.MaxRadius or 0) > iMaxRange then iMaxRange = tWeapon.MaxRadius end
+        end
+    end
+    return iAOE, iStrikeDamage, iMinRange, iMaxRange
 end
 
 function GetBomberRange(oUnit)

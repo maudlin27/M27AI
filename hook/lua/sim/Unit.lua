@@ -1,6 +1,6 @@
 local M27Events = import('/mods/M27AI/lua/AI/M27Events.lua')
 
-do
+do --Per Balthazaar - encasing the code in do .... end means that you dont have to worry about using unique variables
     local M27OldUnit = Unit
     Unit = Class(M27OldUnit) {
         OnKilled = function(self, instigator, type, overkillRatio)
@@ -24,12 +24,14 @@ do
             M27Events.OnMissileBuilt(self, weapon)
         end,
         OnStartBuild = function(self, built, order, ...)
-            M27OldUnit.OnStartBuild(self, built, order, unpack(arg))
             ForkThread(M27Events.OnConstructionStarted, self, built, order)
-        end,
+            return M27OldUnit.OnStartBuild(self, built, order, unpack(arg))
+        end, --[[
         OnStopBuild = function(self, unitBuilding, ...)
-            M27OldUnit.OnStopBuild(self, unitBuilding, unpack(arg))
-        end,
+            if self.GetBlueprint then
+                M27OldUnit.OnStopBuild(self, unitBuilding, unpack(arg))
+            end
+        end,--]]
     
         --[[CreateEnhancementEffects = function(self, enhancement)
             local bp = self:GetBlueprint().Enhancements[enhancement]

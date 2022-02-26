@@ -4317,13 +4317,17 @@ function DeterminePlatoonAction(oPlatoon)
                 if bDebugMessages == true then LOG('oPlatoon has nil units, so moving to action disband; Platoon ref='..sPlatoonName..oPlatoon[refiPlatoonCount]) end
                 oPlatoon[refiCurrentAction] = refActionDisband
             else
-                if oPlatoon[refiUnitsWithShields] > 0 then RetreatLowHealthShields(oPlatoon, aiBrain) end
+                if oPlatoon[refiUnitsWithShields] > 0 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Platoon contains '..oPlatoon[refiUnitsWithShields]..' shielded units, Will check if any of these want to retreat') end
+                    RetreatLowHealthShields(oPlatoon, aiBrain)
+                end
                 if oPlatoon[refiCurrentUnits] == 0 then
                     if bDebugMessages == true then LOG('oPlatoon has no units after retreating shields, so disbanding; Platoon ref='..sPlatoonName..oPlatoon[refiPlatoonCount]) end
                     oPlatoon[refiCurrentAction] = refActionDisband
                 else
                     local bDoNothing = false
                     if oPlatoon[refbACUInPlatoon] and oPlatoon[reftBuilders][1] and oPlatoon[reftBuilders][1][M27UnitInfo.refbOverchargeOrderGiven] then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Overcharge action has been given so will do nothing') end
                         bDoNothing = true
                     end
                     if not(bDoNothing) then
@@ -6766,9 +6770,19 @@ function ProcessPlatoonAction(oPlatoon)
                                     --Give up on issuing overcharge after 4s
                                     M27Utilities.DelayChangeVariable(oOverchargingUnit, M27UnitInfo.refbOverchargeOrderGiven, false, 4, nil, nil)
                                     bDontClearActions = true
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have just issued overcharge action, waiting') end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have just issued overcharge action with gametime='..GetGameTimeSeconds()..' at a unit that is '..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[refExtraActionTargetUnit]:GetPosition())..' away; if current action is nil then will reissue prev action. oPlatoon[refiCurrentAction]='..(oPlatoon[refiCurrentAction] or 'nil')..'; Is the prev action table empty='..tostring(M27Utilities.IsTableEmpty(oPlatoon[reftPrevAction]))) end
                                     --Reissue prev action if current action is nil so we dont stand around for a while
-                                    if oPlatoon[refiCurrentAction] == nil then oPlatoon[refiCurrentAction] = oPlatoon[reftPrevAction][1] end
+                                    if oPlatoon[refiCurrentAction] == nil then
+                                        if M27Utilities.IsTableEmpty(oPlatoon[reftPrevAction]) == false then
+                                            for iPrevAction = 1, 10 do
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Considering the '..iPrevAction..' previous action; Prev action ref ='..(oPlatoon[reftPrevAction][iPrevAction] or 'nil')) end
+                                                if oPlatoon[reftPrevAction][iPrevAction] then
+                                                    oPlatoon[refiCurrentAction] = oPlatoon[reftPrevAction][iPrevAction]
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Updated current action to '..oPlatoon[refiCurrentAction]) end
+                                                end
+                                            end
+                                        end
+                                    end
                                 end
                             else
                                 LOG(sFunctionRef..': Warning - unit to issue overcharge to isnt valid or is dead')
