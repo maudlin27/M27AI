@@ -262,8 +262,8 @@ function RecordIntelPaths(aiBrain)
             local tScoutsToBuild = EntityCategoryGetUnitList(refCategoryLandScout * iFactionCat)
             local oScoutBP, iScoutRange
             if M27Utilities.IsTableEmpty(tScoutsToBuild) == false then
-                for iScout, oScoutBP in tScoutsToBuild do
-                    iScoutRange = oScoutBP.Intel.RadarRadius
+                for iScout, sScoutBP in tScoutsToBuild do
+                    iScoutRange = __blueprints[sScoutBP].Intel.RadarRadius
                     if iScoutRange > 20 then break end
                 end
             end
@@ -3894,9 +3894,32 @@ function SetMaximumFactoryLevels(aiBrain)
         aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
     end
     --local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
-    local iMexesOnOurSideOfMap = M27EconomyOverseer.GetMexCountOnOurSideOfMap(aiBrain)
-    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then iPrimaryFactoriesWanted = math.max(3, math.ceil(iMexesOnOurSideOfMap * 0.25))
-    else iPrimaryFactoriesWanted = math.max(5, math.ceil(iMexesOnOurSideOfMap * 0.7)) end
+
+    local iMexesToBaseCalculationOn
+    if aiBrain[refiOurHighestFactoryTechLevel] >= 3 then
+        iMexesToBaseCalculationOn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex) * 0.25
+    elseif aiBrain[refiOurHighestFactoryTechLevel] == 2 then
+        iMexesToBaseCalculationOn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) * 3 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex) + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex) / 3
+    else
+        iMexesToBaseCalculationOn = math.min(M27EconomyOverseer.GetMexCountOnOurSideOfMap(aiBrain), aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) * 9 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex) * 3 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex))
+    end
+
+    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then
+        if not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('MASS') > 0.2 then
+            iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.25))
+        elseif not(M27Conditions.HaveLowMass(aiBrain)) then iPrimaryFactoriesWanted = math.max(4 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.20))
+        else
+            --Have low mass
+            iPrimaryFactoriesWanted = math.max(1, math.ceil(iMexesToBaseCalculationOn * 0.15))
+        end
+    else
+        if M27Conditions.HaveLowMass(aiBrain) then
+            iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.5))
+        else
+            iPrimaryFactoriesWanted = math.max(6 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.7))
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': iPrimaryFactoriesWanted before considering other factors='..iPrimaryFactoriesWanted) end
 
     aiBrain[reftiMaxFactoryByType][iPrimaryFactoryType] = iPrimaryFactoriesWanted
     local iAirFactoryMin = 1
@@ -3948,6 +3971,7 @@ function SetMaximumFactoryLevels(aiBrain)
     if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
         aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 1)
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': bActiveExperimental='..tostring(bActiveExperimental)..'; Idle factories='..aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused]) end
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]..'; aiBrain[refiMinLandFactoryBeforeOtherTypes]='..aiBrain[refiMinLandFactoryBeforeOtherTypes]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]) end
@@ -4007,26 +4031,33 @@ function UpdateHighestFactoryTechTracker(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateHighestFactoryTechTracker'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, gametime='..GetGameTimeSeconds()) end
 
     local iHighestTechLevel = 1
     if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3) > 0 then iHighestTechLevel = 3
     elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2) > 0 then iHighestTechLevel = 2 end
     aiBrain[refiOurHighestFactoryTechLevel] = iHighestTechLevel
     if iHighestTechLevel > 1 then
+        if bDebugMessages == true then LOG(sFunctionRef..': iHighestTechLevel='..iHighestTechLevel..'; will consider how many air and land factories we have') end
         if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH3) > 0 then aiBrain[refiOurHighestAirFactoryTech] = 3
         elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory * categories.TECH2) > 0 then aiBrain[refiOurHighestAirFactoryTech] = 2
         else
             aiBrain[refiOurHighestAirFactoryTech] = 1
         end
-        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3) > 0 then aiBrain[refiOurHighestFactoryTechLevel] = 3
-        elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH2) > 0 then aiBrain[refiOurHighestLandFactoryTech] = 2
+        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3) > 0 then
+            if bDebugMessages == true then LOG(sFunctionRef..': We have T3 land factories') end
+            aiBrain[refiOurHighestLandFactoryTech] = 3
+        elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH2) > 0 then
+            if bDebugMessages == true then LOG(sFunctionRef..': We dont have T3 land factories but do have T2') end
+            aiBrain[refiOurHighestLandFactoryTech] = 2
         else aiBrain[refiOurHighestLandFactoryTech] = 1
         end
     else
+        if bDebugMessages == true then LOG(sFunctionRef..': Highest of any factory tech is only tech 1') end
         aiBrain[refiOurHighestAirFactoryTech] = 1
         aiBrain[refiOurHighestLandFactoryTech] = 1
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': Number of tech2 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2)..'; Number of tech3 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3)..'; iHighestTechLevel='..iHighestTechLevel..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]..'; aiBrain[refiOurHighestAirFactoryTech]='..aiBrain[refiOurHighestAirFactoryTech]) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Number of tech2 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH2)..'; Number of tech3 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories * categories.TECH3)..'; iHighestTechLevel='..iHighestTechLevel..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]..'; aiBrain[refiOurHighestAirFactoryTech]='..aiBrain[refiOurHighestAirFactoryTech]..'; Number of T3 land factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3)..'; Highest land factory tech='..aiBrain[refiOurHighestLandFactoryTech]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -4444,6 +4475,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
             --Air:
             tsGameState['AirAANeeded'] = aiBrain[M27AirOverseer.refiAirAANeeded]
+            tsGameState['AirAAWanted'] = aiBrain[M27AirOverseer.refiAirAAWanted]
             tsGameState['AvailableBombers'] = 0
             if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then tsGameState['AvailableBombers'] = table.getn(aiBrain[M27AirOverseer.reftAvailableBombers]) end
             tsGameState['RemainingBomberTargets'] = 0

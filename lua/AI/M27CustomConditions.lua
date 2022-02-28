@@ -335,8 +335,18 @@ function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
         end
         if bDebugMessages == true then LOG(sFunctionRef..'; bWantToGetGun='..tostring(bWantToGetGun)) end
     end
-    if bWantToGetGun and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
-        if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantToGetGun = false end
+    --Adjust based on what strategy we are using
+    if bWantToGetGun then
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+            if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantToGetGun = false end
+        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
+            if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 or aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 75 then
+                --Are we about to start on a T2 PGen? If so then hold off on upgrade
+                if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false or aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1 then
+                    bWantToGetGun = false
+                end
+            end
+        end
     end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -415,6 +425,7 @@ function HaveLowMass(aiBrain)
     local iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
     if iMassStoredRatio < 0.05 then bHaveLowMass = true
     elseif (iMassStoredRatio < 0.15 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.2 then bHaveLowMass = true
+    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and (iMassStoredRatio < 0.1 or (iMassStoredRatio < 0.2 and aiBrain:GetEconomyStored('MASS') < 1000 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.3)) then bHaveLowMass = true
     end
     return bHaveLowMass
 end

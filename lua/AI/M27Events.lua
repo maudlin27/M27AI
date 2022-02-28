@@ -83,6 +83,8 @@ function OnUnitDeath(oUnit)
                     M27AirOverseer.OnAirAADeath(oUnit)
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryBomber, sUnitBP) or EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, sUnitBP) then
                     M27AirOverseer.OnBomberDeath(aiBrain, oUnit)
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, sUnitBP) then
+                    M27EngineerOverseer.CheckUnitsStillShielded(aiBrain)
                 --elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sUnitBP) then
                     --aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
                 end
@@ -225,7 +227,6 @@ function OnWeaponFired(oWeapon)
     if oUnit and oUnit.GetUnitId then
         --Overcharge
         if oWeapon.GetBlueprint and oWeapon:GetBlueprint().Overcharge then
-            bDebugMessages = true
             oUnit[M27UnitInfo.refbOverchargeOrderGiven] = false
             if bDebugMessages == true then LOG('Overcharge weapon was just fired') end
             oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] = GetGameTimeSeconds()
@@ -280,12 +281,20 @@ function OnProjectileFired(oWeapon, oMuzzle)
 end--]]
 
 function OnConstructionStarted(oEngineer, oConstruction, sOrder)
-    --Track experimental construction
+    --Track experimental construction and other special on construction logic
     if oEngineer.GetAIBrain and oEngineer:GetAIBrain().M27AI and oConstruction.GetUnitId then
         local aiBrain = oEngineer:GetAIBrain()
+        --Decide if we want to shield the construction
+        if oConstruction:GetBlueprint().Economy.BuildCostMass >= 2000 then
+            if oConstruction:GetBlueprint().Defense.Health / oConstruction:GetBlueprint().Economy.BuildCostMass < 1 then
+                table.insert(aiBrain[M27EngineerOverseer.reftUnitsWantingFixedShield], oConstruction)
+            end
+        end
+
+
         --Check for construction of nuke
         --if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] then
-            local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             local sFunctionRef = 'OnConstructionStarted'
             if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have just started construction on a nuke; if so then will start a monitor; UnitID='..oConstruction:GetUnitId()..'; oConstruction[M27UnitInfo.refbActiveSMDChecker]='..(tostring(oConstruction[M27UnitInfo.refbActiveSMDChecker] or false))) end
 

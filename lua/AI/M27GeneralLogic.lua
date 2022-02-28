@@ -3263,7 +3263,7 @@ function GetNearestActiveFixedEnemyShield(aiBrain, tLocation)
     return oNearestShield
 end
 
-function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead)
+function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetUnderShield'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -3288,15 +3288,18 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     if bEnemy then sSearchType = 'Enemy' end
     local tTargetPos = oTarget:GetPosition()
     local iShieldCategory = M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryFixedShield
+    if bIgnoreMobileShields then iShieldCategory = M27UnitInfo.refCategoryFixedShield end
     local tNearbyShields = aiBrain:GetUnitsAroundPoint(iShieldCategory, tTargetPos, iShieldSearchRange, sSearchType)
     if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repr(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
     local iShieldCurHealth, iShieldMaxHealth
     local iTotalShieldCurHealth = 0
+    local iMinFractionComplete = 0.95
+    if bTreatPartCompleteAsComplete then iMinFractionComplete = 0 end
     if M27Utilities.IsTableEmpty(tNearbyShields) == false then
         if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
         local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
         for iUnit, oUnit in tNearbyShields do
-            if not(oUnit.Dead) and oUnit:GetFractionComplete() >= 0.95 then
+            if not(oUnit.Dead) and oUnit:GetFractionComplete() >= iMinFractionComplete then
                 oCurUnitBP = oUnit:GetBlueprint()
                 iCurShieldRadius = 0
                 if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
@@ -3309,7 +3312,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
                             if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
                             iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                             iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth
-                            if oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1 then iShieldCurHealth = iShieldMaxHealth end
+                            if bTreatPartCompleteAsComplete or (oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1) then iShieldCurHealth = iShieldMaxHealth end
                             if bDebugMessages == true then LOG(sFunctionRef..': iShieldCurHealth='..iShieldCurHealth..'; iIgnoreShieldsWithLessThanThisHealth='..iIgnoreShieldsWithLessThanThisHealth) end
                             if iShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth then
                                 bUnderShield = true
@@ -3590,7 +3593,6 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDamageFromBomb'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if iDamage > 50000 then bDebugMessages = true end
 
 
     local iTotalDamage = 0
@@ -3671,7 +3673,7 @@ end
 
 function ConsiderLaunchingMissile(oLauncher, oWeapon)
     --Should be called via forkthread when missile created due to creating a loop
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     oLauncher[M27UnitInfo.refbActiveMissileChecker] = true

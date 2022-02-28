@@ -35,7 +35,7 @@ end
 function SendGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts)
     --Sends a taunt message after waiting iOptionalDelay, provided we havent sent one within 60s or iOptionalTimeBetweenTaunts
     local sFunctionRef = 'SendGloatingMessage'
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if iOptionalDelay then
