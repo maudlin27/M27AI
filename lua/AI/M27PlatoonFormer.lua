@@ -743,7 +743,13 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
             if M27Utilities.IsTableEmpty(tStructures) == false then AddIdleUnitsToPlatoon(aiBrain, tStructures, aiBrain[M27PlatoonTemplates.refoAllStructures]) end
             if M27Utilities.IsTableEmpty(tAir) == false then AddIdleUnitsToPlatoon(aiBrain, tAir, aiBrain[M27PlatoonTemplates.refoIdleAir]) end
             if M27Utilities.IsTableEmpty(tMobileShield) == false then AllocateNewUnitsToPlatoonNotFromFactory(tMobileShield) end
-            if M27Utilities.IsTableEmpty(tOther) == false then AddIdleUnitsToPlatoon(aiBrain, tOther, aiBrain[M27PlatoonTemplates.refoIdleOther]) end
+            if M27Utilities.IsTableEmpty(tOther) == false then
+                AddIdleUnitsToPlatoon(aiBrain, tOther, aiBrain[M27PlatoonTemplates.refoIdleOther])
+                --Are we dealing with a novax?
+                for iNovax, oNovax in EntityCategoryFilterDown(M27UnitInfo.refCategorySatellite, tOther) do
+                    ForkThread(M27AirOverseer.NovaxManager, oNovax)
+                end
+            end
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -1389,8 +1395,10 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                                 if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == true then LOG('Table is empty')
                                 else
                                     for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
-                                        local iUniqueID = M27UnitInfo.GetUnitLifetimeCount(oNewUnit)
-                                        LOG('iUnit='..iUnit..'; Blueprint+UniqueCount='..oUnit:GetUnitId()..iUniqueID)
+                                        if M27UnitInfo.IsUnitValid(oUnit) then
+                                            local iUniqueID = M27UnitInfo.GetUnitLifetimeCount(oNewUnit)
+                                            LOG('iUnit='..iUnit..'; Blueprint+UniqueCount='..oUnit:GetUnitId()..iUniqueID)
+                                        else LOG('iUnit='..iUnit..'; unit isnt valid') end
                                     end
                                 end
                             end
@@ -1408,6 +1416,10 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                         end
                         if M27Utilities.IsTableEmpty(tAirUnits) == false then
                            AllocateUnitsToIdlePlatoons(aiBrain, tAirUnits)
+                            --Are we dealing with a novax?
+                            for iNovax, oNovax in EntityCategoryFilterDown(M27UnitInfo.refCategorySatellite, tAirUnits) do
+                                ForkThread(M27AirOverseer.NovaxManager, oNovax)
+                            end
                         end
                         if M27Utilities.IsTableEmpty(tNavalUnits) == false then
                             AllocateUnitsToIdlePlatoons(aiBrain, tNavalUnits)
@@ -1430,7 +1442,8 @@ end
 function AllocateNewUnitToPlatoonFromFactory(oNewUnit, oFactory)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG('AllocateNewUnitToPlatoonFromFactory About to fork thread') end
-    if not(oNewUnit.Dead) and not(oNewUnit.GetUnitId) then M27Utilities.ErrorHandler('oNewUnit doesnt have a unit ID so likely isnt a unit') end
+    if not(oNewUnit.Dead) and not(oNewUnit.GetUnitId) then M27Utilities.ErrorHandler('oNewUnit doesnt have a unit ID so likely isnt a unit')
+    elseif bDebugMessages == true then LOG('AllocateNewUnitToPlatoonFromFactory: oNewUnit='..oNewUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNewUnit)) end
     oNewUnit[M27UnitInfo.refoFactoryThatBuildThis] = oFactory
     ForkThread(AllocateNewUnitToPlatoonBase, {oNewUnit}, false)
 end

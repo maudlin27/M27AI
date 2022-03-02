@@ -3999,7 +3999,7 @@ function DetermineInitialBuildOrder(aiBrain)
         end
         if iNearbyMexCount >= 12 then
             aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 7
-        elseif iNearbyMexCount >= 8 or aiBrain[refiDistanceToNearestEnemyBase] >= 300 then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 5
+        elseif iNearbyMexCount >= 8 or aiBrain[refiDistanceToNearestEnemyBase] >= 300 then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 5 --e.g. Theta passage is less than 300 I think
         else
             aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 4
         end

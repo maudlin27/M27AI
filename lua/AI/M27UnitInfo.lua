@@ -88,6 +88,8 @@ refCategoryFixedT3Arti = categories.STRUCTURE * categories.INDIRECTFIRE * catego
 refCategorySML = categories.NUKE * categories.SILO
 refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * categories.STRUCTURE
 refCategoryTML = categories.SILO * categories.STRUCTURE * categories.TECH2 - categories.ANTIMISSILE
+refCategoryNovaxCentre = categories.EXPERIMENTAL * categories.STRUCTURE * categories.ORBITALSYSTEM
+refCategorySatellite = categories.EXPERIMENTAL * categories.SATELLITE
 --refCategorySAM = categories.ANTIAIR * categories.STRUCTURE * categories.TECH3
 
 --Land units
@@ -130,7 +132,8 @@ refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
 refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE
 refCategoryAllNavy = categories.NAVAL
-refCategoryCruiserCarrier = categories.NAVAL * categories.CRUISER + categories.NAVAL * categories.NAVALCARRIER
+refCategoryCruiser = categories.NAVAL * categories.CRUISER
+refCategoryCruiserCarrier = refCategoryCruiser + categories.NAVAL * categories.NAVALCARRIER
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted
 refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL

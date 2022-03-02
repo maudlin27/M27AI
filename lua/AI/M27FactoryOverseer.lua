@@ -1334,7 +1334,7 @@ function FactoryMainOverseerLoop(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FactoryMainOverseerLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local iFactoryCategory = categories.CONSTRUCTION * categories.FACTORY * categories.STRUCTURE
+    local iFactoryCategory = M27UnitInfo.refCategoryAllFactories
     local sUnitToBuild, oCommandAction, tCommandQueue, bFactoryIsIdle
     local refbUpdatedFactoryUnitTracker = 'M27FactoryUnitTracker'
     local oTrackerLastUnit
@@ -1547,4 +1547,42 @@ function SetPreferredUnitsByCategory(aiBrain)
         --Engineers
     aiBrain[reftBlueprintPriorityOverride]['uel0208'] = 1 --T2 Engi (instead of sparky)
 
+end
+
+function NovaxProductionCheck(oNovaxCentre)
+    --Call via forkthread when starting construction of a novax, to make sure we pick up when the satellite is already
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'NovaxProductionCheck'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for centre='..oNovaxCentre:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNovaxCentre)) end
+
+    local iTicksToWait = 10
+    while M27UnitInfo.IsUnitValid(oNovaxCentre) do
+        if oNovaxCentre:GetFractionComplete() >= 1 then
+            iTicksToWait = 1
+            if oNovaxCentre.GetFocusUnit then
+                oNovaxCentre[refoLastUnitBuilt] = oNovaxCentre:GetFocusUnit()
+                if oNovaxCentre[refoLastUnitBuilt] then
+                    break
+                end
+            end
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitTicks(iTicksToWait)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Novax centre is building a unit='..oNovaxCentre[refoLastUnitBuilt]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNovaxCentre[refoLastUnitBuilt])) end
+    while M27UnitInfo.IsUnitValid(oNovaxCentre[refoLastUnitBuilt]) do
+        iTicksToWait = 1
+        if oNovaxCentre[refoLastUnitBuilt]:GetFractionComplete() == 1 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Sending the satellite to be allocated to a platoon and to start the main novax satellite logic') end
+            M27PlatoonFormer.AllocateNewUnitToPlatoonFromFactory(oNovaxCentre[refoLastUnitBuilt], oNovaxCentre)
+            break
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitTicks(iTicksToWait)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
