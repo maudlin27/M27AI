@@ -139,41 +139,71 @@ function GetUnitReclaimTargets(aiBrain)
     local tT3Radar = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT3Radar, false, true)
     local tT2Radar = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Radar, false, true)
     local bRadarInsideOtherRadarRange
+    local bRadarIsConstructed
     --T2 radar if in range of T3
     if M27Utilities.IsTableEmpty(tT3Radar) == false and M27Utilities.IsTableEmpty(tT2Radar) == false then
-        for iUnit, oUnit in tT2Radar do
-            bRadarInsideOtherRadarRange = false
-            for iT3Radar, oT3Radar in tT3Radar do
-                if M27Utilities.GetDistanceBetweenPositions(oT3Radar:GetPosition(), oUnit:GetPosition()) <= (oT3Radar:GetBlueprint().Intel.RadarRadius - oUnit:GetBlueprint().Intel.RadarRadius) then
-                    bRadarInsideOtherRadarRange = true
-                    break
-                end
+        --Check T3 radar is constructed
+        bRadarIsConstructed = false
+        for iUnit, oUnit in tT3Radar do
+            if oUnit:GetFractionComplete() == 1 then
+                bRadarIsConstructed = true
+                break
             end
-            if bRadarInsideOtherRadarRange then table.insert(aiBrain[reftUnitsToReclaim], oUnit) end
         end
-    end
-
-    --T1 radar
-    if M27Utilities.IsTableEmpty(tT3Radar) == false or M27Utilities.IsTableEmpty(tT2Radar) == false then
-        for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT1Radar, false, true) do
-            bRadarInsideOtherRadarRange = false
-            if M27Utilities.IsTableEmpty(tT3Radar) == false then
+        if bRadarIsConstructed then
+            for iUnit, oUnit in tT2Radar do
+                bRadarInsideOtherRadarRange = false
                 for iT3Radar, oT3Radar in tT3Radar do
                     if M27Utilities.GetDistanceBetweenPositions(oT3Radar:GetPosition(), oUnit:GetPosition()) <= (oT3Radar:GetBlueprint().Intel.RadarRadius - oUnit:GetBlueprint().Intel.RadarRadius) then
                         bRadarInsideOtherRadarRange = true
                         break
                     end
                 end
+                if bRadarInsideOtherRadarRange then table.insert(aiBrain[reftUnitsToReclaim], oUnit) end
             end
-            if bRadarInsideOtherRadarRange == false and M27Utilities.IsTableEmpty(tT2Radar) == false then
-                for iT2Radar, oT2Radar in tT2Radar do
-                    if M27Utilities.GetDistanceBetweenPositions(oT2Radar:GetPosition(), oUnit:GetPosition()) <= (oT2Radar:GetBlueprint().Intel.RadarRadius - oUnit:GetBlueprint().Intel.RadarRadius) then
-                        bRadarInsideOtherRadarRange = true
-                        break
-                    end
+        end
+    end
+
+    --T1 radar
+    if M27Utilities.IsTableEmpty(tT3Radar) == false or M27Utilities.IsTableEmpty(tT2Radar) == false then
+        bRadarIsConstructed = false
+        if M27Utilities.IsTableEmpty(tT3Radar) == false then
+            for iUnit, oUnit in tT3Radar do
+                if oUnit:GetFractionComplete() == 1 then
+                    bRadarIsConstructed = true
+                    break
                 end
             end
-            if bRadarInsideOtherRadarRange then table.insert(aiBrain[reftUnitsToReclaim], oUnit) end
+        end
+        if not(bRadarIsConstructed) and M27Utilities.IsTableEmpty(tT2Radar) == false then
+            for iUnit, oUnit in tT2Radar do
+                if oUnit:GetFractionComplete() == 1 then
+                    bRadarIsConstructed = true
+                    break
+                end
+            end
+        end
+        if bRadarIsConstructed then
+            for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT1Radar, false, true) do
+                bRadarInsideOtherRadarRange = false
+                if M27Utilities.IsTableEmpty(tT3Radar) == false then
+                    for iT3Radar, oT3Radar in tT3Radar do
+                        if M27Utilities.GetDistanceBetweenPositions(oT3Radar:GetPosition(), oUnit:GetPosition()) <= (oT3Radar:GetBlueprint().Intel.RadarRadius - oUnit:GetBlueprint().Intel.RadarRadius) then
+                            bRadarInsideOtherRadarRange = true
+                            break
+                        end
+                    end
+                end
+                if bRadarInsideOtherRadarRange == false and M27Utilities.IsTableEmpty(tT2Radar) == false then
+                    for iT2Radar, oT2Radar in tT2Radar do
+                        if M27Utilities.GetDistanceBetweenPositions(oT2Radar:GetPosition(), oUnit:GetPosition()) <= (oT2Radar:GetBlueprint().Intel.RadarRadius - oUnit:GetBlueprint().Intel.RadarRadius) then
+                            bRadarInsideOtherRadarRange = true
+                            break
+                        end
+                    end
+                end
+                if bRadarInsideOtherRadarRange then table.insert(aiBrain[reftUnitsToReclaim], oUnit) end
+            end
         end
     end
 
@@ -182,12 +212,14 @@ function GetUnitReclaimTargets(aiBrain)
         --Do we have T1 sonar within range of T2 sonar?
         local tT1Sonar
         for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Sonar + M27UnitInfo.refCategoryT3Sonar) do
-            if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; .Intel='..repr((oUnit:GetBlueprint().Intel or {'nil'}))..'; .Intel.SonarRadius='..(oUnit:GetBlueprint().Intel.SonarRadius or 'nil')) end
-            tT1Sonar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Sonar, oUnit:GetPosition(), oUnit:GetBlueprint().Intel.SonarRadius - 115, 'Ally')
-            if M27Utilities.IsTableEmpty(tT1Sonar) == false then
-                for iT1Sonar, oT1Sonar in tT1Sonar do
-                    if oT1Sonar:GetAIBrain() == aiBrain then
-                        table.insert(aiBrain[reftUnitsToReclaim], oT1Sonar)
+            if oUnit:GetFractionComplete() == 1 then
+                if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; .Intel='..repr((oUnit:GetBlueprint().Intel or {'nil'}))..'; .Intel.SonarRadius='..(oUnit:GetBlueprint().Intel.SonarRadius or 'nil')) end
+                tT1Sonar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Sonar, oUnit:GetPosition(), oUnit:GetBlueprint().Intel.SonarRadius - 115, 'Ally')
+                if M27Utilities.IsTableEmpty(tT1Sonar) == false then
+                    for iT1Sonar, oT1Sonar in tT1Sonar do
+                        if oT1Sonar:GetAIBrain() == aiBrain then
+                            table.insert(aiBrain[reftUnitsToReclaim], oT1Sonar)
+                        end
                     end
                 end
             end
@@ -494,7 +526,7 @@ function TrackHQUpgrade(oUnitUpgradingToHQ)
     end
     --Update our highest factory tech
     M27Overseer.UpdateHighestFactoryTechTracker(aiBrain)
-    if bDebugMessages == true then LOG(sFunctionRef..': Finished removal from the table, is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]))) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished removal from the table and calling the UpdateHighestFactoryTechTracker, is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]))) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -810,20 +842,20 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iMinT2MexesWanted = 4 end
                                 if aiBrain[refiMexesAvailableForUpgrade] == 0 or aiBrain[refiMexesUpgrading] + iT2Mexes + iT3Mexes >= 2 then
                                     --Do we want to improve build power instead of getting mexes?
-                                    if (iLandFactoryUpgrading + iT2LandFactories + iAirFactoryUpgrading + iT2AirFactories) + (iT3LandFactories + iT3AirFactories) * 1.5 < ((aiBrain[refiMexesUpgrading] + iT2Mexes) + iT3Mexes * 3)*iRatioOfMexToFactory then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade build power if we have factories available and enough engis of our highest tech level. bAlreadyUpgradingLandHQ='..tostring(bAlreadyUpgradingLandHQ)..'; bAlreadyUpgradingAirHQ='..tostring(bAlreadyUpgradingAirHQ)) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Deciding if want to improve build power instead of mexes. Factory value='..(iLandFactoryUpgrading + iT2LandFactories + iAirFactoryUpgrading + iT2AirFactories) + (iT3LandFactories + iT3AirFactories) * 1.5..'; Mex value='..((aiBrain[refiMexesUpgrading] + iT2Mexes) + iT3Mexes * 3)..'; iRatioOfMexToFactory='..iRatioOfMexToFactory..'; aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused]='..aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused]) end
+                                    if (iLandFactoryUpgrading + iT2LandFactories + iAirFactoryUpgrading + iT2AirFactories) + (iT3LandFactories + iT3AirFactories) * 1.5 < ((aiBrain[refiMexesUpgrading] + iT2Mexes) + iT3Mexes * 3)*iRatioOfMexToFactory and aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] == 0 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade build power if we have factories available and enough engis of our highest tech level. bAlreadyUpgradingLandHQ='..tostring((bAlreadyUpgradingLandHQ or false))..'; bAlreadyUpgradingAirHQ='..tostring((bAlreadyUpgradingAirHQ or false))..'; Number of engis of current tech level='..table.getn(aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel])))..'; Gross energy income='..aiBrain[refiEnergyGrossBaseIncome]..'; Mexes near start='..table.getn(M27MapInfo.GetResourcesNearTargetLocation(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 30, true))) end
                                         --Want to upgrade build power; do we want an HQ?
-                                        if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] < 3 and aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel])) >= 3 and aiBrain[refiEnergyGrossBaseIncome] >= 100 then iCategoryToUpgrade = DecideOnFirstHQ()
-                                        elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] < 3 then
+
+                                        if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] < 2 and aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel])) >= 3 and aiBrain[refiEnergyGrossBaseIncome] >= 50 then iCategoryToUpgrade = DecideOnFirstHQ()
+                                        elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and (iT2Mexes + iT3Mexes) >= math.min(8, table.getn(M27MapInfo.GetResourcesNearTargetLocation(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 30, true))) and aiBrain[refiEnergyGrossBaseIncome] >= 100 then iCategoryToUpgrade = DecideOnFirstHQ()
+                                        elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 then
                                             --Dont want to upgrade an HQ, consider upgrading a support factory as well providing it wont be upgraded to an HQ
                                             if bDebugMessages == true then LOG(sFunctionRef..': Dont want to upgrade an HQ yet, want more engineers or power first') end
-                                            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 then
-                                                --Go with default as will be getting multiple HQs at once otherwise
-                                            else --Are at T2 going to T3, so can upgrade T1 factories
-                                                if iT2LandFactories > 0 and iT2AirFactories == 0 then iCategoryToUpgrade = refCategoryLandFactory * categories.TECH1
-                                                elseif iT2LandFactories > 0 and iT2AirFactories > 0 then iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH1
-                                                elseif iT2AirFactories > 0 then iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1
-                                                end
+                                            --Are at T2 going to T3, so can upgrade T1 factories
+                                            if iT2LandFactories > 0 and iT2AirFactories == 0 then iCategoryToUpgrade = refCategoryLandFactory * categories.TECH1
+                                            elseif iT2LandFactories > 0 and iT2AirFactories > 0 then iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1 + refCategoryLandFactory * categories.TECH1
+                                            elseif iT2AirFactories > 0 then iCategoryToUpgrade = refCategoryAirFactory * categories.TECH1
                                             end
                                         else
                                             --Already at tech 3

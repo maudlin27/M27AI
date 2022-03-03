@@ -335,8 +335,18 @@ function WantToGetGunUpgrade(aiBrain, bIgnoreEnemies)
         end
         if bDebugMessages == true then LOG(sFunctionRef..'; bWantToGetGun='..tostring(bWantToGetGun)) end
     end
-    if bWantToGetGun and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
-        if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantToGetGun = false end
+    --Adjust based on what strategy we are using
+    if bWantToGetGun then
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+            if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantToGetGun = false end
+        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
+            if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 or aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 75 then
+                --Are we about to start on a T2 PGen? If so then hold off on upgrade
+                if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false or aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1 then
+                    bWantToGetGun = false
+                end
+            end
+        end
     end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -415,6 +425,7 @@ function HaveLowMass(aiBrain)
     local iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
     if iMassStoredRatio < 0.05 then bHaveLowMass = true
     elseif (iMassStoredRatio < 0.15 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.2 then bHaveLowMass = true
+    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and (iMassStoredRatio < 0.1 or (iMassStoredRatio < 0.2 and aiBrain:GetEconomyStored('MASS') < 1000 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.3)) then bHaveLowMass = true
     end
     return bHaveLowMass
 end
@@ -570,32 +581,39 @@ function ACUShouldAssistEarlyHydro(aiBrain)
 end
 
 function CanUnitUseOvercharge(aiBrain, oUnit)
-    --For now checks if enough energy and not underwater; separate function used as may want to expand this with rate of fire check in future
+    --For now checks if enough energy and not underwater and not fired in last 5s; separate function used as may want to expand this with rate of fire check in future
     local sFunctionRef = 'CanUnitUseOvercharge'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local oBP = oUnit:GetBlueprint()
     local iEnergyNeeded
-    for iWeapon, oWeapon in oBP.Weapon do
-        if oWeapon.OverChargeWeapon then
-            if oWeapon.EnergyRequired then
-                iEnergyNeeded = oWeapon.EnergyRequired
-                break
-            end
-        end
-    end
     local bCanUseOC = false
-    if aiBrain:GetEconomyStored('ENERGY') >= iEnergyNeeded then bCanUseOC = true end
-    if bCanUseOC == true then
-        --Check if underwater
-        local oUnitPosition = oUnit:GetPosition()
-        local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(oUnitPosition, true) + 0.25 --small margin of error
-        local tFiringPositionStart = M27Logic.GetDirectFireWeaponPosition(oUnit)
-        if tFiringPositionStart then
-            local iFiringHeight = tFiringPositionStart[2]
-            if iFiringHeight <= iHeightAtWhichConsideredUnderwater then
-                bCanUseOC = false
+    if GetGameTimeSeconds() - (oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100) >= 5 then
+        for iWeapon, oWeapon in oBP.Weapon do
+            if oWeapon.OverChargeWeapon then
+                if oWeapon.EnergyRequired then
+                    iEnergyNeeded = oWeapon.EnergyRequired
+                    break
+                end
             end
         end
+
+        if aiBrain:GetEconomyStored('ENERGY') >= iEnergyNeeded then bCanUseOC = true end
+        if bDebugMessages == true then LOG(sFunctionRef..': iEnergyNeeded='..iEnergyNeeded..'; aiBrain:GetEconomyStored='..aiBrain:GetEconomyStored('ENERGY')..'; bCanUseOC='..tostring(bCanUseOC)) end
+        if bCanUseOC == true then
+            --Check if underwater
+            local oUnitPosition = oUnit:GetPosition()
+            local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(oUnitPosition, true) + 0.25 --small margin of error
+            local tFiringPositionStart = M27Logic.GetDirectFireWeaponPosition(oUnit)
+            if tFiringPositionStart then
+                local iFiringHeight = tFiringPositionStart[2]
+                if iFiringHeight <= iHeightAtWhichConsideredUnderwater then
+                    if bDebugMessages == true then LOG(sFunctionRef..': ACU is underwater; iFiringHeight='..iFiringHeight..'; iHeightAtWhichConsideredUnderwater='..iHeightAtWhichConsideredUnderwater) end
+                    bCanUseOC = false
+                end
+            end
+        end
+    elseif bDebugMessages == true then LOG(sFunctionRef..': Has been less tahn 5s since last overcharged')
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bCanUseOC

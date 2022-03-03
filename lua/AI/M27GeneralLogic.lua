@@ -1888,12 +1888,15 @@ function CategoriesInVisibleUnits(aiBrain, tEnemyUnits, category, iReturnType)
 
 end
 
-function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdle, bMovingUnassignedEngiIsIdle)
+function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdle, bMovingUnassignedEngiIsIdle, bDontIncreaseIdleCount)
     --Cycles through various unit states that could indicate the unit is idle
     --if bGuardIsIdle == true then will treat a unit that is guarding/assisting as being idle
+    --bDontIncreaseIdleCount - optional - if set to true then wont increase the idle count for determining if a unit is idle; e.g. if debugging, then set to true to avoid changing what happens
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsUnitIdle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit:GetUnitId()) and M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 32 then bDebugMessages = true end
 
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
@@ -1997,15 +2000,11 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return false
     else
-        if oUnit[refiIdleCount] == nil then
-            oUnit[refiIdleCount] = 1
-        else
-            oUnit[refiIdleCount] = oUnit[refiIdleCount] + 1
-        end
+        if not(bDontIncreaseIdleCount) then oUnit[refiIdleCount] = (oUnit[refiIdleCount] or 0) + 1 end
         if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildT3MexOverT2 and not(oUnit[M27EngineerOverseer.rebToldToStartBuildingT3Mex]) then
             iIdleCountThreshold = 60 --can take a long time to start building if units nearby blocking the mex or if pathfinding issues due to units
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..oUnit[refiIdleCount]..'; Idle threshold='..iIdleCountThreshold..'; if >= idle threshold then will return true. Engineer action (nil for non engineers)='..(oUnit[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..(oUnit[refiIdleCount] or 'nil')..'; Idle threshold='..iIdleCountThreshold..'; if >= idle threshold then will return true. Engineer action (nil for non engineers)='..(oUnit[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if oUnit[refiIdleCount] >=  iIdleCountThreshold then
             return true
@@ -3264,7 +3263,7 @@ function GetNearestActiveFixedEnemyShield(aiBrain, tLocation)
     return oNearestShield
 end
 
-function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead)
+function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetUnderShield'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -3289,15 +3288,18 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     if bEnemy then sSearchType = 'Enemy' end
     local tTargetPos = oTarget:GetPosition()
     local iShieldCategory = M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryFixedShield
+    if bIgnoreMobileShields then iShieldCategory = M27UnitInfo.refCategoryFixedShield end
     local tNearbyShields = aiBrain:GetUnitsAroundPoint(iShieldCategory, tTargetPos, iShieldSearchRange, sSearchType)
     if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repr(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
     local iShieldCurHealth, iShieldMaxHealth
     local iTotalShieldCurHealth = 0
+    local iMinFractionComplete = 0.95
+    if bTreatPartCompleteAsComplete then iMinFractionComplete = 0 end
     if M27Utilities.IsTableEmpty(tNearbyShields) == false then
         if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
         local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
         for iUnit, oUnit in tNearbyShields do
-            if not(oUnit.Dead) and oUnit:GetFractionComplete() >= 0.95 then
+            if not(oUnit.Dead) and oUnit:GetFractionComplete() >= iMinFractionComplete then
                 oCurUnitBP = oUnit:GetBlueprint()
                 iCurShieldRadius = 0
                 if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
@@ -3310,7 +3312,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
                             if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
                             iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                             iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth
-                            if oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1 then iShieldCurHealth = iShieldMaxHealth end
+                            if bTreatPartCompleteAsComplete or (oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1) then iShieldCurHealth = iShieldMaxHealth end
                             if bDebugMessages == true then LOG(sFunctionRef..': iShieldCurHealth='..iShieldCurHealth..'; iIgnoreShieldsWithLessThanThisHealth='..iIgnoreShieldsWithLessThanThisHealth) end
                             if iShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth then
                                 bUnderShield = true
@@ -3604,7 +3606,7 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
            if oUnit.GetBlueprint then
                oCurBP = oUnit:GetBlueprint()
                --Is the unit within range of the aoe?
-               if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation) <= (iAOE + math.min(oCurBP.SizeX, oCurBP.SizeZ)) then
+               if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation) <= iAOE then
                    --Is the unit shielded by more than 90% of our damage?
                    if not(IsTargetUnderShield(aiBrain, oUnit, iDamage * 0.9)) then
                        iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
@@ -3617,9 +3619,11 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
                            iMassFactor = 0.1
                            if EntityCategoryContains(categories.EXPERIMENTAL, oUnit:GetUnitId()) then iMassFactor = 0.5 end
                        end
+                       if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
                        --Is the target mobile and not under construction? Then reduce to 20% as unit might dodge or not be there when bomb lands
                        if oUnit:GetFractionComplete() == 1 and EntityCategoryContains(categories.MOBILE, oUnit:GetUnitId()) then iMassFactor = iMassFactor * 0.2 end
                        iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
+                       if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
                    end
                end
            end
@@ -3672,8 +3676,8 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    oLauncher[M27UnitInfo.refbActiveMissileChecker] = true
 
-    oLauncher['M27LauncherLoopActive'] = true
 
     local tTarget
     local tEnemyUnitsOfInterest
@@ -3681,28 +3685,25 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
     local iCurTargetValue
     local tEnemyCategoriesOfInterest
     local aiBrain = oLauncher:GetAIBrain()
-    local iMaxRange = oWeapon.MaxRadius
+    local iMaxRange = 250 --basic default, should get overwritten
     local iMinRange = 0
     local iAOE, iDamage
 
     local bTML = false
     local bSML = false
-    local bCheckForSMD = false
     if EntityCategoryContains(M27UnitInfo.refCategoryTML, oLauncher:GetUnitId()) then bTML = true
     elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher:GetUnitId()) then bSML = true
     else M27Utilities.ErrorHandler('Unknown type of launcher, code to fire a missile wont work') end
 
     if bTML or bSML then
+        iAOE, iDamage, iMinRange, iMaxRange = M27UnitInfo.GetLauncherAOEStrikeDamageMinAndMaxRange(oLauncher)
+
         if bTML then
             tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Mex}
-            iMinRange = oWeapon.MinRadius
-            iAOE = oWeapon.DamageRadius
-            iDamage = oWeapon.Damage
         else
-            tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo. M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL}
-            iAOE = oWeapon.NukeInnerRingRadius
-            iDamage = oWeapon.NukeInnerRingDamage
+            tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL}
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Will consider missile target. iMinRange='..(iMinRange or 'nil')..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')..'; bSML='..tostring((bSML or false))) end
 
         while M27UnitInfo.IsUnitValid(oLauncher) do
             if bTML then
@@ -3726,25 +3727,33 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                 --First get the best location if just target the start position or locations near here
                 tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], iAOE, iDamage)
                 --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
-
+                if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <20k then will consider other targets') end
                 if iBestTargetValue < 20000 then --If have high value location for nearest enemy start then just go with this
                     for iRef, iCategory in tEnemyCategoriesOfInterest do
                         tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                             for iUnit, oUnit in tEnemyUnitsOfInterest do
                                 iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                                if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit:GetUnitId()..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
                                 --Stop looking if tried >=10 targets and have one that is at least 20k of value
+                                if iCurTargetValue > iBestTargetValue then
+                                    iBestTargetValue = iCurTargetValue
+                                    tTarget = oUnit:GetPosition()
+                                end
                                 if iBestTargetValue > 20000 and iUnit >=10 then break end
                             end
                         end
                     end
                     if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': If value is <12k then will clear target; iBestTargetValue='..iBestTargetValue..'; tTarget='..repr(tTarget or {'nil'})) end
                 if iBestTargetValue < 12000 then tTarget = nil end
             end
 
             if tTarget then
                 --Launch missile
+                if bDebugMessages == true then LOG(sFunctionRef..': Will launch missile at tTarget='..repr(tTarget)) end
                 if bTML then IssueTactical({oLauncher}, tTarget)
                 else
                     IssueNuke({oLauncher}, tTarget)
@@ -3752,7 +3761,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     WaitSeconds(10)
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                    M27EngineerOverseer.CheckForEnemySMD(aiBrain, oLauncher)
+                    if not(oLauncher[M27UnitInfo.refbActiveSMDChecker]) then ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oLauncher) end
                     --Send a voice taunt if havent in last 6m
                     ForkThread(M27Chat.SendGloatingMessage, aiBrain, 10, 360)
                 end
@@ -3763,5 +3772,5 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
     end
-    oLauncher['M27LauncherLoopActive'] = false
+    oLauncher[M27UnitInfo.refbActiveMissileChecker] = false
 end

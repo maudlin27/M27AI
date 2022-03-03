@@ -24,6 +24,7 @@ refbSpecialMicroActive = 'M27UnitSpecialMicroActive' --e.g. if dodging bombers
 refiGameTimeToResetMicroActive = 'M27UnitGameTimeToResetMicro'
 refiGameTimeMicroStarted = 'M27UnitGameTimeMicroStarted'
 refbOverchargeOrderGiven = 'M27UnitOverchargeOrderGiven'
+refiTimeOfLastOverchargeShot = 'M27UnitOverchargeShotFired' --gametime of actual firing of overcharge shot
 refsUpgradeRef = 'M27UnitUpgradeRef' --If ACU starts an upgrade, it records the string reference here
 refbPaused = 'M27UnitPaused' --true if paused due to poewr stall manager
 refbRecentlyDealtDamage = 'M27UnitRecentlyDealtDamage' --true if dealt damage in last 5s
@@ -31,6 +32,8 @@ refiGameTimeDamageLastDealt = 'M27UnitTimeLastDealtDamage'
 refoFactoryThatBuildThis = 'M27UnitFactoryThatBuildThis'
 refbFullyUpgraded = 'M27UnitFullyUpgraded' --used on ACU to avoid running some checks every time it wants an upgrade
 refbRecentlyRemovedHealthUpgrade = 'M27UnitRecentlyRemovedHealthUpgrade' --Used on ACU to flag if e.g. we removed T2 which will decrease our health
+refbActiveMissileChecker = 'M27UnitMissileTracker' --True if are actively checking for missile targets
+refbActiveSMDChecker = 'M27UnitSMDChecker' -- true if unit is checking for enemy SMD (use on nuke)
 
 --Factions
 refFactionUEF = 1
@@ -85,6 +88,8 @@ refCategoryFixedT3Arti = categories.STRUCTURE * categories.INDIRECTFIRE * catego
 refCategorySML = categories.NUKE * categories.SILO
 refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * categories.STRUCTURE
 refCategoryTML = categories.SILO * categories.STRUCTURE * categories.TECH2 - categories.ANTIMISSILE
+refCategoryNovaxCentre = categories.EXPERIMENTAL * categories.STRUCTURE * categories.ORBITALSYSTEM
+refCategorySatellite = categories.EXPERIMENTAL * categories.SATELLITE
 --refCategorySAM = categories.ANTIAIR * categories.STRUCTURE * categories.TECH3
 
 --Land units
@@ -98,7 +103,8 @@ refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE 
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
 refCategoryCombatScout = categories.SERAPHIM * categories.SCOUT * categories.DIRECTFIRE
 refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE - refCategoryLandExperimental
-refCategoryT3MobileArtillery = categories.ARTILLERY * categories.LAND * categories.MOBILE
+refCategoryT3MobileArtillery = categories.ARTILLERY * categories.LAND * categories.MOBILE * categories.TECH3
+refCategoryT3MML = categories.SILO * categories.MOBILE * categories.TECH3 * categories.LAND
 refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER - refCategoryEngineer -refCategoryLandScout -refCategoryMAA
 refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS - categories.ANTISHIELD * categories.AEON --Dont include aeon T3 anti-shield here as it sucks unless against shields
 refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR
@@ -126,7 +132,8 @@ refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
 refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE
 refCategoryAllNavy = categories.NAVAL
-refCategoryCruiserCarrier = categories.NAVAL * categories.CRUISER + categories.NAVAL * categories.NAVALCARRIER
+refCategoryCruiser = categories.NAVAL * categories.CRUISER
+refCategoryCruiserCarrier = refCategoryCruiser + categories.NAVAL * categories.NAVALCARRIER
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted
 refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL
@@ -615,6 +622,28 @@ function GetBomberAOEAndStrikeDamage(oUnit)
 
 
     return iAOE, iStrikeDamage
+end
+
+function GetLauncherAOEStrikeDamageMinAndMaxRange(oUnit)
+    local oBP = oUnit:GetBlueprint()
+    local iAOE = 0
+    local iStrikeDamage
+    local iMinRange = 0
+    local iMaxRange = 0
+    for sWeaponRef, tWeapon in oBP.Weapon do
+        if not(tWeapon.WeaponCategory == 'Death') then
+            if (tWeapon.DamageRadius or 0) > iAOE then
+                iAOE = tWeapon.DamageRadius
+                iStrikeDamage = tWeapon.Damage * tWeapon.MuzzleSalvoSize
+            elseif (tWeapon.NukeInnerRingRadius or 0) > iAOE then
+                iAOE = tWeapon.NukeInnerRingRadius
+                iStrikeDamage = tWeapon.NukeInnerRingDamage
+            end
+            if (tWeapon.MinRadius or 0) > iMinRange then iMinRange = tWeapon.MinRadius end
+            if (tWeapon.MaxRadius or 0) > iMaxRange then iMaxRange = tWeapon.MaxRadius end
+        end
+    end
+    return iAOE, iStrikeDamage, iMinRange, iMaxRange
 end
 
 function GetBomberRange(oUnit)

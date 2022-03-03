@@ -40,7 +40,7 @@ reftAirSegmentTracker = 'M27AirSegmentTracker' --[x][z]{a,b,c,d etc.} - x = segm
 refiLastScouted = 'M27AirLastScouted'
 local refiAirScoutsAssigned = 'M27AirScoutsAssigned'
 local refiNormalScoutingIntervalWanted = 'M27AirScoutIntervalWanted' --What to default to if e.g. temporairly increased
-local refiCurrentScoutingInterval = 'M27AirScoutCurrentIntervalWanted' --e.g. can temporarily override this if a unit dies and want to make it higher priority
+refiCurrentScoutingInterval = 'M27AirScoutCurrentIntervalWanted' --e.g. can temporarily override this if a unit dies and want to make it higher priority
 local reftMidpointPosition = 'M27AirSegmentMidpointPosition'
 local refiDeadScoutsSinceLastReveal = 'M27AirDeadScoutsSinceLastReveal'
 local refiLastTimeScoutingIntervalChanged = 'M27AirLastTimeScoutingIntervalChanged'
@@ -3418,7 +3418,7 @@ function SetupAirOverseer(aiBrain)
     aiBrain[refiIntervalMexNotBuiltOn] = 100
     aiBrain[refiIntervaPriorityMex] = 60
     aiBrain[refiIntervalEnemyMex] = 120
-    aiBrain[refiIntervalEnemyBase] = 90
+    aiBrain[refiIntervalEnemyBase] = 80
 
     aiBrain[reftAirSegmentTracker] = {}
     aiBrain[reftScoutingTargetShortlist] = {}
@@ -3471,6 +3471,7 @@ function SetupAirOverseer(aiBrain)
     end
 
     --Higher priorities for enemy start locations
+    --(note - M27Overseer will reduce the threshold for nearest enemy when it thinks we'll be deciding what experimental to be building soon)
     local iOurArmyIndex = aiBrain:GetArmyIndex()
     local iEnemyArmyIndex, tEnemyStartPosition
     local iCurAirSegmentX, iCurAirSegmentZ
@@ -3588,6 +3589,294 @@ function UpdateMexScoutingPriorities(aiBrain)
         if bDebugMessages == true then
             LOG(sFunctionRef..': End: Number of high priority mexes='..table.getn(aiBrain[M27MapInfo.reftHighPriorityMexes]))
             M27Utilities.DrawLocations(aiBrain[M27MapInfo.reftHighPriorityMexes])
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function GetNovaxTarget(aiBrain, oNovax)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetNovaxTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local tEnemyUnits
+    local iMaxRange = 600
+    local oTarget
+    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+        if bDebugMessages == true then LOG(sFunctionRef..': In air dom mode so will target enemy AA units') end
+        tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.SUBMERSIBLE, oNovax:GetPosition(), iMaxRange, 'Enemy')
+        if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+            oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, oNovax:GetPosition(), aiBrain)
+        else
+            if not(M27MapInfo.IsUnderwater(aiBrain[M27Overseer.reftLastNearestACU])) then
+                if bDebugMessages == true then LOG(sFunctionRef..': WIll target enemy ACU as no AA targets and ACU is on ground') end
+                oTarget = aiBrain[M27Overseer.refoLastNearestACU]
+            else
+                tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand, aiBrain[M27Overseer.reftLastNearestACU], iMaxRange * 0.5, 'Enemy')
+                if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                    oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, oNovax:GetPosition(), aiBrain)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Targeting the nearest enemy unit to the last known ACU position') end
+                end
+            end
+        end
+    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+        if bDebugMessages == true then LOG(sFunctionRef..': Want to kill enemy ACU so will target the ACU if we can see it') end
+        if M27Utilities.CanSeeUnit(aiBrain, aiBrain[refoLastNearestACU], true) and not(M27MapInfo.IsUnderwater(aiBrain[M27Overseer.reftLastNearestACU])) then
+            oTarget = aiBrain[refoLastNearestACU]
+        else
+            tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand, aiBrain[M27Overseer.reftLastNearestACU], iMaxRange * 0.5, 'Enemy')
+            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, oNovax:GetPosition(), aiBrain)
+                if bDebugMessages == true then LOG(sFunctionRef..': Targeting the nearest enemy unit to the last known ACU position') end
+            end
+        end
+    else
+        --Normal targeting logic
+        local iRange = math.max(20, oNovax:GetBlueprint().Weapon[1].MaxRadius)
+        local iSpeed = oNovax:GetBlueprint().Physics.MaxSpeed
+        local iTimeToTarget
+        local iTimeToKillTarget
+        local iDPS = 243
+        local iCurDPSMod
+        local iBestTargetValue = 0
+        local iCurValue
+        local bConsideredAllHighValueTargets = false
+        local iCurTargetType = 0
+        local iCategoriesToSearch
+        local iSearchRange
+        local iMassFactor
+        local iCurShield, iMaxShield
+        local tPositionToSearchFrom
+        local iNearestShield, iCurShieldDistance, iNearestWater, tPossiblePosition, tPossibleShields, iACUSpeed, iCurAmphibiousGroup
+
+
+        while not(bConsideredAllHighValueTargets) do
+            iCurTargetType = iCurTargetType + 1
+            --Default values:
+            iMassFactor = 1
+            tPositionToSearchFrom = oNovax:GetPosition()
+            iSearchRange = iRange
+
+            if iCurTargetType == 1 then
+                --Nearby low shields
+                iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryMobileLandShield
+                iSearchRange = 90
+                iMassFactor = 4
+            elseif iCurTargetType == 2 then
+                --Cruisers near base
+                tPositionToSearchFrom = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                iSearchRange = 300
+                iCategoriesToSearch = M27UnitInfo.refCategoryCruiser
+            elseif iCurTargetType == 3 then
+                iCategoriesToSearch = M27UnitInfo.refCategoryT1Mex
+                iMassFactor = 5
+            elseif iCurTargetType == 4 then
+                iCategoriesToSearch = M27UnitInfo.refCategoryT2Mex
+                iMassFactor = 2
+            elseif iCurTargetType == 5 then
+                iCategoriesToSearch = M27UnitInfo.refCategoryT3Mex
+                iMassFactor = 1.5
+            elseif iCurTargetType == 6 then --Use default values for all of these
+                iCategoriesToSearch = M27UnitInfo.refCategoryLandExperimental + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryRadar
+            elseif iCurTargetType == 7 then
+                iCategoriesToSearch = M27UnitInfo.refCategoryEngineer - categories.TECH1
+                iSearchRange = 60
+            elseif iCurTargetType == 8 then
+                iCategoriesToSearch = M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategoryFixedT2Arti
+                iSearchRange = 120
+            elseif iCurTargetType == 9 then
+                iCategoriesToSearch = categories.COMMAND
+            else
+                bConsideredAllHighValueTargets = true
+                break
+            end
+
+            tEnemyUnits = aiBrain:GetUnitsAroundPoint(iCategoriesToSearch, oNovax:GetPosition(), iSearchRange, 'Enemy')
+
+            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                if bDebugMessages == true then LOG(sFunctionRef..': iCurTargetType='..iCurTargetType..'; Found a total of '..table.getn(tEnemyUnits)..' enemy units, will check if any of them are valid targets') end
+                for iUnit, oUnit in tEnemyUnits do
+                    --Is the unit underwater or shielded?
+                    if not(M27UnitInfo.IsUnitUnderwater(oUnit)) and not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 2000, false, false, false)) then
+                        iCurValue = oUnit:GetBlueprint().Economy.BuildCostMass * iMassFactor
+                        if oUnit:GetBlueprint().Defense.Shield and M27UnitInfo.IsUnitShieldEnabled(oUnit) then
+                            if oUnit.MyShield.GetHealth and oUnit.MyShield:GetHealth() > 0 then
+                                iCurDPSMod = oUnit:GetBlueprint().Defense.Shield.ShieldRegenRate
+                            else iCurDPSMod = 0
+                            end
+                        else iCurDPSMod = 0
+                        end
+                        iCurDPSMod = iCurDPSMod + (oUnit:GetBlueprint().Defense.RegenRate or 0)
+                        iTimeToTarget = math.max(0, M27Utilities.GetDistanceBetweenPositions(oNovax:GetPosition(), oUnit:GetPosition()) - iRange) / iSpeed
+                        iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                        iTimeToKillTarget = (oUnit:GetHealth() + iCurShield + math.min(iMaxShield - iCurShield, iTimeToTarget * iCurDPSMod))/math.max(0.001, iDPS - iCurDPSMod)
+                        if iMaxShield == 0 and not(EntityCategoryContains(categories.COMMAND, oUnit:GetUnitId())) then iCurValue = iCurValue * math.max(oUnit:GetHealthPercent(), 0.25) end
+                        if bDebugMessages == true then LOG(sFunctionRef..' Unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' iCurValue='..iCurValue..'; iTimeToTarget='..iTimeToTarget..'; iTimeToKillTarget='..iTimeToKillTarget..'; iCurShield='..iCurShield..'; iMaxShield='..iMaxShield..'; iCurDPSMod='..iCurDPSMod) end
+                        iCurValue = iCurValue / math.max(1.5, iTimeToTarget * 0.9 + iTimeToKillTarget)
+
+
+                        --Massively adjust mass factor if dealing with nearby ACU that can kill before it gets to safety
+                        if iCategoriesToSearch == categories.COMMAND and (iTimeToTarget + iTimeToKillTarget) < 60 and (iMaxShield + oUnit:GetMaxHealth()) <= 25000 then
+                            iACUSpeed = oUnit:GetBlueprint().Physics.MaxSpeed
+                            --Get nearest shield
+                            iNearestShield = 10000
+                            tPossibleShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oUnit:GetPosition(), 102, 'Enemy')
+                            --Dont do mobile shields since risk thinking no mobile shields, then revealing them and aborting attack, then losing intle on the mobile shield and repeating attack; so better to just attack if there's a mobile shield
+                            for iShield, oShield in tPossibleShields do
+                                iCurShieldDistance = M27Utilities:GetDistanceBetweenPositions(oShield:GetPosition(), oUnit:GetPosition()) - oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5
+                                if iCurShieldDistance < iNearestShield then iNearestShield = iCurShieldDistance end
+                            end
+                            --Could the ACU get under a shield before it dies?
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have a nearby ACU target, will consider if we can kill it before it gets to safety; iNearestShield='..iNearestShield..'; iACUSpeed='..iACUSpeed) end
+                            if iNearestShield / iACUSpeed > iTimeToKillTarget then
+                                iNearestWater = nil
+                                if not(M27MapInfo.bMapHasWater) then iNearestWater = 10000
+                                else
+                                    --Where is the nearest water to the ACU
+                                    iCurAmphibiousGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+                                    for iDistance = 20, 100, 20 do
+                                        for iAngle = 0, 315, 45 do
+                                            tPossiblePosition = M27Utilities.MoveInDirection(oUnit:GetPosition(), iAngle, iDistance, true)
+                                            tPossiblePosition[2] = GetTerrainHeight(tPossiblePosition[1], tPossiblePosition[3])
+                                            if M27MapInfo.IsUnderwater(tPossiblePosition) then
+                                                --Can the enemy ACU path here?
+                                                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossiblePosition) == iCurAmphibiousGroup then
+                                                    iNearestWater = iDistance
+                                                    break
+                                                end
+                                            end
+                                        end
+                                        if iNearestWater then break end
+                                    end
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iNearestWater='..(iNearestWater or 'nil')) end
+                                if (iNearestWater or 10000) / iACUSpeed > iTimeToKillTarget then
+                                    iCurValue = iCurValue * 30
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Think we can kill the ACU so massively increasing the curvalue to '..iCurValue) end
+                                end
+                            end
+                        end
+                        if iCurValue > iBestTargetValue then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have a new best target, iBestTargetValue='..iBestTargetValue..'; Target='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                            iBestTargetValue = iCurValue
+                            oTarget = oUnit
+                        end
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': Target unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is underwater or under a shield')
+                    end
+                end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': iCurTargetType='..iCurTargetType..': No units found')
+            end
+        end
+
+        if not(oTarget) then
+            --Get low priority target
+            --Nearest surface naval unit
+            tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, tPositionToSearchFrom, 1000, 'Enemy')
+            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, tPositionToSearchFrom, aiBrain)
+            else
+                --Target nearest T3+ mobile land unit; if are none, then just get the nearest mobile land unit:
+                tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand, tPositionToSearchFrom, 1000, 'Enemy')
+                if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, tEnemyUnits)) then
+                        oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, tPositionToSearchFrom, aiBrain)
+                    else
+                        oTarget = M27Utilities.GetNearestUnit(EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, tEnemyUnits), tPositionToSearchFrom, aiBrain)
+                    end
+                else
+                    --Get the nearest non-wall structure
+                    tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tPositionToSearchFrom, 1000, 'Enemy')
+                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                        oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, tPositionToSearchFrom, aiBrain)
+                    end
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return oTarget
+end
+
+function NovaxCoreTargetLoop(aiBrain, oNovax)
+    --Used so can do forkthread of this in case come across errors
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'NovaxCoreTargetLoop'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iEffectiveRange = math.max(20, oNovax:GetBlueprint().Weapon[1].MaxRadius) + 10
+    local oTarget
+
+    local iOrderType
+    local refiLastIssuedOrderType = 'M27NovaxLastOrderType'
+    local refoLastIssuedOrderUnit = 'M27NovaxLastOrderUnit'
+    local reftLastIssuedOrderLocation = 'M27NovaxLastOrderLocation'
+    local refOrderAttack = 1
+    local refOrderMove = 2
+    oTarget = GetNovaxTarget(aiBrain, oNovax)
+
+    if oTarget then
+        if bDebugMessages == true then LOG(sFunctionRef..': Have a target '..oTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; will decide whether to attack or move to it; Distance to target='..M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oNovax:GetPosition())) end
+        if M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oNovax:GetPosition()) > iEffectiveRange then
+            iOrderType = refOrderMove
+        else iOrderType = refOrderAttack
+        end
+
+
+        if iOrderType == refOrderMove then
+            --Has the order changed from before?
+            if not(iOrderType == oNovax[refiLastIssuedOrderType] and oNovax[reftLastIssuedOrderLocation] and M27Utilities.GetDistanceBetweenPositions(oNovax[reftLastIssuedOrderLocation], oTarget:GetPosition()) <= 8) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Issuing new order to novax, telling it to move to '..repr(oNovax[reftLastIssuedOrderLocation])) end
+                IssueClearCommands({oNovax})
+                oNovax[reftLastIssuedOrderLocation] = oTarget:GetPosition()
+                IssueMove({oNovax}, oNovax[reftLastIssuedOrderLocation])
+                oNovax[refiLastIssuedOrderType] = iOrderType
+                oNovax[refoLastIssuedOrderUnit] = nil
+            end
+        elseif iOrderType == refOrderAttack then
+            --Has the order changed from before?
+            if not(iOrderType == oNovax[refiLastIssuedOrderType] and M27UnitInfo.IsUnitValid(oNovax[refoLastIssuedOrderUnit]) and oNovax[refoLastIssuedOrderUnit] == oTarget) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Issuing new order to novax, telling it to attack target='..oTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTarget)) end
+                IssueClearCommands({oNovax})
+                IssueAttack({oNovax}, oTarget)
+                oNovax[refiLastIssuedOrderType] = iOrderType
+                oNovax[refoLastIssuedOrderUnit] = oTarget
+                oNovax[reftLastIssuedOrderLocation] = nil
+            end
+        else M27Utilities.ErrorHandler('Not coded')
+        end
+    else
+        if bDebugMessages == true then LOG(sFunctionRef..': No target so move to enemy base') end
+        --No target so move towards enemy base
+        iOrderType = refOrderMove
+        if not(iOrderType == oNovax[refiLastIssuedOrderType] and oNovax[reftLastIssuedOrderLocation] and M27Utilities.GetDistanceBetweenPositions(oNovax[reftLastIssuedOrderLocation], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 8) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Issuing new order to novax, telling it to move to nearest enemy start location') end
+            IssueClearCommands({oNovax})
+            oNovax[reftLastIssuedOrderLocation] = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+            IssueMove({oNovax}, oNovax[reftLastIssuedOrderLocation])
+            oNovax[refiLastIssuedOrderType] = iOrderType
+            oNovax[refoLastIssuedOrderUnit] = nil
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function NovaxManager(oNovax)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'NovaxManager'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for oNovax='..oNovax:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNovax)) end
+
+    if M27UnitInfo.IsUnitValid(oNovax) and not(oNovax['M27ActiveNovaxLoop']) then
+        local aiBrain = oNovax:GetAIBrain()
+        if aiBrain then
+            oNovax['M27ActiveNovaxLoop'] = true
+
+            while M27UnitInfo.IsUnitValid(oNovax) do
+                ForkThread(NovaxCoreTargetLoop, aiBrain, oNovax)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                WaitSeconds(1)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            end
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

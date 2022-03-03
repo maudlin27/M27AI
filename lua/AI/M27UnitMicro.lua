@@ -551,11 +551,11 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                         end
                     end
                     if oOverchargeTarget == nil then
-                        --Check further away incase enemy has T2 PD
+                        --Check further away incase enemy has T2 PD that can see us
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any T2 PD further away') end
                         tEnemyPointDefence = aiBrain:GetUnitsAroundPoint(categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH2 + categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH3, tUnitPosition, iInitialT2PDSearchRange, 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyPointDefence) == false then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have enemy T2 defence that can hit us but is out of our range - considering if OC it will bring us in range of T1 PD, and/or if shot is blocked') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have enemy T2 defence that can hit us but is out of our range - considering if OC it will bring us in range of T1 PD, and/or if shot is blocked, and/or if the T2PD cant even see us') end
                             local tNearbyT1PD
                             local iNearestT1PD = 10000
                             local iCurDistance
@@ -571,9 +571,14 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                                 --Can we get in range of the T2 PD without getting in range of the T1 PD? (approximates just based on distances rather than considering the likely path to take)
                                 if M27Utilities.GetDistanceBetweenPositions(oEnemyT2PD:GetPosition(), tUnitPosition) - iACURange + 2 < iNearestT1PD then
                                     if M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT2PD) == false then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Setting target to T2 PD') end
-                                        oOverchargeTarget = oEnemyT2PD
-                                        break
+                                        --Can the T2 PD see us?
+                                        if M27Utilities.CanSeeUnit(oEnemyT2PD:GetAIBrain(), oUnitWithOvercharge, true) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Setting target to T2 PD') end
+                                            oOverchargeTarget = oEnemyT2PD
+                                            break
+                                        else
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy T2 PDs owner can see our ACU') end
+                                        end
                                     end
                                 end
                             end
@@ -662,7 +667,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 end
             end
             if oOverchargeTarget then
-                if bDebugMessages == true then LOG(sFunctionRef..': Telling platoon to process overcharge action') end
+                if bDebugMessages == true then LOG(sFunctionRef..': Telling platoon to process overcharge action on '..oOverchargeTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oOverchargeTarget)) end
                 oPlatoon[M27PlatoonUtilities.refiExtraAction] = M27PlatoonUtilities.refExtraActionOvercharge
                 oPlatoon[M27PlatoonUtilities.refExtraActionTargetUnit] = oOverchargeTarget
             end

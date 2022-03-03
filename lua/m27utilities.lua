@@ -181,7 +181,7 @@ function GetRectAroundLocation(tLocation, iRadius)
 end
 
 
-function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+function DrawTableOfLocationsOld(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
     --Draw circles around a table of locations to help with debugging - note that as this doesnt use ForkThread (might need to have global variables and no function pulled variables for forkthread to work beyond the first few seconds) this will pause all the AI code
     --If a table (i.e. bSingleLocation is false), then will draw lines between each position
     --All values are optional other than tableLocations
@@ -235,6 +235,13 @@ function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCo
         iCurDrawCount = iCurDrawCount + 1
         if iCurDrawCount > iMaxDrawCount then return end
         coroutine.yield(2) --Any more and circles will flash instead of being constant
+    end
+end
+
+function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+    if bSingleLocation then tableLocations = {tableLocations} end
+    for iLocation, tLocation in tableLocations do
+        DrawRectBase(Rect(tLocation[1] - 0.5, tLocation[3] - 0.5, tLocation[1] + 0.5, tLocation[3] + 0.5), iColour, iDisplayCount)
     end
 end
 

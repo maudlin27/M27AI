@@ -83,6 +83,8 @@ function OnUnitDeath(oUnit)
                     M27AirOverseer.OnAirAADeath(oUnit)
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryBomber, sUnitBP) or EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, sUnitBP) then
                     M27AirOverseer.OnBomberDeath(aiBrain, oUnit)
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, sUnitBP) then
+                    M27EngineerOverseer.CheckUnitsStillShielded(aiBrain)
                 --elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sUnitBP) then
                     --aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
                 end
@@ -227,6 +229,7 @@ function OnWeaponFired(oWeapon)
         if oWeapon.GetBlueprint and oWeapon:GetBlueprint().Overcharge then
             oUnit[M27UnitInfo.refbOverchargeOrderGiven] = false
             if bDebugMessages == true then LOG('Overcharge weapon was just fired') end
+            oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] = GetGameTimeSeconds()
         end
     end
 end
@@ -256,7 +259,9 @@ function OnMissileBuilt(self, weapon)
             ForkThread(M27Logic.CheckIfWantToBuildAnotherMissile, self)
         end
         --Start logic to periodically check for targets to fire the missile at (in case there are no targets initially)
-        ForkThread(M27Logic.ConsiderLaunchingMissile, self, weapon)
+        if not(self[M27UnitInfo.refbActiveMissileChecker]) then
+            ForkThread(M27Logic.ConsiderLaunchingMissile, self, weapon)
+        end
 
 
     end
@@ -276,17 +281,30 @@ function OnProjectileFired(oWeapon, oMuzzle)
 end--]]
 
 function OnConstructionStarted(oEngineer, oConstruction, sOrder)
-    --Track experimental construction
-    if oEngineer:GetAIBrain().M27AI and oConstruction.GetUnitId and M27Utilities.IsTableEmpty(oEngineer:GetAIBrain()[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
+    --Track experimental construction and other special on construction logic
+    if oEngineer.GetAIBrain and oEngineer:GetAIBrain().M27AI and oConstruction.GetUnitId then
         local aiBrain = oEngineer:GetAIBrain()
+        --Decide if we want to shield the construction
+        if oConstruction:GetBlueprint().Economy.BuildCostMass >= 2000 then
+            if oConstruction:GetBlueprint().Defense.Health / oConstruction:GetBlueprint().Economy.BuildCostMass < 1 then
+                table.insert(aiBrain[M27EngineerOverseer.reftUnitsWantingFixedShield], oConstruction)
+            end
+        end
+
+
         --Check for construction of nuke
-        if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] then
-            if EntityCategoryContains(aiBrain[M27EngineerOverseer.refiLastExperimentalCategory], oConstruction:GetUnitId()) then
-                --Are building a focus experimental, start tracker if its a nuke
-                if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] == M27UnitInfo.refCategorySML and not(aiBrain[M27EngineerOverseer.refbActiveSMDChecker]) then
+        --if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] then
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+            local sFunctionRef = 'OnConstructionStarted'
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have just started construction on a nuke; if so then will start a monitor; UnitID='..oConstruction:GetUnitId()..'; oConstruction[M27UnitInfo.refbActiveSMDChecker]='..(tostring(oConstruction[M27UnitInfo.refbActiveSMDChecker] or false))) end
+
+            if EntityCategoryContains(M27UnitInfo.refCategorySML, oConstruction:GetUnitId()) then
+                --Are building a nuke, check if already monitoring SMD somehow
+                if not(oConstruction[M27UnitInfo.refbActiveSMDChecker]) then
+                --if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] == M27UnitInfo.refCategorySML and not(aiBrain[M27UnitInfo.refbActiveSMDChecker]) then
                     ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oConstruction)
                 end
             end
-        end
+        --end
     end
 end
