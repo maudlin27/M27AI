@@ -1551,7 +1551,7 @@ end
 
 function NovaxProductionCheck(oNovaxCentre)
     --Call via forkthread when starting construction of a novax, to make sure we pick up when the satellite is already
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'NovaxProductionCheck'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code for centre='..oNovaxCentre:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNovaxCentre)) end

@@ -4883,8 +4883,10 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+    --Draw a circle (new logic)
+    M27Utilities.DrawLocation(M27Utilities.GetACU(aiBrain):GetPosition(), nil, 4, 100)
     --Locate Zthue with LC 35
-    local tT1Arti = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryIndirect * categories.TECH1, false, true)
+    --[[local tT1Arti = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryIndirect * categories.TECH1, false, true)
     if M27Utilities.IsTableEmpty(tT1Arti) == false then
        for iArti, oArti in tT1Arti do
           if M27UnitInfo.IsUnitValid(oArti) and M27UnitInfo.GetUnitLifetimeCount(oArti) == 34 then
@@ -4894,7 +4896,7 @@ function TestCustom(aiBrain)
               end
           end
        end
-    end
+    end--]]
 end
 
 
@@ -4946,7 +4948,7 @@ function OverseerManager(aiBrain)
     if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
     ForkThread(DetermineInitialBuildOrder, aiBrain)
     local iTempProfiling
-    --TestCustom(aiBrain)
+    TestCustom(aiBrain)
 
 
 

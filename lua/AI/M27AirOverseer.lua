@@ -3799,7 +3799,7 @@ end
 
 function NovaxCoreTargetLoop(aiBrain, oNovax)
     --Used so can do forkthread of this in case come across errors
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'NovaxCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -3861,7 +3861,7 @@ function NovaxCoreTargetLoop(aiBrain, oNovax)
 end
 
 function NovaxManager(oNovax)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'NovaxManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code for oNovax='..oNovax:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNovax)) end
