@@ -4948,7 +4948,9 @@ function OverseerManager(aiBrain)
     if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
     ForkThread(DetermineInitialBuildOrder, aiBrain)
     local iTempProfiling
-    TestCustom(aiBrain)
+    --TestCustom(aiBrain)
+
+    ForkThread(M27MiscProfiling.LocalVariableImpact)
 
 
 
@@ -4956,7 +4958,6 @@ function OverseerManager(aiBrain)
 
     while(not(aiBrain:IsDefeated())) do
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
-
         if aiBrain.M27IsDefeated then break end
 
         --ForkThread(TestNewMovementCommands, aiBrain)
