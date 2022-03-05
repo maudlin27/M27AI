@@ -66,6 +66,10 @@ do --Per Balthazaar - encasing the code in do .... end means that you dont have 
                 self.UpgradeEffectsBag:Add(e)
             end
         end, ]]--
-    
+
+        OnStopBuild = function(self, unit)
+            if unit and not(unit.Dead) and unit.GetFractionComplete and unit:GetFractionComplete() == 1 then ForkThread(M27Events.OnConstructed, self, unit) end
+            return M27OldUnit.OnStopBuild(self, unit)
+        end
     }
 end

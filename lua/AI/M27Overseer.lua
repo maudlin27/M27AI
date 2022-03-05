@@ -3698,7 +3698,10 @@ function ACUManager(aiBrain)
                     --Is the ACU close to our base? If so then only do emergency response if very low health
                     if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iRangeForACUToBeNearBase or iHealthPercentage < iACUEmergencyHealthPercentThreshold then
                         if not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) then
-                            aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
+                            --If ACU not taken damage in a while and no nearby enemy units, then dont adopt protectACU strategy
+                            if not(oACU[reftACURecentHealth][iCurTime - 30] < oACU[reftACURecentHealth][iCurTime] and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, tACUPos, 50, 'Enemy'))) then
+                                aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
+                            end
                         end
 
                         --Get all nearby combat units we own
@@ -4329,6 +4332,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                         bKeepProtectingACU = false
                     elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iDistanceFromBaseToBeSafe then
                         bKeepProtectingACU = false
+                    elseif oACU[reftACURecentHealth][iCurTime - 30] < oACU[reftACURecentHealth][iCurTime] and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, oACU:GetPosition(), 50, 'Enemy')) then
+                        bKeepProtectingACU = false
                     end
                     if bDebugMessages == true then LOG(sFunctionRef..': In protect ACU mode, bKeepProtectingACU='..tostring(bKeepProtectingACU)) end
                 end
@@ -4541,7 +4546,13 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         end
 
         aiBrain[refiACUHealthToRunOn] = 5250
-        if iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.5 then aiBrain[refiACUHealthToRunOn] = 8000 end --We have majority of mexes so play safe with ACU
+        if iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.5 then
+            if M27Conditions.DoesACUHaveGun(aiBrain, false) then aiBrain[refiACUHealthToRunOn] = math.max(8000, oACU:GetMaxHealth() * 0.7)
+            else
+                --ACU doesnt have gun so be very careful
+                aiBrain[refiACUHealthToRunOn] = math.max(9000, oACU:GetMaxHealth() * 0.8)
+            end
+        end --We have majority of mexes so play safe with ACU
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -4570,9 +4581,10 @@ end
 function RecordAllEnemiesAndAllies(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAllEnemiesAndAllies'
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of attempt to get backup list of enemies, will wait 5 seconds first') end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of attempt to get backup list of enemies, called for brain with armyindex='..aiBrain:GetArmyIndex()..'; will wait 5 seconds first') end
     WaitSeconds(5)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished waiting 1s for brain with armyindex='..aiBrain:GetArmyIndex()..'; will proceed with updating enemy and ally list') end
     local iOurIndex = aiBrain:GetArmyIndex()
     local iEnemyCount = 0
     local iAllyCount = 0
@@ -4581,15 +4593,22 @@ function RecordAllEnemiesAndAllies(aiBrain)
         aiBrain[toEnemyBrains] = {}
         aiBrain[toAllyBrains] = {}
         for iCurBrain, oBrain in ArmyBrains do
-            iArmyIndex = oBrain:GetArmyIndex()
-            tAllAIBrainsByArmyIndex[iArmyIndex] = oBrain
-            if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) and not(M27Logic.IsCivilianBrain(oBrain)) then
-                iEnemyCount = iEnemyCount + 1
-                aiBrain[toEnemyBrains][iArmyIndex] = oBrain
-                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain Index='..aiBrain:GetArmyIndex()..'; enemy index='..iArmyIndex..'; recording as an enemy; start position number='..oBrain.M27StartPositionNumber..'; start position='..repr(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])) end
-            elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not(oBrain == aiBrain) then
-                iAllyCount = iAllyCount + 1
-                aiBrain[toAllyBrains][iArmyIndex] = oBrain
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering whether brain with armyindex ='..oBrain:GetArmyIndex()..' is defeated and is enemy or ally') end
+            if not(oBrain:IsDefeated()) then
+                --if not(oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Brain isnt defeated') end
+                iArmyIndex = oBrain:GetArmyIndex()
+                tAllAIBrainsByArmyIndex[iArmyIndex] = oBrain
+                if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) and not(M27Logic.IsCivilianBrain(oBrain)) then
+                    iEnemyCount = iEnemyCount + 1
+                    aiBrain[toEnemyBrains][iArmyIndex] = oBrain
+                    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain Index='..aiBrain:GetArmyIndex()..'; enemy index='..iArmyIndex..'; recording as an enemy; start position number='..oBrain.M27StartPositionNumber..'; start position='..repr(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])) end
+                elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not(oBrain == aiBrain) then
+                    iAllyCount = iAllyCount + 1
+                    aiBrain[toAllyBrains][iArmyIndex] = oBrain
+                    if bDebugMessages == true then LOG(sFunctionRef..': Added brain with army index='..iArmyIndex..' as an ally for the brain with an army index '..aiBrain:GetArmyIndex()) end
+                end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Brain is defeated')
             end
         end
     else
@@ -4950,7 +4969,7 @@ function OverseerManager(aiBrain)
     local iTempProfiling
     --TestCustom(aiBrain)
 
-    ForkThread(M27MiscProfiling.LocalVariableImpact)
+    --ForkThread(M27MiscProfiling.LocalVariableImpact)
 
 
 

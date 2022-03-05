@@ -483,7 +483,7 @@ function DodgeBombsFiredByUnit(oWeapon, oBomber)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
+function GetOverchargeExtraActionOld(aiBrain, oPlatoon, oUnitWithOvercharge)
     --should have already confirmed overcharge action is available using CanUnitUseOvercharge
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetOverchargeExtraAction'
@@ -661,6 +661,190 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
             if oOverchargeTarget == nil then
                 --Target enemy ACU anyway if we have max energy and in attack mode
                 if oEnemyACU and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 then
+                    oOverchargeTarget = oEnemyACU
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': oOverchargeTarget is nil, wont give overcharge action') end
+                end
+            end
+            if oOverchargeTarget then
+                if bDebugMessages == true then LOG(sFunctionRef..': Telling platoon to process overcharge action on '..oOverchargeTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oOverchargeTarget)) end
+                oPlatoon[M27PlatoonUtilities.refiExtraAction] = M27PlatoonUtilities.refExtraActionOvercharge
+                oPlatoon[M27PlatoonUtilities.refExtraActionTargetUnit] = oOverchargeTarget
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
+    --should have already confirmed overcharge action is available using CanUnitUseOvercharge
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetOverchargeExtraAction'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+    --Do we have positive energy income? If not, then only overcharge if ACU is low on health as an emergency
+    local bResourcesToOvercharge = false
+    local oOverchargeTarget
+    local bAreRunning = false
+    local oEnemyACU
+
+    function WillShotHit(oFiringUnit, oTargetUnit)
+        if M27Logic.IsShotBlocked(oFiringUnit, oTargetUnit) or M27Logic.IsBuildingOrACUBlockingShot(oFiringUnit, oTargetUnit) then
+            return false
+        else return true
+        end
+    end
+
+
+    --Check unit not already been given an overcharge action recently
+    if not(oUnitWithOvercharge[M27UnitInfo.refbOverchargeOrderGiven]) then
+        if M27Conditions.HaveExcessEnergy(aiBrain, 10) then bResourcesToOvercharge = true
+        else
+            if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true and M27Utilities.GetACU(aiBrain):GetHealthPercent() < 0.4 then bResourcesToOvercharge = true end
+        end
+        if bResourcesToOvercharge == true then
+            local tUnitPosition = oUnitWithOvercharge:GetPosition()
+            local iACURange = M27Logic.GetACUMaxDFRange(oUnitWithOvercharge)
+            local iOverchargeArea = 2.5
+            local bAbort = false
+            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                local iDistanceToEnemyACU
+                --Target enemy ACU if its low health as a top priority unless it's about to move out of our range
+                if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) then
+                    oEnemyACU = aiBrain[M27Overseer.refoLastNearestACU]
+                    if aiBrain[M27Overseer.refoLastNearestACU]:GetHealthPercent() < 0.2 then
+                        iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition)
+                        if iDistanceToEnemyACU < (iACURange - 2) and not(M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyACU)) then
+                            oOverchargeTarget = aiBrain[M27Overseer.refoLastNearestACU]
+                        else
+                            bAbort = true
+                        end
+                    end
+                end
+                if bAbort == false then
+                    if iDistanceToEnemyACU == nil then iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition) end
+                    --Is ACU about to fall out of our vision or weapon range?
+                    if iDistanceToEnemyACU + 4 > math.min(iACURange, 26) then bAbort = true end
+                end
+            end
+            if bAbort == false and not(oOverchargeTarget) then
+                --Cycle through every land combat non-ACU unit within firing range to see if can find one that reduces the damage the most, or failing that does the most mass damage
+                local tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - categories.COMMAND + M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryNavalSurface, tUnitPosition, iACURange - 2, 'Enemy')
+                --local iMostMobileCombatMassDamage = 0
+                --local oMostCombatMassDamage
+                local iMostMassDamage = 0
+                local oMostMassDamage
+                local iMaxOverchargeDamage = (aiBrain:GetEconomyStored('ENERGY') * 0.9) * 0.25
+                local iCurDamageDealt
+                if M27UnitInfo.IsTableEmpty(tEnemyUnits) == false then
+                    for iUnit, oUnit in tEnemyUnits do
+                        if WillShotHit(oUnitWithOvercharge, oUnit) then
+                            iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage)
+                            if iCurDamageDealt > iMostMassDamage then
+                                iMostMassDamage = iCurDamageDealt
+                                oMostMassDamage = oUnit
+                            end
+                        end
+                    end
+                end
+
+                --if iMostMobileCombatMassDamage >= 80 then
+                --    oOverchargeTarget = oMostCombatMassDamage
+                if iMostMassDamage >= 170 then
+                    oOverchargeTarget = oMostMassDamage
+                else
+                    --Consider combat enemies in range first
+                    tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryPD - M27UnitInfo.refCategoryFixedT2Arti, tUnitPosition, iACURange - 2, 'Enemy')
+                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                        for iUnit, oUnit in tEnemyUnits do
+                            if WillShotHit(oUnitWithOvercharge, oUnit) then
+                                iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage)
+                                if iCurDamageDealt > iMostMassDamage then
+                                    iMostMassDamage = iCurDamageDealt
+                                    oMostMassDamage = oUnit
+                                end
+                            end
+                        end
+                    end
+                    if iMostMassDamage >= 170 then
+                        oOverchargeTarget = oMostMassDamage
+                    else
+                        --No decent combat targets; Check for lots of walls that might be blocking our path
+                        tEnemyUnits = aiBrain:GetUnitsAroundPoint(tUnitPosition, tUnitPosition, iACURange - 2, 'Enemy')
+                        if M27Utilities.IsTableEmpty(tEnemyUnits) == false and table.getn(tEnemyUnits) >= 5 then
+                            local bSuspectedPathBlock = false
+                            --If more than 10 then assume blocking our path
+                            if table.getn(tEnemyUnits) >= 10 then bSuspectedPathBlock = true
+                            else
+                                bSuspectedPathBlock = true
+                                local tFirstWall = tEnemyUnits[1]:GetPosition()
+                                for iWall, oWall in tEnemyUnits do
+                                    if iWall > 1 then
+                                        if M27Utilities.GetDistanceBetweenPositions(oWall:GetPosition(), tFirstWall) >= 4 then
+                                            bSuspectedPathBlock = false
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                            if bSuspectedPathBlock then
+                                iMostMassDamage = 0
+                                oMostMassDamage = nil
+                                for iWall, oUnit in tEnemyUnits do
+                                    if WillShotHit(oFiringUnit, oUnit) then
+                                        iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage)
+                                        if iCurDamageDealt > iMostMassDamage then
+                                            iMostMassDamage = iCurDamageDealt
+                                            oMostMassDamage = oUnit
+                                        end
+                                    end
+                                end
+                                if oMostMassDamage then oOverchargeTarget = oMostMassDamage end
+                            end
+                        end
+                    end
+                    if not(oOverchargeTarget) then --Is there enemy T2PD nearby (out of our range)?
+                        --Check further away incase enemy has T2 PD that can see us and we arent running
+                        if oPlatoon[M27PlatoonUtilities.refbHavePreviouslyRun] == true or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionRun or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionTemporaryRetreat or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReturnToBase or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionGoToNearestRallyPoint or (M27Utilities.IsACU(oUnitWithOvercharge) and oUnitWithOvercharge:GetHealth() < aiBrain[M27Overseer.refiACUHealthToRunOn]) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if any T2 PD further away') end
+                            tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, tUnitPosition, 50, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have enemy T2 defence that can hit us but is out of our range - considering if OC it will bring us in range of T1 PD, and/or if shot is blocked, and/or if the T2PD cant even see us') end
+                                local tNearbyT1PD
+                                local iNearestT1PD = 10000
+                                local iCurDistance
+                                if 50 - iACURange > 0 then tNearbyT1PD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryPD * categories.TECH1, tUnitPosition, 50 - iACURange, 'Enemy') end
+                                if M27Utilities.IsTableEmpty(tNearbyT1PD) == false then
+                                    for iT1PD, oT1PD in tNearbyT1PD do
+                                        iCurDistance = M27Utilities.GetDistanceBetweenPositions(oT1PD:GetPosition(), tUnitPosition)
+                                        if iCurDistance < iNearestT1PD then iNearestT1PD = iCurDistance end
+                                    end
+                                end
+
+                                for iUnit, oEnemyT2PD in tEnemyUnits do
+                                    --Can we get in range of the T2 PD without getting in range of the T1 PD? (approximates just based on distances rather than considering the likely path to take)
+                                    if M27Utilities.GetDistanceBetweenPositions(oEnemyT2PD:GetPosition(), tUnitPosition) - iACURange + 2 < iNearestT1PD then
+                                        if M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyT2PD) == false then
+                                            --Can the T2 PD see us?
+                                            if M27Utilities.CanSeeUnit(oEnemyT2PD:GetAIBrain(), oUnitWithOvercharge, true) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Setting target to T2 PD') end
+                                                oOverchargeTarget = oEnemyT2PD
+                                                break
+                                            else
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy T2 PDs owner can see our ACU') end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            if oOverchargeTarget == nil then
+                --Target enemy ACU anyway if we have max energy and in attack mode
+                if oEnemyACU and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 and WillShotHit(oUnitWithOvercharge, oEnemyACU) then
                     oOverchargeTarget = oEnemyACU
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': oOverchargeTarget is nil, wont give overcharge action') end

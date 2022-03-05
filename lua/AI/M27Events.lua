@@ -54,9 +54,11 @@ function OnUnitDeath(oUnit)
         M27Overseer.iACUDeathCount = M27Overseer.iACUDeathCount + 1
         LOG(sFunctionRef..' ACU kill detected; total kills='..M27Overseer.iACUDeathCount)
         --Update list of brains
-        local iACUBrain = oUnit:GetAIBrain()
+        local oACUBrain = oUnit:GetAIBrain()
+        oACUBrain.M27IsDefeated = true
+
         for iArmyIndex, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
-            if aiBrain == iACUBrain then
+            if aiBrain == oACUBrain then
                 M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
             elseif aiBrain.M27AI then
                 ForkThread(M27Overseer.RecordAllEnemiesAndAllies, aiBrain)
@@ -231,6 +233,14 @@ function OnWeaponFired(oWeapon)
             if bDebugMessages == true then LOG('Overcharge weapon was just fired') end
             oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] = GetGameTimeSeconds()
         end
+
+        --T3 arti
+        if oUnit:GetAIBrain().M27AI then
+            if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit:GetUnitId()) then
+                ForkThread(M27Logic.GetT3ArtiTarget, oUnit)
+                ForkThread(M27Logic.MonitorT3ArtiAdjacency, oUnit) --makes sure we have PGens adjacent to the arti if we can
+            end
+        end
     end
 end
 
@@ -306,5 +316,18 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                 end
             end
         --end
+    end
+end
+function OnConstructed(oEngineer, oJustBuilt)
+    --NOTE: This is called every time an engineer stops building a unit whose fractioncomplete is 100%, so can be called multiple times
+    if oJustBuilt:GetAIBrain().M27AI and not(oJustBuilt.M27OnConstructedCalled) then
+        oJustBuilt.M27OnConstructedCalled = true
+
+        --LOG('OnConstructed hook test; oJustBuilt='..oJustBuilt:GetUnitId()..'; oEngineer='..oEngineer:GetUnitId())
+        if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oJustBuilt:GetUnitId()) and not(oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
+            --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
+            ForkThread(M27Logic.MonitorT3ArtiAdjacency, oJustBuilt)
+            ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
+        end
     end
 end

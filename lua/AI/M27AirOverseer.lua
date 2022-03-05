@@ -2996,8 +2996,10 @@ function AirAAManager(aiBrain)
                 iDistanceFromACUToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tACUPos)
                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
                     for iAllyBrain, aiAllyBrain in aiBrain[M27Overseer.toAllyBrains] do
-                        iDistanceFromACUToStart = math.max(iDistanceFromACUToStart, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition()))
-                        if bDebugMessages == true then LOG(sFunctionRef..': Brain start number='..aiAllyBrain.M27StartPositionNumber..'; distance from enemy air unit to ACU of this player='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition())) end
+                        if not(aiAllyBrain:IsDefeated()) then --redundancy in case issue with toallybrains being updated
+                            iDistanceFromACUToStart = math.max(iDistanceFromACUToStart, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition()))
+                            if bDebugMessages == true then LOG(sFunctionRef..': Brain start number='..aiAllyBrain.M27StartPositionNumber..'; distance from enemy air unit to ACU of this player='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition())) end
+                        end
                     end
                 end
             end

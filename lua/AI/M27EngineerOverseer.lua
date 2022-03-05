@@ -2664,6 +2664,17 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': Will build a novax') end
                         end
                     end
+                    if not(iCategoryToBuild) then
+                        --Do we want a fatboy?
+                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[refiDistanceToNearestEnemyBase] <= 600 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) <= 1 and table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy')) <= 2 then
+                            iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
+                        else
+                            --T3 arti if we have the eco to support it
+                            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) >= math.max(1, table.getn(M27MapInfo.tResourceNearStart[M27Utilities.GetAIBrainArmyNumber(aiBrain)][1])) then
+                                iCategoryToBuild = M27UnitInfo.refCategoryFixedT3Arti
+                            end
+                        end
+                    end
                 end
 
                 if not(iCategoryToBuild) then

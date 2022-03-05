@@ -34,6 +34,8 @@ refbFullyUpgraded = 'M27UnitFullyUpgraded' --used on ACU to avoid running some c
 refbRecentlyRemovedHealthUpgrade = 'M27UnitRecentlyRemovedHealthUpgrade' --Used on ACU to flag if e.g. we removed T2 which will decrease our health
 refbActiveMissileChecker = 'M27UnitMissileTracker' --True if are actively checking for missile targets
 refbActiveSMDChecker = 'M27UnitSMDChecker' -- true if unit is checking for enemy SMD (use on nuke)
+refbActiveTargetChecker = 'M27UnitActiveTargetChecker' --e.g. used for T3 fixed arti
+refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will update this when given an IssueAttack order
 
 --Factions
 refFactionUEF = 1

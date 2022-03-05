@@ -2117,9 +2117,12 @@ function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPass
                 if iSegmentX >= math.min(iDestinationSegmentX, iACUSegmentX) then
                     if iSegmentZ <= math.max(iDestinationSegmentZ, iACUSegmentZ) then
                         if iSegmentZ >= math.min(iDestinationSegmentZ, iACUSegmentZ) then
-                            iPossibleMex = iPossibleMex + 1
-                            tMexShortlist[iPossibleMex] = {}
-                            tMexShortlist[iPossibleMex] = tMexLocation
+                            --Ignore if we or an ally already has a mex near here (i.e. below will say its unclaimed if enemy built there or noone built there)
+                            if M27Conditions.IsMexOrHydroUnclaimed(aiBrain, tMexLocation, true, true, false, true) then
+                                iPossibleMex = iPossibleMex + 1
+                                tMexShortlist[iPossibleMex] = {}
+                                tMexShortlist[iPossibleMex] = tMexLocation
+                            end
                         end
                     end
                 end
@@ -2868,15 +2871,16 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             tRevisedDestination = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tFinalDestination, nil, -3, true, false, false)
             --=========Get mexes and high value reclaim en-route================
             if bDebugMessages == true then
-                LOG(sFunctionRef..': tFinalDestination determined, ='..repr(tFinalDestination)..'; tRevisedDestination='..repr(tRevisedDestination))
+                LOG(sFunctionRef..': tFinalDestination determined, ='..repr(tFinalDestination)..'; tRevisedDestination='..repr(tRevisedDestination)..'; will now add mexes as via points')
                 M27Utilities.DrawLocation(tRevisedDestination, nil, 1, 100)
                 --Below may cause desync so only enable temporarily
                 --if bDebugMessages == true then LOG(sFunctionRef..': SegmentGroup of tFinalDestination='..M27MapInfo.InSameSegmentGroup(oPathingUnit, tFinalDestination, true)) end
                 --if bDebugMessages == true then LOG(sFunctionRef..': CanPathToManual for tFinalDestination='..tostring(oPathingUnit:CanPathTo(tFinalDestination))) end
             end
             oPathingUnit.GetPriorityExpansionMovementPath = true
-            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to add nearby reclaim and mexes to movement path') end
+            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to add nearby reclaim and mexes to movement path') end'
             local tRevisedPath = AddMexesAndReclaimToMovementPath(oPathingUnit, tRevisedDestination)
+
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             M27Utilities.FunctionProfiler(sFunctionRef..'AddingDetours', M27Utilities.refProfilerEnd)
             return tRevisedPath
@@ -3635,6 +3639,65 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
     return iTotalDamage
 end
 
+function GetDamageFromOvercharge(aiBrain, oTargetUnit, iAOE, iDamage)
+    --Originally copied from the 'getdamagefrombomb' function, but adjusted since OC doesnt deal full damage to ACU or structures
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetDamageFromOvercharge'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    local iTotalDamage = 0
+    local tEnemiesInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryAllNavy, oTargetUnit:GetPosition(), iAOE, 'Enemy')
+    local oCurBP
+    local iMassFactor
+    local iCurHealth, iMaxHealth, iCurShield, iMaxShield
+    local iActualDamage
+
+    if M27Utilities.IsTableEmpty(tEnemiesInRange) == false then
+        for iUnit, oUnit in tEnemiesInRange do
+            if oUnit.GetBlueprint then
+                oCurBP = oUnit:GetBlueprint()
+                --Is the unit within range of the aoe?
+                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition()) <= iAOE then
+                    --Is the unit shielded by a non-mobile shield (mobile shields should take full damage I think)
+                    --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
+                    if not(IsTargetUnderShield(aiBrain, oUnit, 800, false, true, false)) then
+                        iActualDamage = iDamage
+                        if EntityCategoryContains(categories.STRUCTURE, oUnit:GetUnitId()) then
+                            iActualDamage = 800
+                        elseif EntityCategoryContains(categories.COMMAND, oUnit:GetUnitId()) then
+                            iActualDamage = 400
+                        end
+
+                        iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                        iCurHealth = iCurShield + oUnit:GetHealth()
+                        iMaxHealth = iMaxShield + oUnit:GetMaxHealth()
+                        --Set base mass value based on health
+                        if iDamage >= iMaxHealth or iDamage >= math.min(iCurHealth * 3, iCurHealth + 1000) then
+                            iMassFactor = 1
+                            --Was the unit almost dead already?
+                            if (iCurShield + iCurHealth) <= iMaxHealth * 0.4 then iMassFactor = math.max(0.25, (iCurShield + iCurHealth) / iMaxHealth) end
+                        else
+                            --Still some value in damaging a unit (as might get a second strike), but far less than killing it
+                            iMassFactor = 0.4
+                            if EntityCategoryContains(categories.EXPERIMENTAL, oUnit:GetUnitId()) then iMassFactor = 0.5 end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
+                        --Is the target mobile and within 1 of the AOE edge? If so then reduce to 25% as it might move out of the wayif
+                        if oUnit:GetFractionComplete() == 1 and EntityCategoryContains(categories.MOBILE, oUnit:GetUnitId()) and iAOE - 1 > M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition()) then iMassFactor = iMassFactor * 0.25 end
+                        iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
+                    end
+                end
+            end
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished going through units in the aoe, iTotalDamage in mass='..iTotalDamage..'; tBaseLocation='..repr(tBaseLocation)..'; iAOE='..iAOE..'; iDamage='..iDamage) end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return iTotalDamage
+end
+
 function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
     --Calcualtes the most damaging location for an aoe target; also returns the damage dealt
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -3773,4 +3836,28 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
         end
     end
     oLauncher[M27UnitInfo.refbActiveMissileChecker] = false
+end
+
+function GetT3ArtiTarget(oT3Arti)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetT3ArtiTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    M27Utilities.ErrorHandler('To add T3 targeting logic')
+
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function MonitorT3ArtiAdjacency(oT3Arti)
+    --Call via forked forkthread
+
+    if not(oT3Arti[M27UnitInfo.refbActiveTargetChecker]) then
+        oT3Arti[M27UnitInfo.refbActiveTargetChecker] = true
+        M27Utilities.ErrorHandler('To add code to check for T3 arti pgen adjacency')
+        while oT3Arti[M27UnitInfo.refbActiveTargetChecker] do
+
+           WaitSeconds(20)
+        end
+    end
 end
