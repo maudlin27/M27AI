@@ -96,8 +96,8 @@ refCategorySatellite = categories.EXPERIMENTAL * categories.SATELLITE
 
 --Land units
 refCategoryExperimentalStructure = categories.CYBRAN * categories.ARTILLERY * categories.EXPERIMENTAL + categories.STRUCTURE * categories.EXPERIMENTAL
-refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY
-refCategoryMobileLand = categories.LAND * categories.MOBILE
+refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY - categories.UNSELECTABLE
+refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
 refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT - categories.ANTIAIR --NOTE: Need to specify fastest (for cybran who have mantis and LAB)
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
@@ -152,7 +152,7 @@ refCategoryStealthAndCloakPersonal = categories.STEALTH
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
-refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
+refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN}
 refWeaponPriorityOurGroundExperimental = {refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, categories.COMMAND, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
 
 

@@ -1480,7 +1480,7 @@ function CheckForIdleMobileLandUnits(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CheckForIdleMobileLandUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local tAllUnits = aiBrain:GetListOfUnits(categories.MOBILE * categories.LAND, false, true)
+    local tAllUnits = aiBrain:GetListOfUnits(categories.MOBILE * categories.LAND - categories.UNSELECTABLE, false, true)
     local oPlatoon
     local oArmyPool = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
     --Update flag for mobile shields if we have none idle (as suggests we're using them all)

@@ -678,7 +678,7 @@ end
 
 function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     --should have already confirmed overcharge action is available using CanUnitUseOvercharge
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetOverchargeExtraAction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -688,9 +688,33 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     local oOverchargeTarget
     local bAreRunning = false
     local oEnemyACU
+    local reftiAngleFromACUToUnit = 'M27AngleFromACUToUnit'
+    local reftiDistFromACUToUnit = 'M27DistFromACUToUnit'
+    local toStructuresAndACU
+
+
+    function IsBuildingOrACUBlockingShot(oFiringUnit, oTargetUnit)
+        --Assumes have already been through tBlockingUnits and set their angle to the firing unit, so we just need to compare to firing unit
+        if M27Utilities.IsTableEmpty(toStructuresAndACU) == false then
+            local iAngleToTargetUnit = M27Utilities.GetAngleFromAToB(oFiringUnit:GetPosition(), oTargetUnit:GetPosition())
+            local iDistToTargetUnit = M27Utilities.GetDistanceBetweenPositions(oFiringUnit:GetPosition(), oTargetUnit:GetPosition())
+            local iCurAngleDif
+            for iUnit, oUnit in toStructuresAndACU do
+                if not(oUnit == oTargetUnit) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' will block a shot from the ACU to the target '..oTargetUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)) end
+                    iCurAngleDif = iAngleToTargetUnit - oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]
+                    if iCurAngleDif < 0 then iCurAngleDif = iCurAngleDif + 360 end
+                    if math.max(8, 180 / iDistToTargetUnit) <= iCurAngleDif then
+                        return true
+                    end
+                end
+            end
+        end
+        return false
+    end
 
     function WillShotHit(oFiringUnit, oTargetUnit)
-        if M27Logic.IsShotBlocked(oFiringUnit, oTargetUnit) or M27Logic.IsBuildingOrACUBlockingShot(oFiringUnit, oTargetUnit) then
+        if M27Logic.IsShotBlocked(oFiringUnit, oTargetUnit) or IsBuildingOrACUBlockingShot(oFiringUnit, oTargetUnit) then
             return false
         else return true
         end
@@ -708,14 +732,31 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
             local iACURange = M27Logic.GetACUMaxDFRange(oUnitWithOvercharge)
             local iOverchargeArea = 2.5
             local bAbort = false
+
+            --First locate where any blocking units are - will assume non-wall structures will block the shot, and ACUs will block
+            toStructuresAndACU = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + categories.COMMAND, tUnitPosition, 50, 'Enemy')
+            if bDebugMessages == true then LOG(sFunctionRef..': First locating blocking units; is table empty='..tostring(M27Utilities.IsTableEmpty(toStructuresAndACU))) end
+            if M27Utilities.IsTableEmpty(toStructuresAndACU) == false then
+                for iUnit, oUnit in toStructuresAndACU do
+                    if not(oUnit[reftiAngleFromACUToUnit]) then
+                        oUnit[reftiAngleFromACUToUnit] = {}
+                        oUnit[reftiDistFromACUToUnit] = {}
+                    end
+                    oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()] = M27Utilities.GetAngleFromAToB(tUnitPosition, oUnit:GetPosition())
+                    oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()] = M27Utilities.GetDistanceBetweenPositions(tUnitPosition, oUnit:GetPosition())
+                    if bDebugMessages == true then LOG(sFunctionRef..': Angle from oUnit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to our ACU='..repr(oUnit[reftiAngleFromACUToUnit])..'; distance='..repr(oUnit[reftiDistFromACUToUnit])) end
+                end
+            end
+
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
                 local iDistanceToEnemyACU
                 --Target enemy ACU if its low health as a top priority unless it's about to move out of our range
                 if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) then
                     oEnemyACU = aiBrain[M27Overseer.refoLastNearestACU]
                     if aiBrain[M27Overseer.refoLastNearestACU]:GetHealthPercent() < 0.2 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is almost dead so want to target it, and not target anything else if we cant hit it') end
                         iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition)
-                        if iDistanceToEnemyACU < (iACURange - 2) and not(M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyACU)) then
+                        if iDistanceToEnemyACU < (iACURange - 2) and WillShotHit(oUnitWithOvercharge, oEnemyACU) then
                             oOverchargeTarget = aiBrain[M27Overseer.refoLastNearestACU]
                         else
                             bAbort = true
@@ -725,25 +766,31 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 if bAbort == false then
                     if iDistanceToEnemyACU == nil then iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition) end
                     --Is ACU about to fall out of our vision or weapon range?
-                    if iDistanceToEnemyACU + 4 > math.min(iACURange, 26) then bAbort = true end
+                    if iDistanceToEnemyACU + 4 > math.min(iACURange, 26) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU about to fall out of our vision or range so will abort as want to keep moving') end
+                        bAbort = true
+                    end
                 end
             end
             if bAbort == false and not(oOverchargeTarget) then
-                --Cycle through every land combat non-ACU unit within firing range to see if can find one that reduces the damage the most, or failing that does the most mass damage
-                local tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - categories.COMMAND + M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryNavalSurface, tUnitPosition, iACURange - 2, 'Enemy')
+                --Cycle through every land combat non-ACU unit within firing range to see if can find one that reduces the damage the most, or failing that does the most mass damage; will include all navy on the assumption isshotblocked will trigger if shot will go underwater (as otherwise we might ignore sera T2 destroyers)
+                local tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - categories.COMMAND + M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryAllNavy, tUnitPosition, iACURange - 2, 'Enemy')
                 --local iMostMobileCombatMassDamage = 0
                 --local oMostCombatMassDamage
                 local iMostMassDamage = 0
-                local oMostMassDamage
+                local oMostMassDamage, iKillsExpected
                 local iMaxOverchargeDamage = (aiBrain:GetEconomyStored('ENERGY') * 0.9) * 0.25
-                local iCurDamageDealt
-                if M27UnitInfo.IsTableEmpty(tEnemyUnits) == false then
+                local iCurDamageDealt, iCurKillsExpected
+                if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
                     for iUnit, oUnit in tEnemyUnits do
                         if WillShotHit(oUnitWithOvercharge, oUnit) then
-                            iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage)
+                            iCurDamageDealt, iCurKillsExpected = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Shot will hit enemy unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; damage result='..iCurDamageDealt) end
                             if iCurDamageDealt > iMostMassDamage then
                                 iMostMassDamage = iCurDamageDealt
                                 oMostMassDamage = oUnit
+                                iKillsExpected = iCurKillsExpected
+
                             end
                         end
                     end
@@ -751,57 +798,45 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
 
                 --if iMostMobileCombatMassDamage >= 80 then
                 --    oOverchargeTarget = oMostCombatMassDamage
-                if iMostMassDamage >= 170 then
+                if iMostMassDamage >= 200 or iKillsExpected >= 3 or (iKillsExpected >= 1 and iMostMassDamage >= 112) then --e.g. striker is 56 mass; lobo is 36
                     oOverchargeTarget = oMostMassDamage
                 else
-                    --Consider combat enemies in range first
-                    tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryPD - M27UnitInfo.refCategoryFixedT2Arti, tUnitPosition, iACURange - 2, 'Enemy')
-                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
-                        for iUnit, oUnit in tEnemyUnits do
-                            if WillShotHit(oUnitWithOvercharge, oUnit) then
-                                iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage)
-                                if iCurDamageDealt > iMostMassDamage then
-                                    iMostMassDamage = iCurDamageDealt
-                                    oMostMassDamage = oUnit
+                    --No decent combat targets; Check for lots of walls that might be blocking our path
+                    tEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.WALL, tUnitPosition, iACURange - 2, 'Enemy')
+                    if bDebugMessages == true then LOG(sFunctionRef..': iMostMassDamage='..iMostMassDamage..'; so will check for walls and other structure targets; is table of wall units empty='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false and table.getn(tEnemyUnits) >= 5 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have at least 5 wall units in range, so potential blockage; size='..table.getn(tEnemyUnits)) end
+                        local bSuspectedPathBlock = false
+                        --If more than 10 then assume blocking our path
+                        if table.getn(tEnemyUnits) >= 10 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': At least 10 wall units so assuming a blockage') end
+                            bSuspectedPathBlock = true
+                        else
+                            local tFirstWall = tEnemyUnits[1]:GetPosition()
+                            for iWall, oWall in tEnemyUnits do
+                                if iWall > 1 then
+                                    if M27Utilities.GetDistanceBetweenPositions(oWall:GetPosition(), tFirstWall) >= 4 then
+                                        bSuspectedPathBlock = true
+                                        break
+                                    end
                                 end
                             end
                         end
-                    end
-                    if iMostMassDamage >= 170 then
-                        oOverchargeTarget = oMostMassDamage
-                    else
-                        --No decent combat targets; Check for lots of walls that might be blocking our path
-                        tEnemyUnits = aiBrain:GetUnitsAroundPoint(tUnitPosition, tUnitPosition, iACURange - 2, 'Enemy')
-                        if M27Utilities.IsTableEmpty(tEnemyUnits) == false and table.getn(tEnemyUnits) >= 5 then
-                            local bSuspectedPathBlock = false
-                            --If more than 10 then assume blocking our path
-                            if table.getn(tEnemyUnits) >= 10 then bSuspectedPathBlock = true
-                            else
-                                bSuspectedPathBlock = true
-                                local tFirstWall = tEnemyUnits[1]:GetPosition()
-                                for iWall, oWall in tEnemyUnits do
-                                    if iWall > 1 then
-                                        if M27Utilities.GetDistanceBetweenPositions(oWall:GetPosition(), tFirstWall) >= 4 then
-                                            bSuspectedPathBlock = false
-                                            break
-                                        end
+                        if bSuspectedPathBlock then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Think enemy has walls in a line so will overcharge them') end
+                            iMostMassDamage = 0
+                            oMostMassDamage = nil
+                            for iWall, oUnit in tEnemyUnits do
+                                if WillShotHit(oUnitWithOvercharge, oUnit) then
+                                    iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage, true)
+                                    if iCurDamageDealt > iMostMassDamage then
+                                        iMostMassDamage = iCurDamageDealt
+                                        oMostMassDamage = oUnit
                                     end
                                 end
                             end
-                            if bSuspectedPathBlock then
-                                iMostMassDamage = 0
-                                oMostMassDamage = nil
-                                for iWall, oUnit in tEnemyUnits do
-                                    if WillShotHit(oFiringUnit, oUnit) then
-                                        iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage)
-                                        if iCurDamageDealt > iMostMassDamage then
-                                            iMostMassDamage = iCurDamageDealt
-                                            oMostMassDamage = oUnit
-                                        end
-                                    end
-                                end
-                                if oMostMassDamage then oOverchargeTarget = oMostMassDamage end
-                            end
+                            if oMostMassDamage then oOverchargeTarget = oMostMassDamage end
+                        elseif bDebugMessages == true then LOG(sFunctionRef..': Dont think the walls are in a line so wont try and OC')
                         end
                     end
                     if not(oOverchargeTarget) then --Is there enemy T2PD nearby (out of our range)?
@@ -843,6 +878,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 end
             end
             if oOverchargeTarget == nil then
+                if bDebugMessages == true then LOG(sFunctionRef..': No OC targets found, will target enemy ACU if we are in ACU kill mode and have max energy') end
                 --Target enemy ACU anyway if we have max energy and in attack mode
                 if oEnemyACU and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 and WillShotHit(oUnitWithOvercharge, oEnemyACU) then
                     oOverchargeTarget = oEnemyACU

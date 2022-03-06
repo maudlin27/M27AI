@@ -5125,8 +5125,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     if iEnergyStoredRatio == nil then iEnergyStoredRatio = aiBrain:GetEconomyStoredRatio('ENERGY') end
                                     if iEnergyStorageMax == nil then iEnergyStorageMax = iEnergyStored / iEnergyStoredRatio end
                                     local iMaxStorageWanted = 9000
-                                    if iGrossCurEnergyIncome >= 90 then
-                                        if iGrossCurEnergyIncome >= 200 then
+                                    if iGrossCurEnergyIncome >= 90 or (iGrossCurEnergyIncome >= 40 and aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 2) then
+                                        if iGrossCurEnergyIncome >= 200 or (aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 3 and iGrossCurEnergyIncome >= 100) then
                                             iMaxStorageWanted = math.max(17000, aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] * 200) --Energy storage to replenish overcharge every 20s
                                         else
                                             iMaxStorageWanted = 13000

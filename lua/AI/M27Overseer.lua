@@ -4902,8 +4902,22 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+    --List out all experimental unit BPs
+    --[[
+    for iUnit, oUnit in aiBrain:GetListOfUnits(categories.EXPERIMENTAL, false, true) do
+        LOG('Experimental='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+    end
+    LOG('About to print out blueprint for unit xsl04021')
+    LOG(repr(__blueprints['xsl0402']))
+    LOG('About to print out categories')
+    LOG(repr(__blueprints['xsl04021'].Categories))
+    for iCat, sCat in __blueprints['xsl0402'].Categories do
+       LOG('iCat='..iCat..'; sCat='..sCat)
+    end--]]
+
+
     --Draw a circle (new logic)
-    M27Utilities.DrawLocation(M27Utilities.GetACU(aiBrain):GetPosition(), nil, 4, 100)
+    --M27Utilities.DrawLocation(M27Utilities.GetACU(aiBrain):GetPosition(), nil, 4, 100)
     --Locate Zthue with LC 35
     --[[local tT1Arti = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryIndirect * categories.TECH1, false, true)
     if M27Utilities.IsTableEmpty(tT1Arti) == false then
@@ -4978,6 +4992,7 @@ function OverseerManager(aiBrain)
     while(not(aiBrain:IsDefeated())) do
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
         if aiBrain.M27IsDefeated then break end
+        TestCustom(aiBrain)
 
         --ForkThread(TestNewMovementCommands, aiBrain)
 
