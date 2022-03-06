@@ -74,6 +74,7 @@ reftEngineerAssignmentsByLocation = 'M27EngineerAssignmentsByLoc'     --[x][y][z
 reftEngineerAssignmentsByActionRef = 'M27EngineerAssignmentsByAction' --Records all engineers. [x][y]{1,2} - x is the action ref; y is the engineer unique ref, 1 is the location ref, 2 is the engineer object (use the subtable ref keys instead of numbers to refer to these)
 reftEngineerActionsByEngineerRef = 'M27EngineerActionsByEngineerRef' --Records actions by engineer reference; aiBrain[reftEngineerActionsByEngineerRef][iUniqueRef][BuildingQueue]: returns {LocRef, EngRef, AssistingRef, ActionRef, refbPrimaryBuilder, reftActualTargetLocationRef} but not in that order - i.e. use subtable keys to reference these; buildingqueue will be 1 for the first queueud building by the unit, 2 for the second etc. (e.g. t1 power)
 reftEngineersHelpingACU = 'M27AllEngineersHelpingACU' --Engineer objects for any spare engineers assisting ACU
+refiTimeOfLastAction = 'M27EngineerTimeOfLastAction' --[x] = actionref; recordsgametime that have sent an action to a primary engineer for this
 --Subtable reference keys:
 refEngineerAssignmentLocationRef = 'LocationRef' --Could use a number but this makes it more likely errors will be identified
 refEngineerAssignmentEngineerRef = 'EngineerRef'
@@ -692,6 +693,8 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
             end
         end
     end
+    --Record when we sent engineer this action (used for some occasional build conditions)
+    if oEngineer[refbPrimaryBuilder] and oEngineer[refiEngineerCurrentAction] == iActionToAssign then aiBrain[refiTimeOfLastAction][iActionToAssign] = GetGameTimeSeconds() end
 
     --Record mexes that will be ctrl-k ing
     if oUnitToBeDestroyed then
@@ -1280,14 +1283,14 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
                                 elseif (not(oBuilding.IsPaused) or not(oBuilding:IsPaused())) then
                                     if oBuilding.IsUnitState then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Have a non-paused building with unit state='..M27Logic.GetUnitState(oEngineer)) end
-                                        if oBuilding:IsUnitState('Upgrading') == true or oBuilding:IsUnitState('SiloBuildingAmmo') or (oBuilding.GetWorkProgress and oBuilding:GetWorkProgress() < 1) then
+                                        if oBuilding:IsUnitState('Upgrading') == true or oBuilding:IsUnitState('SiloBuildingAmmo') or (oBuilding.GetWorkProgress and oBuilding:GetWorkProgress() < 1 and oBuilding:GetWorkProgress() > 0) then
                                             --Check we have spare resources
                                             if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 2 then
                                                 --If building ammo, check if we already have 2
                                                 if not(oBuilding:IsUnitState('SiloBuildingAmmo')) or oBuilding:GetTacticalSiloAmmoCount() + oBuilding:GetNukeSiloAmmoCount() < 2 then
                                                     bHaveAction = true
                                                     IssueGuard({ oEngineer}, oBuilding)
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': Have an upgrading unti that will assist') end
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Have an upgrading unti that will assist='..oBuilding:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBuilding)..'; building unit state='..M27Logic.GetUnitState(oBuilding)..'; Workprogress='..(oBuilding:GetWorkProgress() or 'nil')) end
                                                 end
                                             end
                                         elseif oBuilding:IsUnitState('Building') == true then
@@ -5374,7 +5377,28 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                             if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
                                             if iT2Power == nil then iT2Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH2) end
 
-                                            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 and ((aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 and iT3Power >= 2) or (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and iT2Power >=2)) then
+                                            --If at T2 or T3, only build second power if has been a while since we sent hte last action to build normal power (suggesting there may be an issue with it)
+                                            local bBeenAWhile = false
+                                            if GetGameTimeSeconds() - aiBrain[refiTimeOfLastAction][refActionBuildPower] >= 60 then
+                                                bBeenAWhile = M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildPower])
+                                                if not(bBeenAWhile) then
+                                                    bBeenAWhile = true
+                                                    --Check the primary engineer for this action doesnt have a building status
+                                                    for iEngiRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildPower] do
+                                                        if tSubtable[refEngineerAssignmentEngineerRef] then
+                                                            if tSubtable[refEngineerAssignmentEngineerRef]:IsUnitState('Building') or tSubtable[refEngineerAssignmentEngineerRef]:IsUnitState('Repairing') then
+                                                                bBeenAWhile = false
+                                                                break
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                            end
+
+
+
+
+                                            if bBeenAWhile and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 and ((aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 and iT3Power >= 2) or (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and iT2Power >=2))) then
                                                 iActionToAssign = refActionBuildSecondPower
                                                 iMaxEngisWanted = 5
                                             else
@@ -5690,6 +5714,8 @@ function EngineerManager(aiBrain)
     aiBrain[reftUnitsWantingFixedShield] = {}
     aiBrain[reftUnitsWithFixedShield] = {}
     aiBrain[refiTimeOfLastFailure] = {}
+    aiBrain[refiTimeOfLastAction] = {}
+
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     while(not(aiBrain:IsDefeated())) do

@@ -5009,7 +5009,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
 
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -5208,9 +5208,17 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                 if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..': Expanding, reftMovementPath='..repr(oPlatoon[reftMovementPath])..'; platoon position='..repr(tCurPosition)) end
                             end
                         else
-                            --Are there any big threats? Then return to base unless we're cloaked, or are a fully upgraded sera com
+                            local iEnemyGroundExperimentals = 0
+                            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
+                                for iExp, oExp in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
+                                    iEnemyGroundExperimentals = iEnemyGroundExperimentals + 1
+                                end
+                            end
+
+                            --Are there any big threats? Then return to base unless we're cloaked, or are a fully upgraded sera com; retreat these anyway if there are 2+ enemy land or air experimentals
                             local bBigEnemyThreat = false
-                            if not(M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator')) and not(M27Utilities.GetACU(aiBrain):HasEnhancement('BlastAttack') and M27Utilities.GetACU(aiBrain):HasEnhancement('DamageStabilizationAdvanced')) then
+                            if iEnemyGroundExperimentals >= 2 then bBigEnemyThreat = true --Even if have cloaked or maxed sera com want to run from 2+ land experis
+                            elseif not(M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator')) and not(M27Utilities.GetACU(aiBrain):HasEnhancement('BlastAttack') and M27Utilities.GetACU(aiBrain):HasEnhancement('DamageStabilizationAdvanced')) then
                                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false then
                                     for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyNukeLaunchers] do
                                         if M27UnitInfo.IsUnitValid(oUnit) then
@@ -5251,6 +5259,12 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                         end
                                     end
                                 end
+                            end
+                            if not(bBigEnemyThreat) then
+                                --Assume will be a big enemy threat if we have built 1 (or 2 with fully upgraded ACU) experimentals
+                                local iThreshold = 1
+                                if M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') or M27Utilities.GetACU(aiBrain):HasEnhancement('DamageStabilizationAdvanced') then iThreshold = 2 end
+                                if not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, categories.EXPERIMENTAL, iThreshold)) then bBigEnemyThreat = true end
                             end
 
                             --If a big threat, return to first rally point
