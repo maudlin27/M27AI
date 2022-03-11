@@ -987,3 +987,31 @@ function IsLocationNearEnemyOmniRange(aiBrain, tLocation, iMinDistanceOutsideOmn
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bOmniNearby
 end
+
+function IsBuildingWantedForAdjacency(oUnit)
+    --NOTE: Suggested that if use this, the unit gets M27EconomyOverseer.refbWantForAdjacency set to true, and only call this when it's false
+    --If is a powerplant, check if adjacent to T2 or T3 arti
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IsBuildingWantedForAdjacency'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local bWantForAdjacency = false
+    if EntityCategoryContains(M27UnitInfo.refCategoryPower, oUnit:GetUnitId()) then
+        local iBuildingRadius = oUnit:GetBlueprint().Physics.SkirtSizeX
+        --Check for T2 first
+        --Do rect of units
+        local tAdjacent2x2Buildings = GetUnitsInRect(Rect(oUnit:GetPosition()[1]-iBuildingRadius - 1.1, oUnit:GetPosition()[3]-iBuildingRadius - 1.1, oUnit:GetPosition()[1]+iBuildingRadius + 1.1, oUnit:GetPosition()[3]+iBuildingRadius + 1.1))
+        if M27Utilities.IsTableEmpty(tAdjacent2x2Buildings) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedT2Arti, tAdjacent2x2Buildings)) == false then
+            bWantForAdjacency = true
+        else
+            local tAdjacent8x8Buildings = GetUnitsInRect(Rect(oUnit:GetPosition()[1]-iBuildingRadius - 4.1, oUnit:GetPosition()[3]-iBuildingRadius - 4.1, oUnit:GetPosition()[1]+iBuildingRadius + 4.1, oUnit:GetPosition()[3]+iBuildingRadius + 4.1))
+            if bDebugMessages == true then LOG(sFunctionRef..': Checking if any units in a rectangle around '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iBuildingRadius='..iBuildingRadius..'; Unitposition='..repr(oUnit:GetPosition())..'; is tAdjacent8x8Buildings empty='..tostring(M27Utilities.IsTableEmpty(tAdjacent8x8Buildings))) end
+            if M27Utilities.IsTableEmpty(tAdjacent8x8Buildings) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedT3Arti, tAdjacent8x8Buildings)) == false then
+                bWantForAdjacency = true
+            elseif bDebugMessages == true then LOG(sFunctionRef..': No T3 arti in tAdjacent8x8Buildings')
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return bWantForAdjacency
+end

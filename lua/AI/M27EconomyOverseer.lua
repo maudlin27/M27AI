@@ -13,6 +13,7 @@ local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 
 --Tracking variables:
 refbWantMoreFactories = 'M27UpgraderWantMoreFactories'
+refbWantForAdjacency = 'M27UnitWantForAdjacency' --Local unit variable; if true then wont reclaim unit even if obsolete
 
 reftMassStorageLocations = 'M27UpgraderMassStorageLocations' --List of all locations where we want a mass storage to be built
 reftStorageSubtableLocation = 'M27UpgraderStorageLocationSubtable'
@@ -119,8 +120,15 @@ function GetUnitReclaimTargets(aiBrain)
         --Add any old power to the table - T1 and T2 if we have lots of power and T3
         local iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power)
         if iT3Power >= 1 and aiBrain[refiEnergyGrossBaseIncome] >= 500 then
-            --Add all T2 power
-            aiBrain[reftUnitsToReclaim] = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Power, false, true)
+            --Add all t2 power (unless using it for T3 arti)
+            for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Power, false, true) do
+                if not(oUnit[refbWantForAdjacency]) then
+                    oUnit[refbWantForAdjacency] = M27Conditions.IsBuildingWantedForAdjacency(oUnit)
+                    if not(oUnit[refbWantForAdjacency]) then
+                        table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+                    end
+                end
+            end
         end
 
         --Reclaim T1 power if we have T2+ power and enough gross income, unless we also have T2 arti
@@ -130,7 +138,12 @@ function GetUnitReclaimTargets(aiBrain)
                 --Check not near to an air factory - will do slightly larger than actual radius needed to be prudent
                 tNearbyAdjacencyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, oUnit:GetPosition(), 6, 'Ally')
                 if M27Utilities.IsTableEmpty(tNearbyAdjacencyUnits) == true then
-                    table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+                    if not(oUnit[refbWantForAdjacency]) then
+                        oUnit[refbWantForAdjacency] = M27Conditions.IsBuildingWantedForAdjacency(oUnit)
+                        if not(oUnit[refbWantForAdjacency]) then
+                            table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+                        end
+                    end
                 end
             end
         end
@@ -313,7 +326,8 @@ function GetMassStorageTargets(aiBrain)
                         tAdjustedPosition = {tCurLocation[1] + tModPosition[1], GetSurfaceHeight(tCurLocation[1] + tModPosition[1], tCurLocation[3] + tModPosition[2]), tCurLocation[3] + tModPosition[2]}
                         if bDebugMessages == true then LOG(sFunctionRef..': tCurLocation='..repr(tCurLocation)..'; tModPosition='..repr(tModPosition)..'; adjusted position='..repr(tAdjustedPosition)) end
                         sLocationRef = M27Utilities.ConvertLocationToReference(tAdjustedPosition)
-                        if aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition) or (aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMassStorage]) == false) then
+                        if M27EngineerOverseer.CanBuildAtLocation(aiBrain, sStorageBP, tAdjustedPosition, M27EngineerOverseer.refActionBuildMassStorage, false) then
+                        --if aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition) or (aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMassStorage]) == false) then
                             --Check the building hasnt finished construction
                             bStorageFinishedConstruction = false
                             if not(aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition)) then
@@ -398,7 +412,7 @@ function RefreshT2MexesNearBase(aiBrain)
     if M27Utilities.IsTableEmpty(tAllT2Mexes) == false then
         if bDebugMessages == true then LOG(sFunctionRef..': Size of tAllT2Mexes='..table.getn(tAllT2Mexes)) end
         for iMex, oMex in tAllT2Mexes do
-            if M27UnitInfo.IsUnitValid(oMex) then
+            if M27UnitInfo.IsUnitValid(oMex) and oMex:GetFractionComplete() == 1 then
                 iT2MexCount = iT2MexCount + 1
                 tAllT2Mexes[iT2MexCount] = oMex
                 if bDebugMessages == true then

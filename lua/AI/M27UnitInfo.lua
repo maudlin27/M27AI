@@ -36,6 +36,11 @@ refbActiveMissileChecker = 'M27UnitMissileTracker' --True if are actively checki
 refbActiveSMDChecker = 'M27UnitSMDChecker' -- true if unit is checking for enemy SMD (use on nuke)
 refbActiveTargetChecker = 'M27UnitActiveTargetChecker' --e.g. used for T3 fixed arti
 refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will update this when given an IssueAttack order
+reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
+refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
+refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
+refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adjacency, but could be used for other things if want
+
 
 --Factions
 refFactionUEF = 1
@@ -93,6 +98,8 @@ refCategoryTML = categories.SILO * categories.STRUCTURE * categories.TECH2 - cat
 refCategoryNovaxCentre = categories.EXPERIMENTAL * categories.STRUCTURE * categories.ORBITALSYSTEM
 refCategorySatellite = categories.EXPERIMENTAL * categories.SATELLITE
 --refCategorySAM = categories.ANTIAIR * categories.STRUCTURE * categories.TECH3
+
+refCategoryUpgraded = refCategoryT2Radar + refCategoryT3Radar + refCategoryT2Sonar + refCategoryT3Sonar + refCategoryAllFactories * categories.TECH2 + refCategoryAllFactories * categories.TECH3 + refCategoryFixedShield * categories.TECH3 + refCategoryT2Mex + refCategoryT3Mex
 
 --Land units
 refCategoryExperimentalStructure = categories.CYBRAN * categories.ARTILLERY * categories.EXPERIMENTAL + categories.STRUCTURE * categories.EXPERIMENTAL
@@ -418,6 +425,17 @@ function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bIsEngineer
+end
+
+function GetACUShieldRegenRate(oUnit)
+    --Cycles through every possible enhancement, sees if the unit has it, and if so what its shield regen rate is, and returns the max value
+    local iRegenRate = 0
+    for sEnhancement, tEnhancement in oUnit:GetBlueprint().Enhancements do
+        if oUnit:HasEnhancement(sEnhancement) and tEnhancement.ShieldRegenRate then
+            iRegenRate = math.max(iRegenRate, tEnhancement.ShieldRegenRate)
+        end
+    end
+    return iRegenRate
 end
 
 function GetCurrentAndMaximumShield(oUnit)

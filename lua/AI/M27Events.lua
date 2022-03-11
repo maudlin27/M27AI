@@ -238,7 +238,6 @@ function OnWeaponFired(oWeapon)
         if oUnit:GetAIBrain().M27AI then
             if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit:GetUnitId()) then
                 ForkThread(M27Logic.GetT3ArtiTarget, oUnit)
-                ForkThread(M27Logic.MonitorT3ArtiAdjacency, oUnit) --makes sure we have PGens adjacent to the arti if we can
             end
         end
     end
@@ -326,7 +325,7 @@ function OnConstructed(oEngineer, oJustBuilt)
         --LOG('OnConstructed hook test; oJustBuilt='..oJustBuilt:GetUnitId()..'; oEngineer='..oEngineer:GetUnitId())
         if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oJustBuilt:GetUnitId()) and not(oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
             --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
-            ForkThread(M27Logic.MonitorT3ArtiAdjacency, oJustBuilt)
+            oJustBuilt[M27UnitInfo.refbActiveTargetChecker] = true
             ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
         end
     end

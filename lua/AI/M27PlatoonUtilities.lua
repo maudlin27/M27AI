@@ -380,7 +380,18 @@ function PlatoonMove(oPlatoon, tLocation)
     if bGiveSameOrdersToEveryone then
         --Can just give command to all current units - do we want to attackmove?
         local bAttackMove
-        if ((oPlatoon[refiIndirectUnits] > 0 and oPlatoon[refiCurrentUnits] == oPlatoon[refiIndirectUnits]) or oPlatoon[M27PlatoonTemplates.refbAttackMove]) and not(oPlatoon[refbHavePreviouslyRun]) then bAttackMove = true else bAttackMove = false end
+        if ((oPlatoon[refiIndirectUnits] > 0 and oPlatoon[refiCurrentUnits] == oPlatoon[refiIndirectUnits]) or oPlatoon[M27PlatoonTemplates.refbAttackMove]) and not(oPlatoon[refbHavePreviouslyRun]) then
+            if oPlatoon[refiCurrentAction] == refActionTemporaryRetreat or oPlatoon[refiCurrentAction] == refActionKitingRetreat or oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionReturnToBase then
+                --If we have T3 mobile arti then just attack-move due to deployment time, otherwise normal move if we have a run type action
+                if oPlatoon[refiIndirectUnits] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryT3MobileArtillery, oPlatoon[reftIndirectUnits])) == false then
+                    bAttackMove = true
+                else bAttackMove = false
+                end
+            else
+                bAttackMove = true
+            end
+        else bAttackMove = false
+        end
         bMoveInFormation = ShouldPlatoonMoveInFormation(oPlatoon, bAttackMove)
         if bAttackMove then
             if bMoveInFormation then
@@ -1976,7 +1987,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 if bDebugMessages == true then
                     local iLastTimeTakenDamage = oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]
                     if iLastTimeTakenDamage == nil then iLastTimeTakenDamage = 0 end
-                    LOG(sFunctionRef..': Checking last time ACU took damage, iLastTimeTakenDamage='..iLastTimeTakenDamage..'; CurGameTime='..GetGameTimeSeconds())
+                    LOG(sFunctionRef..': Checking last time ACU took unseen damage, iLastTimeTakenDamage='..iLastTimeTakenDamage..'; CurGameTime='..GetGameTimeSeconds())
                 end
 
                 if oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] and GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] <= 25 then
@@ -2083,19 +2094,25 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                 end
                                 iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftFriendlyNearbyCombatUnits], false)
                                 if bDebugMessages == true then LOG(sFunctionRef..': iOurThreatRating='..iOurThreatRating..'; iEnemyThreatRating='..iEnemyThreatRating..'; will run if our threat rating less than 80% of enemy') end
-                                if iOurThreatRating <= iEnemyThreatRating * 1.2 or bHaveMostMexes and iOurThreatRating <= (iEnemyThreatRating * 2) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy threat level is high enough we want to run, unless most of it is in structure threat') end
+                                if iOurThreatRating <= iEnemyThreatRating * 1.2 or (bHaveMostMexes and iOurThreatRating <= (iEnemyThreatRating * 2)) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy threat level is high enough we want to run, unless most of it is in structure threat; iEnemyStructureThreatRating='..iEnemyStructureThreatRating..'; iEnemyThreatRating='..iEnemyThreatRating..'; aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup]='..aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup]..'; aiBrain[M27Overseer.refiAllMexesInBasePathingGroup]='..aiBrain[M27Overseer.refiAllMexesInBasePathingGroup]..'; M27Overseer.iPlayersAtGameStart='..M27Overseer.iPlayersAtGameStart) end
                                     bACUNeedsToRun = true
-                                    if iOurThreatRating > (iEnemyThreatRating - iEnemyStructureThreatRating) * 2 then
+                                    if iOurThreatRating > (iEnemyThreatRating - iEnemyStructureThreatRating) * 1.25 or (aiBrain[M27Overseer.refiEnemyHighestTechLevel] <= 2 and aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup] >= aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] * ((M27Overseer.iPlayersAtGameStart - 1) / M27Overseer.iPlayersAtGameStart + 0.1) and M27Conditions.DoesACUHaveGun(aiBrain, false)) then
                                         --Dont run if most of the threat is structures and we arent in range of enemy PD (or if we are in range of PD, the enemy mobile threat is even less)
                                         bACUNeedsToRun = false
                                         if iOurThreatRating < (iEnemyThreatRating - iEnemyStructureThreatRating) * 3 then
                                             if (oPlatoon[refoFrontUnit]:GetHealth() + (iCurShield or 0)) / (iMaxHealth or oPlatoon[refoFrontUnit]:GetBlueprint().Defense.MaxHealth) < 0.8 then
-                                                for iStructure, oStructure in oPlatoon[reftEnemyStructuresInRange] do
-                                                    if M27UnitInfo.IsUnitValid(oStructure) and EntityCategoryContains(categories.DIRECTFIRE, oStructure:GetUnitId()) then
-                                                        if M27Utilities.GetDistanceBetweenPositions(oStructure:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= (M27Logic.GetUnitMaxGroundRange({ oStructure }) + 5) then
-                                                            bACUNeedsToRun = true
-                                                            break
+                                                if iOurThreatRating <= iEnemyThreatRating then
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': ACU needs to run as it has less than 80% health including its shield') end
+                                                    bACUNeedsToRun = true
+                                                else
+                                                    for iStructure, oStructure in oPlatoon[reftEnemyStructuresInRange] do
+                                                        if M27UnitInfo.IsUnitValid(oStructure) and EntityCategoryContains(categories.DIRECTFIRE, oStructure:GetUnitId()) then
+                                                            if M27Utilities.GetDistanceBetweenPositions(oStructure:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= (M27Logic.GetUnitMaxGroundRange({ oStructure }) + 5) then
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': Need to run as are within 5 of the range of enemy PD and we have <80% health') end
+                                                                bACUNeedsToRun = true
+                                                                break
+                                                            end
                                                         end
                                                     end
                                                 end
@@ -2349,6 +2366,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         oPlatoon[refoNearbyReclaimTarget] = oClosestMobileUnit
                                         oPlatoon[refiCurrentAction] = refActionReclaimTarget
                                     else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Shot is blocked so will move to nearest enemy') end
                                         oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
                                     end
                                     bDontConsiderFurtherOrders = true
@@ -2431,6 +2449,9 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                     if iNearestEnemyDistance > iPlatoonMaxRange then
                                                         bDontConsiderFurtherOrders = true
                                                         oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Nearest enemy is further than our max range, so want to move to the nearest enemy') end
+                                                        --Do we want to attack-move instead of move?
+                                                        if oPlatoon[M27PlatoonTemplates.refbAttackMove] then oPlatoon[refiCurrentAction] = refActionAttack end
                                                     else
                                                         local iIntelCoverage
                                                         --If ACU in platoon, then check if it has a scout assigned that is close enough (for CPU performance reasons only want to call getintelcoverage if we dont)
@@ -2452,6 +2473,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                                 else
                                                                     bDontConsiderFurtherOrders = true
                                                                     oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
+                                                                    if bDebugMessages == true then LOG(sFunctionRef..': Think enemy may be getting away so will move towards them') end
                                                                 end
                                                             end
                                                         end
@@ -5009,7 +5031,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
 
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -5601,7 +5623,7 @@ function IssueIndirectAttack(oPlatoon, bDontClearActions)
     if bDebugMessages == true then LOG(sFunctionRef..':'..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Start of code: iIndirectUnites='..oPlatoon[refiIndirectUnits]) end
     if oPlatoon[refiIndirectUnits] > 0 then
         local sPlatoonName = oPlatoon:GetPlan()
-        if sPlatoonName == 'M27IndirectDefender' and oPlatoon[refiPlatoonCount] == 2 and oPlatoon:GetBrain():GetArmyIndex() == 5 then bDebugMessages = true end
+        --if sPlatoonName == 'M27IndirectDefender' and oPlatoon[refiPlatoonCount] == 2 and oPlatoon:GetBrain():GetArmyIndex() == 5 then bDebugMessages = true end
         --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
         local sPlatoonUniqueRef = sPlatoonName..oPlatoon[refiPlatoonCount]
         local sTargetedRef = sPlatoonUniqueRef..'Indirect'
@@ -7144,9 +7166,9 @@ function ProcessPlatoonAction(oPlatoon)
                                             if bDebugMessages == true then LOG(sFunctionRef..': ACU in platoon so will attack move') end
                                             bMoveNotAttack = false
                                         else
-                                            if GetPlatoonPositionDeviation(oPlatoon) <= 10 then
-                                            --Platoon isn't spread out, so ok to move
-                                            bMoveNotAttack = true
+                                            if not(oPlatoon[M27PlatoonTemplates.refbAttackMove]) and GetPlatoonPositionDeviation(oPlatoon) <= 10 then
+                                                --Platoon isn't spread out, so ok to move unless we normally want to attackmove with this platoon
+                                                bMoveNotAttack = true
                                             end
                                         end
                                     end

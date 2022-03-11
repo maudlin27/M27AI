@@ -136,7 +136,9 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
         local tNearbyReclaim
         local iCurReclaimDist
         local iNearestReclaim = 10000
-        for iSearchRadius = 10, 50, 10 do
+        local bCoveredByEngi
+        local tEngineerActions = {M27EngineerOverseer.refActionReclaimArea, M27EngineerOverseer.refActionReclaimTrees}
+        for iSearchRadius = 10, 100, 10 do
             rCurRect = Rect(tEngiPosition[1] - iSearchRadius, tEngiPosition[3] - iSearchRadius, tEngiPosition[3] + iSearchRadius, tEngiPosition[3] + iSearchRadius)
             if M27MapInfo.GetReclaimInRectangle(5, rCurRect) > 100 then --At least 100 energy income nearby
                 tNearbyReclaim = M27MapInfo.GetReclaimInRectangle(4, rCurRect)
@@ -144,13 +146,28 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                     if oReclaim.MaxEnergyReclaim > 5 then
                         iCurReclaimDist = M27Utilities.GetDistanceBetweenPositions(oReclaim.CachePosition, tEngiPosition)
                         if iCurReclaimDist < iNearestReclaim then
-                            iNearestReclaim = iCurReclaimDist
-                            tClosestLocationToEngi = oReclaim.CachePosition
+                            --Is this location within 10 of existing engineer reclaim targets?
+                            bCoveredByEngi = false
+                            for _, iActionRef in tEngineerActions do
+                                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][iActionRef]) == false then
+                                    for iSubtable, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][iActionRef] do
+                                        if M27Utilities.GetDistanceBetweenPositions(tSubtable[M27EngineerOverseer.refEngineerAssignmentActualLocation], oReclaim.CachePosition) <= 10 then
+                                            bCoveredByEngi = true
+                                            break
+                                        end
+                                    end
+                                end
+                                if bCoveredByEngi then break end
+                            end
+                            if not(bCoveredByEngi) then
+                                iNearestReclaim = iCurReclaimDist
+                                tClosestLocationToEngi = oReclaim.CachePosition
+                            end
                         end
                     end
                 end
                 if M27Utilities.IsTableEmpty(tClosestLocationToEngi) == true then
-                    M27Utilities.ErrorHandler('Couldnt find any energy reclaim, only scenario where expected is if lots of very tiny energy reclaim; will just pick a random location', nil, true)
+                    M27Utilities.ErrorHandler('Couldnt find any energy reclaim, only scenario where expected is if lots of very tiny energy reclaim or have lots of engis already reclaiming; will just pick a random location', nil, true)
                     tClosestLocationToEngi = {tEngiPosition[1] + math.random(iSearchRadius - 10, iSearchRadius), nil, tEngiPosition[3] + math.random(iSearchRadius - 10, iSearchRadius)}
                     tClosestLocationToEngi[2] = GetSurfaceHeight(tClosestLocationToEngi[1], tClosestLocationToEngi[3])
                 end
@@ -1739,8 +1756,10 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
         local sCurUnitPathing
         local oCurUnitBlueprint
         local sCurUnitBP
+        local iGhettoGunshipAdjust = 0
         for iUnit, oUnit in tUnits do
             iCurThreat = 0
+            iGhettoGunshipAdjust = 0
             bCalcActualThreat = false
             if bDebugMessages == true then LOG(sFunctionRef..': About to check if unit is dead') end
             if not(oUnit.Dead) then
@@ -1799,9 +1818,43 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                         if sCurUnitPathing == M27UnitInfo.refPathingTypeAir then
                             if bIncludeNonCombatAir == true then
                                 iMassMod = 1
+                                --Increase for cargo of transports
+                                if EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
+                                    bDebugMessages = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
+                                    --Include threat of cargo if cargo are LABs
+                                    tCargo = oUnit:GetCargo()
+                                    --Filter to just LABs (note unfortunately it doesnt distinguish between mantis and LABs so matnis get treated as LABs to be prudent)
+                                    if tCargo then
+                                        tCargo = EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)
+                                        if M27Utilities.IsTableEmpty(tCargo) == false then
+                                            --Get mass value ignoring health:
+                                            --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
+                                            iGhettoGunshipAdjust = GetCombatThreatRating(aiBrain, tCargo, true, 35, 35, false, true)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Contains LABs so will increase threat by '..iGhettoGunshipAdjust) end
+                                        end
+                                    end
+                                end
                             else
                                 if bIncludeAirToGround == true then
-                                    if EntityCategoryContains(categories.BOMBER + categories.GROUNDATTACK + categories.OVERLAYDIRECTFIRE, sCurUnitBP) == true then iMassMod = 1 end
+                                    if EntityCategoryContains(categories.BOMBER + categories.GROUNDATTACK + categories.OVERLAYDIRECTFIRE, sCurUnitBP) == true then iMassMod = 1
+                                    elseif EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
+                                        bDebugMessages = true
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
+                                        --Include threat of cargo if cargo are LABs
+                                        tCargo = oUnit:GetCargo()
+                                        --Filter to just LABs (note unfortunately it doesnt distinguish between mantis and LABs so matnis get treated as LABs to be prudent)
+                                        if tCargo then
+                                            tCargo = EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)
+                                            if M27Utilities.IsTableEmpty(tCargo) == false then
+                                                iMassMod = 1
+                                                --Get mass value ignoring health:
+                                                --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
+                                                iGhettoGunshipAdjust = GetCombatThreatRating(aiBrain, tCargo, true, 35, 35, false, true)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Contains LABs so will increase threat by '..iGhettoGunshipAdjust) end
+                                            end
+                                        end
+                                    end
                                 end
                                 if bIncludeAirTorpedo == true and EntityCategoryContains(categories.ANTINAVY, sCurUnitBP) == true then iMassMod = 1 end
                                 if bDebugMessages == true then LOG(sFunctionRef..': bIncludeAirTorpedo='..tostring(bIncludeAirTorpedo)..'; iMassMod='..iMassMod) end
@@ -1847,7 +1900,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                         --Only GroundToAir: Increase structure value by 100%
                         if bIncludeGroundToAir == true and sCurUnitPathing == M27UnitInfo.refPathingTypeNone then iMassMod = iMassMod * 2 end
                         iMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
-                        iCurThreat = iMassCost * iMassMod
+                        iCurThreat = iMassCost * iMassMod + iGhettoGunshipAdjust
                         if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit:GetUnitId()..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'iCurThreat='..iCurThreat) end
                     end
                 end
@@ -2350,7 +2403,7 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
 
 
     if oPlatoon[M27PlatoonUtilities.refbNeedToHeal] then
-        tHighestValueLocation = M27MapInfo.GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
+        tHighestValueLocation = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
     else
         --First calculate the value for the enemy start position
         local sPathingType = M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit])
@@ -3641,7 +3694,7 @@ end
 
 function GetDamageFromOvercharge(aiBrain, oTargetUnit, iAOE, iDamage, bTargetWalls)
     --Originally copied from the 'getdamagefrombomb' function, but adjusted since OC doesnt deal full damage to ACU or structures
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDamageFromOvercharge'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -3749,103 +3802,104 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    oLauncher[M27UnitInfo.refbActiveMissileChecker] = true
+    if M27UnitInfo.IsUnitValid(oLauncher) then
+        oLauncher[M27UnitInfo.refbActiveMissileChecker] = true
 
 
-    local tTarget
-    local tEnemyUnitsOfInterest
-    local iBestTargetValue
-    local iCurTargetValue
-    local tEnemyCategoriesOfInterest
-    local aiBrain = oLauncher:GetAIBrain()
-    local iMaxRange = 250 --basic default, should get overwritten
-    local iMinRange = 0
-    local iAOE, iDamage
+        local tTarget
+        local tEnemyUnitsOfInterest
+        local iBestTargetValue
+        local iCurTargetValue
+        local tEnemyCategoriesOfInterest
+        local aiBrain = oLauncher:GetAIBrain()
+        local iMaxRange = 250 --basic default, should get overwritten
+        local iMinRange = 0
+        local iAOE, iDamage
 
-    local bTML = false
-    local bSML = false
-    if EntityCategoryContains(M27UnitInfo.refCategoryTML, oLauncher:GetUnitId()) then bTML = true
-    elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher:GetUnitId()) then bSML = true
-    else M27Utilities.ErrorHandler('Unknown type of launcher, code to fire a missile wont work') end
+        local bTML = false
+        local bSML = false
+        if EntityCategoryContains(M27UnitInfo.refCategoryTML, oLauncher:GetUnitId()) then bTML = true
+        elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher:GetUnitId()) then bSML = true
+        else M27Utilities.ErrorHandler('Unknown type of launcher, code to fire a missile wont work; oLauncher='..oLauncher:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oLauncher)) end
 
-    if bTML or bSML then
-        iAOE, iDamage, iMinRange, iMaxRange = M27UnitInfo.GetLauncherAOEStrikeDamageMinAndMaxRange(oLauncher)
+        if bTML or bSML then
+            iAOE, iDamage, iMinRange, iMaxRange = M27UnitInfo.GetLauncherAOEStrikeDamageMinAndMaxRange(oLauncher)
 
-        if bTML then
-            tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Mex}
-        else
-            tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL}
-        end
-        if bDebugMessages == true then LOG(sFunctionRef..': Will consider missile target. iMinRange='..(iMinRange or 'nil')..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')..'; bSML='..tostring((bSML or false))) end
-
-        while M27UnitInfo.IsUnitValid(oLauncher) do
             if bTML then
-                --Just target the nearest enemy unit
-                iBestTargetValue = 1000
-                for iRef, iCategory in tEnemyCategoriesOfInterest do
-                    tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
-                    if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
-                        for iUnit, oUnit in tEnemyUnitsOfInterest do
-                            iCurTargetValue = M27Utilities.GetDistanceBetweenPositions(oLauncher:GetPosition(), oUnit:GetPosition())
-                            if iCurTargetValue < iBestTargetValue and iCurTargetValue > MinRadius then
-                                iBestTargetValue = iCurTargetValue
-                                tTarget = oUnit:GetPosition()
-                            end
-                        end
-                        break
-                    end
-                end
+                tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Mex}
+            else
+                tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure}
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Will consider missile target. iMinRange='..(iMinRange or 'nil')..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')..'; bSML='..tostring((bSML or false))) end
 
-            else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
-                --First get the best location if just target the start position or locations near here
-                tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], iAOE, iDamage)
-                --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
-                if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <20k then will consider other targets') end
-                if iBestTargetValue < 20000 then --If have high value location for nearest enemy start then just go with this
+            while M27UnitInfo.IsUnitValid(oLauncher) do
+                if bTML then
+                    iBestTargetValue = 1000
                     for iRef, iCategory in tEnemyCategoriesOfInterest do
                         tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                             for iUnit, oUnit in tEnemyUnitsOfInterest do
-                                iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
-                                if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit:GetUnitId()..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
-                                --Stop looking if tried >=10 targets and have one that is at least 20k of value
-                                if iCurTargetValue > iBestTargetValue then
+                                iCurTargetValue = M27Utilities.GetDistanceBetweenPositions(oLauncher:GetPosition(), oUnit:GetPosition())
+                                if iCurTargetValue > iBestTargetValue and iCurTargetValue > iMinRange then
                                     iBestTargetValue = iCurTargetValue
                                     tTarget = oUnit:GetPosition()
                                 end
-                                if iBestTargetValue > 20000 and iUnit >=10 then break end
                             end
+                            break
                         end
                     end
-                    if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
-                    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
+                else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
+                    --First get the best location if just target the start position or locations near here
+                    tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], iAOE, iDamage)
+                    --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
+                    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <20k then will consider other targets') end
+                    if iBestTargetValue < 20000 then --If have high value location for nearest enemy start then just go with this
+                        for iRef, iCategory in tEnemyCategoriesOfInterest do
+                            tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
+                                for iUnit, oUnit in tEnemyUnitsOfInterest do
+                                    iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit:GetUnitId()..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
+                                    --Stop looking if tried >=10 targets and have one that is at least 20k of value
+                                    if iCurTargetValue > iBestTargetValue then
+                                        iBestTargetValue = iCurTargetValue
+                                        tTarget = oUnit:GetPosition()
+                                    end
+                                    if iBestTargetValue > 20000 and iUnit >=10 then break end
+                                end
+                            end
+                        end
+                        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': If value is <12k then will clear target; iBestTargetValue='..iBestTargetValue..'; tTarget='..repr(tTarget or {'nil'})) end
+                    if iBestTargetValue < 12000 then tTarget = nil end
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': If value is <12k then will clear target; iBestTargetValue='..iBestTargetValue..'; tTarget='..repr(tTarget or {'nil'})) end
-                if iBestTargetValue < 12000 then tTarget = nil end
-            end
 
-            if tTarget then
-                --Launch missile
-                if bDebugMessages == true then LOG(sFunctionRef..': Will launch missile at tTarget='..repr(tTarget)) end
-                if bTML then IssueTactical({oLauncher}, tTarget)
-                else
-                    IssueNuke({oLauncher}, tTarget)
-                    --Restart SMD monitor after giving time for missile to fire
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                    WaitSeconds(10)
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                    if not(oLauncher[M27UnitInfo.refbActiveSMDChecker]) then ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oLauncher) end
-                    --Send a voice taunt if havent in last 6m
-                    ForkThread(M27Chat.SendGloatingMessage, aiBrain, 10, 360)
+                if tTarget then
+                    --Launch missile
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will launch missile at tTarget='..repr(tTarget)) end
+                    if bTML then IssueTactical({oLauncher}, tTarget)
+                    else
+                        IssueNuke({oLauncher}, tTarget)
+                        --Restart SMD monitor after giving time for missile to fire
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        WaitSeconds(10)
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                        if not(oLauncher[M27UnitInfo.refbActiveSMDChecker]) then ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oLauncher) end
+                        --Send a voice taunt if havent in last 6m
+                        ForkThread(M27Chat.SendGloatingMessage, aiBrain, 10, 360)
+                    end
+                    break
                 end
-                break
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                WaitSeconds(10)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            WaitSeconds(10)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
+        oLauncher[M27UnitInfo.refbActiveMissileChecker] = false
     end
-    oLauncher[M27UnitInfo.refbActiveMissileChecker] = false
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetT3ArtiTarget(oT3Arti)
@@ -3853,21 +3907,168 @@ function GetT3ArtiTarget(oT3Arti)
     local sFunctionRef = 'GetT3ArtiTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    M27Utilities.ErrorHandler('To add T3 targeting logic')
+    local iMinRange = 0
+    local iMaxRange = 0
+    local iAOE = 1
+    local iDamage = 2500
+    local iRandomness = 0
+    for iWeapon, tWeapon in oT3Arti:GetBlueprint().Weapon do
+        iMinRange = math.max(tWeapon.MinRadius, iMinRange)
+        iMaxRange = math.max(tWeapon.MaxRadius, iMaxRange)
+        iAOE = math.max(iAOE, tWeapon.DamageRadius)
+        iDamage = math.max(iDamage, tWeapon.Damage)
+        iRandomness = math.max(iRandomness, (tWeapon.FiringRandomness or 0))
+    end
+    --Assume that 2.7 shots will land on this target for deciding aoe targets (i.e. unit would need to have massive health to not die)
+    iDamage = math.min(14000, iDamage * 2.7) --Want to ignore shields less than this
 
+    --Adjust aoe for firing randomness
+    iAOE = iAOE * (1 + iRandomness * 3)
 
+    local aiBrain = oT3Arti:GetAIBrain()
+    local tTarget
+    local tEnemyUnitsOfInterest
+    local iBestTargetValue
+    local iCurTargetValue
+    local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategoryStructure * categories.TECH2, categories.COMMAND}
+
+    --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
+    tTarget = {M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)][1], M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)][2], M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)][3]}
+    iBestValueTarget = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage)
+    --iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], iAOE, iDamage)
+    --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
+    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <15k then will consider other targets') end
+    if iBestTargetValue < 15000 then --If have high value location for nearest enemy start then just go with this
+        for iRef, iCategory in tEnemyCategoriesOfInterest do
+            tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oT3Arti:GetPosition(), iMaxRange, 'Enemy')
+            if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
+                for iUnit, oUnit in tEnemyUnitsOfInterest do
+                    iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit:GetUnitId()..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
+                    --Stop looking if tried >=10 targets and have one that is at least 20k of value
+                    if iCurTargetValue > iBestTargetValue then
+                        iBestTargetValue = iCurTargetValue
+                        tTarget = oUnit:GetPosition()
+                    end
+                    if iBestTargetValue > 15000 and iUnit >=10 then break end
+                end
+            end
+            if iBestTargetValue >= 2500 then break end
+        end
+        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
+        if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
+    end
+
+    if tTarget then
+        tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage)
+        IssueClearCommands({oT3Arti})
+        IssueAttack({oT3Arti}, tTarget)
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function MonitorT3ArtiAdjacency(oT3Arti)
-    --Call via forked forkthread
+function RefreshT3ArtiAdjacencyLocations(oT3Arti)
+    --M27UnitInfo variables:
+    --reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
+    --refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
+    --refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
 
-    if not(oT3Arti[M27UnitInfo.refbActiveTargetChecker]) then
-        oT3Arti[M27UnitInfo.refbActiveTargetChecker] = true
-        M27Utilities.ErrorHandler('To add code to check for T3 arti pgen adjacency')
-        while oT3Arti[M27UnitInfo.refbActiveTargetChecker] do
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RefreshT3ArtiAdjacencyLocations'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-           WaitSeconds(20)
+    --If the arti has no valid adjacency locations, then check we haven't recently done this (as dont want to use up too many resources)
+    if bDebugMessages == true then LOG(sFunctionRef..': Arti='..oT3Arti:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..' - is the list of adjacencylocations empty='..tostring(M27Utilities.IsTableEmpty(oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted]))..'; Time of last check='..GetGameTimeSeconds() - (oT3Arti[M27UnitInfo.refiTimeOfLastCheck] or -100)..'; ArtiPosition='..repr(oT3Arti:GetPosition())) end
+    if not(M27Utilities.IsTableEmpty(oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted])) or GetGameTimeSeconds() - (oT3Arti[M27UnitInfo.refiTimeOfLastCheck] or -100) > 30 then
+        oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted] = {}
+        local tsPowerBlueprints = {[1]='ueb1101', [2]='ueb1201', [3]='ueb1301'}
+        local iT3ArtiRadius = math.max(oT3Arti:GetBlueprint().Physics.SkirtSizeX, oT3Arti:GetBlueprint().Physics.SkirtSizeZ) * 0.5
+        local iPowerRadius
+        local tPossibleAdjacencyPosition
+        local iMaxAdjust
+        local tStartingPosition
+        local aiBrain = oT3Arti:GetAIBrain()
+        local iCurBuildingCount = 0
+        local iBuildingCountForSide
+        local iT1FurtherAdjust
+        for iSide = 1, 4 do
+            iBuildingCountForSide = 0
+            for iPowerLevel = 3, 1, -1 do
+                if not(iPowerLevel == 2 and iBuildingCountForSide > 0) then
+                    if iPowerLevel > 1 then iT1FurtherAdjust = 0 end
+                    iPowerRadius = __blueprints[tsPowerBlueprints[iPowerLevel]].Physics.SkirtSizeX * 0.5
+                    iMaxAdjust = iT3ArtiRadius - iPowerRadius
+                    tStartingPosition = M27Utilities.MoveInDirection(oT3Arti:GetPosition(), iSide * 90, iT3ArtiRadius + iPowerRadius, true)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if can build power with tech level='..iPowerLevel..'; tStartingPosition='..repr(tStartingPosition)) end
+                    for iCurAdjust = -iMaxAdjust, iMaxAdjust, 1 do
+
+                        if iCurAdjust == 0 and iBuildingCountForSide == 0 then tPossibleAdjacencyPosition = {tStartingPosition[1], tStartingPosition[2], tStartingPosition[3]}
+                        else tPossibleAdjacencyPosition = M27Utilities.MoveInDirection(tStartingPosition, (iSide - 1) * 90, iCurAdjust + iBuildingCountForSide + iT1FurtherAdjust, true) end
+
+                        if M27EngineerOverseer.CanBuildAtLocation(aiBrain, tsPowerBlueprints[iPowerLevel], tPossibleAdjacencyPosition, M27EngineerOverseer.refActionBuildT3ArtiPower, true) then
+
+                        --[[if aiBrain:CanBuildStructureAt(tsPowerBlueprints[iPowerLevel], tPossibleAdjacencyPosition) then
+                            --Cancel any queued up orders that might be preventing us building here, unless the order is to build T3 arti adjacency
+                            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)][M27EngineerOverseer.refActionBuildT3ArtiPower]) == true then
+                                bDebugMessages = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will cancel any queued up buildings around here so we can build t3 power and tPossibleAdjacencyPosition='..repr(tPossibleAdjacencyPosition)) end
+                                local tLocationToCancel
+                                local sCancelLocationRef
+                                for iAdjustX = -iPowerRadius, iPowerRadius do
+                                    for iAdjustZ = -iPowerRadius, iPowerRadius do
+                                        tLocationToCancel = {tPossibleAdjacencyPosition[1] + iAdjustX, 0, tPossibleAdjacencyPosition[3] + iAdjustZ}
+                                        tLocationToCancel[2] = GetTerrainHeight(tLocationToCancel[1], tLocationToCancel[3])
+                                        sCancelLocationRef = M27Utilities.ConvertLocationToStringRef(tLocationToCancel)
+                                        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sCancelLocationRef]) == false then
+                                            for iActionRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sCancelLocationRef] do
+                                                for iUniqueEngiRef, oEngineer in tSubtable do
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': About to clear oEngineer='..oEngineer:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' which was recorded as having iActionRef='..iActionRef) end
+                                                    IssueClearCommands({oEngineer})
+                                                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': FInished clearing all recorded engi actions in the area needed for building the PGen; IsTableEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]))) end
+                            local bIgnoreQueuedBuildings = false
+                            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]) == false then
+
+                            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]) then
+                            --]]
+                            --We can build here
+                            iCurBuildingCount = iCurBuildingCount + 1
+                            iBuildingCountForSide = iBuildingCountForSide + 1
+                            oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted][iCurBuildingCount] = {}
+                            oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted][iCurBuildingCount][M27UnitInfo.refiSubrefCategory] = M27UnitInfo.refCategoryPower * M27UnitInfo.ConvertTechLevelToCategory(iPowerLevel)
+                            oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted][iCurBuildingCount][M27UnitInfo.refiSubrefBuildLocation] = {tPossibleAdjacencyPosition[1], tPossibleAdjacencyPosition[2], tPossibleAdjacencyPosition[3]}
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': Can build at location '..repr(tPossibleAdjacencyPosition)..' for power='..iPowerLevel..'; side='..iSide..'; will draw in blue')
+                                M27Utilities.DrawLocation(tPossibleAdjacencyPosition, nil, 1, 100)
+                            end
+                            if iPowerLevel > 1 then
+                                if iPowerLevel == 2 then
+                                    if iCurAdjust == -iMaxAdjust then
+                                        iT1FurtherAdjust = 5 --Would be 6, but we already adjust for the number of buildings on the size (which will be 1)
+                                    end --Not perfect as means if T2 power had to be adjusted in order to move we wont be able to build t1 power
+                                end
+                                break
+                            end
+                            --end
+                        elseif bDebugMessages == true then
+                            LOG(sFunctionRef..': Cant build at location '..repr(tPossibleAdjacencyPosition)..' for power='..iPowerLevel..'; side='..iSide..'; will draw in red; aiBrain:CanBuildStructure result='..tostring(aiBrain:CanBuildStructureAt(tsPowerBlueprints[iPowerLevel], tPossibleAdjacencyPosition)))
+                            M27Utilities.DrawLocation(tPossibleAdjacencyPosition, nil, 2, 100)
+                        end
+                        if iPowerLevel == 1 and iBuildingCountForSide + iCurAdjust + iT1FurtherAdjust >= iMaxAdjust then break end
+                    end
+                    --Dont want lower tech PGens if managed to find space for higher tech PGen; can only fit 1 t3 or 1 t2 power on a side
+                    if iBuildingCountForSide > 0 and (iPowerLevel > 2 or iPowerLevel == 2 and iT1FurtherAdjust == 0) then break end
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished considering PGen locations for iSide='..iSide..'; iCurBuildingCount='..iCurBuildingCount) end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

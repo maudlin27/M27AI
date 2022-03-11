@@ -124,7 +124,7 @@ local reftAvailableScouts = 'M27AirScoutsWithFuel'
 reftAvailableBombers = 'M27AirAvailableBombers'
 refiPreviousAvailableBombers = 'M27AirPreviousAvailableBombers' --Number of idle bombers when last checked for threats
 reftAvailableTorpBombers = 'M27AirAvailableTorpBombers' --Determined by threat overseer
-local reftAvailableAirAA = 'M27AirAvailableAirAA'
+reftAvailableAirAA = 'M27AirAvailableAirAA'
 --local reftLowFuelAir = 'M27AirScoutsWithLowFuel'
 local reftLowFuelAir = 'M27AirLowFuelAir'
 
@@ -500,8 +500,12 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
         LOG(sFunctionRef..': Start of code, oBomber='..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber))
         LOG(sFunctionRef..': Current target='..oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]:GetUnitId())
     end
+    local iBomberTechLevel = M27UnitInfo.GetUnitTechLevel(oBomber)
     local aiBrain = oBomber:GetAIBrain()
-    if not(bOneOff) then WaitSeconds(1) end
+    if not(bOneOff) then
+        WaitSeconds(1)
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished waiting 1 second for bomber '..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)) end
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     while M27UnitInfo.IsUnitValid(oBomber) do
         if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
@@ -513,19 +517,25 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
                 end
             end
 
-            if not(aiBrain[refbShortlistContainsLowPriorityTargets]) and oBomber[reftTargetList][oBomber[refiCurTargetNumber]] and oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistPriority] > 1 and not(oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit].Dead) then
+            if not(aiBrain[refbShortlistContainsLowPriorityTargets]) and oBomber[reftTargetList][oBomber[refiCurTargetNumber]] and oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistPriority] > 1 and not(oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit].Dead) and aiBrain[reftBomberTargetShortlist][1][refiShortlistPriority] then
                 --Check if cur target is worse priority tahn the shortlist
+                if bDebugMessages == true then LOG(sFunctionRef..': Bomber '..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..': Shortlist doesnt contain low priority targets, and our bomber doesnt have a top priority target, will see if better targets; shortlist first item priority='..(aiBrain[reftBomberTargetShortlist][1][refiShortlistPriority] or 'nil')) end
                 if oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistPriority] > aiBrain[reftBomberTargetShortlist][1][refiShortlistPriority] then
-                    --Want to change our current target and instead get the nearest target on the shortlist if its not too much further away
+                    --Want to change our current target and instead get the nearest target on the shortlist, unless we are really close to our current target
                     local iMaxPriority = oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistPriority] - 1
-                    local iNearestHighPriority = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]:GetPosition()) - 100
-                    if EntityCategoryContains(categories.TECH3, oBomber:GetUnitId()) or EntityCategoryContains(categories.EXPERIMENTAL, oBomber:GetUnitId()) then iNearestHighPriority = iNearestHighPriority - 100 end
+                    local iNearestHighPriority = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]:GetPosition()) - (40 * iBomberTechLevel)
+                    if iBomberTechLevel >= 3 then iNearestHighPriority = iNearestHighPriority - 30 end
                     local iShortlistRef, iCurDistanceFromBomber
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want to change current target and get the nearest one on the shortlist if its not too far away; iMaxPriority='..iMaxPriority..'; iNearestHighPriority='..iNearestHighPriority) end
                     if iNearestHighPriority > 0 then
                         for iAltUnit, tSubtable in aiBrain[reftBomberTargetShortlist] do
                             if tSubtable[refiShortlistPriority] <= iMaxPriority and tSubtable[refiShortlistUnit] and not(tSubtable[refiShortlistUnit].Dead) then
-                                iCurDistanceFromBomber = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tSubtable[refiShortlistUnit]:GetPosition())
+                                --Ideally want the closest target but not too close or else more likely to need to turn around to attack it
+                                iCurDistanceFromBomber = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tSubtable[refiShortlistUnit]:GetPosition()) - (40 * iBomberTechLevel)
+                                if iCurDistanceFromBomber < 0 then iCurDistanceFromBomber = iCurDistanceFromBomber + (50 * iBomberTechLevel) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurDistanceFromBomber='..iCurDistanceFromBomber) end
                                 if iCurDistanceFromBomber < iNearestHighPriority then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Shortlist target is closer than the prev closest target') end
                                     iMaxPriority = tSubtable[refiShortlistPriority]
                                     iNearestHighPriority = iCurDistanceFromBomber
                                     iShortlistRef = iAltUnit
@@ -564,7 +574,7 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         else
             break --redundancy - shouldnt need but dont want infinite loop
-            end
+        end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -999,12 +1009,19 @@ function AirThreatChecker(aiBrain)
     local sFunctionRef = 'AirThreatChecker'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of cycle') end
+
     local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
-    --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride)
+    local tEnemyAirAAUnits, tEnemyAirGroundUnits
+    if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then
+        tEnemyAirAAUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirAA, tEnemyAirUnits)
+        tEnemyAirGroundUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tEnemyAirUnits)
+    end
+    --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
     if bDebugMessages == true then LOG(sFunctionRef..': About to calcualte threat level of enemy antiair units') end
-    local iAllAirThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, true, true, nil, 0, 0, 0)
+    local iAllAirThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirAAUnits, true, true, false, false, false, nil, 0, 0, 0) * 1.25
+    iAllAirThreat = iAllAirThreat + M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, true, false, true, true, nil, 0, 0, 0) * 0.4
     --Increase enemy air threat based on how many factories and of what tech
-    local tAirThreatByTech = {100, 500, 2000}
+    local tAirThreatByTech = {100, 500, 2000, 4000}
     local tEnemyAirFactories = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], aiBrain[refiMaxScoutRadius], 'Enemy')
     if M27Utilities.IsTableEmpty(tEnemyAirFactories) == false then
         for iAirFac, oAirFac in tEnemyAirFactories do
@@ -1032,13 +1049,17 @@ function AirThreatChecker(aiBrain)
 
     --air AA wanted:
     local tAirAAUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirAA, false, true)
+    local tiAirAAThreatByTech = {50, 235, 350}
+    local iAirAAWantedBasedOnThreat = math.max(0, ((aiBrain[refiHighestEnemyAirThreat] or 0) - (aiBrain[refiOurMassInAirAA] or 0)) / tiAirAAThreatByTech[math.min(3,aiBrain[M27Overseer.refiOurHighestAirFactoryTech])])
+
     if M27Utilities.IsTableEmpty(tAirAAUnits) == true then
         if bDebugMessages == true then LOG(sFunctionRef..': Have no AirAA units so setting amount wanted to 2') end
         aiBrain[refiOurMassInAirAA] = 0
-        aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 2)
+        aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 2, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory), iAirAAWantedBasedOnThreat)
     else
         aiBrain[refiOurMassInAirAA] = M27Logic.GetAirThreatLevel(aiBrain, tAirAAUnits, false, true, false, false, false)
-        if aiBrain[refiOurMassInAirAA] < aiBrain[refiHighestEnemyAirThreat] then aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 2)
+        if aiBrain[refiOurMassInAirAA] < aiBrain[refiHighestEnemyAirThreat] then
+            aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory), iAirAAWantedBasedOnThreat)
         else aiBrain[refiAirAAWanted] = math.max(aiBrain[refiAirAANeeded], 0) end
         if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating how much airAA we want. aiBrain[refiOurMassInAirAA]='..aiBrain[refiOurMassInAirAA]..'; aiBrain[refiHighestEnemyAirThreat]='..aiBrain[refiHighestEnemyAirThreat]..'; aiBrain[refiAirAANeeded]='..aiBrain[refiAirAANeeded]) end
     end
@@ -1052,7 +1073,7 @@ function AirThreatChecker(aiBrain)
             --Is there an enemy air threat near our base and we dont have much MAA near our base?
             local tNearbyEnemyAirThreat = aiBrain:GetUnitsAroundPoint(refCategoryAirNonScout, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 150, 'Enemy')
             if M27Utilities.IsTableEmpty(tNearbyEnemyAirThreat) == false then
-                --Do we have MAA near our base equal to 1/3 of the enemy air threat in mass, to a minimum of 3 units?
+                --Do we have MAA near our base equal to 50% of the enemy air threat in mass, to a minimum of 3 units?
                 local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 100, 'Ally')
                 if M27Utilities.IsTableEmpty(tNearbyMAA) == true then
                     if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemy air threat with '..table.getn(tNearbyEnemyAirThreat)..' units but no nearby MAA so building emergency MAA') end
@@ -1061,7 +1082,7 @@ function AirThreatChecker(aiBrain)
                     local iOurNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false)
                     local iNearbyEnemyAirThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, true, true)
                     if bDebugMessages == true then LOG(sFunctionRef..': iOurNearbyMAAThreat='..iOurNearbyMAAThreat..'; iNearbyEnemyAirThreat='..iNearbyEnemyAirThreat) end
-                    if iOurNearbyMAAThreat < iNearbyEnemyAirThreat * 0.3 then
+                    if iOurNearbyMAAThreat < iNearbyEnemyAirThreat * 0.5 then
                         bEmergencyAA = true
                     end
                 end
@@ -2097,7 +2118,7 @@ function GetBomberTargetShortlist(aiBrain)
     local bIncludeInShortlist
 
     local tEnemyGroundAA
-    local iEnemyAASearchRange = 80
+    local iEnemyAASearchRange = 40 + 20 * aiBrain[M27Overseer.refiEnemyHighestTechLevel]
     local iFriendlyUnitNormalSearchRange = 20 --For non-mexes
     local iFriendlyUnitActualSearchRange
     local iFriendlyUnitMexSearchRange = 70
@@ -2202,11 +2223,15 @@ function GetBomberTargetShortlist(aiBrain)
                     iMaxPercentDistance = 0.6
                 end
 
-                if GetGameTimeSeconds() <= 360 then
+                if GetGameTimeSeconds() <= 360 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryBomber, 4) then
                     reftPriorityTargetCategories = {M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryLandCombat - categories.COMMAND + M27UnitInfo.refCategoryMAA, M27UnitInfo.refCategoryMex}
                     aiBrain[refiLowPriorityStart] = 3
                 else
-                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryMex + M27UnitInfo.refCategoryGroundAA + M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryLandCombat - categories.COMMAND - M27UnitInfo.refCategoryStructureAA, M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryStructureAA, categories.COMMAND}
+                    if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 200 then --Include MAA in priority targets
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryRadar - categories.COMMAND - M27UnitInfo.refCategoryStructureAA, M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryStructureAA, categories.COMMAND}
+                    else
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryRadar - categories.COMMAND - M27UnitInfo.refCategoryStructureAA, M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryStructureAA, categories.COMMAND}
+                    end
                     aiBrain[refiLowPriorityStart] = 2
                 end
 
@@ -3700,10 +3725,23 @@ function GetNovaxTarget(aiBrain, oNovax)
                 for iUnit, oUnit in tEnemyUnits do
                     --Is the unit underwater or shielded?
                     if not(M27UnitInfo.IsUnitUnderwater(oUnit)) and not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 2000, false, false, false)) then
+                        iCurDPSMod = 0
                         iCurValue = oUnit:GetBlueprint().Economy.BuildCostMass * iMassFactor
                         if oUnit:GetBlueprint().Defense.Shield and M27UnitInfo.IsUnitShieldEnabled(oUnit) then
                             if oUnit.MyShield.GetHealth and oUnit.MyShield:GetHealth() > 0 then
                                 iCurDPSMod = oUnit:GetBlueprint().Defense.Shield.ShieldRegenRate
+                                if not(iCurDPSMod) then
+                                    if EntityCategoryContains(categories.COMMAND + categories.SUBCOMMANDER, oUnit:GetUnitId()) then
+                                        iCurDPSMod = M27UnitInfo.GetACUShieldRegenRate(oUnit)
+                                        if (iCurDPSMod or 0) == 0 then
+                                            M27Utilities.ErrorHandler('For some reason the unit has a shield with health but no regen rate; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit), nil, true)
+                                            iCurDPSMod = 0
+                                        end
+                                    else
+                                        M27Utilities.ErrorHandler('For some reason the unit has a shield with health but no regen rate; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit), nil, true)
+                                        iCurDPSMod = 0
+                                    end
+                                end
                             else iCurDPSMod = 0
                             end
                         else iCurDPSMod = 0

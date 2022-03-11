@@ -39,6 +39,10 @@ iACUGetHelpPercentThreshold = 0.6
 reftACURecentHealth = 'M27ACURecentHealth' --Records the ACU health every second - attached to ACU object
 reftACURecentUpgradeProgress = 'M27ACURecentUpgradeProgress' --[gametimesecond] - Records the % upgrade every second the ACU is upgrading, by gametimesecond
 
+refiUnclaimedMexesInBasePathingGroup = 'M27UnclaimedMexesInBaseGroup'
+refiAllMexesInBasePathingGroup = 'M27AllMexesInBaseGroup'
+iPlayersAtGameStart = 2
+
 --Threat groups:
 
 local reftEnemyThreatGroup = 'M27EnemyThreatGroupObject'
@@ -834,12 +838,14 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         elseif iACUMinMAAThreatWantedWithAirThreat == 3 then iACUMinMAAThreatWantedWithAirThreat = 800 --1 T3 MAA
         end
     end
-    local iAirThreatMAAFactor = 0.16 --approx mass value of MAA wanted with ACU as a % of the total air threat
+    local iAirThreatMAAFactor = 0.2 --approx mass value of MAA wanted with ACU as a % of the total air threat
     local iMaxMAAThreatForACU = 2400 --equivalent to 3 T3 MAA
     local iACUMinMAAThreatWantedWithNoAirThreat = 28 --Equivalent to 1 T1 maa
     local iMAAThreatWanted = 0
     local iMinACUMAAThreatWanted = iACUMinMAAThreatWantedWithNoAirThreat
     local iMaxMAAWantedForACUAtOnce = 2
+    local tiMAAMassValue = {55, 160, 800, 800}
+    local iSingleMAAMassValue = tiMAAMassValue[aiBrain[refiOurHighestFactoryTechLevel]]
     if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] <= 1000 and aiBrain[refiOurHighestFactoryTechLevel] >= 3 then iMaxMAAWantedForACUAtOnce = 1 end
 
     local function GetMAAThreat(tMAAUnits)
@@ -955,32 +961,42 @@ function AssignMAAToPreferredPlatoons(aiBrain)
     if iMAAThreatWanted <= 0 then --Have more than enough MAA to cover ACU, move on to considering if large platoons can get MAA support
         --=================Large platoons - ensure they have MAA in them, and if not then add MAA
         local tPlatoonUnits, iPlatoonUnits, tPlatoonCurrentMAAs, oMAAToAdd, oMAAOldPlatoon
-        local iThresholdForAMAA = iMAALargePlatoonThresholdNoThreat --Any platoons with this many units should have a MAA in them
+
+        local iThresholdForAMAA
         if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] == nil then aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] = 0 end
-        if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 then iThresholdForAMAA = iMAALargePlatoonThresholdAirThreat end
+        if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 then
+            iThresholdForAMAA = 250 + (500 * (aiBrain[refiOurHighestFactoryTechLevel] - 1))
+        else iThresholdForAMAA = 750 + (1500 * (aiBrain[refiOurHighestFactoryTechLevel] - 1))
+        end
         local iMAAWanted = 0
         local iTotalMAAWanted = 0
         local iMAAAlreadyHave
         local iCurLoopCount
         local iMaxLoopCount = 50
+
         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
             for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-                if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
-                    tPlatoonUnits = oPlatoon:GetPlatoonUnits()
-                    if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
-                        iPlatoonUnits = table.getn(tPlatoonUnits)
-                        if iPlatoonUnits >= iThresholdForAMAA then
-                            iMAAWanted = math.floor(iPlatoonUnits / iThresholdForAMAA)
-                            tPlatoonCurrentMAAs = EntityCategoryFilterDown(refCategoryMAA, tPlatoonUnits)
+                if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) and not(oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow]) and not(oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies]) then
+                    if (oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 0) >= iThresholdForAMAA then
+                        --Can we path here with land from our base?
+                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                            iMAAWanted = math.floor(oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] / iThresholdForAMAA)
+                            tPlatoonCurrentMAAs = EntityCategoryFilterDown(refCategoryMAA, oPlatoon:GetPlatoonUnits())
                             if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == true then iMAAAlreadyHave = 0
-                                else iMAAAlreadyHave = table.getn(tPlatoonCurrentMAAs) end
+                                --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
+                                else iMAAAlreadyHave = GetAirThreatLevel(aiBrain, tPlatoonCurrentMAAs, false, false, true, false, false, nil, nil, nil, nil, nil) end
                             if oPlatoon[refoUnitsMAAHelper] then
-                                tPlatoonCurrentMAAs = oPlatoon[refoUnitsMAAHelper]:GetPlatoonUnits()
-                                if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == false then
-                                    iMAAAlreadyHave = iMAAAlreadyHave + table.getn(tPlatoonCurrentMAAs)
-                                end
+                                --tPlatoonCurrentMAAs = oPlatoon[refoUnitsMAAHelper]:GetPlatoonUnits()
+                                --if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == false then
+                                    iMAAAlreadyHave = iMAAAlreadyHave + oPlatoon[refoUnitsMAAHelper][M27PlatoonUtilities.refiPlatoonMassValue]
+                                --end
                             end
                             iCurLoopCount = 0
+
+                            --Convert to number of units
+                            iMAAWanted = math.floor(iMAAWanted / iSingleMAAMassValue)
+                            iMAAAlreadyHave = math.ceil(iMAAAlreadyHave / iSingleMAAMassValue)
+
                             while iMAAWanted > iMAAAlreadyHave do
                                 iCurLoopCount = iCurLoopCount + 1
                                 if iCurLoopCount > iMaxLoopCount then
@@ -1008,16 +1024,18 @@ function AssignMAAToPreferredPlatoons(aiBrain)
 
                                 end
                             end
-                            if iMAAWanted > iMAAAlreadyHave then
-                                iTotalMAAWanted = iMAAWanted - iMAAAlreadyHave
-                                break
-                            end
+                        end
+                        if iMAAWanted > iMAAAlreadyHave then
+                            iTotalMAAWanted = iMAAWanted - iMAAAlreadyHave
+                            break
                         end
                     end
                 end
             end
         end
         aiBrain[refiMAAShortfallLargePlatoons] = iTotalMAAWanted
+        if aiBrain[refiMAAShortfallLargePlatoons] > 0 then aiBrain[refiMAAShortfallBase] = 1
+        else aiBrain[refiMAAShortfallBase] = 0 end
     end
 
 
@@ -4204,6 +4222,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         local tAllMexesInPathingGroupWeHaventClaimed = M27EngineerOverseer.GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, true, false, true)
         local iAllMexesInPathingGroupWeHaventClaimed = 0
         if M27Utilities.IsTableEmpty(tAllMexesInPathingGroupWeHaventClaimed) == false then iAllMexesInPathingGroupWeHaventClaimed = table.getn(tAllMexesInPathingGroupWeHaventClaimed) end
+        aiBrain[refiUnclaimedMexesInBasePathingGroup] = iAllMexesInPathingGroupWeHaventClaimed
+        aiBrain[refiAllMexesInBasePathingGroup] = iAllMexesInPathingGroup
 
         local tLandCombatUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandCombat, false, true)
         local iLandCombatUnits = 0
@@ -4481,7 +4501,12 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             --Air:
             tsGameState['AirAANeeded'] = aiBrain[M27AirOverseer.refiAirAANeeded]
             tsGameState['AirAAWanted'] = aiBrain[M27AirOverseer.refiAirAAWanted]
+            tsGameState['OurMassInAirAA'] = aiBrain[M27AirOverseer.refiOurMassInAirAA]
+            local iAvailableAirAA = 0
+            if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false then for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableAirAA] do iAvailableAirAA = iAvailableAirAA + 1 end end
+            tsGameState['AvailableAirAA'] = iAvailableAirAA
             tsGameState['AvailableBombers'] = 0
+
             if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then tsGameState['AvailableBombers'] = table.getn(aiBrain[M27AirOverseer.reftAvailableBombers]) end
             tsGameState['RemainingBomberTargets'] = 0
             if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberTargetShortlist]) == false then tsGameState['RemainingBomberTargets'] = table.getn(aiBrain[M27AirOverseer.reftBomberTargetShortlist]) end
@@ -4513,6 +4538,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
             if aiBrain[M27AirOverseer.refiOurMassInMAA] then tsGameState['OurMAAThreat'] = aiBrain[M27AirOverseer.refiOurMassInMAA] end
             if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] then tsGameState['EnemyAirThreat'] = aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] end
+            tsGameState['EmergencyMAANeeded'] = aiBrain[refbEmergencyMAANeeded]
 
             --Get other unclaimed mex details
             local iUnclaimedMexesOnOurSideOfMap = 0
@@ -4611,6 +4637,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
             elseif bDebugMessages == true then LOG(sFunctionRef..': Brain is defeated')
             end
         end
+        iPlayersAtGameStart = iAllyCount + iEnemyCount
     else
         for iCurBrain, oBrain in tAllAIBrainsByArmyIndex do
             if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
@@ -4933,9 +4960,11 @@ function TestCustom(aiBrain)
 end
 
 
+
 function OverseerManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OverseerManager'
+
 
 
 
@@ -4984,7 +5013,6 @@ function OverseerManager(aiBrain)
     --TestCustom(aiBrain)
 
     --ForkThread(M27MiscProfiling.LocalVariableImpact)
-
 
 
 

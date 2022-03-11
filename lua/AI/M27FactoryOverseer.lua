@@ -315,6 +315,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
             local tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE, oFactory:GetPosition(), iEnemySearchRange, 'Enemy')
             local iNearbyEnemies = 0
             local iUnitTechLevelCategory
+            local bHavePowerForAir --only used if have air fac
             if M27Utilities.IsTableEmpty(tNearbyEnemies) == false then iNearbyEnemies = table.getn(tNearbyEnemies) end
             if bDebugMessages == true then
                 if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then LOG(sFunctionRef..': No nearby enemies')
@@ -852,13 +853,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     iCategoryToBuild = M27UnitInfo.refCategoryAmphibiousCombat
                                     iTotalWanted = 1000
                                 else
-                                    iCategoryToBuild = M27UnitInfo.refCategoryLandCombat
+                                    iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
                                     iTotalWanted = 1000
                                 end
                             end
                         elseif iCurrentConditionToTry == 5 then --Land combat if protecting our ACU and its near our base, even if cant path to it yet
                             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27Utilities.GetACU(aiBrain):GetPosition()) <= 150 then
-                                iCategoryToBuild = M27UnitInfo.refCategoryLandCombat
+                                iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
                                 iTotalWanted = 1000
                             end
                         elseif iCurrentConditionToTry == 6 then --Antiair
@@ -874,7 +875,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             end
                         elseif iCurrentConditionToTry == 8 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                             --Even if cant path to ACU, can path to enemy base, so build land combat as ACU may just be in water near land
-                            iCategoryToBuild = M27UnitInfo.refCategoryLandCombat
+                            iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
                             iTotalWanted = 10000
                         else
                             bReachedLastOption = true
@@ -895,7 +896,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     local iMinPowerPerTickWantedForAir = 8
                     if iFactoryTechLevel == 2 then iMinPowerPerTickWantedForAir = 13
                     elseif iFactoryTechLevel == 3 then iMinPowerPerTickWantedForAir = 45 end --Actually need 50 for strat bomber
-                    local bHavePowerForAir = false
+                    bHavePowerForAir = false
                     if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= iMinPowerPerTickWantedForAir then
                         bHavePowerForAir = true
                         if aiBrain[M27EconomyOverseer.refbStallingEnergy] or (iFactoryTechLevel == 3 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 275) then
@@ -1177,8 +1178,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         else iEngiCategory = refCategoryEngineer * categories.TECH3 end
 
                         local iExistingEngis = aiBrain:GetCurrentUnits(iEngiCategory)
-                        if bDebugMessages == true then LOG(sFunctionRef..': About to check engi cap which willi increase if we have a t3 factory. aiBrain[refiEngineerCap]='..aiBrain[refiEngineerCap]..'; iFactoryTechLevel='..iFactoryTechLevel) end
-                        if iExistingEngis > aiBrain[refiEngineerCap] and (iFactoryTechLevel < 3 or iExistingEngis > aiBrain[refiEngineerCap] * 2) then iCategoryToBuild = nil
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to check engi cap which willi increase if we have a t3 factory. aiBrain[refiEngineerCap]='..aiBrain[refiEngineerCap]..'; iFactoryTechLevel='..iFactoryTechLevel..'; iExistingEngis='..iExistingEngis) end
+                        if iExistingEngis > aiBrain[refiEngineerCap] and (iFactoryTechLevel < 3 or iExistingEngis > aiBrain[refiEngineerCap] * 2.3) then iCategoryToBuild = nil
                         elseif iExistingEngis > aiBrain[reftiEngineerLowMassCap][iFactoryTechLevel] and aiBrain:GetEconomyStored('MASS') <= 50 then iCategoryToBuild = nil
                         elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1 and iFactoryTechLevel < aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] then
                             --Dealing with factory below our highest level; Use an engineer cap of the current cap or if lower 20 (i.e. 20 of current and higher tech level)
@@ -1188,7 +1189,15 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             end
                         end
                     end
-                elseif iCategoryToBuild == refCategoryIndirect then
+                    if bReachedLastOption and aiBrain:GetEconomyStoredRatio('MASS') >= 0.6 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 50 then
+                        if bIsLandFactory then
+                            iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
+                        elseif bIsAirFactory and bHavePowerForAir then
+                            iCategoryToBuild = M27UnitInfo.refCategoryBomber
+                        end
+                    end
+                end
+                if iCategoryToBuild == refCategoryIndirect then
                     --Set min tech level based on the tech level wanted (so we dont try t1 arti vs t2 PD, and dont try t2 MML against ravagers)
                     if aiBrain[M27Overseer.refiMinIndirectTechLevel] > 1 then
                         if aiBrain[M27Overseer.refiMinIndirectTechLevel] >= 3 then iCategoryToBuild = M27UnitInfo.refCategoryIndirectT3
@@ -1499,7 +1508,11 @@ function FactoryMainOverseerLoop(aiBrain)
                         end
                     end
                 else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Factory '..oFactory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' is paused or busy; will consider if shoudl ctrl-K if its a T1 factory; Current time='..GetGameTimeSeconds()..'; oFactory[refbFactoryTemporaryPauseActive]='..tostring((oFactory[refbFactoryTemporaryPauseActive] or false))..'; aiBrain[M27Overseer.refiOurHighestLandFactoryTech]='..aiBrain[M27Overseer.refiOurHighestLandFactoryTech]..'; Factory tech level='..M27UnitInfo.GetUnitTechLevel(oFactory)..'; Is this a land factory='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oFactory:GetUnitId()))..'; Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; Distance to our start='..M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Factory '..oFactory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' is paused or busy; will consider if shoudl ctrl-K if its a T1 factory; Current time='..GetGameTimeSeconds()..'; oFactory[refbFactoryTemporaryPauseActive]='..tostring((oFactory[refbFactoryTemporaryPauseActive] or false)))
+                        LOG('(cont): aiBrain[M27Overseer.refiOurHighestLandFactoryTech]='..(aiBrain[M27Overseer.refiOurHighestLandFactoryTech] or 'nil')..'; Factory tech level='..M27UnitInfo.GetUnitTechLevel(oFactory)..'; Is this a land factory='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oFactory:GetUnitId())))
+                        LOG('cont): Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; Distance to our start='..M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+                    end
                     oFactory[refFactoryIdleCount] = 0
                     --Ctrl-K paused T1 factories that no longer need
                     if oFactory[refbFactoryTemporaryPauseActive] == true and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 3 and M27UnitInfo.GetUnitTechLevel(oFactory) == 1 and EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oFactory:GetUnitId()) and M27Conditions.HaveLowMass(aiBrain) and M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 100 then

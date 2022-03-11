@@ -1350,6 +1350,10 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                                 IssueMove({tEngineerUnits[1]}, aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.reftActualTargetLocationRef])
                                 M27EngineerOverseer.BuildStructureAtLocation(aiBrain, tEngineerUnits[1], M27UnitInfo.refCategoryT3Mex, 1, nil, aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.reftActualTargetLocationRef], true, false)
                             else
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef..': About to send engineer units to be reassigned')
+                                    --M27Utilities.ErrorHandler('Full audit trail of reassignengineer call', nil, true)
+                                end
                                 M27EngineerOverseer.ReassignEngineers(aiBrain, false, tEngineerUnits)
                             end
                         end
