@@ -1820,7 +1820,6 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                 iMassMod = 1
                                 --Increase for cargo of transports
                                 if EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
-                                    bDebugMessages = true
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
                                     --Include threat of cargo if cargo are LABs
                                     tCargo = oUnit:GetCargo()
@@ -1839,7 +1838,6 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                 if bIncludeAirToGround == true then
                                     if EntityCategoryContains(categories.BOMBER + categories.GROUNDATTACK + categories.OVERLAYDIRECTFIRE, sCurUnitBP) == true then iMassMod = 1
                                     elseif EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
-                                        bDebugMessages = true
                                         if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
                                         --Include threat of cargo if cargo are LABs
                                         tCargo = oUnit:GetCargo()
@@ -2072,6 +2070,7 @@ function GetReclaimDetourLocation(tCurStartPosition, tEndPosition, iMaxDetourAbs
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetReclaimDetourLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if iMinDistanceFromStartAndEnd == nil then iMinDistanceFromStartAndEnd = 0 end
     local iAngleToTarget = M27Utilities.GetAngleFromAToB(tCurStartPosition, tEndPosition)
     local tCurPointAlongLine
@@ -2090,10 +2089,14 @@ function GetReclaimDetourLocation(tCurStartPosition, tEndPosition, iMaxDetourAbs
 
     tCurPointAlongLine = {tCurStartPosition[1], tCurStartPosition[2], tCurStartPosition[3]}
     for iCurPointAlongLine = 1, iMaxPointsAlongLine do
+        if bDebugMessages == true then LOG(sFunctionRef..': iCurPointAlongLine='..iCurPointAlongLine..'; iMaxPointsALongLine='..iMaxPointsAlongLine..'; iAngleToTarget='..iAngleToTarget..'; iBaseDistanceInterval='..iBaseDistanceInterval..'; iMaxSegmentRange='..(iMaxSegmentRange or 'nil')) end
         tCurPointAlongLine = M27Utilities.MoveInDirection(tCurPointAlongLine, iAngleToTarget, iBaseDistanceInterval)
+        if bDebugMessages == true then LOG(sFunctionRef..': tCurPointAlongLine='..repr((tCurPointAlongLine or {'nil'}))) end
         iBaseSegmentX, iBaseSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tCurPointAlongLine)
+        if bDebugMessages == true then LOG(sFunctionRef..': iBaseSegmentX='..iBaseSegmentX..'; iBaseSegmentZ='..iBaseSegmentZ) end
         for iAdjX = -iMaxSegmentRange, iMaxSegmentRange do
             for iAdjZ = -iMaxSegmentRange, iMaxSegmentRange do
+                if bDebugMessages == true then LOG(sFunctionRef..': iAdjX='..iAdjX..'; iAdjZ='..iAdjZ) end
                 --Different segment to the start and end positions?
                 if not({iBaseSegmentX + iAdjX, iBaseSegmentZ + iAdjZ} == {iStartSegmentX, iStartSegmentZ}) and not({iBaseSegmentX + iAdjX, iBaseSegmentZ + iAdjZ} == {iEndSegmentX, iEndSegmentZ}) then
 
@@ -2125,6 +2128,7 @@ function GetReclaimDetourLocation(tCurStartPosition, tEndPosition, iMaxDetourAbs
             break
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code; tClosestDetour='..repr((tClosestDetour or {'nil'}))) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tClosestDetour
 end
@@ -2132,199 +2136,212 @@ end
 function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPassingSearchRadius)
     --Considers mex locations and reclaim that are near the path that would take to reach tFinalDestination
     --iPassingSearchRadius - defaults to build distance+10 if not specified
-    --Config variables
-    local iMinReclaimToConsider = 29 --Will consider a detour if reclaim is more than this
 
-    --Other variables:
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddMexesAndReclaimToMovementPath'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local oUnitBP = oPathingUnit:GetBlueprint()
-    local iBuildDistance = oUnitBP.Economy.MaxBuildDistance
-    local iUnitSpeed = oUnitBP.Physics.MaxSpeed
-    local aiBrain = oPathingUnit:GetAIBrain()
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
-    if iBuildDistance == nil then iBuildDistance = 5 end
-    if iPassingSearchRadius == nil then iPassingSearchRadius = iBuildDistance + 10 end --look for mexes and reclaim within this distance of the path
-    local iSearchIntervals = iPassingSearchRadius * 0.5 --will look every x points along the path from start to end to identify places where want to stop off on the way
-    local tCurStartPosition = {}
-    tCurStartPosition = oPathingUnit:GetPosition()
-    local iMaxLoopCount = 200
-    local iCurLoopCount = 0
-    local tAllTargetLocations = {}
-    local iPassingLocationCount = 0
-    local bHavePassThrough
-    --Get shortlist of mexes so not having to cycle through every mex on the map at every point
-    local tMexShortlist = {}
-    local iPossibleMex = 0
-    local iDestinationSegmentX, iDestinationSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tFinalDestination)
-    local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnit)
-    local iACUSegmentX, iACUSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tCurStartPosition)
-    local iUnitPathGroup = M27MapInfo.InSameSegmentGroup(oPathingUnit, tCurStartPosition, true)
-    local iReclaimLoopCount
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to loop through mexes in pathing group') end
-    if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
-        for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
-            local iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
-            if iSegmentX <= math.max(iDestinationSegmentX, iACUSegmentX) then
-                if iSegmentX >= math.min(iDestinationSegmentX, iACUSegmentX) then
-                    if iSegmentZ <= math.max(iDestinationSegmentZ, iACUSegmentZ) then
-                        if iSegmentZ >= math.min(iDestinationSegmentZ, iACUSegmentZ) then
-                            --Ignore if we or an ally already has a mex near here (i.e. below will say its unclaimed if enemy built there or noone built there)
-                            if M27Conditions.IsMexOrHydroUnclaimed(aiBrain, tMexLocation, true, true, false, true) then
-                                iPossibleMex = iPossibleMex + 1
-                                tMexShortlist[iPossibleMex] = {}
-                                tMexShortlist[iPossibleMex] = tMexLocation
+
+    --Avoid infinite loop caused by dividing by 0 later on - check reclaim segment size has been determined
+    if (M27MapInfo.iReclaimSegmentSizeX or 0) == 0 then --Not yet determined reclaim sizes
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return {tFinalDestination}
+    else
+
+        --Config variables
+        local iMinReclaimToConsider = 29 --Will consider a detour if reclaim is more than this
+
+        --Other variables:
+
+        local oUnitBP = oPathingUnit:GetBlueprint()
+        local iBuildDistance = oUnitBP.Economy.MaxBuildDistance
+        local iUnitSpeed = oUnitBP.Physics.MaxSpeed
+        local aiBrain = oPathingUnit:GetAIBrain()
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
+        if iBuildDistance == nil then iBuildDistance = 5 end
+        if iPassingSearchRadius == nil then iPassingSearchRadius = iBuildDistance + 10 end --look for mexes and reclaim within this distance of the path
+        local iSearchIntervals = iPassingSearchRadius * 0.5 --will look every x points along the path from start to end to identify places where want to stop off on the way
+        local tCurStartPosition = {}
+        tCurStartPosition = oPathingUnit:GetPosition()
+        local iMaxLoopCount = 200
+        local iCurLoopCount = 0
+        local tAllTargetLocations = {}
+        local iPassingLocationCount = 0
+        local bHavePassThrough
+        --Get shortlist of mexes so not having to cycle through every mex on the map at every point
+        local tMexShortlist = {}
+        local iPossibleMex = 0
+        local iDestinationSegmentX, iDestinationSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tFinalDestination)
+        local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnit)
+        local iACUSegmentX, iACUSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tCurStartPosition)
+        local iUnitPathGroup = M27MapInfo.InSameSegmentGroup(oPathingUnit, tCurStartPosition, true)
+        local iReclaimLoopCount
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to loop through mexes in pathing group') end
+        if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
+            for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
+                local iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
+                if iSegmentX <= math.max(iDestinationSegmentX, iACUSegmentX) then
+                    if iSegmentX >= math.min(iDestinationSegmentX, iACUSegmentX) then
+                        if iSegmentZ <= math.max(iDestinationSegmentZ, iACUSegmentZ) then
+                            if iSegmentZ >= math.min(iDestinationSegmentZ, iACUSegmentZ) then
+                                --Ignore if we or an ally already has a mex near here (i.e. below will say its unclaimed if enemy built there or noone built there)
+                                if M27Conditions.IsMexOrHydroUnclaimed(aiBrain, tMexLocation, true, true, false, true) then
+                                    iPossibleMex = iPossibleMex + 1
+                                    tMexShortlist[iPossibleMex] = {}
+                                    tMexShortlist[iPossibleMex] = tMexLocation
+                                end
                             end
                         end
                     end
                 end
             end
         end
-    end
-    local iMinDistanceToMex, iCurDistanceToMex
-    local tClosestMex, bFoundPassThroughMex
-    local iCurDistanceToEnd = M27Utilities.GetDistanceBetweenPositions(tCurStartPosition, tFinalDestination)
-    local tPassThroughLocation, iTempDistanceToEnd
-    local tLastPassThroughPosition = {}
-    local tHighestValidReclaim, ReclaimRectangle, tReclaimables, iMassValue
-    local iTempDistanceToCurStart
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': just before while loop') end
-    while iCurDistanceToEnd > iSearchIntervals do
-        bHavePassThrough = false
-        iCurLoopCount = iCurLoopCount + 1
-        if iCurLoopCount > iMaxLoopCount then
-            LOG(sFunctionRef..': LIKELY ERROR - Infinite loop count exceeded')
-            break
-        end
-        tPassThroughLocation = {}
-        --Search for nearby mex within shortlist
-        if iPossibleMex > 0 then
-            iMinDistanceToMex = 10000
-            tClosestMex = {}
-            bFoundPassThroughMex = false
-            if bDebugMessages == true then LOG(sFunctionRef..': tMexShortlist='..repr(tMexShortlist)..'; iPassingLocationCount='..iPassingLocationCount) end
-            for iCurMex, tMexLocation in tMexShortlist do
-                if not(tLastPassThroughPosition == tMexLocation) then
-                    if M27Utilities.IsTableEmpty(tMexLocation) == false then
-                        --Check it's not close to our current position
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..'; tCurStartPosition='..repr(tCurStartPosition))
-                            if tLastPassThroughPosition == nil then LOG(sFunctionRef..'; tLastPassThroughPosition is nil')
-                            else LOG(sFunctionRef..': tLastPassThroughPosition='..repr(tLastPassThroughPosition))
+        local iMinDistanceToMex, iCurDistanceToMex
+        local tClosestMex, bFoundPassThroughMex
+        local iCurDistanceToEnd = M27Utilities.GetDistanceBetweenPositions(tCurStartPosition, tFinalDestination)
+        local tPassThroughLocation, iTempDistanceToEnd
+        local tLastPassThroughPosition = {}
+        local tHighestValidReclaim, ReclaimRectangle, tReclaimables, iMassValue
+        local iTempDistanceToCurStart
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': just before while loop') end
+        while iCurDistanceToEnd > iSearchIntervals do
+            bHavePassThrough = false
+            iCurLoopCount = iCurLoopCount + 1
+            if iCurLoopCount > iMaxLoopCount then
+                LOG(sFunctionRef..': LIKELY ERROR - Infinite loop count exceeded')
+                break
+            end
+            tPassThroughLocation = {}
+            --Search for nearby mex within shortlist
+            if iPossibleMex > 0 then
+                iMinDistanceToMex = 10000
+                tClosestMex = {}
+                bFoundPassThroughMex = false
+                if bDebugMessages == true then LOG(sFunctionRef..': tMexShortlist='..repr(tMexShortlist)..'; iPassingLocationCount='..iPassingLocationCount) end
+                for iCurMex, tMexLocation in tMexShortlist do
+                    if not(tLastPassThroughPosition == tMexLocation) then
+                        if M27Utilities.IsTableEmpty(tMexLocation) == false then
+                            --Check it's not close to our current position
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..'; tCurStartPosition='..repr(tCurStartPosition))
+                                if tLastPassThroughPosition == nil then LOG(sFunctionRef..'; tLastPassThroughPosition is nil')
+                                else LOG(sFunctionRef..': tLastPassThroughPosition='..repr(tLastPassThroughPosition))
+                                end
                             end
-                        end
-                        iCurDistanceToMex = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tCurStartPosition)
-                        if iCurDistanceToMex <= iPassingSearchRadius then
-                            if iCurDistanceToMex < iMinDistanceToMex then
-                                iMinDistanceToMex = iCurDistanceToMex
-                                tClosestMex = tMexLocation
-                                bHavePassThrough = true
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have at least 1 passthrough mex, current tClosestMex='..repr(tClosestMex)) end
+                            iCurDistanceToMex = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tCurStartPosition)
+                            if iCurDistanceToMex <= iPassingSearchRadius then
+                                if iCurDistanceToMex < iMinDistanceToMex then
+                                    iMinDistanceToMex = iCurDistanceToMex
+                                    tClosestMex = tMexLocation
+                                    bHavePassThrough = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have at least 1 passthrough mex, current tClosestMex='..repr(tClosestMex)) end
+                                end
                             end
                         end
                     end
-                end
-                --Add closest mex:
-                if bHavePassThrough == true then
-                    tPassThroughLocation = tClosestMex
-                end
-            end
-        end
-
-
-        --Search for nearby reclaim as a detour (if no mexes were found)
-        if bHavePassThrough == false then
-            --GetReclaimablesResourceValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis)
-            ReclaimRectangle = {}
-            tReclaimables = {}
-            ReclaimRectangle = Rect(tCurStartPosition[1] - iPassingSearchRadius,tCurStartPosition[3] - iPassingSearchRadius, tCurStartPosition[1] + iPassingSearchRadius, tCurStartPosition[3] + iPassingSearchRadius)
-            tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
-            tHighestValidReclaim = {}
-
-            iMassValue, tHighestValidReclaim = M27MapInfo.GetReclaimablesResourceValue(tReclaimables, true, iMinReclaimToConsider)
-            if M27Utilities.IsTableEmpty(tHighestValidReclaim) == false then
-                if not(tHighestValidReclaim == tLastPassThroughPosition) then
-                    bHavePassThrough = true
-                    tPassThroughLocation = tHighestValidReclaim
+                    --Add closest mex:
+                    if bHavePassThrough == true then
+                        tPassThroughLocation = tClosestMex
+                    end
                 end
             end
-        end
 
 
-        --Update the start position if have added a via point:
-      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': just before updating start position') end
-        if bHavePassThrough == true then
-            --Check won't be moving further away from the end destination than we currently are:
-            iTempDistanceToEnd = M27Utilities.GetDistanceBetweenPositions(tPassThroughLocation, tFinalDestination)
-            if iTempDistanceToEnd < iCurDistanceToEnd then
-                iTempDistanceToCurStart = M27Utilities.GetDistanceBetweenPositions(tPassThroughLocation, tCurStartPosition)
-                if iTempDistanceToCurStart <= iTempDistanceToEnd then
-                    tLastPassThroughPosition = tPassThroughLocation --needed so dont consider this in next loop (given aren't moving all the way to the target)
+            --Search for nearby reclaim as a detour (if no mexes were found)
+            if bHavePassThrough == false then
+                --GetReclaimablesResourceValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis)
+                ReclaimRectangle = {}
+                tReclaimables = {}
+                ReclaimRectangle = Rect(tCurStartPosition[1] - iPassingSearchRadius,tCurStartPosition[3] - iPassingSearchRadius, tCurStartPosition[1] + iPassingSearchRadius, tCurStartPosition[3] + iPassingSearchRadius)
+                tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
+                tHighestValidReclaim = {}
 
-                    iPassingLocationCount = iPassingLocationCount + 1
-                    tAllTargetLocations[iPassingLocationCount] = {}
-                    --Dont move all the way to the target, just close enough that should spend at least 1 second in its build range
-
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have a pass-through location, iPassingLocationCount='..iPassingLocationCount..'; location='..repr(tPassThroughLocation)..'; about to get position to move near it for construction') end
-                    --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
-                    tAllTargetLocations[iPassingLocationCount] = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tPassThroughLocation, nil, -iUnitSpeed, true, false, false)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Move position='..repr(tAllTargetLocations[iPassingLocationCount])) end
-                    tCurStartPosition = tAllTargetLocations[iPassingLocationCount]
-                    if bDebugMessages == true then LOG(sFunctionRef..': CurStartPosition='..repr(tCurStartPosition)) end
-                    iCurDistanceToEnd = iTempDistanceToEnd
-                else
-                    bHavePassThrough = false
+                iMassValue, tHighestValidReclaim = M27MapInfo.GetReclaimablesResourceValue(tReclaimables, true, iMinReclaimToConsider)
+                if M27Utilities.IsTableEmpty(tHighestValidReclaim) == false then
+                    if not(tHighestValidReclaim == tLastPassThroughPosition) then
+                        bHavePassThrough = true
+                        tPassThroughLocation = tHighestValidReclaim
+                    end
                 end
-            else bHavePassThrough = false
             end
 
-            --Check for reclaim alone a line from the start to the next position on the path
-            iReclaimLoopCount = 0
-            if bDebugMessages == true then LOG(sFunctionRef..': Have pass through location, tAllTargetLocations[iPassingLocationCount]='..repr(tAllTargetLocations[iPassingLocationCount])..'; tCurStartPosition='..repr(tCurStartPosition)..'; about to add any reclaim along the path') end
-            while bHavePassThrough == true do
-                iReclaimLoopCount = iReclaimLoopCount + 1
-                if iReclaimLoopCount > iMaxLoopCount then
-                    M27Utilities.ErrorHandler('Infinite loop')
-                    bHavePassThrough = false
-                    break
-                else
-                    local tCurPassThrough = {tPassThroughLocation[1], tPassThroughLocation[2], tPassThroughLocation[3]}
-                    tPassThroughLocation = GetReclaimDetourLocation(tCurStartPosition, tCurPassThrough, iPassingSearchRadius, iBuildDistance)
-                    if bDebugMessages == true then LOG(sFunctionRef..'; iReclaimLoopCount='..iReclaimLoopCount..'; tPassThroughLocation='..repr(tPassThroughLocation or {'nil'})) end
-                    if tPassThroughLocation then
+
+            --Update the start position if have added a via point:
+          --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': just before updating start position') end
+            if bHavePassThrough == true then
+                --Check won't be moving further away from the end destination than we currently are:
+                iTempDistanceToEnd = M27Utilities.GetDistanceBetweenPositions(tPassThroughLocation, tFinalDestination)
+                if iTempDistanceToEnd < iCurDistanceToEnd then
+                    iTempDistanceToCurStart = M27Utilities.GetDistanceBetweenPositions(tPassThroughLocation, tCurStartPosition)
+                    if iTempDistanceToCurStart <= iTempDistanceToEnd then
+                        tLastPassThroughPosition = tPassThroughLocation --needed so dont consider this in next loop (given aren't moving all the way to the target)
+
                         iPassingLocationCount = iPassingLocationCount + 1
                         tAllTargetLocations[iPassingLocationCount] = {}
-                                                                            --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
+                        --Dont move all the way to the target, just close enough that should spend at least 1 second in its build range
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a pass-through location, iPassingLocationCount='..iPassingLocationCount..'; location='..repr(tPassThroughLocation)..'; about to get position to move near it for construction') end
+                        --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
                         tAllTargetLocations[iPassingLocationCount] = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tPassThroughLocation, nil, -iUnitSpeed, true, false, false)
-                        tCurStartPosition = {tAllTargetLocations[iPassingLocationCount][1], tAllTargetLocations[iPassingLocationCount][2], tAllTargetLocations[iPassingLocationCount][3]}
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have a valid apssthrough location, so moving near here and adding that to the movement path; tAllTargetLocations[iPassingLocationCount]='..repr(tAllTargetLocations[iPassingLocationCount])..'; tCurStartPosition='..repr(tCurStartPosition)) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Move position='..repr(tAllTargetLocations[iPassingLocationCount])) end
+                        tCurStartPosition = tAllTargetLocations[iPassingLocationCount]
+                        if bDebugMessages == true then LOG(sFunctionRef..': CurStartPosition='..repr(tCurStartPosition)) end
+                        iCurDistanceToEnd = iTempDistanceToEnd
                     else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have no passthrough location') end
                         bHavePassThrough = false
+                    end
+                else bHavePassThrough = false
+                end
+
+                --Check for reclaim alone a line from the start to the next position on the path
+                iReclaimLoopCount = 0
+                if bDebugMessages == true then LOG(sFunctionRef..': Have pass through location, tAllTargetLocations[iPassingLocationCount]='..repr(tAllTargetLocations[iPassingLocationCount])..'; tCurStartPosition='..repr(tCurStartPosition)..'; about to add any reclaim along the path') end
+                while bHavePassThrough == true do
+                    iReclaimLoopCount = iReclaimLoopCount + 1
+                    if bDebugMessages == true then LOG(sFunctionRef..': Start of loop for passthrough; iReclaimLoopCount='..iReclaimLoopCount) end
+                    if iReclaimLoopCount > iMaxLoopCount then
+                        M27Utilities.ErrorHandler('Infinite loop')
+                        bHavePassThrough = false
+                        break
+                    else
+                        local tCurPassThrough = {tPassThroughLocation[1], tPassThroughLocation[2], tPassThroughLocation[3]}
+                        tPassThroughLocation = GetReclaimDetourLocation(tCurStartPosition, tCurPassThrough, iPassingSearchRadius, iBuildDistance)
+                        if bDebugMessages == true then LOG(sFunctionRef..'; iReclaimLoopCount='..iReclaimLoopCount..'; tPassThroughLocation='..repr(tPassThroughLocation or {'nil'})) end
+                        if tPassThroughLocation then
+                            iPassingLocationCount = iPassingLocationCount + 1
+                            tAllTargetLocations[iPassingLocationCount] = {}
+                                                                                --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
+                            tAllTargetLocations[iPassingLocationCount] = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tPassThroughLocation, nil, -iUnitSpeed, true, false, false)
+                            tCurStartPosition = {tAllTargetLocations[iPassingLocationCount][1], tAllTargetLocations[iPassingLocationCount][2], tAllTargetLocations[iPassingLocationCount][3]}
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have a valid apssthrough location, so moving near here and adding that to the movement path; tAllTargetLocations[iPassingLocationCount]='..repr(tAllTargetLocations[iPassingLocationCount])..'; tCurStartPosition='..repr(tCurStartPosition)) end
+                        else
+                            bHavePassThrough = false
+                        end
                     end
                 end
             end
+            if bHavePassThrough == false then
+                --No move points - move forwards by iSearchIntervals
+                if bDebugMessages == true then LOG(sFunctionRef..': No nearby pass-points - moving forwards along path by 10. Position before moving forwards='..repr(tCurStartPosition)) end
+                --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
+                tCurStartPosition = M27Utilities.MoveTowardsTarget(tCurStartPosition, tFinalDestination, iSearchIntervals, 0)
+                if bDebugMessages == true then LOG(sFunctionRef..': Position after moving forwards by '..iSearchIntervals..' ='..repr(tCurStartPosition)) end
+                iCurDistanceToEnd = iCurDistanceToEnd - iSearchIntervals
+            end
         end
-        if bHavePassThrough == false then
-            --No move points - move forwards by iSearchIntervals
-            if bDebugMessages == true then LOG(sFunctionRef..': No nearby pass-points - moving forwards along path by 10. Position before moving forwards='..repr(tCurStartPosition)) end
-            --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
-            tCurStartPosition = M27Utilities.MoveTowardsTarget(tCurStartPosition, tFinalDestination, iSearchIntervals, 0)
-            if bDebugMessages == true then LOG(sFunctionRef..': Position after moving forwards by '..iSearchIntervals..' ='..repr(tCurStartPosition)) end
-            iCurDistanceToEnd = iCurDistanceToEnd - iSearchIntervals
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': about to add final destination at the end') end
+        tAllTargetLocations[iPassingLocationCount + 1] = {}
+        tAllTargetLocations[iPassingLocationCount + 1] = tFinalDestination
+        if bDebugMessages == true then
+            if bDebugMessages == true then LOG(sFunctionRef..': Will draw alltargetlocations in blue') end
+            --DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+            M27Utilities.DrawLocations(tAllTargetLocations)
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': End of function, iPassingLocationCount='..iPassingLocationCount..'; tAllTargetLocations='..repr(tAllTargetLocations)) end
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': End of code') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return tAllTargetLocations
     end
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': about to add final destination at the end') end
-    tAllTargetLocations[iPassingLocationCount + 1] = {}
-    tAllTargetLocations[iPassingLocationCount + 1] = tFinalDestination
-    if bDebugMessages == true then
-        --DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
-        M27Utilities.DrawLocations(tAllTargetLocations)
-    end
-    if bDebugMessages == true then LOG(sFunctionRef..': End of function, iPassingLocationCount='..iPassingLocationCount..'; tAllTargetLocations='..repr(tAllTargetLocations)) end
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': End of code') end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return tAllTargetLocations
 
 end
 

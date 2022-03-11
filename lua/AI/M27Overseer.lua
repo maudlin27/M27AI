@@ -4571,7 +4571,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             LOG(repr(tsGameState))
         end
 
-        aiBrain[refiACUHealthToRunOn] = 5250
+        aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
         if iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.5 then
             if M27Conditions.DoesACUHaveGun(aiBrain, false) then aiBrain[refiACUHealthToRunOn] = math.max(8000, oACU:GetMaxHealth() * 0.7)
             else
@@ -4752,6 +4752,9 @@ function OverseerInitialisation(aiBrain)
     aiBrain[M27FactoryOverseer.refiMAACap] = 150 --Max MAA of any 1 tech level
     aiBrain[M27FactoryOverseer.reftiEngineerLowMassCap] = {35, 20, 20, 20} --Max engis to get if have low mass
     aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5
+    aiBrain[M27FactoryOverseer.refiAirAACap] = 250
+    aiBrain[M27FactoryOverseer.refiAirScoutCap] = 35
+
     aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
     aiBrain[refiCyclesThatACUHasNoPlatoon] = 0
     aiBrain[refiCyclesThatACUInArmyPool] = 0

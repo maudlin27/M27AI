@@ -443,7 +443,7 @@ function MoveAlongPath(oPlatoon, tMovementPath, iPathStartPoint, bDontClearActio
                 end
             end
 
-            if bDebugMessages == true then LOG(sFunctionRef..': Moving to tLocationXZ='..tLocation[1]..'-'..tLocation[3]..'; deciding whether will be in formation.  oPlatoon[M27PlatoonTemplates.refbFormMoveIfCloseTogetherAndNoEnemies]='..tostring(oPlatoon[M27PlatoonTemplates.refbFormMoveIfCloseTogetherAndNoEnemies] or false)..'; oPlatoon[refiEnemiesInRange]='..oPlatoon[refiEnemiesInRange]..'oPlatoon[refiEnemyStructuresInRange]='..oPlatoon[refiEnemyStructuresInRange]..'; distance between front and rear position='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), GetPlatoonRearPosition(oPlatoon))..'; oPlatoon[M27PlatoonTemplates.refiFormMoveCloseDistanceThreshold]='..(oPlatoon[M27PlatoonTemplates.refiFormMoveCloseDistanceThreshold] or 'nil')..'; bMoveInFormation='..tostring(bMoveInFormation)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Moving to tLocationXZ='..tLocation[1]..'-'..tLocation[3]..'; deciding whether will be in formation.  oPlatoon[M27PlatoonTemplates.refbFormMoveIfCloseTogetherAndNoEnemies]='..tostring(oPlatoon[M27PlatoonTemplates.refbFormMoveIfCloseTogetherAndNoEnemies] or false)..'; oPlatoon[refiEnemiesInRange]='..oPlatoon[refiEnemiesInRange]..'oPlatoon[refiEnemyStructuresInRange]='..oPlatoon[refiEnemyStructuresInRange]..'; distance between front and rear position='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), GetPlatoonRearPosition(oPlatoon))..'; oPlatoon[M27PlatoonTemplates.refiFormMoveCloseDistanceThreshold]='..(oPlatoon[M27PlatoonTemplates.refiFormMoveCloseDistanceThreshold] or 'nil')) end
             PlatoonMove(oPlatoon, tLocation)
         end
         --oPlatoon[refiLastPathTarget] = table.getn(tMovementPath)
@@ -1372,15 +1372,27 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     if bAbort == false then
+        local tNearbyEnemies
         oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures] = math.max(aiBrain[M27Overseer.refiSearchRangeForEnemyStructures], iEnemySearchRadius)
         oPlatoon[refiEnemySearchRadius] = iEnemySearchRadius
         --if oPlatoon[reftEnemiesInRange] == nil then oPlatoon[reftEnemiesInRange] = {} end
         local iMobileEnemyCategories = categories.LAND * categories.MOBILE
         if oPlatoon[refbPlatoonHasOverwaterLand] == true then iMobileEnemyCategories = categories.LAND * categories.MOBILE + categories.NAVAL * categories.MOBILE end
-        oPlatoon[reftEnemiesInRange] = aiBrain:GetUnitsAroundPoint(iMobileEnemyCategories, tCurPos, iEnemySearchRadius, 'Enemy')
+        tNearbyEnemies = aiBrain:GetUnitsAroundPoint(iMobileEnemyCategories, tCurPos, iEnemySearchRadius, 'Enemy')
         if M27Utilities.IsTableEmpty(oPlatoon[reftEnemiesInRange]) == true then
             oPlatoon[refiEnemiesInRange] = 0
-        else oPlatoon[refiEnemiesInRange] = table.getn(oPlatoon[reftEnemiesInRange]) end
+            oPlatoon[reftEnemiesInRange] = { }
+        else
+            --Rework the table to ignore units that are attached to a transport
+            oPlatoon[refiEnemiesInRange] = 0
+            oPlatoon[reftEnemiesInRange] = {}
+            for iUnit, oUnit in tNearbyEnemies do
+               if not(oUnit:IsUnitState('Attached')) then
+                   oPlatoon[refiEnemiesInRange] = oPlatoon[refiEnemiesInRange] + 1
+                   oPlatoon[reftEnemiesInRange][oPlatoon[refiEnemiesInRange]] = oUnit
+               end
+            end
+        end
         oPlatoon[reftEnemyStructuresInRange] = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - categories.BENIGN, tCurPos, oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures], 'Enemy')
         if oPlatoon[reftEnemyStructuresInRange] == nil then
             oPlatoon[refiEnemyStructuresInRange] = 0
@@ -2124,6 +2136,18 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         end
                     end
                 end
+
+                --Also run if enemy has air units near our ACU and it doesnt have nearby MAA support and we need air units
+                if not(bACUNeedsToRun) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
+                   local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, GetPlatoonFrontPosition(oPlatoon), 90, 'Enemy')
+                    if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
+                        --Do we have nearby MAA?
+                        if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, GetPlatoonFrontPosition(oPlatoon), 90, 'Ally')) then
+                            bACUNeedsToRun = true
+                        end
+                    end
+                end
+
 
                 --Override - if ACU has stealth+high health, or cloak, and not in enemy omni range, then ignore need to run
                 if bACUNeedsToRun and not(oPlatoon[refbNeedToHeal]) and (M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') or (M27Utilities.GetACU(aiBrain):HasEnhancement('StealthGenerator') and M27Utilities.GetACU(aiBrain):GetHealthPercent() >= 0.95)) then

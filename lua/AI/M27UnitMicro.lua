@@ -354,7 +354,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                             --ACU specific
                             if M27Utilities.IsACU(oUnit) then
                                 local aiBrain = oCurBrain
-                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and oUnit:GetHealthPercent() > 0.3 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) > (M27Logic.GetUnitMaxGroundRange({oUnit}) - 8) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) < 32 then
+                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) > (M27Logic.GetUnitMaxGroundRange({oUnit}) - 10) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) < 32 and (M27UnitInfo.GetUnitTechLevel(oBomber) == 1 or oUnit:GetHealthPercent() > 0.3) then
                                     --Dont dodge in case we can no longer attack ACU
                                 else
                                     --If ACU is upgrading might not want to cancel
@@ -483,7 +483,7 @@ function DodgeBombsFiredByUnit(oWeapon, oBomber)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function GetOverchargeExtraActionOld(aiBrain, oPlatoon, oUnitWithOvercharge)
+--[[function GetOverchargeExtraActionOld(aiBrain, oPlatoon, oUnitWithOvercharge)
     --should have already confirmed overcharge action is available using CanUnitUseOvercharge
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetOverchargeExtraAction'
@@ -674,7 +674,7 @@ function GetOverchargeExtraActionOld(aiBrain, oPlatoon, oUnitWithOvercharge)
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-end
+end--]]
 
 function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     --should have already confirmed overcharge action is available using CanUnitUseOvercharge
@@ -714,7 +714,8 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     end
 
     function WillShotHit(oFiringUnit, oTargetUnit)
-        if M27Logic.IsShotBlocked(oFiringUnit, oTargetUnit) or IsBuildingOrACUBlockingShot(oFiringUnit, oTargetUnit) then
+        --Check for units in a transport
+        if oTargetUnit:IsUnitState('Attached') or M27Logic.IsShotBlocked(oFiringUnit, oTargetUnit) or IsBuildingOrACUBlockingShot(oFiringUnit, oTargetUnit) then
             return false
         else return true
         end
@@ -798,7 +799,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
 
                 --if iMostMobileCombatMassDamage >= 80 then
                 --    oOverchargeTarget = oMostCombatMassDamage
-                if iMostMassDamage >= 200 or iKillsExpected >= 3 or (iKillsExpected >= 1 and iMostMassDamage >= 112) then --e.g. striker is 56 mass; lobo is 36
+                if iMostMassDamage >= 200 or iKillsExpected >= 3 or (iKillsExpected >= 1 and iMostMassDamage >= 112) or (iMostMassDamage >= 60 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain:GetEconomyStored('ENERGY') >= 10000) then --e.g. striker is 56 mass; lobo is 36
                     oOverchargeTarget = oMostMassDamage
                 else
                     --No decent combat targets; Check for lots of walls that might be blocking our path

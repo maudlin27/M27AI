@@ -2999,6 +2999,8 @@ function AirAAManager(aiBrain)
 
         if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then
             if bDebugMessages == true then
+
+                --Below is all for debug
                 if bDebugMessages == true then LOG(sFunctionRef..': Will list out any friendly bombers and the distance of the nearest enemy airAA unit to them') end
                 local tFriendlyT3Bombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Ally')
                 local tEnemyAirAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirAA, tEnemyAirUnits)
@@ -3013,6 +3015,7 @@ function AirAAManager(aiBrain)
                         end
                     end
                 end
+                --End of debug
             end
 
             --Is any teammate ACU far enough away from their base that we want to check for air threats near it?
@@ -3032,6 +3035,8 @@ function AirAAManager(aiBrain)
             local iMapMidpointDistance = iDistanceFromEnemyStartToOurStart * 0.5
 
 
+
+
             local refoUnit = 'AirAAUnit'
 
             local iEnemyUnitCount = 0
@@ -3044,12 +3049,19 @@ function AirAAManager(aiBrain)
             local tEnemyGroundAA
             local bCloseEnoughToConsider
             local tFriendlyGroundUnits
-            local tFriendlyPriorityDefence = aiBrain:GetUnitsAroundPoint(categories.COMMAND + categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Ally')
+            local tFriendlyPriorityDefence = aiBrain:GetUnitsAroundPoint(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Ally')
+            local iOtherUnitCategoriesToDefend = M27UnitInfo.refCategoryIndirectT3 + categories.STRUCTURE * categories.TECH3 + M27UnitInfo.refCategoryBomber * categories.TECH3
+            local tOtherUnitsToDefend = aiBrain:GetUnitsAroundPoint(iOtherUnitCategoriesToDefend, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Ally')
+            local bCheckForOtherUnitsToDefend = false
+            if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then bCheckForOtherUnitsToDefend = true end
+            local iOtherUnitDefenceRange = 70
+            local bNearPriorityDefence
 
             if bDebugMessages == true then LOG(sFunctionRef..': total enemy threats='..table.getn(tEnemyAirUnits)..'; total vailable inties='..table.getn(aiBrain[reftAvailableAirAA])) end
 
             --Create a table with all air threats and their distance
             for iUnit, oUnit in tEnemyAirUnits do
+                bNearPriorityDefence = false
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to attack enemy unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' that is at position '..repr(oUnit:GetPosition())..' which is '..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
                 bShouldAttackThreat = false
                 if not(oUnit.Dead) and oUnit.GetUnitId then
@@ -3094,58 +3106,68 @@ function AirAAManager(aiBrain)
                             bShouldAttackThreat = true
                             iCurTargetModDistanceFromStart = iCurDistanceToStart
                         else
-                            if iCurDistanceToStart <= iMapMidpointDistance then bCloseEnoughToConsider = true
-                            else
-                                --Are we in defence coverage?
-                                if bDebugMessages == true then LOG(sFunctionRef..': Target unit='..oUnit:GetUnitId()..'; iCurTargetModDistanceFromStart='..iCurTargetModDistanceFromStart..'; iDefenceCoverage='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]) end
-                                if iCurTargetModDistanceFromStart <= aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] then
-                                    bCloseEnoughToConsider = true
-                                else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Not on our side of map, not in defence coverage, and not near ACU; will see if we have nearby units we want to protect. iAssistNearbyUnitRange='..iAssistNearbyUnitRange) end
-                                    --Do we have nearby ground units (that we'll want to protect)?
-
-                                    --NOTE: If making changes to the below, also update the logic for an air unit cancelling its attack
-                                    tFriendlyGroundUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + categories.LAND + categories.NAVAL + M27UnitInfo.refCategoryTorpBomber + M27UnitInfo.refCategoryBomber, tUnitCurPosition, iAssistNearbyUnitRange, 'Ally')
-                                    if M27Utilities.IsTableEmpty(tFriendlyGroundUnits) == false then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tFriendlyGroundUnits)..' friendly units nearby so will assist') end
-                                        bCloseEnoughToConsider = true
-                                    elseif bDebugMessages == true then LOG(sFunctionRef..': No friendly units near '..repr(tUnitCurPosition))
-                                    end
+                            --Ignore enemy AA if near another type of unit to defend
+                            if bCheckForOtherUnitsToDefend then
+                                tOtherUnitsToDefend = aiBrain:GetUnitsAroundPoint(iOtherUnitCategoriesToDefend, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
+                                if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
+                                    bShouldAttackThreat = true
                                 end
                             end
-                            if bCloseEnoughToConsider == true then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy is close enough to consider, will check if unit is attached (e.g. still being built by factory) or has nearby enemy ground AA, iEnemyGroundAASearchRange='..iEnemyGroundAASearchRange) end
-                                if not(oUnit:IsUnitState('Attached')) then
-                                    --Check if ground AA near the target
-                                    tEnemyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tUnitCurPosition, iEnemyGroundAASearchRange, 'Enemy')
-                                    if M27Utilities.IsTableEmpty(tEnemyGroundAA) == true then
-                                        bShouldAttackThreat = true
+
+                            if not(bShouldAttackThreat) then
+                                if iCurDistanceToStart <= iMapMidpointDistance then bCloseEnoughToConsider = true
+                                else
+                                    --Are we in defence coverage?
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Target unit='..oUnit:GetUnitId()..'; iCurTargetModDistanceFromStart='..iCurTargetModDistanceFromStart..'; iDefenceCoverage='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]) end
+                                    if iCurTargetModDistanceFromStart <= aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] then
+                                        bCloseEnoughToConsider = true
                                     else
-                                        --Ignore T1 AA if have asfs
-                                        if iOurHighestAirAATech == 3 then tEnemyGroundAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirAA * categories.TECH2 + M27UnitInfo.refCategoryAllNavy * categories.TECH2 + categories.TECH3, tEnemyGroundAA) end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Not on our side of map, not in defence coverage, and not near ACU; will see if we have nearby units we want to protect. iAssistNearbyUnitRange='..iAssistNearbyUnitRange) end
+                                        --Do we have nearby ground units (that we'll want to protect)?
+
+                                        --NOTE: If making changes to the below, also update the logic for an air unit cancelling its attack
+                                        tFriendlyGroundUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + categories.LAND + categories.NAVAL + M27UnitInfo.refCategoryTorpBomber + M27UnitInfo.refCategoryBomber, tUnitCurPosition, iAssistNearbyUnitRange, 'Ally')
+                                        if M27Utilities.IsTableEmpty(tFriendlyGroundUnits) == false then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tFriendlyGroundUnits)..' friendly units nearby so will assist') end
+                                            bCloseEnoughToConsider = true
+                                        elseif bDebugMessages == true then LOG(sFunctionRef..': No friendly units near '..repr(tUnitCurPosition))
+                                        end
+                                    end
+                                end
+                                if bCloseEnoughToConsider == true then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy is close enough to consider, will check if unit is attached (e.g. still being built by factory) or has nearby enemy ground AA, iEnemyGroundAASearchRange='..iEnemyGroundAASearchRange) end
+                                    if not(oUnit:IsUnitState('Attached')) then
+                                        --Check if ground AA near the target
+                                        tEnemyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tUnitCurPosition, iEnemyGroundAASearchRange, 'Enemy')
                                         if M27Utilities.IsTableEmpty(tEnemyGroundAA) == true then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': No nearby ground AA so ok to attack') end
                                             bShouldAttackThreat = true
                                         else
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef..': Nearby ground AA so dont want to attack unelss its all being transported.  Will list out nearby ground AA')
-                                                for iEnemyAA, oEnemyAA in tEnemyGroundAA do
-                                                    LOG(sFunctionRef..': oEnemyAA='..oEnemyAA:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemyAA))
+                                            --Ignore T1 AA if have asfs
+                                            if iOurHighestAirAATech == 3 then tEnemyGroundAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirAA * categories.TECH2 + M27UnitInfo.refCategoryAllNavy * categories.TECH2 + categories.TECH3, tEnemyGroundAA) end
+                                            if M27Utilities.IsTableEmpty(tEnemyGroundAA) == true then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby ground AA so ok to attack') end
+                                                bShouldAttackThreat = true
+                                            else
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef..': Nearby ground AA so dont want to attack unelss its all being transported.  Will list out nearby ground AA')
+                                                    for iEnemyAA, oEnemyAA in tEnemyGroundAA do
+                                                        LOG(sFunctionRef..': oEnemyAA='..oEnemyAA:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemyAA))
+                                                    end
                                                 end
-                                            end
-                                            --Ignore if only threat is MAA that is being transported
-                                            bShouldAttackThreat = true
-                                            for iAA, oAA in tEnemyGroundAA do
-                                               if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA - M27UnitInfo.refCategoryMAA, oAA:GetUnitId()) then
-                                                   bShouldAttackThreat = false
-                                                   break
-                                               else
-                                                   if bDebugMessages == true then LOG(sFunctionRef..': Enemy has AA with unit ID='..oAA:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oAA)..'; Unit state='..M27Logic.GetUnitState(oAA)) end
-                                                   if not(oAA:IsUnitState('Attached')) then
+                                                --Ignore if only threat is MAA that is being transported
+                                                bShouldAttackThreat = true
+                                                for iAA, oAA in tEnemyGroundAA do
+                                                   if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA - M27UnitInfo.refCategoryMAA, oAA:GetUnitId()) then
                                                        bShouldAttackThreat = false
                                                        break
+                                                   else
+                                                       if bDebugMessages == true then LOG(sFunctionRef..': Enemy has AA with unit ID='..oAA:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oAA)..'; Unit state='..M27Logic.GetUnitState(oAA)) end
+                                                       if not(oAA:IsUnitState('Attached')) then
+                                                           bShouldAttackThreat = false
+                                                           break
+                                                       end
                                                    end
-                                               end
+                                                end
                                             end
                                         end
                                     end
@@ -3188,7 +3210,7 @@ function AirAAManager(aiBrain)
                     iRemainingMassThreat = iOriginalMassThreat * 2.5
                     if EntityCategoryContains(M27UnitInfo.refCategoryAirNonScout, oCurTarget:GetUnitId()) then iRemainingMassThreat = iRemainingMassThreat * 2 end
                     iAlreadyAssignedMassValue = 0
-                    if bDebugMessages == true then LOG(sFunctionRef..': Target ='..oCurTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oCurTarget)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Target ='..oCurTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oCurTarget)..'; iRemainingMassThreat='..iRemainingMassThreat..'; iOriginalMassThreat='..iOriginalMassThreat) end
                     if M27Utilities.IsTableEmpty(oCurTarget[reftTargetedByList]) == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': About to update details of units already assigned to the unit; cycle through reftTargetedByList, table size='..table.getn(oCurTarget[reftTargetedByList])) end
                         for iExistingAirAA, oExistingAirAA in oCurTarget[reftTargetedByList] do
@@ -3215,8 +3237,9 @@ function AirAAManager(aiBrain)
 
 
                     local iCurLoopCount = 0
-                    local iMaxLoopCount = 50
-                    local iMaxAirAA = 50 --Will stop cycling through after this many (performance reasons)
+                    local iMaxLoopCount = 150
+                    local iMaxAirAA = 150 --Will stop cycling through after this many (performance reasons)
+                    local iThresholdToDisableDistanceCheck = 30
 
                     if bDebugMessages == true then LOG(sFunctionRef..': About to look for our AirAA units to attack the target; Target Unit Id='..oCurTarget:GetUnitId()..'; original mass threat='..iOriginalMassThreat..'; iAlreadyAssignedMassValue='..iAlreadyAssignedMassValue..'; iRemainingMassThreat='..iRemainingMassThreat..'; size of availableAA='..table.getn(aiBrain[reftAvailableAirAA])) end
                     while iRemainingMassThreat > 0 and bAbortAsNoMoreAirAA == false do
@@ -3224,26 +3247,30 @@ function AirAAManager(aiBrain)
                             if iOriginalMassThreat <= 5000 then M27Utilities.ErrorHandler('Infinite loop; threat mass threat='..iOriginalMassThreat) end
                             break
                         end
+                        if iCurLoopCount < iThresholdToDisableDistanceCheck then
 
-                        iClosestAirAADistance = 10000
-                        oClosestAirAA = nil
-                        if bDebugMessages == true then LOG(sFunctionRef..': About to look for inties to attack, iRemainingMassThreat='..iRemainingMassThreat..'; size of availableAA='..table.getn(aiBrain[reftAvailableAirAA])) end
-                        iCurLoopCount = iCurLoopCount + 1
+                            iClosestAirAADistance = 10000
+                            oClosestAirAA = nil
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to look for inties to attack, iRemainingMassThreat='..iRemainingMassThreat..'; size of availableAA='..table.getn(aiBrain[reftAvailableAirAA])) end
+                            iCurLoopCount = iCurLoopCount + 1
 
 
-                        for iAirAA, oAirAA in aiBrain[reftAvailableAirAA] do
-                            if iAirAA > iMaxAirAA then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering more AA than want to this cycle so aborting') end
-                                bAbortAsNoMoreAirAA = true
-                                break
+                            for iAirAA, oAirAA in aiBrain[reftAvailableAirAA] do
+                                if iAirAA > iMaxAirAA then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering more AA than want to this cycle so aborting') end
+                                    bAbortAsNoMoreAirAA = true
+                                    break
+                                end
+
+                                iCurAirAADistance = M27Utilities.GetDistanceBetweenPositions(oAirAA:GetPosition(), tCurUnitPos)
+                                if iCurAirAADistance < iClosestAirAADistance then
+                                    iClosestAirAADistance = iCurAirAADistance
+                                    oClosestAirAA = oAirAA
+                                    iClosestAirAARef = iAirAA
+                                end
                             end
-
-                            iCurAirAADistance = M27Utilities.GetDistanceBetweenPositions(oAirAA:GetPosition(), tCurUnitPos)
-                            if iCurAirAADistance < iClosestAirAADistance then
-                                iClosestAirAADistance = iCurAirAADistance
-                                oClosestAirAA = oAirAA
-                                iClosestAirAARef = iAirAA
-                            end
+                        else
+                            oClosestAirAA = aiBrain[reftAvailableAirAA][1]
                         end
                         if oClosestAirAA then
                             if bDebugMessages == true then

@@ -356,7 +356,7 @@ end
 function WantToGetAnotherACUUpgrade(aiBrain)
     --Returns 2 variables: true/false if we have eco+safety to get upgrade; also returns true/false if safe to get upgrade
     local sFunctionRef = 'WantToGetAnotherACUUpgrade'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local bWantUpgrade = false
@@ -380,30 +380,34 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                     local iMassIncomePerTickWanted = iUpgradeMassCost / iUpgradeBuildTime * iACUBuildRate * 0.1
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering if enough mass income to get upgrade; iMassIncomePerTickWanted='..iMassIncomePerTickWanted..'; iUpgradeMassCost='..iUpgradeMassCost..'; iUpgradeBuildTime='..iUpgradeBuildTime..'; iACUBuildRate='..iACUBuildRate..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; aiBrain:GetEconomyStored(MASS)='..aiBrain:GetEconomyStored('MASS')) end
                     if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= iMassIncomePerTickWanted and aiBrain:GetEconomyStored('MASS') >= 5 then --check we're not massively mass stalling
-                        --Have enough energy, check if safe to get upgrade
-                        local bAbort = false
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy and mass, check its safe to get upgrade') end
-                        --Dont treat as being safe if trying to get a slow upgrade and arent on our side of map
-                        if (iUpgradeBuildTime / iACUBuildRate) > 150 then --If will take a while then need to be closer to our base than enemy
-                            local iDistToStart = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                            local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
-                            if iDistToStart + 75 > iDistToEnemy then
-                                --Abort unless we're close to a rally point and near our side of the map
-                                if bDebugMessages == true then M27Utilities.DrawLocation(M27Logic.GetNearestRallyPoint(aiBrain, oACU:GetPosition()), nil, 1, 100) end --draw in dark blue
-                                if iDistToStart - 25 > iDistToEnemy or M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27Logic.GetNearestRallyPoint(aiBrain, oACU:GetPosition())) > 50 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Are on enemy side of map, or too far from nearest rally point') end
-                                    bAbort = true
+                        --Do we have good health, and dont have map control?  If so then want to use ACU to attack
+                        if bDebugMessages == true then LOG(sFunctionRef..': If have low health or nearby threats wont upgrade; oACU:GetHealthPercent()='..oACU:GetHealthPercent()..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
+                        if oACU:GetHealthPercent() < 0.8 or (aiBrain[M27Overseer.refiPercentageOutstandingThreat] > 0.5 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > 0.3) then
+                            --Have enough energy, check if safe to get upgrade
+                            local bAbort = false
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy and mass, check its safe to get upgrade') end
+                            --Dont treat as being safe if trying to get a slow upgrade and arent on our side of map
+                            if (iUpgradeBuildTime / iACUBuildRate) > 150 then --If will take a while then need to be closer to our base than enemy
+                                local iDistToStart = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                                if iDistToStart + 75 > iDistToEnemy then
+                                    --Abort unless we're close to a rally point and near our side of the map
+                                    if bDebugMessages == true then M27Utilities.DrawLocation(M27Logic.GetNearestRallyPoint(aiBrain, oACU:GetPosition()), nil, 1, 100) end --draw in dark blue
+                                    if iDistToStart - 25 > iDistToEnemy or M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27Logic.GetNearestRallyPoint(aiBrain, oACU:GetPosition())) > 50 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Are on enemy side of map, or too far from nearest rally point') end
+                                        bAbort = true
+                                    end
                                 end
                             end
-                        end
-                        if bAbort then bSafeToGetUpgrade = false
-                        else
-                            if bDebugMessages == true then LOG(sFunctionRef..': Want to get upgrade providing its safe; based on distances it looks ok') end
-                            bSafeToGetUpgrade = SafeToGetACUUpgrade(aiBrain)
-                        end
-                        if bSafeToGetUpgrade then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Its safe to get upgrade') end
-                            bWantUpgrade = true
+                            if bAbort then bSafeToGetUpgrade = false
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': Want to get upgrade providing its safe; based on distances it looks ok') end
+                                bSafeToGetUpgrade = SafeToGetACUUpgrade(aiBrain)
+                            end
+                            if bSafeToGetUpgrade then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Its safe to get upgrade') end
+                                bWantUpgrade = true
+                            end
                         end
                     end
                 end
