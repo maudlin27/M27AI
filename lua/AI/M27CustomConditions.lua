@@ -356,7 +356,7 @@ end
 function WantToGetAnotherACUUpgrade(aiBrain)
     --Returns 2 variables: true/false if we have eco+safety to get upgrade; also returns true/false if safe to get upgrade
     local sFunctionRef = 'WantToGetAnotherACUUpgrade'
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local bWantUpgrade = false

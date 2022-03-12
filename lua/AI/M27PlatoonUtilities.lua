@@ -1379,18 +1379,22 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
         local iMobileEnemyCategories = categories.LAND * categories.MOBILE
         if oPlatoon[refbPlatoonHasOverwaterLand] == true then iMobileEnemyCategories = categories.LAND * categories.MOBILE + categories.NAVAL * categories.MOBILE end
         tNearbyEnemies = aiBrain:GetUnitsAroundPoint(iMobileEnemyCategories, tCurPos, iEnemySearchRadius, 'Enemy')
-        if M27Utilities.IsTableEmpty(oPlatoon[reftEnemiesInRange]) == true then
+        if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')..'; iEnemySearchRadius='..iEnemySearchRadius..'; Is table of nearby units empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemies))) end
+        if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are no enemies in range') end
             oPlatoon[refiEnemiesInRange] = 0
             oPlatoon[reftEnemiesInRange] = { }
         else
             --Rework the table to ignore units that are attached to a transport
+            if bDebugMessages == true then LOG(sFunctionRef..': Have enemies in range, will exclude if their unit state is attached; size of table='..table.getn(tNearbyEnemies)) end
             oPlatoon[refiEnemiesInRange] = 0
             oPlatoon[reftEnemiesInRange] = {}
             for iUnit, oUnit in tNearbyEnemies do
-               if not(oUnit:IsUnitState('Attached')) then
-                   oPlatoon[refiEnemiesInRange] = oPlatoon[refiEnemiesInRange] + 1
-                   oPlatoon[reftEnemiesInRange][oPlatoon[refiEnemiesInRange]] = oUnit
-               end
+                if not(oUnit:IsUnitState('Attached')) then
+                    oPlatoon[refiEnemiesInRange] = oPlatoon[refiEnemiesInRange] + 1
+                    oPlatoon[reftEnemiesInRange][oPlatoon[refiEnemiesInRange]] = oUnit
+                    if bDebugMessages == true then LOG(sFunctionRef..': enemy unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' isnt attached so recording as an enemy in range; enemies in range='..oPlatoon[refiEnemiesInRange]) end
+                end
             end
         end
         oPlatoon[reftEnemyStructuresInRange] = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - categories.BENIGN, tCurPos, oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures], 'Enemy')
@@ -1941,7 +1945,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
 
-    if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code') end
+    if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code; platoon action='..(oPlatoon[refiCurrentAction] or 'nil')) end
 
     --Mobile shield normal platoon - will be assisting a unit so dont care about whether are nearby enemies, instead only care if shield is failing (handled via separate logic)
     if not(sPlatoonName == 'M27MobileShield') then
@@ -2139,7 +2143,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
                 --Also run if enemy has air units near our ACU and it doesnt have nearby MAA support and we need air units
                 if not(bACUNeedsToRun) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
-                   local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, GetPlatoonFrontPosition(oPlatoon), 90, 'Enemy')
+                    local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, GetPlatoonFrontPosition(oPlatoon), 90, 'Enemy')
                     if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
                         --Do we have nearby MAA?
                         if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, GetPlatoonFrontPosition(oPlatoon), 90, 'Ally')) then
@@ -2206,7 +2210,13 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
         local bDontConsiderFurtherOrders = false
         local bWillWinAttack = false
         local bHaveRunRecently = false
-        if oPlatoon[refiCurrentAction] then bProceed = false end
+
+        if oPlatoon[refiCurrentAction] then
+            if bDebugMessages == true then LOG(sFunctionRef..': Have determined platoon action from the above so wont proceed, action='..oPlatoon[refiCurrentAction]) end
+            bProceed = false
+        end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering if should proceed, oPlatoon[refiCurrentAction]='..(oPlatoon[refiCurrentAction] or 'nil')..'; bProceed='..tostring(bProceed)..'; iNearbyEnemies='..iNearbyEnemies) end
         if iNearbyEnemies > 0 then
             if bProceed == true then
                 --Intel specific - just run unless only structures and known to be hostile, or have a seraphim scout and against enemy non-sera scout or engi:
@@ -2394,7 +2404,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
                                     end
                                     bDontConsiderFurtherOrders = true
-                                --elseif bShotIsBlockedForAnyUnit == true then
+                                    --elseif bShotIsBlockedForAnyUnit == true then
                                 else
                                     oPlatoon[refiCurrentAction] = refActionAttackSpecificUnit
                                     oPlatoon[refoTemporaryAttackTarget] = oClosestUnitWhereShotNotBlocked
@@ -3593,10 +3603,20 @@ function DetermineActionForNearbyMex(oPlatoon)
                     if M27Utilities.IsTableEmpty(tNearbyMex) == false then
                         --Do we already have an action to reclaim? If so then only build mex if are in range
                         if not(oPlatoon[refiCurrentAction]) or (aiBrain:GetEconomyStored('MASS') >= 20 and M27Utilities.GetDistanceBetweenPositions(tNearbyMex, GetPlatoonFrontPosition(oPlatoon)) <= oPlatoon[reftBuilders][1]:GetBlueprint().MaxBuildDistance) then
-                            oPlatoon[refiCurrentAction] = refActionBuildMex
-                            if oPlatoon[reftNearbyMexToBuildOn] == nil then oPlatoon[reftNearbyMexToBuildOn] = {} end
-                            oPlatoon[reftNearbyMexToBuildOn] = tNearbyMex
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have updated for nearby mex='..repr(oPlatoon[reftNearbyMexToBuildOn])) end
+                            --Is the mex location in range of enemy T2+ PD?
+                            local tEnemyT2PlusPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, tNearbyMex, 53, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) then
+                                tEnemyT2PlusPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3PD, tNearbyMex, 72, 'Enemy')
+                                if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) then
+
+                                    oPlatoon[refiCurrentAction] = refActionBuildMex
+                                    if oPlatoon[reftNearbyMexToBuildOn] == nil then oPlatoon[reftNearbyMexToBuildOn] = {} end
+                                    oPlatoon[reftNearbyMexToBuildOn] = tNearbyMex
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have updated for nearby mex='..repr(oPlatoon[reftNearbyMexToBuildOn])) end
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': Mex has T3 PD near it so wont proceed')
+                                end
+                            elseif bDebugMessages == true then LOG(sFunctionRef..': Mex has T2 PD near it so wont proceed')
+                            end
                         elseif bDebugMessages == true then LOG(sFunctionRef..': Already have an action assigned, and not in range of mex, so will proceed with existing action')
                         end
                     end
@@ -4343,7 +4363,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 26 then bDebugMessages = true end
 
             if bDebugMessages == true then
-                LOG(sFunctionRef..': Start of code')
+                LOG(sFunctionRef..': Start of code; GameTime='..GetGameTimeSeconds())
               --M27EngineerOverseer.TEMPTEST(aiBrain, 'Determine platoon action - start of code')
                 if sPlatoonName == 'M27IndirectDefender' then LOG(sFunctionRef..': Platoon name and count='..sPlatoonName..oPlatoon[refiPlatoonCount]..': refbShouldHaveEscort='..tostring(oPlatoon[refbShouldHaveEscort])) end
             end

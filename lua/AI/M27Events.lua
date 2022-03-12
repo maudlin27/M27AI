@@ -309,7 +309,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
 
             if EntityCategoryContains(M27UnitInfo.refCategorySML, oConstruction:GetUnitId()) then
                 --Are building a nuke, check if already monitoring SMD somehow
-                if not(oConstruction[M27UnitInfo.refbActiveSMDChecker]) then
+                if not(oConstruction[M27UnitInfo.refbActiveSMDChecker]) and oConstruction:GetFractionComplete() < 1 then
                 --if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] == M27UnitInfo.refCategorySML and not(aiBrain[M27UnitInfo.refbActiveSMDChecker]) then
                     ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oConstruction)
                 end

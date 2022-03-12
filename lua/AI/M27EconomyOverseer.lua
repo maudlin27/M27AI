@@ -25,6 +25,7 @@ reftT2MexesNearBase = 'M27EconomyT2MexesNearBase' --Amphib pathable near base an
 refoNearestT2MexToBase = 'M27EconomyNearestT2MexToBase' --As per t2mexesnearbase
 refbWillCtrlKMex = 'M27EconomyWillCtrlKMex' --true if mex is marked for ctrl-k
 refbReclaimNukes = 'M27EconomyReclaimNukes' --true if want to add nuke silos to the reclaim shortlist
+refbWillReclaimUnit = 'M27EconomyWillReclaimUnit' --Set against a unit, true if will reclaim it
 
 local reftUpgrading = 'M27UpgraderUpgrading' --[x] is the nth building upgrading, returns the object upgrading
 refiPausedUpgradeCount = 'M27UpgraderPausedCount' --Number of units where have paused the upgrade
@@ -259,6 +260,13 @@ function GetUnitReclaimTargets(aiBrain)
     if aiBrain[refbReclaimNukes] then
         for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategorySML, false, false) do
             table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+        end
+    end
+
+    --Flag any units set to be reclaimed
+    if M27Utilities.IsTableEmpty(aiBrain[reftUnitsToReclaim]) == false then
+        for iUnit, oUnit in aiBrain[reftUnitsToReclaim] do
+            oUnit[refbWillReclaimUnit] = true
         end
     end
 

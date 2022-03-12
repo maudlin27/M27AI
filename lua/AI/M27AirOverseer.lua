@@ -1460,13 +1460,28 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Sends low fuel units to air staging
     if M27Utilities.IsTableEmpty(tUnitsToRefuel) == false then
+        bDebugMessages = true
         local tAirStaging = aiBrain:GetListOfUnits(categories.AIRSTAGINGPLATFORM, false, true)
-        if bDebugMessages == true then LOG(sFunctionRef..': Want units to refuel, number of airstaging we have='..table.getn(tAirStaging)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; Want units to refuel, number of airstaging we have='..table.getn(tAirStaging)) end
         if M27Utilities.IsTableEmpty(tAirStaging) == true then
             if bDebugMessages == true then LOG(sFunctionRef..': tAirStaging is nil, but we have units that want to refuel') end
             aiBrain[refiAirStagingWanted] = math.max(1, math.ceil(table.getn(tUnitsToRefuel) / 8))
         else
-            aiBrain[refiAirStagingWanted] = math.max(0, math.floor(table.getn(tAirStaging) - table.getn(tUnitsToRefuel) / 4))
+            local iFullyAvailableStaging = 0
+            aiBrain[refiAirStagingWanted] = table.getn(tAirStaging)
+            aiBrain[refiAirStagingWanted] = aiBrain[refiAirStagingWanted] + math.max(0, math.floor(table.getn(tUnitsToRefuel) / 3 - aiBrain[refiAirStagingWanted]))
+
+            --Check if all our air staging are being used, in which case increase the number wanted by 1
+
+            for iAirStaging, oAirStaging in tAirStaging do
+                if M27Utilities.IsTableEmpty(oAirStaging[reftAssignedRefuelingUnits]) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': We have an air staging unit '..oAirStaging:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oAirStaging)..' that hasnt had any units sent to it to refuel that we know of') end
+                    iFullyAvailableStaging = iFullyAvailableStaging + 1
+                end
+            end
+            if iFullyAvailableStaging == 0 then aiBrain[refiAirStagingWanted] = aiBrain[refiAirStagingWanted] + 1 end
+
+
             --Find nearest available air staging unit
             if bDebugMessages == true then LOG(sFunctionRef..': We have air staging so getting unit to refuel') end
             local bAlreadyTryingToRefuel = false
@@ -1477,81 +1492,86 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
             local iLoopCount = 0
             for iStaging, oStaging in tAirStaging do
                 if M27UnitInfo.IsUnitValid(oStaging) then
-                    --Estimate capacity (cant see in blueprint)
-                    if EntityCategoryContains(categories.STRUCTURE, oStaging) then iCapacity = 4
-                    elseif EntityCategoryContains(categories.EXPERIMENTAL * categories.CARRIER, oStaging) then iCapacity = 40
-                    else iCapacity = 1
-                    end
+                    --Do we have a fully available air staging and <=4 units t o refuel? If so then just send the units to this air staging
+                    if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) or not(iFullyAvailableStaging > 0 and iFullyAvailableStaging * 4 <= table.getn(tUnitsToRefuel)) then
 
-                    iAssignedUnits = 0
-                    if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) == false then
-                        for iRefuelingUnit, oRefuelingUnit in oStaging[reftAssignedRefuelingUnits] do
-                            if M27UnitInfo.IsUnitValid(oRefuelingUnit) == false or oRefuelingUnit[refbSentRefuelCommand] == false then
-                                oStaging[reftAssignedRefuelingUnits][iRefuelingUnit] = nil
-                            else
-                                --Is the unit already refueled and isnt flagged as being in air staging?
-                                if oRefuelingUnit:GetFuelRatio() >= 0.95 and oRefuelingUnit:GetHealthPercent() >= 0.98 and not(oRefuelingUnit:IsUnitState('Attached')) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': oRefuelingUnit='..oRefuelingUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oRefuelingUnit)..'; appears to have refueld and isnt attached, unit state='..M27Logic.GetUnitState(oRefuelingUnit)..' so will clear refueling trakcers') end
-                                    oRefuelingUnit[refbSentRefuelCommand] = false
-                                    oStaging[reftAssignedRefuelingUnits][iRefuelingUnit] = nil
-                                    oRefuelingUnit[refoAirStagingAssigned] = nil
-                                else
-                                    iAssignedUnits = iAssignedUnits + 1
-                                end
-                            end
+
+                        --Estimate capacity (cant see in blueprint)
+                        if EntityCategoryContains(categories.STRUCTURE, oStaging) then iCapacity = 4
+                        elseif EntityCategoryContains(categories.EXPERIMENTAL * categories.CARRIER, oStaging) then iCapacity = 40
+                        else iCapacity = 1
                         end
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Air staging unit '..oStaging:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oStaging)..': iCapacity='..iCapacity..'; iAssignedUnits='..iAssignedUnits) end
 
-                    if iAssignedUnits < iCapacity then
-                        for iUnit, oUnit in tUnitsToRefuel do
-                            bAlreadyTryingToRefuel = false
-                            if M27UnitInfo.IsUnitValid(oUnit) then
-                                --Does the unit already have a target of the air staging and isnt flagged as having been sent a refuel command?
-                                if not(oUnit[refbSentRefuelCommand]) and oUnit.GetNavigator then
-                                    oNavigator = oUnit:GetNavigator()
-                                    if oNavigator.GetCurrentTargetPos then
-                                        tCurTarget = oNavigator:GetCurrentTargetPos()
-                                        tNearbyAirStaging = M27Utilities.GetOwnedUnitsAroundPoint(aiBrain, categories.AIRSTAGINGPLATFORM, tCurTarget, 1)
-                                        if M27Utilities.IsTableEmpty(tNearbyAirStaging) == false then
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef..' tCurTarget='..repr(tCurTarget))
-                                                M27Utilities.DrawLocation(tCurTarget)
-                                            end
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Units target is the same as an air staging platform so think it is already trying to refuel') end
-                                            bAlreadyTryingToRefuel = true
-                                        end
+                        iAssignedUnits = 0
+                        if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) == false then
+                            for iRefuelingUnit, oRefuelingUnit in oStaging[reftAssignedRefuelingUnits] do
+                                if M27UnitInfo.IsUnitValid(oRefuelingUnit) == false or oRefuelingUnit[refbSentRefuelCommand] == false then
+                                    oStaging[reftAssignedRefuelingUnits][iRefuelingUnit] = nil
+                                else
+                                    --Is the unit already refueled and isnt flagged as being in air staging?
+                                    if oRefuelingUnit:GetFuelRatio() >= 0.95 and oRefuelingUnit:GetHealthPercent() >= 0.98 and not(oRefuelingUnit:IsUnitState('Attached')) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': oRefuelingUnit='..oRefuelingUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oRefuelingUnit)..'; appears to have refueld and isnt attached, unit state='..M27Logic.GetUnitState(oRefuelingUnit)..' so will clear refueling trakcers') end
+                                        oRefuelingUnit[refbSentRefuelCommand] = false
+                                        oStaging[reftAssignedRefuelingUnits][iRefuelingUnit] = nil
+                                        oRefuelingUnit[refoAirStagingAssigned] = nil
+                                    else
+                                        iAssignedUnits = iAssignedUnits + 1
                                     end
                                 end
-                                if not(bAlreadyTryingToRefuel) and not(oUnit:IsUnitState('Attached')) then
-                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                                    IssueClearCommands({ oUnit})
-                                    IssueTransportLoad({ oUnit }, oStaging)
-                                    oUnit[refbSentRefuelCommand] = true
-                                    oUnit[refoAirStagingAssigned] = oStaging
-                                    if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) then oStaging[reftAssignedRefuelingUnits] = {} end
-                                    oStaging[reftAssignedRefuelingUnits][oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
-                                    iAssignedUnits = iAssignedUnits + 1
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Sent command for oUnit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to refuel, iAssignedUnits='..iAssignedUnits) end
-                                    if iAssignedUnits >= iCapacity then break end
-                                end
                             end
                         end
-                        --Update units to refuel
-                        if bDebugMessages == true then LOG(sFunctionRef..': About to update tUnitsToRefuel to remove units that have now been sent for refueling') end
-                        bUpdateRefuelingUnits = true
-                        while bUpdateRefuelingUnits do
-                            iLoopCount = iLoopCount + 1
-                            if iLoopCount >= 100 then M27Utilities.ErrorHandler('Infinite loop, iLoopCount='..iLoopCount) break end
-                            bUpdateRefuelingUnits = false
+                        if bDebugMessages == true then LOG(sFunctionRef..': Air staging unit '..oStaging:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oStaging)..': iCapacity='..iCapacity..'; iAssignedUnits='..iAssignedUnits) end
+
+                        if iAssignedUnits < iCapacity then
                             for iUnit, oUnit in tUnitsToRefuel do
-                                if M27UnitInfo.IsUnitValid(oUnit) == false or oUnit[refbSentRefuelCommand] then
-                                    bUpdateRefuelingUnits = true
-                                    table.remove(tUnitsToRefuel, iUnit) break
+                                bAlreadyTryingToRefuel = false
+                                if M27UnitInfo.IsUnitValid(oUnit) then
+                                    --Does the unit already have a target of the air staging and isnt flagged as having been sent a refuel command?
+                                    if not(oUnit[refbSentRefuelCommand]) and oUnit.GetNavigator then
+                                        oNavigator = oUnit:GetNavigator()
+                                        if oNavigator.GetCurrentTargetPos then
+                                            tCurTarget = oNavigator:GetCurrentTargetPos()
+                                            tNearbyAirStaging = M27Utilities.GetOwnedUnitsAroundPoint(aiBrain, categories.AIRSTAGINGPLATFORM, tCurTarget, 1)
+                                            if M27Utilities.IsTableEmpty(tNearbyAirStaging) == false then
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef..' tCurTarget='..repr(tCurTarget))
+                                                    M27Utilities.DrawLocation(tCurTarget)
+                                                end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Units target is the same as an air staging platform so think it is already trying to refuel') end
+                                                bAlreadyTryingToRefuel = true
+                                            end
+                                        end
+                                    end
+                                    if not(bAlreadyTryingToRefuel) and not(oUnit:IsUnitState('Attached')) then
+                                        ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                                        IssueClearCommands({ oUnit})
+                                        IssueTransportLoad({ oUnit }, oStaging)
+                                        oUnit[refbSentRefuelCommand] = true
+                                        oUnit[refoAirStagingAssigned] = oStaging
+                                        if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) then oStaging[reftAssignedRefuelingUnits] = {} end
+                                        oStaging[reftAssignedRefuelingUnits][oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+                                        iAssignedUnits = iAssignedUnits + 1
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Sent command for oUnit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to refuel, iAssignedUnits='..iAssignedUnits) end
+                                        if iAssignedUnits >= iCapacity then break end
+                                    end
                                 end
                             end
+                            --Update units to refuel
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to update tUnitsToRefuel to remove units that have now been sent for refueling') end
+                            bUpdateRefuelingUnits = true
+                            while bUpdateRefuelingUnits do
+                                iLoopCount = iLoopCount + 1
+                                if iLoopCount >= 100 then M27Utilities.ErrorHandler('Infinite loop, iLoopCount='..iLoopCount) break end
+                                bUpdateRefuelingUnits = false
+                                for iUnit, oUnit in tUnitsToRefuel do
+                                    if M27UnitInfo.IsUnitValid(oUnit) == false or oUnit[refbSentRefuelCommand] then
+                                        bUpdateRefuelingUnits = true
+                                        table.remove(tUnitsToRefuel, iUnit) break
+                                    end
+                                end
+                            end
+                            if M27Utilities.IsTableEmpty(tUnitsToRefuel) then break end
                         end
-                        if M27Utilities.IsTableEmpty(tUnitsToRefuel) then break end
                     end
                 end
             end
@@ -3740,6 +3760,9 @@ function GetNovaxTarget(aiBrain, oNovax)
                 iSearchRange = 120
             elseif iCurTargetType == 9 then
                 iCategoriesToSearch = categories.COMMAND
+            elseif iCurTargetType == 10 then
+                iCategoriesToSearch = categories.VOLATILE * categories.STRUCTURE + categories.VOLATILE * categories.LAND
+                iMassFactor = 2
             else
                 bConsideredAllHighValueTargets = true
                 break
@@ -3750,85 +3773,90 @@ function GetNovaxTarget(aiBrain, oNovax)
             if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
                 if bDebugMessages == true then LOG(sFunctionRef..': iCurTargetType='..iCurTargetType..'; Found a total of '..table.getn(tEnemyUnits)..' enemy units, will check if any of them are valid targets') end
                 for iUnit, oUnit in tEnemyUnits do
-                    --Is the unit underwater or shielded?
-                    if not(M27UnitInfo.IsUnitUnderwater(oUnit)) and not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 2000, false, false, false)) then
-                        iCurDPSMod = 0
-                        iCurValue = oUnit:GetBlueprint().Economy.BuildCostMass * iMassFactor
-                        if oUnit:GetBlueprint().Defense.Shield and M27UnitInfo.IsUnitShieldEnabled(oUnit) then
-                            if oUnit.MyShield.GetHealth and oUnit.MyShield:GetHealth() > 0 then
-                                iCurDPSMod = oUnit:GetBlueprint().Defense.Shield.ShieldRegenRate
-                                if not(iCurDPSMod) then
-                                    if EntityCategoryContains(categories.COMMAND + categories.SUBCOMMANDER, oUnit:GetUnitId()) then
-                                        iCurDPSMod = M27UnitInfo.GetACUShieldRegenRate(oUnit)
-                                        if (iCurDPSMod or 0) == 0 then
+                    --Is the unit mobile and attached to another and is <=T3?
+                    if not(oUnit:IsUnitState('Attached') and EntityCategoryContains(categories.MOBILE, oUnit:GetUnitId())) then
+                        --Is the unit underwater or shielded?
+                        if not(M27UnitInfo.IsUnitUnderwater(oUnit)) and not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 2000, false, false, false)) then
+                            iCurDPSMod = 0
+                            iCurValue = oUnit:GetBlueprint().Economy.BuildCostMass * iMassFactor
+                            if oUnit:GetBlueprint().Defense.Shield and M27UnitInfo.IsUnitShieldEnabled(oUnit) then
+                                if oUnit.MyShield.GetHealth and oUnit.MyShield:GetHealth() > 0 then
+                                    iCurDPSMod = oUnit:GetBlueprint().Defense.Shield.ShieldRegenRate
+                                    if not(iCurDPSMod) then
+                                        if EntityCategoryContains(categories.COMMAND + categories.SUBCOMMANDER, oUnit:GetUnitId()) then
+                                            iCurDPSMod = M27UnitInfo.GetACUShieldRegenRate(oUnit)
+                                            if (iCurDPSMod or 0) == 0 then
+                                                M27Utilities.ErrorHandler('For some reason the unit has a shield with health but no regen rate; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit), nil, true)
+                                                iCurDPSMod = 0
+                                            end
+                                        else
                                             M27Utilities.ErrorHandler('For some reason the unit has a shield with health but no regen rate; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit), nil, true)
                                             iCurDPSMod = 0
                                         end
-                                    else
-                                        M27Utilities.ErrorHandler('For some reason the unit has a shield with health but no regen rate; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit), nil, true)
-                                        iCurDPSMod = 0
                                     end
+                                else iCurDPSMod = 0
                                 end
                             else iCurDPSMod = 0
                             end
-                        else iCurDPSMod = 0
-                        end
-                        iCurDPSMod = iCurDPSMod + (oUnit:GetBlueprint().Defense.RegenRate or 0)
-                        iTimeToTarget = math.max(0, M27Utilities.GetDistanceBetweenPositions(oNovax:GetPosition(), oUnit:GetPosition()) - iRange) / iSpeed
-                        iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
-                        iTimeToKillTarget = (oUnit:GetHealth() + iCurShield + math.min(iMaxShield - iCurShield, iTimeToTarget * iCurDPSMod))/math.max(0.001, iDPS - iCurDPSMod)
-                        if iMaxShield == 0 and not(EntityCategoryContains(categories.COMMAND, oUnit:GetUnitId())) then iCurValue = iCurValue * math.max(oUnit:GetHealthPercent(), 0.25) end
-                        if bDebugMessages == true then LOG(sFunctionRef..' Unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' iCurValue='..iCurValue..'; iTimeToTarget='..iTimeToTarget..'; iTimeToKillTarget='..iTimeToKillTarget..'; iCurShield='..iCurShield..'; iMaxShield='..iMaxShield..'; iCurDPSMod='..iCurDPSMod) end
-                        iCurValue = iCurValue / math.max(1.5, iTimeToTarget * 0.9 + iTimeToKillTarget)
+                            iCurDPSMod = iCurDPSMod + (oUnit:GetBlueprint().Defense.RegenRate or 0)
+                            iTimeToTarget = math.max(0, M27Utilities.GetDistanceBetweenPositions(oNovax:GetPosition(), oUnit:GetPosition()) - iRange) / iSpeed
+                            iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                            iTimeToKillTarget = (oUnit:GetHealth() + iCurShield + math.min(iMaxShield - iCurShield, iTimeToTarget * iCurDPSMod))/math.max(0.001, iDPS - iCurDPSMod)
+                            if iMaxShield == 0 and not(EntityCategoryContains(categories.COMMAND, oUnit:GetUnitId())) then iCurValue = iCurValue * math.max(oUnit:GetHealthPercent(), 0.25) end
+                            if bDebugMessages == true then LOG(sFunctionRef..' Unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' iCurValue='..iCurValue..'; iTimeToTarget='..iTimeToTarget..'; iTimeToKillTarget='..iTimeToKillTarget..'; iCurShield='..iCurShield..'; iMaxShield='..iMaxShield..'; iCurDPSMod='..iCurDPSMod) end
+                            iCurValue = iCurValue / math.max(1.5, iTimeToTarget * 0.9 + iTimeToKillTarget)
 
 
-                        --Massively adjust mass factor if dealing with nearby ACU that can kill before it gets to safety
-                        if iCategoriesToSearch == categories.COMMAND and (iTimeToTarget + iTimeToKillTarget) < 60 and (iMaxShield + oUnit:GetMaxHealth()) <= 25000 then
-                            iACUSpeed = oUnit:GetBlueprint().Physics.MaxSpeed
-                            --Get nearest shield
-                            iNearestShield = 10000
-                            tPossibleShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oUnit:GetPosition(), 102, 'Enemy')
-                            --Dont do mobile shields since risk thinking no mobile shields, then revealing them and aborting attack, then losing intle on the mobile shield and repeating attack; so better to just attack if there's a mobile shield
-                            for iShield, oShield in tPossibleShields do
-                                iCurShieldDistance = M27Utilities:GetDistanceBetweenPositions(oShield:GetPosition(), oUnit:GetPosition()) - oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5
-                                if iCurShieldDistance < iNearestShield then iNearestShield = iCurShieldDistance end
-                            end
-                            --Could the ACU get under a shield before it dies?
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have a nearby ACU target, will consider if we can kill it before it gets to safety; iNearestShield='..iNearestShield..'; iACUSpeed='..iACUSpeed) end
-                            if iNearestShield / iACUSpeed > iTimeToKillTarget then
-                                iNearestWater = nil
-                                if not(M27MapInfo.bMapHasWater) then iNearestWater = 10000
-                                else
-                                    --Where is the nearest water to the ACU
-                                    iCurAmphibiousGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
-                                    for iDistance = 20, 100, 20 do
-                                        for iAngle = 0, 315, 45 do
-                                            tPossiblePosition = M27Utilities.MoveInDirection(oUnit:GetPosition(), iAngle, iDistance, true)
-                                            tPossiblePosition[2] = GetTerrainHeight(tPossiblePosition[1], tPossiblePosition[3])
-                                            if M27MapInfo.IsUnderwater(tPossiblePosition) then
-                                                --Can the enemy ACU path here?
-                                                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossiblePosition) == iCurAmphibiousGroup then
-                                                    iNearestWater = iDistance
-                                                    break
-                                                end
-                                            end
-                                        end
-                                        if iNearestWater then break end
+                            --Massively adjust mass factor if dealing with nearby ACU that can kill before it gets to safety
+                            if iCategoriesToSearch == categories.COMMAND and (iTimeToTarget + iTimeToKillTarget) < 60 and (iMaxShield + oUnit:GetMaxHealth()) <= 25000 then
+                                iACUSpeed = oUnit:GetBlueprint().Physics.MaxSpeed
+                                --Get nearest shield
+                                iNearestShield = 10000
+                                tPossibleShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oUnit:GetPosition(), 102, 'Enemy')
+                                --Dont do mobile shields since risk thinking no mobile shields, then revealing them and aborting attack, then losing intle on the mobile shield and repeating attack; so better to just attack if there's a mobile shield
+                                if M27Utilities.IsTableEmpty(tPossibleShields) == false then
+                                    for iShield, oShield in tPossibleShields do
+                                        iCurShieldDistance = M27Utilities:GetDistanceBetweenPositions(oShield:GetPosition(), oUnit:GetPosition()) - oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5
+                                        if iCurShieldDistance < iNearestShield then iNearestShield = iCurShieldDistance end
                                     end
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': iNearestWater='..(iNearestWater or 'nil')) end
-                                if (iNearestWater or 10000) / iACUSpeed > iTimeToKillTarget then
-                                    iCurValue = iCurValue * 30
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Think we can kill the ACU so massively increasing the curvalue to '..iCurValue) end
+                                --Could the ACU get under a shield before it dies?
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have a nearby ACU target, will consider if we can kill it before it gets to safety; iNearestShield='..iNearestShield..'; iACUSpeed='..iACUSpeed) end
+                                if iNearestShield / iACUSpeed > iTimeToKillTarget then
+                                    iNearestWater = nil
+                                    if not(M27MapInfo.bMapHasWater) then iNearestWater = 10000
+                                    else
+                                        --Where is the nearest water to the ACU
+                                        iCurAmphibiousGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+                                        for iDistance = 20, 100, 20 do
+                                            for iAngle = 0, 315, 45 do
+                                                tPossiblePosition = M27Utilities.MoveInDirection(oUnit:GetPosition(), iAngle, iDistance, true)
+                                                tPossiblePosition[2] = GetTerrainHeight(tPossiblePosition[1], tPossiblePosition[3])
+                                                if M27MapInfo.IsUnderwater(tPossiblePosition) then
+                                                    --Can the enemy ACU path here?
+                                                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossiblePosition) == iCurAmphibiousGroup then
+                                                        iNearestWater = iDistance
+                                                        break
+                                                    end
+                                                end
+                                            end
+                                            if iNearestWater then break end
+                                        end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iNearestWater='..(iNearestWater or 'nil')) end
+                                    if (iNearestWater or 10000) / iACUSpeed > iTimeToKillTarget then
+                                        iCurValue = iCurValue * 30
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Think we can kill the ACU so massively increasing the curvalue to '..iCurValue) end
+                                    end
                                 end
                             end
+                            if iCurValue > iBestTargetValue then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have a new best target, iBestTargetValue='..iBestTargetValue..'; Target='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                                iBestTargetValue = iCurValue
+                                oTarget = oUnit
+                            end
+                        elseif bDebugMessages == true then LOG(sFunctionRef..': Target unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is underwater or under a shield')
                         end
-                        if iCurValue > iBestTargetValue then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have a new best target, iBestTargetValue='..iBestTargetValue..'; Target='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
-                            iBestTargetValue = iCurValue
-                            oTarget = oUnit
-                        end
-                    elseif bDebugMessages == true then LOG(sFunctionRef..': Target unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is underwater or under a shield')
                     end
                 end
             elseif bDebugMessages == true then LOG(sFunctionRef..': iCurTargetType='..iCurTargetType..': No units found')

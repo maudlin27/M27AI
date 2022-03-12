@@ -3900,6 +3900,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                     else
                         IssueNuke({oLauncher}, tTarget)
                         --Restart SMD monitor after giving time for missile to fire
+                        if oLauncher then oLauncher[M27UnitInfo.refbActiveSMDChecker] = false end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         WaitSeconds(10)
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
