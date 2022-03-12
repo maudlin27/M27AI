@@ -170,6 +170,7 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                     M27Utilities.ErrorHandler('Couldnt find any energy reclaim, only scenario where expected is if lots of very tiny energy reclaim or have lots of engis already reclaiming; will just pick a random location', nil, true)
                     tClosestLocationToEngi = {tEngiPosition[1] + math.random(iSearchRadius - 10, iSearchRadius), nil, tEngiPosition[3] + math.random(iSearchRadius - 10, iSearchRadius)}
                     tClosestLocationToEngi[2] = GetSurfaceHeight(tClosestLocationToEngi[1], tClosestLocationToEngi[3])
+                    aiBrain[M27EngineerOverseer.refiTimeOfLastFailure][M27EngineerOverseer.refActionReclaimTrees] = GetGameTimeSeconds()
                 end
                 break
             end
@@ -2384,7 +2385,7 @@ function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathingType, iSegmen
 
     --Factor in reclaim: 60% of cur segment, 30% of adjacent segments (i.e. would rather target units than reclaim)
     local iBaseReclaimSegmentX, iBaseReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tLocation)
-    iTotalValue = iTotalValue + 0.3 * M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimTotalMass]
+    iTotalValue = iTotalValue + 0.3 * (M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimTotalMass] or 0)
     for iAdjustX = -1, 1, 1 do
         for iAdjustZ = -1, 1, 1 do
             if iBaseReclaimSegmentX + iAdjustX > 0 and iBaseReclaimSegmentZ + iAdjustZ > 0 then
@@ -2420,6 +2421,7 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
 
 
     if oPlatoon[M27PlatoonUtilities.refbNeedToHeal] then
+        if bDebugMessages == true then LOG(sFunctionRef..': ACU flagged as needing to heal so will go to nearest rally point') end
         tHighestValueLocation = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
     else
         --First calculate the value for the enemy start position
@@ -2431,7 +2433,7 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
 
 
 
-
+        if bDebugMessages == true then LOG(sFunctionRef..': Value of enemy start location='..iHighestValueLocation..'; will consider if any mexes have a better value') end
         --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
         for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathingType][M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))] do
             if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 then
@@ -2439,6 +2441,7 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
                 if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathingType, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
                     iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathingType, iSegmentGroup)
                     if iCurValueLocation > iHighestValueLocation then
+                        if bDebugMessages == true then LOG(sFunctionRef..': tMex='..repr(tMex)..'; value of location='..iCurValueLocation) end
                         iHighestValueLocation = iCurValueLocation
                         tHighestValueLocation = tMex
                     end
@@ -2446,7 +2449,10 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
             end
         end
     end
-    if tHighestValueLocation == nil then tHighestValueLocation = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)] end
+    if tHighestValueLocation == nil then
+        if bDebugMessages == true then LOG(sFunctionRef..': Dont have a highest value location so will pick enemy start') end
+        tHighestValueLocation = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tHighestValueLocation
 end
@@ -3215,6 +3221,7 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsShotBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local bShotIsBlocked = false
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -3953,6 +3960,12 @@ function GetT3ArtiTarget(oT3Arti)
     --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
     tTarget = {M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)][1], M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)][2], M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)][3]}
     iBestValueTarget = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage)
+
+    --Check we dont have key friendly units close to here
+    if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
+        iBestTargetValue = 0
+    end
+
     --iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], iAOE, iDamage)
     --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
     if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <15k then will consider other targets') end
@@ -3965,8 +3978,13 @@ function GetT3ArtiTarget(oT3Arti)
                     if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit:GetUnitId()..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
                     --Stop looking if tried >=10 targets and have one that is at least 20k of value
                     if iCurTargetValue > iBestTargetValue then
-                        iBestTargetValue = iCurTargetValue
-                        tTarget = oUnit:GetPosition()
+                        if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
+                            iCurTargetValue = 0
+                        end
+                        if iCurTargetValue > iBestTargetValue then
+                            iBestTargetValue = iCurTargetValue
+                            tTarget = oUnit:GetPosition()
+                        end
                     end
                     if iBestTargetValue > 15000 and iUnit >=10 then break end
                 end

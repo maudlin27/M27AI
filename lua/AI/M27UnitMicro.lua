@@ -700,11 +700,12 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
             local iAngleToTargetUnit = M27Utilities.GetAngleFromAToB(oFiringUnit:GetPosition(), oTargetUnit:GetPosition())
             local iDistToTargetUnit = M27Utilities.GetDistanceBetweenPositions(oFiringUnit:GetPosition(), oTargetUnit:GetPosition())
             local iCurAngleDif
+            if bDebugMessages == true then LOG(sFunctionRef..': iAngleToTargetUnit='..iAngleToTargetUnit..'; iDistToTargetUnit='..iDistToTargetUnit) end
             for iUnit, oUnit in toStructuresAndACU do
-                if not(oUnit == oTargetUnit) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' will block a shot from the ACU to the target '..oTargetUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)) end
+                if not(oUnit == oTargetUnit) and iDistToTargetUnit > oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()] then
                     iCurAngleDif = iAngleToTargetUnit - oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]
                     if iCurAngleDif < 0 then iCurAngleDif = iCurAngleDif + 360 end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' will block a shot from the ACU to the target '..oTargetUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; iCurAngleDif='..iCurAngleDif..'; 180 / iDistToTargetUnit='..180 / iDistToTargetUnit..'; oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]='..oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]..'; oUnit[reftiDistFromACUToUnit]='..oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()]) end
                     if math.max(8, 180 / iDistToTargetUnit) <= iCurAngleDif then
                         return true
                     end

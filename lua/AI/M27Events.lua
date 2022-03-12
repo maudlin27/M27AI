@@ -156,7 +156,7 @@ function OnDamaged(self, instigator)
                                     --Do we have nearby friendly units?
                                     if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
                                         --Is the unit within range of us?
-                                        local iOurMaxRange = GetUnitMaxGroundRange({self})
+                                        local iOurMaxRange = M27Logic.GetUnitMaxGroundRange({self})
                                         if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
                                             IssueClearCommands({self})
                                             IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])

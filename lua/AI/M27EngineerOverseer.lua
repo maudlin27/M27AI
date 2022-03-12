@@ -3322,7 +3322,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
             else
                 local bAreAssisting = false
                 if iActionToAssign == refActionReclaimArea or iActionToAssign == refActionReclaimTrees then
-                    tActionTargetLocation = M27Logic.ChooseReclaimTarget(oEngineer, true)
+                    tActionTargetLocation = M27Logic.ChooseReclaimTarget(oEngineer, (iActionToAssign == refActionReclaimTrees))
                     if M27Utilities.IsTableEmpty(tActionTargetLocation) == true then
                         --Get random position between 50 and 100 of base to attack-move to
                         tActionTargetLocation = AttackMoveToRandomPositionAroundBase(aiBrain, oEngineer, 100, 50)

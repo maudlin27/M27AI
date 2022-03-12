@@ -75,6 +75,7 @@ refiLastPrevActionOverride = 'M27PlatoonLastPrevActionOverride' --Used to track 
 refbConsiderReclaim = 'M27ConsiderNearbyReclaim'
 refbConsiderMexes = 'M27ConsiderNearbyMexes'
 refbNeedToHeal = 'M27NeedToHeal'
+refbNeededToHealWhenGotMovementPath = 'M27PlatoonNeededToHeal' --True if when we got a new movement path the platoon needed to heal - used for ACU
 
 --2) Pathing related
 --refiLastPathTarget = 'M27LastPathTarget' --Replaced with table.getn due to too high a risk of error if this wasnt updated
@@ -1699,14 +1700,16 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
                                                             end
                                                         else
 
-                                                            --We're not moving along a path, and aren't attacking an enemy
-                                                            --Are there nearby enemies? If so then attack them
-                                                            if oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] > 0 then
+                                                            --We're not moving along a path, and aren't attacking an enemy - do nothing for now
+                                                            --Are there nearby enemies? If so then attack them - decided to remove this due to risk of ACU attacking when its been told to ignore an attack order previously
+                                                            --also dont want action to continuemovementpath or else risk ignoring the 'have reached destination' logic
+
+                                                            --[[if oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] > 0 then
                                                                 if bDebugMessages == true then LOG(sFunctionRef..': Not moving along a path but have nearby enemies so will attack') end
                                                                 oPlatoon[refiCurrentAction] = refActionAttack
                                                             else
                                                                 oPlatoon[refiCurrentAction] = refActionContinueMovementPath
-                                                            end
+                                                            end--]]
                                                         end --Prev action refActionContinueMovementPath
                                                     end --Prev action refActionAttack
                                                 end --bAttackingForAWhile
@@ -3037,6 +3040,29 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
         else
             oPlatoon[refiPrevNearestEnemyDistance] = nil
         end
+        --Ignore an action to attack if we cant path to the nearest enemy/building unless dealing with indirect fire platoon
+        if oPlatoon[refiCurrentAction] == refActionAttack and oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] > 0 and oPlatoon[refiIndirectUnits] == 0 and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) then
+            local bCanPath = false
+            local oNearestStructure
+            if oPlatoon[refiEnemyStructuresInRange] > 0 then oNearestStructure = M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil) end
+            local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[refoFrontUnit])
+            local iPlatoonGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, GetPlatoonFrontPosition(oPlatoon))
+            if oNearestStructure and iPlatoonGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oNearestStructure:GetPosition()) then
+                bCanPath = true
+            end
+            if not(bCanPath) and oPlatoon[refiEnemiesInRange] > 0 then
+                local oNearestMobileUnit = M27Utilities.GetNearestUnit(oPlatoon[reftEnemiesInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil)
+                if oNearestMobileUnit and iPlatoonGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oNearestMobileUnit:GetPosition()) then
+                    bCanPath = true
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Order was to attack, have checked if can path to nearest structure or mobile enemy; bCanPath='..tostring(bCanPath)) end
+            if not(bCanPath) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Ignoring order to attack as we may not be able to path there') end
+                oPlatoon[refiCurrentAction] = nil
+            end
+        end
+
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -4778,6 +4804,21 @@ function DeterminePlatoonAction(oPlatoon)
             end
 
             --Action changes in specific scenarios:
+            --If platoon has been told to continue its movement path, then check if it's reached its destination
+            if (oPlatoon[refiCurrentAction] == refActionContinueMovementPath or oPlatoon[refiCurrentAction] == refActionReissueMovementPath) and HasPlatoonReachedDestination(oPlatoon) == true then
+                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Platoon has reached current destination; oPlatoon[refiCurrentPathTarget] after reaching destination='..oPlatoon[refiCurrentPathTarget]..'; size of movement path='..table.getn(oPlatoon[reftMovementPath])) end
+                --Check if reached final destination:
+                if oPlatoon[refiCurrentPathTarget] > table.getn(oPlatoon[reftMovementPath]) then
+                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': refiCurrentPathTarget='..oPlatoon[refiCurrentPathTarget]..'; movement path table size='..table.getn(oPlatoon[reftMovementPath])..'; have reached final destination') end
+                    DeterminePlatoonCompletionAction(oPlatoon)
+                else
+                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Not reached final destination, will reissue movement path') end
+                    oPlatoon[refiCurrentAction] = refActionReissueMovementPath
+                    ForceActionRefresh(oPlatoon)
+                end
+            end
+
+
             --Get a new movement path if ACU is returning to base and was running previously
             if oPlatoon[refbACUInPlatoon] and (oPlatoon[refiCurrentAction] == refActionReissueMovementPath or oPlatoon[refiCurrentAction] == refActionContinueMovementPath) then
                 if oPlatoon[refbNeedToHeal] == false and oPlatoon[refbHavePreviouslyRun] == true and oPlatoon[reftMovementPath][1] == M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] then
@@ -4980,13 +5021,14 @@ function ReturnToBaseOrRally(oPlatoon, tLocationToReturnTo, iOnlyGoThisFarToward
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local sPlatoonName = oPlatoon:GetPlan()
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27AttackNearestUnits' then bDebugMessages = true end
     local aiBrain = oPlatoon:GetBrain()
     local iArmyStartNumber = aiBrain.M27StartPositionNumber
 
-    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': 1s loop: Running away - moving to start position') end
+    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': 1s loop: Running away - moving to start position; bDontClearActions='..tostring((bDontClearActions or false))) end
     if bDontClearActions == nil then bDontClearActions = false end
     if bDontClearActions == false then
         if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': Clearing commands; Gametime='..GetGameTimeSeconds()) end
@@ -5096,6 +5138,12 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': GettingNewMovementPath') end
     local tCurPosition = GetPlatoonFrontPosition(oPlatoon)
     local bDontGetNewPath = false
+
+    --Record whether we need to heal now, so can get a new movement path if we no longer need to heal later on
+    oPlatoon[refbNeededToHealWhenGotMovementPath] = oPlatoon[refbNeedToHeal]
+
+    --Update platoon action so it knows we have got a new movement path recently
+    oPlatoon[refiCurrentAction] = refActionNewMovementPath
 
     if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then
         if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonName..': About to refresh support platoon movement path') end
@@ -5472,91 +5520,99 @@ function ReissueMovementPath(oPlatoon, bDontClearActions)
             if bDebugMessages == true then LOG(sFunctionRef..': about to refresh support movement path') end
             RefreshSupportPlatoonMovementPath(oPlatoon)
         else
-            if oPlatoon[refiCurrentPathTarget] == nil then
-                LOG(sFunctionRef..': WARNING - have been told to reissue movement path but CurrentPathTarget is nil; will get first entry in movement path instead')
-                oPlatoon[refiCurrentPathTarget] = 1
-            end
-            if oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]] == nil then
-                LOG(sFunctionRef..': WARNING - have been told to reissue movement path, but movement path for iCurrentPathTarget'..oPlatoon[refiCurrentPathTarget]..' is nil, will get new movement path instead')
+            --Did we get our movement path when we needed to heal and no longer need to heal? If so then want a new movement path instead
+            if oPlatoon[refbNeededToHealWhenGotMovementPath] and not(oPlatoon[refbNeedToHeal]) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Needed to heal when last got movement path but we dont need to heal now') end
                 GetNewMovementPath(oPlatoon, bDontClearActions)
             else
-                if bDebugMessages == true then
-                    if sPlatoonName == nil then LOG(sFunctionRef..': Warning - sPlatoonName is nil') end
-                    if oPlatoon[refiPlatoonCount] == nil then LOG(sFunctionRef..': Warning: PlatoonCount is nil') end
+
+
+                if oPlatoon[refiCurrentPathTarget] == nil then
+                    LOG(sFunctionRef..': WARNING - have been told to reissue movement path but CurrentPathTarget is nil; will get first entry in movement path instead')
+                    oPlatoon[refiCurrentPathTarget] = 1
                 end
-
-                --General (all platoons) - are we closer to the current point on the path or the 2nd?
-                local bGetNewPathInstead = false
-                local iPossibleMovementPaths = table.getn(oPlatoon[reftMovementPath])
-                local tPlatoonCurPos = {}
-                local iDistToCurrent, iDistToNext, iDistBetween1and2
-                local iLoopCount = 0
-                local iMaxLoopCount = 100
-                if bDebugMessages == true then LOG(sFunctionRef..': About to check if we are closer to the next path than the current path target; iPossibleMovementPaths='..iPossibleMovementPaths..'; oPlatoon[refiCurrentPathTarget]='..oPlatoon[refiCurrentPathTarget]..'; Platoon front position='..repr(GetPlatoonFrontPosition(oPlatoon))) end
-                local aiBrain = oPlatoon:GetBrain()
-                if iPossibleMovementPaths <= oPlatoon[refiCurrentPathTarget] then
-                    --Only 1 movement path point left - if are ACU then get a new movement path unless are in defender platoon or prev action was movement related, or are running
-                    if oPlatoon[refbACUInPlatoon] == true and not(sPlatoonName==M27Overseer.sDefenderPlatoonRef) and not(oPlatoon[refbHavePreviouslyRun]) then
-                        if bDebugMessages == true then
-                            local iCount = oPlatoon[refiPlatoonCount]
-                            if iCount == nil then iCount = 0 end
-                            local iPrevAction = oPlatoon[reftPrevAction][1]
-                            if iPrevAction == nil then iPrevAction = 0 end
-                            LOG(sPlatoonName..iCount..':'..sFunctionRef..': ACU in platoon with only 1 movement path, so will get new movement path depending on if cur target is closer to our base ir not, prevAction='..iPrevAction)
-                        end
-
-                        tPlatoonCurPos = GetPlatoonFrontPosition(oPlatoon)
-                        local iACUDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                        local iTargetDistanceToStart = M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                        if iACUDistanceToStart > iTargetDistanceToStart then
-                            bGetNewPathInstead = true
-                        end
-                    end
-                else
-                    --Have more than 1 movement path left, check we dont have any pathing issues if have a high value platoon
-                        --i.e. one issue is that the first movement path can be cancelled by the game if it cant be pathed to, and we cause a perpetual loop by trying to remove back to it after it was cancelled
-                        --Only want to do this check in limited circumstances though, and only for certain platoons; will ignore for first 3m as CanPathTo is less reliable the earlier that its used
-                    if GetGameTimeSeconds() >= 180 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]) <= 20 and (oPlatoon[refiPlatoonMassValue] >= 700 or oPlatoon[refiCurrentUnits] >= 4) and not(oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] or oPlatoon[M27PlatoonTemplates.refbIgnoreStuckAction] or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard]) then
-                        --Are ok to run a pathing check
-                        if bDebugMessages == true then LOG(sFunctionRef..': Running manual canpathto check') end
-                        if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit]), oPlatoon[refoPathingUnit], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], nil) then
-                            --Had a pathing change
-                            if bDebugMessages == true then LOG(sFunctionRef..': Pathing error so will get a new movement path') end
-                            bGetNewPathInstead = true
-                        end
-                    end
-                    if not(bGetNewPathInstead) then
-                        tPlatoonCurPos = GetPlatoonFrontPosition(oPlatoon)
-                        --If we check the next point in the movement path, is it closer than the current point?
-                        while iPossibleMovementPaths > oPlatoon[refiCurrentPathTarget] do
-                            iLoopCount = iLoopCount + 1
-                            if iLoopCount > iMaxLoopCount then M27Utilities.ErrorHandler('Infinite loop') break end
-
-                            iDistToCurrent = M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
-                            iDistToNext = M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1])
-                            iDistBetween1and2 = M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1])
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef..'iLoopCount='..iLoopCount..'; tPlatoonCurPos='..repr(tPlatoonCurPos)..'; CurMovePath='..repr(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]))
-                                LOG('Next movement path='..repr(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1]))
-                                LOG('iDistToCurrent='..iDistToCurrent..'; iDistToNext='..iDistToNext..'; iDistBetween1and2='..iDistBetween1and2)
-                            end
-                            if iDistToNext < iDistBetween1and2 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Next target is closer than current so skipping current') end
-                                oPlatoon[refiCurrentPathTarget] = oPlatoon[refiCurrentPathTarget] + 1
-                            else
-                                if bDebugMessages == true then LOG(sFunctionRef..': Next target isnt closer than target so will stop looking') end
-                                break
-                            end
-                        end
-                    end
-                end
-                if bGetNewPathInstead == true then
-                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..':'..sFunctionRef..': Are getting new movement path instead') end
+                if oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]] == nil then
+                    LOG(sFunctionRef..': WARNING - have been told to reissue movement path, but movement path for iCurrentPathTarget'..oPlatoon[refiCurrentPathTarget]..' is nil, will get new movement path instead')
                     GetNewMovementPath(oPlatoon, bDontClearActions)
                 else
-                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionReissueMovementPath: About to update platoon name and movement path, current target='..oPlatoon[refiCurrentPathTarget]..'; position of this='..repr(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])..'PlatoonUnitCount='..table.getn(oPlatoon[reftCurrentUnits])..'; plaotonaction='..oPlatoon[refiCurrentAction]) end
-                    if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..'-'..oPlatoon[refiPlatoonUniqueCount]..': A'..refActionReissueMovementPath) end
-                    MoveAlongPath(oPlatoon, oPlatoon[reftMovementPath], oPlatoon[refiCurrentPathTarget], bDontClearActions)
+                    if bDebugMessages == true then
+                        if sPlatoonName == nil then LOG(sFunctionRef..': Warning - sPlatoonName is nil') end
+                        if oPlatoon[refiPlatoonCount] == nil then LOG(sFunctionRef..': Warning: PlatoonCount is nil') end
+                    end
+
+                    --General (all platoons) - are we closer to the current point on the path or the 2nd?
+                    local bGetNewPathInstead = false
+                    local iPossibleMovementPaths = table.getn(oPlatoon[reftMovementPath])
+                    local tPlatoonCurPos = {}
+                    local iDistToCurrent, iDistToNext, iDistBetween1and2
+                    local iLoopCount = 0
+                    local iMaxLoopCount = 100
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to check if we are closer to the next path than the current path target; iPossibleMovementPaths='..iPossibleMovementPaths..'; oPlatoon[refiCurrentPathTarget]='..oPlatoon[refiCurrentPathTarget]..'; Platoon front position='..repr(GetPlatoonFrontPosition(oPlatoon))) end
+                    local aiBrain = oPlatoon:GetBrain()
+                    if iPossibleMovementPaths <= oPlatoon[refiCurrentPathTarget] then
+                        --Only 1 movement path point left - if are ACU then get a new movement path unless are in defender platoon or prev action was movement related, or are running
+                        if oPlatoon[refbACUInPlatoon] == true and not(sPlatoonName==M27Overseer.sDefenderPlatoonRef) and not(oPlatoon[refbHavePreviouslyRun]) then
+                            if bDebugMessages == true then
+                                local iCount = oPlatoon[refiPlatoonCount]
+                                if iCount == nil then iCount = 0 end
+                                local iPrevAction = oPlatoon[reftPrevAction][1]
+                                if iPrevAction == nil then iPrevAction = 0 end
+                                LOG(sPlatoonName..iCount..':'..sFunctionRef..': ACU in platoon with only 1 movement path, so will get new movement path depending on if cur target is closer to our base ir not, prevAction='..iPrevAction)
+                            end
+
+                            tPlatoonCurPos = GetPlatoonFrontPosition(oPlatoon)
+                            local iACUDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            local iTargetDistanceToStart = M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            if iACUDistanceToStart > iTargetDistanceToStart then
+                                bGetNewPathInstead = true
+                            end
+                        end
+                    else
+                        --Have more than 1 movement path left, check we dont have any pathing issues if have a high value platoon
+                            --i.e. one issue is that the first movement path can be cancelled by the game if it cant be pathed to, and we cause a perpetual loop by trying to remove back to it after it was cancelled
+                            --Only want to do this check in limited circumstances though, and only for certain platoons; will ignore for first 3m as CanPathTo is less reliable the earlier that its used
+                        if GetGameTimeSeconds() >= 180 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]) <= 20 and (oPlatoon[refiPlatoonMassValue] >= 700 or oPlatoon[refiCurrentUnits] >= 4) and not(oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] or oPlatoon[M27PlatoonTemplates.refbIgnoreStuckAction] or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard]) then
+                            --Are ok to run a pathing check
+                            if bDebugMessages == true then LOG(sFunctionRef..': Running manual canpathto check') end
+                            if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit]), oPlatoon[refoPathingUnit], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], nil) then
+                                --Had a pathing change
+                                if bDebugMessages == true then LOG(sFunctionRef..': Pathing error so will get a new movement path') end
+                                bGetNewPathInstead = true
+                            end
+                        end
+                        if not(bGetNewPathInstead) then
+                            tPlatoonCurPos = GetPlatoonFrontPosition(oPlatoon)
+                            --If we check the next point in the movement path, is it closer than the current point?
+                            while iPossibleMovementPaths > oPlatoon[refiCurrentPathTarget] do
+                                iLoopCount = iLoopCount + 1
+                                if iLoopCount > iMaxLoopCount then M27Utilities.ErrorHandler('Infinite loop') break end
+
+                                iDistToCurrent = M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
+                                iDistToNext = M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1])
+                                iDistBetween1and2 = M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1])
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef..'iLoopCount='..iLoopCount..'; tPlatoonCurPos='..repr(tPlatoonCurPos)..'; CurMovePath='..repr(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]))
+                                    LOG('Next movement path='..repr(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1]))
+                                    LOG('iDistToCurrent='..iDistToCurrent..'; iDistToNext='..iDistToNext..'; iDistBetween1and2='..iDistBetween1and2)
+                                end
+                                if iDistToNext < iDistBetween1and2 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Next target is closer than current so skipping current') end
+                                    oPlatoon[refiCurrentPathTarget] = oPlatoon[refiCurrentPathTarget] + 1
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Next target isnt closer than target so will stop looking') end
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    if bGetNewPathInstead == true then
+                        if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..':'..sFunctionRef..': Are getting new movement path instead') end
+                        GetNewMovementPath(oPlatoon, bDontClearActions)
+                    else
+                        if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionReissueMovementPath: About to update platoon name and movement path, current target='..oPlatoon[refiCurrentPathTarget]..'; position of this='..repr(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])..'PlatoonUnitCount='..table.getn(oPlatoon[reftCurrentUnits])..'; plaotonaction='..oPlatoon[refiCurrentAction]) end
+                        if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..'-'..oPlatoon[refiPlatoonUniqueCount]..': A'..refActionReissueMovementPath) end
+                        MoveAlongPath(oPlatoon, oPlatoon[reftMovementPath], oPlatoon[refiCurrentPathTarget], bDontClearActions)
+                    end
                 end
             end
         end
@@ -6950,6 +7006,7 @@ function ProcessPlatoonAction(oPlatoon)
                                             end
                                         end
                                     end
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': Cancelling overcharge')
                                 end
                             else
                                 LOG(sFunctionRef..': Warning - unit to issue overcharge to isnt valid or is dead')
@@ -7520,28 +7577,34 @@ function ProcessPlatoonAction(oPlatoon)
 
                     --IssueMove(oPlatoon[reftCurrentUnits], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
                 elseif oPlatoon[refiCurrentAction] == refActionContinueMovementPath  then
-                    --if if bDontClearActions == false then IssueClearCommands(oPlatoon[reftCurrentUnits]) end --already clear using MoveAlongPath
-                    --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionContinueMovementPath') end
-                    oPlatoon:SetPlatoonFormationOverride('AttackFormation')
-                    --Update movement path if have already gone past it and are closer to the next part of the path:
-                    if table.getn(oPlatoon[reftMovementPath]) > oPlatoon[refiCurrentPathTarget] then
-                        local tPlatoonCurPos = GetPlatoonFrontPosition(oPlatoon)
-                        if tPlatoonCurPos == nil then
-                            M27Utilities.ErrorHandler(sPlatoonName..oPlatoon[refiPlatoonCount]..': Processing current action ContinueMovementPath - platoon has nil position so disbanding instead')
-                            oPlatoon[refiCurrentAction] = refActionDisband
-                            --if oPlatoon and aiBrain:PlatoonExists(oPlatoon) then oPlatoon:PlatoonDisband() end
-                        else
-                            if M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1]) < M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]+1]) then
-                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Are moving current path target up 1 as a recloser to next destination than current; refiCurrentPathTarget='..oPlatoon[refiCurrentPathTarget]..'; table.getn(oPlatoon[reftMovementPath])='..table.getn(oPlatoon[reftMovementPath])) end
-                                oPlatoon[refiCurrentPathTarget] = oPlatoon[refiCurrentPathTarget] + 1
+                    --Did we get our movement path when we needed to heal and no longer need to heal? If so then want a new movement path instead
+                    if oPlatoon[refbNeededToHealWhenGotMovementPath] and not(oPlatoon[refbNeedToHeal]) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': ContinueMovementPath: Needed to heal when last got movement path but we dont need to heal now') end
+                        GetNewMovementPath(oPlatoon, bDontClearActions)
+                    else
+                        --if if bDontClearActions == false then IssueClearCommands(oPlatoon[reftCurrentUnits]) end --already clear using MoveAlongPath
+                        --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionContinueMovementPath') end
+                        oPlatoon:SetPlatoonFormationOverride('AttackFormation')
+                        --Update movement path if have already gone past it and are closer to the next part of the path:
+                        if table.getn(oPlatoon[reftMovementPath]) > oPlatoon[refiCurrentPathTarget] then
+                            local tPlatoonCurPos = GetPlatoonFrontPosition(oPlatoon)
+                            if tPlatoonCurPos == nil then
+                                M27Utilities.ErrorHandler(sPlatoonName..oPlatoon[refiPlatoonCount]..': Processing current action ContinueMovementPath - platoon has nil position so disbanding instead')
+                                oPlatoon[refiCurrentAction] = refActionDisband
+                                --if oPlatoon and aiBrain:PlatoonExists(oPlatoon) then oPlatoon:PlatoonDisband() end
                             else
-                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Are not moving current path target up 1. Distance between platoon and current target='..M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1])..'; distance between current and next move targets='..M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]+1])..'; refiCurrentPathTarget='..oPlatoon[refiCurrentPathTarget]..'; table.getn(oPlatoon[reftMovementPath])='..table.getn(oPlatoon[reftMovementPath])) end
+                                if M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1]) < M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]+1]) then
+                                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Are moving current path target up 1 as a recloser to next destination than current; refiCurrentPathTarget='..oPlatoon[refiCurrentPathTarget]..'; table.getn(oPlatoon[reftMovementPath])='..table.getn(oPlatoon[reftMovementPath])) end
+                                    oPlatoon[refiCurrentPathTarget] = oPlatoon[refiCurrentPathTarget] + 1
+                                else
+                                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Are not moving current path target up 1. Distance between platoon and current target='..M27Utilities.GetDistanceBetweenPositions(tPlatoonCurPos, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget] + 1])..'; distance between current and next move targets='..M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]+1])..'; refiCurrentPathTarget='..oPlatoon[refiCurrentPathTarget]..'; table.getn(oPlatoon[reftMovementPath])='..table.getn(oPlatoon[reftMovementPath])) end
+                                end
                             end
                         end
-                    end
 
-                    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': About to issue MoveAlongPath order, oPlatoon[refiCurrentPathTarget]='..oPlatoon[refiCurrentPathTarget]) end
-                    MoveAlongPath(oPlatoon, oPlatoon[reftMovementPath], oPlatoon[refiCurrentPathTarget], bDontClearActions)
+                        if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': About to issue MoveAlongPath order, oPlatoon[refiCurrentPathTarget]='..oPlatoon[refiCurrentPathTarget]) end
+                        MoveAlongPath(oPlatoon, oPlatoon[reftMovementPath], oPlatoon[refiCurrentPathTarget], bDontClearActions)
+                    end
                 elseif oPlatoon[refiCurrentAction] == refActionNewMovementPath  then
                   --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Pre getting new movement path') end
                     GetNewMovementPath(oPlatoon, bDontClearActions)
@@ -7633,7 +7696,10 @@ function ProcessPlatoonAction(oPlatoon)
                                 oTargetEnemy = M27Utilities.GetNearestUnit(M27Utilities.CombineTables(oPlatoon[reftEnemiesInRange], oPlatoon[reftEnemyStructuresInRange]), GetPlatoonFrontPosition(oPlatoon))
                             end
                             if oTargetEnemy then
-                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Have a target to move to. bDontClearActions='..tostring(bDontClearActions)) end
+                                if bDebugMessages == true then
+                                    LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Have a target to move to. bDontClearActions='..tostring(bDontClearActions)..'; will draw target in blue')
+                                    M27Utilities.DrawLocation(oTargetEnemy:GetPosition(), nil, 1)
+                                end
                                 if bDontClearActions == false then
                                     if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Clearing commands; Gametime='..GetGameTimeSeconds()) end
                                     IssueClearCommands(GetPlatoonUnitsOrUnitCount(oPlatoon, reftDFUnits, false, true))
@@ -7646,10 +7712,11 @@ function ProcessPlatoonAction(oPlatoon)
                                         LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Have tried moving to '..repr(oPlatoon[reftTemporaryMoveTarget])..' too many times so will ignore action; will draw platoon and temp target in red with line; platoon position='..repr(GetPlatoonFrontPosition(oPlatoon)))
                                         M27Utilities.DrawLocations({GetPlatoonFrontPosition(oPlatoon), oPlatoon[reftTemporaryMoveTarget]}, nil, 2, 200)
                                     end
-                                    if M27Logic.IsUnitIdle(oPlatoon[refoFrontUnit], false, false, false) then
+                                    --Will no longer check unit is idle, since it could lead to e.g. ACU firing at a unit (not idle) but not having any move orders, and if shot was blocked it'd be a problem
+                                    --if M27Logic.IsUnitIdle(oPlatoon[refoFrontUnit], false, false, false) then
                                         --Front unit idle so reissue movement path
                                         ReissueMovementPath(oPlatoon, bDontClearActions)
-                                    end
+                                    --end
                                 else
                                     if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Sending Issue Move to DF units') end
                                     IssueMove(GetPlatoonUnitsOrUnitCount(oPlatoon, reftDFUnits, false, true), oPlatoon[reftTemporaryMoveTarget])
@@ -7680,7 +7747,8 @@ function ProcessPlatoonAction(oPlatoon)
 
                 elseif oPlatoon[refiCurrentAction] == refActionReturnToBase   then
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionReturnToBase') end
-                    ReturnToBaseOrRally(oPlatoon, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                    --ReturnToBaseOrRally(oPlatoon, tLocationToReturnTo, iOnlyGoThisFarTowardsBase, bDontClearActions, bUseTemporaryMoveLocation)
+                    ReturnToBaseOrRally(oPlatoon, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], nil, bDontClearActions)
                 elseif oPlatoon[refiCurrentAction] == refActionReclaimTarget then
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': ActionReclaim') end
                     if bDebugMessages == true then
@@ -8263,6 +8331,7 @@ function PlatoonInitialSetup(oPlatoon)
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Clearing commands; oPathingUnit='..oPathingUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..'; pathing unit position='..repr(oPathingUnit:GetPosition())) end
                 IssueClearCommands(tPlatoonUnits)
+                if bDebugMessages == true then LOG(sFunctionRef..': About to get segment group of unit '..oPathingUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..' with platooon ='..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
                 local iSegmentGroup = M27MapInfo.GetUnitSegmentGroup(oPathingUnit)
                 if iSegmentGroup == nil then LOG('ERROR: '..sPlatoonName..oPlatoon[refiPlatoonCount]..': No segments that the platoon can path to') end
                 --M27MapInfo.RecordMexForPathingGroup(oPathingUnit)

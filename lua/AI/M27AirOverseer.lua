@@ -1460,7 +1460,6 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Sends low fuel units to air staging
     if M27Utilities.IsTableEmpty(tUnitsToRefuel) == false then
-        bDebugMessages = true
         local tAirStaging = aiBrain:GetListOfUnits(categories.AIRSTAGINGPLATFORM, false, true)
         if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; Want units to refuel, number of airstaging we have='..table.getn(tAirStaging)) end
         if M27Utilities.IsTableEmpty(tAirStaging) == true then
