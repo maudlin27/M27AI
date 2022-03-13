@@ -689,7 +689,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
                 if iTargetDistanceFromOurBase > 100 then bWantEscort = true
                 elseif iTargetDistanceFromOurBase > 50 then
                     --Are we closer to enemy base than our base is?
-                    local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                    local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                     local iDistanceBetweenBases = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
                     local iTargetDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tEnemyStartPosition)
                     if iTargetDistanceToEnemyBase < iDistanceBetweenBases then bWantEscort = true end
@@ -1509,141 +1509,6 @@ function AreMobileUnitsInRect(rRectangleToSearch, bOnlyLookForMobileLand)
     return bAreUnits
 end
 
---[[function FindRandomPlaceToBuildOld(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax)
---TRUE RANDOM APPROACH BELOW - replaced with non-random appraoch in subsequent function
---This hasnt been updated for getmapsizechange
---tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
---Can also be used for general movement
-local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-local sFunctionRef = 'FindRandomPlaceToBuildOld'
-M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-local iMapSizeX, iMapSizeZ = GetMapSize()
-local iMapBoundMaxX = iMapSizeX - 4
-local iMapBoundMaxZ = iMapSizeZ - 4
-local iMapBoundMinX = 4
-local iMapBoundMinZ = 4
-local tTargetLocation = {} --{tStartPosition[1], tStartPosition[2], tStartPosition[3]}
-if iSearchSizeMax == nil then iSearchSizeMax = 10 end
-if iSearchSizeMin == nil then iSearchSizeMin = 2 end
-local iRandomX, iRandomZ
-local iCurSizeCycleCount = 0
-local iCycleSize = 8
-local iSignageX, iSignageZ
-local iMaxCycles = 5
-local iCurCycle = 0
-local iValidLocationCount = 0
-local tValidLocations = {}
-local tValidDistanceToEnemy = {}
-local tValidDistanceToBuilder = {}
-local iMinDistanceToBuilder = 10000
-local iMaxDistanceToBuilder = 0
-local iMaxDistanceToEnemy = 0
-local iCurDistanceToEnemy, iCurDistanceToBuilder
-local iCurPriority = 0
-local iMaxPriority = 0
-local tBuilderPosition
-local oBuilderBP, iBuilderRange
-if oBuilder and oBuilder.GetPosition then
-tBuilderPosition = oBuilder:GetPosition()
-oBuilderBP = oBuilder:GetBlueprint()
-if oBuilderBP.Economy and oBuilderBP.Economy.MaxBuildDistance then iBuilderRange = oBuilderBP.Economy.MaxBuildDistance end
-else
-M27Utilities.ErrorHandler('oBuilder is nil or has no position')
-tBuilderPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-end
-
-
-local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
-local tNewBuildingSize
-if sBlueprintToBuild then tNewBuildingSize = M27UnitInfo.GetBuildingSize(sBlueprintToBuild) end
-if tNewBuildingSize == nil then
-M27Utilities.ErrorHandler('sBlueprintToBuild is nil or has no building size')
-tNewBuildingSize = {0,0}
-end
-local fSizeMod = 0.5
-local iMaxDistanceToBuildWithoutMoving = iBuilderRange + tNewBuildingSize[1] * fSizeMod
-local sPathing
-local iBuilderSegmentX, iBuilderSegmentZ
-local iBuilderPathingGroup, iCurPathingGroup
-local iCurSegmentX, iCurSegmentZ
-local iGroupCycleCount = 0
-
-while iValidLocationCount == 0 do
-iGroupCycleCount = iGroupCycleCount + 1
-if bDebugMessages == true then LOG(sFunctionRef..': Start of main loop grouping, iGroupCycleCount='..iGroupCycleCount..'; iCycleSize='..iCycleSize) end
-if iGroupCycleCount > iMaxCycles then
-M27Utilities.ErrorHandler('Possible infinite loop - Old findrandom place - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax)
-break
-end
-for iCurSizeCycleCount = 1, iCycleSize do
-iSignageX = math.random(0,1) * 2 - 1
-iSignageZ = math.random(0,1) * 2 - 1
-iRandomX = math.random(iSearchSizeMin, iSearchSizeMax) * iSignageX + tStartPosition[1]
-iRandomZ = math.random(iSearchSizeMin, iSearchSizeMax) * iSignageZ + tStartPosition[3]
-if iRandomX < iMapBoundMinX then iRandomX = iMapBoundMinX
-elseif iRandomX > iMapBoundMaxX then iRandomX = iMapBoundMaxX end
-if iRandomZ < iMapBoundMinZ then iRandomZ = iMapBoundMinZ
-elseif iRandomZ > iMapBoundMaxZ then iRandomZ = iMapBoundMaxZ end
-
-tTargetLocation = {iRandomX, GetTerrainHeight(iRandomX, iRandomZ), iRandomZ}
-if aiBrain:CanBuildStructureAt(sBlueprintToBuild, tTargetLocation) == true then
-    iValidLocationCount = iValidLocationCount + 1
-    tValidLocations[iValidLocationCount] = tTargetLocation
-    iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tTargetLocation)
-    tValidDistanceToEnemy[iValidLocationCount] = iCurDistanceToEnemy
-    if iCurDistanceToEnemy > iMaxDistanceToEnemy then iMaxDistanceToEnemy = iCurDistanceToEnemy end
-    iCurDistanceToBuilder = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tBuilderPosition)
-    tValidDistanceToBuilder[iValidLocationCount] = iCurDistanceToBuilder
-    if iCurDistanceToBuilder > iMaxDistanceToBuilder then iMaxDistanceToBuilder = iCurDistanceToBuilder end
-    if iCurDistanceToBuilder < iMinDistanceToBuilder then iMinDistanceToBuilder = iCurDistanceToBuilder end
-end
-if iCurSizeCycleCount == iCycleSize then
-    iSearchSizeMin = iSearchSizeMax
-    iSearchSizeMax = iSearchSizeMax * 2
-end
-end
-end
-if bDebugMessages == true then LOG(sFunctionRef..': Finished looping through locations, iValidLocationCount='..iValidLocationCount) end
-if iValidLocationCount > 0 then
---Pick the best valid location that we have
-if iMaxDistanceToBuilder > iMaxDistanceToBuildWithoutMoving and oBuilder then
-sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
-iBuilderSegmentX, iBuilderSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tBuilderPosition)
-iBuilderPathingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iBuilderSegmentX, iBuilderSegmentZ)
-end
-
-local rBuildAreaRect
-for iCurLocation, tLocation in tValidLocations do
-rBuildAreaRect = Rect(tLocation[1] - iNewBuildingRadius, tLocation[3] - iNewBuildingRadius, tLocation[1] + iNewBuildingRadius, tLocation[3] + iNewBuildingRadius)
-if M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
-if AreMobileUnitsInRect(rBuildAreaRect) == false then iCurPriority = iCurPriority + 3 end
-if tValidDistanceToEnemy[iCurLocation] >= iMaxDistanceToEnemy then iCurPriority = iCurPriority + 1 end
-iCurDistanceToBuilder = tValidDistanceToBuilder[iValidLocationCount]
-if iCurDistanceToBuilder <= iMaxDistanceToBuildWithoutMoving then
-    iCurPriority = iCurPriority + 3
-else
-    iCurSegmentX, iCurSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tLocation)
-    iCurPathingGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iCurSegmentX, iCurSegmentZ)
-    if not(iCurPathingGroup == iBuilderPathingGroup) then
-        iCurPriority = iCurPriority - 40
-        if iCurDistanceToBuilder == iMinDistanceToBuilder then iCurPriority = iCurPriority + 20 end --If only have places that cant path to, then want the cloest one as are most likely to be able to build
-    end
-end
-iCurPriority = iCurPriority + 2 * (iCurDistanceToBuilder - iMinDistanceToBuilder) / (iMaxDistanceToBuilder - iMinDistanceToBuilder)
-
-if iCurPriority > iMaxPriority then
-    iMaxPriority = iCurPriority
-    tTargetLocation = tLocation
-end
-end
-end
-
-M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-return tTargetLocation
-end--]]
-
 function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride, bAlreadyRecheckedPathing)
     --Returns nil if cant find anywhere
     --tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
@@ -1692,8 +1557,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     end
 
 
-    local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-    local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+    local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
     local tNewBuildingSize
     if sBlueprintToBuild then tNewBuildingSize = M27UnitInfo.GetBuildingSize(sBlueprintToBuild) end
     if tNewBuildingSize == nil then
@@ -1981,8 +1845,7 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     if aiBrain == nil then bCheckValid = false end
     if bReturnOnlyBestMatch == nil then bReturnOnlyBestMatch = false end
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-    local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+    local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
     local iDistanceToEnemy
     local iMinDistanceToEnemy = 10000
     local iMaxDistanceToEnemy = 0
@@ -2754,7 +2617,7 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
             --Worth building nuke? Check we and any ally dont already own a nuke, we have a decent amount of energy (at least 3 T3 PGens) and check nearest enemy has no SMD around our base or theirs, and that we have scouted their base in the last 90s
             if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to build a nuke; checking gross energy and if we already have a nuke; current SML per getcurrentunits='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML)..'; Gross energy='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; ') end
             if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 600 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML) == 0 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySML, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Ally')) then
-                local iEnemyBaseSegmentX, iEnemyBaseSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                local iEnemyBaseSegmentX, iEnemyBaseSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to build a nuke; Time since last had sight of enemy start='..aiBrain[M27AirOverseer.reftAirSegmentTracker][iEnemyBaseSegmentX][iEnemyBaseSegmentZ][M27AirOverseer.refiLastScouted]..'; Cur gametime='..GetGameTimeSeconds()) end
                 if GetGameTimeSeconds() - (aiBrain[M27AirOverseer.reftAirSegmentTracker][iEnemyBaseSegmentX][iEnemyBaseSegmentZ][M27AirOverseer.refiLastScouted] or 0) <= 100 then
                     --Anti-nuke has range of 90; SML has aoe of 30
@@ -2790,7 +2653,7 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
                         local iValueWanted = 20000 * iExistingNovax + 10000
 
                         --If enemy has T3 navy then want at least 1 novax
-                        if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalFactory * categories.TECH3, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], 1500, 'Enemy')) == false then iNovaxTargetValue = iNovaxTargetValue + 10000 end
+                        if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalFactory * categories.TECH3, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 1500, 'Enemy')) == false then iNovaxTargetValue = iNovaxTargetValue + 10000 end
 
                         if iNovaxTargetValue < iValueWanted then
                             --Include mass value of any enemy cruisers and carriers
@@ -2801,7 +2664,7 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
                                 local tEnemyMexes = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1500, 'Enemy')
                                 if M27Utilities.IsTableEmpty(tEnemyMexes) == false then
                                     for iMex, oMex in tEnemyMexes do
-                                        if M27Utilities.GetDistanceBetweenPositions(oMex:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) >= 90 then
+                                        if M27Utilities.GetDistanceBetweenPositions(oMex:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= 90 then
                                             if not(M27Logic.IsTargetUnderShield(aiBrain, oMex, 0, nil, false, true)) then
                                                 iNovaxTargetValue = iNovaxTargetValue + tMexValueByTech[M27UnitInfo.GetUnitTechLevel(oMex)]
                                             end
@@ -3726,12 +3589,11 @@ function FilterLocationsBasedOnDistanceToEnemy(aiBrain, tLocationsToFilter, iMax
     if M27Utilities.IsTableEmpty(tLocationsToFilter) == false then
         local iCurPercentageDistance, iCurDistanceToEnemy, iCurDistanceToStart
         local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-        local iNearestEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-        local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iNearestEnemyStartNumber]
+        local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
         local iValidLocationCount = 0
         local iClosestDistance = 1000
         if M27Utilities.IsTableEmpty(tStartPosition) == false and M27Utilities.IsTableEmpty(tEnemyStartPosition) == false then
-            if bDebugMessages == true then LOG(sFunctionRef..': Just before main loop; tStartPosition='..repr(tStartPosition)..'; tEnemyStartPosition='..repr(tEnemyStartPosition)..'; our startposition number='..aiBrain.M27StartPositionNumber..'; enemy start position number='..iNearestEnemyStartNumber) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Just before main loop; tStartPosition='..repr(tStartPosition)..'; tEnemyStartPosition='..repr(tEnemyStartPosition)..'; our startposition number='..aiBrain.M27StartPositionNumber..'; enemy start position number='..M27Logic.GetNearestEnemyStartNumber(aiBrain)) end
             for iLocation, tLocation in tLocationsToFilter do
                 iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tLocation, tEnemyStartPosition)
                 iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tLocation, tStartPosition)
@@ -4031,7 +3893,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
             --Pick targets based on action
             if iActionRefToAssign == refActionReclaimArea then
                 --Get preferred reclaim position - pick engineer closest to below location (will overwrite the actual target location later on when assigning reclaim action)
-                tActionLocation = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                tActionLocation = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
             elseif iActionRefToAssign == refActionReclaimUnit then
                 --Pick a reclaim unit closest to our start
                 oActionObject = M27Utilities.GetNearestUnit(aiBrain[M27EconomyOverseer.reftUnitsToReclaim], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, false, false)
@@ -4046,10 +3908,10 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                 --Find water along the way from our base to the midpoint of the map that is pathable by an amphibious unit
                 local tPossiblePosition
                 local iT2SonarAdjust = 5
-                --local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                --local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                 for iCurPath = 1, math.floor(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.05) do
                     --Debug mode - draw valid location in gold, invalid locations in red
-                    tPossiblePosition = M27Utilities.MoveTowardsTarget(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], iCurPath * 10 + iT2SonarAdjust, 0)
+                    tPossiblePosition = M27Utilities.MoveTowardsTarget(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iCurPath * 10 + iT2SonarAdjust, 0)
                     if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossiblePosition) == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] and not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossiblePosition) == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeLand]) then
                         --Can path there amphibiously but not with land, is the locaiton water?
                         if GetTerrainHeight(tPossiblePosition[1], tPossiblePosition[3]) < M27MapInfo.iMapWaterHeight then
@@ -4068,10 +3930,10 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                 if M27Utilities.IsTableEmpty(tActionLocation) then
                     --Try a (sort of) random location
                     if bDebugMessages == true then LOG(sFunctionRef..': COuldnt find a location moving in a straight line so will try a random location') end
-                    local tBasePoint = M27Utilities.MoveTowardsTarget(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25, 0)
+                    local tBasePoint = M27Utilities.MoveTowardsTarget(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25, 0)
                     for iDistanceAdjust = 50, 250, 50 do
                         for iAngleAdjust = -2, 6 do
-                            tPossiblePosition = M27Utilities.MoveTowardsTarget(tBasePoint, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], iDistanceAdjust + iT2SonarAdjust, iAngleAdjust * 45)
+                            tPossiblePosition = M27Utilities.MoveTowardsTarget(tBasePoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iDistanceAdjust + iT2SonarAdjust, iAngleAdjust * 45)
                             if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossiblePosition) == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] and not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossiblePosition) == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeLand]) then
                                 --Can path there amphibiously but not with land, is the locaiton water?
                                 if GetTerrainHeight(tPossiblePosition[1], tPossiblePosition[3]) < M27MapInfo.iMapWaterHeight then

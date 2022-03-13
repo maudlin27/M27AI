@@ -124,7 +124,7 @@ function SafeToGetACUUpgrade(aiBrain)
                 if M27UnitInfo.IsUnitUnderwater(oACU) or (oACU:HasEnhancement('CloakingGenerator') and not(IsLocationNearEnemyOmniRange(aiBrain, oACU:GetPosition(), 3))) then bIsSafe = true
                 else
                     --Are we near to enemy base and not near ours?
-                    local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                    local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                     if iDistToEnemy > 90 or iDistToEnemy > M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                         local bNearbyScout = false
                         if oACU[M27Overseer.refoScoutHelper] and M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoScoutHelper][M27PlatoonUtilities.refoFrontUnit]) and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoScoutHelper]), tACUPos) <= math.max(8, oACU[M27Overseer.refoScoutHelper][M27PlatoonUtilities.refoFrontUnit]:GetBlueprint().Intel.RadarRadius - iSearchRange) then bNearbyScout = true end
@@ -170,7 +170,7 @@ function SafeToGetACUUpgrade(aiBrain)
                         end
                     end
                     if bIsSafe == false then --Check if we have mobile shields nearby and are on our side of the map
-                        if oACU.PlatoonHandle and HaveNearbyMobileShield(oACU.PlatoonHandle) and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) and oACU:GetHealthPercent() <= M27Overseer.iACUEmergencyHealthPercentThreshold * 0.8 then
+                        if oACU.PlatoonHandle and HaveNearbyMobileShield(oACU.PlatoonHandle) and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) and oACU:GetHealthPercent() <= M27Overseer.iACUEmergencyHealthPercentThreshold * 0.8 then
                             bIsSafe = true
                         end
                     end
@@ -180,7 +180,7 @@ function SafeToGetACUUpgrade(aiBrain)
                             local iIntervalDegrees = 30
                             local iMaxInterval = 180
                             local iChecks = math.ceil(iMaxInterval / iIntervalDegrees)
-                            local iAngleToEnemy = M27Utilities.GetAngleFromAToB(tACUPos, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                            local iAngleToEnemy = M27Utilities.GetAngleFromAToB(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                             local iBaseAngle = -iMaxInterval / 2 + iAngleToEnemy
                             local iCurAngle
 
@@ -389,7 +389,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                             --Dont treat as being safe if trying to get a slow upgrade and arent on our side of map
                             if (iUpgradeBuildTime / iACUBuildRate) > 150 then --If will take a while then need to be closer to our base than enemy
                                 local iDistToStart = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                                local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                                 if iDistToStart + 75 > iDistToEnemy then
                                     --Abort unless we're close to a rally point and near our side of the map
                                     if bDebugMessages == true then M27Utilities.DrawLocation(M27Logic.GetNearestRallyPoint(aiBrain, oACU:GetPosition()), nil, 1, 100) end --draw in dark blue
@@ -922,8 +922,7 @@ function IsLocationWithinIntelPathLine(aiBrain, tLocation)
         if iIntelPathPosition then
             local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
 
-            local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-            local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+            local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
             local iLocationDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tLocation)
             if bDebugMessages == true then LOG(sFunctionRef..': tLocation='..repr(tLocation)..'; iLocationDistanceToEnemy='..iLocationDistanceToEnemy..'; iDistanceFromStartToEnemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; tEnemyStartPosition='..repr(tEnemyStartPosition)..'; tStartPosition='..repr(tStartPosition)) end
             if iLocationDistanceToEnemy > aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] then

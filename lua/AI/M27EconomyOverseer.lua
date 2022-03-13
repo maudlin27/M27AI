@@ -74,8 +74,7 @@ function GetMexCountOnOurSideOfMap(aiBrain)
         --Update/refresh the count:
         aiBrain[reftMexOnOurSideOfMap] = {}
         local tOurStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-        local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-        local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+        local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
 
         local iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tOurStartPosition)
         local oACU = M27Utilities.GetACU(aiBrain)
@@ -246,7 +245,7 @@ function GetUnitReclaimTargets(aiBrain)
     if M27Utilities.IsTableEmpty(tCivilianBuildings) == false then
         for iUnit, oUnit in tCivilianBuildings do
             --Are we closer to our base than enemy?
-            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) then
+            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
                 --Can we path here with an amphibious unit?
                 if iBasePathingGroup == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) then
                     table.insert(aiBrain[reftUnitsToReclaim], oUnit)
@@ -606,8 +605,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     local iMaxCombinedDist = -100000
     local tOurStartPosition
     if tStartPoint then tOurStartPosition = tStartPoint else tOurStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] end
-    --local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-    --local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[iEnemyStartPosition]
+    --local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
     --local iEnemySearchRange = 60
     --local tNearbyEnemies
     if bDebugMessages == true then LOG(sFunctionRef..': About to loop through units to find one to upgrade; size of tAllUnits='..table.getn(tAllUnits)) end

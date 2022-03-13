@@ -535,12 +535,12 @@ function GetUnitNearestEnemy(aiBrain, tUnits)
     if (iTimeOfLastBrainAllDefeated or 0) > 10 then
         return nil
     else
-        return M27Utilities.GetNearestUnit(tUnits, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], aiBrain, false)
+        return M27Utilities.GetNearestUnit(tUnits, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
     end
     --[[
     local iNearestDistance = 100000
     local oNearestUnit
-    local tEnemyStart = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]
+    local tEnemyStart = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
     local iCurDistanceToEnemy
     for iUnit, oUnit in tUnits do
         if not(oUnit.Dead) and oUnit.GetPosition then
@@ -654,8 +654,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
     else
         local tUnitStart = oUnit:GetPosition()
         local iPlayerArmyIndex = aiBrain:GetArmyIndex()
-        local iEnemyStartPos = GetNearestEnemyStartNumber(aiBrain)
-        if iEnemyStartPos then
+        if GetNearestEnemyStartNumber(aiBrain) then
             local sPathingType = M27UnitInfo.GetUnitPathingType(oUnit)
             local iBaseStartGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             --function InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly)
@@ -729,7 +728,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                     end
                     if bNoBetterTargets == true then
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
+                        return {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)}
                     end
                 end
             end
@@ -739,7 +738,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                 --Is the mex closer to the enemy than to us?
                 tCurMexPosition = M27MapInfo.tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup][iCurMex]
                 if M27Utilities.IsTableEmpty(tCurMexPosition) == false then
-                    iDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPos])
+                    iDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                     iDistanceToOurBase = M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.PlayerStartPoints[iPlayerArmyIndex])
                     if bDebugMessages == true then LOG(sFunctionRef..': Looping through mex, iCurMex='..iCurMex..'; iDistanceToEnemyBase='..iDistanceToEnemyBase..'; iDistanceToOurBase='..iDistanceToOurBase) end
                     --Check if mex is too close to any player start:
@@ -783,7 +782,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                                     --Only consider if will be a valid end position:
                                     bIsEndDestinationMex = false
                                     if iEndPointMaxDistFromEnemyStart == nil then bIsEndDestinationMex = true
-                                    elseif M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPos]) <= iEndPointMaxDistFromEnemyStart then bIsEndDestinationMex = true end
+                                    elseif M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= iEndPointMaxDistFromEnemyStart then bIsEndDestinationMex = true end
                                     if bIsEndDestinationMex == true then iMinRaidsAlreadySent = tPlatoonRaiderTargets[iPlayerArmyIndex][sMexLocationRef] end
                                 end
                             end
@@ -818,7 +817,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                     --if have specified a distance from enemy base, check if are close enough:
                     bIsEndDestinationMex = false
                     if iEndPointMaxDistFromEnemyStart == nil then bIsEndDestinationMex = true
-                    elseif M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPos]) <= iEndPointMaxDistFromEnemyStart then bIsEndDestinationMex = true end
+                    elseif M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= iEndPointMaxDistFromEnemyStart then bIsEndDestinationMex = true end
 
                     if bIsEndDestinationMex == true then
                         sMexLocationRef = M27Utilities.ConvertLocationToStringRef(tCurMexPosition)
@@ -846,7 +845,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                 elseif iPossibleTargetCount == 0 then bErrorControl = true end
                 if bErrorControl then
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                    return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
+                    return {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)}
                 else
                     M27Utilities.ErrorHandler('iRevisedPossibleMex is nil or 0 but iPossibleTargetCount > 0 so reverting to that')
                     iFinalMex = math.random(1, iPossibleTargetCount)
@@ -871,7 +870,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             if bNoBetterTargets == true then
                 M27Utilities.ErrorHandler('bNoBetterTargets is true, returning player start point')
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
+                return {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)}
             end
 
             if bDebugMessages == true then LOG(sFunctionRef..': iRevisedPossibleMex='..iRevisedPossibleMex..'; iFinalMex='..iFinalMex) end
@@ -997,7 +996,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                 if bAbort == false then
                     --Are there any mexes on our side of the map that wouldn't result in a significant detour to pass by? If so then add to queue
                     if iFriendlyPossibleMexes > 0 then
-                        if M27Utilities.GetDistanceBetweenPositions(tUnitStart, M27MapInfo.PlayerStartPoints[iPlayerArmyIndex]) > M27Utilities.GetDistanceBetweenPositions(tUnitStart, M27MapInfo.PlayerStartPoints[iEnemyStartPos]) then
+                        if M27Utilities.GetDistanceBetweenPositions(tUnitStart, M27MapInfo.PlayerStartPoints[iPlayerArmyIndex]) > M27Utilities.GetDistanceBetweenPositions(tUnitStart, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
                             --Dont search for friendly mexes as are closer to enemy base than our own
                         else
                             --To avoid significant slowdown, if >10 friendly mexes then split them into groups of 10
@@ -1150,7 +1149,7 @@ function SetFactoryRallyPoint(oFactory)
 
     local tRallyPoint = {iRallyX, GetTerrainHeight(iRallyX, iRallyZ), iRallyZ}
     local tNearestRallyPoint = GetNearestRallyPoint(aiBrain, tFactoryPos)
-    if M27Utilities.GetDistanceBetweenPositions(tRallyPoint, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]) > M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]) then
+    if M27Utilities.GetDistanceBetweenPositions(tRallyPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) > M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
         tRallyPoint = {tNearestRallyPoint[1], tNearestRallyPoint[2], tNearestRallyPoint[3]}
     end
     if bDebugMessages == true then LOG('SetFactoryRallyPoint: tFactoryPos='..tFactoryPos[1]..'-'..tFactoryPos[3]..'; iRallyXZ='..iRallyX..'-'..iRallyZ..'; iEnemyXZ='..iEnemyX..'-'..iEnemyZ) end
@@ -2396,9 +2395,9 @@ function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathingType, iSegmen
 
 
     --Adjust value based on distance
-    local iStartToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tStartPoint, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)])
+    local iStartToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tStartPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
     local iStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPoint, tLocation)
-    local iTargetToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tLocation, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)])
+    local iTargetToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
 
     --% reduction based on how much of a detour to enemy base
     iTotalValue = iTotalValue * iStartToEnemyBase / (iStartToTarget + iTargetToEnemyBase)
@@ -2427,7 +2426,7 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
         --First calculate the value for the enemy start position
         local sPathingType = M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit])
         local iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
-        local iHighestValueLocation = GetLocationValue(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathingType, iSegmentGroup)
+        local iHighestValueLocation = GetLocationValue(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathingType, iSegmentGroup)
         local iCurValueLocation
 
 
@@ -2451,7 +2450,7 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
     end
     if tHighestValueLocation == nil then
         if bDebugMessages == true then LOG(sFunctionRef..': Dont have a highest value location so will pick enemy start') end
-        tHighestValueLocation = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]
+        tHighestValueLocation = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tHighestValueLocation
@@ -2509,25 +2508,24 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
     local iMaxSegmentDistanceZ = iMaxDistanceAbsolute / iSegmentSizeZ
     local tCurSegmentPosition = {}
     local iPlayerStartPoint = aiBrain.M27StartPositionNumber
-    local iEnemyStartPoint = GetNearestEnemyStartNumber(aiBrain)
     local iMaxDistanceFromEnemy, iMaxDistanceFromStart, iMinDistanceFromStart, iMinDistanceFromEnemy, iCurDistanceFromUnit, bIsFarEnoughFromStart
     local tCurPosition = oPathingUnit:GetPosition()
     local iSegmentX, iSegmentZ
 
 
 
-    if iEnemyStartPoint == nil then
-        LOG(sFunctionRef..': ERROR unless enemy is dead - iEnemyStartPoint is nil; returning our start position')
+    if GetNearestEnemyStartNumber(aiBrain) == nil then
+        LOG(sFunctionRef..': ERROR unless enemy is dead - GetNearestEnemyStartNumber(aiBrain) is nil; returning our start position')
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return M27MapInfo.PlayerStartPoints[iPlayerStartPoint]
     else
         --Do we have an ACU with gun? If so then just pick enemy base
         if M27Utilities.IsACU(oPathingUnit) and M27Conditions.DoesACUHaveGun(aiBrain, true, oPathingUnit) then
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            return M27MapInfo.PlayerStartPoints[iEnemyStartPoint]
+            return M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
         else
-            if bDebugMessages == true then LOG(sFunctionRef..': iEnemyStartPoint='..iEnemyStartPoint..'; iPlayerStartPoint='..iPlayerStartPoint) end
-            local iDistanceBetweenBases = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
+            if bDebugMessages == true then LOG(sFunctionRef..': GetNearestEnemyStartNumber(aiBrain)='..GetNearestEnemyStartNumber(aiBrain)..'; iPlayerStartPoint='..iPlayerStartPoint) end
+            local iDistanceBetweenBases = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
             iMinDistanceFromEnemy = iDistanceBetweenBases * iMinDistancePercentage
             iMaxDistanceFromEnemy = iDistanceBetweenBases * iMaxDistancePercentage
             iMaxDistanceFromStart = iDistanceBetweenBases * iMaxDistancePercentage
@@ -2551,7 +2549,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             iCurDistanceFromUnit = 0
             local iMaxDistanceToACU = 0
 
-            local iDistanceFromStartToEnd = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
+            local iDistanceFromStartToEnd = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
 
             M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimNearACU', M27Utilities.refProfilerStart)
             --First check if overseer has flagged there's nearby reclaim (in which case have this as the end destination)
@@ -2591,7 +2589,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                                     local iSpareStorage = aiBrain:GetEconomyStored('MASS') / iStorageRatio
                                     if iSpareStorage >= 100 then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, and we have enough storage, checking its closer to enemy than ACU') end
-                                        if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.PlayerStartPoints[iEnemyStartPoint]) <= M27Utilities.GetDistanceBetweenPositions(tUnitPos, M27MapInfo.PlayerStartPoints[iEnemyStartPoint]) then
+                                        if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= M27Utilities.GetDistanceBetweenPositions(tUnitPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, but closer to enemy than us, so choosing it as final destination') end
                                             bHaveFinalDestination = true
                                         end
@@ -2613,9 +2611,9 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             if bDebugMessages == true then
                 local iDisplayCount = 500         --DrawLocation(tLocation, relativeStart, iColour, iDisplayCount, iCircleSize)
                 M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], false, 2, iDisplayCount, iMinDistanceFromStart)
-                M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iEnemyStartPoint], false, 2,iDisplayCount, iMinDistanceFromStart)
+                M27Utilities.DrawLocation(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), false, 2,iDisplayCount, iMinDistanceFromStart)
                 M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], false, 4,iDisplayCount, iMaxDistanceFromStart)
-                M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iEnemyStartPoint], false, 4,iDisplayCount, iMaxDistanceFromStart)
+                M27Utilities.DrawLocation(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), false, 4,iDisplayCount, iMaxDistanceFromStart)
             end
 
 
@@ -2650,7 +2648,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                                             --Is the location close enough to warrant consideration?
                                             if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iSegmentX..'-'..iSegmentZ..' might be close enough; ReclaimAmount='..tReclaimInfo[1]) end
                                             tCurSegmentPosition = M27MapInfo.GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
-                                            iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tCurSegmentPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
+                                            iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tCurSegmentPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                                             if iCurDistanceFromEnemy <= iMaxDistanceFromEnemy then
                                                 if iCurDistanceFromEnemy >= iMinDistanceFromEnemy then
                                                     iCurDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(tCurSegmentPosition, M27MapInfo.PlayerStartPoints[iPlayerStartPoint])
@@ -2782,7 +2780,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                     if math.abs(iSegmentX - iACUSegmentX) <= iMaxSegmentDistanceX then
                         if math.abs(iSegmentZ - iACUSegmentZ) <= iMaxSegmentDistanceZ then
                             --Is the location close enough to warrant consideration?
-                            iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
+                            iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                             if iCurDistanceFromEnemy <= iMaxDistanceFromEnemy then
                                 if iCurDistanceFromEnemy >= iMinDistanceFromEnemy then
                                     iCurDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.PlayerStartPoints[iPlayerStartPoint])
@@ -2925,7 +2923,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             --end
             if bDebugMessages == true then LOG(sFunctionRef..': Near end of code, will return value based on specifics') end
             if bHaveFinalDestination == false then
-                tFinalDestination = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]
+                tFinalDestination = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                 if bDebugMessages == true then LOG(sFunctionRef..': Failed to find a final destination, will just use enemy base') end
                 --[[ As of v15 removed this since performance on this function is already terrible
                 --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Failed to get final destination, repeating again') end
@@ -3874,7 +3872,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                     end
                 else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
                     --First get the best location if just target the start position or locations near here
-                    tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], iAOE, iDamage)
+                    tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage)
                     --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
                     if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <20k then will consider other targets') end
                     if iBestTargetValue < 20000 then --If have high value location for nearest enemy start then just go with this
@@ -3958,7 +3956,7 @@ function GetT3ArtiTarget(oT3Arti)
     local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategoryStructure * categories.TECH2, categories.COMMAND}
 
     --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
-    tTarget = {M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)][1], M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)][2], M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)][3]}
+    tTarget = {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[2], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[3]}
     iBestValueTarget = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage)
 
     --Check we dont have key friendly units close to here
@@ -3966,7 +3964,7 @@ function GetT3ArtiTarget(oT3Arti)
         iBestTargetValue = 0
     end
 
-    --iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], iAOE, iDamage)
+    --iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage)
     --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
     if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <15k then will consider other targets') end
     if iBestTargetValue < 15000 then --If have high value location for nearest enemy start then just go with this

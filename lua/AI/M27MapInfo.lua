@@ -16,6 +16,7 @@ tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment
 tHydroByPathingAndGrouping = {}
 HydroPoints = {} -- Stores position values i.e. a table with 3 values, x, y, z
 PlayerStartPoints = {} -- Stores position values i.e. a table with 3 values, x, y, z; item 1 = ARMY_1 etc.
+reftPrimaryEnemyBaseLocation = 'M27MapPrimaryEnemyBase'
 tResourceNearStart = {} --[iArmy][iResourceType (1=mex2=hydro)][iCount][tLocation] Stores location of mass extractors and hydrocarbons that are near to start locations; 1st value is the army number, 2nd value the resource type, 3rd the mex number, 4th value the position array (which itself is made up of 3 values)
 MassCount = 0 -- used as a way of checking if have the core markers needed
 HydroCount = 0
@@ -98,6 +99,8 @@ iMaxBaseSegmentX = 1 --Will be set by pathing, sets the maximum possible base se
 iMaxBaseSegmentZ = 1
 
 iMapWaterHeight = 0 --Surface height of water on the map
+
+
 
 function DetermineMaxTerrainHeightDif()
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -836,7 +839,6 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
             local tCurMidpoint, sLocationRef
             local bEngineerDiedOrSpottedEnemiesRecently, iCurDistToBase, iCurDistToEnemyBase
             local tACUPosition
-            local iNearestEnemyStartNumber
             --local tNearbyEnemies
 
             iStartPositionPathingGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -844,8 +846,7 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
             if oACU then
                 tACUPosition = oACU:GetPosition()
             else tACUPosition = PlayerStartPoints[aiBrain.M27StartPositionNumber] end
-            iNearestEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-            if iNearestEnemyStartNumber then
+            if M27Logic.GetNearestEnemyStartNumber(aiBrain) then
                 local iCurAirSegmentX, iCurAirSegmentZ, bUnassigned
                 --Can an amphibious unit path here from our start
                 tCurMidpoint = GetReclaimLocationFromSegment(iReclaimSegmentX, iReclaimSegmentZ)
@@ -887,7 +888,7 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
                                 if bEngineerDiedOrSpottedEnemiesRecently then break end
                             end
                             if not(bEngineerDiedOrSpottedEnemiesRecently) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': No enemies have died recently and no enemies have been spotted recently around target; tCurMidpoint='..repr(tCurMidpoint)..'; iNearestEnemyStartNumber='..iNearestEnemyStartNumber) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': No enemies have died recently and no enemies have been spotted recently around target; tCurMidpoint='..repr(tCurMidpoint)..'; NearestEnemyStartNumber='..M27Logic.GetNearestEnemyStartNumber(aiBrain)) end
 
                                 --Check no nearby enemies - decided not to implement for CPU performance reasons
                                 --tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, tCurMidpoint, 90, 'Enemy')
@@ -898,7 +899,7 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
 
 
                                 iCurDistToBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                iCurDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[iNearestEnemyStartNumber])
+                                iCurDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, GetPrimaryEnemyBaseLocation(aiBrain))
                                 --if bDebugMessages == true then LOG(sFunctionRef..': No nearby T2 arti detected; iCurDistToBase='..iCurDistToBase..'; iCurDistToEnemyBase='..iCurDistToEnemyBase..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase='..iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase)..'; M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)..'; iDistanceFromStartToEnemy='..iDistanceFromStartToEnemy) end
                                 --Within defence and front unit coverage or just very close to base?
                                 if iCurDistToBase <= 100 or aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] - 0.1 > iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase) then
@@ -1148,7 +1149,6 @@ function UpdateReclaimAreasOfInterest(aiBrain)
             local tCurMidpoint, sLocationRef
             local tNearbyEnemies, bEngineerDiedOrSpottedEnemiesRecently, iCurDistToBase, iCurDistToEnemyBase
             local tACUPosition = M27Utilities.GetACU(aiBrain):GetPosition()
-            local iNearestEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
             local iCurAirSegmentX, iCurAirSegmentZ, bUnassigned
             local iArmyIndex = aiBrain:GetArmyIndex()
 
@@ -1222,7 +1222,7 @@ function UpdateReclaimAreasOfInterest(aiBrain)
 
 
                                                 iCurDistToBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                                iCurDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, PlayerStartPoints[iNearestEnemyStartNumber])
+                                                iCurDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMidpoint, GetPrimaryEnemyBaseLocation(aiBrain))
                                                 if bDebugMessages == true then LOG(sFunctionRef..': No nearby T2 arti detected; iCurDistToBase='..iCurDistToBase..'; iCurDistToEnemyBase='..iCurDistToEnemyBase..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase='..iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase)..'; M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tCurMidpoint, false)..'; iDistanceFromStartToEnemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
                                                 --Within defence and front unit coverage?
                                                 if aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] - 0.1 > iCurDistToBase / (iCurDistToBase + iCurDistToEnemyBase) then
@@ -1810,7 +1810,7 @@ function RecordMexesInPathingGroupFilteredByEnemyDistance(aiBrain, sPathing, iPa
         if M27Utilities.IsTableEmpty(aiBrain[reftMexesInPathingGroupFilteredByDistanceToEnemy][sPathing][iPathingGroup][iMinDistanceFromEnemy]) == true then aiBrain[reftMexesInPathingGroupFilteredByDistanceToEnemy][sPathing][iPathingGroup][iMinDistanceFromEnemy] = {} end
         aiBrain[reftMexesInPathingGroupFilteredByDistanceToEnemy][sPathing][iPathingGroup][iMinDistanceFromEnemy][iMaxDistanceFromEnemy] = {}
         local iValidMexCount = 0
-        local tEnemyStartPosition = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+        local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
         for iMex, tMexLocation in tMexByPathingAndGrouping[sPathing][iPathingGroup] do
             iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tEnemyStartPosition, tMexLocation)
             if iCurDistanceToEnemy >= iMinDistanceFromEnemy and iCurDistanceToEnemy <= iMaxDistanceFromEnemy then
@@ -1835,7 +1835,7 @@ function RecordSortedMexesInOriginalPathingGroup(aiBrain)
     local iPathingGroup = aiBrain[refiStartingSegmentGroup][sPathing]
     local iCurDistanceToOurStart, iCurDistanceToEnemy, iCurModDistanceValue
     local tOurStartPos = PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    local tEnemyStartPosition = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+    local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
 
     --First determine how far away each mex is from us and enemy:
 
@@ -1957,7 +1957,7 @@ function GetMexPatrolLocations(aiBrain, iMexRallyPointsToAdd, bIncludeRallyPoint
         local iSegmentGroup = GetSegmentGroupOfLocation(sPathing, tStartPosition)
         local iCurDistanceToEnemy, iCurDistanceToStart
 
-        local tEnemyStartPosition = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+        local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
         local iMaxTotalDistance = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.3
         local iPossibleMexCount = 0
         local tPossibleMexDetails = {}
@@ -2010,7 +2010,7 @@ function GetMexPatrolLocations(aiBrain, iMexRallyPointsToAdd, bIncludeRallyPoint
         tPatrolLocations[iEntry][3] = tEntry[3]
     end
     --Add the nearest rally poitn to the enemy base as a patrol location
-    table.insert(tPatrolLocations, M27Logic.GetNearestRallyPoint(aiBrain, PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]))
+    table.insert(tPatrolLocations, M27Logic.GetNearestRallyPoint(aiBrain, GetPrimaryEnemyBaseLocation(aiBrain)))
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tPatrolLocations
 end
@@ -2673,7 +2673,7 @@ function SetWhetherCanPathToEnemy(aiBrain)
     --Set flag for whether AI can path to enemy base
     local sFunctionRef = 'SetWhetherCanPathToEnemy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local tEnemyStartPosition = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+    local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
     local tOurBase = PlayerStartPoints[aiBrain.M27StartPositionNumber]
     local sPathing = M27UnitInfo.refPathingTypeLand
     local iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
@@ -3102,7 +3102,7 @@ function RecordIfSuitableRallyPoint(aiBrain, tPossibleRallyPoint, iCurRallyPoint
         if M27Utilities.IsTableEmpty(tPossibleRallyPoint) then M27Utilities.ErrorHandler('No rally point specified')
         else
             --Closer to enemy base than last rally point?
-            if M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftRallyPoints][iCurRallyPoints], PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) then
+            if M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, GetPrimaryEnemyBaseLocation(aiBrain)) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftRallyPoints][iCurRallyPoints], GetPrimaryEnemyBaseLocation(aiBrain)) then
                 if bDebugMessages == true then
                     LOG(sFunctionRef..': About to check if '..repr(tPossibleRallyPoint)..' is a valid rally point; iCurRallyPoints='..iCurRallyPoints..'; will draw a black circle around potential location')
                     M27Utilities.DrawLocation(tPossibleRallyPoint, nil, 3)
@@ -3181,7 +3181,7 @@ function RecordAllRallyPoints(aiBrain)
                 for iMex, tMex in tMexByPathingAndGrouping[M27UnitInfo.refPathingTypeLand][iOurBaseGroup] do
 
                     iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tMex, PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                    iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tMex, PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                    iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tMex, GetPrimaryEnemyBaseLocation(aiBrain))
                     iMaxDistToBeNearMiddle = math.min(60, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2, iDistToOurBase * 0.3) + aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering if mex is near path to enemy base; iMex='..iMex..'; tMex='..repr(tMex)..'; iDistToOurBase='..iDistToOurBase..'; iDistToEnemyBase='..iDistToEnemyBase..'; iMaxDistToBeNearMiddle='..iMaxDistToBeNearMiddle) end
 
@@ -3196,7 +3196,7 @@ function RecordAllRallyPoints(aiBrain)
         local bAbortedDueToEnemiesOrIntel
         aiBrain[reftRallyPoints] = {}
         local tPossibleRallyPoint
-        local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+        local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], GetPrimaryEnemyBaseLocation(aiBrain))
         local iFailedRallyPointChecks = 0
 
 
@@ -3303,3 +3303,26 @@ function CanWeMoveInSameGroupInLineToTarget(sPathingType, tStart, tEnd)
     return true
 end
 
+function UpdateNewPrimaryBaseLocation(aiBrain)
+    --local refiTimeOfLastUpdate = 'M27RefTimeOfLastLocationUpdate'
+    --LOG('UpdateNewPrimaryBaseLocation: aiBrain='..aiBrain:GetArmyIndex()..'; Start position='..(aiBrain.M27StartPositionNumber or 'nil'))
+    if not(M27Logic.IsCivilianBrain(aiBrain)) then
+        local tEnemyBase = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+        if not(aiBrain.M27AI) then
+            aiBrain[reftPrimaryEnemyBaseLocation] = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]}
+        else
+           --Todo
+            aiBrain[reftPrimaryEnemyBaseLocation] = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]}
+        end
+    end
+end
+
+function GetPrimaryEnemyBaseLocation(aiBrain)
+    --Returns a table {x,y,z} - usually this is the start position of the nearest enemy base.  However in certain cases it will be different
+    --Used as the main location for the AI to evaluate things such as threats and make decisions; by default will be the nearest enemy start position
+
+    --Done as a function so easier to adjust in the future if decide we want to
+    if not(aiBrain[reftPrimaryEnemyBaseLocation]) then UpdateNewPrimaryBaseLocation(aiBrain) end
+    --return aiBrain[reftPrimaryEnemyBaseLocation]
+    return PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+end

@@ -1022,7 +1022,7 @@ function AirThreatChecker(aiBrain)
     iAllAirThreat = iAllAirThreat + M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, true, false, true, true, nil, 0, 0, 0) * 0.4
     --Increase enemy air threat based on how many factories and of what tech
     local tAirThreatByTech = {100, 500, 2000, 4000}
-    local tEnemyAirFactories = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], aiBrain[refiMaxScoutRadius], 'Enemy')
+    local tEnemyAirFactories = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain[refiMaxScoutRadius], 'Enemy')
     if M27Utilities.IsTableEmpty(tEnemyAirFactories) == false then
         for iAirFac, oAirFac in tEnemyAirFactories do
             iAllAirThreat = iAllAirThreat + tAirThreatByTech[M27UnitInfo.GetUnitTechLevel(oAirFac)]
@@ -1123,7 +1123,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
     if M27Utilities.IsTableEmpty(tAllBombers) == false then
         for iUnit, oBomber in tAllBombers do
             if M27UnitInfo.IsUnitValid(oBomber) then
-                iCurDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                iCurDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                 if iCurDistanceToEnemyBase < iClosestBomberDistanceToEnemy then iClosestBomberDistanceToEnemy = iCurDistanceToEnemyBase end
             end
         end
@@ -1131,7 +1131,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
     if M27Utilities.IsTableEmpty(tTorpBombers) == false then
         for iUnit, oBomber in tTorpBombers do
             if M27UnitInfo.IsUnitValid(oBomber) then
-                iCurDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                iCurDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                 if iCurDistanceToEnemyBase < iClosestBomberDistanceToEnemy then iClosestBomberDistanceToEnemy = iCurDistanceToEnemyBase end
             end
         end
@@ -1154,7 +1154,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             local tCurWaypointTarget, iDistanceToComplete, tUnitCurPosition, iTotalMovementPaths, iCurLoopCount, iCurAirSegmentX, iCurAirSegmentZ, oNavigator
             local iMaxLoopCount = 50
             local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-            local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+            local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
             local iDistanceFromStartForReset = 20 --If unit is this close to start then will reset it if its not on its first assignment/doesnt have a target thats further away
             local iFuelPercent, iHealthPercent
             for iUnit, oUnit in tAllAirOfType do
@@ -1330,7 +1330,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                                     --currently have set range to double the range when target first assigned
                                                                     tNearbyFriendlies = M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + categories.LAND + categories.NAVAL + M27UnitInfo.refCategoryTorpBomber + M27UnitInfo.refCategoryBomber, tTargetPos, iAssistNearbyUnitRange + math.min(iAssistNearbyUnitRange, 40), 'Ally'))
                                                                     --Do we have any friendly units nearby, and/or our closest bomber to the enemy base is a similar distance from the base to the air unit we are targetting and our target is significantly slower than us? (as e.g. strat bombers can outpace inties meaning the intie ends up out of range until the strat bomber turns)
-                                                                    if M27Utilities.IsTableEmpty(tNearbyFriendlies) and (M27Utilities.GetDistanceBetweenPositions(tTargetPos, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) - 50 < iClosestBomberDistanceToEnemy or oUnit[refoAirAATarget]:GetBlueprint().Air.MaxAirspeed >= oUnit:GetBlueprint().Air.MaxAirSpeed) then
+                                                                    if M27Utilities.IsTableEmpty(tNearbyFriendlies) and (M27Utilities.GetDistanceBetweenPositions(tTargetPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) - 50 < iClosestBomberDistanceToEnemy or oUnit[refoAirAATarget]:GetBlueprint().Air.MaxAirspeed >= oUnit:GetBlueprint().Air.MaxAirSpeed) then
                                                                         if bDebugMessages == true then LOG(sFunctionRef..': Will clear target since its heading towards enemy base and we dont want to follow it') end
                                                                         bClearAirAATargets = true
                                                                         bReturnToRallyPoint = true
@@ -1608,8 +1608,8 @@ function RefuelIdleAirUnits(aiBrain)
 
                 if bRefuelUnit == true then
                     --Are we on our side of the map?
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have a unit to refuel='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..', checking if its on our side of the map; distance to our start='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Distance to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])) end
-                    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a unit to refuel='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..', checking if its on our side of the map; distance to our start='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Distance to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))) end
+                    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
                         iUnitsToRefuel = iUnitsToRefuel + 1
                         tUnitsToRefuel[iUnitsToRefuel] = oUnit
                         if bDebugMessages == true then LOG(sFunctionRef..': Adding unit to list of units to be refueled') end
@@ -1703,7 +1703,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
 
     --reftScoutingTargetShortlist = 'M27ScoutingTargetShortlist' --[y] is the count (e.g. location 1, 2, 3), and then this gives {a,b,c} where a, b, c are subrefs, i.e. refiTimeSinceWantedToScout
     local iCurActiveScoutsAssigned
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Nearest enemy start point='..repr(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])..'; aiBrain[refiMinSegmentX]='..aiBrain[refiMinSegmentX]..'; aiBrain[refiMaxSegmentX]='..aiBrain[refiMaxSegmentX]..'; aiBrain[refiMinSegmentX]='..aiBrain[refiMinSegmentX]..'; aiBrain[refiMaxSegmentZ]='..aiBrain[refiMaxSegmentZ]) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Nearest enemy start point='..repr(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; aiBrain[refiMinSegmentX]='..aiBrain[refiMinSegmentX]..'; aiBrain[refiMaxSegmentX]='..aiBrain[refiMaxSegmentX]..'; aiBrain[refiMinSegmentX]='..aiBrain[refiMinSegmentX]..'; aiBrain[refiMaxSegmentZ]='..aiBrain[refiMaxSegmentZ]) end
     for iCurAirSegmentX = aiBrain[refiMinSegmentX], aiBrain[refiMaxSegmentX], 1 do
         for iCurAirSegmentZ = aiBrain[refiMinSegmentZ], aiBrain[refiMaxSegmentZ], 1 do
             iLastScoutedTime = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]
@@ -1755,7 +1755,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
     end
     if bDebugMessages == true then
         LOG(sFunctionRef..': Finished going through every segment on the map')
-        local iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+        local iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
         LOG(sFunctionRef..':Values for enemy base: iCurAirSegmentX='..iCurAirSegmentX..'; iCurAirSegmentZ='..iCurAirSegmentZ..'; iCurIntervalWanted='..aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval]..'; iLastScoutedTime='..aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]..'; iLongScoutDelayThreshold='..iLongScoutDelayThreshold..'; aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiDeadScoutsSinceLastReveal]='..aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiDeadScoutsSinceLastReveal])
     end
 
@@ -1786,9 +1786,9 @@ function GetEndDestinationForScout(aiBrain, oScout)
 
     local iStartSegmentX, iStartSegmentZ = GetAirSegmentFromPosition(oScout:GetPosition())
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Shortlist size='..table.getn(aiBrain[reftScoutingTargetShortlist])..'; reftScoutingTargetShortlist='..repr(aiBrain[reftScoutingTargetShortlist])..'; Enemy start position='..repr(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Shortlist size='..table.getn(aiBrain[reftScoutingTargetShortlist])..'; reftScoutingTargetShortlist='..repr(aiBrain[reftScoutingTargetShortlist])..'; Enemy start position='..repr(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))) end
 
-    local iEnemyBaseSegmentX, iEnemyBaseSegmentZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+    local iEnemyBaseSegmentX, iEnemyBaseSegmentZ = GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
     local bHaveLocationsReallyOverdue = false
     --If any location is more than 2.5m overdue then will filter to only consider locations overdue by this; if enemy base is overdue by 2m, then will prioritise scouting the base
     local iReallyOverduePriorityThreshold = 150
@@ -2311,7 +2311,7 @@ function GetBomberTargetShortlist(aiBrain)
             else
                 aiBrain[refbShortlistContainsLowPriorityTargets] = true
                 bProceed = true
-                local iCurX, iCurZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                local iCurX, iCurZ = GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                 if GetGameTimeSeconds() - aiBrain[reftAirSegmentTracker][iCurX][iCurZ][refiLastScouted] > 30 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] < 3 then bProceed = false end
                 if bProceed then
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have targets in shortlist so will considerl ow priority category; iHardToHitTargets='..iHardToHitTargets) end
@@ -2348,7 +2348,7 @@ function GetBomberTargetShortlist(aiBrain)
                             bIncludeInShortlist = false
                             --Is the unit close enough?
                             if iMaxPercentDistance < 1 then
-                                iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                                iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                                 iCurDistanceToBase = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                             end
                             if iMaxPercentDistance >= 1 or iMaxPercentDistance >= (iCurDistanceToBase / (iCurDistanceToBase + iCurDistanceToEnemy)) then
@@ -2494,7 +2494,7 @@ function IssueLargeBomberAttack(aiBrain, tBombers)
                 oBomber[refbPartOfLargeAttack] = true
             end
 
-            local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+            local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
 
             local iCurLoop = 0
             local iMaxLoop = 100
@@ -3361,7 +3361,7 @@ function AirAAManager(aiBrain)
         if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then
             aiBrain[refbNonScoutUnassignedAirAATargets] = false --redundancy
             if bDebugMessages == true then LOG(sFunctionRef..': Have available air units after assigning actions to deal with air threats; will send any remaining units to the rally point nearest the enemy unless theyre already near here') end
-            local tAirRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+            local tAirRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
             for iAirAA, oAirAA in aiBrain[reftAvailableAirAA] do
                if M27Utilities.GetDistanceBetweenPositions(oAirAA:GetPosition(), tAirRallyPoint) > 40 then
                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands of airAA unit '..oAirAA:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oAirAA)) end
@@ -3512,7 +3512,7 @@ function SetupAirOverseer(aiBrain)
 
     if bDebugMessages == true then LOG(sFunctionRef..': iMapMaxSegmentX='..iMapMaxSegmentX..'; iMapMaxSegmentZ='..iMapMaxSegmentZ..'; rPlayableArea='..repr(rPlayableArea)..'; iAirSegmentSize='..iAirSegmentSize) end
     --For large maps want to limit the segments that we consider (dont want to use aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] in case its not updated
-    local iDistanceToEnemyFromStart = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+    local iDistanceToEnemyFromStart = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
     aiBrain[refiMaxScoutRadius] = math.max(1500, iDistanceToEnemyFromStart * 1.5)
     local iStartSegmentX, iStartSegmentZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
     --local iSegmentSizeX = iMapSizeX / iAirSegmentSize
@@ -3942,10 +3942,10 @@ function NovaxCoreTargetLoop(aiBrain, oNovax)
         if bDebugMessages == true then LOG(sFunctionRef..': No target so move to enemy base') end
         --No target so move towards enemy base
         iOrderType = refOrderMove
-        if not(iOrderType == oNovax[refiLastIssuedOrderType] and oNovax[reftLastIssuedOrderLocation] and M27Utilities.GetDistanceBetweenPositions(oNovax[reftLastIssuedOrderLocation], M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 8) then
+        if not(iOrderType == oNovax[refiLastIssuedOrderType] and oNovax[reftLastIssuedOrderLocation] and M27Utilities.GetDistanceBetweenPositions(oNovax[reftLastIssuedOrderLocation], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= 8) then
             if bDebugMessages == true then LOG(sFunctionRef..': Issuing new order to novax, telling it to move to nearest enemy start location') end
             IssueClearCommands({oNovax})
-            oNovax[reftLastIssuedOrderLocation] = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+            oNovax[reftLastIssuedOrderLocation] = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
             IssueMove({oNovax}, oNovax[reftLastIssuedOrderLocation])
             oNovax[refiLastIssuedOrderType] = iOrderType
             oNovax[refoLastIssuedOrderUnit] = nil

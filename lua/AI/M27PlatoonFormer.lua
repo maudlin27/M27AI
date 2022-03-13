@@ -558,7 +558,7 @@ function CombatPlatoonFormer(aiBrain)
                         end
                         local tTargetPosition = aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint][1]
                         --]]
-                        local tTargetPosition = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                        local tTargetPosition = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                         --Modify position if its close to a factory
                         --[[local iCurLoop = 0
                         local iMaxLoop = 10
@@ -583,7 +583,7 @@ function CombatPlatoonFormer(aiBrain)
                             tBasePosition = {tStartPoint[1], tStartPoint[2], tStartPoint[3]}
                         end
 
-                        local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                        local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                         local bHaveValidLocation = false
                         local oPathingUnitExample = aiBrain[reftoCombatUnitsWaitingForAssignment][1]
                         local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnitExample)
@@ -901,7 +901,7 @@ function MAAPlatoonFormer(aiBrain, tMAA)
         if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the base MAA platoon and set location to guard='..repr(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
     elseif aiBrain[refoMAARallyPatrolPlatoon] == nil or (aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] or 0) == 0 then
         oPlatoonToAddTo = CreatePlatoon(aiBrain, 'M27MAAPatrol', tMAA)
-        oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard] = M27MapInfo.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+        oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard] = M27MapInfo.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
         if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the rally point MAA platoon and set location to guard='..repr(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
     else
         --Which platoon needs more MAA if we want 60:40 ratio for base:rally point?
@@ -1295,8 +1295,8 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                         --Give the new unit a move command to try and make sure its away from the factory
                         --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
                         if tStartPosition then
-                            local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
-                            --local tRallyPoint = M27Utilities.MoveTowardsTarget(tStartPosition, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], 10, 0)
+                            local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                            --local tRallyPoint = M27Utilities.MoveTowardsTarget(tStartPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 10, 0)
                             if EntityCategoryContains(refCategoryLandCombat, sUnitID) then
                                 IssueAggressiveMove(tNewUnits, tRallyPoint)
                             elseif not(EntityCategoryContains(M27UnitInfo.refCategoryEngineer, sUnitID)) then IssueMove(tNewUnits, tRallyPoint) end

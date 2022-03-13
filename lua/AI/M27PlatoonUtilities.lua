@@ -357,7 +357,7 @@ function PlatoonMove(oPlatoon, tLocation)
                 --function IssueFormAggressiveMove(tblUnits, position, formation, degrees)
                 -- @param degrees The orientation the platoon should take when it reaches the position. South is 0 degrees, east is 90 degrees, etc.
                 --Per below, assume we always want to face towards enemy base
-                IssueFormAggressiveMove(tIndirectUnits, tLocation, oPlatoon[M27PlatoonTemplates.refsDefaultFormation], M27Utilities.ConvertM27AngleToFAFAngle(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(oPlatoon:GetBrain())])))
+                IssueFormAggressiveMove(tIndirectUnits, tLocation, oPlatoon[M27PlatoonTemplates.refsDefaultFormation], M27Utilities.ConvertM27AngleToFAFAngle(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(oPlatoon:GetBrain()))))
             else
                 IssueAggressiveMove(tIndirectUnits, tLocation)
             end
@@ -365,7 +365,7 @@ function PlatoonMove(oPlatoon, tLocation)
             --Normal move to all other units
             bMoveInFormation = ShouldPlatoonMoveInFormation(oPlatoon, false)
             local iAngle
-            if bMoveInFormation then iAngle = M27Utilities.ConvertM27AngleToFAFAngle(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(oPlatoon:GetBrain())])) end
+            if bMoveInFormation then iAngle = M27Utilities.ConvertM27AngleToFAFAngle(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(oPlatoon:GetBrain()))) end
             for iUnit, oUnit in tCurrentUnits do
                 if M27UnitInfo.IsUnitValid(oUnit) and not(EntityCategoryContains(M27UnitInfo.refCategoryIndirect, oUnit:GetUnitId())) then
 
@@ -396,13 +396,13 @@ function PlatoonMove(oPlatoon, tLocation)
         bMoveInFormation = ShouldPlatoonMoveInFormation(oPlatoon, bAttackMove)
         if bAttackMove then
             if bMoveInFormation then
-                IssueFormAggressiveMove(tCurrentUnits, tLocation, oPlatoon[M27PlatoonTemplates.refsDefaultFormation], M27Utilities.ConvertM27AngleToFAFAngle(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(oPlatoon:GetBrain())])))
+                IssueFormAggressiveMove(tCurrentUnits, tLocation, oPlatoon[M27PlatoonTemplates.refsDefaultFormation], M27Utilities.ConvertM27AngleToFAFAngle(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(oPlatoon:GetBrain()))))
             else
                 IssueAggressiveMove(tCurrentUnits, tLocation)
             end
         else
             if bMoveInFormation then
-                IssueFormMove(tCurrentUnits, tLocation, oPlatoon[M27PlatoonTemplates.refsDefaultFormation], M27Utilities.ConvertM27AngleToFAFAngle(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(oPlatoon:GetBrain())])))
+                IssueFormMove(tCurrentUnits, tLocation, oPlatoon[M27PlatoonTemplates.refsDefaultFormation], M27Utilities.ConvertM27AngleToFAFAngle(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(oPlatoon:GetBrain()))))
             else
                 IssueMove(tCurrentUnits, tLocation)
             end
@@ -824,11 +824,10 @@ function IsDestinationAwayFromNearbyEnemies(aiBrain, tCurPos, tCurDestination, i
             local bEnemyStartZLessThanTarget = false
             local bEnemyStartXLessThanOurs = false
             local bEnemyStartZLessThanOurs = false
-            local iEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-            if iEnemyStartNumber == nil then
-                M27Utilities.ErrorHandler('iEnemyStartNumber=nil')
+            if M27Logic.GetNearestEnemyStartNumber(aiBrain) == nil then
+                M27Utilities.ErrorHandler('M27Logic.GetNearestEnemyStartNumber(aiBrain)=nil')
             else
-                local tEnemyStartPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                 if tEnemyStartPosition[1] < tCurDestination[1] then bEnemyStartXLessThanTarget = true end
                 if tEnemyStartPosition[3] < tCurDestination[3] then bEnemyStartZLessThanTarget = true end
                 if tEnemyStartPosition[1] < tCurPos[1] then bEnemyStartXLessThanOurs = true end
@@ -1098,9 +1097,8 @@ function MergeWithPlatoonsOnPath(oPlatoonToMergeInto, sTargetPlatoonPlanName, bO
         if M27Utilities.IsTableEmpty(tMergePosition) == false then
             local iCorePlatoonDistFromMerge = M27Utilities.GetDistanceBetweenPositions(tBasePlatoonPos, tMergePosition)
             local iArmyStartNumber = aiBrain.M27StartPositionNumber
-            local iNearestEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-            if iNearestEnemyStartNumber == nil then
-                M27Utilities.ErrorHandler('iNearestEnemyStartNumber is nil')
+            if M27Logic.GetNearestEnemyStartNumber(aiBrain) == nil then
+                M27Utilities.ErrorHandler('M27Logic.GetNearestEnemyStartNumber(aiBrain) is nil')
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': getn(tFriendlyPlatoons)='..table.getn(tFriendlyPlatoons)) end
                 for iCurPlan, oCurPlatoon in tFriendlyPlatoons do
@@ -1115,7 +1113,7 @@ function MergeWithPlatoonsOnPath(oPlatoonToMergeInto, sTargetPlatoonPlanName, bO
                                     if bOnlyOnOurSideOfMap == false then bNearToPath = true
                                     else
                                         --Check if closer to our start base than enemy
-                                        if M27Utilities.GetDistanceBetweenPositions(tCurPlatoonPos, M27MapInfo.PlayerStartPoints[iArmyStartNumber]) <= M27Utilities.GetDistanceBetweenPositions(tCurPlatoonPos, M27MapInfo.PlayerStartPoints[iNearestEnemyStartNumber]) then bNearToPath = true end
+                                        if M27Utilities.GetDistanceBetweenPositions(tCurPlatoonPos, M27MapInfo.PlayerStartPoints[iArmyStartNumber]) <= M27Utilities.GetDistanceBetweenPositions(tCurPlatoonPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then bNearToPath = true end
                                     end
                                 end
                                 if bDebugMessages == true then LOG(sFunctionRef..': iCurPlatoonPos='..tCurPlatoonPos[1]..'-'..tCurPlatoonPos[3]..'; tBasePlatoonPos='..tBasePlatoonPos[1]..'-'..tBasePlatoonPos[3]..'; iCurDistFromMerge='..iCurDistFromMerge) end
@@ -3736,8 +3734,7 @@ function DetermineIfACUShouldBuildFactory(oPlatoon)
             if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories) < 3 or iFactoryCount < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] then
                 --Are we closer to enemy than base?
                 local tCurPosition = GetPlatoonFrontPosition(oPlatoon)
-                local iEnemyStartPosition = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-                local iDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPosition])
+                local iDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                 local iDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToEnemy='..iDistanceToEnemy..'; iDistanceToStart='..iDistanceToStart) end
                 if iDistanceToEnemy >= iDistanceToStart then
@@ -5188,12 +5185,11 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                 oPlatoon[reftMovementPath] = M27Logic.GetMexRaidingPath(oPlatoon, 0, 15, 50, true)
                 --oPlatoon[refiLastPathTarget] = table.getn(oPlatoon[reftMovementPath])
             elseif sPlatoonName == 'M27AttackNearestUnits' then
-                local iEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-                if iEnemyStartNumber == nil then
+                if M27Logic.GetNearestEnemyStartNumber(aiBrain) == nil then
                     LOG(sFunctionRef..':'..sPlatoonName..': EnemyStartNumber=nil, ERROR unless enemy dead')
                     oPlatoon[reftMovementPath][1] = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
                 else
-                    local tTargetBase = M27MapInfo.PlayerStartPoints[iEnemyStartNumber]
+                    local tTargetBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                     if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath][1]) == true or not(oPlatoon[reftMovementPath][1][1] == tTargetBase[1] and oPlatoon[reftMovementPath][1][3] == tTargetBase[3]) then
                         oPlatoon[reftMovementPath][1] = tTargetBase
                     else
@@ -5204,7 +5200,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                 oPlatoon[refiCurrentPathTarget] = 1
             elseif sPlatoonName == 'M27GroundExperimental' then
                 oPlatoon[reftMovementPath] = {}
-                local tTargetBase = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                local tTargetBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                 if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tTargetBase) >= 50 then
                     oPlatoon[reftMovementPath][1] = tTargetBase
                 else
@@ -5212,7 +5208,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                 end
                 oPlatoon[refiCurrentPathTarget] = 1
             elseif sPlatoonName == 'M27IndirectSpareAttacker' then
-                local tTargetBase = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                local tTargetBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                 oPlatoon[refiCurrentPathTarget] = 1
                 if oPlatoon[reftMovementPath] and oPlatoon[reftMovementPath][1] and oPlatoon[reftMovementPath][1][1] == tTargetBase[1] and oPlatoon[reftMovementPath][1][3] == tTargetBase[3] then
                     --Are already targetting enemy base - check if we're close to it
@@ -5391,22 +5387,21 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                 tTargetBase = M27Logic.GetPriorityACUDestination(aiBrain, oPlatoon)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will go to enemy base or priority destination = '..repr(tTargetBase)) end
                                 --[[
-                                local iEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-                                if iEnemyStartNumber == nil then
-                                    LOG(sFunctionRef..': ERROR unless enemy dead as iEnemyStartNumber is nil')
+                                if M27Logic.GetNearestEnemyStartNumber(aiBrain) == nil then
+                                    LOG(sFunctionRef..': ERROR unless enemy dead as M27Logic.GetNearestEnemyStartNumber(aiBrain) is nil')
                                     tTargetBase = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
                                 else
-                                    tTargetBase = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                                    tTargetBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                                 end --]]
                             end
 
                             --Are we already near the target position? If so then switch to go to enemy base, or home if close to enemy base
                             if M27Utilities.GetDistanceBetweenPositions(tTargetBase, M27Utilities.GetACU(aiBrain):GetPosition()) <= 5 then
-                                if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 5 then
+                                if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= 5 then
                                     --return to nearest rally point
                                     tTargetBase = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
                                 else
-                                    tTargetBase = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                                    tTargetBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                                 end
 
                                 if bDebugMessages == true then LOG(sFunctionRef..': Already near destination so will either go to enemy base or to nearest rally point; revised target='..repr(tTargetBase)) end
@@ -5467,12 +5462,11 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                         local iMaxMexPriorityTargets = table.getn(aiBrain[M27MapInfo.reftHighPriorityMexes])
                         oPlatoon[reftMovementPath][1] = aiBrain[M27MapInfo.reftHighPriorityMexes][math.random(1, iMaxMexPriorityTargets)]
                     else
-                        local iEnemyStartNumber = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-                        if iEnemyStartNumber == nil then
+                        if M27Logic.GetNearestEnemyStartNumber(aiBrain) == nil then
                             LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..':ERROR - enemy start number is nil if theyre not dead then something is wrong')
                             oPlatoon[reftMovementPath][1] = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
                         else
-                            oPlatoon[reftMovementPath][1] = M27MapInfo.PlayerStartPoints[iEnemyStartNumber]
+                            oPlatoon[reftMovementPath][1] = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                         end
                     end
                 end
@@ -6641,7 +6635,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
         if oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then
             --Are we the MAA platoon that is meant to patrol the last rally point? If so then first update its movement path if its not the latest rally point
             if oPlatoon == aiBrain[M27PlatoonFormer.refoMAARallyPatrolPlatoon] then
-                local tRallyPointWanted = M27MapInfo.GetNearestRallyPoint(aiBrain, M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+                local tRallyPointWanted = M27MapInfo.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                 oPlatoon[reftLocationToGuard] = {tRallyPointWanted[1], tRallyPointWanted[2], tRallyPointWanted[3]}
             end
             oPlatoon[reftMovementPath][1] = oPlatoon[reftLocationToGuard]
@@ -6818,8 +6812,8 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
                                 --oPlatoon[reftMovementPath][1] = M27Logic.GetPositionToFollowTargets(tUnitsToFollow, oOurPlatoonUnitReference, oPlatoon[refiSupportHelperFollowDistance])
                                 --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions, bCheckAgainstExistingCommandTarget, iMinDistanceFromCurrentBuilderMoveTarget)
                                 if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': About to get position near target in same pathing group; tTargetUnitPosition='..repr(tTargetUnitPosition)..'; distance we want to be towards enemy base from the target='..-oPlatoon[refiSupportHelperFollowDistance]) end
-                                --local tNewTargetPath = GetPositionNearTargetInSamePathingGroup(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tTargetUnitPosition, -oPlatoon[refiSupportHelperFollowDistance], 0, oOurPlatoonUnitReference, 1, true, true, 3)
-                                local tNewTargetPath = GetPositionAtOrNearTargetInPathingGroup(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)], tTargetUnitPosition, -oPlatoon[refiSupportHelperFollowDistance], 0, oOurPlatoonUnitReference, true, true, 3)
+                                --local tNewTargetPath = GetPositionNearTargetInSamePathingGroup(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), tTargetUnitPosition, -oPlatoon[refiSupportHelperFollowDistance], 0, oOurPlatoonUnitReference, 1, true, true, 3)
+                                local tNewTargetPath = GetPositionAtOrNearTargetInPathingGroup(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), tTargetUnitPosition, -oPlatoon[refiSupportHelperFollowDistance], 0, oOurPlatoonUnitReference, true, true, 3)
                                 if bDebugMessages == true then
                                     if M27Utilities.IsTableEmpty(tNewTargetPath) == false then M27Utilities.DrawLocation(tNewTargetPath, nil, 2, 10) end --red
                                     M27Utilities.DrawLocation(tTargetUnitPosition, nil, 5, 10) --Light blue
@@ -7175,7 +7169,7 @@ function ProcessPlatoonAction(oPlatoon)
                             --GetPositionAtOrNearTargetInPathingGroup(tStartPos, tTargetPos, iDistanceFromTargetToStart, iAngleAdjust, oPathingUnit, bMoveCloserBeforeFurtherIfBlocked, bCheckIfExistingTargetIsBetter, iMinDistanceFromExistingCommandTarget)
                             if M27Utilities.IsTableEmpty(tDFTargetPosition) == nil and not(oUnitToAttackInstead) then
                                 M27Utilities.ErrorHandler('Couldnt find target for experimental that is valid, will revert to enemy base', nil, true)
-                                tDFTargetPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+                                tDFTargetPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                             elseif not(oUnitToAttackInstead) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have a DF position, will move near the target') end
                                 tDFTargetPosition = GetPositionAtOrNearTargetInPathingGroup(GetPlatoonFrontPosition(oPlatoon), tDFTargetPosition, 5, 0, oPlatoon[refoPathingUnit], true, true, 5)
@@ -7274,7 +7268,7 @@ function ProcessPlatoonAction(oPlatoon)
                                         end
                                     end
                                 end
-                                if M27Utilities.IsTableEmpty(tDFTargetPosition) == true then tDFTargetPosition = M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)] end
+                                if M27Utilities.IsTableEmpty(tDFTargetPosition) == true then tDFTargetPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain) end
                                 oPlatoon[reftTemporaryMoveTarget] = tDFTargetPosition
 
                                 --Is the target under shield? If so then change the target to the shield itself
