@@ -120,7 +120,7 @@ refiOurMassInAirAA = 'M27OurMassInAirAA'
 
 
 --Available air units
-local reftAvailableScouts = 'M27AirScoutsWithFuel'
+reftAvailableScouts = 'M27AirScoutsWithFuel'
 reftAvailableBombers = 'M27AirAvailableBombers'
 refiPreviousAvailableBombers = 'M27AirPreviousAvailableBombers' --Number of idle bombers when last checked for threats
 reftAvailableTorpBombers = 'M27AirAvailableTorpBombers' --Determined by threat overseer
@@ -2158,9 +2158,11 @@ function GetBomberTargetShortlist(aiBrain)
     local iMaxPercentDistance = 1 --Max % distance of way to enemy base that will add units to shortlist
     local iCurDistanceToEnemy, iCurDistanceToBase
 
+    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then bDebugMessages = true end
+
 
     if bDebugMessages == true then LOG(sFunctionRef..': Deciding what categories and priorities to look for') end
-    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refoLastNearestACU] and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) == false then
+    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) == false then
         reftPriorityTargetCategories = {categories.COMMAND}
         aiBrain[refiLowPriorityStart] = 2
         bOnlyIncludeTargetACU = true
@@ -2459,7 +2461,7 @@ function GetBomberTargetShortlist(aiBrain)
                 LOG(sFunctionRef..': Table of units for target category is empty; iMaxSearchRange='..iMaxSearchRange)
                 if iCategory == categories.COMMAND then
                     LOG('Were trying to target ACU')
-                    if aiBrain[M27Overseer.refoLastNearestACU] then LOG('Distance to last nearest ACU='..M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+                    if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then LOG('Distance to last nearest ACU='..M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
                 end
             end
         end
@@ -2874,7 +2876,7 @@ function AirBomberManager(aiBrain)
     end
 
     --Tell any spare bombers to go to the nearest rally point if hteyre not there already, and treat it as ahving a low priority target for tracking purposes (for how much shield damage to ignore)
-    --Order any spare bombers that dont have a current target to go to nearest rally point
+    --Order any spare bombers that dont have a current target to go to nearest rally point; if are in air domination mode then instead send them on attack-move to enemy base
     if bDebugMessages == true then LOG(sFunctionRef..': iSpareBombers='..iSpareBombers..'; if have available bombers then will get any with no target to go to the nearest rally point') end
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableBombers]) == false and iSpareBombers > 0 then
         local tRallyPoint, tCurTarget, oNavigator
@@ -2889,8 +2891,11 @@ function AirBomberManager(aiBrain)
                 end
 
 
-                if bDebugMessages == true then LOG(sFunctionRef..': Bomber '..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' has no target number, will check if its moving to or already near a rally point') end
-                tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, oBomber:GetPosition())
+                if bDebugMessages == true then LOG(sFunctionRef..': Bomber '..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' has no target number, will check if its moving to or already near a rally point or enemy base') end
+                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then tRallyPoint = {aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation][1], aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation][2], aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation][3]}
+                else
+                    tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, oBomber:GetPosition())
+                end
                 oNavigator = oBomber:GetNavigator()
                 if oNavigator and oNavigator.GetCurrentTargetPos then
                     tCurTarget = oNavigator:GetCurrentTargetPos()
@@ -2902,7 +2907,11 @@ function AirBomberManager(aiBrain)
                     --Move to nearest rally point
                     if bDebugMessages == true then LOG(sFunctionRef..': Telling '..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' to move to nearest rapply point='..repr(tRallyPoint)) end
                     IssueClearCommands({oBomber})
-                    IssueMove({oBomber}, tRallyPoint)
+                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
+                        IssueAggressiveMove({oBomber}, tRallyPoint)
+                    else
+                        IssueMove({oBomber}, tRallyPoint)
+                    end
                 end
                 if M27Config.M27ShowUnitNames == true and oBomber.GetUnitId then M27PlatoonUtilities.UpdateUnitNames({oBomber}, oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..':NoTargetReturnToBase') end
             end
@@ -3003,7 +3012,11 @@ function AirAAManager(aiBrain)
         if bDebugMessages == true then
             LOG(sFunctionRef..': AirAA manager start; will list out position of all friendly T3 bombers')
         end
-        local tACUPos = M27Utilities.GetACU(aiBrain):GetPosition()
+        local tACUPos
+        if M27Utilities.GetACU(aiBrain) then
+            tACUPos = M27Utilities.GetACU(aiBrain):GetPosition()
+        else tACUPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        end
         local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
         local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tACUPos, iMAANearACURange, 'Ally')
         if M27Utilities.IsTableEmpty(tNearbyMAA) == false then aiBrain[refiNearToACUThreshold] = iAssistNearbyUnitRange
@@ -3041,10 +3054,15 @@ function AirAAManager(aiBrain)
             local iDistanceFromACUToStart = 0
             if aiBrain[refiNearToACUThreshold] > 0 then
                 iDistanceFromACUToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tACUPos)
+                local tAllyACUPos
                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
                     for iAllyBrain, aiAllyBrain in aiBrain[M27Overseer.toAllyBrains] do
                         if not(aiAllyBrain:IsDefeated()) then --redundancy in case issue with toallybrains being updated
-                            iDistanceFromACUToStart = math.max(iDistanceFromACUToStart, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition()))
+                            if M27Utilities.GetACU(aiAllyBrain) then
+                                tAllyACUPos = M27Utilities.GetACU(aiAllyBrain):GetPosition()
+                            else tAllyACUPos = M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber]
+                            end
+                            iDistanceFromACUToStart = math.max(iDistanceFromACUToStart, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], tAllyACUPos))
                             if bDebugMessages == true then LOG(sFunctionRef..': Brain start number='..aiAllyBrain.M27StartPositionNumber..'; distance from enemy air unit to ACU of this player='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition())) end
                         end
                     end
@@ -3513,7 +3531,7 @@ function SetupAirOverseer(aiBrain)
     if bDebugMessages == true then LOG(sFunctionRef..': iMapMaxSegmentX='..iMapMaxSegmentX..'; iMapMaxSegmentZ='..iMapMaxSegmentZ..'; rPlayableArea='..repr(rPlayableArea)..'; iAirSegmentSize='..iAirSegmentSize) end
     --For large maps want to limit the segments that we consider (dont want to use aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] in case its not updated
     local iDistanceToEnemyFromStart = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-    aiBrain[refiMaxScoutRadius] = math.max(1500, iDistanceToEnemyFromStart * 1.5)
+    aiBrain[refiMaxScoutRadius] = math.max(1500, iDistanceToEnemyFromStart * 1.5) --Note this gets updated whenever the enemy start position is changed
     local iStartSegmentX, iStartSegmentZ = GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
     --local iSegmentSizeX = iMapSizeX / iAirSegmentSize
     --local iSegmentSizeZ = iMapSizeZ / iAirSegmentSize
@@ -3681,7 +3699,7 @@ function GetNovaxTarget(aiBrain, oNovax)
         if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
             oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, oNovax:GetPosition(), aiBrain)
         else
-            if not(M27MapInfo.IsUnderwater(aiBrain[M27Overseer.reftLastNearestACU])) then
+            if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and not(M27MapInfo.IsUnderwater(aiBrain[M27Overseer.reftLastNearestACU])) then
                 if bDebugMessages == true then LOG(sFunctionRef..': WIll target enemy ACU as no AA targets and ACU is on ground') end
                 oTarget = aiBrain[M27Overseer.refoLastNearestACU]
             else
@@ -3694,7 +3712,7 @@ function GetNovaxTarget(aiBrain, oNovax)
         end
     elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
         if bDebugMessages == true then LOG(sFunctionRef..': Want to kill enemy ACU so will target the ACU if we can see it') end
-        if M27Utilities.CanSeeUnit(aiBrain, aiBrain[refoLastNearestACU], true) and not(M27MapInfo.IsUnderwater(aiBrain[M27Overseer.reftLastNearestACU])) then
+        if M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[refoLastNearestACU], true) and not(M27MapInfo.IsUnderwater(aiBrain[M27Overseer.reftLastNearestACU])) then
             oTarget = aiBrain[refoLastNearestACU]
         else
             tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand, aiBrain[M27Overseer.reftLastNearestACU], iMaxRange * 0.5, 'Enemy')

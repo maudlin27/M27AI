@@ -55,10 +55,10 @@ function OnUnitDeath(oUnit)
         LOG(sFunctionRef..' ACU kill detected; total kills='..M27Overseer.iACUDeathCount)
         --Update list of brains
         local oACUBrain = oUnit:GetAIBrain()
-        oACUBrain.M27IsDefeated = true
+        if ScenarioInfo.Options.Victory == "demoralization" then oACUBrain.M27IsDefeated = true end
 
         for iArmyIndex, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
-            if aiBrain == oACUBrain then
+            if aiBrain == oACUBrain and ScenarioInfo.Options.Victory == "demoralization" then
                 M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
             elseif aiBrain.M27AI then
                 ForkThread(M27Overseer.RecordAllEnemiesAndAllies, aiBrain)

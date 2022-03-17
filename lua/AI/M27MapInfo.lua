@@ -17,6 +17,7 @@ tHydroByPathingAndGrouping = {}
 HydroPoints = {} -- Stores position values i.e. a table with 3 values, x, y, z
 PlayerStartPoints = {} -- Stores position values i.e. a table with 3 values, x, y, z; item 1 = ARMY_1 etc.
 reftPrimaryEnemyBaseLocation = 'M27MapPrimaryEnemyBase'
+refiLastTimeCheckedEnemyBaseLocation = 'M27LastTimeChecked'
 tResourceNearStart = {} --[iArmy][iResourceType (1=mex2=hydro)][iCount][tLocation] Stores location of mass extractors and hydrocarbons that are near to start locations; 1st value is the army number, 2nd value the resource type, 3rd the mex number, 4th value the position array (which itself is made up of 3 values)
 MassCount = 0 -- used as a way of checking if have the core markers needed
 HydroCount = 0
@@ -56,7 +57,7 @@ iMapTotalMass = 0 --Stores the total mass on the map
 --tSegmentGroupReferencePos = {} --Table holding the engineer segment X and Z positions used for the group; e.g. [3][1] returns the X segment for group 3, [3][2] returns the Z position for group 3
 
 tUnmappedMarker = {} --[sPathing][iResource]; iResource: 1=Mex, 2=Hydro, 3=PlayerStart; returns the marker location
-refiStartingSegmentGroup = 'M27StartingSegmentGroup' --[sPathingType]  - returns the group number for the given pathing type
+refiStartingSegmentGroup = 'M27StartingSegmentGroup' --[sPathing]  - returns the group number for the given pathing type
 reftSortedMexesInOriginalGroup = 'M27SortedMexesInOriginalGroup' --Local to AI Brain, [iPathingGroup][iMexCount], returns mex location; ordered based on how close the mex is to our base and enemy (early entries are closest to our base)
 reftMexesInPathingGroupFilteredByDistanceToEnemy = 'M27MexesInPathingGroupFilteredByDistanceToEnemy' --local to aiBrain; [sPathing][iPathingGroup][iMinRangeFromEnemy][iMaxRangeFromEnemy][iMexCount] returns Mex Location
 reftHighPriorityMexes = 'M27HighPriorityMexes' --Local to aiBrain, list of mex locations
@@ -165,7 +166,7 @@ function RecordResourceLocations(aiBrain)
     MassCount = 0
     HydroCount = 0
     local iMarkerType
-    local iResourceCount, sPathingType, sLocationRef
+    local iResourceCount, sPathing, sLocationRef
     if bDebugMessages == true then LOG(sFunctionRef..': About to record resource locations') end
     local bHaveAdaptiveMap = ScenarioInfo.AdaptiveMap
 
@@ -210,16 +211,16 @@ function RecordResourceLocations(aiBrain)
         --Update unmapped marker list:
 
         --[[for iPathingType = 1, iMaxPathingType do
-            if iPathingType == 1 then sPathingType = M27UnitInfo.refPathingTypeAmphibious
-            elseif iPathingType == 2 then sPathingType = M27UnitInfo.refPathingTypeNavy
-            elseif iPathingType == 3 then sPathingType = M27UnitInfo.refPathingTypeAir
-            else sPathingType = M27UnitInfo.refPathingTypeLand
+            if iPathingType == 1 then sPathing = M27UnitInfo.refPathingTypeAmphibious
+            elseif iPathingType == 2 then sPathing = M27UnitInfo.refPathingTypeNavy
+            elseif iPathingType == 3 then sPathing = M27UnitInfo.refPathingTypeAir
+            else sPathing = M27UnitInfo.refPathingTypeLand
             end ]]--
         if iMarkerType > 0 then
-            for iPathingType, sPathingType in M27UnitInfo.refPathingTypeAll do
-                if tUnmappedMarker[sPathingType] == nil then tUnmappedMarker[sPathingType] = {} end
-                if tUnmappedMarker[sPathingType][iMarkerType] == nil then tUnmappedMarker[sPathingType][iMarkerType] = {} end
-                tUnmappedMarker[sPathingType][iMarkerType][iResourceCount] = v.position
+            for iPathingType, sPathing in M27UnitInfo.refPathingTypeAll do
+                if tUnmappedMarker[sPathing] == nil then tUnmappedMarker[sPathing] = {} end
+                if tUnmappedMarker[sPathing][iMarkerType] == nil then tUnmappedMarker[sPathing][iMarkerType] = {} end
+                tUnmappedMarker[sPathing][iMarkerType][iResourceCount] = v.position
             end
         end
     end -- GetMarkers() loop
@@ -305,10 +306,10 @@ function RecordPlayerStartLocations()
         if tempPos ~= nil then
             PlayerStartPoints[i] = tempPos
             if bDebugMessages == true then LOG('* M27AI: Recording Player start point, ARMY_'..i..' x=' ..PlayerStartPoints[i][1]..';y='..PlayerStartPoints[i][2]..';z='..PlayerStartPoints[i][3]) end
-            for iPathingType, sPathingType in M27UnitInfo.refPathingTypeAll do
-                if tUnmappedMarker[sPathingType] == nil then tUnmappedMarker[sPathingType] = {} end
-                if tUnmappedMarker[sPathingType][iMarkerType] == nil then tUnmappedMarker[sPathingType][iMarkerType] = {} end
-                tUnmappedMarker[sPathingType][iMarkerType][i] = tempPos
+            for iPathingType, sPathing in M27UnitInfo.refPathingTypeAll do
+                if tUnmappedMarker[sPathing] == nil then tUnmappedMarker[sPathing] = {} end
+                if tUnmappedMarker[sPathing][iMarkerType] == nil then tUnmappedMarker[sPathing][iMarkerType] = {} end
+                tUnmappedMarker[sPathing][iMarkerType][i] = tempPos
             end
         end
     end
@@ -402,16 +403,17 @@ function InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly, bReturnDe
     local sFunctionRef = 'InSameSegmentGroup'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oUnit and not(oUnit.Dead) and oUnit.GetUnitId then
-        local sPathingType = M27UnitInfo.GetUnitPathingType(oUnit)
+        local sPathing = M27UnitInfo.GetUnitPathingType(oUnit)
+        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
         local tCurPosition = oUnit:GetPosition()
         local iSegmentX, iSegmentZ, iUnitGroup, iTargetSegmentX, iTargetSegmentZ, iTargetGroup
         if not(bReturnDestinationGroupOnly) then
             iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tCurPosition)
-            iUnitGroup = tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ]
+            iUnitGroup = tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
         end
         if not(bReturnUnitGroupOnly) then
             iTargetSegmentX, iTargetSegmentZ = GetPathingSegmentFromPosition(tDestination)
-            iTargetGroup = tPathingSegmentGroupBySegment[sPathingType][iTargetSegmentX][iTargetSegmentZ]
+            iTargetGroup = tPathingSegmentGroupBySegment[sPathing][iTargetSegmentX][iTargetSegmentZ]
         end
 
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -427,11 +429,13 @@ end
 
 function GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
     --Returns unit group for the target segment position, or nil if its not known; oUnit should be specified to allow it to see if oUnit can path there (in case we havent recorded the location yet)
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
     return tPathingSegmentGroupBySegment[sPathing][iTargetSegmentX][iTargetSegmentZ]
 end
 
 function GetSegmentGroupOfLocation(sPathing, tLocation)
     local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tLocation)
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
     return tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
 end
 
@@ -440,35 +444,37 @@ function GetUnitSegmentGroup(oUnit)
     --Intended for convenience not optimisation - if going to be called alot of times use other approach
     local sPathing = M27UnitInfo.GetUnitPathingType(oUnit)
     local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(oUnit:GetPosition())
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
     return tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
 end
 
-function FixSegmentPathingGroup(sPathingType, tLocation, iCorrectPathingGroup)
+function FixSegmentPathingGroup(sPathing, tLocation, iCorrectPathingGroup)
     --Called if CanPathTo identifies an inconsistency in our pathing logic - basic fix
     --Try using RecheckPathingOfLocation in future which incorporates this
 
     --have commented out code re updating amphibious pathing based on land pathing check, as its flawed since the correctpathinggroup might be different for teh amphibious pathing
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
     local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tLocation)
     --local bUpdateAmphibiousWithSameGroup = false
-    local iOldPathingGroup = tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ]
-    --if sPathingType == M27UnitInfo.refPathingTypeLand and tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] == tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] then bUpdateAmphibiousWithSameGroup = true end
-    tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] = iCorrectPathingGroup
+    local iOldPathingGroup = tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
+    --if sPathing == M27UnitInfo.refPathingTypeLand and tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] == tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] then bUpdateAmphibiousWithSameGroup = true end
+    tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] = iCorrectPathingGroup
     --if bUpdateAmphibiousWithSameGroup then tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] = iCorrectPathingGroup end
-    tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(tLocation)] = tLocation
-    if M27Utilities.IsTableEmpty(tSegmentBySegmentGroup[sPathingType][iOldPathingGroup]) == false then
-        for iEntry, tSegments in tSegmentBySegmentGroup[sPathingType][iOldPathingGroup] do
-            --table.insert into this is tSegmentBySegmentGroup[sPathingType][iPathingGroup], {iSegmentX, iSegmentZ}
+    tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tLocation)] = tLocation
+    if M27Utilities.IsTableEmpty(tSegmentBySegmentGroup[sPathing][iOldPathingGroup]) == false then
+        for iEntry, tSegments in tSegmentBySegmentGroup[sPathing][iOldPathingGroup] do
+            --table.insert into this is tSegmentBySegmentGroup[sPathing][iPathingGroup], {iSegmentX, iSegmentZ}
             if tSegments == {iSegmentX, iSegmentZ} then
-                table.remove(tSegmentBySegmentGroup[sPathingType][iOldPathingGroup], iEntry)
+                table.remove(tSegmentBySegmentGroup[sPathing][iOldPathingGroup], iEntry)
                 break
             end
         end
     end
-    if not(tSegmentBySegmentGroup[sPathingType][iCorrectPathingGroup]) then tSegmentBySegmentGroup[sPathingType][iCorrectPathingGroup] = {} end
-    table.insert(tSegmentBySegmentGroup[sPathingType][iCorrectPathingGroup], {iSegmentX, iSegmentZ})
+    if not(tSegmentBySegmentGroup[sPathing][iCorrectPathingGroup]) then tSegmentBySegmentGroup[sPathing][iCorrectPathingGroup] = {} end
+    table.insert(tSegmentBySegmentGroup[sPathing][iCorrectPathingGroup], {iSegmentX, iSegmentZ})
 end
 
-function RecheckPathingAroundLocationIfUnitIsCorrect(sPathingType, oPathingUnit, iUnitCorrectPathingGroup, tTargetLocation, iSegmentSizeAdjust)
+function RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iUnitCorrectPathingGroup, tTargetLocation, iSegmentSizeAdjust)
     --Intended to be called if we identify an incorrect pathing, so the area around that pathing can also be checked/updated
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecheckPathingAroundLocationIfUnitIsCorrect'
@@ -484,11 +490,11 @@ function RecheckPathingAroundLocationIfUnitIsCorrect(sPathingType, oPathingUnit,
         for iSegmentX = -iSegmentSizeAdjust + iBaseSegmentX, iSegmentSizeAdjust + iBaseSegmentX, 1 do
             for iSegmentZ = -iSegmentSizeAdjust + iBaseSegmentZ, iSegmentSizeAdjust + iBaseSegmentZ, 1 do
                 if not(iSegmentX == iBaseSegmentX and iSegmentZ == iBaseSegmentZ) then
-                    if not(GetSegmentGroupOfTarget(sPathingType, iSegmentX, iSegmentZ) == iUnitCorrectPathingGroup) then
+                    if not(GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ) == iUnitCorrectPathingGroup) then
                         tCurTargetLocation = GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
-                        if not(tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(tCurTargetLocation)]) then
+                        if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tCurTargetLocation)]) then
                             if oPathingUnit:CanPathTo(tCurTargetLocation) then
-                                FixSegmentPathingGroup(sPathingType, tCurTargetLocation, iUnitCorrectPathingGroup)
+                                FixSegmentPathingGroup(sPathing, tCurTargetLocation, iUnitCorrectPathingGroup)
                             end
                         end
                     end
@@ -500,42 +506,43 @@ function RecheckPathingAroundLocationIfUnitIsCorrect(sPathingType, oPathingUnit,
 end
 
 
-function RecheckPathingOfLocation(sPathingType, oPathingUnit, tTargetLocation, tComparisonKnownCorrectPoint)
+function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOptionalComparisonKnownCorrectPoint)
     --E.g. set tKnownCorrectPoint to the player start position; will update the pathing
     --return true if pathing has changed, or false if no change
-    --tComparisonKnownCorrectPoint is optional
+    --tOptionalComparisonKnownCorrectPoint is optional
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecheckPathingOfLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
 
-    if not(tComparisonKnownCorrectPoint) then
+    if not(tOptionalComparisonKnownCorrectPoint) then
         --[[if M27Utilities.IsTableEmpty(tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]) == false then
-            tComparisonKnownCorrectPoint = tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]
+            tOptionalComparisonKnownCorrectPoint = tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]
         else--]]
-            tComparisonKnownCorrectPoint = PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber]
+            tOptionalComparisonKnownCorrectPoint = PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber]
         --end
     end
 
-    local iUnitPathingGroup = GetSegmentGroupOfLocation(sPathingType, oPathingUnit:GetPosition())
-    local iTargetPathingGroup = GetSegmentGroupOfLocation(sPathingType, tTargetLocation)
-    local iBasePathingGroup = GetSegmentGroupOfLocation(sPathingType, tComparisonKnownCorrectPoint)
+    local iUnitPathingGroup = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
+    local iTargetPathingGroup = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
+    local iBasePathingGroup = GetSegmentGroupOfLocation(sPathing, tOptionalComparisonKnownCorrectPoint)
 
     local iCurManualCheckDist
     local sClosestManualCheckRef
 
 
-    if not(tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) then
-        local iClosestManualCheck = M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tComparisonKnownCorrectPoint)
+    if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) then
+        local iClosestManualCheck = M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tOptionalComparisonKnownCorrectPoint)
         if bDebugMessages == true then LOG(sFunctionRef..': iClosestManualCheck='..iClosestManualCheck..'; Unit position='..repr(oPathingUnit:GetPosition())) end
         if iClosestManualCheck > 50 then
             --Find the closest location where have done a manual check that has the same pathing group as the comparison known correct point
-            if M27Utilities.IsTableEmpty(tManualPathingChecks[sPathingType]) == false then
+            if M27Utilities.IsTableEmpty(tManualPathingChecks[sPathing]) == false then
                 if bDebugMessages == true then LOG(sFunctionRef..'WIll go through every entry in tManualPathingChecks and see how close it is') end
-                for sLocationRef, tLocationChecked in tManualPathingChecks[sPathingType] do
+                for sLocationRef, tLocationChecked in tManualPathingChecks[sPathing] do
                     iCurManualCheckDist = M27Utilities.GetDistanceBetweenPositions(tLocationChecked, oPathingUnit:GetPosition())
                     if bDebugMessages == true then LOG(sFunctionRef..': tLocationChecked='..repr(tLocationChecked)..'; iCurManualCheckDist='..iCurManualCheckDist..'; iClosestManualCheck='..iClosestManualCheck) end
-                    if iCurManualCheckDist < iClosestManualCheck and GetSegmentGroupOfLocation(sPathingType, tLocationChecked) == iBasePathingGroup then
+                    if iCurManualCheckDist < iClosestManualCheck and GetSegmentGroupOfLocation(sPathing, tLocationChecked) == iBasePathingGroup then
                         sClosestManualCheckRef = sLocationRef
                         iClosestManualCheck = iCurManualCheckDist
                         if iClosestManualCheck <= 50 then break end
@@ -546,9 +553,9 @@ function RecheckPathingOfLocation(sPathingType, oPathingUnit, tTargetLocation, t
     end
     local tKnownCorrectPoint
     if sClosestManualCheckRef then
-        tKnownCorrectPoint = tManualPathingChecks[sPathingType][sClosestManualCheckRef]
+        tKnownCorrectPoint = tManualPathingChecks[sPathing][sClosestManualCheckRef]
     else
-        tKnownCorrectPoint = tComparisonKnownCorrectPoint
+        tKnownCorrectPoint = tOptionalComparisonKnownCorrectPoint
     end
 
     local bCanPathToTarget = oPathingUnit:CanPathTo(tTargetLocation)
@@ -563,10 +570,10 @@ function RecheckPathingOfLocation(sPathingType, oPathingUnit, tTargetLocation, t
     end
 
     local bHaveChangedPathing = false
-    if bDebugMessages == true then LOG(sFunctionRef..': About to start main checks, oPathingUnit='..oPathingUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..'; iUnitPathingGroup='..iUnitPathingGroup..'; iTargetPathingGroup='..iTargetPathingGroup..'; iBasePathingGroup='..iBasePathingGroup..'; manual check for engi position='..repr(tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())] or { 'nil'})..'; bCanPathToTarget='..tostring(bCanPathToTarget)..'; bCanPathToBase='..tostring(bCanPathToBase)..'; bExpectedToPathToBase='..tostring(bExpectedToPathToBase)..'; bExpectedToPathToTarget='..tostring(bExpectedToPathToTarget)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to start main checks, oPathingUnit='..oPathingUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..'; iUnitPathingGroup='..iUnitPathingGroup..'; iTargetPathingGroup='..iTargetPathingGroup..'; iBasePathingGroup='..iBasePathingGroup..'; manual check for engi position='..repr(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())] or { 'nil'})..'; bCanPathToTarget='..tostring(bCanPathToTarget)..'; bCanPathToBase='..tostring(bCanPathToBase)..'; bExpectedToPathToBase='..tostring(bExpectedToPathToBase)..'; bExpectedToPathToTarget='..tostring(bExpectedToPathToTarget)) end
 
     --Have we not checked the pathing of either the engineer position or the target?
-    if not(tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) or not(tManualPathingChecks[sPathingType][M27Utilities.ConvertLocationToReference(tTargetLocation)]) then
+    if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) or not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tTargetLocation)]) then
         if bDebugMessages == true then
             LOG('Will draw the 3 positions in red, with a line')
             M27Utilities.DrawLocations({tKnownCorrectPoint, oPathingUnit:GetPosition(), tTargetLocation}, nil, 2, 200)
@@ -578,14 +585,14 @@ function RecheckPathingOfLocation(sPathingType, oPathingUnit, tTargetLocation, t
             if not(iUnitPathingGroup == iBasePathingGroup) then
                 bHaveChangedPathing = true
                 if bDebugMessages == true then LOG(sFunctionRef..': Can path to base but we didnt think we could, will change unit pathing group to '..iBasePathingGroup) end
-                FixSegmentPathingGroup(sPathingType, oPathingUnit:GetPosition(), iBasePathingGroup)
-                RecheckPathingAroundLocationIfUnitIsCorrect(sPathingType, oPathingUnit, iBasePathingGroup, oPathingUnit:GetPosition(), 4)
+                FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iBasePathingGroup)
+                RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, oPathingUnit:GetPosition(), 4)
 
                 if not(bTargetIsBase) and bCanPathToTarget and not(iTargetPathingGroup == iBasePathingGroup) then
                     if bDebugMessages == true then LOG(sFunctionRef..': target location cna path to base but we didnt think it could, will change target pathing group to '..iBasePathingGroup) end
-                    FixSegmentPathingGroup(sPathingType, tTargetLocation, iBasePathingGroup)
+                    FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
                     --Check an area around the target (if its not really far away)
-                    RecheckPathingAroundLocationIfUnitIsCorrect(sPathingType, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
+                    RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
                 end
             else
                 --Can path to base, and correctly think we can; can we path to the target?
@@ -593,8 +600,8 @@ function RecheckPathingOfLocation(sPathingType, oPathingUnit, tTargetLocation, t
                     if not(bExpectedToPathToTarget) then
                         --can path to target but didnt think we could
                         if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to the target') end
-                        FixSegmentPathingGroup(sPathingType, tTargetLocation, iBasePathingGroup)
-                        RecheckPathingAroundLocationIfUnitIsCorrect(sPathingType, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
+                        FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
+                        RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
                     end
                 end
             end
@@ -603,13 +610,13 @@ function RecheckPathingOfLocation(sPathingType, oPathingUnit, tTargetLocation, t
             if bExpectedToPathToBase then
                 --Incorrectly think we can path to base, so change our pathing group to something else - add 1 to current size
                 bHaveChangedPathing = true
-                local iNewPathingGroup = table.getn(tSegmentBySegmentGroup[sPathingType]) + 1
+                local iNewPathingGroup = table.getn(tSegmentBySegmentGroup[sPathing]) + 1
                 if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to base, will set engineer position group to '..iNewPathingGroup) end
-                FixSegmentPathingGroup(sPathingType, oPathingUnit:GetPosition(), iNewPathingGroup)
+                FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iNewPathingGroup)
                 --Is there also an issue with the target?
                 if not(bTargetIsBase) and bCanPathToTarget and iTargetPathingGroup == iBasePathingGroup then
                     if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think the target can path to base, will set target location group to '..iNewPathingGroup) end
-                    FixSegmentPathingGroup(sPathingType, tTargetLocation, iNewPathingGroup)
+                    FixSegmentPathingGroup(sPathing, tTargetLocation, iNewPathingGroup)
                 end
             else
                 --cant path to base, and we correctly think we cant path to base; is the target ok?
@@ -621,14 +628,14 @@ function RecheckPathingOfLocation(sPathingType, oPathingUnit, tTargetLocation, t
                             --Can path to target but werent expecting to be able to; Will assume our units pathing group is correct and will update target pathing group to be the engineers pathing group
                             bHaveChangedPathing = true
                             if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to target, will set target location pathing group to '..iUnitPathingGroup) end
-                            FixSegmentPathingGroup(sPathingType, tTargetLocation, iUnitPathingGroup)
+                            FixSegmentPathingGroup(sPathing, tTargetLocation, iUnitPathingGroup)
                         end
                     else
                         if bExpectedToPathToTarget then
                             --Cant path to target but thought we could; increase the targets pathing group
                             bHaveChangedPathing = true
-                            if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to target, will set target location pathing group to '..(table.getn(tSegmentBySegmentGroup[sPathingType]) + 1)) end
-                            FixSegmentPathingGroup(sPathingType, tTargetLocation, table.getn(tSegmentBySegmentGroup[sPathingType]) + 1)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to target, will set target location pathing group to '..(table.getn(tSegmentBySegmentGroup[sPathing]) + 1)) end
+                            FixSegmentPathingGroup(sPathing, tTargetLocation, table.getn(tSegmentBySegmentGroup[sPathing]) + 1)
                         else
                             --Dont have enough informatino to say antyhing more, since we cant path to base, or to the target, and we're correctly expecting to not path to either of them
                         end
@@ -1288,23 +1295,25 @@ end
 
 --GetUnclaimedMexes - contained within EngineerOverseer
 
-function GetHydroLocationsForPathingGroup(sPathingType, iPathingGroup)
+function GetHydroLocationsForPathingGroup(sPathing, iPathingGroup)
     --Return table of hydro locations for iPathingGroup
     --Return {} if no such table
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetHydroLocationsForPathingGroup'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+
     local tHydroForPathingGroup = {}
     local bNeedToRecord = false
     if bDebugMessages == true then LOG(sFunctionRef..': Checking for hydros in pathing group; HydroCount='..HydroCount) end
     if HydroCount > 0 then
-        if tHydroByPathingAndGrouping[sPathingType] == nil then
-            tHydroByPathingAndGrouping[sPathingType] = {}
+        if tHydroByPathingAndGrouping[sPathing] == nil then
+            tHydroByPathingAndGrouping[sPathing] = {}
             bNeedToRecord = true
         end
-        if tHydroByPathingAndGrouping[sPathingType][iPathingGroup] == nil then
-            tHydroByPathingAndGrouping[sPathingType][iPathingGroup] = {}
+        if tHydroByPathingAndGrouping[sPathing][iPathingGroup] == nil then
+            tHydroByPathingAndGrouping[sPathing][iPathingGroup] = {}
             bNeedToRecord = true
         end
         if bDebugMessages == true then LOG(sFunctionRef..': bNeedToRecord='..tostring(bNeedToRecord)..'; iPathingGroup='..iPathingGroup) end
@@ -1313,14 +1322,14 @@ function GetHydroLocationsForPathingGroup(sPathingType, iPathingGroup)
             local iCurSegmentX, iCurSegmentZ, iCurSegmentGroup
             for iHydro, tHydro in HydroPoints do
                 iCurSegmentX, iCurSegmentZ = GetPathingSegmentFromPosition(tHydro)
-                iCurSegmentGroup = GetSegmentGroupOfTarget(sPathingType, iCurSegmentX, iCurSegmentZ)
+                iCurSegmentGroup = GetSegmentGroupOfTarget(sPathing, iCurSegmentX, iCurSegmentZ)
                 if iCurSegmentGroup == iPathingGroup then
                     iValidHydroCount = iValidHydroCount + 1
-                    tHydroByPathingAndGrouping[sPathingType][iPathingGroup][iValidHydroCount] = tHydro
+                    tHydroByPathingAndGrouping[sPathing][iPathingGroup][iValidHydroCount] = tHydro
                 end
             end
         end
-        tHydroForPathingGroup = tHydroByPathingAndGrouping[sPathingType][iPathingGroup]
+        tHydroForPathingGroup = tHydroByPathingAndGrouping[sPathing][iPathingGroup]
     end
     if bDebugMessages == true then
         if M27Utilities.IsTableEmpty(tHydroForPathingGroup) == true then
@@ -1339,19 +1348,19 @@ function RecordMexForPathingGroup()
     local iCurResourceGroup
     local iValidCount = 0
     tMexByPathingAndGrouping = {}
-    for iPathingType, sPathingType in tsPathingTypes do
-        tMexByPathingAndGrouping[sPathingType] = {}
+    for iPathingType, sPathing in tsPathingTypes do
+        tMexByPathingAndGrouping[sPathing] = {}
         iValidCount = 0
 
         for iCurMex, tMexLocation in MassPoints do
             iValidCount = iValidCount + 1
-            iCurResourceGroup = GetSegmentGroupOfLocation(sPathingType, tMexLocation)
-            if tMexByPathingAndGrouping[sPathingType][iCurResourceGroup] == nil then
-                tMexByPathingAndGrouping[sPathingType][iCurResourceGroup] = {}
+            iCurResourceGroup = GetSegmentGroupOfLocation(sPathing, tMexLocation)
+            if tMexByPathingAndGrouping[sPathing][iCurResourceGroup] == nil then
+                tMexByPathingAndGrouping[sPathing][iCurResourceGroup] = {}
                 iValidCount = 1
-            else iValidCount = table.getn(tMexByPathingAndGrouping[sPathingType][iCurResourceGroup]) + 1
+            else iValidCount = table.getn(tMexByPathingAndGrouping[sPathing][iCurResourceGroup]) + 1
             end
-            tMexByPathingAndGrouping[sPathingType][iCurResourceGroup][iValidCount] = tMexLocation
+            tMexByPathingAndGrouping[sPathing][iCurResourceGroup][iValidCount] = tMexLocation
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..'; tMexByPathingAndGrouping='..repr(tMexByPathingAndGrouping)) end
@@ -1366,22 +1375,23 @@ function RecordMexForPathingGroupOld(oPathingUnit, bForceRefresh)
     local sFunctionRef = 'RecordMexForPathingGroupOld'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oPathingUnit and not(oPathingUnit.Dead) then
-        local sPathingType = M27UnitInfo.GetUnitPathingType(oPathingUnit)
+        local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnit)
+        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
         local tUnitPosition = oPathingUnit:GetPosition()
         local iUnitSegmentX, iUnitSegmentZ = GetPathingSegmentFromPosition(tUnitPosition)
         --GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ)
-        local iUnitSegmentGroup = GetSegmentGroupOfTarget(sPathingType, iUnitSegmentX, iUnitSegmentZ)
-        if bDebugMessages == true then LOG(sFunctionRef..': , sPathingType='..sPathingType..'; iUnitSegmentGroup='..iUnitSegmentGroup) end
-        if tMexByPathingAndGrouping[sPathingType] == nil then tMexByPathingAndGrouping[sPathingType] = {} end
-        if tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup] == nil or bForceRefresh == true then
+        local iUnitSegmentGroup = GetSegmentGroupOfTarget(sPathing, iUnitSegmentX, iUnitSegmentZ)
+        if bDebugMessages == true then LOG(sFunctionRef..': , sPathing='..sPathing..'; iUnitSegmentGroup='..iUnitSegmentGroup) end
+        if tMexByPathingAndGrouping[sPathing] == nil then tMexByPathingAndGrouping[sPathing] = {} end
+        if tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup] == nil or bForceRefresh == true then
             --Need to record mass locations for this:
-            if tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup] == nil then tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup] = {} end
+            if tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup] == nil then tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup] = {} end
             local iCurSegmentX, iCurSegmentZ
             local iMexSegmentGroup
             local iValidCount = 0
             local iOriginalCount = 0
             if bForceRefresh == true then
-                iValidCount = table.getn(tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup])
+                iValidCount = table.getn(tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup])
                 iOriginalCount = iValidCount
             end
             local bIncludeMex = false
@@ -1390,7 +1400,7 @@ function RecordMexForPathingGroupOld(oPathingUnit, bForceRefresh)
                 if bDebugMessages == true then LOG(sFunctionRef..': About to consider tMexLocation='..repr(tMexLocation)) end
                 iCurSegmentX, iCurSegmentZ = GetPathingSegmentFromPosition(tMexLocation)
                 --if bDebugMessages == true then TEMPMAPTEST(sFunctionRef..': About to get segment group') end
-                iMexSegmentGroup = GetSegmentGroupOfTarget(sPathingType, iCurSegmentX, iCurSegmentZ)
+                iMexSegmentGroup = GetSegmentGroupOfTarget(sPathing, iCurSegmentX, iCurSegmentZ)
                 if bDebugMessages == true then
                     LOG(sFunctionRef..': Considering mex location '..repr(tMexLocation))
                 end
@@ -1400,7 +1410,7 @@ function RecordMexForPathingGroupOld(oPathingUnit, bForceRefresh)
                         --Mex is in the same pathing group, so record it (unless are forcing a refresh and have already recorded it)
                         bIncludeMex = true
                         if bForceRefresh then
-                            for iExistingMex, tExistingMex in tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup] do
+                            for iExistingMex, tExistingMex in tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup] do
                                 if iExistingMex > iOriginalCount then break end
                                 if tExistingMex[1] == tMexLocation[1] and tExistingMex[3] == tMexLocation[3] then
                                     bIncludeMex = false
@@ -1412,9 +1422,9 @@ function RecordMexForPathingGroupOld(oPathingUnit, bForceRefresh)
                         if bIncludeMex == true then
                             --if bDebugMessages == true then TEMPMAPTEST(sFunctionRef..': About to record mex as being in same pathing group') end
                             iValidCount = iValidCount + 1
-                            tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup][iValidCount] = {}
-                            tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup][iValidCount] = tMexLocation
-                            if bDebugMessages == true then LOG(sFunctionRef..': Pathing='..sPathingType..': Segment '..iCurSegmentX..'-'..iCurSegmentZ..' is in a pathing group, so adding it to recorded mexes; iMexSegmentGroup='..iMexSegmentGroup..';, iValidCount='..iValidCount) end
+                            tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup][iValidCount] = {}
+                            tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup][iValidCount] = tMexLocation
+                            if bDebugMessages == true then LOG(sFunctionRef..': Pathing='..sPathing..': Segment '..iCurSegmentX..'-'..iCurSegmentZ..' is in a pathing group, so adding it to recorded mexes; iMexSegmentGroup='..iMexSegmentGroup..';, iValidCount='..iValidCount) end
                         end
                     else
                         if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iCurSegmentX..'-'..iCurSegmentZ..' isnt in pathing group '..iUnitSegmentGroup) end
@@ -1425,10 +1435,10 @@ function RecordMexForPathingGroupOld(oPathingUnit, bForceRefresh)
             end
         end
         if bDebugMessages == true then
-            LOG(sFunctionRef..': table.getn of mexbypathing for sPathingType='..sPathingType..'; iUnitSegmentGroup='..iUnitSegmentGroup..'; table.getn='..table.getn(tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup]))
+            LOG(sFunctionRef..': table.getn of mexbypathing for sPathing='..sPathing..'; iUnitSegmentGroup='..iUnitSegmentGroup..'; table.getn='..table.getn(tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup]))
             if iUnitSegmentGroup == 1 then
-                M27Utilities.DrawLocations(tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup], nil, 2)
-                LOG('List of all mex locations for iSegmentGroup='..iUnitSegmentGroup..' for '..sPathingType..'='..repr(tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup]))
+                M27Utilities.DrawLocations(tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup], nil, 2)
+                LOG('List of all mex locations for iSegmentGroup='..iUnitSegmentGroup..' for '..sPathing..'='..repr(tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup]))
             end
         end
     else
@@ -1554,6 +1564,7 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
     --local iUnitSegmentX, iUnitSegmentZ = GetPathingSegmentFromPosition(tLocationToSearchFrom)
     local iUnitPathGroup = GetUnitSegmentGroup(oBuilder)
     local sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
     local oUnitBP = oBuilder:GetBlueprint()
     local iBuildDistance = 0
     if oUnitBP.Economy and oUnitBP.Economy.MaxBuildDistance then iBuildDistance = oUnitBP.Economy.MaxBuildDistance end
@@ -1733,6 +1744,7 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
 
     if oPathingUnit and not(oPathingUnit.Dead) and oPathingUnit.GetUnitId then
         sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnit)
+        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
         local tUnitPosition = oPathingUnit:GetPosition()
         local iUnitSegmentX, iUnitSegmentZ = GetPathingSegmentFromPosition(tUnitPosition)
         local iUnitPathingGroup = GetSegmentGroupOfTarget(sPathing, iUnitSegmentX, iUnitSegmentZ)
@@ -1832,6 +1844,7 @@ function RecordSortedMexesInOriginalPathingGroup(aiBrain)
 
     local oACU = M27Utilities.GetACU(aiBrain)
     local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
     local iPathingGroup = aiBrain[refiStartingSegmentGroup][sPathing]
     local iCurDistanceToOurStart, iCurDistanceToEnemy, iCurModDistanceValue
     local tOurStartPos = PlayerStartPoints[aiBrain.M27StartPositionNumber]
@@ -1883,8 +1896,8 @@ function RecordSortedMexesInOriginalPathingGroup(aiBrain)
     --Now record mexes that we want to maintain scouts for
     if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy]) == true then
         aiBrain[reftMexesToKeepScoutsBy] = {}
-        local sPathingType = M27UnitInfo.refPathingTypeLand
-        local iStartPathingGroup = GetSegmentGroupOfLocation(sPathingType, PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local sPathing = M27UnitInfo.refPathingTypeLand
+        local iStartPathingGroup = GetSegmentGroupOfLocation(sPathing, PlayerStartPoints[aiBrain.M27StartPositionNumber])
         local sLocationRef
         local iMinDistanceFromBase = 40
         local tNearbyMexes
@@ -1892,9 +1905,9 @@ function RecordSortedMexesInOriginalPathingGroup(aiBrain)
         local bHaveNearbyAssignedMex
         local sNearbyLocationRef
         local iCurDistanceToEnemy, iCurDistanceToStart
-        if bDebugMessages == true then LOG(sFunctionRef..': sPathingType='..sPathingType..'; iStartPathingGroup='..iStartPathingGroup..'; tMexByPathingAndGrouping='..repr(aiBrain[tMexByPathingAndGrouping])) end
+        if bDebugMessages == true then LOG(sFunctionRef..': sPathing='..sPathing..'; iStartPathingGroup='..iStartPathingGroup..'; tMexByPathingAndGrouping='..repr(aiBrain[tMexByPathingAndGrouping])) end
 
-        for iMex, tMex in tMexByPathingAndGrouping[sPathingType][iStartPathingGroup] do
+        for iMex, tMex in tMexByPathingAndGrouping[sPathing][iStartPathingGroup] do
             iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tMex, tOurStartPos)
             if bDebugMessages == true then LOG(sFunctionRef..': iMex='..iMex..'; tMex='..repr(tMex)..'; iCurDistanceToStart='..iCurDistanceToStart) end
             if iCurDistanceToStart > iMinDistanceFromBase then
@@ -1905,7 +1918,7 @@ function RecordSortedMexesInOriginalPathingGroup(aiBrain)
                     sLocationRef = M27Utilities.ConvertLocationToReference(tMex)
                     bHaveNearbyAssignedMex = false
                     if bDebugMessages == true then LOG(sFunctionRef..': About to check if near another mex that have already assigned') end
-                    for iNearbyMex, tNearbyMex in tMexByPathingAndGrouping[sPathingType][iStartPathingGroup] do
+                    for iNearbyMex, tNearbyMex in tMexByPathingAndGrouping[sPathing][iStartPathingGroup] do
                         sNearbyLocationRef = M27Utilities.ConvertLocationToReference(tNearbyMex)
                         if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy][sNearbyLocationRef]) == false then
                             if M27Utilities.GetDistanceBetweenPositions(tNearbyMex, tMex) <= iNearbyMexSearchRange then
@@ -1954,6 +1967,7 @@ function GetMexPatrolLocations(aiBrain, iMexRallyPointsToAdd, bIncludeRallyPoint
         local tStartPosition = PlayerStartPoints[aiBrain.M27StartPositionNumber]
         local oACU = M27Utilities.GetACU(aiBrain)
         local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
+        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
         local iSegmentGroup = GetSegmentGroupOfLocation(sPathing, tStartPosition)
         local iCurDistanceToEnemy, iCurDistanceToStart
 
@@ -2016,12 +2030,12 @@ function GetMexPatrolLocations(aiBrain, iMexRallyPointsToAdd, bIncludeRallyPoint
 end
 
 
---[[function RecordSegmentGroup(iSegmentX, iSegmentZ, sPathingType, iSegmentGroup)
+--[[function RecordSegmentGroup(iSegmentX, iSegmentZ, sPathing, iSegmentGroup)
     --Cycle through all adjacent cells, and then call this function on them as well
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordSegmentGroup'
     if bDebugMessages == true then LOG(sFunctionRef..': About to record iSegmentX='..iSegmentX..'; iSegmentZ='..iSegmentZ..'; iSegmentGroup='..iSegmentGroup..'; and then check if can path to adjacent segments') end
-    tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] = iSegmentGroup
+    tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] = iSegmentGroup
 
     local tAllAdjacentSegments = {
         {iSegmentX - 1, iSegmentZ},
@@ -2053,11 +2067,11 @@ end
     LOG('Number of adjacent segments='..table.getn(tAllAdjacentSegments))
     for iEntry, tAdjacentSegment in tAllAdjacentSegments do
     --]]
-        --if tPathingSegmentGroupBySegment[sPathingType][tAdjacentSegment[1]][tAdjacentSegment[2]] == nil then
+        --if tPathingSegmentGroupBySegment[sPathing][tAdjacentSegment[1]][tAdjacentSegment[2]] == nil then
 --[[            if bDebugMessages == true then LOG(sFunctionRef..': Have no entry yet for XZ='..tAdjacentSegment[1]..'-'..tAdjacentSegment[2]..' so will see if we can path there') end
             tTargetPosition = GetPositionFromPathingSegments(tAdjacentSegment[1], tAdjacentSegment[2])
             if IsLandPathableAlongLine(tCurPosition[1], tTargetPosition[1], tCurPosition[3], tTargetPosition[3]) then
-                RecordSegmentGroup(tAdjacentSegment[1], tAdjacentSegment[2], sPathingType, iSegmentGroup)
+                RecordSegmentGroup(tAdjacentSegment[1], tAdjacentSegment[2], sPathing, iSegmentGroup)
             end
         end
     end
@@ -2102,7 +2116,7 @@ function RecordBaseLevelPathability()
    --Land pathing
     --tPathingSegmentGroupBySegment = {} --[a][b][c]: a = pathing type; b = segment x, c = segment z
     --First set table varaibles
-    --local sPathingType = M27UnitInfo.refPathingTypeLand
+    --local sPathing = M27UnitInfo.refPathingTypeLand
 
 
 
@@ -2123,7 +2137,7 @@ function RecordBaseLevelPathability()
             iCurTerrainHeight = GetTerrainHeight(tCurPosition[1], tCurPosition[3])
             iCurSurfaceHeight = GetSurfaceHeight(tCurPosition[1], tCurPosition[3])
             if iCurTerrainHeight < iCurSurfaceHeight then
-                tPathingSegmentGroupBySegment[sPathingType][iBaseSegmentX][iBaseSegmentZ] = iLandPathingGroupForWater
+                tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX][iBaseSegmentZ] = iLandPathingGroupForWater
             end
         end
     end--]]
@@ -2414,54 +2428,54 @@ function RecordBaseLevelPathability()
         return true
     end
     
-    local function RecordPathingGroup(sPathingType, iSegmentX, iSegmentZ, iPathingGroup)
-        tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ] = iPathingGroup
-        if tSegmentBySegmentGroup[sPathingType][iPathingGroup] == nil then
-            tSegmentBySegmentGroup[sPathingType][iPathingGroup] = {}
+    local function RecordPathingGroup(sPathing, iSegmentX, iSegmentZ, iPathingGroup)
+        tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] = iPathingGroup
+        if tSegmentBySegmentGroup[sPathing][iPathingGroup] == nil then
+            tSegmentBySegmentGroup[sPathing][iPathingGroup] = {}
         end
-        table.insert(tSegmentBySegmentGroup[sPathingType][iPathingGroup], {iSegmentX, iSegmentZ})
+        table.insert(tSegmentBySegmentGroup[sPathing][iPathingGroup], {iSegmentX, iSegmentZ})
     end
 
-    for iPathingType, sPathingType in sAllPathingTypes do
-        if sPathingType == M27UnitInfo.refPathingTypeNavy then iIntervalSize = iWaterPathingIntervalSize
+    for iPathingType, sPathing in sAllPathingTypes do
+        if sPathing == M27UnitInfo.refPathingTypeNavy then iIntervalSize = iWaterPathingIntervalSize
         else iIntervalSize = iPathingIntervalSize end
 
-        tPathingSegmentGroupBySegment[sPathingType] = {}
-        tSegmentBySegmentGroup[sPathingType] = {}
+        tPathingSegmentGroupBySegment[sPathing] = {}
+        tSegmentBySegmentGroup[sPathing] = {}
         for iSegmentX = 1, iMaxSegmentX do
-            tPathingSegmentGroupBySegment[sPathingType][iSegmentX] = {}
+            tPathingSegmentGroupBySegment[sPathing][iSegmentX] = {}
         end
         bNavyPathfinding = false
         bLandPathing = false
         bAmphibPathing = false
         bCheckForLand = false
-        if sPathingType == sPathingLand then
+        if sPathing == sPathingLand then
             bCheckForWater = true
             bLandPathing = true
-        elseif sPathingType == sPathingAmphibious then
+        elseif sPathing == sPathingAmphibious then
             bCheckForWater = false
             bAmphibPathing = true
-        elseif sPathingType == sPathingNavy then
+        elseif sPathing == sPathingNavy then
             bCheckForWater = true
             bCheckForLand = true
             bNavyPathfinding = true
         else M27Utilities.ErrorHandler('Need to add code')
         end
 
-        --LOG(sFunctionRef..'; bMapContainsWater='..tostring(bMapContainsWater)..'; bLandPathing='..tostring(bLandPathing)..'; sPathingType='..sPathingType..'; sPathingAmphibious='..sPathingAmphibious)
+        --LOG(sFunctionRef..'; bMapContainsWater='..tostring(bMapContainsWater)..'; bLandPathing='..tostring(bLandPathing)..'; sPathing='..sPathing..'; sPathingAmphibious='..sPathingAmphibious)
         for iBaseSegmentX = 1, iMaxSegmentX do
             for iBaseSegmentZ = 1, iMaxSegmentZ do
                 if bMapContainsWater == false and bLandPathing == false then
-                    if sPathingType == sPathingAmphibious then --Copy land pathing as no water
-                        tPathingSegmentGroupBySegment[sPathingType][iBaseSegmentX][iBaseSegmentZ] = tPathingSegmentGroupBySegment[sPathingLand][iBaseSegmentX][iBaseSegmentZ]
-                        tSegmentBySegmentGroup[sPathingType] = tSegmentBySegmentGroup[sPathingLand]
-                    elseif sPathingType == sPathingNavy then --No water so everything just land
-                        tPathingSegmentGroupBySegment[sPathingType][iBaseSegmentX][iBaseSegmentZ] = iLandPathingGroupForWater
+                    if sPathing == sPathingAmphibious then --Copy land pathing as no water
+                        tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX][iBaseSegmentZ] = tPathingSegmentGroupBySegment[sPathingLand][iBaseSegmentX][iBaseSegmentZ]
+                        tSegmentBySegmentGroup[sPathing] = tSegmentBySegmentGroup[sPathingLand]
+                    elseif sPathing == sPathingNavy then --No water so everything just land
+                        tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX][iBaseSegmentZ] = iLandPathingGroupForWater
                     end
                 else
                     iCurRecursivePosition = 1
                     --Check not already determined this
-                    if tPathingSegmentGroupBySegment[sPathingType][iBaseSegmentX][iBaseSegmentZ] == nil then
+                    if tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX][iBaseSegmentZ] == nil then
                         bWaterOrLandCheck = true
                         iSegmentX = iBaseSegmentX
                         iSegmentZ = iBaseSegmentZ
@@ -2475,18 +2489,18 @@ function RecordBaseLevelPathability()
                                 if not(bCheckForLand) then bWaterOrLandCheck = false end
                             elseif bCheckForLand then bWaterOrLandCheck = false end
                             if bWaterOrLandCheck == false then
-                                RecordPathingGroup(sPathingType, iBaseSegmentX, iBaseSegmentZ, iLandPathingGroupForWater)
+                                RecordPathingGroup(sPathing, iBaseSegmentX, iBaseSegmentZ, iLandPathingGroupForWater)
                             end
                         end
                         if bWaterOrLandCheck then
                             --Not on water (if looking at land pathing)/not on land (if looking at navy pathing)
                             iCurPathingGroup = iCurPathingGroup + 1
-                            --RecordSegmentGroup(iSegmentX, iSegmentZ, sPathingType, iCurPathingGroup)
+                            --RecordSegmentGroup(iSegmentX, iSegmentZ, sPathing, iCurPathingGroup)
                             iCurRecursivePosition = iCurRecursivePosition + 1
 
                             while iCurRecursivePosition > 1 do
                                 bHaveSubsequentPath = false
-                                RecordPathingGroup(sPathingType, iSegmentX, iSegmentZ, iCurPathingGroup)
+                                RecordPathingGroup(sPathing, iSegmentX, iSegmentZ, iCurPathingGroup)
                                 local tAllAdjacentSegments = {
                                     {iSegmentX - 1, iSegmentZ -1},
                                     {iSegmentX - 1, iSegmentZ},
@@ -2530,7 +2544,7 @@ function RecordBaseLevelPathability()
                                 --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': Number of adjacent locations to consider='..table.getn(tAllAdjacentSegments)) end
                                 for iEntry, tAdjacentSegment in tAllAdjacentSegments do
                                     --if bDebugMessages == true then LOG(sFunctionRef..': Considering adjacent segment; iEntry='..iEntry..'; tAdjacentSegment='..repr(tAdjacentSegment)) end
-                                    if tPathingSegmentGroupBySegment[sPathingType][tAdjacentSegment[1]][tAdjacentSegment[2]] == nil then
+                                    if tPathingSegmentGroupBySegment[sPathing][tAdjacentSegment[1]][tAdjacentSegment[2]] == nil then
                                         tTargetPosition = GetPositionFromPathingSegments(tAdjacentSegment[1], tAdjacentSegment[2])
                                         --if bDebugMessages == true then LOG(sFunctionRef..': iEntry='..iEntry..': Have no entry yet for XZ='..tAdjacentSegment[1]..'-'..tAdjacentSegment[2]..' so will see if we can path there; tTargetPosition='..repr(tTargetPosition)..'; tCurPosition='..repr(tCurPosition)..'; iSegmentXZ='..iSegmentX..'-'..iSegmentZ) end
                                         if bLandPathing then
@@ -2572,7 +2586,7 @@ function RecordBaseLevelPathability()
                                             break
                                         end
                                     else
-                                        --if bDebugMessages == true then LOG(sFunctionRef..': Already have a pathing group which is '..tPathingSegmentGroupBySegment[sPathingType][tAdjacentSegment[1]][tAdjacentSegment[2]]) end
+                                        --if bDebugMessages == true then LOG(sFunctionRef..': Already have a pathing group which is '..tPathingSegmentGroupBySegment[sPathing][tAdjacentSegment[1]][tAdjacentSegment[2]]) end
                                     end
                                 end
                                 if bHaveSubsequentPath == true then
@@ -2591,7 +2605,7 @@ function RecordBaseLevelPathability()
                     end
                 end
             end
-            --LOG(sFunctionRef..': Finished going through all Z values, size of table='..table.getn(tPathingSegmentGroupBySegment[sPathingType][iBaseSegmentX]))
+            --LOG(sFunctionRef..': Finished going through all Z values, size of table='..table.getn(tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX]))
         end
 
     end
@@ -2648,8 +2662,8 @@ function MappingInitialisation(aiBrain)
         bPathfindingComplete = true
 
         --Other variables used by all M27ai
-        for iPathingType, sPathingType in M27UnitInfo.refPathingTypeAll do
-            tManualPathingChecks[sPathingType] = {}
+        for iPathingType, sPathing in M27UnitInfo.refPathingTypeAll do
+            tManualPathingChecks[sPathing] = {}
         end
 
     end
@@ -2671,6 +2685,8 @@ end
 
 function SetWhetherCanPathToEnemy(aiBrain)
     --Set flag for whether AI can path to enemy base
+    --Also updates other values that are based on the nearest enemy
+
     local sFunctionRef = 'SetWhetherCanPathToEnemy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
@@ -2685,6 +2701,10 @@ function SetWhetherCanPathToEnemy(aiBrain)
     iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
     if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithAmphibious] = true
     else aiBrain[refbCanPathToEnemyBaseWithAmphibious] = false end
+
+    aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[reftPrimaryEnemyBaseLocation])
+    aiBrain[M27AirOverseer.refiMaxScoutRadius] = math.max(1500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.5)
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -2741,11 +2761,11 @@ function DrawAllMapPathing(aiBrain)
     end
 end
 
-function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
-    if M27Utilities.IsTableEmpty(bMapDrawingAlreadyCommenced[sPathingType]) == true then
-        bMapDrawingAlreadyCommenced[sPathingType] = true
+function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
+    if M27Utilities.IsTableEmpty(bMapDrawingAlreadyCommenced[sPathing]) == true then
+        bMapDrawingAlreadyCommenced[sPathing] = true
         if bDontDrawWaterIfPathingLand == nil then
-            if sPathingType == M27UnitInfo.refPathingTypeAmphibious then bDontDrawWaterIfPathingLand = false
+            if sPathing == M27UnitInfo.refPathingTypeAmphibious then bDontDrawWaterIfPathingLand = false
             else bDontDrawWaterIfPathingLand = true end
         end
         --Draw core pathing group
@@ -2753,7 +2773,7 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
         local sFunctionRef = 'DrawMapPathing'
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
         local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(PlayerStartPoints[aiBrain.M27StartPositionNumber])
-        local iStartingGroup = tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ]
+        local iStartingGroup = tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
         local iMatches = 0
         local tiMatchesPerSegmentGroup = {}
         local tiColourToUse = {}
@@ -2764,7 +2784,7 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
         local iSegmentInterval = 1
         local bLandPathing = false
         local iResetColour = 2
-        if sPathingType == M27UnitInfo.refPathingTypeLand then
+        if sPathing == M27UnitInfo.refPathingTypeLand then
             bLandPathing = true
             iResetColour = 3
         end
@@ -2781,17 +2801,17 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
 
         local iCurIntervalCount = 0
         if bDebugMessages == true then
-            LOG(sFunctionRef..': iMaxBaseSegmentX='..iMaxBaseSegmentX..'; iMaxBaseSegmentZ='..iMaxBaseSegmentZ..'; size of tPathingSegmentGroupBySegment for land pathing='..table.getn(tPathingSegmentGroupBySegment[sPathingType])..'; player start point group='..iStartingGroup..'; player starting segments='..iSegmentX..'-'..iSegmentZ..'; start position location='..repr(PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; position of segment='..repr(GetPositionFromPathingSegments(iSegmentX, iSegmentZ)))
+            LOG(sFunctionRef..': iMaxBaseSegmentX='..iMaxBaseSegmentX..'; iMaxBaseSegmentZ='..iMaxBaseSegmentZ..'; size of tPathingSegmentGroupBySegment for land pathing='..table.getn(tPathingSegmentGroupBySegment[sPathing])..'; player start point group='..iStartingGroup..'; player starting segments='..iSegmentX..'-'..iSegmentZ..'; start position location='..repr(PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; position of segment='..repr(GetPositionFromPathingSegments(iSegmentX, iSegmentZ)))
             LOG('Pathing groups of every segment around player start position about to be produced')
             for iAdjX = -1, 1, 1 do
                 for iAdjZ = -1, 1, 1 do
-                    LOG('iAdjX-Z='..iAdjX..'-'..iAdjZ..'; pathing group='..tPathingSegmentGroupBySegment[sPathingType][iSegmentX+iAdjX][iSegmentZ+iAdjZ])
+                    LOG('iAdjX-Z='..iAdjX..'-'..iAdjZ..'; pathing group='..tPathingSegmentGroupBySegment[sPathing][iSegmentX+iAdjX][iSegmentZ+iAdjZ])
                 end
             end
         end
         for iSegmentX = 1, iMaxBaseSegmentX do
             for iSegmentZ = 1, iMaxBaseSegmentZ do
-                iCurGroup = tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ]
+                iCurGroup = tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
                 if iCurGroup then
                     if tiMatchesPerSegmentGroup[iCurGroup] == nil then tiMatchesPerSegmentGroup[iCurGroup] = 1
                     else
@@ -2825,14 +2845,14 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
                 --if iSegmentX <= 380 and iSegmentX >= 280 and iSegmentZ <=380 and iSegmentZ >= 280 then iCurIntervalCount = iSegmentInterval end
                 if iCurIntervalCount >= iSegmentInterval then
                     iCurIntervalCount = 0
-                    iCurGroup = tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ]
+                    iCurGroup = tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
                     if tiMatchesPerSegmentGroup[iCurGroup] > 10 and (not(bDontDrawWaterIfPathingLand) or not(iCurGroup == iLandPathingGroupForWater)) then
                         M27Utilities.DrawLocation(GetPositionFromPathingSegments(iSegmentX, iSegmentZ), nil, tiColourToUse[iCurGroup], iTimeToWait)
                     end
                 end
                 if iCurGroup == iStartingGroup then iMatches = iMatches + 1 end
             end
-            LOG('iMatches='..iMatches..'; iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; Pathing group='..tPathingSegmentGroupBySegment[sPathingType][iSegmentX][iSegmentZ]..'; position='..repr(GetPositionFromPathingSegments(iSegmentX, iSegmentZ)))
+            LOG('iMatches='..iMatches..'; iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; Pathing group='..tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]..'; position='..repr(GetPositionFromPathingSegments(iSegmentX, iSegmentZ)))
             iWaitCount = iWaitCount + 1
             if iWaitCount > 10 then
                 WaitTicks(1)
@@ -2840,7 +2860,7 @@ function DrawMapPathing(aiBrain, sPathingType, bDontDrawWaterIfPathingLand)
             end
         end
     end
-    bMapDrawingAlreadyCommenced[sPathingType] = false
+    bMapDrawingAlreadyCommenced[sPathing] = false
 end
 
 function DrawWater()
@@ -3247,7 +3267,7 @@ function RecordAllRallyPoints(aiBrain)
                     if (aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart) > 40 then
                         --FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride)
                         tPossibleRallyPoint = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][reftMexLocation]
-                        ,M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryLandFactory, M27Utilities.GetACU(aiBrain), false, false)
+                        ,(M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryLandFactory, M27Utilities.GetACU(aiBrain), false, false) or 'ueb0101')
                         ,2, 10, false, 2)
 
                         --if M27Utilities.IsTableEmpty(tPossibleRallyPoint) == false and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossibleRallyPoint) == iOurBaseGroup then
@@ -3291,12 +3311,25 @@ function RecordAllRallyPoints(aiBrain)
     end
 end
 
-function CanWeMoveInSameGroupInLineToTarget(sPathingType, tStart, tEnd)
+function CanWeMoveInSameGroupInLineToTarget(sPathing, tStart, tEnd)
     --If we move in a line to the target, are there any pathing issues? Use front unit rather than pathing unit
-    local iStartingGroup = GetSegmentGroupOfLocation(sPathingType, tStart)
+    local iStartingGroup = GetSegmentGroupOfLocation(sPathing, tStart)
     local iAngle = M27Utilities.GetAngleFromAToB(tStart, tEnd)
     for iCurPoint = 1, math.floor(M27Utilities.GetDistanceBetweenPositions(tStart, tEnd)) - 1 do
-        if not(iStartingGroup == GetSegmentGroupOfLocation(sPathingType, M27Utilities.MoveInDirection(tStart, iAngle, iCurPoint, true))) then
+        if not(iStartingGroup == GetSegmentGroupOfLocation(sPathing, M27Utilities.MoveInDirection(tStart, iAngle, iCurPoint, true))) then
+            return false
+        end
+    end
+    return true
+end
+
+function IsEnemyStartPositionValid(aiBrain, tEnemyBase)
+    local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tEnemyBase)
+    --Have we had sight of the enemy start position in the last 6 mins?
+    if GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] <= 360 then
+        --Are there any enemy structures within 50 of the base?
+        local tEnemyStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tEnemyBase, 50, 'Enemy')
+        if M27Utilities.IsTableEmpty(tEnemyStructures) then
             return false
         end
     end
@@ -3304,15 +3337,76 @@ function CanWeMoveInSameGroupInLineToTarget(sPathingType, tStart, tEnd)
 end
 
 function UpdateNewPrimaryBaseLocation(aiBrain)
+    --Updates reftPrimaryEnemyBaseLocation to the nearest enemy start position (unless there are no structures there in which case it searches for a better start position)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'UpdateNewPrimaryBaseLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     --local refiTimeOfLastUpdate = 'M27RefTimeOfLastLocationUpdate'
     --LOG('UpdateNewPrimaryBaseLocation: aiBrain='..aiBrain:GetArmyIndex()..'; Start position='..(aiBrain.M27StartPositionNumber or 'nil'))
     if not(M27Logic.IsCivilianBrain(aiBrain)) then
         local tEnemyBase = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
-        if not(aiBrain.M27AI) then
-            aiBrain[reftPrimaryEnemyBaseLocation] = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]}
-        else
-           --Todo
-            aiBrain[reftPrimaryEnemyBaseLocation] = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]}
+        local tPrevPosition
+        if aiBrain[reftPrimaryEnemyBaseLocation] then tPrevPosition = {aiBrain[reftPrimaryEnemyBaseLocation][1], aiBrain[reftPrimaryEnemyBaseLocation][2], aiBrain[reftPrimaryEnemyBaseLocation][3]} end
+        --Is this different from the current location we are using?
+        if not(tEnemyBase[1] == aiBrain[reftPrimaryEnemyBaseLocation][1]) or not(tEnemyBase[3] == aiBrain[reftPrimaryEnemyBaseLocation][3]) then aiBrain[refiLastTimeCheckedEnemyBaseLocation] = -1000 end
+        aiBrain[reftPrimaryEnemyBaseLocation] = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]} --Default
+        if aiBrain.M27AI then
+            --Consider if we want to check for alternative locations to the actual enemy start:
+            --Have we recently checked for a base location; --Do we have at least T2 (as a basic guide that this isn't the start of the game), has at least 3m of gametime elapsed, and have scouted the enemy base location recently, and have built at least 1 air scout this game?
+            if GetGameTimeSeconds() - (aiBrain[refiLastTimeCheckedEnemyBaseLocation] or -1000) >= 10 and GetGameTimeSeconds() >= 180 then
+                --(below includes alternative condition just in case there are strange unit restrictions)
+                if (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout, 2))) or (M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) == false and GetGameTimeSeconds() >= 600) then
+                    if not(IsEnemyStartPositionValid(aiBrain, tEnemyBase)) then
+                        aiBrain[reftPrimaryEnemyBaseLocation] = nil
+                        local iNearestEnemyBase = 10000
+                        local tNearestEnemyBase
+                        --Cycle through every valid enemy brain and pick the nearest one, if there is one
+                        for iCurBrain, brain in ArmyBrains do
+                            if not(brain == aiBrain) and not(M27Logic.IsCivilianBrain(brain)) and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()) and (not(brain:IsDefeated()) or not(ScenarioInfo.Options.Victory == "demoralization")) then
+                                if M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber]) < iNearestEnemyBase then
+                                    if IsEnemyStartPositionValid(aiBrain, PlayerStartPoints[brain.M27StartPositionNumber]) then
+                                        iNearestEnemyBase = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                        tNearestEnemyBase = {PlayerStartPoints[brain.M27StartPositionNumber][1], PlayerStartPoints[brain.M27StartPositionNumber][2], PlayerStartPoints[brain.M27StartPositionNumber][3]}
+                                    end
+                                end
+                            end
+                        end
+                        aiBrain[reftPrimaryEnemyBaseLocation] = tNearestEnemyBase
+                        if not(aiBrain[reftPrimaryEnemyBaseLocation]) then
+                            local tiCategoriesToConsider = {M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryAirFactory + M27UnitInfo.refCategoryLandFactory}
+                            local tEnemyUnits
+                            tNearestEnemyBase = nil
+                            for iRef, iCategory in tiCategoriesToConsider do
+                                tEnemyUnits = aiBrain:GetUnitsAroundPoint(iCategory, PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
+                                if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                                    tNearestEnemyBase = M27Utilities.GetNearestUnit(tEnemyUnits, PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, nil, nil):GetPosition()
+                                    break
+                                end
+                            end
+                            if tNearestEnemyBase then aiBrain[reftPrimaryEnemyBaseLocation] = tNearestEnemyBase
+                            else
+                                --Cant find anywhere so just pick the furthest away enemy start location
+                                iNearestEnemyBase = 10000
+                                for iCurBrain, brain in ArmyBrains do
+                                    if not(brain == aiBrain) and not(M27Logic.IsCivilianBrain(brain)) and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()) then
+                                        if M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber]) < iNearestEnemyBase then
+                                            iNearestEnemyBase = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                            tNearestEnemyBase = {PlayerStartPoints[brain.M27StartPositionNumber][1], PlayerStartPoints[brain.M27StartPositionNumber][2], PlayerStartPoints[brain.M27StartPositionNumber][3]}
+                                        end
+                                    end
+                                end
+                                aiBrain[reftPrimaryEnemyBaseLocation] = tNearestEnemyBase
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        --Have we changed position and are dealing with an M27 brain?
+        if aiBrain.M27AI and not(tPrevPosition[1] == aiBrain[reftPrimaryEnemyBaseLocation][1] and tPrevPosition[3] == aiBrain[reftPrimaryEnemyBaseLocation][3]) then
+            --We have changed position so update any global variables that reference this
+            ForkThread(SetWhetherCanPathToEnemy, aiBrain)
         end
     end
 end
@@ -3323,6 +3417,5 @@ function GetPrimaryEnemyBaseLocation(aiBrain)
 
     --Done as a function so easier to adjust in the future if decide we want to
     if not(aiBrain[reftPrimaryEnemyBaseLocation]) then UpdateNewPrimaryBaseLocation(aiBrain) end
-    --return aiBrain[reftPrimaryEnemyBaseLocation]
-    return PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+    return aiBrain[reftPrimaryEnemyBaseLocation]
 end

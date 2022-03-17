@@ -71,3 +71,22 @@ function SendGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function SendGameCompatibilityWarning(aiBrain, sMessage, iOptionalDelay, iOptionalTimeBetweenTaunts)
+    local sFunctionRef = 'SendGameCompatibilityWarning'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if iOptionalDelay then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitSeconds(iOptionalDelay)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': iOptionalTimeBetweenTaunts='..(iOptionalTimeBetweenTaunts or 'nil')..'; tiM27VoiceTauntByType[sFunctionRef]='..(tiM27VoiceTauntByType[sFunctionRef] or 'nil')..'; Cur game time='..GetGameTimeSeconds()) end
+
+    if GetGameTimeSeconds() - (tiM27VoiceTauntByType[sFunctionRef] or -10000) > (iOptionalTimeBetweenTaunts or 60) then
+        SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
+        tiM27VoiceTauntByType[sFunctionRef] = GetGameTimeSeconds()
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repr(tiM27VoiceTauntByType)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end

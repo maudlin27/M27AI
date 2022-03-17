@@ -168,7 +168,7 @@ function M27SafeToGetACUUpgrade(aiBrain, bool)
 end
 
 function M27WantACUToGetGunUpgrade(aiBrain, bool)
-    if M27Conditions.WantToGetGunUpgrade(aiBrain, false) == true then return bool else return not(bool) end
+    if M27Conditions.WantToGetFirstACUUpgrade(aiBrain, false) == true then return bool else return not(bool) end
 end
 
 function M27ACUHasGunUpgrade(aiBrain, bool, bBothUpgrades)

@@ -617,16 +617,14 @@ function IsACU(oUnit)
 end
 
 function GetACU(aiBrain)
-    local oACU = aiBrain[M27Overseer.refoStartingACU]
-    if oACU == nil then
+    if aiBrain[M27Overseer.refoStartingACU] == nil then
         if aiBrain == nil then
             ErrorHandler('aiBrain not specified - update function call')
         else
             local tACUUnits = aiBrain:GetListOfUnits(categories.COMMAND, false, true)
             if IsTableEmpty(tACUUnits) == false then
                 for _, oCurACU in aiBrain:GetListOfUnits(categories.COMMAND, false, true) do
-                    oACU = oCurACU
-                    aiBrain[M27Overseer.refoStartingACU] = oACU
+                    aiBrain[M27Overseer.refoStartingACU] = oCurACU
                     break
                 end
             else
@@ -636,7 +634,7 @@ function GetACU(aiBrain)
             end
         end
     else
-        if oACU.Dead then
+        if aiBrain[M27Overseer.refoStartingACU].Dead then
             if GetGameTimeSeconds() <= 10 then
                 LOG('WARNING - GetACU failed to find alive AUC in first 10 seconds of game, will keep trying')
                 WaitSeconds(1)
@@ -648,13 +646,37 @@ function GetACU(aiBrain)
                 --WaitSeconds(1)
                 --ErrorHandler('ACU is dead - finished waiting 1 second to try and avoid crash', nil, true)
                 M27Overseer.iACUAlternativeFailureCount = M27Overseer.iACUAlternativeFailureCount + 1
-                aiBrain.M27IsDefeated = true
-                ErrorHandler('ACU is dead, will return nil; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
-                oACU = nil
+                ErrorHandler('ACU is dead, will return nil if in assination, or a substitute unit otherwise; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
+                if ScenarioInfo.Options.Victory == "demoralization" then
+                    aiBrain.M27IsDefeated = true
+                elseif aiBrain:IsDefeated() then
+                    aiBrain.M27IsDefeated = true
+                else
+                    --Get substitute
+                    local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
+                    local tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirFactory + M27UnitInfo.refCategoryLandFactory)
+                    if IsTableEmpty(tSubstitutes) then
+                        tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer)
+                        if IsTableEmpty(tSubstitutes) then
+                            tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure)
+                            if IsTableEmpty(tSubstitutes) then
+                                tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLand)
+                            end
+                        end
+                    end
+                    if IsTableEmpty(tSubstitutes) then
+                        aiBrain.M27IsDefeated = true
+                    else
+                        aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(tSubstitutes, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
+                        aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] = true
+                    end
+                end
             end
+        elseif aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] and aiBrain:IsDefeated() then aiBrain.M27IsDefeated = true
         end
     end
-    return oACU
+    if aiBrain.M27IsDefeated then aiBrain[M27Overseer.refoStartingACU] = nil end
+    return aiBrain[M27Overseer.refoStartingACU]
 end
 
 function ConvertAbsolutePositionToRelative(tableAbsolutePositions, relativePosition, bIgnoreY)

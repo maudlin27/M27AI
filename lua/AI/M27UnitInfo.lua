@@ -160,7 +160,7 @@ refCategoryStealthAndCloakPersonal = categories.STEALTH
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
 refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN}
-refWeaponPriorityOurGroundExperimental = {refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, categories.COMMAND, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
+refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
 
 
 function GetUnitLifetimeCount(oUnit)
@@ -388,7 +388,10 @@ function GetUnitStrikeDamage(oUnit)
 end
 
 function IsUnitUnderwater(oUnit)
-    return M27MapInfo.IsUnderwater({oUnit:GetPosition()[1], oUnit:GetPosition()[2] + oUnit:GetBlueprint().SizeY, oUnit:GetPosition()[3]}, false)
+    if oUnit.GetPosition and oUnit.GetBlueprint then
+        return M27MapInfo.IsUnderwater({oUnit:GetPosition()[1], oUnit:GetPosition()[2] + (oUnit:GetBlueprint().SizeY or 0), oUnit:GetPosition()[3]}, false)
+    else return false
+    end
 end
 
 function IsUnitOnOrUnderWater(oUnit)

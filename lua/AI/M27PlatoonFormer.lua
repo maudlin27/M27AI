@@ -1210,7 +1210,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                 if bProceed == true then
                     --Check the unit doesnt already have an order to move away from the factory
                     if bDebugMessages == true then LOG(sFunctionRef..': NewUnit='..sUnitID..': Checking if unit is already moving far away from factory') end
-                    if oNewUnit.GetCommandQueue then
+                    if M27UnitInfo.IsUnitValid(oNewUnit) and oNewUnit.GetCommandQueue then
                         local tCommandQueue = oNewUnit:GetCommandQueue() --NOTE: For some reason this sometimes causes an error message despite having the check in the previous line that the unit has such a function; not sure what can do to fix this but it happens rarely enough that hopefully can just ignore the error
                         if M27Utilities.IsTableEmpty(tCommandQueue) == false then
                             if oNewUnit.GetNavigator then

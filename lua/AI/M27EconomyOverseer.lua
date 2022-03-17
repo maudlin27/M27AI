@@ -77,8 +77,8 @@ function GetMexCountOnOurSideOfMap(aiBrain)
         local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
 
         local iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tOurStartPosition)
-        local oACU = M27Utilities.GetACU(aiBrain)
-        local sPathing = M27UnitInfo.GetUnitPathingType(oACU)
+        local sPathing = M27UnitInfo.GetUnitPathingType(M27Utilities.GetACU(aiBrain))
+        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
         local iSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ)
         local iCurDistanceToStart
         local iCurDistanceToEnemy
@@ -1794,14 +1794,22 @@ function ManageEnergyStalls(aiBrain)
                     --Have a decent amount of power, are flagged as stalling energy, but couldnt find any categories to unpause
                     if bDebugMessages == true then LOG(sFunctionRef..': werent able to find any units to unpause with normal approach so will unpause all remaining units') end
                     local iLoopCountCheck = 0
+                    local iMaxLoop = math.max(20, table.getn(aiBrain[reftPausedUnits]) + 1)
                     while M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == false do
                         iLoopCountCheck = iLoopCountCheck + 1
-                        if iLoopCountCheck >= 20 then M27Utilities.ErrorHandler('Infinite loop likely') break end
+                        if iLoopCountCheck >= iMaxLoop then M27Utilities.ErrorHandler('Infinite loop likely') break end
                         if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == false then
                             for iUnit, oUnit in aiBrain[reftPausedUnits] do
                                 if bDebugMessages == true then
-                                    if M27UnitInfo.IsUnitValid(oUnit) then LOG(sFunctionRef..': About to unpause '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                                    if M27UnitInfo.IsUnitValid(oUnit) then LOG(sFunctionRef..': About to unpause '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
                                     else LOG('Removing iUnit='..iUnit..' which is no longer valid')
+                                    end
+                                    LOG('Size of aiBrain[reftPausedUnits] before removal='..table.getn(aiBrain[reftPausedUnits])..'; will double check this size')
+                                    local iActualSize = 0
+                                    for iAltUnit, oAltUnit in aiBrain[reftPausedUnits] do
+                                        iActualSize = iActualSize + 1
+                                    end
+                                    LOG('Actual size='..iActualSize)
                                 end
                                 if M27UnitInfo.IsUnitValid(oUnit) then M27UnitInfo.PauseOrUnpauseEnergyUsage(aiBrain, oUnit, false) end
                                 table.remove(aiBrain[reftPausedUnits], iUnit)
