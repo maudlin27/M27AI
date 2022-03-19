@@ -71,7 +71,6 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBlueprintsThatCanBuildOfCategory'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if iOptionalCategoryThatMustBeAbleToBuild then bDebugMessages = true end
 
     local tBlueprints = EntityCategoryGetUnitList(iCategoryCondition)
     local tValidBlueprints = {}
@@ -943,7 +942,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                     --=======AIR FACTORY------------------
                 elseif bIsAirFactory then
-                    if aiBrain:GetArmyIndex() == 5 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 then bDebugMessages = true end
                     if iCurrentConditionToTry == 1 and bDebugMessages == true then LOG(sFunctionRef..': About to determine what to build for an air factory, mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; GameTime='..GetGameTimeSeconds()) end
                     local iMinPowerPerTickWantedForAir = 8
                     if iFactoryTechLevel == 2 then iMinPowerPerTickWantedForAir = 13

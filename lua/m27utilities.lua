@@ -180,8 +180,44 @@ function GetRectAroundLocation(tLocation, iRadius)
     return Rect(tLocation[1] - iRadius, tLocation[3] - iRadius, tLocation[1] + iRadius, tLocation[3] + iRadius)
 end
 
+function DrawCircleAroundPoint(tLocation, iColour, iDisplayCount, iCircleSize)
+    --Use DrawCircle which will call a forkthread to call this
+    local sFunctionRef = 'DrawCircleAroundPoint'
+    local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
 
-function DrawTableOfLocationsOld(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+    if iCircleSize == nil then iCircleSize = 2 end
+    if iDisplayCount == nil then iDisplayCount = 500
+    elseif iDisplayCount <= 0 then iDisplayCount = 1
+    elseif iDisplayCount >= 10000 then iDisplayCount = 10000
+    end
+
+    local sColour
+    if iColour == nil then sColour = 'c00000FF' --dark blue
+    elseif iColour == 1 then sColour = 'c00000FF' --dark blue
+    elseif iColour == 2 then sColour = 'ffFF4040' --Red
+    elseif iColour == 3 then sColour = 'c0000000' --Black (can be hard to see on some maps)
+    elseif iColour == 4 then sColour = 'fff4a460' --Gold
+    elseif iColour == 5 then sColour = 'ff27408b' --Light Blue
+    elseif iColour == 6 then sColour = 'ff1e90ff' --Cyan (might actually be white as well?)
+    elseif iColour == 7 then sColour = 'ffffffff' --white
+    else sColour = 'ffFF6060' --Orangy pink
+    end
+
+    local iMaxDrawCount = iDisplayCount
+    local iCurDrawCount = 0
+    if bDebugMessages == true then LOG('About to draw circle at table location ='..repr(tLocation)) end
+    while true do
+        bFirstLocation = true
+        DrawCircle(tLocation, iCircleSize, sColour)
+        iCurDrawCount = iCurDrawCount + 1
+        if iCurDrawCount > iMaxDrawCount then return end
+        if bDebugMessages == true then LOG(sFunctionRef..': Will wait 2 ticks then refresh the drawing') end
+        coroutine.yield(2) --Any more and circles will flash instead of being constant
+    end
+end
+
+
+function OldDrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
     --Draw circles around a table of locations to help with debugging - note that as this doesnt use ForkThread (might need to have global variables and no function pulled variables for forkthread to work beyond the first few seconds) this will pause all the AI code
     --If a table (i.e. bSingleLocation is false), then will draw lines between each position
     --All values are optional other than tableLocations
@@ -320,6 +356,14 @@ end
 
 function SteppingStoneForDrawRect(rRect, iColour, iDisplayCount)
     return DrawRectBase(rRect, iColour, iDisplayCount)
+end
+
+function SteppingStoneForDrawCircle(tLocation, iColour, iDisplayCount, iCircleSize)
+    DrawCircleAroundPoint(tLocation, iColour, iDisplayCount, iCircleSize)
+end
+
+function DrawCircleAtTarget(tLocation, iColour, iDisplayCount, iCircleSize) --Dont call DrawCircle since this is a built in function
+    ForkThread(SteppingStoneForDrawCircle, tLocation, iColour, iDisplayCount, iCircleSize)
 end
 
 function DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)

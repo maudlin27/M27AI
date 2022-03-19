@@ -1136,7 +1136,6 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 8 then bDebugMessages = true end
 
 
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
@@ -1499,7 +1498,6 @@ function UpgradeMainLoop(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 8 then bDebugMessages = true end
 
 
     if (M27Logic.iTimeOfLastBrainAllDefeated or 0) < 10 then

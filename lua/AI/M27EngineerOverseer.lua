@@ -1538,12 +1538,18 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-    local rPlayableArea = M27MapInfo.rMapPlayableArea
+    local rPlayableArea
+    if M27MapInfo.bNoRushActive then
+        rPlayableArea = {aiBrain[M27MapInfo.reftNoRushCentre][1] - M27MapInfo.iNoRushRange,aiBrain[M27MapInfo.reftNoRushCentre][3] - M27MapInfo.iNoRushRange, aiBrain[M27MapInfo.reftNoRushCentre][1] + M27MapInfo.iNoRushRange,aiBrain[M27MapInfo.reftNoRushCentre][3] + M27MapInfo.iNoRushRange}
+    else
+        rPlayableArea = M27MapInfo.rMapPlayableArea
+    end
 
     local iMapBoundMaxX = rPlayableArea[3]
     local iMapBoundMaxZ = rPlayableArea[4]
     local iMapBoundMinX = rPlayableArea[1]
     local iMapBoundMinZ = rPlayableArea[2]
+
     local tTargetLocation = {} --{tStartPosition[1], tStartPosition[2], tStartPosition[3]}
     if iSearchSizeMax == nil then iSearchSizeMax = 10 end
     if iSearchSizeMin == nil then iSearchSizeMin = 2 end
@@ -1844,7 +1850,6 @@ end
 function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
     --Returns all co-ordinates that will result in a sNewBuildingBPID being built adjacent to PosTarget; if bCheckValid is true (default) then will also check it's a valid location to build
     -- tablePosTarget can either be a table (e.g. a table of mex locations), or just a single position
-    --Only need to specify aiBrain if bCheckValid = true
     --bIgnoreOutsideBuildArea - if true then ignore any locations outside of the builder's build area
     --bReturnOnlyBestMatch: if true then applies prioritisation and returns only the best match
     --bBetterIfNoReclaim - if true, then will ignore any build location that contains any reclaim (to avoid ACU trying to build somewhere that it has to walk to and reclaim)
@@ -1922,9 +1927,15 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     local bNewBuildingLargerThanNewTarget = false
     if TargetSize[1] < tNewBuildingSize[1] or TargetSize[2] < tNewBuildingSize[2] then bNewBuildingLargerThanNewTarget = true end
 
-    local rPlayableArea = M27MapInfo.rMapPlayableArea
+    local rPlayableArea
+    if M27MapInfo.bNoRushActive then
+        rPlayableArea = {aiBrain[M27MapInfo.reftNoRushCentre][1] - M27MapInfo.iNoRushRange,aiBrain[M27MapInfo.reftNoRushCentre][3] - M27MapInfo.iNoRushRange, aiBrain[M27MapInfo.reftNoRushCentre][1] + M27MapInfo.iNoRushRange,aiBrain[M27MapInfo.reftNoRushCentre][3] + M27MapInfo.iNoRushRange}
+    else
+        rPlayableArea = M27MapInfo.rMapPlayableArea
+    end
     local iMaxMapX = rPlayableArea[3]
     local iMaxMapZ = rPlayableArea[4]
+
     local bHaveGoodMatch
     local iMapBoundarySize = 4
     local iActualMaxSearchRange
@@ -2215,7 +2226,6 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
 
     local sFunctionRef = 'BuildStructureAtLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if M27Utilities.IsACU(oEngineer) then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 59 then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Engineer UC='..GetEngineerUniqueCount(oEngineer)..'; Engineer LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; Techlevel='..M27UnitInfo.GetUnitTechLevel(oEngineer)..'; tAlternativePositionToLookFrom='..repr(tAlternativePositionToLookFrom or {'nil'})) end
@@ -2587,7 +2597,7 @@ function GetPartCompleteBuilding(aiBrain, oBuilder, iCategoryToBuild, iBuildingS
 end
 
 function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideOnExperimentalToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -3045,6 +3055,11 @@ function AttackMoveToRandomPositionAroundBase(aiBrain, oEngineer, iMaxDistance, 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AttackMoveToRandomPositionAroundBase'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if M27MapInfo.bNoRushActive then
+        iMinDistance = math.max(M27MapInfo.iNoRushRange - iMaxDistance + iMinDistance, 0)
+        iMaxDistance = math.min(iMaxDistance, M27MapInfo.iNoRushRange)
+    end
+
     --Check pathing group
     local iEngiPathingGroup = M27MapInfo.GetUnitSegmentGroup(oEngineer)
     local sPathing = M27UnitInfo.GetUnitPathingType(oEngineer)
@@ -3174,7 +3189,7 @@ end
 
 function CheckForEnemySMD(aiBrain, oSML)
     --Call via fork thread; Checks if enemy has built an SMD, and if so considers if should abort the SML
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CheckForEnemySMD'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -3897,13 +3912,16 @@ function GetUnclaimedMexOrHydro(bMexNotHydro, aiBrain, sPathing, iPathingGroup, 
                 LOG(sFunctionRef..': Checking if sLocation ref is unclaimed; sLocationRef='..sLocationRef..'; bClaimedResult='..tostring(bClaimedResult)..'; Brain start number='..aiBrain.M27StartPositionNumber)
             end
             if M27Conditions.IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatOurOrAllyMexAsUnclaimed, bTreatQueuedBuildingAsUnclaimed) == true then
-                iValidMexCount = iValidMexCount + 1
-                if bDebugMessages == true then
-                    local sLocationRef = M27Utilities.ConvertLocationToReference(tMexPosition)
-                    LOG(sFunctionRef..': iValidMexCount='..iValidMexCount..': Recorded mex with location '..sLocationRef..' as a valid mex. aiBrain startposition='..aiBrain.M27StartPositionNumber)
+                --Is it in norush radius?
+                if not(M27MapInfo.bNoRushActive) or M27Utilities.GetDistanceBetweenPositions(tMexPosition, aiBrain[M27MapInfo.reftNoRushCentre]) <= M27MapInfo.iNoRushRange then
+                    iValidMexCount = iValidMexCount + 1
+                    if bDebugMessages == true then
+                        local sLocationRef = M27Utilities.ConvertLocationToReference(tMexPosition)
+                        LOG(sFunctionRef..': iValidMexCount='..iValidMexCount..': Recorded mex with location '..sLocationRef..' as a valid mex. aiBrain startposition='..aiBrain.M27StartPositionNumber)
+                    end
+                    tUnclaimedLocations[iValidMexCount] = {}
+                    tUnclaimedLocations[iValidMexCount] = tMexPosition
                 end
-                tUnclaimedLocations[iValidMexCount] = {}
-                tUnclaimedLocations[iValidMexCount] = tMexPosition
             end
         end
     end
@@ -4835,7 +4853,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
                             if iAirFactories == nil then iAirFactories = 0 end
                         end
-                        if iLandFactories+iAirFactories < 3 or (iLandFactories+iAirFactories < 5 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandEarly and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) then
+                        if iLandFactories+iAirFactories < (aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] + aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir]) and (iLandFactories+iAirFactories < 3 or (iLandFactories+iAirFactories < 5 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandEarly and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])) then
                             if aiBrain:GetEconomyStored('MASS') >= 100 and aiBrain:GetEconomyStored('ENERGY') >= 1000 then
                                 if iLandFactories < aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] then
                                     iActionToAssign = refActionBuildLandFactory
@@ -5880,6 +5898,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 if bDebugMessages == true then LOG(sFunctionRef..': iActionToAssign='..iActionToAssign..'; iMaxEngisWanted='..iMaxEngisWanted..'; iCurrentConditionToTry='..iCurrentConditionToTry) end
                                 --Need to get the location first so can search for engineers nearest to it
                                 if iSearchRangeForNearestEngi == nil then iSearchRangeForNearestEngi = 100 end
+                                if M27MapInfo.bNoRushActive then iSearchRangeForNearestEngi = math.min(iSearchRangeForNearestEngi, M27MapInfo.iNoRushRange * 2) end
                                 --GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocationsToPickFrom, tIdleEngineers, iActionPriority, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinTechLevelWanted)
                                 --GET MIN ENGI TECH LEVEL WANTED if not already specified above
                                 --Set minimum engineer tech level if not specified and no existing engineers assigned to the action

@@ -1511,7 +1511,7 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
             end
         end
     end
-    if bIgnoreAssister == false then
+    if bIgnoreAssister == false and not(M27MapInfo.bNoRushActive) then
         --Check we havent dealt damage in the last 5s
         if not(oPlatoon[refoFrontUnit][M27UnitInfo.refbRecentlyDealtDamage]) then
             --Check we're not busy reclaiming, building, upgrading:
@@ -4449,7 +4449,7 @@ function DeterminePlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
@@ -4705,7 +4705,7 @@ function DeterminePlatoonAction(oPlatoon)
                                                 end
                                                 if bRun == true then
                                                     --Nearby enemy action should already consider running
-                                                    UpdatePlatoonActionForNearbyEnemies(oPlatoon)
+                                                    if not(M27MapInfo.bNoRushActive) then UpdatePlatoonActionForNearbyEnemies(oPlatoon) end
 
                                                     if bDebugMessages == true then LOG(sFunctionRef..': ACU needs to run so will set action to return to base') end
                                                     --Below is redundancy, as nearbyenemy action should already tell ACU to run in most cases
@@ -4754,7 +4754,7 @@ function DeterminePlatoonAction(oPlatoon)
                                                             --local iEnemySearchRadius = math.min(math.max(iPlatoonMaxRange * 2, iPlatoonMaxRange + 5), iPlatoonMaxRange + 25) --Will consider responses if any enemies get within 2 times the max range of platoon
                                                             --GetNearbyEnemyData(oPlatoon, iEnemySearchRadius)
                                                             local iOriginalAction = oPlatoon[refiCurrentAction]
-                                                            UpdatePlatoonActionForNearbyEnemies(oPlatoon, true)
+                                                            if not(M27MapInfo.bNoRushActive) then UpdatePlatoonActionForNearbyEnemies(oPlatoon, true) end
                                                             if oPlatoon[refiCurrentAction] == nil then oPlatoon[refiCurrentAction] = iOriginalAction end
                                                         end
                                                     end
@@ -4794,7 +4794,7 @@ function DeterminePlatoonAction(oPlatoon)
                                                                 if oPlatoon[refiCurrentAction] and oPlatoon[refbConsiderMexes] then DetermineActionForNearbyMex(oPlatoon) end
                                                             end
                                                             --if oPlatoon[refiCurrentAction] == nil then
-                                                                UpdatePlatoonActionForNearbyEnemies(oPlatoon)
+                                                                if not(M27MapInfo.bNoRushActive) then UpdatePlatoonActionForNearbyEnemies(oPlatoon) end
                                                                 if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Finished getting action for nearby enemies; action='..(oPlatoon[refiCurrentAction] or 'nil')) end
                                                                 if oPlatoon[refiCurrentAction] == nil then
                                                                     --MAA specific - check for nearby air units
@@ -7058,7 +7058,7 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end

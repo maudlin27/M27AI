@@ -2338,6 +2338,9 @@ function ThreatAssessAndRespond(aiBrain)
         if bConsideringNavy == true then iThreatGroupDistance = iNavyThreatGroupDistance end
 
         tEnemyUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Enemy')
+        --Ignore threats if norush is active
+        if M27MapInfo.bNoRushActive then tEnemyUnits = nil end
+
         if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
             for iCurEnemy, oEnemyUnit in tEnemyUnits do
                 tEnemyUnitPos = oEnemyUnit:GetPosition()
@@ -2981,7 +2984,7 @@ function ThreatAssessAndRespond(aiBrain)
                             --Make sure ACU is moving where we want already; if not then tell it to
                             local oACUPlatoon = M27Utilities.GetACU(aiBrain).PlatoonHandle
                             if oACUPlatoon and M27Utilities.IsACU(M27Utilities.GetACU(aiBrain)) then
-                                if M27Utilities.GetDistanceBetweenPositions(oACUPlatoon[M27PlatoonUtilities.reftMovementPath][oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget]], tEnemyThreatGroup[reftAveragePosition]) > 10 then
+                                if M27Utilities.IsTableEmpty(oACUPlatoon[M27PlatoonUtilities.reftMovementPath][oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget]]) or M27Utilities.GetDistanceBetweenPositions(oACUPlatoon[M27PlatoonUtilities.reftMovementPath][oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget]], tEnemyThreatGroup[reftAveragePosition]) > 10 then
                                     --ACU isnt moving near where we want it to, update its movement path if it doesnt have nearby enemies
                                     if oACUPlatoon[M27PlatoonUtilities.refiEnemiesInRange] == 0 or M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE, M27Utilities.GetACU(aiBrain):GetPosition(), 23, 'Enemy')) == true then --ACU range is 22
                                         oACUPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftAveragePosition]
@@ -3915,97 +3918,106 @@ function SetMaximumFactoryLevels(aiBrain)
     local sFunctionRef = 'SetMaximumFactoryLevels'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-    local iAirFactoriesOwned = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory)
-    local iPrimaryFactoriesWanted
-    local iPrimaryFactoryType = refFactoryTypeLand
-    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then
-        iPrimaryFactoryType = refFactoryTypeAir
+
+    --NoRush - set factories wanted to 1
+    if M27MapInfo.bNoRushActive then
         aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
-    elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
-        iPrimaryFactoryType = refFactoryTypeAir
-        aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
-    end
-    --local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
-
-    local iMexesToBaseCalculationOn
-    if aiBrain[refiOurHighestFactoryTechLevel] >= 3 then
-        iMexesToBaseCalculationOn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex) * 0.25
-    elseif aiBrain[refiOurHighestFactoryTechLevel] == 2 then
-        iMexesToBaseCalculationOn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) * 3 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex) + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex) / 3
-    else
-        iMexesToBaseCalculationOn = math.min(M27EconomyOverseer.GetMexCountOnOurSideOfMap(aiBrain), aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) * 9 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex) * 3 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex))
-    end
-
-    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then
-        if not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('MASS') > 0.2 then
-            iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.25))
-        elseif not(M27Conditions.HaveLowMass(aiBrain)) then iPrimaryFactoriesWanted = math.max(4 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.20))
-        else
-            --Have low mass
-            iPrimaryFactoriesWanted = math.max(1, math.ceil(iMexesToBaseCalculationOn * 0.15))
-        end
-    else
-        if M27Conditions.HaveLowMass(aiBrain) then
-            iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.5))
-        else
-            iPrimaryFactoriesWanted = math.max(6 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.7))
-        end
-    end
-    if bDebugMessages == true then LOG(sFunctionRef..': iPrimaryFactoriesWanted before considering other factors='..iPrimaryFactoriesWanted) end
-
-    aiBrain[reftiMaxFactoryByType][iPrimaryFactoryType] = iPrimaryFactoriesWanted
-    local iAirFactoryMin = 1
-    if iPrimaryFactoryType == refFactoryTypeAir then iAirFactoryMin = iPrimaryFactoriesWanted end
-    local iTorpBomberShortfall = aiBrain[M27AirOverseer.refiTorpBombersWanted]
-    if aiBrain[refiOurHighestAirFactoryTech] < 2 then
-        if iTorpBomberShortfall > 0 then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
-        iTorpBomberShortfall = 0 --Dont want to build more factories for torp bombers until have access to T2 (since T1 cant build them)
-    end
-    if iPrimaryFactoryType == refFactoryTypeAir then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
-    if bDebugMessages== true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]='..aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]..'; aiBrain[M27AirOverseer.refiBombersWanted]='..aiBrain[M27AirOverseer.refiBombersWanted]..'; iTorpBomberShortfall='..iTorpBomberShortfall) end
-    local iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 3)
-    --reftBomberEffectiveness = 'M27AirBomberEffectiveness' --[x][y]: x = unit tech level, y = nth entry; returns subtable {refiBomberMassCost}{refiBomberMassKilled}
-    if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]]) == false then
-        if aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassKilled] >= aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassCost] then
-            --Last bomber that died at this tech levle killed more than it cost
-            iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 6)
-        end
-    end
-    local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(3, math.ceil(aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]/10)) + math.min(5, aiBrain[M27AirOverseer.refiBombersWanted]) + iTorpBomberShortfall
-    aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4)))
-    if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
-
-    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill or aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
-        --Just build air factories if we have mass (assuming we have enough energy)
+        aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = 1
         aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
-        if aiBrain:GetEconomyStoredRatio('MASS') > 0.1 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 1 then
-            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = iAirFactoriesOwned + 1
-        else
-            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, iAirFactoriesOwned)
-        end
-        aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
-    end
+    else
 
-    --Cap the number of land factories if we are building an experimental
-    local bActiveExperimental = false
-    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) == false then
-        for iRef, tSubtable in  aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental] do
-            if tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]:IsUnitState('Building') then
-                bActiveExperimental = true
-                break
+        local iAirFactoriesOwned = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory)
+        local iPrimaryFactoriesWanted
+        local iPrimaryFactoryType = refFactoryTypeLand
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then
+            iPrimaryFactoryType = refFactoryTypeAir
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+        elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
+            iPrimaryFactoryType = refFactoryTypeAir
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+        end
+        --local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
+
+        local iMexesToBaseCalculationOn
+        if aiBrain[refiOurHighestFactoryTechLevel] >= 3 then
+            iMexesToBaseCalculationOn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex) * 0.25
+        elseif aiBrain[refiOurHighestFactoryTechLevel] == 2 then
+            iMexesToBaseCalculationOn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) * 3 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex) + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex) / 3
+        else
+            iMexesToBaseCalculationOn = math.min(M27EconomyOverseer.GetMexCountOnOurSideOfMap(aiBrain), aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex) * 9 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Mex) * 3 + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex))
+        end
+
+        if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then
+            if not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('MASS') > 0.2 then
+                iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.25))
+            elseif not(M27Conditions.HaveLowMass(aiBrain)) then iPrimaryFactoriesWanted = math.max(4 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.20))
+            else
+                --Have low mass
+                iPrimaryFactoriesWanted = math.max(1, math.ceil(iMexesToBaseCalculationOn * 0.15))
+            end
+        else
+            if M27Conditions.HaveLowMass(aiBrain) then
+                iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.5))
+            else
+                iPrimaryFactoriesWanted = math.max(6 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.7))
             end
         end
-    end
-    if bActiveExperimental then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 4) end
-    if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(2, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
-    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) == false then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(2, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
+        if bDebugMessages == true then LOG(sFunctionRef..': iPrimaryFactoriesWanted before considering other factors='..iPrimaryFactoriesWanted) end
 
-    if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
-        aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 1)
-    end
-    if bDebugMessages == true then LOG(sFunctionRef..': bActiveExperimental='..tostring(bActiveExperimental)..'; Idle factories='..aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused]) end
+        aiBrain[reftiMaxFactoryByType][iPrimaryFactoryType] = iPrimaryFactoriesWanted
+        local iAirFactoryMin = 1
+        if iPrimaryFactoryType == refFactoryTypeAir then iAirFactoryMin = iPrimaryFactoriesWanted end
+        local iTorpBomberShortfall = aiBrain[M27AirOverseer.refiTorpBombersWanted]
+        if aiBrain[refiOurHighestAirFactoryTech] < 2 then
+            if iTorpBomberShortfall > 0 then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
+            iTorpBomberShortfall = 0 --Dont want to build more factories for torp bombers until have access to T2 (since T1 cant build them)
+        end
+        if iPrimaryFactoryType == refFactoryTypeAir then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
+        if bDebugMessages== true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]='..aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]..'; aiBrain[M27AirOverseer.refiBombersWanted]='..aiBrain[M27AirOverseer.refiBombersWanted]..'; iTorpBomberShortfall='..iTorpBomberShortfall) end
+        local iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 3)
+        --reftBomberEffectiveness = 'M27AirBomberEffectiveness' --[x][y]: x = unit tech level, y = nth entry; returns subtable {refiBomberMassCost}{refiBomberMassKilled}
+        if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]]) == false then
+            if aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassKilled] >= aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassCost] then
+                --Last bomber that died at this tech levle killed more than it cost
+                iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 6)
+            end
+        end
+        local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(3, math.ceil(aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]/10)) + math.min(5, aiBrain[M27AirOverseer.refiBombersWanted]) + iTorpBomberShortfall
+        aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4)))
+        if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 
-    aiBrain[refiMinLandFactoryBeforeOtherTypes] = math.min(aiBrain[refiMinLandFactoryBeforeOtherTypes], aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
+        if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill or aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
+            --Just build air factories if we have mass (assuming we have enough energy)
+            aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
+            if aiBrain:GetEconomyStoredRatio('MASS') > 0.1 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 1 then
+                aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = iAirFactoriesOwned + 1
+            else
+                aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, iAirFactoriesOwned)
+            end
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+        end
+
+        --Cap the number of land factories if we are building an experimental
+        local bActiveExperimental = false
+        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) == false then
+            for iRef, tSubtable in  aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental] do
+                if tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]:IsUnitState('Building') then
+                    bActiveExperimental = true
+                    break
+                end
+            end
+        end
+        if bActiveExperimental then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 4) end
+        if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(2, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
+        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) == false then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(2, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
+
+        if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 1)
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': bActiveExperimental='..tostring(bActiveExperimental)..'; Idle factories='..aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused]) end
+
+        aiBrain[refiMinLandFactoryBeforeOtherTypes] = math.min(aiBrain[refiMinLandFactoryBeforeOtherTypes], aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
+    end
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]..'; aiBrain[refiMinLandFactoryBeforeOtherTypes]='..aiBrain[refiMinLandFactoryBeforeOtherTypes]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]) end
@@ -4038,6 +4050,9 @@ function DetermineInitialBuildOrder(aiBrain)
     if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true then
         aiBrain[refiInitialRaiderPlatoonsWanted] = 2
         aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
+        if M27MapInfo.bNoRushActive then aiBrain[refiInitialRaiderPlatoonsWanted] = 0 end
+
+
         --How many mexes are there nearby?
         local iPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
         --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
@@ -4119,7 +4134,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 5 then bDebugMessages = true end
     --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
     local iBigThreatSearchRange = 10000
 
@@ -4418,78 +4432,81 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 --Should we switch to eco?
 
                 local bWantToEco = false
-                if bKeepProtectingACU == false then
-                    --How far away is the enemy?
-                    local bBigEnemyThreat = false
-                    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArti]) == false then bBigEnemyThreat = true end
-                    if bDebugMessages == true then LOG(sFunctionRef..'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat='..tostring(bBigEnemyThreat)..'; aiBrain[refbEnemyACUNearOurs]='..tostring(aiBrain[refbEnemyACUNearOurs])) end
+                if M27MapInfo.bNoRushActive and M27MapInfo.iNoRushTimer - GetGameTimeSeconds() >= 60 then
+                    aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
+                else
+                    if bKeepProtectingACU == false then
+                        --How far away is the enemy?
+                        local bBigEnemyThreat = false
+                        if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArti]) == false then bBigEnemyThreat = true end
+                        if bDebugMessages == true then LOG(sFunctionRef..'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat='..tostring(bBigEnemyThreat)..'; aiBrain[refbEnemyACUNearOurs]='..tostring(aiBrain[refbEnemyACUNearOurs])) end
 
 
 
 
 
-                    --Dont eco if enemy ACU near ours as likely will need backup
-                    if aiBrain[refbEnemyACUNearOurs] == false then
-                        if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
-                            if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.6 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': No big enemy threats and good defence and mex coverage so will eco') end
-                                bWantToEco = true
-                            else
-                                if bDebugMessages == true then LOG(sFunctionRef..': Dont want to eco based on initial tests: bBigEnemyThreat='..tostring(bBigEnemyThreat)..'; %threat='..aiBrain[refiPercentageOutstandingThreat]..'; UnclaimedMex%='..iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup..'; EnemyDist='..aiBrain[refiDistanceToNearestEnemyBase]) end
-                                --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
-                                if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Ok defence coverage and income not changed in a while so will eco') end
+                        --Dont eco if enemy ACU near ours as likely will need backup
+                        if aiBrain[refbEnemyACUNearOurs] == false then
+                            if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
+                                if bBigEnemyThreat == false and aiBrain[refiPercentageOutstandingThreat] > 0.55 and (iAllMexesInPathingGroupWeHaventClaimed <= iAllMexesInPathingGroup * 0.6 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not(iT3Mexes >= math.min(iMexesNearStart, 4) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': No big enemy threats and good defence and mex coverage so will eco') end
                                     bWantToEco = true
                                 else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if we are making use of tanks - if not then will switch to eco if have a decent number of tanks. aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]='..tostring(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons])) end
-                                    if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
-                                        --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
-                                        local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
-                                        if bDebugMessages == true then LOG(sFunctionRef..': iMinTanksWanted='..iMinTanksWanted..'; iLandCombatUnits='..iLandCombatUnits) end
-                                        if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco') end
-                                            bWantToEco = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Dont want to eco based on initial tests: bBigEnemyThreat='..tostring(bBigEnemyThreat)..'; %threat='..aiBrain[refiPercentageOutstandingThreat]..'; UnclaimedMex%='..iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup..'; EnemyDist='..aiBrain[refiDistanceToNearestEnemyBase]) end
+                                    --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
+                                    if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Ok defence coverage and income not changed in a while so will eco') end
+                                        bWantToEco = true
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Checking if we are making use of tanks - if not then will switch to eco if have a decent number of tanks. aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]='..tostring(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons])) end
+                                        if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
+                                            --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
+                                            local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
+                                            if bDebugMessages == true then LOG(sFunctionRef..': iMinTanksWanted='..iMinTanksWanted..'; iLandCombatUnits='..iLandCombatUnits) end
+                                            if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco') end
+                                                bWantToEco = true
+                                            end
                                         end
                                     end
                                 end
                             end
                         end
-                    end
-                    --Eco even if enemy has big threats if we cant path to enemy base with amphibious and we have all mexes in our pathing group
-                    if not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and iAllMexesInPathingGroupWeHaventClaimed == 0 then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Want to eco as we cant reach enemy base except by air and we have all mexes in our pathing group') end
-                        bWantToEco = true
-                    end
-
-
-
-
-                    if bWantToEco == true then
-                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
-                            bWantToEco = false
-                        --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
-                        elseif oACU:GetHealthPercent() < 0.45 then
-                            bWantToEco = false
-                        --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
-                        elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
-                            bWantToEco = false
+                        --Eco even if enemy has big threats if we cant path to enemy base with amphibious and we have all mexes in our pathing group
+                        if not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and iAllMexesInPathingGroupWeHaventClaimed == 0 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want to eco as we cant reach enemy base except by air and we have all mexes in our pathing group') end
+                            bWantToEco = true
                         end
-                    end
 
-                    if bWantToEco == true then
-                        aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = nil
-                        aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
-                    else
-                        aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryDFTank
-                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false then
-                            if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryAmphibiousCombat
-                            else aiBrain[refiAIBrainCurrentStrategy] = M27UnitInfo.refCategoryEngineer
+
+
+
+                        if bWantToEco == true then
+                            if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
+                                bWantToEco = false
+                            --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
+                            elseif oACU:GetHealthPercent() < 0.45 then
+                                bWantToEco = false
+                            --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
+                            elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
+                                bWantToEco = false
                             end
                         end
-                        aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandEarly
+
+                        if bWantToEco == true then
+                            aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = nil
+                            aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
+                        else
+                            aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryDFTank
+                            if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false then
+                                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryAmphibiousCombat
+                                else aiBrain[refiAIBrainCurrentStrategy] = M27UnitInfo.refCategoryEngineer
+                                end
+                            end
+                            aiBrain[refiAIBrainCurrentStrategy] = refStrategyLandEarly
+                        end
                     end
                 end
-
             end
         end
 
@@ -4910,6 +4927,8 @@ function OverseerInitialisation(aiBrain)
 
     ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain) --Will figure out the speed of scouts (except seraphim)
 
+
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -4933,7 +4952,7 @@ function GameSettingWarnings(aiBrain)
         bIncompatible = true
         sIncompatibleMessage = sIncompatibleMessage..' Cant path to enemy base. '
     end
-    if bIncompatible then M27Chat.SendGameCompatibilityWarning(aiBrain, "M27 hasnt been fully tested for the following game settings: "..sIncompatibleMessage..'  If issues are encountered, report them to maudlin27 via Discord or the forums, and include the replay.', 0, 10) end
+    if bIncompatible then M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: "..sIncompatibleMessage..'  If issues are encountered, report them to maudlin27 via Discord or the forums, and include the replay.', 0, 10) end
 end
 
 function TEMPUNITPOSITIONLOG(aiBrain)
@@ -5014,6 +5033,7 @@ end
 
 
 
+
 function OverseerManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OverseerManager'
@@ -5027,6 +5047,7 @@ function OverseerManager(aiBrain)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Pre fork thread of player start locations') end
     ForkThread(M27MapInfo.RecordPlayerStartLocations, aiBrain)
+
     --ForkThread(M27MapInfo.RecordResourceLocations, aiBrain) --need to do after 1 tick for adaptive maps - superceded by hook into siminit
     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain:GetArmyIndex()='..aiBrain:GetArmyIndex()..'; aiBrain start position='..(aiBrain.M27StartPositionNumber or 'nil')) end
     ForkThread(M27MapInfo.RecordMexNearStartPosition, aiBrain.M27StartPositionNumber, 26) --similar to the range of T1 PD
@@ -5038,10 +5059,12 @@ function OverseerManager(aiBrain)
         --ForkThread(M27MapInfo.DrawHeightMapAstro)
         --ForkThread(M27MapInfo.LogMapTerrainTypes)
     end
+    WaitTicks(1)
+    ForkThread(M27MapInfo.SetupNoRushDetails, aiBrain)
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Pre wait 10 ticks') end
+    if bDebugMessages == true then LOG(sFunctionRef..': Pre wait 9 ticks') end
 
-    WaitTicks(10)
+    WaitTicks(9)
 
     --Hopefully have ACU now so can re-check pathing
     --if bDebugMessages == true then LOG(sFunctionRef..': About to check pathing to mexes') end

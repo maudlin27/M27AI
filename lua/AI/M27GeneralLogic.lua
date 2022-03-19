@@ -3909,7 +3909,6 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckF
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBestAOETarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bOptionalCheckForSMD then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': About to find the best target for bomb, tBaseLocation='..repr(tBaseLocation)..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')) end
 
     local tBestTarget = {tBaseLocation[1], tBaseLocation[2], tBaseLocation[3]}
@@ -3945,7 +3944,7 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckF
 end
 
 function IsSMDBlockingTarget(aiBrain, tTarget, tSMLPosition, iIgnoreSMDCreatedThisManySecondsAgo, iSMDRangeAdjust)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsSMDBlockingTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -4002,7 +4001,7 @@ end
 
 function ConsiderLaunchingMissile(oLauncher, oWeapon)
     --Should be called via forkthread when missile created due to creating a loop
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27UnitInfo.IsUnitValid(oLauncher) then

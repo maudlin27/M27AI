@@ -1762,8 +1762,22 @@ function UpdateScoutingSegmentRequirements(aiBrain)
     --reftScoutingTargetShortlist = 'M27ScoutingTargetShortlist' --[y] is the count (e.g. location 1, 2, 3), and then this gives {a,b,c} where a, b, c are subrefs, i.e. refiTimeSinceWantedToScout
     local iCurActiveScoutsAssigned
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Nearest enemy start point='..repr(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; aiBrain[refiMinSegmentX]='..aiBrain[refiMinSegmentX]..'; aiBrain[refiMaxSegmentX]='..aiBrain[refiMaxSegmentX]..'; aiBrain[refiMinSegmentX]='..aiBrain[refiMinSegmentX]..'; aiBrain[refiMaxSegmentZ]='..aiBrain[refiMaxSegmentZ]) end
-    for iCurAirSegmentX = aiBrain[refiMinSegmentX], aiBrain[refiMaxSegmentX], 1 do
-        for iCurAirSegmentZ = aiBrain[refiMinSegmentZ], aiBrain[refiMaxSegmentZ], 1 do
+    local iScoutMinSegmentX = aiBrain[refiMinSegmentX]
+    local iScoutMaxSegmentX = aiBrain[refiMaxSegmentX]
+    local iScoutMinSegmentZ = aiBrain[refiMinSegmentZ]
+    local iScoutMaxSegmentZ = aiBrain[refiMaxSegmentZ]
+    if M27MapInfo.bNoRushActive then
+        local iBaseSegmentX, iBaseSegmentZ = GetAirSegmentFromPosition(aiBrain[M27MapInfo.reftNoRushCentre])
+        local iSegmentSizeAdjust = math.ceil(M27MapInfo.iNoRushRange / iAirSegmentSize)
+        iScoutMinSegmentX = iBaseSegmentX - iSegmentSizeAdjust
+        iScoutMaxSegmentX = iBaseSegmentX + iSegmentSizeAdjust
+        iScoutMinSegmentZ = iBaseSegmentZ - iSegmentSizeAdjust
+        iScoutMaxSegmentZ = iBaseSegmentZ + iSegmentSizeAdjust
+    end
+
+
+    for iCurAirSegmentX = iScoutMinSegmentX, iScoutMaxSegmentX, 1 do
+        for iCurAirSegmentZ = iScoutMinSegmentZ, iScoutMaxSegmentZ, 1 do
             iLastScoutedTime = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]
             if bDebugMessages == true then
                 if iCurAirSegmentX <= 4 and iCurAirSegmentZ then
@@ -1825,7 +1839,10 @@ function UpdateScoutingSegmentRequirements(aiBrain)
     local iAvailableScouts = 0
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableScouts]) == false then iAvailableScouts = table.getn(aiBrain[reftAvailableScouts]) end
 
+    if M27MapInfo.bNoRushActive then iScoutsWantedActual = math.min(iScoutsWantedActual, 3) end
+
     aiBrain[refiExtraAirScoutsWanted] = iScoutsWantedActual - iAvailableScouts
+
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[refiExtraAirScoutsWanted]='..aiBrain[refiExtraAirScoutsWanted]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -2347,6 +2364,7 @@ function GetBomberTargetShortlist(aiBrain)
             end
         end
     end
+    if M27MapInfo.bNoRushActive then iMaxSearchRange = math.min(iMaxSearchRange, M27MapInfo.iNoRushRange) end
 
     if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through different types of categories with iMaxSearchRange='..iMaxSearchRange..'; aiBrain[refiShieldIgnoreValue]='..aiBrain[refiShieldIgnoreValue]) end
 
@@ -2599,7 +2617,7 @@ function IssueLargeBomberAttack(aiBrain, tBombers)
 
                 --Determine what targets to assign, cycling through each bomber based on how close they are to enemy, and then determining the closest unit if the category being considered to the bomber that doesnt already have enough units assigned to it
                 if bDebugMessages == true then LOG(sFunctionRef..': Finished going through bombers, iBombersNeedingTargets='..iBombersNeedingTargets) end
-                if iBombersNeedingTargets > 0 then
+                if iBombersNeedingTargets > 0 and not(M27MapInfo.bNoRushActive) then
                     --Sort bombers based on distance to enemy start, so will start by assigning action to the nearest bomber to enemy start
                     for iEntry, tSubvalue in M27Utilities.SortTableBySubtable(tBombersNeedingTargetsTracker, refiTrackerDistanceToEnemy, true) do
                         iCurLoop = 0
@@ -3081,7 +3099,10 @@ function AirAAManager(aiBrain)
         if M27Utilities.IsTableEmpty(tNearbyMAA) == false then aiBrain[refiNearToACUThreshold] = iAssistNearbyUnitRange
         else aiBrain[refiNearToACUThreshold] = 90 end
 
-        local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir, tStartPosition, aiBrain[refiMaxScoutRadius], 'Enemy')
+        local iEnemyAirSearchRange = aiBrain[refiMaxScoutRadius]
+        if M27MapInfo.bNoRushActive then iEnemyAirSearchRange = math.min(iEnemyAirSearchRange, M27MapInfo.iNoRushRange) end
+
+        local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir, tStartPosition, iEnemyAirSearchRange, 'Enemy')
 
         local iAirThreatShortfall = 0
         local tValidEnemyAirThreats = {}
