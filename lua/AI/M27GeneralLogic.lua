@@ -2585,7 +2585,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             if oPathingUnit.PlatoonHandle and oPathingUnit.PlatoonHandle[M27PlatoonUtilities.refbNeedToHeal] then
                 if bDebugMessages == true then LOG(sFunctionRef..': ACU flagged as needing to heal so will go to nearest rally point') end
                 bHaveFinalDestination = true
-                tFinalDestination = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(tUnitPos))
+                tFinalDestination = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPathingUnit.PlatoonHandle))
             elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] or M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]) > math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25) then
 
 

@@ -3181,7 +3181,6 @@ function GetLikelySMLTarget(aiBrain, oSML)
                 end
             end
         end
-    else tLikelyTarget = tSMLTarget
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tLikelyTarget, iBestDamage
@@ -3212,6 +3211,7 @@ function CheckForEnemySMD(aiBrain, oSML)
 
     while M27UnitInfo.IsUnitValid(oSML) do
         --Be more responsive to enemy SMD
+        if bDebugMessages == true then LOG(sFunctionRef..': About to make segments around tLikelyTarget='..repr((tLikelyTarget or {'nil'}))..' a high priority for scouting') end
         M27AirOverseer.MakeSegmentsAroundPositionHighPriority(aiBrain, tLikelyTarget, 1)
 
         tEnemySMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] + 60, 'Enemy')
@@ -5656,7 +5656,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if we want sonar, aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 1)='..tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 1))) end
                         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then
                             --Want sonar if we have built at least 1 torp bomber, or if we have a naval factory, or if we have a T3 air factory (broader range of conditions to help reduce risk of unit restrictions interfering)
-                            if not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 1)) or aiBrian[M27Overseer.refiOurHighestAirFactoryTech] >= 3 or  aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNavalFactory) >= 1  then
+                            if not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 1)) or aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 or  aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNavalFactory) >= 1  then
                             --Can get to enemy via amphib not land so must be a water map, so want sonar to detect subs if we dont already have it
                                 if bDebugMessages == true then LOG(sFunctionRef..': aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySonar)='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySonar)) end
                                 if aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySonar) == 0 then

@@ -2573,6 +2573,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                 if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies, will check if want to use overcharge and if have nearby naval surface threats') end
                                 --ACU action for nearby naval units when no ground threats - move towards them to get in range
                                 if oPlatoon[refbACUInPlatoon] == true and M27Conditions.CanUnitUseOvercharge(aiBrain, M27Utilities.GetACU(aiBrain)) then
+                                    bDebugMessages = true
                                     if bDebugMessages == true then LOG(sFunctionRef..': Can use overcharge; about to check if have nearby naval units in which case will move towards them so are in range') end
                                     local tNearbyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, GetPlatoonFrontPosition(oPlatoon), iPlatoonMaxRange + 8, 'Enemy')
                                     if M27Utilities.IsTableEmpty(tNearbyNavy) == false then
