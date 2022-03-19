@@ -744,7 +744,11 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                 else
                     if aiBrain[refiEnergyGrossBaseIncome] <= 42 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Energy income too low to support air fac') end
-                        iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1
+                        if not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and aiBrain[refiMexesAvailableForUpgrade] > 0 then
+                            iFactoryToUpgrade = M27UnitInfo.refCategoryT1Mex --Better to not upgrade factory yet and e.g. upgrade a mex than to upgrade land
+                        else
+                            iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH1
+                        end
                     elseif aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Want to upgrade air factory as need torp bombers') end
                         iFactoryToUpgrade = M27UnitInfo.refCategoryAirFactory * categories.TECH1 + M27UnitInfo.refCategoryAirFactory * categories.TECH2
@@ -1132,6 +1136,8 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if aiBrain:GetArmyIndex() == 8 then bDebugMessages = true end
+
 
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
     local bHaveHighMass, bHaveEnoughEnergy
@@ -1199,20 +1205,41 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             end
         end
 
+        local iPausedMexes = 0
+        if M27Utilities.IsTableEmpty(aiBrain[reftUpgrading]) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Have paused units; size of table='..table.getn(aiBrain[reftPausedUnits])) end
+            for iUnit, oUnit in aiBrain[reftUpgrading] do
+                if M27UnitInfo.IsUnitValid(oUnit) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Upgrading unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; IsPaused='..tostring(oUnit:IsPaused())..'; refbUpgradePaused='..tostring(oUnit[refbUpgradePaused])) end
+                    if oUnit[refbUpgradePaused] then
+                        if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit:GetUnitId()) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Unit is a mex so noting it as paused') end
+                            iPausedMexes = iPausedMexes + 1
+                        end
+                    end
+                end
+            end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': aiBrain[reftPausedUnits] is empty')
+        end
 
 
 
 
-
-        if bWantHQEvenWithLowMass or (aiBrain[refiPausedUpgradeCount] >= 1 and table.getn(aiBrain[reftUpgrading]) <= 1) then --Want to resume unless we're energy stalling
+        --Ecoing strategy - want to have a mex ugprading at all times regardless of mass income if we have mexes available to upgrade and arent getting an HQ upgrade and have at least 6 T1 mexes
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refiMassGrossBaseIncome] >= 1.4 and aiBrain[refiMexesUpgrading] - iPausedMexes <= 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) and (aiBrain[refiMexesAvailableForUpgrade] > 0 or iPausedMexes > 0) and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) then
+            tMassThresholds[1] = {0, -10}
+        elseif bWantHQEvenWithLowMass or (aiBrain[refiPausedUpgradeCount] >= 1 and table.getn(aiBrain[reftUpgrading]) <= 1) then --Want to resume unless we're energy stalling
+            if bDebugMessages == true then LOG(sFunctionRef..': Have paused upgrades, and nothing is currently upgrading, so want to resume one of the upgrades hence setting mass thresholds really low') end
             tMassThresholds[1] = {0, -2.0}
             tMassThresholds[2] = {500, -8}
             tMassThresholds[3] = {1000, -25}
             tMassThresholds[4] = {2500,-200}
-        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refiMexesUpgrading] <= 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true then
+        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and ((aiBrain[refiPausedUpgradeCount] >= 1 and iPausedMexes == aiBrain[refiMexesUpgrading]) or (aiBrain[refiMexesUpgrading] <= 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true)) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Want to eco but dont have any active mex upgrades') end
             tMassThresholds[1] = {0, -100.0}
             tMassThresholds[2] = {1000, -200}
-        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refiMexesUpgrading] <= iT1MexesNearBase and aiBrain[refiMexesAvailableForUpgrade] > 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true and iT2MexesUpgrading <= 0 then
+        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and iT2MexesUpgrading <= 0 and (iPausedMexes > 0 or (M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true and aiBrain[refiMexesUpgrading] <= iT1MexesNearBase and aiBrain[refiMexesAvailableForUpgrade] > 0)) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Want to eco, dont have any active t2 upgrades, so will either unpause paused mex upgrades, or will start a new upgrade if we arent planning to ctrl-K a T2 mex') end
             local iFullStorageAmount = 1000 --Base value for if we have 0% stored ratio
             tMassThresholds[1] = {math.min(400, iFullStorageAmount * 0.1), 0.0}
             tMassThresholds[2] = {math.min(800, iFullStorageAmount * 0.15), -0.3}
@@ -1223,6 +1250,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             tMassThresholds[7] = {iFullStorageAmount * 0.98,-10}
         else
             if aiBrain[refiMassGrossBaseIncome] <= 15 then
+                if bDebugMessages == true then LOG(sFunctionRef..': Arent ecoing and our mass income is less tahn 150') end
                 tMassThresholds[1] = {400, 1}
                 tMassThresholds[2] = {500, 0.5}
                 tMassThresholds[3] = {600, 0.1}
@@ -1256,6 +1284,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
 
         --Increase thresholds if we're trying to build a missile
         if aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are trying to buidl a missile so will decrease thresholds') end
             for iThresholdRef, tThreshold in tMassThresholds do
                 tMassThresholds[iThresholdRef][1] = tMassThresholds[iThresholdRef][1] + math.max(500, tMassThresholds[iThresholdRef][1] * 0.5)
                 tMassThresholds[iThresholdRef][2] = tMassThresholds[iThresholdRef][2] + 1
@@ -1276,19 +1305,27 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             end
         end
 
+
         aiBrain[refbWantMoreFactories] = bWantMoreFactories
 
         for _, tThreshold in tMassThresholds do
             if iMassStored >= tThreshold[1] and iMassNetIncome >= tThreshold[2] then bHaveHighMass = true break end
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': bWantMoreFactories='..tostring(bWantMoreFactories)..'; iLandFactoryCount='..iLandFactoryCount..'; iMexesOnOurSideOfMap='..iMexesOnOurSideOfMap..'; bHaveHighMass='..tostring(bHaveHighMass)..'; iMassStored='..iMassStored..'; iMassNetIncome='..iMassNetIncome) end
+
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': Finished calculating mass thresholds='..repr(tMassThresholds)..'; bHaveHighmass='..tostring(bHaveHighMass)..'; iPausedMexes='..iPausedMexes..'; aiBrain[refiMexesUpgrading]='..aiBrain[refiMexesUpgrading])
+            LOG(sFunctionRef..': bWantMoreFactories='..tostring(bWantMoreFactories)..'; iLandFactoryCount='..iLandFactoryCount..'; iMexesOnOurSideOfMap='..iMexesOnOurSideOfMap..'; bHaveHighMass='..tostring(bHaveHighMass)..'; iMassStored='..iMassStored..'; iMassNetIncome='..iMassNetIncome)
+        end
 
         --Low mass override
-        if M27Conditions.HaveLowMass(aiBrain) == true and aiBrain[refiMexesUpgrading] >= 2 then bHaveHighMass = false end
+        if M27Conditions.HaveLowMass(aiBrain) == true and (aiBrain[refiMexesUpgrading] - iPausedMexes) >= 2 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Low mass override - standard low mass condition is failed, and are upgrading more than 1 mex at once, so want to pause one of them') end
+            bHaveHighMass = false
+        end
 
 
         if bHaveHighMass == true then
-            if not(aiBrain[refbStallingEnergy]) then
+            if not(aiBrain[refbStallingEnergy]) or (aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[refiEnergyNetIncome] >= 25)  then
                 --Do we have any power plants of the current tech level? If not, then hold off on upgrades until we do, unless we have lots of power already
                 if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] <= 1 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel])) > 0 or (aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[refiEnergyGrossBaseIncome] > 25 * aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] * (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] - 1)) then
                     --Have we powerstalled at T2+ in last 15s?
@@ -1333,11 +1370,13 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                             end
                         end
                     end
-                else
-                    --Dont have much power
+                elseif bDebugMessages == true then LOG(sFunctionRef..': Are stalling energy and dont have 100% stored with decent net income')
                 end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Are stalling energy so wont upgrade more')
             end
         end
+
+
 
         if iMaxToUpgrade == 0 then
             if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough resources to upgrade, checking if should pause upgrades') end
@@ -1360,7 +1399,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 local iLandFactoryUpgrading, iLandFactoryAvailable, bAlreadyUpgradingLandHQ = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryLandFactory, true)
                 local iAirFactoryUpgrading, iAirFactoryAvailable, bAlreadyUpgradingAirHQ = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryAirFactory, true)
 
-                if aiBrain[refiMexesUpgrading] > 1 or iLandFactoryUpgrading + iAirFactoryUpgrading > 0 or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 100 or aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= 0.3 then
+                if (aiBrain[refiMexesUpgrading] - iPausedMexes) > 1 or iLandFactoryUpgrading + iAirFactoryUpgrading > 0 or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 100 or aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= 0.3 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Checking if stalling mass; iMassStored='..iMassStored..'; aiBrain:GetEconomyStoredRatio(MASS)='..aiBrain:GetEconomyStoredRatio('MASS')..'; iMassNetIncome='..iMassNetIncome) end
                     if (M27Conditions.HaveLowMass(aiBrain) and aiBrain[refiMexesUpgrading] + iLandFactoryUpgrading + iAirFactoryUpgrading >= 2) or (iMassStored <= 60 or aiBrain:GetEconomyStoredRatio('MASS') <= 0.06) and iMassNetIncome < 0.2 then
                         aiBrain[refbPauseForPowerStall] = false
@@ -1460,6 +1499,7 @@ function UpgradeMainLoop(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if aiBrain:GetArmyIndex() == 8 then bDebugMessages = true end
 
 
     if (M27Logic.iTimeOfLastBrainAllDefeated or 0) < 10 then
@@ -1477,11 +1517,11 @@ function UpgradeMainLoop(aiBrain)
         if iMaxToBeUpgrading >= 1 then
             --Unpause any already upgrading units first
             iAmountToUpgradeAfterUnpausing = math.max(iMaxToBeUpgrading - aiBrain[refiPausedUpgradeCount],0)
-            if bDebugMessages == true then LOG(sFunctionRef..': Checking if upgrades to be unpaused') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Checking if upgrades to be unpaused; iPausedUpgradeCount='..(aiBrain[refiPausedUpgradeCount] or 0)) end
             UnpauseUpgrades(aiBrain, iMaxToBeUpgrading)
-            if bDebugMessages == true then LOG(sFunctionRef..'; iAmountToUpgradeAfterUnpausing='..iAmountToUpgradeAfterUnpausing) end
+            if bDebugMessages == true then LOG(sFunctionRef..'; iAmountToUpgradeAfterUnpausing='..iAmountToUpgradeAfterUnpausing..'; Paused upgrade count='..(aiBrain[refiPausedUpgradeCount] or 0)) end
             if iAmountToUpgradeAfterUnpausing > 0 then
-
+                if bDebugMessages == true then LOG(sFunctionRef..': WIll look for a category to start upgrading as well') end
                 iCategoryToUpgrade = DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
 
                 if iCategoryToUpgrade then
@@ -1738,7 +1778,7 @@ function ManageEnergyStalls(aiBrain)
                                     local iEnergyPerBP = 9
                                     if iCategoryRef == categories.COMMAND and oUnit[M27UnitInfo.refsUpgradeRef] then
                                         --Determine energy cost per BP
-                                        iEnergyPerBP = M27UnitInfo.GetUpgradeEnergyCost(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) / M27UnitInfo.GetUpgradeBuildTime(oUnit, oUnit[M27UnitInfo.refsUpgradeRef])
+                                        iEnergyPerBP = M27UnitInfo.GetUpgradeEnergyCost(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) / (M27UnitInfo.GetUpgradeBuildTime(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) or 1)
                                     end
                                     if oUnit:GetBlueprint().Economy.BuildRate then iCurUnitEnergyUsage = oUnit:GetBlueprint().Economy.BuildRate * iEnergyPerBP end
                                 end

@@ -617,6 +617,32 @@ function IsACU(oUnit)
 end
 
 function GetACU(aiBrain)
+    function GetSubstituteACU(aiBrain)
+        --Get substitute
+        local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
+        local tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirFactory + M27UnitInfo.refCategoryLandFactory)
+        if IsTableEmpty(tSubstitutes) then
+            tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer)
+            if IsTableEmpty(tSubstitutes) then
+                tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure)
+                if IsTableEmpty(tSubstitutes) then
+                    tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLand)
+                end
+            end
+        end
+        if IsTableEmpty(tSubstitutes) then
+            aiBrain.M27IsDefeated = true
+        else
+            aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(tSubstitutes, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
+            if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
+                ErrorHandler('Dont have a valid substitute ACU, will treat us as being defeated')
+                aiBrain.M27IsDefeated = true
+            else
+                aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] = true
+            end
+        end
+    end
+
     if aiBrain[M27Overseer.refoStartingACU] == nil then
         if aiBrain == nil then
             ErrorHandler('aiBrain not specified - update function call')
@@ -628,9 +654,14 @@ function GetACU(aiBrain)
                     break
                 end
             else
-                ErrorHandler('ACU hasnt been set')
-            --WaitSeconds(30)
-            --ErrorHandler('ACU hasnt been set - finished waiting 30 seconds to try and avoid crash, then will return nil')
+                if ScenarioInfo.Options.Victory == "demoralization" then
+                    ErrorHandler('Cant find any ACUs that we own, and in assassination game mode, so will treat us as being defeated')
+                    aiBrain.M27IsDefeated = true
+                else
+                    GetSubstituteACU(aiBrain)
+                    --WaitSeconds(30)
+                    --ErrorHandler('ACU hasnt been set - finished waiting 30 seconds to try and avoid crash, then will return nil')
+                end
             end
         end
     else
@@ -652,24 +683,7 @@ function GetACU(aiBrain)
                 elseif aiBrain:IsDefeated() then
                     aiBrain.M27IsDefeated = true
                 else
-                    --Get substitute
-                    local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
-                    local tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirFactory + M27UnitInfo.refCategoryLandFactory)
-                    if IsTableEmpty(tSubstitutes) then
-                        tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer)
-                        if IsTableEmpty(tSubstitutes) then
-                            tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure)
-                            if IsTableEmpty(tSubstitutes) then
-                                tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLand)
-                            end
-                        end
-                    end
-                    if IsTableEmpty(tSubstitutes) then
-                        aiBrain.M27IsDefeated = true
-                    else
-                        aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(tSubstitutes, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
-                        aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] = true
-                    end
+                    GetSubstituteACU(aiBrain)
                 end
             end
         elseif aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] and aiBrain:IsDefeated() then aiBrain.M27IsDefeated = true

@@ -330,22 +330,22 @@ function CombatPlatoonFormer(aiBrain)
                             oPlatoonOrUnitToEscort = GetPlatoonOrUnitToEscort(aiBrain)
                             if oPlatoonOrUnitToEscort then sPlatoonToForm = 'M27EscortAI' end
                         end
-                    elseif iCurrentConditionToTry == 4 then --1 active raider
+                    elseif iCurrentConditionToTry == 4 then --1 active raider if can path to enemy base with amphibious
                         aiBrain[M27PlatoonUtilities.refbNeedEscortUnits] = false --Have just gone through the escort conditions - if not allocated to it, then suggests we dont need any more units
                         iRaiders = M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexLargerRaiderAI')
                         if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders) end
-                        if iRaiders < 1 then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                        if iRaiders < 1 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then sPlatoonToForm = 'M27MexLargerRaiderAI' end
                     elseif iCurrentConditionToTry == 5 then
                         if iDefenceCoverage < 0.4 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])  then sPlatoonToForm = 'M27DefenderAI' end
                     elseif iCurrentConditionToTry == 6 then
-                        if iRaiders < 2 then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                        if iRaiders < 2 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then sPlatoonToForm = 'M27MexLargerRaiderAI' end
 
                     elseif iCurrentConditionToTry == 7 then
-                        if iRaiders < 3 then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                        if iRaiders < 3 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then sPlatoonToForm = 'M27MexLargerRaiderAI' end
                     elseif iCurrentConditionToTry == 8 then
                         if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
                     elseif iCurrentConditionToTry == 9 then
-                        if M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27LargeAttackForce') < 1 and (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3 or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= M27Overseer.iDistanceToEnemyEcoThreshold) then
+                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27LargeAttackForce') < 1 and (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3 or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= M27Overseer.iDistanceToEnemyEcoThreshold) then
                             --Does the ACU need help? If not, then can form a large platoon
                             local bACUNeedsHelp = false
                             local oACU = M27Utilities.GetACU(aiBrain)
@@ -361,7 +361,7 @@ function CombatPlatoonFormer(aiBrain)
                             end
                         end
                     elseif iCurrentConditionToTry == 10 then
-                        if iRaiders < 5 then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                        if iRaiders < 5 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then sPlatoonToForm = 'M27MexLargerRaiderAI' end
                     else
                         if bDebugMessages == true then LOG(sFunctionRef..': Dont meet any other conditions so will form attackenarestunit platoon') end
                         sPlatoonToForm = 'M27AttackNearestUnits'
@@ -388,7 +388,7 @@ function CombatPlatoonFormer(aiBrain)
                     elseif iCurrentConditionToTry == 4 then --1 active raider
                         iRaiders = M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexLargerRaiderAI')
                         if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders) end
-                        if iRaiders < 1 then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                        if iRaiders < 1 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then sPlatoonToForm = 'M27MexLargerRaiderAI' end
                     elseif iCurrentConditionToTry == 5 then
                         if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
                     else

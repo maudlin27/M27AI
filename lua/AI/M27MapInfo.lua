@@ -2705,6 +2705,10 @@ function SetWhetherCanPathToEnemy(aiBrain)
     aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[reftPrimaryEnemyBaseLocation])
     aiBrain[M27AirOverseer.refiMaxScoutRadius] = math.max(1500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.5)
 
+    if aiBrain[refbCanPathToEnemyBaseWithAmphibious] then
+        aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5
+    else aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 0 end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -3240,8 +3244,9 @@ function RecordAllRallyPoints(aiBrain)
                         --Add rally point inbetween these positions if can find a nearby area large enough to fit a land factory, that is at least 50 from the current mex
                         --FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride)
                         iCurDistToOurBase = math.min(aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - 50, (aiBrain[reftMexesAndDistanceNearPathToNearestEnemy][iMex][refiDistanceToOurBase] - iLastRallyPointDistToStart)*0.5)
+                                                                    --FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride, bAlreadyRecheckedPathing)
                         tPossibleRallyPoint = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemyBase, iCurDistToOurBase)
-                                ,M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryLandFactory, M27Utilities.GetACU(aiBrain), false, false)
+                                ,(M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, M27UnitInfo.refCategoryLandFactory, M27Utilities.GetACU(aiBrain), false, false) or 'ueb0101')
                                 ,2, 10, false, 2)
                         --if M27Utilities.IsTableEmpty(tPossibleRallyPoint) == false and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tPossibleRallyPoint) == iOurBaseGroup then
 

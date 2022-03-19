@@ -268,7 +268,7 @@ function OnMissileBuilt(self, weapon)
             ForkThread(M27Logic.CheckIfWantToBuildAnotherMissile, self)
         end
         --Start logic to periodically check for targets to fire the missile at (in case there are no targets initially)
-        if not(self[M27UnitInfo.refbActiveMissileChecker]) then
+        if not(self[M27UnitInfo.refbActiveMissileChecker]) and not(EntityCategoryContains(M27UnitInfo.refCategorySMD, self:GetUnitId())) then
             ForkThread(M27Logic.ConsiderLaunchingMissile, self, weapon)
         end
 
@@ -291,7 +291,8 @@ end--]]
 
 function OnConstructionStarted(oEngineer, oConstruction, sOrder)
     --Track experimental construction and other special on construction logic
-    if oEngineer.GetAIBrain and oEngineer:GetAIBrain().M27AI and oConstruction.GetUnitId then
+    if oEngineer.GetAIBrain and oEngineer:GetAIBrain().M27AI and oConstruction.GetUnitId and not(oConstruction['M27FirstConstructionStart']) then
+        oConstruction['M27FirstConstructionStart'] = true
         local aiBrain = oEngineer:GetAIBrain()
         --Decide if we want to shield the construction
         if oConstruction:GetBlueprint().Economy.BuildCostMass >= 2000 then

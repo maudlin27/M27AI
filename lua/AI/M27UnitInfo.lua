@@ -39,7 +39,7 @@ refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will upd
 reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
 refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
 refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
-refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adjacency, but could be used for other things if want
+refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adjacency and when first detected enemy SMD, but could be used for other things if want
 
 
 --Factions
@@ -593,15 +593,17 @@ function GetUnitIndirectRange(oUnit)
 end
 
 function GetUpgradeBuildTime(oUnit, sUpgradeRef)
+    --Returns nil if unit cant get enhancements
     local oBP = oUnit:GetBlueprint()
     local iUpgradeTime
-    for sUpgradeID, tUpgrade in oBP.Enhancements do
-        if sUpgradeID == sUpgradeRef then
-            iUpgradeTime = tUpgrade.BuildTime
-        end
+    if oBP.Enhancements then
+        for sUpgradeID, tUpgrade in oBP.Enhancements do
+            if sUpgradeID == sUpgradeRef then
+                iUpgradeTime = tUpgrade.BuildTime
+            end
 
+        end
     end
-    if not(iUpgradeTime) then M27Utilities.ErrorHandler('oUnit '..oUnit:GetUnitId()..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeTime
 end
 

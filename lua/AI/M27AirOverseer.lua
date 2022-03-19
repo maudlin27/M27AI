@@ -357,6 +357,12 @@ function CheckForUnseenKiller(aiBrain, oKilled, oKiller)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function ResetBomberEffectiveness(aiBrain, iTechLevel, iDelayInTicks)
+    --Call via forkthread
+    WaitTicks(iDelayInTicks)
+    aiBrain[refbBombersAreEffective][iTechLevel] = true
+end
+
 function UpdateBomberEffectiveness(aiBrain, oBomber, bUpdateExistingEntry)
     --Called either when bomber has died, or when it has fired a bomb (in the latter case, bUpdateExistingEntry should be set to true so we dont add a new entry to the table but instead overwrite the last entry)
     --Track how effective the bomber was
@@ -418,6 +424,12 @@ function UpdateBomberEffectiveness(aiBrain, oBomber, bUpdateExistingEntry)
                 end
             end
             if bDebugMessages == true then LOG(sFunctionRef..': Bomber died; iBomberMassCost='..iBomberMassCost..'; iMassKilled='..iMassKilled..'; bNoEffectiveBombers='..tostring(bNoEffectiveBombers)) end
+
+            --If this was one of our last t3 bombers then reset the flag for effectiveness after a while (for long games we might want to retry bombers again)
+            if iTechLevel == 3 and bNoEffectiveBombers and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * M27UnitInfo.ConvertTechLevelToCategory(iTechLevel)) <= 1 then
+                --6 mins would be 6*60 seconds, and want the number of ticks; will do every 7 minuts
+                ForkThread(ResetBomberEffectiveness, aiBrain, iTechLevel, 7*60*10)
+            end
         end
     end
 
@@ -807,23 +819,49 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                 if bDebugMessages == true then LOG(sFunctionRef..': No nearby shields or AA to consider') end
                             end
                             if iNearbyPriorityShieldTargets + iNearbyPriorityAATargets > 0 then
-                                --Switch target to this
-                                bHaveAssignedNewTarget = true
+                                --Switch target to this if we are far enough away (based on our tech level)
                                 local oTargetToSwitchTo
                                 if iNearbyPriorityShieldTargets > 0 then
                                     oTargetToSwitchTo = M27Utilities.GetNearestUnit(tNearbyPriorityShieldTargets, oBomber:GetPosition(), aiBrain, false, false)
                                 else
                                     oTargetToSwitchTo = M27Utilities.GetNearestUnit(tNearbyPriorityAATargets, oBomber:GetPosition(), aiBrain, false, false)
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': Want to switch target to high priority AA or shield') end
-                                ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
-                                TrackBomberTarget(oBomber, oTargetToSwitchTo, 1)
-                                IssueClearCommands({oBomber})
-                                --T3+ bombers - consider moving away from target first to make sure have a clear shot
-                                if M27UnitInfo.GetUnitTechLevel(oBomber) >= 3 or M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTargetToSwitchTo:GetPosition()) >= 100 then
-                                    TellBomberToAttackTarget(oBomber, oTargetToSwitchTo)
-                                else
-                                    IssueAttack({oBomber}, oTargetToSwitchTo)
+                                if bDebugMessages == true then
+                                    if M27UnitInfo.IsUnitValid(oTargetToSwitchTo) then LOG(sFunctionRef..': oTargetToSwitchTo='..oTargetToSwitchTo:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTargetToSwitchTo))
+                                    else LOG(sFunctionRef..': oTargetToSwitchTo is not valid')
+                                    end
+                                end
+                                if not(M27UnitInfo.IsUnitValid(oTargetToSwitchTo)) then --(added all this in for error that didnt actually have!)
+                                    M27Utilities.ErrorHandler('Unexpected error as oTargetToSwitchTo is not valid; iNearbyPriorityShieldTargets='..iNearbyPriorityShieldTargets..'; iNearbyPriorityAATargets='..iNearbyPriorityAATargets..'; will do a log of units in the tables')
+                                    if M27Utilities.IsTableEmpty(tNearbyPriorityAATargets) then LOG('tNearbyPriorityAATargets is empty')
+                                    else
+                                        for iUnit, oUnit in tNearbyPriorityAATargets do
+                                            LOG('tNearbyPriorityAATargets oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                        end
+                                    end
+                                    if M27Utilities.IsTableEmpty(tNearbyPriorityShieldTargets) then LOG('tNearbyPriorityShieldTargets is empty')
+                                    else
+                                        for iUnit, oUnit in tNearbyPriorityShieldTargets do
+                                            LOG('tNearbyPriorityShieldTargets oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                        end
+                                    end
+                                end
+                                local bChangeTarget = true
+                                local iMinDistanceWanted = (M27UnitInfo.GetUnitTechLevel(oBomber) - 1)*60
+
+                                if M27Utilities.GetDistanceBetweenPositions(oTargetToSwitchTo:GetPosition(), oBomber:GetPosition()) < iMinDistanceWanted then bChangeTarget = false end
+                                if bChangeTarget then
+                                    bHaveAssignedNewTarget = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to switch target to high priority AA or shield') end
+                                    ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
+                                    TrackBomberTarget(oBomber, oTargetToSwitchTo, 1)
+                                    IssueClearCommands({oBomber})
+                                    --T3+ bombers - consider moving away from target first to make sure have a clear shot
+                                    if M27UnitInfo.GetUnitTechLevel(oBomber) >= 3 or M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTargetToSwitchTo:GetPosition()) >= 100 then
+                                        TellBomberToAttackTarget(oBomber, oTargetToSwitchTo)
+                                    else
+                                        IssueAttack({oBomber}, oTargetToSwitchTo)
+                                    end
                                 end
                             end
                         elseif bDebugMessages == true then LOG(sFunctionRef..': Bomber cur target is already a shield or AA')
@@ -1489,6 +1527,14 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
             local iCapacity
             local bUpdateRefuelingUnits
             local iLoopCount = 0
+            local iRemainingUnitsToRefuel = 0
+            for iUnit, oUnit in tUnitsToRefuel do
+                --T3 bombers look like they take up 4 slots instead of 1
+               if EntityCategoryContains(M27UnitInfo.refCategoryBomber * categories.TECH3, oUnit:GetUnitId()) then
+                   iRemainingUnitsToRefuel = iRemainingUnitsToRefuel + 4
+               else iRemainingUnitsToRefuel = iRemainingUnitsToRefuel + 1
+               end
+            end
             for iStaging, oStaging in tAirStaging do
                 if M27UnitInfo.IsUnitValid(oStaging) then
                     --Do we have a fully available air staging and <=4 units t o refuel? If so then just send the units to this air staging
@@ -1514,7 +1560,12 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
                                         oStaging[reftAssignedRefuelingUnits][iRefuelingUnit] = nil
                                         oRefuelingUnit[refoAirStagingAssigned] = nil
                                     else
-                                        iAssignedUnits = iAssignedUnits + 1
+                                        if EntityCategoryContains(M27UnitInfo.refCategoryBomber * categories.TECH3, oRefuelingUnit:GetUnitId()) then
+                                            iAssignedUnits = iAssignedUnits + 4
+                                        else
+                                            iAssignedUnits = iAssignedUnits + 1
+                                        end
+
                                     end
                                 end
                             end
@@ -1525,33 +1576,40 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
                             for iUnit, oUnit in tUnitsToRefuel do
                                 bAlreadyTryingToRefuel = false
                                 if M27UnitInfo.IsUnitValid(oUnit) then
-                                    --Does the unit already have a target of the air staging and isnt flagged as having been sent a refuel command?
-                                    if not(oUnit[refbSentRefuelCommand]) and oUnit.GetNavigator then
-                                        oNavigator = oUnit:GetNavigator()
-                                        if oNavigator.GetCurrentTargetPos then
-                                            tCurTarget = oNavigator:GetCurrentTargetPos()
-                                            tNearbyAirStaging = M27Utilities.GetOwnedUnitsAroundPoint(aiBrain, categories.AIRSTAGINGPLATFORM, tCurTarget, 1)
-                                            if M27Utilities.IsTableEmpty(tNearbyAirStaging) == false then
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef..' tCurTarget='..repr(tCurTarget))
-                                                    M27Utilities.DrawLocation(tCurTarget)
+                                    --Does the air staging have enough capacity for this unit?
+                                    if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) or iCapacity >= 4 or not(EntityCategoryContains(M27UnitInfo.refCategoryBomber * categories.TECH3, oUnit:GetUnitId())) then
+
+                                        --Does the unit already have a target of the air staging and isnt flagged as having been sent a refuel command?
+                                        if not(oUnit[refbSentRefuelCommand]) and oUnit.GetNavigator then
+                                            oNavigator = oUnit:GetNavigator()
+                                            if oNavigator.GetCurrentTargetPos then
+                                                tCurTarget = oNavigator:GetCurrentTargetPos()
+                                                tNearbyAirStaging = M27Utilities.GetOwnedUnitsAroundPoint(aiBrain, categories.AIRSTAGINGPLATFORM, tCurTarget, 1)
+                                                if M27Utilities.IsTableEmpty(tNearbyAirStaging) == false then
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef..' tCurTarget='..repr(tCurTarget))
+                                                        M27Utilities.DrawLocation(tCurTarget)
+                                                    end
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Units target is the same as an air staging platform so think it is already trying to refuel') end
+                                                    bAlreadyTryingToRefuel = true
                                                 end
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Units target is the same as an air staging platform so think it is already trying to refuel') end
-                                                bAlreadyTryingToRefuel = true
                                             end
                                         end
-                                    end
-                                    if not(bAlreadyTryingToRefuel) and not(oUnit:IsUnitState('Attached')) then
-                                        ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                                        IssueClearCommands({ oUnit})
-                                        IssueTransportLoad({ oUnit }, oStaging)
-                                        oUnit[refbSentRefuelCommand] = true
-                                        oUnit[refoAirStagingAssigned] = oStaging
-                                        if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) then oStaging[reftAssignedRefuelingUnits] = {} end
-                                        oStaging[reftAssignedRefuelingUnits][oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
-                                        iAssignedUnits = iAssignedUnits + 1
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Sent command for oUnit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to refuel, iAssignedUnits='..iAssignedUnits) end
-                                        if iAssignedUnits >= iCapacity then break end
+                                        if not(bAlreadyTryingToRefuel) and not(oUnit:IsUnitState('Attached')) then
+                                            ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                                            IssueClearCommands({ oUnit})
+                                            IssueTransportLoad({ oUnit }, oStaging)
+                                            oUnit[refbSentRefuelCommand] = true
+                                            oUnit[refoAirStagingAssigned] = oStaging
+                                            if M27Utilities.IsTableEmpty(oStaging[reftAssignedRefuelingUnits]) then oStaging[reftAssignedRefuelingUnits] = {} end
+                                            oStaging[reftAssignedRefuelingUnits][oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+                                            if EntityCategoryContains(M27UnitInfo.refCategoryBomber * categories.TECH3, oUnit:GetUnitId()) then
+                                                iAssignedUnits = iAssignedUnits + 4
+                                            else iAssignedUnits = iAssignedUnits + 1
+                                            end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Sent command for oUnit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to refuel, iAssignedUnits='..iAssignedUnits) end
+                                            if iAssignedUnits >= iCapacity then break end
+                                        end
                                     end
                                 end
                             end
@@ -2158,7 +2216,6 @@ function GetBomberTargetShortlist(aiBrain)
     local iMaxPercentDistance = 1 --Max % distance of way to enemy base that will add units to shortlist
     local iCurDistanceToEnemy, iCurDistanceToBase
 
-    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then bDebugMessages = true end
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': Deciding what categories and priorities to look for') end
@@ -2682,7 +2739,9 @@ function TellBomberToAttackTarget(oBomber, oTarget)
     local iBomberAOE, iBomberStrikeDamage = M27UnitInfo.GetBomberAOEAndStrikeDamage(oBomber)
     local tGroundTarget
     if iBomberAOE >= 2 and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oTarget:GetUnitId()) then bTargetGround = true end
-    if bTargetGround then tGroundTarget = M27Logic.GetBestAOETarget(aiBrain, oTarget:GetPosition(), iBomberAOE, iBomberStrikeDamage)
+    --Will reduce bomber aoe by 0.1 as had an issue where bombers were just missing a mex, not sure if this was the cause; however if come across same issue use logs to confirm what is causing in case it's somethign else
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering oBomber='..oBomber:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; iBomberAOE='..(iBomberAOE or 'nil')) end
+    if bTargetGround then tGroundTarget = M27Logic.GetBestAOETarget(aiBrain, oTarget:GetPosition(), iBomberAOE - 0.1, iBomberStrikeDamage)
     else tGroundTarget = oTarget:GetPosition()
     end
 

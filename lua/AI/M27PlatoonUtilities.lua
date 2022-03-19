@@ -1203,7 +1203,7 @@ function HasPlatoonReachedDestination(oPlatoon)
 
     local sPlatoonName = oPlatoon:GetPlan()
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
-    if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code for platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..'; Current path number='..(oPlatoon[refiCurrentPathTarget] or 'nil')) end
@@ -1308,7 +1308,7 @@ function DeterminePlatoonCompletionAction(oPlatoon)
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local sPlatoonName = oPlatoon:GetPlan()
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
-    if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1484,7 +1484,7 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
     local sPlatoonName = oPlatoon:GetPlan()
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code for '..sPlatoonName..oPlatoon[refiPlatoonCount]) end
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
-    if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1968,7 +1968,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local bProceed = true
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
-    if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -4449,8 +4449,8 @@ function DeterminePlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
-            if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -5204,7 +5204,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
 
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
-    if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -5301,14 +5301,44 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                 if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tTargetBase) >= 40 then
                     oPlatoon[reftMovementPath][1] = tTargetBase
                 else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Are within 40 of the enemy target base; will target the last known enemy ACU position if there is one') end
                     if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then
                         oPlatoon[reftMovementPath][1] = aiBrain[M27Overseer.reftLastNearestACU]
                     else
+                        if bDebugMessages == true then LOG(sFunctionRef..': No enemy ACUs, will still target current position if it has structures or we are more than 10 from it') end
                         if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tTargetBase) <= 10 then
-                            --Are there T2+ structures around this point? If so then still target it
-                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - categories.TECH1, tTargetBase, 30, 'Enemy')) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': No T2+ structures around here so will get nearest rally point') end
-                                oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
+                            --Are there structures around this point? If so then still target it
+                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tTargetBase, 30, 'Enemy')) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': No structures around here, will look for the nearest highest tech structure we can path to') end
+
+                                local tNearbyEnemyUnits
+                                local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[refoFrontUnit])
+                                local iPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, GetPlatoonFrontPosition(oPlatoon))
+                                local iNearestUnitDistance = 10000
+                                local iCurUnitDistance
+                                local oNearestUnit
+                                for iTechLevel = 3, 1, -1 do
+                                    tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * M27UnitInfo.ConvertTechLevelToCategory(iTechLevel), GetPlatoonFrontPosition(oPlatoon), 150, 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
+                                        for iUnit, oUnit in tNearbyEnemyUnits do
+                                            if oUnit:GetFractionComplete() >= 0.9 and M27MapInfo.GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == iPathingGroup then
+                                                iCurUnitDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
+                                                if iCurUnitDistance < iNearestUnitDistance and not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
+                                                    oNearestUnit = oUnit
+                                                    iNearestUnitDistance = iCurUnitDistance
+                                                end
+                                            end
+                                        end
+                                    end
+                                    if oNearestUnit then break end
+                                end
+                                if oNearestUnit then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Nearest structure to platoon (when looking for highest tech first)='..oNearestUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNearestUnit)) end
+                                    oPlatoon[reftMovementPath][1] = oNearestUnit:GetPosition()
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find any nearby structures so will target the nearest rally point we have') end
+                                    oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
+                                end
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': Still have T2+ units around here so will return the enemy base') end
                                 oPlatoon[reftMovementPath][1] = tTargetBase
@@ -7028,9 +7058,9 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
-            if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -7276,6 +7306,7 @@ function ProcessPlatoonAction(oPlatoon)
                                     if HasPlatoonReachedDestination(oPlatoon) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Have reached destination so will get a new movement path') end
                                         GetNewMovementPath(oPlatoon)
+                                        tDFTargetPosition = oPlatoon[reftMovementPath][1]
                                     else
                                         if bDebugMessages == true then LOG(sFunctionRef..': No priority locations to go to so will just target movement path') end
                                         tDFTargetPosition = oPlatoon[reftMovementPath][1]
@@ -7286,12 +7317,12 @@ function ProcessPlatoonAction(oPlatoon)
                             end
                             --Get position near the target in the same group
                             --GetPositionAtOrNearTargetInPathingGroup(tStartPos, tTargetPos, iDistanceFromTargetToStart, iAngleAdjust, oPathingUnit, bMoveCloserBeforeFurtherIfBlocked, bCheckIfExistingTargetIsBetter, iMinDistanceFromExistingCommandTarget)
-                            if M27Utilities.IsTableEmpty(tDFTargetPosition) == nil and not(oUnitToAttackInstead) then
+                            if M27Utilities.IsTableEmpty(tDFTargetPosition) and not(oUnitToAttackInstead) then
                                 M27Utilities.ErrorHandler('Couldnt find target for experimental that is valid, will revert to enemy base', nil, true)
                                 tDFTargetPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                             elseif not(oUnitToAttackInstead) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have a DF position, will move near the target') end
-                                tDFTargetPosition = GetPositionAtOrNearTargetInPathingGroup(GetPlatoonFrontPosition(oPlatoon), tDFTargetPosition, 5, 0, oPlatoon[refoPathingUnit], true, true, 5)
+                                tDFTargetPosition = GetPositionAtOrNearTargetInPathingGroup(GetPlatoonFrontPosition(oPlatoon), tDFTargetPosition, 2, 0, oPlatoon[refoPathingUnit], true, true, 2)
                             end
 
                             --Get platoon front unit target - if platoon front and rear units both have this as the target then dont clear commands
@@ -7991,8 +8022,8 @@ function ProcessPlatoonAction(oPlatoon)
                         if oNearbyUnderConstruction == nil then
                             --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, tAlternativePositionToLookFrom)
                             if bDebugMessages == true then LOG(sFunctionRef..': About to tell ACU to build land factory') end
-                            --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings)
-                            oPlatoon[reftLastBuildLocation] = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil)
+                                                                        --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild)
+                            oPlatoon[reftLastBuildLocation] = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil, false, false, nil, nil, M27UnitInfo.refCategoryEngineer)
                             if not(M27Utilities.IsTableEmpty(oPlatoon[reftLastBuildLocation])) then
                                 --Update engineer trackers so they can assist us
                                 --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers, oUnitToBeDestroyed)
@@ -8073,7 +8104,10 @@ function ProcessPlatoonAction(oPlatoon)
                                     if oPlatoon[refiOverrideDistanceToReachDestination] == nil then oPlatoon[refiOverrideDistanceToReachDestination] = 3 end --(redundancy as set when platoon first created if there are builders in it)
                                     MoveNearConstruction(aiBrain, oBuilder, tBuildingPosition, oPlatoon[refoConstructionToAssist]:GetUnitId(), -oPlatoon[refiOverrideDistanceToReachDestination] - 1, false)
                                 end
-                                IssueRepair({oBuilder}, oPlatoon[refoConstructionToAssist])
+                                if EntityCategoryContains(M27UnitInfo.refCategoryStructure + categories.EXPERIMENTAL, oPlatoon[refoConstructionToAssist]:GetUnitId()) then
+                                    IssueRepair({oBuilder}, oPlatoon[refoConstructionToAssist])
+                                else IssueGuard({oBuilder}, oPlatoon[refoConstructionToAssist])
+                                end
                                 --IssueGuard({oBuilder}, oPlatoon[refoConstructionToAssist])
                                 if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonName..': Issued guard order to assist') end
                             end

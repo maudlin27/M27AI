@@ -929,8 +929,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                         iLoopCount = iLoopCount + 1
                         iWaitCount = iWaitCount + 1
                         if iLoopCount > iMaxLoopCountBeforeChecks then
-                            M27Utilities.ErrorHandler('iLoopCount has exceeded iMaxLoopCountBeforeChecks, likely infinite loop; slowing down script')
-                            bDebugMessages = true --for error control - want these enabled to help debugging where get this error arising
+                            M27Utilities.ErrorHandler('iLoopCount has exceeded iMaxLoopCountBeforeChecks, likely infinite loop; slowing down script') bDebugMessages = true --for error control - want these enabled to help debugging where get this error arising
                             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             WaitTicks(5)
                             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -3509,27 +3508,33 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     end
 end
 
-function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, iMaxDistance, iMinDistance)
+function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, iMaxDistance, iMinDistance, bDebugMode)
     --Tries to find a random location in a square around tMidpoint that can path to; returns nil if couldnt find anywhere
     local sFunctionRef = 'GetRandomPointInAreaThatCanPathTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = (bDebugMode or false) if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
+
 
 
 
     local iLoopCount = 0
     local iMaxLoop1 = 6
     local iMaxLoop2 = iMaxLoop1 + 8
+    local iMaxLoop3 = iMaxLoop2 + 4
     local tEndDestination
 
     local iMidSegmentX, iMidSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMidpoint)
-    local iSegmentMaxRange = iMaxDistance / M27MapInfo.iPathingIntervalSize
-    local iSegmentMinRange = iMinDistance / M27MapInfo.iPathingIntervalSize
+    local iSegmentMaxRange = iMaxDistance / M27MapInfo.iSizeOfBaseLevelSegment
+    local iSegmentMinRange = iMinDistance / M27MapInfo.iSizeOfBaseLevelSegment
+
 
     local iMinSegmentX = math.max(1, iMidSegmentX - iSegmentMaxRange)
     local iMaxSegmentX = math.min(M27MapInfo.iMaxBaseSegmentX, iMidSegmentX + iSegmentMaxRange)
     local iMinSegmentZ = math.max(1, iMidSegmentZ - iSegmentMaxRange)
     local iMaxSegmentZ = math.min(M27MapInfo.iMaxBaseSegmentZ, iMidSegmentZ + iSegmentMaxRange)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; Mid segments='..iMidSegmentX..'-'..iMidSegmentZ..'; iMinSegmentX-Z='..iMinSegmentX..'-'..iMinSegmentZ..'; iMaxSegmentX-Z='..iMaxSegmentX..'-'..iMaxSegmentZ..'; M27MapInfo.iSizeOfBaseLevelSegment='..M27MapInfo.iSizeOfBaseLevelSegment) end
 
     local iConstraintMinX = math.max(1, iMidSegmentX - iSegmentMinRange)
     local iConstraintMaxX = math.min(M27MapInfo.iMaxBaseSegmentX, iMidSegmentX + iSegmentMinRange)
@@ -3540,22 +3545,29 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
     local iRandX, iRandZ
     local iRandFlag
     local iPathingTarget
-    local bTryManualAlterantive = false
-    local iManualRandomStart
+    local bTryManualAlternative = false
+    local tiManualRandomStart
     local tiManualSegments --
     local iSegmentThickness
+    local tiMinRangeAttempt = {
+        {iMinSegmentX, iMinSegmentZ},
+        {iMinSegmentX, -iMinSegmentZ},
+        {-iMinSegmentX, -iMinSegmentZ},
+        {iMinSegmentX, -iMinSegmentZ},
+    }
 
     if bDebugMessages == true then
-        LOG(sFunctionRef..': About to search between Segment min and max X of '..iMinSegmentX..'-'..iMaxSegmentX..'; and Z min and max of '..iMinSegmentZ..'-'..iMaxSegmentZ..' if the pathing target of each point checked is different to iSegmentGroup'..iSegmentGroup)
+        LOG(sFunctionRef..': About to search between Segment min and max X of '..iMinSegmentX..'-'..iMaxSegmentX..'; and Z min and max of '..iMinSegmentZ..'-'..iMaxSegmentZ..' if the pathing target of each point checked is different to iSegmentGroup'..iSegmentGroup..'; iMidSegmentX='..iMidSegmentX..'; iSegmentMaxRange='..iSegmentMaxRange..'; iMidSegment'..iMidSegmentZ)
 
     end
     while not(iPathingTarget == iSegmentGroup) do
         iLoopCount = iLoopCount + 1
         if iLoopCount > iMaxLoop1 then
-            if bTryManualAlterantive == false then
-                bTryManualAlterantive = true
-                iSegmentThickness = math.max(1, math.floor((iMaxDistance - iMinDistance) / M27MapInfo.iPathingIntervalSize))
-                iManualRandomStart = math.random(0, 7)
+            if bDebugMessages == true then LOG(sFunctionRef..': Failed to find anywhere in the first '..iMaxLoop1..' attempts so will try alternative approach. bTryManualAlternative='..tostring(bTryManualAlternative)) end
+            if bTryManualAlternative == false then
+                bTryManualAlternative = true
+                iSegmentThickness = math.max(1, math.floor((iMaxDistance - iMinDistance) / M27MapInfo.iSizeOfBaseLevelSegment))
+                tiManualRandomStart = {math.random(0, 7), math.random(0, 7)}
                 tiManualSegments = {
                     {iMinSegmentX + iSegmentThickness, iMinSegmentZ + iSegmentThickness },
                     {math.floor((iMaxSegmentX - iMinSegmentX) * 0.5), iMinSegmentZ + iSegmentThickness },
@@ -3575,9 +3587,10 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
                     {iMinSegmentX + iSegmentThickness, iMaxSegmentZ - iSegmentThickness},
                     {iMinSegmentX + iSegmentThickness, math.floor((iMaxSegmentZ - iMinSegmentZ) * 0.5)}
                 }
+                if bDebugMessages == true then LOG(sFunctionRef..': tiManualSegments='..repr(tiManualSegments)..'; tiManualRandomStart='..repr(tiManualRandomStart)..'; iSegmentThickness='..iSegmentThickness) end
 
             end
-            if iLoopCount > iMaxLoop2 then
+            if iLoopCount > iMaxLoop3 then
                 M27Utilities.ErrorHandler('Couldnt find random point in area after looking '..iLoopCount..' times, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1]))
                 if bDebugMessages == true then
                     --Draw midpoint in white, draw last place checked in gold
@@ -3588,7 +3601,7 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
                 return nil
             end
         end
-        if bTryManualAlterantive == false then
+        if bTryManualAlternative == false then
 
             --Get random position in the X range first
             iRandX = math.random(iMinSegmentX, iMaxSegmentX)
@@ -3611,16 +3624,25 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
             iRandZ = math.random(iCurMinSegmentZ, iCurMaxSegmentZ)
         else
             --Have tried randomly and failed, now just try by looking at NW/N/NE/E etc. randomly
-            iRandX = tiManualSegments[iLoopCount - iMaxLoop1 + iManualRandomStart][1]
-            iRandZ = tiManualSegments[iLoopCount - iMaxLoop1 + iManualRandomStart][2]
+            if iLoopCount < iMaxLoop2 then
+                iRandX = tiManualSegments[iLoopCount - iMaxLoop1 + tiManualRandomStart[1]][1]
+                iRandZ = tiManualSegments[iLoopCount - iMaxLoop1 + tiManualRandomStart[2]][2]
+                if bDebugMessages == true then LOG(sFunctionRef..': tiManualRandomStart='..repr(tiManualRandomStart)..'; X segment to use='..(iLoopCount - iMaxLoop1 + tiManualRandomStart[1])..'; Z segment to use='..(iLoopCount - iMaxLoop1 + tiManualRandomStart[2])..'; iRandX='..iRandX..'; iRandZ='..iRandZ) end
+            else
+                iRandX = tiMinRangeAttempt[iMaxLoop3 - iLoopCount][1]
+                iRandZ = tiMinRangeAttempt[iMaxLoop3 - iLoopCount][2]
+            end
         end
 
         --Can we path here?
         iPathingTarget = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iRandX, iRandZ)
 
         if bDebugMessages == true then
-            LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; Target='..repr(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ))..'; iRandX='..iRandX..'; iRandZ='..iRandZ..'; iPathingTarget (i.e. group) ='..iPathingTarget..'; will draw in red')
-            M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 2, 20)
+            LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; Target='..repr(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ))..'; iRandX='..iRandX..'; iRandZ='..iRandZ..'; iPathingTarget (i.e. group) ='..iPathingTarget..'; will draw in red unless can path there in which case in blue')
+            if not(iPathingTarget == iSegmentGroup) then
+                M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 2, 100)
+            else M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 1, 100)
+            end
         end
     end
     if iPathingTarget == iSegmentGroup then
@@ -3793,7 +3815,12 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
                        end
                        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
                        --Is the target mobile and not under construction? Then reduce to 20% as unit might dodge or not be there when bomb lands
-                       if oUnit:GetFractionComplete() == 1 and EntityCategoryContains(categories.MOBILE, oUnit:GetUnitId()) then iMassFactor = iMassFactor * 0.2 end
+                       if oUnit:GetFractionComplete() == 1 then
+                           if EntityCategoryContains(categories.MOBILE, oUnit:GetUnitId()) then iMassFactor = iMassFactor * 0.2
+                           --Is it a mex that will be killed outright? Then increase the value of killing it
+                           elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION, oUnit:GetUnitId()) then iMassFactor = iMassFactor * 3
+                           end
+                       end
                        iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
                        if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
                    end
@@ -3876,12 +3903,14 @@ function GetDamageFromOvercharge(aiBrain, oTargetUnit, iAOE, iDamage, bTargetWal
     return iTotalDamage, iKillsExpected
 end
 
-function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
+function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckForSMD, tSMLLocationForSMDCheck, iOptionalTimeSMDNeedsToHaveBeenBuiltFor, iSMDRangeAdjust)
     --Calcualtes the most damaging location for an aoe target; also returns the damage dealt
+    --if bOptionalCheckForSMD is true then will ignore targest that are near an SMD
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBestAOETarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': About to find the best target for bomb, tBaseLocation='..repr(tBaseLocation)..'; iAOE='..iAOE..'; iDamage='..iDamage) end
+    if bOptionalCheckForSMD then bDebugMessages = true end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to find the best target for bomb, tBaseLocation='..repr(tBaseLocation)..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')) end
 
     local tBestTarget = {tBaseLocation[1], tBaseLocation[2], tBaseLocation[3]}
     --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
@@ -3890,6 +3919,7 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
     local iMaxDistanceChecks = math.min(4, math.ceil(iAOE / 2))
     local iDistanceFromBase = 0
     local tPossibleTarget
+    if bOptionalCheckForSMD and IsSMDBlockingTarget(aiBrain, tBaseLocation, tSMLLocationForSMDCheck, (iOptionalTimeSMDNeedsToHaveBeenBuiltFor or 200), iSMDRangeAdjust) then iMaxTargetDamage = math.min(4000, iMaxTargetDamage) end
 
     for iCurDistanceCheck = iMaxDistanceChecks, 1, -1 do
         iDistanceFromBase = iAOE / iCurDistanceCheck
@@ -3897,8 +3927,11 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
             tPossibleTarget = M27Utilities.MoveInDirection(tBaseLocation, iAngle, iDistanceFromBase)
             iCurTargetDamage = GetDamageFromBomb(aiBrain, tPossibleTarget, iAOE, iDamage)
             if iCurTargetDamage > iMaxTargetDamage then
-                tBestTarget = tPossibleTarget
-                iMaxTargetDamage = iCurTargetDamage
+                if bOptionalCheckForSMD and IsSMDBlockingTarget(aiBrain, tPossibleTarget, tSMLLocationForSMDCheck, (iOptionalTimeSMDNeedsToHaveBeenBuiltFor or 200), iSMDRangeAdjust) then iCurTargetDamage = math.min(4000, iCurTargetDamage) end
+                if iCurTargetDamage > iMaxTargetDamage then
+                    tBestTarget = tPossibleTarget
+                    iMaxTargetDamage = iCurTargetDamage
+                end
             end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Finished checking every angle for iDistanceFromBase='..iDistanceFromBase..'; iMaxTargetDamage='..iMaxTargetDamage..'; tBestTarget='..repr(tBestTarget)) end
@@ -3911,10 +3944,65 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
     return tBestTarget, iMaxTargetDamage
 end
 
+function IsSMDBlockingTarget(aiBrain, tTarget, tSMLPosition, iIgnoreSMDCreatedThisManySecondsAgo, iSMDRangeAdjust)
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IsSMDBlockingTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local bEnemySMDInRange = false
+    local iTargetToBase = M27Utilities.GetDistanceBetweenPositions(tTarget, tSMLPosition)
+    local iAngleToTarget = M27Utilities.GetAngleFromAToB(tTarget, tSMLPosition)
+    local iTargetToSMD
+    local iBaseToSMD
+    local iSMDRange
+    local iAngleToSMD
+    local bInRangeBeforeTimeCheck
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering tTarget='..repr(tTarget)..'; iIgnoreSMDCreatedThisManySecondsAgo='..(iIgnoreSMDCreatedThisManySecondsAgo or 1)..'; Current game time='..GetGameTimeSeconds()) end
+
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemySMD]) == false then
+       for iSMD, oSMD in aiBrain[M27Overseer.reftEnemySMD] do
+           if M27UnitInfo.IsUnitValid(oSMD) then
+               bInRangeBeforeTimeCheck = false
+               iSMDRange = (oSMD:GetBlueprint().Weapon[1].MaxRadius or 90) + 2 + (iSMDRangeAdjust or 0)
+               iTargetToSMD = M27Utilities.GetDistanceBetweenPositions(tTarget, oSMD:GetPosition())
+               iBaseToSMD = M27Utilities.GetDistanceBetweenPositions(oSMD:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+               if bDebugMessages == true then LOG(sFunctionRef..': oSMD='..oSMD:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oSMD)..'; iTargetToSMD='..iTargetToSMD..'; iBaseToSMD='..iBaseToSMD..'; iTargetToBase='..iTargetToBase..'; iSMDRange='..iSMDRange..'; oSMD[M27UnitInfo.refiTimeOfLastCheck]='..(oSMD[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
+               if iTargetToSMD < iSMDRange or iBaseToSMD < iSMDRange then
+                   --SMD is in range of us
+                   bInRangeBeforeTimeCheck = true
+               elseif iBaseToSMD > iTargetToBase then
+                   --SMD is further away than the target, and not in range of the target (per above check), so isnt in range so just check distance from target to SMD
+               else
+                   --SMD is closer to us than target, but not in range of either the start or the end; check if the distance means it might be close enough such that we want to consider the angle
+                   if iTargetToSMD + iBaseToSMD < iTargetToBase + iSMDRange then
+                        iAngleToSMD = M27Utilities.GetAngleFromAToB(oSMD:GetPosition(), tSMLPosition)
+                       --Cant be bothered to figure out a more accurate check, below is meant as an approximation
+                       if math.abs(iAngleToSMD - iAngleToTarget) < math.min(85, math.max(15, 90 - math.min(iBaseToSMD - iSMDRange, iTargetToSMD - iSMDRange))) then
+                           bInRangeBeforeTimeCheck = true
+                       end
+                   end
+               end
+               if bInRangeBeforeTimeCheck then
+                   if bDebugMessages == true then LOG(sFunctionRef..': SMD is in range, checking how recently it has been built') end
+                   if GetGameTimeSeconds() - (oSMD[M27UnitInfo.refiTimeOfLastCheck] or (GetGameTimeSeconds() - 10)) > (iIgnoreSMDCreatedThisManySecondsAgo or 0) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': SMD is in range and was built a while ago') end
+                        bEnemySMDInRange = true
+                        break
+                   end
+               end
+           end
+       end
+    elseif bDebugMessages == true then LOG(sFunctionRef..': No enemy SMD detected')
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return bEnemySMDInRange
+end
+
 
 function ConsiderLaunchingMissile(oLauncher, oWeapon)
     --Should be called via forkthread when missile created due to creating a loop
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27UnitInfo.IsUnitValid(oLauncher) then
@@ -3965,10 +4053,46 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                     end
                 else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
                     --First get the best location if just target the start position or locations near here
-                    tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage)
+                    tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage, bSML, oLauncher:GetPosition())
+                    local iAirSegmentX, iAirSegmentZ
+
+                    --Cycle through other start positions to see if can get a better target, but reduce value of target if we havent scouted it in the last 5 minutes
+                    for iStartPoint = 1, table.getn(M27MapInfo.PlayerStartPoints) do
+                        if not(iStartPoint == aiBrain.M27StartPositionNumber) and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iStartPoint], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= 30 then
+                            --Have we scouted this location recently?
+                            iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[iStartPoint])
+                            if GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] <= 300 then
+                                iCurTargetValue = GetDamageFromBomb(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], iAOE, iDamage)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering the start position '..iStartPoint..'='..repr(M27MapInfo.PlayerStartPoints[iStartPoint])..'; value ignroign SMD='..iCurTargetValue) end
+                                if iCurTargetValue > iBestTargetValue then
+                                    if IsSMDBlockingTarget(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], oLauncher:GetPosition(), 200) then
+                                        iCurTargetValue = 4000
+                                    end
+                                    if iCurTargetValue > iBestTargetValue then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a better start position target, for the start position='..iStartPoint..' dealing damage of '..iCurTargetValue..' vs prev best value of '..iBestTargetValue) end
+                                        iBestTargetValue = iCurTargetValue
+                                        tTarget = {M27MapInfo.PlayerStartPoints[iStartPoint][1], M27MapInfo.PlayerStartPoints[iStartPoint][2], M27MapInfo.PlayerStartPoints[iStartPoint][3]}
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+
+
+
+
+                    --Reduce value if enemy has SMD within range of here - already incorporated into getbestaoetarget
+                    --[[if IsSMDBlockingTarget(aiBrain, tTarget, oLauncher:GetPosition(), 200) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking the nearest enemy base so will limit damage to 4k') end
+                        iBestTargetValue = 4000
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': SMD not blockign enemy base, value of that='..iBestTargetValue)
+                    end--]]
+
+
                     --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
                     if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <20k then will consider other targets') end
-                    if iBestTargetValue < 20000 then --If have high value location for nearest enemy start then just go with this
+                    if iBestTargetValue < 27000 then --If have high value location for nearest enemy start then just go with this
                         for iRef, iCategory in tEnemyCategoriesOfInterest do
                             tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
                             if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
@@ -3977,15 +4101,21 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                                     if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit:GetUnitId()..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
                                     --Stop looking if tried >=10 targets and have one that is at least 20k of value
                                     if iCurTargetValue > iBestTargetValue then
-                                        iBestTargetValue = iCurTargetValue
-                                        tTarget = oUnit:GetPosition()
+                                        if IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), 200) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking the unit target '..repr(oUnit:GetPosition())..'; will limit damage to 4k') end
+                                            iCurTargetValue = 4000 end
+                                        if iCurTargetValue > iBestTargetValue then
+                                            iBestTargetValue = iCurTargetValue
+                                            tTarget = oUnit:GetPosition()
+                                            if bDebugMessages == true then LOG(sFunctionRef..': New best target with value='..iBestTargetValue) end
+                                        end
                                     end
                                     if iBestTargetValue > 20000 and iUnit >=10 then break end
                                 end
                             end
                         end
-                        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
-                        if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
+                        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage, bSML, oLauncher:GetPosition()) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue..'; Best location for this target='..repr(tTarget)) end
                     end
                     if bDebugMessages == true then LOG(sFunctionRef..': If value is <12k then will clear target; iBestTargetValue='..iBestTargetValue..'; tTarget='..repr(tTarget or {'nil'})) end
                     if iBestTargetValue < 12000 then tTarget = nil end
@@ -4137,8 +4267,7 @@ function RefreshT3ArtiAdjacencyLocations(oT3Arti)
 
                         --[[if aiBrain:CanBuildStructureAt(tsPowerBlueprints[iPowerLevel], tPossibleAdjacencyPosition) then
                             --Cancel any queued up orders that might be preventing us building here, unless the order is to build T3 arti adjacency
-                            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)][M27EngineerOverseer.refActionBuildT3ArtiPower]) == true then
-                                bDebugMessages = true
+                            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)][M27EngineerOverseer.refActionBuildT3ArtiPower]) == true then bDebugMessages = true
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will cancel any queued up buildings around here so we can build t3 power and tPossibleAdjacencyPosition='..repr(tPossibleAdjacencyPosition)) end
                                 local tLocationToCancel
                                 local sCancelLocationRef
