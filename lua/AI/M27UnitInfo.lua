@@ -169,7 +169,7 @@ function GetUnitLifetimeCount(oUnit)
     if sCount == nil then
         if oUnit.GetAIBrain and oUnit.GetUnitId then
             local aiBrain = oUnit:GetAIBrain()
-            local sUnitId = oUnit:GetUnitId()
+            local sUnitId = oUnit.UnitId
             if aiBrain.M27LifetimeUnitCount == nil then aiBrain.M27LifetimeUnitCount = {} end
             if aiBrain.M27LifetimeUnitCount[sUnitId] == nil then
                 aiBrain.M27LifetimeUnitCount[sUnitId] = 1
@@ -264,7 +264,7 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     --Gets the support factory blueprint, and checks if it can be built; if not then returns the normal UpgradesTo blueprint
     local sUpgradeBP
     if not(oUnitToUpgrade.Dead) and oUnitToUpgrade.CanBuild then
-        if bDebugMessages == true then LOG(sFunctionRef..': Start of code, UnitToUpgrade='..oUnitToUpgrade:GetUnitId()..GetUnitLifetimeCount(oUnitToUpgrade)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Start of code, UnitToUpgrade='..oUnitToUpgrade.UnitId..GetUnitLifetimeCount(oUnitToUpgrade)) end
         if bGetSupportFactory == true and oUnitToUpgrade.CanBuild then
             local tsSupportFactoryBP = {
 
@@ -301,7 +301,7 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
                 ['xsb0203'] = 'zsb9603',
             }
 
-            local sFactoryBP = oUnitToUpgrade:GetUnitId()
+            local sFactoryBP = oUnitToUpgrade.UnitId
             if tsSupportFactoryBP[sFactoryBP] then
                 if bDebugMessages == true then LOG(sFunctionRef..': Support factoryBP='..tsSupportFactoryBP[sFactoryBP]) end
                 sUpgradeBP = tsSupportFactoryBP[sFactoryBP]
@@ -351,7 +351,7 @@ function GetUnitIDTechLevel(sUnitId)
 end
 
 function GetUnitTechLevel(oUnit)
-    local sUnitId = oUnit:GetUnitId()
+    local sUnitId = oUnit.UnitId
     local iTechLevel = 1
     if EntityCategoryContains(categories.TECH1, sUnitId) then iTechLevel = 1
     elseif EntityCategoryContains(categories.TECH2, sUnitId) then iTechLevel = 2
@@ -373,7 +373,7 @@ function GetUnitStrikeDamage(oUnit)
     --Gets strike damage of the first weapon in oUnit (longer term might want to make better so it considers other weapons)
     --For bombers will be subject to a minimum value as some bombers will have
     local oBP = oUnit:GetBlueprint()
-    local sBP = oUnit:GetUnitId()
+    local sBP = oUnit.UnitId
     local iStrikeDamage = 0
 
 
@@ -409,7 +409,7 @@ function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
     local iEnemySpeed
     if oEnemyUnit.GetUnitId then
 
-        local sEnemyID = oEnemyUnit:GetUnitId()
+        local sEnemyID = oEnemyUnit.UnitId
 
         if EntityCategoryContains(categories.STRUCTURE, sEnemyID) then bIsEngineer = false
         else
@@ -616,7 +616,7 @@ function GetUpgradeEnergyCost(oUnit, sUpgradeRef)
         end
 
     end
-    if not(iUpgradeEnergy) then M27Utilities.ErrorHandler('oUnit '..oUnit:GetUnitId()..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
+    if not(iUpgradeEnergy) then M27Utilities.ErrorHandler('oUnit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeEnergy
 end
 

@@ -226,7 +226,7 @@ function SafeToGetACUUpgrade(aiBrain)
                             if oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] and GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] <= 20 then
                                 local oUnseenDamageDealer = oACU[M27Overseer.refoUnitDealingUnseenDamage]
                                 if oUnseenDamageDealer and not(oUnseenDamageDealer.Dead) and oUnseenDamageDealer.GetUnitId then
-                                    if M27Logic.GetUnitMaxGroundRange({oUnseenDamageDealer}) >= 35 or EntityCategoryContains(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnseenDamageDealer:GetUnitId()) then
+                                    if M27Logic.GetUnitMaxGroundRange({oUnseenDamageDealer}) >= 35 or EntityCategoryContains(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnseenDamageDealer.UnitId) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': ACU taken unseem damage from a unit with a range of at least 35 so want to run') end
                                         bIsSafe = false
                                     end
@@ -732,7 +732,7 @@ function IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal, iMinIndivid
                 LOG(sFunctionRef..': X-Z='..iBaseX + iAdjX..'-'..iBaseZ + iAdjZ..'; Location='..repr(tLocation)..'; refReclaimTotalMass='..(M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 'nil')..'; refReclaimHighestIndividualReclaim='..(M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimHighestIndividualReclaim] or 'nil')..'; Location from segment='..repr(M27MapInfo.GetReclaimLocationFromSegment(iBaseX, iBaseZ)))
                 if iAdjX == 0 and iAdjZ == 0 then
                     local rRect = Rect((iBaseX - 1) * M27MapInfo.iReclaimSegmentSizeX, (iBaseZ - 1) * M27MapInfo.iReclaimSegmentSizeZ, iBaseX * M27MapInfo.iReclaimSegmentSizeX, iBaseZ * M27MapInfo.iReclaimSegmentSizeZ)
-                    local tReclaimables = GetReclaimablesInRect(rRect)
+                    local tReclaimables = GetReclaimablesInRect(rRect) --(this is only being used if debugmessages is true)
                     M27Utilities.DrawRectangle(rRect)
                     for iReclaim, oReclaim in tReclaimables do
                         if oReclaim.MaxMassReclaim > 0 and oReclaim.CachePosition then
@@ -741,7 +741,7 @@ function IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal, iMinIndivid
                     end
                 end
             end
-            if M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimTotalMass] >= iMinTotal and (not iMinIndividual or M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimHighestIndividualReclaim] >= iMinIndividual) then
+            if (M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 0) >= iMinTotal and (not iMinIndividual or (M27MapInfo.tReclaimAreas[iBaseX + iAdjX][iBaseZ + iAdjZ][M27MapInfo.refReclaimHighestIndividualReclaim] or 0) >= iMinIndividual) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have enough reclaim so returning true') end
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return true
@@ -761,80 +761,61 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
     if bTreatEnemyBuildingAsUnclaimed == nil then bTreatEnemyBuildingAsUnclaimed = false end
     if bTreatOurOrAllyBuildingAsUnclaimed == nil then bTreatOurOrAllyBuildingAsUnclaimed = false end
     if bTreatQueuedBuildingsAsUnclaimed == nil then bTreatQueuedBuildingsAsUnclaimed = bTreatOurOrAllyBuildingAsUnclaimed end
-    local iBuildingSizeRadius = 0.5
-    local bResourceIsUnclaimed = true
     local sLocationRef = M27Utilities.ConvertLocationToReference(tResourcePosition)
-    if bMexNotHydro == false then
-        iBuildingSizeRadius = M27UnitInfo.GetBuildingSize('UAB1102')[1]*0.5
-    else
-        --Mex specific - if we just ctrlKd our mex then would have an engi nearby so treat mex as claimed
-        if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation] and aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27EngineerOverseer.refActionBuildT3MexOverT2] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27EngineerOverseer.refActionBuildT3MexOverT2][sLocationRef]) == false then
-            bResourceIsUnclaimed = false
-        end
+
+    if not(aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef]) then
+        aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef] = {}
+        aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef][M27EngineerOverseer.refiResourceStatus] = M27EngineerOverseer.refiStatusAvailable --Available
+        aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef][M27EngineerOverseer.refiTimeOfLastUpdate] = -1000
     end
 
-    if bResourceIsUnclaimed then
+    local bDontHaveResourceStatus = true
+    local iAvailabilityType
+    --Refresh every 10 seconds for unavailable mexes, and every time for available mexes
+    if aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef][M27EngineerOverseer.refiResourceStatus] == M27EngineerOverseer.refiStatusAvailable or GetGameTimeSeconds() - aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef][M27EngineerOverseer.refiTimeOfLastUpdate] >= 10 then
+        aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef][M27EngineerOverseer.refiTimeOfLastUpdate] = GetGameTimeSeconds()
+        iAvailabilityType = M27EngineerOverseer.refiStatusAvailable --Available
 
-        local tNearbyAllyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Ally')
+        local iBuildingSizeRadius = 0.5
 
-
-        if M27Utilities.IsTableEmpty(tNearbyAllyUnits) == false then
-            if bDebugMessages == true then LOG(sFunctionRef..': Detected an allied building, checking its fractioncomplete') end
-            if bTreatOurOrAllyBuildingAsUnclaimed == false then
-                --Check if mex is part-built
-                for iBuilding, oBuilding in tNearbyAllyUnits do
-                    if not(oBuilding.Dead) then
-                        if oBuilding.GetFractionComplete then
-                            if oBuilding:GetFractionComplete() >= 1 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Fraction complete>=1 so building marked as complete') end
-                                bResourceIsUnclaimed = false break end
-                        else
-                            if bDebugMessages == true then LOG(sFunctionRef..': Fractioncomplete='..oBuilding.GetFractionComplete()) end
-                        end
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': 1 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-                end
-
-                if bDebugMessages == true then LOG(sFunctionRef..': 2 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-            else
-                if bTreatEnemyBuildingAsUnclaimed == true then bResourceIsUnclaimed = true
-                else
-                    local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Enemy')
-                    if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
-                        for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
-                            if not(oBuilding.Dead) then
-                                bResourceIsUnclaimed = false break
-                            end
-                        end
-                    end
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': 3 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-            end
-            if bDebugMessages == true then LOG(sFunctionRef..': 3a bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+        if bMexNotHydro == false then
+            iBuildingSizeRadius = M27UnitInfo.GetBuildingSize('UAB1102')[1]*0.5
         else
-            if bDebugMessages == true then LOG(sFunctionRef..': 3b bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-            if bTreatEnemyBuildingAsUnclaimed == true then
-                bResourceIsUnclaimed = true
-                if bDebugMessages == true then LOG(sFunctionRef..': 3c bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-            else
-                local tNearbyEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Enemy')
-                if M27Utilities.IsTableEmpty(tNearbyEnemyUnits) == false then
-                    for iEnemyBuilding, oEnemyBuilding in tNearbyEnemyUnits do
-                        if not(oEnemyBuilding.Dead) then
-                            bResourceIsUnclaimed = false break
+            --Mex specific - if we just ctrlKd our mex then would have an engi nearby so treat mex as claimed
+            if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation] and aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27EngineerOverseer.refActionBuildT3MexOverT2] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27EngineerOverseer.refActionBuildT3MexOverT2][sLocationRef]) == false then
+                iAvailabilityType = M27EngineerOverseer.refiStatusT3MexQueued
+                bDontHaveResourceStatus = false
+            end
+        end
+
+        if bDontHaveResourceStatus then
+            local tNearbyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Ally')
+            if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
+                for iBuilding, oBuilding in tNearbyUnits do
+                    if not(oBuilding.Dead) and oBuilding.GetFractionComplete then
+                        if oBuilding:GetFractionComplete() >= 1 then
+                            iAvailabilityType = M27EngineerOverseer.refiStatusAllyBuilt
+                        else
+                            iAvailabilityType = M27EngineerOverseer.refiStatusAllyPartBuilt
                         end
+                        bDontHaveResourceStatus = false
+                        break
                     end
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': 3d bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': 4 bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
-        end
-        if bDebugMessages == true then LOG(sFunctionRef..': bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)..'; about to check if we should consider building queues bTreatQueuedBuildingsAsUnclaimed='..tostring(bTreatQueuedBuildingsAsUnclaimed)) end
-        if bResourceIsUnclaimed == true and bTreatQueuedBuildingsAsUnclaimed == false then
-            --Do we have an entry in the mex queue?
-            if bDebugMessages == true then LOG(sFunctionRef..': Checking if queued up anything for sLocationRef='..sLocationRef) end
-            --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location
-            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation]) == false then
+            --Check for enemy units
+            if bDontHaveResourceStatus then
+                tNearbyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tResourcePosition, iBuildingSizeRadius, 'Enemy')
+                for iBuilding, oBuilding in tNearbyUnits do
+                    if not(oBuilding.Dead) and oBuilding.GetFractionComplete then
+                        iAvailabilityType = M27EngineerOverseer.refiStatusEnemyBuilt
+                        bDontHaveResourceStatus = false
+                        break
+                    end
+                end
+            end
+            if bDontHaveResourceStatus then
+                --Check for queued units
                 if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': Have queued something for sLocationRef='..sLocationRef..'; checking if any builders are still alive') end
                     --Check that any queued engineer is still alive
@@ -844,26 +825,48 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
                         if M27Utilities.IsTableEmpty(tSubtable) == false then
                             for iUniqueRef, oBuilder in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
                                 if oBuilder.Dead then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': oBuilder for iAction='..iAction..' is dead so clearing its actions') end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oBuilder for iAction='..iActionRef..' is dead so clearing its actions') end
                                     M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oBuilder)
                                     bClearedSomething = true
                                 else
-                                    bResourceIsUnclaimed = false
+                                    bDontHaveResourceStatus = false
+                                    iAvailabilityType = M27EngineerOverseer.refiStatusQueued
                                     break
                                 end
                             end
                         end
                     end
-                    if bClearedSomething == true and bResourceIsUnclaimed == true then
+                    if bClearedSomething == true and bDontHaveResourceStatus == true then
                         if bDebugMessages == true then LOG(sFunctionRef..': Resource was claimed but all builders are dead so treating as unclaimed') end
                     end
                 end
             end
+            --If still not found status then will go with default (i.e. treat it as available)
         end
+    else
+        iAvailabilityType = aiBrain[M27EngineerOverseer.reftiResourceClaimedStatus][sLocationRef][M27EngineerOverseer.refiResourceStatus]
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': End: bResourceIsUnclaimed='..tostring(bResourceIsUnclaimed)) end
+    --Decide if its uncalimed or not based on availability type
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return bResourceIsUnclaimed
+    if iAvailabilityType == M27EngineerOverseer.refiStatusEnemyBuilt then
+        return bTreatEnemyBuildingAsUnclaimed
+    elseif iAvailabilityType == M27EngineerOverseer.refiStatusAllyBuilt then
+        return bTreatOurOrAllyBuildingAsUnclaimed
+    elseif iAvailabilityType == M27EngineerOverseer.refiStatusAllyPartBuilt then
+        if bTreatOurOrAllyBuildingAsUnclaimed then return true
+        else
+            --Want to treat as claimed if we have fully built on it, or if we are part-built and have an engineer queued up to build; if part built and no engi queued then treat as unclaimed
+            return M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef])
+        end
+    elseif iAvailabilityType == M27EngineerOverseer.refiStatusQueued then
+        return bTreatQueuedBuildingsAsUnclaimed
+    elseif iAvailabilityType == M27EngineerOverseer.refiStatusT3MexQueued then
+        return false
+    elseif iAvailabilityType == M27EngineerOverseer.refiStatusAvailable then
+        return true
+    else M27Utilities.ErrorHandler('Unrecognised iAvailabilityType='..(iAvailabilityType or 'nil')..' for sLocationRef='..sLocationRef..'; tResourcePosition='..repr(tResourcePosition)..'; will return true')
+        return true
+    end
 end
 
 function IsHydroUnclaimed(aiBrain, tHydroPosition, bTreatEnemyBuildingAsUnclaimed, bTreatOurOrAllyBuildingAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
@@ -1010,7 +1013,7 @@ function IsLocationNearEnemyOmniRange(aiBrain, tLocation, iMinDistanceOutsideOmn
             if M27UnitInfo.IsUnitValid(oUnit) then
                 iCurDistanceToLocation = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tLocation)
                 iCurOmni = (oUnit:GetBlueprint().Intel.OmniRadius or 0)
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering if oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' with omni radius '..iCurOmni..' and distance to location of '..iCurDistanceToLocation..'; is too close to location '..repr(tLocation)..'; iMinDistanceOutsideOmniToNotBeInRange='..iMinDistanceOutsideOmniToNotBeInRange) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering if oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' with omni radius '..iCurOmni..' and distance to location of '..iCurDistanceToLocation..'; is too close to location '..repr(tLocation)..'; iMinDistanceOutsideOmniToNotBeInRange='..iMinDistanceOutsideOmniToNotBeInRange) end
                 if (iCurOmni + iMinDistanceOutsideOmniToNotBeInRange - iCurDistanceToLocation) > 0 then
                     bOmniNearby = true
                     break
@@ -1031,7 +1034,7 @@ function IsBuildingWantedForAdjacency(oUnit)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local bWantForAdjacency = false
-    if EntityCategoryContains(M27UnitInfo.refCategoryPower, oUnit:GetUnitId()) then
+    if EntityCategoryContains(M27UnitInfo.refCategoryPower, oUnit.UnitId) then
         local iBuildingRadius = oUnit:GetBlueprint().Physics.SkirtSizeX
         --Check for T2 first
         --Do rect of units
@@ -1040,7 +1043,7 @@ function IsBuildingWantedForAdjacency(oUnit)
             bWantForAdjacency = true
         else
             local tAdjacent8x8Buildings = GetUnitsInRect(Rect(oUnit:GetPosition()[1]-iBuildingRadius - 4.1, oUnit:GetPosition()[3]-iBuildingRadius - 4.1, oUnit:GetPosition()[1]+iBuildingRadius + 4.1, oUnit:GetPosition()[3]+iBuildingRadius + 4.1))
-            if bDebugMessages == true then LOG(sFunctionRef..': Checking if any units in a rectangle around '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iBuildingRadius='..iBuildingRadius..'; Unitposition='..repr(oUnit:GetPosition())..'; is tAdjacent8x8Buildings empty='..tostring(M27Utilities.IsTableEmpty(tAdjacent8x8Buildings))) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Checking if any units in a rectangle around '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iBuildingRadius='..iBuildingRadius..'; Unitposition='..repr(oUnit:GetPosition())..'; is tAdjacent8x8Buildings empty='..tostring(M27Utilities.IsTableEmpty(tAdjacent8x8Buildings))) end
             if M27Utilities.IsTableEmpty(tAdjacent8x8Buildings) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedT3Arti, tAdjacent8x8Buildings)) == false then
                 bWantForAdjacency = true
             elseif bDebugMessages == true then LOG(sFunctionRef..': No T3 arti in tAdjacent8x8Buildings')

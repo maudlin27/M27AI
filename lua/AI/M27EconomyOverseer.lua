@@ -226,7 +226,7 @@ function GetUnitReclaimTargets(aiBrain)
         local tT1Sonar
         for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Sonar + M27UnitInfo.refCategoryT3Sonar) do
             if oUnit:GetFractionComplete() == 1 then
-                if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; .Intel='..repr((oUnit:GetBlueprint().Intel or {'nil'}))..'; .Intel.SonarRadius='..(oUnit:GetBlueprint().Intel.SonarRadius or 'nil')) end
+                if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; .Intel='..repr((oUnit:GetBlueprint().Intel or {'nil'}))..'; .Intel.SonarRadius='..(oUnit:GetBlueprint().Intel.SonarRadius or 'nil')) end
                 tT1Sonar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Sonar, oUnit:GetPosition(), oUnit:GetBlueprint().Intel.SonarRadius - 115, 'Ally')
                 if M27Utilities.IsTableEmpty(tT1Sonar) == false then
                     for iT1Sonar, oT1Sonar in tT1Sonar do
@@ -327,7 +327,7 @@ function GetMassStorageTargets(aiBrain)
             if iMexesForStorage < iMinSingleMexForStorage then bOnlyConsiderDoubleOrT3 = true end
             for iMex, oMex in tAllT2PlusMexes do
                 if not(oMex.Dead) and oMex:GetFractionComplete() >= 1 then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering mex with unique ref='..oMex:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oMex)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering mex with unique ref='..oMex.UnitId..M27UnitInfo.GetUnitLifetimeCount(oMex)) end
                     tCurLocation = oMex:GetPosition()
                     for _, tModPosition in tPositionAdjustments do
                         tAdjustedPosition = {tCurLocation[1] + tModPosition[1], GetSurfaceHeight(tCurLocation[1] + tModPosition[1], tCurLocation[3] + tModPosition[2]), tCurLocation[3] + tModPosition[2]}
@@ -357,7 +357,7 @@ function GetMassStorageTargets(aiBrain)
                                 iCurPositionAdjacencyAdjust = 0
                                 --Reduce distance by 100 if already have it assigned to an engineer (as want to continue existing structure)
                                 if aiBrain:CanBuildStructureAt(sStorageBP, tAdjustedPosition) == false then iCurPositionStartedConstructionAdjust = -100 end
-                                if EntityCategoryContains(categories.TECH2, oMex:GetUnitId()) then iCurPositionTechAdjust = iDistanceModForTech2 end
+                                if EntityCategoryContains(categories.TECH2, oMex.UnitId) then iCurPositionTechAdjust = iDistanceModForTech2 end
                                 if bDebugMessages == true then LOG(sFunctionRef..': Can build storage at the position, so will record; sLocationRef='..sLocationRef..'; iDistanceFromOurBase='..iDistanceFromOurBase..'; iCurPositionTechAdjust='..iCurPositionTechAdjust..'; iDistanceModForEachAdjacentMex='..iDistanceModForEachAdjacentMex) end
                                 if aiBrain[reftMassStorageLocations][sLocationRef] then
                                     iCurPositionAdjacencyAdjust = iDistanceModForEachAdjacentMex
@@ -430,7 +430,7 @@ function RefreshT2MexesNearBase(aiBrain)
 
 
                 iCurDistToBase = M27Utilities.GetDistanceBetweenPositions(oMex:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering mex '..oMex:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oMex)..'; iCurDistanceToBase='..iCurDistToBase) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering mex '..oMex.UnitId..M27UnitInfo.GetUnitLifetimeCount(oMex)..'; iCurDistanceToBase='..iCurDistToBase) end
                 if iCurDistToBase <= 80 then
                     --Ignore mexes which are upgrading
                     if not(oMex:IsUnitState('Upgrading') or (oMex.GetWorkProgress and oMex:GetWorkProgress() < 1 and oMex:GetWorkProgress() > 0.01)) then
@@ -481,7 +481,7 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
             else
                 if M27Conditions.SafeToUpgradeUnit(oUnit) and not(oUnit[refbWillCtrlKMex]) then
                     iAvailableToUpgradeCount = iAvailableToUpgradeCount + 1
-                    if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; iAvailableToUpgradeCount='..iAvailableToUpgradeCount..'; Have unit available to upgrading whose unit state isnt upgrading.  UnitId='..oUnit:GetUnitId()..'; Unit State='..M27Logic.GetUnitState(oUnit)..': Upgradesto='..(oUnitBP.General.UpgradesTo or 'nil')) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; iAvailableToUpgradeCount='..iAvailableToUpgradeCount..'; Have unit available to upgrading whose unit state isnt upgrading.  UnitId='..oUnit.UnitId..'; Unit State='..M27Logic.GetUnitState(oUnit)..': Upgradesto='..(oUnitBP.General.UpgradesTo or 'nil')) end
                 end
             end
         end
@@ -497,7 +497,7 @@ function TrackHQUpgrade(oUnitUpgradingToHQ)
     local sFunctionRef = 'TrackHQUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local aiBrain = oUnitUpgradingToHQ:GetAIBrain()
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for unit '..oUnitUpgradingToHQ:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitUpgradingToHQ)..'; Game time='..GetGameTimeSeconds()..'; is the table of units upgrading to HQ empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]))) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for unit '..oUnitUpgradingToHQ.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitUpgradingToHQ)..'; Game time='..GetGameTimeSeconds()..'; is the table of units upgrading to HQ empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]))) end
 
 
     --Check not already in the table
@@ -521,7 +521,7 @@ function TrackHQUpgrade(oUnitUpgradingToHQ)
     WaitTicks(10)
     while M27UnitInfo.IsUnitValid(oUnitUpgradingToHQ) do
         if not(oUnitUpgradingToHQ.GetWorkProgress) or oUnitUpgradingToHQ:GetWorkProgress() == 1 then
-            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnitUpgradingToHQ:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitUpgradingToHQ)..' either has no work progress or it is 1') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnitUpgradingToHQ.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitUpgradingToHQ)..' either has no work progress or it is 1') end
             break
         else
             WaitTicks(1)
@@ -574,7 +574,7 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
         if bUpdateUpgradeTracker then
             local aiBrain = oUnitToUpgrade:GetAIBrain()
             table.insert(aiBrain[reftUpgrading], oUnitToUpgrade)
-            if bDebugMessages == true then LOG(sFunctionRef..': Have issued upgrade '..sUpgradeID..' to unit '..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..' and recorded it') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Have issued upgrade '..sUpgradeID..' to unit '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..' and recorded it') end
         end
         --Are we upgrading to a factory HQ? If so then record this as will prioritise it with spare engineers
         --oBlueprint = __blueprints[string.lower(sBlueprintID)]
@@ -587,7 +587,7 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
             end
         end
 
-    else M27Utilities.ErrorHandler('Dont have a valid upgrade ID; UnitID='..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade))
+    else M27Utilities.ErrorHandler('Dont have a valid upgrade ID; UnitID='..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade))
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -621,10 +621,10 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
         for iUnit, oUnit in tAllUnits do
             if bDebugMessages == true then
                 LOG(sFunctionRef..': iUnit in tAllUnits='..iUnit..'; checking if its valid')
-                if M27UnitInfo.IsUnitValid(oUnit) then LOG('Unit is valid, ID='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit status='..M27Logic.GetUnitState(oUnit)..'; GameTime='..GetGameTimeSeconds()) end
+                if M27UnitInfo.IsUnitValid(oUnit) then LOG('Unit is valid, ID='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit status='..M27Logic.GetUnitState(oUnit)..'; GameTime='..GetGameTimeSeconds()) end
             end
             if M27UnitInfo.IsUnitValid(oUnit) and not(M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, true) == nil) and not(oUnit:IsUnitState('Upgrading')) then
-                if bDebugMessages == true then LOG(sFunctionRef..': Have a unit that is available for upgrading; iUnit='..iUnit..'; Unit ref='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Have a unit that is available for upgrading; iUnit='..iUnit..'; Unit ref='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                 if M27Conditions.SafeToUpgradeUnit(oUnit) and not(oUnit[refbWillCtrlKMex]) then
                     iPotentialUnits = iPotentialUnits + 1
                     tPotentialUnits[iPotentialUnits] = oUnit
@@ -637,7 +637,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
             if bDebugMessages == true then LOG(sFunctionRef..': Are overflowing mass so will redo check without checking if its safe to upgrade the mex') end
             for iUnit, oUnit in tAllUnits do
                 if M27UnitInfo.IsUnitValid(oUnit) and not(M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, true) == nil) and not(oUnit:IsUnitState('Upgrading')) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have a unit that is available for upgrading; iUnit='..iUnit..'; Unit ref='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a unit that is available for upgrading; iUnit='..iUnit..'; Unit ref='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                     if not(oUnit[refbWillCtrlKMex]) then
                         iPotentialUnits = iPotentialUnits + 1
                         tPotentialUnits[iPotentialUnits] = oUnit
@@ -672,7 +672,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
         if bDebugMessages == true then LOG(sFunctionRef..': Dont have any units of the desired category') end
     end
 
-    if oUnitToUpgrade and EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnitToUpgrade:GetUnitId()) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
+    if oUnitToUpgrade and EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnitToUpgrade.UnitId) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
         aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -958,7 +958,7 @@ function ClearOldRecords(aiBrain, iOldRecordsExpected)
                         --elseif oUnit:GetFractionComplete() < 1 then sUnitReasonForClear = 'Unit fraction complete isnt 100%'
                         --elseif oUnit:IsUnitState('Upgrading') == false then sUnitReasonForClear = 'Unit state isnt upgrading'
                         end
-                        --if oUnit.GetUnitId then sUnitReasonForClear = oUnit:GetUnitId()..':'..sUnitReasonForClear end
+                        --if oUnit.GetUnitId then sUnitReasonForClear = oUnit.UnitId..':'..sUnitReasonForClear end
                         LOG(sFunctionRef..': iRef='..iRef..': clearing from tracker, reason for clearing: '..sUnitReasonForClear)
                         --sUnitState = 'UnknownState'
                         --if oUnit.IsUnitState then sUnitState = M27Logic.GetUnitState(oUnit) end
@@ -1015,7 +1015,7 @@ function UnpauseUpgrades(aiBrain, iMaxToUnpause)
                 for iRef, oUnit in aiBrain[reftUpgrading] do
                     if bDebugMessages == true then LOG(sFunctionRef..': Cycling through units in reftUpgrading; iRef='..iRef) end
                     if M27UnitInfo.IsUnitValid(oUnit) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have a valid unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..';, checking if it has a paused upgrade, oUnit[refbUpgradePaused]='..tostring(oUnit[refbUpgradePaused])) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a valid unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..';, checking if it has a paused upgrade, oUnit[refbUpgradePaused]='..tostring(oUnit[refbUpgradePaused])) end
                         if oUnit[refbUpgradePaused] == true then
                             InternalUnpauseUpgrade(oUnit)
                         end
@@ -1077,7 +1077,7 @@ function PauseLastUpgrade(aiBrain)
                         end
                         if not(bIsHQUpgrade) then
 
-                            sUnitId = oUnit:GetUnitId()
+                            sUnitId = oUnit.UnitId
                             if bDebugMessages == true then LOG(sFunctionRef..': Unit ID='..sUnitId..'; Unit is valid and not paused so will pause it unless theres a later upgrade or its a mex and almost complete') end
                             if not(EntityCategoryContains(refCategoryMex, sUnitId)) then
                                 iThresholdToIgnorePausing = iGeneralThresholdToIgnorePausing
@@ -1090,7 +1090,7 @@ function PauseLastUpgrade(aiBrain)
                                 LOG(sFunctionRef..': oUnit='..sUnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
                                 if oUnit.UnitBeingBuilt then
                                     LOG(sFunctionRef..': Have a unit being built')
-                                    if oUnit.UnitBeingBuilt.GetUnitId then LOG(sFunctionRef..': ID of unit being built='..oUnit.UnitBeingBuilt:GetUnitId()) end
+                                    if oUnit.UnitBeingBuilt.GetUnitId then LOG(sFunctionRef..': ID of unit being built='..oUnit.UnitBeingBuilt.UnitId) end
                                     if oUnit.UnitBeingBuilt.GetFractionComplete then LOG(sFunctionRef..': Fraction complete='..oUnit.UnitBeingBuilt:GetFractionComplete()) else LOG('Fraction complete is nil') end
                                 elseif oUnit.unitBeingBuilt then
                                     M27Utilities.ErrorHandler('UnitBeingBuilt sometimes is lower case so need to revise code')
@@ -1209,9 +1209,9 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': Have paused units; size of table='..table.getn(aiBrain[reftPausedUnits])) end
             for iUnit, oUnit in aiBrain[reftUpgrading] do
                 if M27UnitInfo.IsUnitValid(oUnit) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Upgrading unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; IsPaused='..tostring(oUnit:IsPaused())..'; refbUpgradePaused='..tostring(oUnit[refbUpgradePaused])) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Upgrading unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; IsPaused='..tostring(oUnit:IsPaused())..'; refbUpgradePaused='..tostring(oUnit[refbUpgradePaused])) end
                     if oUnit[refbUpgradePaused] then
-                        if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit:GetUnitId()) then
+                        if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Unit is a mex so noting it as paused') end
                             iPausedMexes = iPausedMexes + 1
                         end
@@ -1553,7 +1553,7 @@ function UpgradeMainLoop(aiBrain)
                                                         --Do we own any of these
                                                         for iUpgradable, oUpgradable in tNearbyUpgradables do
                                                             if oUpgradable:GetAIBrain() == aiBrain and not(oUpgradable:IsUnitState('Upgrading')) then
-                                                                M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; nearest enemy to base='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; Have a T2 or below mex or factory within 100 of our base, which includes '..oUpgradable:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUpgradable),nil, true)
+                                                                M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; nearest enemy to base='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; Have a T2 or below mex or factory within 100 of our base, which includes '..oUpgradable.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUpgradable),nil, true)
                                                                 break
                                                             end
                                                         end
@@ -1567,7 +1567,7 @@ function UpgradeMainLoop(aiBrain)
                         end
                     end
                     if oUnitToUpgrade and not(oUnitToUpgrade.Dead) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': About to try and upgrade unit ID='..oUnitToUpgrade:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to try and upgrade unit ID='..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)) end
                         UpgradeUnit(oUnitToUpgrade, true)
                         if bDebugMessages == true then LOG(sFunctionRef..': Finished sending order to upgrade unit') end
                     else
@@ -1705,7 +1705,7 @@ function ManageEnergyStalls(aiBrain)
                         bApplyActionToUnit = false
                         iCurUnitEnergyUsage = 0
                         if M27UnitInfo.IsUnitValid(oUnit) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to consider pausing/unpausingunit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; will first check category specific logic for if we want to go ahead with pausing4') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to consider pausing/unpausingunit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; will first check category specific logic for if we want to go ahead with pausing4') end
 
 
                             --Do we actually want to pause the unit? check any category specific logic
@@ -1839,7 +1839,7 @@ function ManageEnergyStalls(aiBrain)
                         if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == false then
                             for iUnit, oUnit in aiBrain[reftPausedUnits] do
                                 if bDebugMessages == true then
-                                    if M27UnitInfo.IsUnitValid(oUnit) then LOG(sFunctionRef..': About to unpause '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                                    if M27UnitInfo.IsUnitValid(oUnit) then LOG(sFunctionRef..': About to unpause '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
                                     else LOG('Removing iUnit='..iUnit..' which is no longer valid')
                                     end
                                     LOG('Size of aiBrain[reftPausedUnits] before removal='..table.getn(aiBrain[reftPausedUnits])..'; will double check this size')

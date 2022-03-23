@@ -27,11 +27,17 @@ sProfilerActiveFunctionForThisTick = 'nil'
 refiLongestTickAfterStartRef = 0
 refiLongestTickAfterStartTime = 0
 bFullOutputAlreadyDone = {} -- true if have done the full output for the nth time; n being based on how long an interval we want
-iFullOutputIntervalInTicks = 3000 --every 5m
+iFullOutputIntervalInTicks = 10 --every second (will do a full output of every log every 10s, this will just do every 30 functions)
 iFullOutputCount = 0 --increased each time do a full output
+iFullOutputCycleCount = 0 --Increased each time do a full output, and reset to 0 when reach
 tProfilerCountByTickByFunction = {}
 tbProfilerOutputGivenForTick = {} --true if already given output for [iTick]
 IssueCount = 0 --Used to track no. of times issuemove has been sent in game
+
+tiProfilerStartCountByFunction = {} --[functionref] - Used if want to temporarily check how many times a function is called - have this update in the function itself, along with the end count
+--example of usage of the above: --M27Utilities.tiProfilerStartCountByFunction[sFunctionRef] = (M27Utilities.tiProfilerStartCountByFunction[sFunctionRef] or 0) + 1 LOG(sFunctionRef..': M27Utilities.tiProfilerStartCountByFunction[sFunctionRef]='..M27Utilities.tiProfilerStartCountByFunction[sFunctionRef])
+tiProfilerEndCountByFunction = {} --[functionref] - Used if want to temporarily check how many times a function is called - have this update in the function itself, along with the end count
+--Example of usage of the above: M27Utilities.tiProfilerEndCountByFunction[sFunctionRef] = (M27Utilities.tiProfilerEndCountByFunction[sFunctionRef] or 0) + 1 LOG(sFunctionRef..': M27Utilities.tiProfilerEndCountByFunction[sFunctionRef]='..M27Utilities.tiProfilerEndCountByFunction[sFunctionRef])
 
 
 function ErrorHandler(sErrorMessage, iOptionalWaitInSeconds, bWarningNotError)
@@ -648,7 +654,7 @@ end
 
 function IsACU(oUnit)
     if oUnit.Dead then return false else
-        if oUnit.GetUnitId and EntityCategoryContains(categories.COMMAND, oUnit:GetUnitId()) then return true else return false end
+        if oUnit.GetUnitId and EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then return true else return false end
     end
     --if UnitID == 'ual0001' then -- Aeon
 --        return true
@@ -701,6 +707,8 @@ function GetACU(aiBrain)
                 if ScenarioInfo.Options.Victory == "demoralization" then
                     ErrorHandler('Cant find any ACUs that we own, and in assassination game mode, so will treat us as being defeated')
                     aiBrain.M27IsDefeated = true
+                    M27Overseer.tAllActiveM27Brains[aiBrain:GetArmyIndex()] = nil
+
                 else
                     GetSubstituteACU(aiBrain)
                     --WaitSeconds(30)
@@ -906,7 +914,7 @@ function GetNearestUnit(tUnits, tCurPos, aiBrain, bHostileOnly, bOurAIOnly)
 
     if bDebugMessages == true then
         if iNearestUnit == nil then LOG('Nearest unit is nil')
-        else LOG('Nearest unit ID='..tUnits[iNearestUnit]:GetUnitId())
+        else LOG('Nearest unit ID='..tUnits[iNearestUnit].UnitId)
         end
     end
     FunctionProfiler(sFunctionRef, refProfilerEnd)
@@ -1047,8 +1055,180 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
     end
 end
 
+function FunctionProfilerOld(sFunctionRef, sStartOrEndRef)
+    --sStartOrEndRef: refProfilerStart or refProfilerEnd (0 or 1)
+    local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
+    if M27Config.M27RunProfiling then
+
+        if sStartOrEndRef == refProfilerStart then
+            --First ever time calling:
+            --1-off for any function - already done via global variables above
+
+            --1-off for this function
+            if not(tProfilerStartCount[sFunctionRef]) then
+                tProfilerStartCount[sFunctionRef] = 0
+                tProfilerEndCount[sFunctionRef] = 0
+                tProfilerFunctionStart[sFunctionRef] = {}
+                tProfilerTimeTakenCumulative[sFunctionRef] = 0
+                tProfilerTimeTakenByCount[sFunctionRef] = {}
+            end
+
+            --1-off for this tick
+            local iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
+            if tProfilerTimeTakenInTickByFunction[iGameTimeInTicks] == nil then
+                --if bDebugMessages == true then LOG('FunctionProfiler: '..sFunctionRef..': '..iGameTimeInTicks..': Resetting active profiler') end
+                tProfilerTimeTakenInTickByFunction[iGameTimeInTicks] = {}
+                tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = 0
+                sProfilerActiveFunctionForThisTick = 'nil'
+                tProfilerCountByTickByFunction[iGameTimeInTicks] = {}
+            end
+
+            --Increase unique count
+            local iCount = tProfilerStartCount[sFunctionRef] + 1
+            tProfilerStartCount[sFunctionRef] = iCount
+            tProfilerFunctionStart[sFunctionRef][iCount] = GetSystemTimeSecondsOnlyForProfileUse()
+            if sProfilerActiveFunctionForThisTick == 'nil' then sProfilerActiveFunctionForThisTick = sFunctionRef end
+            if tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] == nil then tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] = 0 end
+            tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] = tProfilerCountByTickByFunction[iGameTimeInTicks][sFunctionRef] + 1
+            --if bDebugMessages == true then LOG('FunctionProfiler: '..sFunctionRef..': refProfilerStart; iCount='..iCount..'; iGameTimeInTicks='..iGameTimeInTicks..'; System time at start='..GetSystemTimeSecondsOnlyForProfileUse()..'; tProfilerFunctionStart[sFunctionRef][iCount]='..tProfilerFunctionStart[sFunctionRef][iCount]) end
+
+        elseif sStartOrEndRef == refProfilerEnd then
+            tProfilerEndCount[sFunctionRef] = tProfilerEndCount[sFunctionRef] + 1
+            local iCount = tProfilerEndCount[sFunctionRef]
+            local iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
+            if tProfilerFunctionStart[sFunctionRef][iCount] == nil then ErrorHandler('sFunctionRef='..sFunctionRef..'; iGameTimeInTicks='..iGameTimeInTicks..'; iCount='..(iCount or 'nil')) end
+            local iCurTimeTaken = GetSystemTimeSecondsOnlyForProfileUse() - tProfilerFunctionStart[sFunctionRef][iCount]
+
+            if M27Config.M27ProfilingIgnoreFirstMin and iGameTimeInTicks <= 20 then iCurTimeTaken = 0 end
+            --if bDebugMessages == true then LOG('FunctionProfiler: '..sFunctionRef..': refProfilerEnd; iCount='..iCount..'; iCurTimeTaken='..iCurTimeTaken..'; tProfilerFunctionStart[sFunctionRef][iCount]='..tProfilerFunctionStart[sFunctionRef][iCount]) end
+            if not(tProfilerTimeTakenCumulative[sFunctionRef]) then tProfilerTimeTakenCumulative[sFunctionRef] = 0 end
+            tProfilerTimeTakenCumulative[sFunctionRef] = tProfilerTimeTakenCumulative[sFunctionRef] + iCurTimeTaken
+            tProfilerTimeTakenByCount[sFunctionRef][iCount] = iCurTimeTaken
+
+
+            if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks]) then
+                tProfilerTimeTakenInTickByFunction[iGameTimeInTicks] = {}
+                tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = 0
+                tProfilerCountByTickByFunction[iGameTimeInTicks] = {}
+            end
+
+            if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef]) then tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] = 0 end
+
+            tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] = tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] + iCurTimeTaken
+
+            --if bDebugMessages == true then LOG('FunctionProfiler: iGameTimeInTicks='..iGameTimeInTicks..'; sFunctionRef='..sFunctionRef..'; sProfilerActiveFunctionForThisTick='..sProfilerActiveFunctionForThisTick) end
+            if sFunctionRef == sProfilerActiveFunctionForThisTick or sProfilerActiveFunctionForThisTick == 'nil' then
+                tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] + iCurTimeTaken
+                --if bDebugMessages == true then LOG('FunctionProfiler: iGameTimeInTicks='..iGameTimeInTicks..'; Clearing active function from profiler; iCurTimeTaken='..iCurTimeTaken..'; tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks]='..tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks]) end
+                sProfilerActiveFunctionForThisTick = 'nil'
+            end
+
+            --Track longest tick (ignore first min due to mapping initialisation)
+            if iGameTimeInTicks > 600 then
+                if iCurTimeTaken > refiLongestTickAfterStartTime then
+                    refiLongestTickAfterStartTime = iCurTimeTaken
+                    refiLongestTickAfterStartRef = iGameTimeInTicks
+                end
+            end
+
+        else ErrorHandler('FunctionProfiler: Unknown reference, wont record')
+        end
+    end
+end
 
 function ProfilerOutput()
+    local sFunctionRef = 'ProfilerOutput'
+    local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
+
+    if M27Config.M27RunProfiling then
+        --[[--Cumulative most intensive functions
+        local iCount = 0
+        for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
+            iCount = iCount + 1
+            LOG(sFunctionRef..': Top10Cumulative No.'..iCount..'='..sFunctionName..'; Times run cumulative='..tProfilerStartCount[sFunctionName]..'; Time='..iValue)
+            if iCount >= 10 then break end
+        end--]]
+
+        --[[local iThreshold = 0.01
+        local iEntireTickThreshold = 0.02
+        local iStartTick = math.floor(GetGameTimeSeconds()*10) - 10
+        --if bDebugMessages == true then LOG(sFunctionRef..': iStartTick='..iStartTick..'; GetGameTimeSeconds='..GetGameTimeSeconds()..'; math.floor(GetGameTimeSeconds()='..math.floor(GetGameTimeSeconds())..'; same but *10='..math.floor(GetGameTimeSeconds()*10)) end
+        for iCurTick = iStartTick, 10 do --]]
+        --if bDebugMessages == true then LOG(sFunctionRef..': iCurTick='..iCurTick..'; tProfilerCumulativeTimeTakenInTick[iCurTick]='..(tProfilerCumulativeTimeTakenInTick[iCurTick] or 'Doesnt exist')) end
+        --if tProfilerCumulativeTimeTakenInTick[iCurTick] >= iThreshold or iCurTick == refiLongestTickAfterStartRef or tProfilerActualTimeTakenInTick[iCurTick] >= iEntireTickThreshold then
+        --local sReason = 'Over threshold of '..iThreshold
+        --if iCurTick == refiLongestTickAfterStartRef then sReason = 'Highest tick we have on record'
+        --elseif tProfilerActualTimeTakenInTick[iCurTick] >= iEntireTickThreshold then sReason = 'Actual tick time incl wider FAF code over threshold' end
+
+        local iCurTick = math.floor(GetGameTimeSeconds()*10) - 1
+        if not(tbProfilerOutputGivenForTick[iCurTick]) then
+            tbProfilerOutputGivenForTick[iCurTick] = true
+            LOG(sFunctionRef..': Tick='..iCurTick..'; Time taken='..(tProfilerCumulativeTimeTakenInTick[iCurTick] or 'nil')..'; Entire time for tick='..(tProfilerActualTimeTakenInTick[iCurTick] or 'nil')..'; About to list out top 10 functions in this tick')
+            local iCount = 0
+            if IsTableEmpty(tProfilerTimeTakenInTickByFunction[iCurTick]) == false then
+                for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenInTickByFunction[iCurTick], true) do
+                    iCount = iCount + 1
+                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..(tProfilerCountByTickByFunction[iCurTick][sFunctionName] or 'nil')..'; Total Time='..iValue)
+                    if iCount >= 10 then break end
+                end
+
+                LOG(sFunctionRef..': About to list top 10 called functions in this tick')
+                iCount = 0
+                for sFunctionName, iValue in SortTableByValue(tProfilerCountByTickByFunction[iCurTick], true) do
+                    iCount = iCount + 1
+                    LOG(sFunctionRef..': iTick='..iCurTick..': No.'..iCount..'='..sFunctionName..'; TimesRun='..(tProfilerCountByTickByFunction[iCurTick][sFunctionName] or 'nil')..'; Total Time='..iValue)
+                    if iCount >= 10 then break end
+                end
+                LOG(sFunctionRef..': IssueMove cumulative count='..IssueCount)
+            end
+            --else
+            --LOG(sFunctionRef..': Tick='..iCurTick..'; Below threshold at '..(tProfilerCumulativeTimeTakenInTick[iCurTick] or 'missing'))
+            --end
+            --end
+
+            --Include full output of function cumulative time taken every interval
+            local bFullOutputNow = false
+
+            if iCurTick > (iFullOutputCount + 1) * iFullOutputIntervalInTicks then bFullOutputNow = true end
+            if bFullOutputNow then
+                if bFullOutputAlreadyDone[iFullOutputCount + 1] then
+                    --Already done
+                else
+                    iFullOutputCount = iFullOutputCount + 1
+                    bFullOutputAlreadyDone[iFullOutputCount] = true
+                    LOG(sFunctionRef..': About to print detailed output of all functions cumulative values')
+                    iCount = 0
+                    for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
+                        iCount = iCount + 1
+                        if tProfilerStartCount[sFunctionName] == nil then LOG('ERROR somehow '..sFunctionName..' hasnt been recorded in the cumulative count despite having its time recorded.  iValue='..iValue)
+                        else
+                            LOG(sFunctionRef..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerStartCount[sFunctionName]..'; Time='..iValue)
+                        end
+                    end
+                    --Give the total time taken to get to this point based on time per tick
+                    local iTotalTimeTakenToGetHere = 0
+                    local iTotalDelayedTime = 0
+                    local iLongestTickTime = 0
+                    local iLongestTickRef
+                    for iTick, iTime in tProfilerActualTimeTakenInTick do
+                        iTotalTimeTakenToGetHere = iTotalTimeTakenToGetHere + iTime
+                        iTotalDelayedTime = iTotalDelayedTime + math.max(0, iTime - 0.1)
+                        if iTime > iLongestTickTime then
+                            iLongestTickTime = iTime
+                            iLongestTickRef = iTick
+                        end
+                    end
+                    LOG(sFunctionRef..': Total time taken to get to '..iCurTick..'= '..iTotalTimeTakenToGetHere..'; Total time of any freezes = '..iTotalDelayedTime..'; Longest tick time='..iLongestTickTime..'; tick ref = '..((iLongestTickRef or 0) - 1)..' to '..(iLongestTickRef or 'nil'))
+
+                end
+            end
+        end
+    end
+end
+
+
+function ProfilerOutputAttemptedRework()
+    --Temporarily saved attempted rework in v29 but led to strange results
     local sFunctionRef = 'ProfilerOutput'
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
 
@@ -1100,6 +1280,7 @@ function ProfilerOutput()
 
             --Include full output of function cumulative time taken every interval
             local bFullOutputNow = false
+            local iFunctionsToPrint = 30
 
             if iCurTick > (iFullOutputCount + 1) * iFullOutputIntervalInTicks then bFullOutputNow = true end
             if bFullOutputNow then
@@ -1107,15 +1288,22 @@ function ProfilerOutput()
                     --Already done
                 else
                     iFullOutputCount = iFullOutputCount + 1
+                    iFullOutputCycleCount = iFullOutputCycleCount + 1
                     bFullOutputAlreadyDone[iFullOutputCount] = true
-                    LOG(sFunctionRef..': About to print detailed output of all functions cumulative values')
                     iCount = 0
+                    if iFullOutputCycleCount >= 10 then
+                        iFunctionsToPrint = 10000
+                        iFullOutputCycleCount = 0
+                    else iFunctionsToPrint = 30 end
+                    LOG(sFunctionRef..': About to print detailed output of functions cumulative values. Will print a max of '..iFunctionsToPrint..' functions.')
+
                     for sFunctionName, iValue in SortTableByValue(tProfilerTimeTakenCumulative, true) do
                         iCount = iCount + 1
                         if tProfilerStartCount[sFunctionName] == nil then LOG('ERROR somehow '..sFunctionName..' hasnt been recorded in the cumulative count despite having its time recorded.  iValue='..iValue)
                         else
                             LOG(sFunctionRef..': No.'..iCount..'='..sFunctionName..'; TimesRun='..tProfilerStartCount[sFunctionName]..'; Time='..iValue)
                         end
+                        if iCount > iFunctionsToPrint then break end
                     end
                     --Give the total time taken to get to this point based on time per tick
                     local iTotalTimeTakenToGetHere = 0
@@ -1130,8 +1318,7 @@ function ProfilerOutput()
                             iLongestTickRef = iTick
                         end
                     end
-                    LOG(sFunctionRef..': Total time taken to get to '..iCurTick..'= '..iTotalTimeTakenToGetHere..'; Total time of any freezes = '..iTotalDelayedTime..'; Longest tick time='..iLongestTickTime..'; tick ref = '..(iLongestTickRef - 1)..' to '..iLongestTickRef)
-
+                    LOG(sFunctionRef..': Total time taken to get to '..iCurTick..'= '..iTotalTimeTakenToGetHere..'; Total time of any freezes = '..iTotalDelayedTime..'; Longest tick time='..iLongestTickTime..'; tick ref = '..((iLongestTickRef or 0) - 1)..' to '..(iLongestTickRef or 'nil'))
                 end
             end
         end
@@ -1149,6 +1336,27 @@ function ProfilerActualTimePerTick()
             iSystemTime = GetSystemTimeSecondsOnlyForProfileUse()
             iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
             if M27Config.M27ProfilingIgnoreFirst2Seconds and iGameTimeInTicks <= 20 then
+                --Dont record
+            else
+                tProfilerActualTimeTakenInTick[iGameTimeInTicks] = iSystemTime - iPrevGameTime
+            end
+            ProfilerOutput()
+        end
+
+    end
+end
+
+function ProfilerActualTimePerTickOld()
+    if M27Config.M27RunProfiling then
+        local iGameTimeInTicks
+        local iPrevGameTime = 0
+        local iSystemTime = 0
+        while true do
+            iPrevGameTime = GetSystemTimeSecondsOnlyForProfileUse()
+            WaitTicks(1)
+            iSystemTime = GetSystemTimeSecondsOnlyForProfileUse()
+            iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
+            if M27Config.M27ProfilingIgnoreFirstMin and iGameTimeInTicks <= 20 then
                 --Dont record
             else
                 tProfilerActualTimeTakenInTick[iGameTimeInTicks] = iSystemTime - iPrevGameTime

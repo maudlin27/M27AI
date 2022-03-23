@@ -32,7 +32,7 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     --local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
     local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, true, false)
     if tNewTargetInSameGroup then
-        if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tNewTargetInSameGroup='..repr(tNewTargetInSameGroup)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tNewTargetInSameGroup='..repr(tNewTargetInSameGroup)) end
         IssueClearCommands({oUnit})
         IssueMove({oUnit}, tNewTargetInSameGroup)
         oUnit[M27UnitInfo.refbSpecialMicroActive] = true
@@ -190,7 +190,7 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
     local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
     local iTempDistanceAwayToMove
     local bTimeToStop = false
-    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbSpecialMicroActive='..tostring((oUnit[M27UnitInfo.refbSpecialMicroActive] or false))..'; iMaxLoop='..iMaxLoop) end
+    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; refbSpecialMicroActive='..tostring((oUnit[M27UnitInfo.refbSpecialMicroActive] or false))..'; iMaxLoop='..iMaxLoop) end
     while bTimeToStop == false do
     --while not(iTempAngleDirectionToMove == iFacingAngleWanted) do
         iLoopCount = iLoopCount + 1
@@ -256,7 +256,7 @@ function MoveInOppositeDirectionTemporarily(oUnit, iTimeToMove)
             local tNewTargetIgnoringGrouping = M27Utilities.MoveTowardsTarget(tUnitPosition, tUnitTarget, iDistanceToMove, 180)
             --local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
             local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, true, false)
-            if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
             local bRecentMicro = false
             local iRecentMicroThreshold = 1
             local iGameTime = GetGameTimeSeconds()
@@ -325,10 +325,10 @@ function DodgeBomb(oBomber, oWeapon, projectile)
         local iBombSize = 2.5
         if oWeapon.GetBlueprint then iBombSize = math.max(iBombSize, (oWeapon:GetBlueprint().DamageRadius or iBombSize)) end
         local iTimeToRun = 0.75 --T1
-        if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then
+        if EntityCategoryContains(categories.TECH2, oBomber.UnitId) then
             iBombSize = 3
             iTimeToRun = 1.5
-        elseif EntityCategoryContains(categories.TECH3, oBomber:GetUnitId()) then
+        elseif EntityCategoryContains(categories.TECH3, oBomber.UnitId) then
             iTimeToRun = 2.5
         end --Some t2 bombers do damage in a spread (cybran, uef)
         --local iTimeToRun = math.min(7, iBombSize + 1)
@@ -361,7 +361,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                                     local bIgnoreAsUpgrading = false
                                     if oUnit:IsUnitState('Upgrading') then
                                         --Are we facing a T1 bomb?
-                                        if EntityCategoryContains(categories.TECH1, oBomber:GetUnitId()) then
+                                        if EntityCategoryContains(categories.TECH1, oBomber.UnitId) then
                                             bIgnoreAsUpgrading = true
                                         else
                                             --Facing T2+ bomb, so greater risk if we dont try and dodge; dont dodge if are almost complete
@@ -369,7 +369,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                                                 bIgnoreAsUpgrading = true
                                             else
                                                 --Is it a T2 bomber, and there arent many bombers nearby?
-                                                if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then
+                                                if EntityCategoryContains(categories.TECH2, oBomber.UnitId) then
                                                     local tNearbyBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oUnit:GetPosition(), 100, 'Enemy')
                                                     if M27Utilities.IsTableEmpty(tNearbyBombers) == true then
                                                         bIgnoreAsUpgrading = true
@@ -401,7 +401,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                                 end
                             else
                                 --Are we a mobile shield that isn't on the same team as the bomber? If so, then dont worry about dodging
-                                --if not(EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit:GetUnitId())) then
+                                --if not(EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, oUnit.UnitId)) then
                                     --if IsEnemy(oCurBrain:GetArmyIndex(), oBomber:GetAIBrain():GetArmyIndex()) and oUnit.MyShield and oUnit.MyShield:GetHealth() > 0 and (M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBombTarget) - oUnit:GetBlueprint().Defense.Shield.ShieldSize * 0.5) <= -4 then
                                         --Dont actually want to dodge as highly unlikely to avoid due to size of our shield bubble
                                     --else
@@ -436,13 +436,13 @@ function DodgeBombsFiredByUnit(oWeapon, oBomber)
     local tBombTarget = oWeapon:GetCurrentTargetPos()
     local iRadiusSize = 1.5
     local iBombSize = 2.5
-    if EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then iBombSize = 3 end --Some t2 bombers do damage in a spread (cybran, uef)
+    if EntityCategoryContains(categories.TECH2, oBomber.UnitId) then iBombSize = 3 end --Some t2 bombers do damage in a spread (cybran, uef)
     if oWeapon.GetBlueprint then iBombSize = math.min(iBombSize, (oWeapon:GetBlueprint().DamageRadius or iBombSize)) end
     local iTimeToRun = math.min(7, iBombSize + 1)
-    if EntityCategoryContains(categories.TECH3, oBomber:GetUnitId()) then
+    if EntityCategoryContains(categories.TECH3, oBomber.UnitId) then
         iRadiusSize = 2.5
         iTimeToRun = 5
-    elseif EntityCategoryContains(categories.TECH2, oBomber:GetUnitId()) then
+    elseif EntityCategoryContains(categories.TECH2, oBomber.UnitId) then
         iTimeToRun = 4
     end
 
@@ -667,7 +667,7 @@ end
                 end
             end
             if oOverchargeTarget then
-                if bDebugMessages == true then LOG(sFunctionRef..': Telling platoon to process overcharge action on '..oOverchargeTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oOverchargeTarget)) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Telling platoon to process overcharge action on '..oOverchargeTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOverchargeTarget)) end
                 oPlatoon[M27PlatoonUtilities.refiExtraAction] = M27PlatoonUtilities.refExtraActionOvercharge
                 oPlatoon[M27PlatoonUtilities.refExtraActionTargetUnit] = oOverchargeTarget
             end
@@ -705,7 +705,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 if not(oUnit == oTargetUnit) and iDistToTargetUnit > oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()] then
                     iCurAngleDif = iAngleToTargetUnit - oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]
                     if iCurAngleDif < 0 then iCurAngleDif = iCurAngleDif + 360 end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' will block a shot from the ACU to the target '..oTargetUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; iCurAngleDif='..iCurAngleDif..'; 180 / iDistToTargetUnit='..180 / iDistToTargetUnit..'; oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]='..oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]..'; oUnit[reftiDistFromACUToUnit]='..oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()]) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' will block a shot from the ACU to the target '..oTargetUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; iCurAngleDif='..iCurAngleDif..'; 180 / iDistToTargetUnit='..180 / iDistToTargetUnit..'; oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]='..oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]..'; oUnit[reftiDistFromACUToUnit]='..oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()]) end
                     if math.max(8, 180 / iDistToTargetUnit) <= iCurAngleDif then
                         return true
                     end
@@ -719,7 +719,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     function WillShotHit(oFiringUnit, oTargetUnit)
         --Check for units in a transport
         if oTargetUnit:IsUnitState('Attached') or M27Logic.IsShotBlocked(oFiringUnit, oTargetUnit) or IsBuildingOrACUBlockingShot(oFiringUnit, oTargetUnit) then
-            if bDebugMessages == true then LOG(sFunctionRef..': oTargetUnit='..oTargetUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; shot is blocked so wont hit') end
+            if bDebugMessages == true then LOG(sFunctionRef..': oTargetUnit='..oTargetUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; shot is blocked so wont hit') end
             return false
         else return true
         end
@@ -751,7 +751,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                     end
                     oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()] = M27Utilities.GetAngleFromAToB(tUnitPosition, oUnit:GetPosition())
                     oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()] = M27Utilities.GetDistanceBetweenPositions(tUnitPosition, oUnit:GetPosition())
-                    if bDebugMessages == true then LOG(sFunctionRef..': Angle from oUnit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to our ACU='..repr(oUnit[reftiAngleFromACUToUnit])..'; distance='..repr(oUnit[reftiDistFromACUToUnit])) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Angle from oUnit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to our ACU='..repr(oUnit[reftiAngleFromACUToUnit])..'; distance='..repr(oUnit[reftiDistFromACUToUnit])) end
                 end
             end
 
@@ -793,7 +793,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                     for iUnit, oUnit in tEnemyUnits do
                         if WillShotHit(oUnitWithOvercharge, oUnit) then
                             iCurDamageDealt, iCurKillsExpected = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Shot will hit enemy unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; damage result='..iCurDamageDealt) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Shot will hit enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; damage result='..iCurDamageDealt) end
                             if iCurDamageDealt > iMostMassDamage then
                                 iMostMassDamage = iCurDamageDealt
                                 oMostMassDamage = oUnit
@@ -809,7 +809,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 --    oOverchargeTarget = oMostCombatMassDamage
                 if iMostMassDamage >= 200 or iKillsExpected >= 3 or (iKillsExpected >= 1 and iMostMassDamage >= 112) or (iMostMassDamage >= 60 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain:GetEconomyStored('ENERGY') >= 10000) then --e.g. striker is 56 mass; lobo is 36
                     oOverchargeTarget = oMostMassDamage
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have a mobile or PD unit in range that will do enough damage to, oOverchargeTarget='..oOverchargeTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oOverchargeTarget)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a mobile or PD unit in range that will do enough damage to, oOverchargeTarget='..oOverchargeTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOverchargeTarget)) end
                 else
                     --Check we aren't running before considering whether to target walls or T2 PDs
                     if not(oPlatoon[M27PlatoonUtilities.refbHavePreviouslyRun] == true or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionRun or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionTemporaryRetreat or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReturnToBase or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionGoToNearestRallyPoint or (M27Utilities.IsACU(oUnitWithOvercharge) and oUnitWithOvercharge:GetHealth() < aiBrain[M27Overseer.refiACUHealthToRunOn])) then
@@ -898,7 +898,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                                 for iUnit, oUnit in tEnemyUnits do
                                     if WillShotHit(oUnitWithOvercharge, oUnit) then
                                         iCurDamageDealt, iCurKillsExpected = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage)
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Shot will hit enemy unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; damage result='..iCurDamageDealt) end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Shot will hit enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; damage result='..iCurDamageDealt) end
                                         if iCurDamageDealt > iMostMassDamage then
                                             iMostMassDamage = iCurDamageDealt
                                             oMostMassDamage = oUnit
@@ -924,7 +924,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 end
             end
             if oOverchargeTarget then
-                if bDebugMessages == true then LOG(sFunctionRef..': Telling platoon to process overcharge action on '..oOverchargeTarget:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oOverchargeTarget)) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Telling platoon to process overcharge action on '..oOverchargeTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOverchargeTarget)) end
                 oPlatoon[M27PlatoonUtilities.refiExtraAction] = M27PlatoonUtilities.refExtraActionOvercharge
                 oPlatoon[M27PlatoonUtilities.refExtraActionTargetUnit] = oOverchargeTarget
             end

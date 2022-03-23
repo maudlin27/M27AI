@@ -1607,7 +1607,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                 end
             end
             if bCalcActualThreat == true then
-                if bDebugMessages == true then LOG(sFunctionRef..': About to calculate threat using actual unit data; unitID='..oUnit:GetUnitId()) end
+                if bDebugMessages == true then LOG(sFunctionRef..': About to calculate threat using actual unit data; unitID='..oUnit.UnitId) end
                 --get actual threat calc
                 if bJustGetMassValue == true then iCurThreat = oUnit:GetBlueprint().Economy.BuildCostMass
                 else
@@ -1664,7 +1664,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             end
                         end
                         iCurThreat = iMassCost * iMassMod * iHealthFactor
-                        if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit:GetUnitId()..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'; iHealthPercentage='..iHealthPercentage..'; UnitHealth='..oUnit:GetHealth()..'; UnitMaxHealth='..oUnit:GetBlueprint().Defense.MaxHealth..'; UnitHealth='..oUnit:GetBlueprint().Defense.Health) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'; iHealthPercentage='..iHealthPercentage..'; UnitHealth='..oUnit:GetHealth()..'; UnitMaxHealth='..oUnit:GetBlueprint().Defense.MaxHealth..'; UnitHealth='..oUnit:GetBlueprint().Defense.Health) end
                     end
                 end
                 --Reduce threat if its under construction
@@ -1766,7 +1766,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
             if bDebugMessages == true then LOG(sFunctionRef..': About to check if unit is dead') end
             if not(oUnit.Dead) then
                 sCurUnitPathing = M27UnitInfo.GetUnitPathingType(oUnit)
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering threat calculation for oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering threat calculation for oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                 if oUnit:GetAIBrain() == aiBrain then
                     bOurUnits = true
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and has same ai brain so will determine actual threat') end
@@ -1901,7 +1901,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                         if bIncludeGroundToAir == true and sCurUnitPathing == M27UnitInfo.refPathingTypeNone then iMassMod = iMassMod * 2 end
                         iMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
                         iCurThreat = iMassCost * iMassMod + iGhettoGunshipAdjust
-                        if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit:GetUnitId()..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'iCurThreat='..iCurThreat) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'iCurThreat='..iCurThreat) end
                     end
                 end
                 iTotalThreat = iTotalThreat + iCurThreat
@@ -1925,7 +1925,7 @@ function CategoriesInVisibleUnits(aiBrain, tEnemyUnits, category, iReturnType)
     for iUnit, oUnit in tIndirectUnits do
         bIsSeen = M27Utilities.CanSeeUnit(aiBrain, oUnit)
         if bIsSeen == true then
-            if bDebugMessages == true then LOG('CategoriesInVisibleUnits: iUnit='..iUnit..'; is seen; ID='..oUnit:GetUnitId()) end
+            if bDebugMessages == true then LOG('CategoriesInVisibleUnits: iUnit='..iUnit..'; is seen; ID='..oUnit.UnitId) end
             if iReturnType == 1 then return true
             else
                 iValidCount = iValidCount + 1
@@ -1949,14 +1949,14 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     local sFunctionRef = 'IsUnitIdle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit:GetUnitId()) and M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 32 then bDebugMessages = true end
+    --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) and M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 32 then bDebugMessages = true end
 
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
         --Note this is increased for engineers with an action to build a T3 mex
     --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit) and (M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 59) then bDebugMessages = true end
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is idle; unit state='..(GetUnitState(oUnit) or 'nil')) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is idle; unit state='..(GetUnitState(oUnit) or 'nil')) end
     if oUnit[M27UnitInfo.refbSpecialMicroActive] then bIsIdle = false
     else
 
@@ -1968,7 +1968,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
             bIsIdle = false
         elseif oUnit:IsUnitState('Moving') then
             if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Moving') end
-            if bMovingUnassignedEngiIsIdle == true and not(oUnit[M27EngineerOverseer.refiEngineerCurrentAction]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit:GetUnitId()) then
+            if bMovingUnassignedEngiIsIdle == true and not(oUnit[M27EngineerOverseer.refiEngineerCurrentAction]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) then
                 bIsIdle = true
             else
                 bIsIdle = false
@@ -2103,7 +2103,7 @@ function GetReclaimDetourLocation(tCurStartPosition, tEndPosition, iMaxDetourAbs
                 if not({iBaseSegmentX + iAdjX, iBaseSegmentZ + iAdjZ} == {iStartSegmentX, iStartSegmentZ}) and not({iBaseSegmentX + iAdjX, iBaseSegmentZ + iAdjZ} == {iEndSegmentX, iEndSegmentZ}) then
 
                     --Has at least 30 mass with at least a 7.5+ reclaim item in it?
-                    if M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX] and M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ] and M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] >= 30 and M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ][M27MapInfo.refReclaimHighestIndividualReclaim] >= 7.5 then
+                    if M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX] and M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ] and (M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 0) >= 30 and (M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ][M27MapInfo.refReclaimHighestIndividualReclaim] or 0) >= 7.5 then
                         --In same pathing group?
                         tPossibleDetour = M27MapInfo.GetReclaimLocationFromSegment(iBaseSegmentX + iAdjX, iBaseSegmentZ + iAdjZ)
                         if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossibleDetour) == iBasePathingGroup then
@@ -2178,6 +2178,9 @@ function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPass
         local iACUSegmentX, iACUSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tCurStartPosition)
         local iUnitPathGroup = M27MapInfo.InSameSegmentGroup(oPathingUnit, tCurStartPosition, true)
         local iReclaimLoopCount
+        local iReclaimSegmentBaseX, iReclaimSegmentBaseZ, iHighestReclaimValue
+        local tBestReclaimSegmentXZ = {}
+        local iReclaimSegmentSearchSize = math.ceil(iPassingSearchRadius / M27MapInfo.iReclaimSegmentSizeX)
       --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to loop through mexes in pathing group') end
         if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
             for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
@@ -2251,19 +2254,22 @@ function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPass
 
             --Search for nearby reclaim as a detour (if no mexes were found)
             if bHavePassThrough == false then
-                --GetReclaimablesResourceValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis)
-                ReclaimRectangle = {}
-                tReclaimables = {}
-                ReclaimRectangle = Rect(tCurStartPosition[1] - iPassingSearchRadius,tCurStartPosition[3] - iPassingSearchRadius, tCurStartPosition[1] + iPassingSearchRadius, tCurStartPosition[3] + iPassingSearchRadius)
-                tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
-                tHighestValidReclaim = {}
+                iHighestReclaimValue = 0
+                iReclaimSegmentBaseX, iReclaimSegmentBaseZ = M27MapInfo.GetReclaimSegmentsFromLocation(tCurStartPosition)
 
-                iMassValue, tHighestValidReclaim = M27MapInfo.GetReclaimablesResourceValue(tReclaimables, true, iMinReclaimToConsider)
-                if M27Utilities.IsTableEmpty(tHighestValidReclaim) == false then
-                    if not(tHighestValidReclaim == tLastPassThroughPosition) then
-                        bHavePassThrough = true
-                        tPassThroughLocation = tHighestValidReclaim
+                for iReclaimSegmentX = iReclaimSegmentBaseX - iReclaimSegmentSearchSize, iReclaimSegmentBaseX + iReclaimSegmentSearchSize do
+                    for iReclaimSegmentZ = iReclaimSegmentBaseZ - iReclaimSegmentSearchSize, iReclaimSegmentBaseZ + iReclaimSegmentSearchSize do
+                        if (M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimTotalMass] or 0) > iMinReclaimToConsider then
+                            if (M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimHighestIndividualReclaim] or 0) > iHighestReclaimValue then
+                                iHighestReclaimValue = (M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimHighestIndividualReclaim] or 0)
+                                tBestReclaimSegmentXZ = {iReclaimSegmentX, iReclaimSegmentZ}
+                            end
+                        end
                     end
+                end
+                if iHighestReclaimValue > 0 then
+                    bHavePassThrough = true
+                    tPassThroughLocation = M27MapInfo.GetReclaimLocationFromSegment(tBestReclaimSegmentXZ[1], tBestReclaimSegmentXZ[2])
                 end
             end
 
@@ -2497,7 +2503,7 @@ function GetNearbyUnderConstructionBuilding(aiBrain, oPathingUnit, iMaxSearchRan
         local iPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tUnitPosition)
         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any of the buildings are under construction and have a pathing group of '..iPathingGroup) end
         for iBuilding, oBuilding in tNearbyBuildings do
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering building '..oBuilding:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oBuilding)..'with pathing group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, oBuilding:GetPosition())..' and fraction complete='..oBuilding:GetFractionComplete()) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering building '..oBuilding.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBuilding)..'with pathing group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, oBuilding:GetPosition())..' and fraction complete='..oBuilding:GetFractionComplete()) end
             if oBuilding:GetFractionComplete() < 1 and M27MapInfo.GetSegmentGroupOfLocation(sPathing, oBuilding:GetPosition()) == iPathingGroup then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a building under construction, distance to ACU='..M27Utilities.GetDistanceBetweenPositions(oBuilding:GetPosition(), tUnitPosition)..'; iNearestBuilding prior to this='..iNearestBuilding) end
                 if M27Utilities.GetDistanceBetweenPositions(oBuilding:GetPosition(), tUnitPosition) < iNearestBuilding then
@@ -2625,10 +2631,10 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                 local iHighestReclaimLocationMass = 0
                 for iAdjX = -1, 1 do
                     for iAdjZ = -1, 1 do
-                        if M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX] and M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ] and M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] >= iMinReclaimIfCloseToACU then
+                        if M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX] and M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ] and (M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 0) >= iMinReclaimIfCloseToACU then
                             bReclaimNearACU = true
-                            if iHighestReclaimLocationMass < M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] then
-                                iHighestReclaimLocationMass = M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass]
+                            if iHighestReclaimLocationMass < (M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 0) then
+                                iHighestReclaimLocationMass = (M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 0)
                                 tFinalDestination = M27MapInfo.GetReclaimLocationFromSegment(iACUReclaimSegmentX + iAdjX, iACUReclaimSegmentZ + iAdjZ)
                             end
                         end
@@ -2704,7 +2710,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                                 --for iSegmentZ, tReclaimInfo in tVal do
                                     if math.abs(iSegmentZ - iACUSegmentZ) <= iMaxSegmentDistanceZ then
                                         --Is there enough reclaim in this segment?
-                                        if M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass] >= iMinReclaimWanted then
+                                        if (M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass] or 0) >= iMinReclaimWanted then
                                             --Are we in the same pathing group?
                                             --GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
                                             iTargetGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ)
@@ -2755,7 +2761,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                                                                         if bDebugMessages == true then LOG(sFunctionRef..': position '..repr(tCurSegmentPosition)..' has enough reclaim - recording as a possible location') end
 
                                                                         iPossibleMexLocations = iPossibleMexLocations + 1
-                                                                        iReclaimInCurrentArea = M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass]
+                                                                        iReclaimInCurrentArea = (M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass] or 0)
 
                                                                         tPossibleMexLocationsAndNumber[iPossibleMexLocations] = {}
                                                                         tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] = iReclaimInCurrentArea
@@ -2832,6 +2838,8 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                 iCurDistanceFromUnit = 0
                 local iMaxDistanceToACU = 0]]--
                 local iClaimedMexesInArea = 0
+                local iReclaimSegmentX, iReclaimSegmentZ
+                local iReclaimSegmentSearchRange = math.ceil(iSearchRadius / M27MapInfo.iReclaimSegmentSizeX)
                 local bIsCurMexUnclaimed
                 --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to record mex for pathing group') end
                 --M27MapInfo.RecordMexForPathingGroup(oPathingUnit)
@@ -2909,9 +2917,16 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                                                                 if iClaimedMexesInArea < 0 then iClaimedMexesInArea = 0 LOG(sFunctionRef..': ERROR - shouldnt be possible for claimed mexes to be negative') end
 
                                                                 --Now get reclaim in the area:
-                                                                ReclaimRectangle = Rect(tMexLocation[1] - iSearchRadius,tMexLocation[3] - iSearchRadius, tMexLocation[1] + iSearchRadius, tMexLocation[3] + iSearchRadius)
-                                                                tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
-                                                                iReclaimInCurrentArea = M27MapInfo.GetReclaimablesResourceValue(tReclaimables, false, iSmallestReclaimSizeToConsider)
+                                                                iReclaimSegmentX, iReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tMexLocation)
+                                                                iReclaimInCurrentArea = 0
+                                                                for iBaseX = iReclaimSegmentX - iReclaimSegmentSearchRange, iReclaimSegmentX + iReclaimSegmentSearchRange do
+                                                                    for iBaseZ = iReclaimSegmentZ - iReclaimSegmentSearchRange, iReclaimSegmentZ + iReclaimSegmentSearchRange do
+                                                                        iReclaimInCurrentArea = iReclaimInCurrentArea + (M27MapInfo.tReclaimAreas[iBaseX][iBaseZ][M27MapInfo.refReclaimTotalMass] or 0)
+                                                                    end
+                                                                end
+                                                                --ReclaimRectangle = Rect(tMexLocation[1] - iSearchRadius,tMexLocation[3] - iSearchRadius, tMexLocation[1] + iSearchRadius, tMexLocation[3] + iSearchRadius)
+                                                                --tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
+                                                                --iReclaimInCurrentArea = M27MapInfo.GetReclaimablesResourceValue(tReclaimables, false, iSmallestReclaimSizeToConsider)
 
                                                                 iCurDistanceFromMiddle = math.abs(iCurDistanceFromEnemy - iCurDistanceFromStart)
 
@@ -3494,7 +3509,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
                     elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
                     end
                 else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit:GetUnitId()) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit.UnitId) end
                 end
             elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is dead')
             end
@@ -3811,14 +3826,14 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
                        else
                            --Still some value in damaging a unit (as might get a second strike), but far less than killing it
                            iMassFactor = 0.1
-                           if EntityCategoryContains(categories.EXPERIMENTAL, oUnit:GetUnitId()) then iMassFactor = 0.5 end
+                           if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then iMassFactor = 0.5 end
                        end
-                       if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
+                       if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
                        --Is the target mobile and not under construction? Then reduce to 20% as unit might dodge or not be there when bomb lands
                        if oUnit:GetFractionComplete() == 1 then
-                           if EntityCategoryContains(categories.MOBILE, oUnit:GetUnitId()) then iMassFactor = iMassFactor * 0.2
+                           if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then iMassFactor = iMassFactor * 0.2
                            --Is it a mex that will be killed outright? Then increase the value of killing it
-                           elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION, oUnit:GetUnitId()) then iMassFactor = iMassFactor * 3
+                           elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION, oUnit.UnitId) then iMassFactor = iMassFactor * 3
                            end
                        end
                        iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
@@ -3854,22 +3869,22 @@ function GetDamageFromOvercharge(aiBrain, oTargetUnit, iAOE, iDamage, bTargetWal
     local iActualDamage
     local iKillsExpected = 0
     local iUnitsHit = 0 --E.g. if targeting walls then this means we target the most walls assuming no nearby other units
-    if bDebugMessages == true then LOG(sFunctionRef..': About to loop through all enemies in range; iDamage='..iDamage..'; iAOE='..iAOE..'; Base target unit='..oTargetUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; position='..repr(oTargetUnit:GetPosition())) end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to loop through all enemies in range; iDamage='..iDamage..'; iAOE='..iAOE..'; Base target unit='..oTargetUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; position='..repr(oTargetUnit:GetPosition())) end
 
     if M27Utilities.IsTableEmpty(tEnemiesInRange) == false then
         for iUnit, oUnit in tEnemiesInRange do
             if oUnit.GetBlueprint then
                 oCurBP = oUnit:GetBlueprint()
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; dist to postiion='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition())) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; dist to postiion='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition())) end
                 --Is the unit within range of the aoe?
                 if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition()) <= iAOE then
                     --Is the unit shielded by a non-mobile shield (mobile shields should take full damage I think)
                     --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
                     if not(IsTargetUnderShield(aiBrain, oUnit, 800, false, true, false)) then
                         iActualDamage = iDamage
-                        if EntityCategoryContains(categories.STRUCTURE, oUnit:GetUnitId()) then
+                        if EntityCategoryContains(categories.STRUCTURE, oUnit.UnitId) then
                             iActualDamage = 800
-                        elseif EntityCategoryContains(categories.COMMAND, oUnit:GetUnitId()) then
+                        elseif EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
                             iActualDamage = 400
                         end
 
@@ -3885,11 +3900,11 @@ function GetDamageFromOvercharge(aiBrain, oTargetUnit, iAOE, iDamage, bTargetWal
                         else
                             --Still some value in damaging a unit (as might get a second strike), but far less than killing it
                             iMassFactor = 0.4
-                            if EntityCategoryContains(categories.EXPERIMENTAL, oUnit:GetUnitId()) then iMassFactor = 0.5 end
+                            if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then iMassFactor = 0.5 end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor..'; Unit max health='..iMaxHealth..'; CurHealth='..iCurHealth) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor..'; Unit max health='..iMaxHealth..'; CurHealth='..iCurHealth) end
                         --Is the target mobile and within 1 of the AOE edge? If so then reduce to 25% as it might move out of the wayif
-                        if oUnit:GetFractionComplete() == 1 and EntityCategoryContains(categories.MOBILE, oUnit:GetUnitId()) and iAOE - 0.5 < M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition()) then iMassFactor = iMassFactor * 0.25 end
+                        if oUnit:GetFractionComplete() == 1 and EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and iAOE - 0.5 < M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition()) then iMassFactor = iMassFactor * 0.25 end
                         iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
                         if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor) end
                     end
@@ -3966,7 +3981,7 @@ function IsSMDBlockingTarget(aiBrain, tTarget, tSMLPosition, iIgnoreSMDCreatedTh
                iSMDRange = (oSMD:GetBlueprint().Weapon[1].MaxRadius or 90) + 2 + (iSMDRangeAdjust or 0)
                iTargetToSMD = M27Utilities.GetDistanceBetweenPositions(tTarget, oSMD:GetPosition())
                iBaseToSMD = M27Utilities.GetDistanceBetweenPositions(oSMD:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-               if bDebugMessages == true then LOG(sFunctionRef..': oSMD='..oSMD:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oSMD)..'; iTargetToSMD='..iTargetToSMD..'; iBaseToSMD='..iBaseToSMD..'; iTargetToBase='..iTargetToBase..'; iSMDRange='..iSMDRange..'; oSMD[M27UnitInfo.refiTimeOfLastCheck]='..(oSMD[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
+               if bDebugMessages == true then LOG(sFunctionRef..': oSMD='..oSMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSMD)..'; iTargetToSMD='..iTargetToSMD..'; iBaseToSMD='..iBaseToSMD..'; iTargetToBase='..iTargetToBase..'; iSMDRange='..iSMDRange..'; oSMD[M27UnitInfo.refiTimeOfLastCheck]='..(oSMD[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
                if iTargetToSMD < iSMDRange or iBaseToSMD < iSMDRange then
                    --SMD is in range of us
                    bInRangeBeforeTimeCheck = true
@@ -4020,9 +4035,9 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
 
         local bTML = false
         local bSML = false
-        if EntityCategoryContains(M27UnitInfo.refCategoryTML, oLauncher:GetUnitId()) then bTML = true
-        elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher:GetUnitId()) then bSML = true
-        else M27Utilities.ErrorHandler('Unknown type of launcher, code to fire a missile wont work; oLauncher='..oLauncher:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oLauncher)) end
+        if EntityCategoryContains(M27UnitInfo.refCategoryTML, oLauncher.UnitId) then bTML = true
+        elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher.UnitId) then bSML = true
+        else M27Utilities.ErrorHandler('Unknown type of launcher, code to fire a missile wont work; oLauncher='..oLauncher.UnitId..M27UnitInfo.GetUnitLifetimeCount(oLauncher)) end
 
         if bTML or bSML then
             iAOE, iDamage, iMinRange, iMaxRange = M27UnitInfo.GetLauncherAOEStrikeDamageMinAndMaxRange(oLauncher)
@@ -4097,7 +4112,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                             if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                                 for iUnit, oUnit in tEnemyUnitsOfInterest do
                                     iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit:GetUnitId()..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
                                     --Stop looking if tried >=10 targets and have one that is at least 20k of value
                                     if iCurTargetValue > iBestTargetValue then
                                         if IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), 200) then
@@ -4195,7 +4210,7 @@ function GetT3ArtiTarget(oT3Arti)
             if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                 for iUnit, oUnit in tEnemyUnitsOfInterest do
                     iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
-                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit:GetUnitId()..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
                     --Stop looking if tried >=10 targets and have one that is at least 20k of value
                     if iCurTargetValue > iBestTargetValue then
                         if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
@@ -4235,7 +4250,7 @@ function RefreshT3ArtiAdjacencyLocations(oT3Arti)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --If the arti has no valid adjacency locations, then check we haven't recently done this (as dont want to use up too many resources)
-    if bDebugMessages == true then LOG(sFunctionRef..': Arti='..oT3Arti:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..' - is the list of adjacencylocations empty='..tostring(M27Utilities.IsTableEmpty(oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted]))..'; Time of last check='..GetGameTimeSeconds() - (oT3Arti[M27UnitInfo.refiTimeOfLastCheck] or -100)..'; ArtiPosition='..repr(oT3Arti:GetPosition())) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Arti='..oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..' - is the list of adjacencylocations empty='..tostring(M27Utilities.IsTableEmpty(oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted]))..'; Time of last check='..GetGameTimeSeconds() - (oT3Arti[M27UnitInfo.refiTimeOfLastCheck] or -100)..'; ArtiPosition='..repr(oT3Arti:GetPosition())) end
     if not(M27Utilities.IsTableEmpty(oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted])) or GetGameTimeSeconds() - (oT3Arti[M27UnitInfo.refiTimeOfLastCheck] or -100) > 30 then
         oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted] = {}
         local tsPowerBlueprints = {[1]='ueb1101', [2]='ueb1201', [3]='ueb1301'}
@@ -4278,7 +4293,7 @@ function RefreshT3ArtiAdjacencyLocations(oT3Arti)
                                         if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sCancelLocationRef]) == false then
                                             for iActionRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sCancelLocationRef] do
                                                 for iUniqueEngiRef, oEngineer in tSubtable do
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': About to clear oEngineer='..oEngineer:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' which was recorded as having iActionRef='..iActionRef) end
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': About to clear oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' which was recorded as having iActionRef='..iActionRef) end
                                                     IssueClearCommands({oEngineer})
                                                     M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
                                                 end

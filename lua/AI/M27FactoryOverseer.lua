@@ -317,7 +317,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
     if not(oFactory.GetBlueprint) then M27Utilities.ErrorHandler('Factory doesnt have a blueprint')
     else
         local oFactoryBlueprint = oFactory:GetBlueprint()
-        local sFactoryBP = oFactory:GetUnitId()
+        local sFactoryBP = oFactory.UnitId
         local iStrategy = aiBrain[M27Overseer.refiAIBrainCurrentStrategy]
         --local bGetSlowest, bGetFastest
 
@@ -365,7 +365,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                 else
                     LOG(sFunctionRef..': iNearbyEnemies='..iNearbyEnemies..'; List of nearby enemies:')
                     for iEnemy, oEnemy in tNearbyEnemies do
-                        LOG(oEnemy:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemy))
+                        LOG(oEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEnemy))
                     end
                 end
             end
@@ -1231,7 +1231,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                 if bDebugMessages == true then
 
-                    if iCategoryToBuild == M27UnitInfo.refCategoryAmphibiousCombat then LOG(sFunctionRef..': Factory '..oFactory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; iCurrentConditionToTry='..iCurrentConditionToTry..'; Are going to try and build amphibious units')
+                    if iCategoryToBuild == M27UnitInfo.refCategoryAmphibiousCombat then LOG(sFunctionRef..': Factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; iCurrentConditionToTry='..iCurrentConditionToTry..'; Are going to try and build amphibious units')
                     elseif iCategoryToBuild then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; Have a category to build that isnt amphibious combat')
                     else LOG(sFunctionRef..': iCategoryToBuild is nil; iCurrentConditionToTry='..iCurrentConditionToTry)
                     end
@@ -1281,7 +1281,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         end
                     end
                     --Override this for UEF and just build mobile artillery instead of the missile launchers in some scenarios
-                    if iFactoryTechLevel >= 3 and EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionUEF), oFactory:GetUnitId()) then
+                    if iFactoryTechLevel >= 3 and EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionUEF), oFactory.UnitId) then
                         --If enemy has lots of TMD (or just 1 if aeon) then build mobile artillery
                         local tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyUnits) == false and (table.getn(tEnemyUnits) >= 4 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionAeon), tEnemyUnits)) == false) then
@@ -1460,7 +1460,7 @@ function RemoveTemporaryFactoryPause(aiBrain, oFactory)
     local sFunctionRef = 'RemoveTemporaryFactoryPause'
     WaitSeconds(iFactoryDelayBeforeConsiderBuildingAgain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary pause to false for factory '..oFactory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; GameTIme='..GetGameTimeSeconds()) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary pause to false for factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; GameTIme='..GetGameTimeSeconds()) end
 
     aiBrain[refiFactoriesTemporarilyPaused] = aiBrain[refiFactoriesTemporarilyPaused] - 1
     if oFactory then oFactory[refbFactoryTemporaryPauseActive] = false end
@@ -1480,10 +1480,10 @@ function FactoryMainOverseerLoop(aiBrain)
     if tAllFactories then
         for iFactory, oFactory in tAllFactories do
             if not(oFactory.Dead) then
-                if bDebugMessages == true then LOG(sFunctionRef..': iFactory='..iFactory..'; ID='..oFactory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oFactory)..': Factory unit state='..M27Logic.GetUnitState(oFactory)..'; oFactory[refbFactoryTemporaryPauseActive]='..tostring((oFactory[refbFactoryTemporaryPauseActive] or false))) end
+                if bDebugMessages == true then LOG(sFunctionRef..': iFactory='..iFactory..'; ID='..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..': Factory unit state='..M27Logic.GetUnitState(oFactory)..'; oFactory[refbFactoryTemporaryPauseActive]='..tostring((oFactory[refbFactoryTemporaryPauseActive] or false))) end
                 if not(oFactory:IsUnitState('BeingBuilt')) and not(oFactory[refbFactoryTemporaryPauseActive] == true) then
                     if not(oFactory:IsUnitState('Building')) and not(oFactory:IsUnitState('Upgrading')) then --and not(oFactory:IsUnitState('Guarding'))
-                        if bDebugMessages == true then LOG(sFunctionRef..': Factory '..oFactory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' doesnt appear to be busy, checking command queue') end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' doesnt appear to be busy, checking command queue') end
                         if oFactory.GetCommandQueue then
                             tCommandQueue = oFactory:GetCommandQueue()
                             bFactoryIsIdle = false
@@ -1493,7 +1493,7 @@ function FactoryMainOverseerLoop(aiBrain)
                                 if bDebugMessages == true then LOG(sFunctionRef..': factory has a command queue') end
                                 if oFactory:GetFractionComplete() >= 1 and not(oFactory:IsPaused()) then
                                     if oLastUnit and not(oLastUnit.Dead) then
-                                        local sUnitID = oLastUnit:GetUnitId()
+                                        local sUnitID = oLastUnit.UnitId
                                         if not(oLastUnit[M27PlatoonFormer.refbProcessedForPlatoon]) then M27PlatoonFormer.AllocateNewUnitToPlatoonFromFactory(oLastUnit, oFactory)
                                         else
                                             if oFactory[refFactoryIdleCount] == nil then oFactory[refFactoryIdleCount] = 0 end
@@ -1524,7 +1524,7 @@ function FactoryMainOverseerLoop(aiBrain)
 
                                                                         IssueClearCommands({oLastUnit})
                                                                     end
-                                                                    if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oLastUnit:GetUnitId()) then M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oLastUnit, true) end
+                                                                    if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oLastUnit.UnitId) then M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oLastUnit, true) end
                                                                     IssueClearFactoryCommands({oFactory})
                                                                 end
                                                                 --bFactoryIsIdle = true
@@ -1580,8 +1580,8 @@ function FactoryMainOverseerLoop(aiBrain)
                                     end
                                 end
                                 --Ctrl-K T1 land factories near base if have T3 land factories and low mass
-                                if bDebugMessages == true then LOG(sFunctionRef..': Deciding if should ctrlK the factory. aiBrain[M27Overseer.refiOurHighestLandFactoryTech]='..(aiBrain[M27Overseer.refiOurHighestLandFactoryTech] or 'nil')..'; Dealing with Tehc1 Land factory='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandFactory * categories.TECH1, oFactory:GetUnitId()))..'; HaveLowMass='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; Dist to our start='..M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
-                                if aiBrain[M27Overseer.refiOurHighestLandFactoryTech] >= 3 and EntityCategoryContains(M27UnitInfo.refCategoryLandFactory * categories.TECH1, oFactory:GetUnitId()) and M27Conditions.HaveLowMass(aiBrain) and M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 100 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Deciding if should ctrlK the factory. aiBrain[M27Overseer.refiOurHighestLandFactoryTech]='..(aiBrain[M27Overseer.refiOurHighestLandFactoryTech] or 'nil')..'; Dealing with Tehc1 Land factory='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandFactory * categories.TECH1, oFactory.UnitId))..'; HaveLowMass='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; Dist to our start='..M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+                                if aiBrain[M27Overseer.refiOurHighestLandFactoryTech] >= 3 and EntityCategoryContains(M27UnitInfo.refCategoryLandFactory * categories.TECH1, oFactory.UnitId) and M27Conditions.HaveLowMass(aiBrain) and M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 100 then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Will kill the factory') end
                                     oFactory:Kill()
                                 end
@@ -1589,9 +1589,9 @@ function FactoryMainOverseerLoop(aiBrain)
 
                                 sUnitToBuild = DetermineWhatToBuild(aiBrain, oFactory)
                                 if sUnitToBuild == nil then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary pause to true for oFactory='..oFactory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; GameTime='..GetGameTimeSeconds()) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary pause to true for oFactory='..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; GameTime='..GetGameTimeSeconds()) end
                                     --Ctrl-K the factory instead if we have a number of other paused factories and its lower than our highest tech
-                                    if EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oFactory:GetUnitId()) and M27UnitInfo.GetUnitTechLevel(oFactory) < aiBrain[M27Overseer.refiOurHighestLandFactoryTech] and M27Conditions.HaveLowMass(aiBrain) and (aiBrain[refiFactoriesTemporarilyPaused] >= 2 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestLandFactoryTech])) >= 3) then
+                                    if EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oFactory.UnitId) and M27UnitInfo.GetUnitTechLevel(oFactory) < aiBrain[M27Overseer.refiOurHighestLandFactoryTech] and M27Conditions.HaveLowMass(aiBrain) and (aiBrain[refiFactoriesTemporarilyPaused] >= 2 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestLandFactoryTech])) >= 3) then
                                         oFactory:Kill()
                                     else
                                         oFactory[refbFactoryTemporaryPauseActive] = true
@@ -1628,13 +1628,13 @@ function FactoryMainOverseerLoop(aiBrain)
                     end
                 else
                     if bDebugMessages == true then
-                        LOG(sFunctionRef..': Factory '..oFactory:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' is paused or busy; will consider if shoudl ctrl-K if its a T1 factory; Current time='..GetGameTimeSeconds()..'; oFactory[refbFactoryTemporaryPauseActive]='..tostring((oFactory[refbFactoryTemporaryPauseActive] or false)))
-                        LOG('(cont): aiBrain[M27Overseer.refiOurHighestLandFactoryTech]='..(aiBrain[M27Overseer.refiOurHighestLandFactoryTech] or 'nil')..'; Factory tech level='..M27UnitInfo.GetUnitTechLevel(oFactory)..'; Is this a land factory='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oFactory:GetUnitId())))
+                        LOG(sFunctionRef..': Factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' is paused or busy; will consider if shoudl ctrl-K if its a T1 factory; Current time='..GetGameTimeSeconds()..'; oFactory[refbFactoryTemporaryPauseActive]='..tostring((oFactory[refbFactoryTemporaryPauseActive] or false)))
+                        LOG('(cont): aiBrain[M27Overseer.refiOurHighestLandFactoryTech]='..(aiBrain[M27Overseer.refiOurHighestLandFactoryTech] or 'nil')..'; Factory tech level='..M27UnitInfo.GetUnitTechLevel(oFactory)..'; Is this a land factory='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oFactory.UnitId)))
                         LOG('cont): Have low mass='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; Distance to our start='..M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
                     end
                     oFactory[refFactoryIdleCount] = 0
                     --Ctrl-K paused T1 factories that no longer need
-                    if oFactory[refbFactoryTemporaryPauseActive] == true and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 3 and M27UnitInfo.GetUnitTechLevel(oFactory) == 1 and EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oFactory:GetUnitId()) and M27Conditions.HaveLowMass(aiBrain) and M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 100 then
+                    if oFactory[refbFactoryTemporaryPauseActive] == true and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 3 and M27UnitInfo.GetUnitTechLevel(oFactory) == 1 and EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oFactory.UnitId) and M27Conditions.HaveLowMass(aiBrain) and M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 100 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Will kill factory') end
                         oFactory:Kill()
                     end
@@ -1695,7 +1695,7 @@ function NovaxProductionCheck(oNovaxCentre)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'NovaxProductionCheck'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for centre='..oNovaxCentre:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNovaxCentre)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for centre='..oNovaxCentre.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNovaxCentre)) end
 
     local iTicksToWait = 10
     while M27UnitInfo.IsUnitValid(oNovaxCentre) do
@@ -1712,7 +1712,7 @@ function NovaxProductionCheck(oNovaxCentre)
         WaitTicks(iTicksToWait)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': Novax centre is building a unit='..oNovaxCentre[refoLastUnitBuilt]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oNovaxCentre[refoLastUnitBuilt])) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Novax centre is building a unit='..oNovaxCentre[refoLastUnitBuilt].UnitId..M27UnitInfo.GetUnitLifetimeCount(oNovaxCentre[refoLastUnitBuilt])) end
     while M27UnitInfo.IsUnitValid(oNovaxCentre[refoLastUnitBuilt]) do
         iTicksToWait = 1
         if oNovaxCentre[refoLastUnitBuilt]:GetFractionComplete() == 1 then

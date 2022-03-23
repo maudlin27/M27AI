@@ -117,7 +117,7 @@ Platoon = Class(M27PlatoonClass) {
                 end
 
                 eng.ProcessBuildDone = false
-                if bDebugMessages == true then LOG('Platoon: ProcessBuildCommand: Just before issue clear commands to eng UnitId='..eng:GetUnitId()) end
+                if bDebugMessages == true then LOG('Platoon: ProcessBuildCommand: Just before issue clear commands to eng UnitId='..eng.UnitId) end
                 IssueClearCommands({eng})
                 local commandDone = false
                 local PlatoonPos
@@ -126,7 +126,7 @@ Platoon = Class(M27PlatoonClass) {
                     iCount = iCount + 1
                     if iCount > 1000 then
                         M27Utilities.ErrorHandler('Infinite loop 1')
-                        LOG('eng ID and lifetime count='..eng:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(eng))
+                        LOG('eng ID and lifetime count='..eng.UnitId..M27UnitInfo.GetUnitLifetimeCount(eng))
                         break
                     end
                     if bDebugMessages == true then LOG('Platoon: ProcessBuildCommand: Getting next building from engineer build queue') end
@@ -164,7 +164,7 @@ Platoon = Class(M27PlatoonClass) {
                             while not eng.Dead do
                                 iCount2 = iCount2 + 1
                                 if iCount2 > 1000 then M27Utilities.ErrorHandler('Infinite loop 2')
-                                    LOG('eng ID and lifetime count='..eng:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(eng))
+                                    LOG('eng ID and lifetime count='..eng.UnitId..M27UnitInfo.GetUnitLifetimeCount(eng))
                                     break
                                 end
                                 PlatoonPos = eng:GetPosition()
@@ -364,7 +364,7 @@ Platoon = Class(M27PlatoonClass) {
                         while aiBrain:PlatoonExists(self) do
                             --Check if hydro has finished construction or engineer that are assisting has died:
                             if oGuardedUnit == nil then LOG(sFunctionRef..': oGuardedUnit is nil') end
-                            if bDebugMessages == true then LOG(sFunctionRef..': oGuardedUnit='..tostring(oGuardedUnit:GetUnitId())) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': oGuardedUnit='..tostring(oGuardedUnit.UnitId)) end
                             if not oGuardedUnit or oGuardedUnit.Dead or oGuardedUnit:BeenDestroyed() then
                                 if bDebugMessages == true then LOG(sFunctionRef..': oguardedunit no longer exists') end
                                 break end
@@ -374,7 +374,7 @@ Platoon = Class(M27PlatoonClass) {
                                 if oGuardedUnit:IsUnitState('Building') == true then
                                     bConstructionStarted = true
                                     oUnitBeingBuilt = oGuardedUnit:GetFocusUnit()
-                                    if bDebugMessages == true then LOG(sFunctionRef..': guarded unit is building; oUnitBeingBuilt='..tostring(oUnitBeingBuilt:GetUnitId())) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': guarded unit is building; oUnitBeingBuilt='..tostring(oUnitBeingBuilt.UnitId)) end
                                 end
                                 --iFractionComplete = oGuardedUnit:GetFractionComplete()
                                 --if iFractionComplete == nil then --do nothing
@@ -565,7 +565,7 @@ Platoon = Class(M27PlatoonClass) {
                         oBeingBuilt = oEngi:GetFocusUnit()
                         if oBeingBuilt == nil then if bDebugMessages == true then LOG(sPlatoonName..': bACUInPlatoon='..tostring(bACUInPlatoon)..'Engi is building but oBeingBuilt is nil') end --sometimes this is the case so presumably engineer is 'building' when it's about to build but hasn't actually started yet?
                             else
-                            if EntityCategoryContains(categories.TECH1*categories.MASSEXTRACTION, oBeingBuilt:GetUnitId()) == false then
+                            if EntityCategoryContains(categories.TECH1*categories.MASSEXTRACTION, oBeingBuilt.UnitId) == false then
                                 if bDebugMessages == true then LOG(sPlatoonName..': bACUInPlatoon='..tostring(bACUInPlatoon)..'iUnit='..iUnit..'; Engi isnt building a T1 Mex') end
                                 --Engi is building something; work out if ACU can path to the unit being built, and (if so) how close it is to the ACU
                                 tTargetCurPosition = oBeingBuilt:GetPosition() --(want the unit being built so can prioritise buildings the ACU can assist without moving, if there are any)

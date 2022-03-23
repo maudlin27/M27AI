@@ -23,6 +23,7 @@ local iLandThreatSearchRange = 1000
 refbACUHelpWanted = 'M27ACUHelpWanted' --flags if we want teh ACU to stay in army pool platoon so its available for defence
 refoStartingACU = 'M27PlayerStartingACU' --NOTE: Use M27Utilities.GetACU(aiBrain) instead of getting this directly (to help with crash control)
 tAllAIBrainsByArmyIndex = {} --Stores table of all aiBrains, used as sometimes are getting errors when trying to use ArmyBrains
+tAllActiveM27Brains = {} --As per tAllAIBrainsByArmyIndex but just for M27 brains - defined for quick reference when updating reclaim
 refiDistanceToNearestEnemyBase = 'M27DistanceToNearestEnemy' --Distance from our base to the nearest enemy base
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
@@ -1926,7 +1927,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
     --Only call this if haven't already called this on a unit:
     if oEnemyUnit[iArmyIndex] == nil then oEnemyUnit[iArmyIndex] = {} end
     if oEnemyUnit[iArmyIndex][refbUnitAlreadyConsidered] == nil then
-        if bDebugMessages == true then LOG(sFunctionRef..': sThreatGroup='..sThreatGroup..': oEnemyUnit='..oEnemyUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': sThreatGroup='..sThreatGroup..': oEnemyUnit='..oEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit)) end
 
         local bNewUnitIsOnRightTerrain
         local bIsOnWater
@@ -1943,7 +1944,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
         if bMustBeOnWater == true then
             iCurThreat = M27Logic.GetAirThreatLevel(aiBrain, { oEnemyUnit }, true, false, true, false, false, 50, 20, iNavalBlipThreat, iNavalBlipThreat, false)
             oEnemyUnit[iArmyIndex][refiUnitNavalAAThreat] = iCurThreat
-            if bDebugMessages == true then LOG(sFunctionRef..': bMustBeOnWater is true; Unit='..oEnemyUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit)..': iCurThreat='..iCurThreat) end
+            if bDebugMessages == true then LOG(sFunctionRef..': bMustBeOnWater is true; Unit='..oEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit)..': iCurThreat='..iCurThreat) end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': refbUnitAlreadyConsidered is false, recording unit.  sThreatGroup='..sThreatGroup) end
         oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] = sThreatGroup
@@ -1967,7 +1968,7 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
         table.insert(aiBrain[reftEnemyThreatGroup][sThreatGroup][refoEnemyGroupUnits], oEnemyUnit)
         aiBrain[reftEnemyThreatGroup][sThreatGroup][refiEnemyThreatGroupUnitCount] = aiBrain[reftEnemyThreatGroup][sThreatGroup][refiEnemyThreatGroupUnitCount] + 1
         aiBrain[reftEnemyThreatGroup][sThreatGroup][refiThreatGroupCategory] = iCategory
-        local sBP = oEnemyUnit:GetUnitId()
+        local sBP = oEnemyUnit.UnitId
         local iTechLevel = 1
         if EntityCategoryContains(categories.TECH2, sBP) then iTechLevel = 2
         elseif EntityCategoryContains(categories.TECH3, sBP) then iTechLevel = 3
@@ -2150,11 +2151,11 @@ function RemoveSpareUnits(oPlatoon, iThreatNeeded, iMinScouts, iMinMAA, oPlatoon
                                 iRemainingThreatNeeded = iRemainingThreatNeeded - iCurUnitThreat
                                 iRetainedThreat = iRetainedThreat + iCurUnitThreat
                                 if iRemainingThreatNeeded < 0 then bRemoveRemainingUnits = true end
-                                if bDebugMessages == true then LOG(sFunctionRef..': Retaining unit with ID='..oUnit:GetUnitId()..'and iCurUnitThreat='..iCurUnitThreat..'; iRemainingThreatNeeded='..iRemainingThreatNeeded..'; bRemoveRemainingUnits='..tostring(bRemoveRemainingUnits)) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Retaining unit with ID='..oUnit.UnitId..'and iCurUnitThreat='..iCurUnitThreat..'; iRemainingThreatNeeded='..iRemainingThreatNeeded..'; bRemoveRemainingUnits='..tostring(bRemoveRemainingUnits)) end
                             else
                                 bRemoveCurUnit = true
                                 if iScoutsWanted > 0 then
-                                    if EntityCategoryContains(categories.SCOUT, oUnit:GetUnitId()) == true then
+                                    if EntityCategoryContains(categories.SCOUT, oUnit.UnitId) == true then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Not removing unit as its a scout and we need a scout') end
                                         iScoutsWanted = iScoutsWanted - 1
                                         iRetainedThreat = iRetainedThreat + M27Logic.GetCombatThreatRating(oPlatoon:GetBrain(), {oUnit}, false)
@@ -2162,7 +2163,7 @@ function RemoveSpareUnits(oPlatoon, iThreatNeeded, iMinScouts, iMinMAA, oPlatoon
                                     end
                                 end
                                 if iMAAWanted > 0 then
-                                    if EntityCategoryContains(categories.ANTIAIR, oUnit:GetUnitId()) == true then
+                                    if EntityCategoryContains(categories.ANTIAIR, oUnit.UnitId) == true then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Not removing unit as its a MAA and we need a MAA') end
                                         iMAAWanted = iMAAWanted - 1
                                         iRetainedThreat = iRetainedThreat + M27Logic.GetCombatThreatRating(oPlatoon:GetBrain(), {oUnit}, false)
@@ -2351,7 +2352,7 @@ function ThreatAssessAndRespond(aiBrain)
                 if bUnitOnWater == bConsideringNavy then --either on water and considering navy, or not on water and not considering navy
                     --Can we see enemy unit/blip:
                     --function CanSeeUnit(aiBrain, oUnit, bBlipOnly)
-                    if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to see if can see the unit and get its threat. Enemy Unit ID='..oEnemyUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit)..'; Position='..repr(oEnemyUnit:GetPosition())) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iCurEnemy='..iCurEnemy..' - about to see if can see the unit and get its threat. Enemy Unit ID='..oEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit)..'; Position='..repr(oEnemyUnit:GetPosition())) end
                     if M27Utilities.CanSeeUnit(aiBrain, oEnemyUnit, true) == true then
                         if oEnemyUnit[iArmyIndex] == nil then oEnemyUnit[iArmyIndex] = {} end
                         if oEnemyUnit[iArmyIndex][refsEnemyThreatGroup] == nil then
@@ -2410,7 +2411,7 @@ function ThreatAssessAndRespond(aiBrain)
                                             end
                                         end
                                     end
-                                elseif bDebugMessages == true then LOG(sFunctionRef..': Cant path to enemy unit='..oEnemyUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit))
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': Cant path to enemy unit='..oEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEnemyUnit))
                                 end
                             elseif bDebugMessages == true then LOG(sFunctionRef..': Unit already has a threat group')
                             end
@@ -2431,14 +2432,14 @@ function ThreatAssessAndRespond(aiBrain)
         oACU = M27Utilities.GetACU(aiBrain)
         tACUPos = oACU:GetPosition()
         if bDebugMessages == true then LOG(sFunctionRef..': tACUPos='..repr(tACUPos)) end
-        --if bDebugMessages == true then LOG(sFunctionRef..': ACU ID='..oACU:GetUnitId()) end
+        --if bDebugMessages == true then LOG(sFunctionRef..': ACU ID='..oACU.UnitId) end
         for iCurGroup, tEnemyThreatGroup in aiBrain[reftEnemyThreatGroup] do
             UpdatePreviousPlatoonThreatReferences(aiBrain, tEnemyThreatGroup)
             bConsideringNavy = false
             if tEnemyThreatGroup[refiThreatGroupCategory] == iNavyUnitCategories then bConsideringNavy = true end
             --function GetCombatThreatRating(aiBrain, tUnits, bUseBlip, iMassValueOfBlipsOverride)
             if bDebugMessages == true then LOG(sFunctionRef..': Finished updating previous platoon threat references; iCurGroup='..iCurGroup..';  through enemy units, iCurThreatGroup='..iCurThreatGroup..'; bConsideringNavy='..tostring(bConsideringNavy)) end
-            if bDebugMessages == true then LOG('Units in tEnemyThreatGroup='..table.getn(tEnemyThreatGroup[refoEnemyGroupUnits])..'; reference of first unit='..tEnemyThreatGroup[refoEnemyGroupUnits][1]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(tEnemyThreatGroup[refoEnemyGroupUnits][1])) end
+            if bDebugMessages == true then LOG('Units in tEnemyThreatGroup='..table.getn(tEnemyThreatGroup[refoEnemyGroupUnits])..'; reference of first unit='..tEnemyThreatGroup[refoEnemyGroupUnits][1].UnitId..M27UnitInfo.GetUnitLifetimeCount(tEnemyThreatGroup[refoEnemyGroupUnits][1])) end
             --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
             if bConsideringNavy == true then
                 --Already recorded naval AA threat when added individual units to the threat group
@@ -3036,9 +3037,9 @@ function ThreatAssessAndRespond(aiBrain)
                     if iAvailableThreat >= iThreatNeeded then
                         for iEntry, tTorpSubtable in M27Utilities.SortTableBySubtable(tTorpBombersByDistance, refiActualDistanceFromEnemy, true) do
                             --Cycle through each enemy unit in the threat group
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering torp bomber '..tTorpSubtable[refoTorpUnit]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..'; tTorpSubtable[refiCurThreat]='..(tTorpSubtable[refiCurThreat] or 0)..'; about to cycle through every enemy unit in threat group to see if should attack one of them') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering torp bomber '..tTorpSubtable[refoTorpUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..'; tTorpSubtable[refiCurThreat]='..(tTorpSubtable[refiCurThreat] or 0)..'; about to cycle through every enemy unit in threat group to see if should attack one of them') end
                             for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
-                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy Unit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iAssignedThreat='..(oUnit[iArmyIndex][refiAssignedThreat] or 0)..'; oUnit[iArmyIndex][refiUnitNavalAAThreat]='..(oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0)..'; iNavalThreatMaxFactor='..iNavalThreatMaxFactor) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iAssignedThreat='..(oUnit[iArmyIndex][refiAssignedThreat] or 0)..'; oUnit[iArmyIndex][refiUnitNavalAAThreat]='..(oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0)..'; iNavalThreatMaxFactor='..iNavalThreatMaxFactor) end
                                 if oUnit[iArmyIndex][refiAssignedThreat] <= iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat] then
                                     oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
                                     IssueClearCommands({tTorpSubtable[refoTorpUnit]})
@@ -3049,7 +3050,7 @@ function ThreatAssessAndRespond(aiBrain)
                                     end
                                     IssueAggressiveMove({tTorpSubtable[refoTorpUnit]}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                     tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing torp bomber and then Telling torpedo bomber with ID ref='..tTorpSubtable[refoTorpUnit]:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..' to attack '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; GameTime='..GetGameTimeSeconds()) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Clearing torp bomber and then Telling torpedo bomber with ID ref='..tTorpSubtable[refoTorpUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..' to attack '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; GameTime='..GetGameTimeSeconds()) end
                                     break
                                 end
                             end
@@ -3256,7 +3257,7 @@ function ACUManager(aiBrain)
                                     local oUnitBeingBuilt = oACU:GetFocusUnit()
                                     if oUnitBeingBuilt:GetFractionComplete() <= 0.25 then
                                         --Only keep building if is a mex
-                                        local sBeingBuilt = oUnitBeingBuilt:GetUnitId()
+                                        local sBeingBuilt = oUnitBeingBuilt.UnitId
                                         if EntityCategoryContains(categories.MASSEXTRACTION, sBeingBuilt) == true then bLetACUFinishBuilding = true end
                                     else bLetACUFinishBuilding = true
                                     end
@@ -3673,7 +3674,7 @@ function ACUManager(aiBrain)
                     if bDebugMessages == true then
                         LOG(sFunctionRef..': iHealthPercentage='..iHealthPercentage..'; GetFractionComplete='..oACU:GetFractionComplete())
                         if oACU.GetWorkProgress then LOG('GetWorkProgress='..oACU:GetWorkProgress()) end
-                        if oACU.UnitBeingBuilt then LOG('UnitBeingBuilt='..oACU.UnitBeingBuilt:GetUnitId()..'; FractionComplete='..oACU.UnitBeingBuilt:GetFractionComplete())
+                        if oACU.UnitBeingBuilt then LOG('UnitBeingBuilt='..oACU.UnitBeingBuilt.UnitId..'; FractionComplete='..oACU.UnitBeingBuilt:GetFractionComplete())
                         else LOG('No unit being built') end
                     end
 
@@ -4165,7 +4166,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             if bDebugMessages == true then LOG(sFunctionRef..': Have some units for experimental threat category _='.._..'; will check if its dead and if not add it to the table of threats') end
             for iUnit, oUnit in tCurCategoryUnits do
                 if M27Utilities.CanSeeUnit(aiBrain, oUnit, false) == true then
-                    sUnitUniqueRef = oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                    sUnitUniqueRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
                     if tReferenceTable[sUnitUniqueRef] == nil then
                         tReferenceTable[sUnitUniqueRef] = oUnit
                         if bDebugMessages == true then LOG(sFunctionRef..': Added Unit with uniqueref='..sUnitUniqueRef..' to the threat table') end
@@ -4233,7 +4234,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain)
         end
         iPreviousNearestEnemyIndex = iNearestEnemyArmyIndex--]]
-
 
         ForkThread(M27MapInfo.UpdateReclaimMarkers)
 
@@ -4704,6 +4704,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
     local iEnemyCount = 0
     local iAllyCount = 0
     local iArmyIndex
+    tAllActiveM27Brains = {}
     if M27Utilities.IsTableEmpty(ArmyBrains) == false then
         aiBrain[toEnemyBrains] = {}
         aiBrain[toAllyBrains] = {}
@@ -4714,6 +4715,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
                 if bDebugMessages == true then LOG(sFunctionRef..': Brain isnt defeated') end
                 iArmyIndex = oBrain:GetArmyIndex()
                 tAllAIBrainsByArmyIndex[iArmyIndex] = oBrain
+                if oBrain.M27AI then tAllActiveM27Brains[iArmyIndex] = oBrain end
                 if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) and not(M27Logic.IsCivilianBrain(oBrain)) then
                     iEnemyCount = iEnemyCount + 1
                     aiBrain[toEnemyBrains][iArmyIndex] = oBrain
@@ -4927,6 +4929,9 @@ function OverseerInitialisation(aiBrain)
 
     ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain) --Will figure out the speed of scouts (except seraphim)
 
+    ForkThread(M27MapInfo.UpdateReclaimMarkers)
+    ForkThread(M27MapInfo.ReclaimManager)
+
 
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -4962,7 +4967,7 @@ function TEMPUNITPOSITIONLOG(aiBrain)
     if M27Utilities.IsTableEmpty(tAllUnits) == false then
         for iUnit, oUnit in tAllUnits do
             tPosition = oUnit:GetPosition()
-            LOG('TEMPUNITPOSITIONLOG: iUnit='..iUnit..'; oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; postiion='..repr(oUnit:GetPosition()))
+            LOG('TEMPUNITPOSITIONLOG: iUnit='..iUnit..'; oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; postiion='..repr(oUnit:GetPosition()))
             iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tPosition)
             LOG('Segment position X-Z='..iSegmentX..'-'..iSegmentZ..'; TerrainHeight='..GetTerrainHeight(tPosition[1], tPosition[3])..'; Surface height='..GetSurfaceHeight(tPosition[1], tPosition[3]))
         end
@@ -5004,7 +5009,7 @@ function TestCustom(aiBrain)
     --List out all experimental unit BPs
     --[[
     for iUnit, oUnit in aiBrain:GetListOfUnits(categories.EXPERIMENTAL, false, true) do
-        LOG('Experimental='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+        LOG('Experimental='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
     end
     LOG('About to print out blueprint for unit xsl04021')
     LOG(repr(__blueprints['xsl0402']))
@@ -5029,6 +5034,72 @@ function TestCustom(aiBrain)
           end
        end
     end--]]
+end
+
+function TempCreateReclaim(aiBrain)
+    local bp, position, orientation, mass, energy, time, deathHitBox
+    bp = __blueprints['xel0305'] --percie
+
+    position = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    orientation = M27Utilities.GetACU(aiBrain):GetOrientation()
+    mass = 1000
+    energy = 10
+    time = 1000
+    deathHitBox = 1000
+
+    local wreck = bp.Wreckage
+    local bpWreck = bp.Wreckage.Blueprint
+
+    local prop = CreateProp(position, bpWreck)
+    prop:SetOrientation(orientation, true)
+    prop:SetScale(bp.Display.UniformScale)
+
+    -- take the default center (cx, cy, cz) and size (sx, sy, sz)
+    local cx, cy, cz, sx, sy, sz;
+    cx = bp.CollisionOffsetX
+    cy = bp.CollisionOffsetY
+    cz = bp.CollisionOffsetZ
+    sx = bp.SizeX
+    sy = bp.SizeY
+    sz = bp.SizeZ
+
+    -- if a death animation is played the wreck hitbox may need some changes
+    if deathHitBox then
+        cx = deathHitBox.CollisionOffsetX or cx
+        cy = deathHitBox.CollisionOffsetY or cy
+        cz = deathHitBox.CollisionOffsetZ or cz
+        sx = deathHitBox.SizeX or sx
+        sy = deathHitBox.SizeY or sy
+        sz = deathHitBox.SizeZ or sz
+    end
+
+    -- adjust the size, these dimensions are in both directions based on the center
+    sx = sx * 0.5
+    sy = sy * 0.5
+    sz = sz * 0.5
+
+    -- create the collision box
+    prop:SetPropCollision('Box', cx, cy, cz, sx, sy, sz)
+
+    prop:SetMaxHealth(bp.Defense.Health)
+    prop:SetHealth(nil, bp.Defense.Health * (bp.Wreckage.HealthMult or 1))
+    prop:SetMaxReclaimValues(time, mass, energy)
+
+    --FIXME: SetVizToNeurals('Intel') is correct here, so you can't see enemy wreckage appearing
+    -- under the fog. However the engine has a bug with prop intel that makes the wreckage
+    -- never appear at all, even when you drive up to it, so this is disabled for now.
+    --prop:SetVizToNeutrals('Intel')
+    if not bp.Wreckage.UseCustomMesh then
+        prop:SetMesh(bp.Display.MeshBlueprintWrecked)
+    end
+
+    -- This field cannot be renamed or the magical native code that detects rebuild bonuses breaks.
+    prop.AssociatedBP = bp.Wreckage.IdHook or bp.BlueprintId
+
+    LOG('TempCreateReclaim - will do a debugarray of the prop variable that gets returned')
+    M27Utilities.DebugArray(prop)
+
+    return prop
 end
 
 
@@ -5091,7 +5162,7 @@ function OverseerManager(aiBrain)
     --Log of basic info to help with debugging any replays we are sent (want this enabled/running as standard)
     LOG('M27Brain overseer logic is active. Nickname='..aiBrain.Nickname..'; ArmyIndex='..aiBrain:GetArmyIndex()..'; Start position='..aiBrain.M27StartPositionNumber..'; Start position='..repr(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Nearest enemy brain details: Name='..tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain)].Nickname..'; ArmyIndex='..M27Logic.GetNearestEnemyIndex(aiBrain)..'; Start position='..M27Logic.GetNearestEnemyStartNumber(aiBrain)..'; Start position='..repr(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]))
 
-
+    --ForkThread(TempCreateReclaim, aiBrain)
 
 
     while(not(aiBrain:IsDefeated())) do
