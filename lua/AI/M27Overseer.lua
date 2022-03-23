@@ -4538,8 +4538,14 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             local tsGameState = {}
             local tTempUnitList, iTempUnitCount
 
-            tsGameState['01.CurTimeInSecondsRounded'] = iCurTime
-            tsGameState['02. aiBrain'] = 'Name='..aiBrain.Nickname..'; Index='..aiBrain:GetArmyIndex()..'Start='..aiBrain.M27StartPositionNumber
+            --Brain
+            tsGameState['01. aiBrain'] = 'Name='..aiBrain.Nickname..'; Index='..aiBrain:GetArmyIndex()..'Start='..aiBrain.M27StartPositionNumber
+
+            --Time
+            tsGameState['02.CurTimeInSecondsRounded'] = iCurTime
+            tsGameState['02.SystemTimeSinceLastLog'] = GetSystemTimeSecondsOnlyForProfileUse() - (aiBrain[M27Utilities.refiLastSystemTimeRecorded] or 0)
+            aiBrain[M27Utilities.refiLastSystemTimeRecorded] = GetSystemTimeSecondsOnlyForProfileUse()
+            tsGameState['02.SystemTimeTotal'] = aiBrain[M27Utilities.refiLastSystemTimeRecorded]
 
             --Grand Strategy
             tsGameState['03.'..refiAIBrainCurrentStrategy] = aiBrain[refiAIBrainCurrentStrategy]

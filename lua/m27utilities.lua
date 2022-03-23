@@ -11,6 +11,7 @@ refProfilerEnd = 1
 bGlobalDebugOverride = false
 
 --Profiler variables
+refiLastSystemTimeRecorded = 'M27ProfilingLastSystemTime' --Used for simple profiler to just measure how long something is taking without all the logs
 
 refProfilerStart = 0
 refProfilerEnd = 1
