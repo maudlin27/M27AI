@@ -168,7 +168,7 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                     end
                 end
                 if M27Utilities.IsTableEmpty(tClosestLocationToEngi) == true then
-                    M27Utilities.ErrorHandler('Couldnt find any energy reclaim, only scenario where expected is if lots of very tiny energy reclaim or have lots of engis already reclaiming; will just pick a random location', nil, true)
+                    M27Utilities.ErrorHandler('Couldnt find any energy reclaim, only scenario where expected is if lots of very tiny energy reclaim or have lots of engis already reclaiming; will just pick a random location', true)
                     tClosestLocationToEngi = {tEngiPosition[1] + math.random(iSearchRadius - 10, iSearchRadius), nil, tEngiPosition[3] + math.random(iSearchRadius - 10, iSearchRadius)}
                     tClosestLocationToEngi[2] = GetSurfaceHeight(tClosestLocationToEngi[1], tClosestLocationToEngi[3])
                     aiBrain[M27EngineerOverseer.refiTimeOfLastFailure][M27EngineerOverseer.refActionReclaimTrees] = GetGameTimeSeconds()
@@ -460,7 +460,7 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                         WaitSeconds(1)
                         return GetNearestEnemyIndex(aiBrain, true)
                     else
-                        M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will wait 1 second then call again; gametime='..GetGameTimeSeconds())
+                        M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will wait 1 second then call again')
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         WaitSeconds(1)
                         return GetNearestEnemyIndex(aiBrain, true)
@@ -646,7 +646,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
     end
     local tSortedFinalWaypoints = {}
     if bHaveAliveUnit == false then
-        M27Utilities.ErrorHandler('Cant find valid unit in platoon, will set platoon to disband and return start position as the movement path.  Will send log with platoon plan and count after this', nil, true)
+        M27Utilities.ErrorHandler('Cant find valid unit in platoon, will set platoon to disband and return start position as the movement path.  Will send log with platoon plan and count after this', true)
         if oPlatoonHandle.GetPlan then LOG(oPlatoonHandle:GetPlan()..(oPlatoonHandle[M27PlatoonUtilities.refiPlatoonCount] or 'nil')) end
         oPlatoonHandle[M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
         tSortedFinalWaypoints = {M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]}
@@ -663,6 +663,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             local iUnitSegmentX, iUnitSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tUnitStart)
             local iUnitSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iUnitSegmentX, iUnitSegmentZ)
             local tPossibleMexTargets = {} --Table storing the mex number within tMexByPathingAndGrouping for mexes that aren't in enemy base (or other player base where other player is alive) but are nearer enemy than us
+
             --Determine PlayerStartPoints:
             local tActivePlayerStartLocations = {}
             local iActivePlayerCount = 0
@@ -995,6 +996,8 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                         end
                     end
                 end
+                --Logic for adding via point near friendly mexes - have decided to ignore in v29 for performance reasons
+                --[[
                 if bAbort == false then
                     --Are there any mexes on our side of the map that wouldn't result in a significant detour to pass by? If so then add to queue
                     if iFriendlyPossibleMexes > 0 then
@@ -1090,7 +1093,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                             end
                         end
                     end
-                end
+                end --]]
             end
             if M27Utilities.IsTableEmpty(tFinalWaypoints) == true then
                 bAbort = true
@@ -2055,7 +2058,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     else
         if not(bDontIncreaseIdleCount) then oUnit[refiIdleCount] = (oUnit[refiIdleCount] or 0) + 1 end
         if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildT3MexOverT2 and not(oUnit[M27EngineerOverseer.rebToldToStartBuildingT3Mex]) then
-            iIdleCountThreshold = 60 --can take a long time to start building if units nearby blocking the mex or if pathfinding issues due to units
+            iIdleCountThreshold = 20 --can take a long time to start building if units nearby blocking the mex or if pathfinding issues due to units; was set to 60 but have changed reassignment so it should typically only happen once every 4 seconds (made 20 as compromise as sometimes will be more often)
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..(oUnit[refiIdleCount] or 'nil')..'; Idle threshold='..iIdleCountThreshold..'; if >= idle threshold then will return true. Engineer action (nil for non engineers)='..(oUnit[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -3606,7 +3609,7 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
 
             end
             if iLoopCount > iMaxLoop3 then
-                M27Utilities.ErrorHandler('Couldnt find random point in area after looking '..iLoopCount..' times, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1]))
+                M27Utilities.ErrorHandler('Couldnt find random point in area after looking more than iMaxLoop3='..iMaxLoop3..' times, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1]))
                 if bDebugMessages == true then
                     --Draw midpoint in white, draw last place checked in gold
                     M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 4, 20)
@@ -3679,7 +3682,7 @@ function GetNearestRallyPoint(aiBrain, tPosition)
     local iNearestRallyPoint, iCurDistanceToStart
     if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftRallyPoints]) then
         if GetGameTimeSeconds() >= 150 then
-            M27Utilities.ErrorHandler('Dont have any rally point >=2.5m into the game, wouldve expected to have generated intel paths by now; will return base as a rally point', nil, true)
+            M27Utilities.ErrorHandler('Dont have any rally point >=2.5m into the game, wouldve expected to have generated intel paths by now; will return base as a rally point', true)
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
@@ -3964,10 +3967,11 @@ function IsSMDBlockingTarget(aiBrain, tTarget, tSMLPosition, iIgnoreSMDCreatedTh
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local bEnemySMDInRange = false
-    local iTargetToBase = M27Utilities.GetDistanceBetweenPositions(tTarget, tSMLPosition)
-    local iAngleToTarget = M27Utilities.GetAngleFromAToB(tTarget, tSMLPosition)
+    local iSMLToTarget = M27Utilities.GetDistanceBetweenPositions(tTarget, tSMLPosition)
+    local iAngleSMLToTarget = M27Utilities.GetAngleFromAToB(tTarget, tSMLPosition)
     local iTargetToSMD
-    local iBaseToSMD
+
+    local iSMLToSMD
     local iSMDRange
     local iAngleToSMD
     local bInRangeBeforeTimeCheck
@@ -3980,23 +3984,13 @@ function IsSMDBlockingTarget(aiBrain, tTarget, tSMLPosition, iIgnoreSMDCreatedTh
                bInRangeBeforeTimeCheck = false
                iSMDRange = (oSMD:GetBlueprint().Weapon[1].MaxRadius or 90) + 2 + (iSMDRangeAdjust or 0)
                iTargetToSMD = M27Utilities.GetDistanceBetweenPositions(tTarget, oSMD:GetPosition())
-               iBaseToSMD = M27Utilities.GetDistanceBetweenPositions(oSMD:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-               if bDebugMessages == true then LOG(sFunctionRef..': oSMD='..oSMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSMD)..'; iTargetToSMD='..iTargetToSMD..'; iBaseToSMD='..iBaseToSMD..'; iTargetToBase='..iTargetToBase..'; iSMDRange='..iSMDRange..'; oSMD[M27UnitInfo.refiTimeOfLastCheck]='..(oSMD[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
-               if iTargetToSMD < iSMDRange or iBaseToSMD < iSMDRange then
-                   --SMD is in range of us
-                   bInRangeBeforeTimeCheck = true
-               elseif iBaseToSMD > iTargetToBase then
-                   --SMD is further away than the target, and not in range of the target (per above check), so isnt in range so just check distance from target to SMD
-               else
-                   --SMD is closer to us than target, but not in range of either the start or the end; check if the distance means it might be close enough such that we want to consider the angle
-                   if iTargetToSMD + iBaseToSMD < iTargetToBase + iSMDRange then
-                        iAngleToSMD = M27Utilities.GetAngleFromAToB(oSMD:GetPosition(), tSMLPosition)
-                       --Cant be bothered to figure out a more accurate check, below is meant as an approximation
-                       if math.abs(iAngleToSMD - iAngleToTarget) < math.min(85, math.max(15, 90 - math.min(iBaseToSMD - iSMDRange, iTargetToSMD - iSMDRange))) then
-                           bInRangeBeforeTimeCheck = true
-                       end
-                   end
-               end
+
+               iSMLToSMD = M27Utilities.GetDistanceBetweenPositions(oSMD:GetPosition(), tSMLPosition)
+               iAngleToSMD = M27Utilities.GetAngleFromAToB(oSMD:GetPosition(), tSMLPosition)
+               if bDebugMessages == true then LOG(sFunctionRef..': oSMD='..oSMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSMD)..'; iTargetToSMD='..iTargetToSMD..'; iSMLToSMD='..iSMLToSMD..'; iSMLToTarget='..iSMLToTarget..'; iSMDRange='..iSMDRange..'; oSMD[M27UnitInfo.refiTimeOfLastCheck]='..(oSMD[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
+
+               bInRangeBeforeTimeCheck = M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iSMLToTarget, iSMLToSMD, iTargetToSMD, iAngleSMLToTarget, iAngleToSMD, iSMDRange)
+
                if bInRangeBeforeTimeCheck then
                    if bDebugMessages == true then LOG(sFunctionRef..': SMD is in range, checking how recently it has been built') end
                    if GetGameTimeSeconds() - (oSMD[M27UnitInfo.refiTimeOfLastCheck] or (GetGameTimeSeconds() - 10)) > (iIgnoreSMDCreatedThisManySecondsAgo or 0) then
@@ -4339,6 +4333,107 @@ function RefreshT3ArtiAdjacencyLocations(oT3Arti)
             end
             if bDebugMessages == true then LOG(sFunctionRef..': Finished considering PGen locations for iSide='..iSide..'; iCurBuildingCount='..iCurBuildingCount) end
         end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function DetermineTMDWantedForTML(aiBrain, oTML, toOptionalUnitsToProtect)
+    --toOptionalUnitsToProtect - so can call this function when just considering a single unit
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'DetermineTMDWantedForTML'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local iTMLRange = (oTML:GetBlueprint().Weapon[1].MaxRadius or 256) + 4 --slight buffer given aoe and building sizes
+    local tUnitsToProtect
+    local tTMLPosition = oTML:GetPosition()
+    if toOptionalUnitsToProtect then
+        tUnitsToProtect = {}
+        for iUnit, oUnit in toOptionalUnitsToProtect do
+            if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTMLPosition) <= iTMLRange then
+                table.insert(tUnitsToProtect, oUnit)
+            end
+        end
+    else
+        tUnitsToProtect = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryProtectFromTML, oTML:GetPosition(), iTMLRange, 'Ally')
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Identifying any units we want to protect within range of enemy TML '..oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)..'; Is tUnitsToProtect empty='..tostring(M27Utilities.IsTableEmpty(tUnitsToProtect))) end
+    if M27Utilities.IsTableEmpty(tUnitsToProtect) == false then
+        local iBasePathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local sTMLRef = oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)
+        local tNearbyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, oTML:GetPosition(), iTMLRange + 21, 'Ally')
+        local iUnitToTML
+        local iTMDToTML
+        local iUnitToTMD
+
+        local iTMDRange
+        local iBuildingSize
+        local bCanBlock
+        local iAngleTMLToUnit
+        local iAngleTMLToTMD
+        local sUnitRef
+        for iUnit, oUnit in tUnitsToProtect do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; IsTable for oUnit[M27UnitInfo.reftTMLDefence] empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftTMLDefence]))..'; oUnit[M27UnitInfo.refbCantBuildTMDNearby]='..tostring((oUnit[M27UnitInfo.refbCantBuildTMDNearby] or false))) end
+            if not(oUnit[M27UnitInfo.reftTMLDefence] and oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]) and not(oUnit[M27UnitInfo.refbCantBuildTMDNearby]) then
+                --Havent considered this TML yet
+                --oUnit[M27UnitInfo.reftTMLDefence][sTMLRef] = false --Decided to clear this as want to be able see if we have any TMD built for a unit by checking if this table is empty
+                --Is the unit in the same pathing group as our base? (if not wont wnat to try and build TMD to cover it)
+                if bDebugMessages == true then LOG(sFunctionRef..': iBasePathingGroup='..iBasePathingGroup..'; Unit pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())) end
+                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) == iBasePathingGroup then
+
+                    sUnitRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                    iBuildingSize = M27UnitInfo.GetBuildingSize(oUnit.UnitId)
+                    iAngleTMLToUnit = M27Utilities.GetAngleFromAToB(tTMLPosition, oUnit:GetPosition())
+                    if not(oUnit[M27UnitInfo.reftTMLDefence]) then oUnit[M27UnitInfo.reftTMLDefence] = {} end
+                    if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                        for iTMD, oTMD in tNearbyTMD do
+                            bCanBlock = false
+                            iUnitToTMD = M27Utilities.GetDistanceBetweenPositions(oTMD:GetPosition(), oUnit:GetPosition())
+                            iUnitToTML = M27Utilities.GetDistanceBetweenPositions(tTMLPosition, oUnit:GetPosition())
+                            iTMDToTML = M27Utilities.GetDistanceBetweenPositions(oTMD:GetPosition(), tTMLPosition)
+                            if EntityCategoryContains(categories.AEON, oTMD.UnitId) then
+                                iTMDRange = 12.5
+                            else iTMDRange = (oTMD:GetBlueprint().Weapon[1].MaxRadius or 31) - 10 --Reduce by 10 to factor in effective range (a guess as to how much coverage is needed)
+                            end
+                            --Reduce TMDRange to the effective range
+                            iTMDRange = iTMDRange - iBuildingSize
+                            iAngleTMLToTMD = M27Utilities.GetAngleFromAToB(tTMLPosition, oTMD:GetPosition())
+                            if M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iUnitToTML, iTMDToTML, iUnitToTMD, iAngleTMLToUnit, iAngleTMLToTMD, iTMDRange) then
+                                --TMD can block the TML
+                                if bDebugMessages == true then LOG(sFunctionRef..': oTMD='..oTMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTMD)..' can block the TML so will record it') end
+                                oUnit[M27UnitInfo.reftTMLDefence][sTMLRef] = oTMD
+                                if not(oTMD[M27UnitInfo.reftTMLDefence]) then oTMD[M27UnitInfo.reftTMLDefence] = {} end
+                                oTMD[M27UnitInfo.reftTMLDefence][sUnitRef] = oUnit
+                                break
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is TMD empty for sTMLRef='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]))) end
+                    if not(oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]) then
+                        --Dont have anything to protect this unit, and its in the same pathing group as our base, so add it to list of units that want protection
+                        aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][sUnitRef] = oUnit
+                        if not(oUnit[M27UnitInfo.reftTMLThreats]) then oUnit[M27UnitInfo.reftTMLThreats] = {} end
+                        oUnit[M27UnitInfo.reftTMLThreats][sTMLRef] = oTML
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have recorded oTML with sTMLRef='..sTMLRef..' as a threat for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                    end
+                end
+            end
+        end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function DetermineTMDWantedForUnits(aiBrain, tUnits)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'DetermineTMDWantedForUnits'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --First remove tUnits from the list of units wanting TMD (will re-add them per the below if we still want TMD)
+    for iUnit, oUnit in tUnits do
+        aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil
+    end
+
+    for iTML, oTML in aiBrain[M27Overseer.reftEnemyTML] do
+        DetermineTMDWantedForTML(aiBrain, oTML, tUnits)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

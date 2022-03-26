@@ -1072,7 +1072,7 @@ function GetEnemyNetThreatAlongIntelPath(aiBrain, iIntelPathBaseNumber, iIntelPa
         --20 is used because the lowest scout intel range is 40, but some are higher
         iLoopCount1 = iLoopCount1 + 1
         if iLoopCount1 > iLoopMax1 then
-            M27Utilities.ErrorHandler('Likely infinite loop, iIntelPathBaseNumber='..iIntelPathBaseNumber..'; iSubpath='..iSubPath..'; iLoopCount1='..iLoopCount1..'; size of subpath table='..table.getn(aiBrain[reftIntelLinePositions][iIntelPathBaseNumber]))
+            M27Utilities.ErrorHandler('Likely infinite loop, iIntelPathBaseNumber='..iIntelPathBaseNumber..'; iSubpath='..iSubPath..'; size of subpath table='..table.getn(aiBrain[reftIntelLinePositions][iIntelPathBaseNumber]))
             break
         end
         if aiBrain == nil then M27Utilities.ErrorHandler('aiBrain is nil') end
@@ -3133,7 +3133,7 @@ end
 function ACUManager(aiBrain)
     --A lot of the below code is a hangover from when the ACU would use the built in AIBuilders and platoons;
     --Almost all the functionality has now been integrated into the M27ACUMain platoon logic, with a few exceptions (such as calling for help), although these could probably be moved over as well
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -4190,9 +4190,20 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             end
         end
     end
-    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false and aiBrain[refbEnemyTMLSightedBefore] == false then
-        aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
-        aiBrain[refbEnemyTMLSightedBefore] = true
+    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false then
+        for iUnit, oUnit in aiBrain[reftEnemyTML] do
+            if not(oUnit[M27UnitInfo.refbTMDChecked]) then
+                oUnit[M27UnitInfo.refbTMDChecked] = true
+                ForkThread(M27Logic.DetermineTMDWantedForTML, aiBrain, oUnit)
+            end
+        end
+
+
+        --Mobile shield to protect temporarily:
+        if aiBrain[refbEnemyTMLSightedBefore] == false then
+            aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
+            aiBrain[refbEnemyTMLSightedBefore] = true
+        end
     end
 
     --Record when we have first had sight of SMD (so can factor in if we decide to fire a nuke)
@@ -4817,8 +4828,11 @@ end
 
 function OverseerInitialisation(aiBrain)
     --Below may get overwritten by later functions - this is just so we have a default/non nil value
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OverseerInitialisation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
     --Config settings
     if ScenarioInfo.Options.AIPLatoonNameDebug == 'all' then M27Config.M27ShowUnitNames = true end
@@ -4934,9 +4948,10 @@ function OverseerInitialisation(aiBrain)
     ForkThread(RevealCiviliansToAI, aiBrain)
 
     ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain) --Will figure out the speed of scouts (except seraphim)
-
     ForkThread(M27MapInfo.UpdateReclaimMarkers)
     ForkThread(M27MapInfo.ReclaimManager)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
 
 
 
@@ -4945,6 +4960,10 @@ end
 
 function GameSettingWarnings(aiBrain)
     --If unsupported settings then note at start of the game
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GameSettingWarnings'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of compatibility check') end
     local sIncompatibleMessage = ""
     local bIncompatible = false
     if not(ScenarioInfo.Options.Victory == "demoralization") then
@@ -4963,7 +4982,38 @@ function GameSettingWarnings(aiBrain)
         bIncompatible = true
         sIncompatibleMessage = sIncompatibleMessage..' Cant path to enemy base. '
     end
-    if bIncompatible then M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: "..sIncompatibleMessage..'  If issues are encountered, report them to maudlin27 via Discord or the forums, and include the replay.', 0, 10) end
+    --Check for non-AI sim-mods.  Thanks to Softles for pointing me towards the __active_mods variable
+    local tSimMods = __active_mods or {}
+    local tAIModNameWhitelist = {
+        'M27AI','AI-Swarm','AI-Uveso','AI: DilliDalli','Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'SACUAI',
+    }
+    local tModIsOk = {}
+    for iAI, sAI in tAIModNameWhitelist do
+       tModIsOk[sAI] = true
+    end
+    local iSimModCount = 0
+    for iMod, tModData in tSimMods do
+        if not(tModIsOk[tModData.name]) and tModData.enabled and not(tModData.ui_only) then
+            iSimModCount = iSimModCount + 1
+            bIncompatible = true
+            if iSimModCount == 1 then
+                sIncompatibleMessage = sIncompatibleMessage..' SIM mods '
+            else  sIncompatibleMessage = sIncompatibleMessage..'; '
+            end
+            sIncompatibleMessage = sIncompatibleMessage..' '..(tModData.name or 'UnknownName')
+            if bDebugMessages == true then
+                LOG('Whitelist of mod names='..repr(tModIsOk))
+                LOG(sFunctionRef..' About to debug the tModData for mod '..(tModData.name or 'nil'))
+                M27Utilities.DebugArray(tModData)
+            end
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished checking compatibility; compatibility message='..sIncompatibleMessage) end
+
+
+
+    if bIncompatible then M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: "..sIncompatibleMessage..'.  If issues are encountered, report them to maudlin27 via Discord or the forums, and include the replay ID.', 0, 10) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function TEMPUNITPOSITIONLOG(aiBrain)
@@ -5040,6 +5090,17 @@ function TestCustom(aiBrain)
           end
        end
     end--]]
+end
+
+function TempBomberLocation(aiBrain)
+    for iBrain, oBrain in aiBrain[toEnemyBrains] do
+        local tStratBomber = oBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Ally')
+        if M27Utilities.IsTableEmpty(tStratBomber) == false then
+            for iBomber, oBomber in tStratBomber do
+                LOG('iBomber='..iBomber..'; oBomber position='..repr(oBomber))
+            end
+        end
+    end
 end
 
 function TempCreateReclaim(aiBrain)
@@ -5174,6 +5235,7 @@ function OverseerManager(aiBrain)
     while(not(aiBrain:IsDefeated())) do
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
         if aiBrain.M27IsDefeated then break end
+
 
         --ForkThread(TestNewMovementCommands, aiBrain)
 

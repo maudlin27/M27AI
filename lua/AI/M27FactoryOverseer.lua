@@ -66,13 +66,14 @@ local refCategoryFrigate = M27UnitInfo.refCategoryFrigate
 iMaxCyclesBeforeOverride = 28
 
 
-function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFactory, bGetSlowest, bGetFastest, iOptionalCategoryThatMustBeAbleToBuild)
+function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFactory, bGetSlowest, bGetFastest, iOptionalCategoryThatMustBeAbleToBuild, bGetCheapest)
     --returns nil if cant find any blueprints that can build
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBlueprintsThatCanBuildOfCategory'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local tBlueprints = EntityCategoryGetUnitList(iCategoryCondition)
+    local tAllBlueprints = __blueprints
     local tValidBlueprints = {}
     local iValidBlueprints = 0
     local tBestBlueprints = {}
@@ -81,8 +82,9 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
     local iCurrentTech = 1
     --if bGetSlowest == nil then bGetSlowest = false end
     --if bGetFastest == nil then bGetFastest = false end
-    local iCurSpeed
+    local iCurSpeed, iCurMass
     local tiLowestSpeedByTech = {1000, 1000, 1000}
+    local tiLowestMassByTech = {100000000, 100000000, 100000000}
     local tiHighestSpeedByTech = {0,0,0}
     local oCurBlueprint
     local iHighestPriority = 0
@@ -100,6 +102,7 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
 
     if bDebugMessages == true then LOG(sFunctionRef..': reftBlueprintPriorityOverride='..repr(aiBrain[reftBlueprintPriorityOverride])) end
     for _, sBlueprint in tBlueprints do
+        if bDebugMessages == true then LOG(sFunctionRef..': About to see if factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; can build blueprint '..sBlueprint) end
         if oFactory:CanBuild(sBlueprint) == true then
             --Check we can build the desired category
             if not(iOptionalCategoryThatMustBeAbleToBuild) then bCanBuildRequiredCategory = true
@@ -107,9 +110,9 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
                 if bDebugMessages == true then LOG(sFunctionRef..': Have said we need to build a particualr category, will see if sBLueprint='..sBlueprint..' can build this') end
                 bCanBuildRequiredCategory = false
                 iCategoriesThatBlueprintCanBuild = nil
-                if __blueprints[sBlueprint].Economy.BuildableCategory and not(M27Utilities.IsTableEmpty(tsBlueprintsMeetingDesiredCategoriesToBuild)) then
+                if tAllBlueprints[sBlueprint].Economy.BuildableCategory and not(M27Utilities.IsTableEmpty(tsBlueprintsMeetingDesiredCategoriesToBuild)) then
                     if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint has a buildablecategory set, will convert it into a category and see if it matches any of the blueprints we want to be able to build') end
-                    for categoryIndex, category in __blueprints[sBlueprint].Economy.BuildableCategory do
+                    for categoryIndex, category in tAllBlueprints[sBlueprint].Economy.BuildableCategory do
                         if categoryIndex == 1 then
                             iCategoriesThatBlueprintCanBuild = ParseEntityCategory(category)
                         else
@@ -141,13 +144,13 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
                     iHighestTech = iCurrentTech
                     iHighestPriority = 0
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering if sBlueprint has a priority specified if we arent looking for slowest or fastest. sBlueprint='..sBlueprint..'; bGetSlowest='..tostring(bGetSlowest)..'; bGetFastest='..tostring(bGetFastest)) end
-                if bGetSlowest == false and bGetFastest == false and aiBrain[reftBlueprintPriorityOverride][sBlueprint] then
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering if sBlueprint has a priority specified if we arent looking for slowest or fastest. sBlueprint='..sBlueprint..'; bGetSlowest='..tostring(bGetSlowest)..'; bGetFastest='..tostring(bGetFastest)..'; bGetCheapest='..tostring((bGetCheapest or false))) end
+                if not(bGetSlowest) and not(bGetFastest) and not(bGetCheapest) and aiBrain[reftBlueprintPriorityOverride][sBlueprint] then
                     if bDebugMessages == true then LOG(sFunctionRef..': Have a priority specified='..aiBrain[reftBlueprintPriorityOverride][sBlueprint]..'; iHighestPriority='..iHighestPriority) end
                     iHighestPriority = math.max(aiBrain[reftBlueprintPriorityOverride][sBlueprint], iHighestPriority)
                 end
                 if bGetSlowest == true or bGetFastest == true then
-                    oCurBlueprint = __blueprints[sBlueprint]
+                    oCurBlueprint = tAllBlueprints[sBlueprint]
                     iCurSpeed = oCurBlueprint.Physics.MaxSpeed
                     if bDebugMessages == true then LOG(sFunctionRef..': '..sBlueprint..': iCurSpeed='..iCurSpeed) end
                     if bGetSlowest == true then
@@ -155,6 +158,10 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
                     elseif bGetFastest == true then
                         if iCurSpeed > tiHighestSpeedByTech[iCurrentTech] then tiHighestSpeedByTech[iCurrentTech] = iCurSpeed end
                     end
+                elseif bGetCheapest then
+                    oCurBlueprint = tAllBlueprints[sBlueprint]
+                    iCurMass = oCurBlueprint.Economy.BuildCostMass
+                    if iCurMass < tiLowestMassByTech[iCurrentTech] then tiLowestMassByTech[iCurrentTech] = iCurMass end
                 end
                 --end
             end
@@ -181,25 +188,33 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
         end
         if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..': Considering whether we have high enough tech to consider') end
         if iCurrentTech >= iMinTechToUse then
-            if bGetFastest == false and bGetSlowest == false then iCurrentPriority = aiBrain[reftBlueprintPriorityOverride][sBlueprint] end
+            if not(bGetFastest) and not(bGetSlowest) and not(bGetCheapest) then iCurrentPriority = aiBrain[reftBlueprintPriorityOverride][sBlueprint] end
             if iCurrentPriority == nil then iCurrentPriority = 0 end
             if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..'; iCurrentTech='..iCurrentTech..'; considering priority, iCurrentPriority='..iCurrentPriority..'; iHighestPriority='..iHighestPriority) end
             if iCurrentPriority >= iHighestPriority then
                 bIsValid = true
 
-                if bGetSlowest == false and bGetFastest == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Not interested in if slowest or fastest so marking BP as valid') end
+                if not(bGetSlowest) and not(bGetFastest) and not(bGetCheapest) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Not interested in if slowest or fastest or cheapest so marking BP as valid') end
                     bIsValid = true
                 else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want to get either the slowest, fastest or cheapest') end
                     bIsValid = false
-                    oCurBlueprint = __blueprints[sBlueprint]
-                    iCurSpeed = oCurBlueprint.Physics.MaxSpeed
-                    if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..'; iCurSpeed='..iCurSpeed) end
-                    if bGetSlowest == true then
-                        if iCurSpeed <= tiLowestSpeedByTech[iHighestTech] then bIsValid = true end
-                    elseif iCurSpeed >= iFastestSpeed then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have the highest speed for tech levels being considered') end
-                        bIsValid = true
+                    if bGetSlowest or bGetFastest then
+                        oCurBlueprint = tAllBlueprints[sBlueprint]
+                        iCurSpeed = oCurBlueprint.Physics.MaxSpeed
+                        if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..'; iCurSpeed='..iCurSpeed) end
+                        if bGetSlowest == true then
+                            if iCurSpeed <= tiLowestSpeedByTech[iHighestTech] then bIsValid = true end
+                        elseif iCurSpeed >= iFastestSpeed then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have the highest speed for tech levels being considered') end
+                            bIsValid = true
+                        end
+                    elseif bGetCheapest then
+                        oCurBlueprint = tAllBlueprints[sBlueprint]
+                        iCurMass = oCurBlueprint.Economy.BuildCostMass
+                        if iCurMass < tiLowestMassByTech[iCurrentTech] then bIsValid = true end
+                    else M27Utilities.ErrorHandler('Missing code')
                     end
                 end
             end
@@ -1440,7 +1455,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                 else
                     if iCurrentConditionToTry > iMaxLoop then
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurrentCondition exceeds max loop so will abort') end
-                        M27Utilities.ErrorHandler('reached max loop determining what to build, need to try and stop sooner for efficiency; bIsLandFactory='..tostring(bIsLandFactory)..'; bIsAirFactory='..tostring(bIsAirFactory)..'; M27GrandStrategyRef='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy], nil, true)
+                        M27Utilities.ErrorHandler('reached max loop determining what to build, need to try and stop sooner for efficiency; bIsLandFactory='..tostring(bIsLandFactory)..'; bIsAirFactory='..tostring(bIsAirFactory)..'; M27GrandStrategyRef='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy], true)
                         break
                     end
                 end
@@ -1543,7 +1558,7 @@ function FactoryMainOverseerLoop(aiBrain)
                                             end
                                             if oFactory[refFactoryIdleCount] > 200 then
                                                 if bDebugMessages == true then M27Utilities.DrawLocation(oFactory:GetPosition()) end
-                                                M27Utilities.ErrorHandler('Factory has gone 200 cycles of being stuck - will reset count. Factory position='..repr(oFactory:GetPosition())..'; iFactory='..iFactory, nil, true)
+                                                M27Utilities.ErrorHandler('Factory has gone 200 cycles of being stuck - will reset count. Factory position='..repr(oFactory:GetPosition())..'; iFactory='..iFactory, true)
                                                 oFactory[refFactoryIdleCount] = 1
                                             end
                                         end

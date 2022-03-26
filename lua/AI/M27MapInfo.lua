@@ -167,6 +167,7 @@ function RecordResourcePoint(t,x,y,z,size)
         HydroCount = HydroCount + 1
         HydroPoints[HydroCount] = {x,y,z}
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of hook') end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -288,6 +289,7 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
         for iCurResource, v in tResourceNearStart[iArmy][iResourceType] do
             NearbyResourcePos[iResourceCount] = v
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return NearbyResourcePos
     else
@@ -589,7 +591,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
         if bDebugMessages == true then
             LOG('Will draw the 3 positions in red, with a line')
             M27Utilities.DrawLocations({tKnownCorrectPoint, oPathingUnit:GetPosition(), tTargetLocation}, nil, 2, 200)
-            M27Utilities.ErrorHandler('Temp to see history of function call', nil, true)
+            M27Utilities.ErrorHandler('Temp to see history of function call', true)
         end
 
         if bDebugMessages == true then LOG(sFunctionRef..': First time doing a manual check for this location') end
@@ -1116,6 +1118,13 @@ function RecordThatWeWantToUpdateReclaimAtLocation(tLocation, iNearbySegmentsToU
     end
 end
 
+function DelayedReclaimRecordAtLocation(tPosition, iNearbySegmentsToUpdate, iWaitInSeconds)
+    WaitSeconds(iWaitInSeconds)
+    if M27Utilities.bM27AIInGame then
+        RecordThatWeWantToUpdateReclaimAtLocation(tPosition, iNearbySegmentsToUpdate)
+    end
+end
+
 function ReclaimManager()
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'ReclaimManager'
@@ -1130,6 +1139,7 @@ function ReclaimManager()
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart) --Want the profile coutn to reflect the number of times actually running the core code
 
         while bReclaimManagerActive do
+            if bDebugMessages == true then LOG(sFunctionRef..': Start of main active loop') end
 
             tAreasToUpdateThisCycle = {}
             iUpdateCount = 0
@@ -1173,6 +1183,7 @@ function ReclaimManager()
                                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                                 iLoopCount = 1
                             end
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to update reclaim data for segments '..iSegmentX..'-'..iSegmentZ) end
                             UpdateReclaimDataNearSegments(iSegmentX, iSegmentZ, 0, nil)
                         end
                     end
@@ -1297,6 +1308,7 @@ function UpdateReclaimMarkers()
 
     --Record all segments' mass information:
     if bReclaimRefreshActive == false and ((iLastReclaimRefresh or 0) == 0 or GetGameTimeSeconds() - iLastReclaimRefresh >= iTimeBeforeFullRefresh) then
+        if bDebugMessages == true then LOG(sFunctionRef..': Setting bReclaimRefreshActive to true') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart) --Want the profile coutn to reflect the number of times actually running the core code
         bReclaimRefreshActive = true
         --local iMinValueOfIndividualReclaim = 2.5
@@ -1348,7 +1360,6 @@ function UpdateReclaimMarkers()
 
 
         --local tReclaimables = {}
-        local iTotalMassValue
 
         if bDebugMessages == true then LOG('ReclaimRefresh: About to do full refresh') end
         iLastReclaimRefresh = GetGameTimeSeconds()
@@ -1361,7 +1372,7 @@ function UpdateReclaimMarkers()
                 iMapTotalMass = iMapTotalMass + UpdateReclaimDataNearSegments(iCurX, iCurZ, 0, tM27Brains)
                 --for iCurX = 1, math.floor(iMapSizeX / iSegmentSizeX) do
                 --for iCurZ = 1, math.floor(iMapSizeZ / iSegmentSizeZ) do
-                if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; iTotalMassValue='..iTotalMassValue..'; Location of segment='..repr(GetReclaimLocationFromSegment(iCurX, iCurZ))) end
+                if bDebugMessages == true then LOG('iCurX='..iCurX..'; iCurZ='..iCurZ..'; iMapTotalMass='..iMapTotalMass..'; Location of segment='..repr(GetReclaimLocationFromSegment(iCurX, iCurZ))) end
                 iCurCount = iCurCount + 1
             end
 
@@ -2168,7 +2179,7 @@ function FindEmptyPathableAreaNearTarget(aiBrain, oPathingUnit, tStartPosition, 
             iGroupCycleCount = iGroupCycleCount + 1
             if bDebugMessages == true then LOG(sFunctionRef..': Start of main loop grouping, iGroupCycleCount='..iGroupCycleCount..'; iCycleSize='..iCycleSize) end
             if iGroupCycleCount > iMaxCycles then
-                M27Utilities.ErrorHandler('Possible infinite loop - unable to find empty pathable area despite iSearchSizeMax='..iSearchSizeMax)
+                M27Utilities.ErrorHandler('Possible infinite loop - unable to find empty pathable area despite searching more than '..iMaxCycles..' times')
                 break
             end
             iRandomDistance = iSearchSize
@@ -2355,7 +2366,7 @@ function RecordSortedMexesInOriginalPathingGroup(aiBrain)
 
     if bDebugMessages == true then
         if M27Utilities.IsTableEmpty(aiBrain[reftMexesToKeepScoutsBy]) == true then
-            M27Utilities.ErrorHandler('No mexes on our side of map in pathing group outside core mexes - likely error unless unusual map setup', nil, true)
+            M27Utilities.ErrorHandler('No mexes on our side of map in pathing group outside core mexes - likely error unless unusual map setup', true)
         else
             LOG(sFunctionRef..': Finished recording mexes to keep scouts by='..repr(aiBrain[reftMexesToKeepScoutsBy])..'; count='..table.getn(aiBrain[reftMexesToKeepScoutsBy]))
         end
@@ -3824,6 +3835,7 @@ function UpdateNewPrimaryBaseLocation(aiBrain)
                         local iNearestEnemyBase = 10000
                         local tNearestEnemyBase
                         --Cycle through every valid enemy brain and pick the nearest one, if there is one
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through each brain to identify nearest enemy base') end
                         for iCurBrain, brain in ArmyBrains do
                             if not(brain == aiBrain) and not(M27Logic.IsCivilianBrain(brain)) and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()) and (not(brain:IsDefeated()) or not(ScenarioInfo.Options.Victory == "demoralization")) then
                                 if M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber]) < iNearestEnemyBase then
@@ -3868,8 +3880,10 @@ function UpdateNewPrimaryBaseLocation(aiBrain)
         --Have we changed position and are dealing with an M27 brain?
         if aiBrain.M27AI and not(tPrevPosition[1] == aiBrain[reftPrimaryEnemyBaseLocation][1] and tPrevPosition[3] == aiBrain[reftPrimaryEnemyBaseLocation][3]) then
             --We have changed position so update any global variables that reference this
+            if bDebugMessages == true then LOG(sFunctionRef..': Will update whether we can path to enemy') end
             ForkThread(SetWhetherCanPathToEnemy, aiBrain)
         end
+    elseif bDebugMessages == true then LOG(sFunctionRef..': Dealing with a civilian brain')
     end
 end
 

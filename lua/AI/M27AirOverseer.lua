@@ -116,6 +116,8 @@ refiEnemyMassInGroundAA = 'M27HighestEnemyGroundAAThreat'
 refiOurMassInMAA = 'M27OurMassInMAA'
 refiOurMAAUnitCount = 'M27OurMAAUnitCount'
 refiOurMassInAirAA = 'M27OurMassInAirAA'
+refiTimeOfLastMercy = 'M27TimeOfLastMercy'
+refbMercySightedRecently = 'M27MercySightedRecently'
 
 
 
@@ -1058,6 +1060,15 @@ function AirThreatChecker(aiBrain)
     if bDebugMessages == true then LOG(sFunctionRef..': About to calcualte threat level of enemy antiair units') end
     local iAllAirThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirAAUnits, true, true, false, false, false, nil, 0, 0, 0) * 1.25
     iAllAirThreat = iAllAirThreat + M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, true, false, true, true, nil, 0, 0, 0) * 0.4
+    if iAllAirThreat >= 200 then
+        if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMercy, tEnemyAirGroundUnits)) == false then
+            aiBrain[refiTimeOfLastMercy] = GetGameTimeSeconds()
+            aiBrain[refbMercySightedRecently] = true
+        elseif aiBrain[refbMercySightedRecently] and GetGameTimeSeconds() - aiBrain[refiTimeOfLastMercy] >= 120 then
+            aiBrain[refbMercySightedRecently] = false
+        end
+    elseif aiBrain[refbMercySightedRecently] and GetGameTimeSeconds() - aiBrain[refiTimeOfLastMercy] >= 120 then aiBrain[refbMercySightedRecently] = false
+    end
     --Increase enemy air threat based on how many factories and of what tech
     local tAirThreatByTech = {100, 500, 2000, 4000}
     local tEnemyAirFactories = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain[refiMaxScoutRadius], 'Enemy')
@@ -1066,6 +1077,7 @@ function AirThreatChecker(aiBrain)
             iAllAirThreat = iAllAirThreat + tAirThreatByTech[M27UnitInfo.GetUnitTechLevel(oAirFac)]
         end
     end
+
 
 
     if aiBrain[refiHighestEnemyAirThreat] == nil then aiBrain[refiHighestEnemyAirThreat] = 0 end
@@ -1618,7 +1630,7 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
                             bUpdateRefuelingUnits = true
                             while bUpdateRefuelingUnits do
                                 iLoopCount = iLoopCount + 1
-                                if iLoopCount >= 100 then M27Utilities.ErrorHandler('Infinite loop, iLoopCount='..iLoopCount) break end
+                                if iLoopCount >= 100 then M27Utilities.ErrorHandler('Infinite loop') break end
                                 bUpdateRefuelingUnits = false
                                 for iUnit, oUnit in tUnitsToRefuel do
                                     if M27UnitInfo.IsUnitValid(oUnit) == false or oUnit[refbSentRefuelCommand] then
@@ -3070,6 +3082,11 @@ function AirAAManager(aiBrain)
     local sFunctionRef = 'AirAAManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMAANearACURange = 25
+
+    if aiBrain[refbMercySightedRecently] then
+        if bDebugMessages == true then LOG(sFunctionRef..': Mercies sighted recently so will defend threats near ACU at a greater range') end
+        iMAANearACURange = 0
+    end
     local iEnemyGroundAASearchRange = 90
     local iOurHighestAirAATech = 1
     if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then
@@ -3095,9 +3112,12 @@ function AirAAManager(aiBrain)
         else tACUPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
         end
         local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-        local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tACUPos, iMAANearACURange, 'Ally')
+        local tNearbyMAA
+        if iMAANearACURange > 0 then tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tACUPos, iMAANearACURange, 'Ally') end
         if M27Utilities.IsTableEmpty(tNearbyMAA) == false then aiBrain[refiNearToACUThreshold] = iAssistNearbyUnitRange
-        else aiBrain[refiNearToACUThreshold] = 90 end
+        else aiBrain[refiNearToACUThreshold] = 90
+            if aiBrain[refbMercySightedRecently] then aiBrain[refiNearToACUThreshold] = 150 end
+        end
 
         local iEnemyAirSearchRange = aiBrain[refiMaxScoutRadius]
         if M27MapInfo.bNoRushActive then iEnemyAirSearchRange = math.min(iEnemyAirSearchRange, M27MapInfo.iNoRushRange) end
@@ -3458,14 +3478,42 @@ function AirAAManager(aiBrain)
         end
         if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then
             aiBrain[refbNonScoutUnassignedAirAATargets] = false --redundancy
-            if bDebugMessages == true then LOG(sFunctionRef..': Have available air units after assigning actions to deal with air threats; will send any remaining units to the rally point nearest the enemy unless theyre already near here') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Have available air units after assigning actions to deal with air threats; will send any remaining units to the rally point nearest the enemy unless theyre already near here; are considering aiBrain with armyindex='..aiBrain:GetArmyIndex()) end
             local tAirRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-            for iAirAA, oAirAA in aiBrain[reftAvailableAirAA] do
-               if M27Utilities.GetDistanceBetweenPositions(oAirAA:GetPosition(), tAirRallyPoint) > 40 then
-                   if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands of airAA unit '..oAirAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirAA)) end
-                   IssueClearCommands({oAirAA})
-                   IssueMove({oAirAA}, tAirRallyPoint)
-               end
+            local tAltRallyPoint = M27Utilities.GetACU(aiBrain):GetPosition()
+            local iAirUnitsWantAtAltRallyPoint = 0
+            if aiBrain[refbMercySightedRecently] and M27Utilities.GetDistanceBetweenPositions(tAltRallyPoint, tAirRallyPoint) >= 30 then iAirUnitsWantAtAltRallyPoint = 2 end
+
+            if iAirUnitsWantAtAltRallyPoint > 0 then
+                --Create table containing air units and their distance to the alt rally
+                local tAirUnitsByDistance = {}
+                local iCount = 0
+                local oAirAA
+                for iAirAA, oAirAA in aiBrain[reftAvailableAirAA] do
+                    tAirUnitsByDistance[iAirAA] = {}
+                    tAirUnitsByDistance[iAirAA]['Unit'] = oAirAA
+                    tAirUnitsByDistance[iAirAA]['DistToAlt'] = M27Utilities.GetDistanceBetweenPositions(tAltRallyPoint, oAirAA:GetPosition())
+                end
+                for iEntry, tValue in M27Utilities.SortTableBySubtable(tAirUnitsByDistance, 'DistToAlt', true) do
+                    oAirAA = tValue['Unit']
+                    iCount = iCount + 1
+                    if iCount <= iAirUnitsWantAtAltRallyPoint then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Sending airAA unit '..tValue['Unit'].UnitId..M27UnitInfo.GetUnitLifetimeCount(tValue['Unit'])..' to alt rally point; dist to rally='..tValue['DistToAlt']) end
+                        IssueClearCommands({oAirAA})
+                        IssueMove({oAirAA}, tAltRallyPoint)
+                    else
+                        IssueClearCommands({oAirAA})
+                        IssueMove({oAirAA}, tAirRallyPoint)
+                    end
+                end
+            else
+                for iAirAA, oAirAA in aiBrain[reftAvailableAirAA] do
+                   if M27Utilities.GetDistanceBetweenPositions(oAirAA:GetPosition(), tAirRallyPoint) > 40 then
+                       if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands of airAA unit '..oAirAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirAA)) end
+                       IssueClearCommands({oAirAA})
+                       IssueMove({oAirAA}, tAirRallyPoint)
+                   end
+                end
             end
         end
 

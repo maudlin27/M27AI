@@ -1007,12 +1007,13 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                     if bDebugMessages == true then LOG(sFunctionRef..': Have no more platoons to help, checking if we need to guard mexes') end
                     if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': Have enemy TML, size='..table.getn(aiBrain[M27Overseer.reftEnemyTML])) end
-                        --Search for nearest mex without a shield assigned
+                        --Search for nearest mex without a shield or TMD assigned
                         local tBuildingsWantingShield = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Radar, false, false)
                         if M27Utilities.IsTableEmpty(tBuildingsWantingShield) == false then
                             if bDebugMessages == true then LOG(sFunctionRef..': tBuildingsWantingShield size='..table.getn(tBuildingsWantingShield)) end
                             for iMex, oMex in tBuildingsWantingShield do
-                                if M27UnitInfo.IsUnitValid(oMex) then
+                                --Ignore if invalid or has TMD protecting it
+                                if M27UnitInfo.IsUnitValid(oMex) and M27Utilities.IsTableEmpty(oMex[M27UnitInfo.reftTMLDefence]) then
                                     if bDebugMessages == true then LOG(sFunctionRef..'iMex='..iMex..'; oMex='..oMex.UnitId..M27UnitInfo.GetUnitLifetimeCount(oMex)) end
                                     M27PlatoonUtilities.RecordPlatoonUnitsByType(oMex, true)
                                     oMex[M27PlatoonTemplates.refbWantsShieldEscort] = true
@@ -1166,7 +1167,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory)
                             local sUniqueCount = M27UnitInfo.GetUnitLifetimeCount(oNewUnit)
                             if sUniqueCount == nil then sUniqueCount = 'nil' end
                             if oNewUnit.GetUnitId then LOG('UnitId='..oNewUnit.UnitId..'; UniqueCount='..sUniqueCount) end
-                            M27Utilities.ErrorHandler('Waited 10 seconds for unit to leave land factory area and it still hasnt, will proceed with trying to form a platoon with it anyway', nil, true) break
+                            M27Utilities.ErrorHandler('Waited 10 seconds for unit to leave land factory area and it still hasnt, will proceed with trying to form a platoon with it anyway', true) break
                         end
                         if oNewUnit and not(oNewUnit.Dead) then
                             WaitTicks(1)

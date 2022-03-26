@@ -9,8 +9,12 @@ refProfilerEnd = 1
 
 --Debug variables
 bGlobalDebugOverride = false
+bM27AIInGame = false
+tErrorCountByMessage = {} --WHenever we have an error, then the error message is a key that gets included in this table
 
---Profiler variables
+
+
+--Profiling variables
 refiLastSystemTimeRecorded = 'M27ProfilingLastSystemTime' --Used for simple profiler to just measure how long something is taking without all the logs
 
 refProfilerStart = 0
@@ -41,17 +45,33 @@ tiProfilerEndCountByFunction = {} --[functionref] - Used if want to temporarily 
 --Example of usage of the above: M27Utilities.tiProfilerEndCountByFunction[sFunctionRef] = (M27Utilities.tiProfilerEndCountByFunction[sFunctionRef] or 0) + 1 LOG(sFunctionRef..': M27Utilities.tiProfilerEndCountByFunction[sFunctionRef]='..M27Utilities.tiProfilerEndCountByFunction[sFunctionRef])
 
 
-function ErrorHandler(sErrorMessage, iOptionalWaitInSeconds, bWarningNotError)
+function ErrorHandler(sErrorMessage, bWarningNotError)
     --Intended to be put in code wherever a condition isn't met that should be, so can debug it without the code crashing
     --Search for "error " in the log to find both these errors and normal lua errors, while not bringing up warnings
     if sErrorMessage == nil then sErrorMessage = 'Not specified' end
-    local sErrorBase = 'M27ERROR '
-    if bWarningNotError then sErrorBase = 'M27WARNING: ' end
-    sErrorBase = sErrorBase..'GameTime '..math.floor(GetGameTimeSeconds())..': '
-    sErrorMessage = sErrorBase..sErrorMessage
-    local a, s = pcall(assert, false, sErrorMessage)
-    WARN(a, s)
-    if iOptionalWaitInSeconds then WaitSeconds(iOptionalWaitInSeconds) end
+    local iCount = (tErrorCountByMessage[sErrorMessage] or 0) + 1
+    tErrorCountByMessage[sErrorMessage] = iCount
+    local iInterval = 1
+    local bShowError = true
+    if iCount > 10 then
+        bShowError = false
+        if iCount > 2000 then iInterval = 1000
+        elseif iCount > 500 then iInterval = 100
+        elseif iCount > 50 then iInterval = 25
+        else iInterval = 5
+        end
+        if math.floor(iCount / iInterval) == iCount/iInterval then bShowError = true end
+    end
+    if bShowError then
+        local sErrorBase = 'M27ERROR '
+        if bWarningNotError then sErrorBase = 'M27WARNING: ' end
+        sErrorBase = sErrorBase..'Count='..iCount..': GameTime '..math.floor(GetGameTimeSeconds())..': '
+        sErrorMessage = sErrorBase..sErrorMessage
+        local a, s = pcall(assert, false, sErrorMessage)
+        WARN(a, s)
+    end
+
+    --if iOptionalWaitInSeconds then WaitSeconds(iOptionalWaitInSeconds) end
 end
 
 function IsTableEmpty(tTable, bEmptyIfNonTableWithValue)
@@ -557,6 +577,18 @@ function ConvertM27AngleToFAFAngle(iM27Angle)
     return iFAFAngle
 end
 
+function IsLineFromAToBInRangeOfCircleAtC(iDistFromAToB, iDistFromAToC, iDistFromBToC, iAngleFromAToB, iAngleFromAToC, iCircleRadius)
+    --E.g. if TML is at point A, target is at point B, and TMD is at point C, does the TMD block the TML in a straight line?
+    if iDistFromAToC <= iCircleRadius or iDistFromBToC <= iCircleRadius then return true
+    elseif iDistFromAToB + iCircleRadius <= iDistFromAToC and iDistFromBToC then
+        if math.sin(iAngleFromAToC - iAngleFromAToB) * iDistFromAToC <= iCircleRadius then
+            return true
+        else return false
+        end
+    else return false
+    end
+end
+
 function GetAngleFromAToB(tLocA, tLocB)
     --Returns an angle 0 = north, 90 = east, etc. based on direction of tLocB from tLocA
     local iTheta = math.atan(math.abs(tLocA[3] - tLocB[3]) / math.abs(tLocA[1] - tLocB[1])) * 180 / math.pi
@@ -677,17 +709,22 @@ function GetACU(aiBrain)
             if IsTableEmpty(tSubstitutes) then
                 tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure)
                 if IsTableEmpty(tSubstitutes) then
-                    tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLand)
+                    tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMobileLand)
                 end
             end
         end
         if IsTableEmpty(tSubstitutes) then
+            ErrorHandler('Dont have a valid substitute ACU so will treat aiBrain '..aiBrain:GetArmyIndex()..' as being defeated')
             aiBrain.M27IsDefeated = true
         else
             aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(tSubstitutes, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
             if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
-                ErrorHandler('Dont have a valid substitute ACU, will treat us as being defeated')
-                aiBrain.M27IsDefeated = true
+                --Retry with all of above categories
+                aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
+                if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
+                    ErrorHandler('Dont have a valid substitute ACU, will treat aiBrain '..aiBrain:GetArmyIndex()..' as being defeated')
+                    aiBrain.M27IsDefeated = true
+                end
             else
                 aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] = true
             end
@@ -706,10 +743,8 @@ function GetACU(aiBrain)
                 end
             else
                 if ScenarioInfo.Options.Victory == "demoralization" then
-                    ErrorHandler('Cant find any ACUs that we own, and in assassination game mode, so will treat us as being defeated')
+                    ErrorHandler('Cant find any ACUs that we own for brain'..aiBrain:GetArmyIndex()..', and in assassination game mode, so will treat us as being defeated')
                     aiBrain.M27IsDefeated = true
-                    M27Overseer.tAllActiveM27Brains[aiBrain:GetArmyIndex()] = nil
-
                 else
                     GetSubstituteACU(aiBrain)
                     --WaitSeconds(30)
@@ -726,20 +761,24 @@ function GetACU(aiBrain)
             else
                 --is an error where if return the ACU then causes a hard crash (due to some of hte code that relies on this) - easiest way is to just return nil causing an error message that doesnt cause a hard crash
                 --(have tested without waiting any seconds and it avoids the hard crash, but waiting just to be safe)
-                --ErrorHandler('ACU is dead - will wait 1 second and then return nil', nil, true)
+                --ErrorHandler('ACU is dead - will wait 1 second and then return nil', true)
                 --WaitSeconds(1)
-                --ErrorHandler('ACU is dead - finished waiting 1 second to try and avoid crash', nil, true)
+                --ErrorHandler('ACU is dead - finished waiting 1 second to try and avoid crash', true)
                 M27Overseer.iACUAlternativeFailureCount = M27Overseer.iACUAlternativeFailureCount + 1
-                ErrorHandler('ACU is dead, will return nil if in assination, or a substitute unit otherwise; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
                 if ScenarioInfo.Options.Victory == "demoralization" then
+                    ErrorHandler('ACU is dead for brain'..aiBrain:GetArmyIndex()..', will return nil as are in assassination; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
                     aiBrain.M27IsDefeated = true
                 elseif aiBrain:IsDefeated() then
+                    ErrorHandler('AI brain '..aiBrain:GetArmyIndex()..' is showing as defeated; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
                     aiBrain.M27IsDefeated = true
                 else
+                    ErrorHandler('ACU is dead for brain'..aiBrain:GetArmyIndex()..', so will try and get a substitute as arent in assassination; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount, true)
                     GetSubstituteACU(aiBrain)
                 end
             end
-        elseif aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] and aiBrain:IsDefeated() then aiBrain.M27IsDefeated = true
+        elseif aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] and aiBrain:IsDefeated() then
+            ErrorHandler('aiBrain '..aiBrain:GetArmyIndex()..' is showing as having been defeated')
+            aiBrain.M27IsDefeated = true
         end
     end
     if aiBrain.M27IsDefeated then aiBrain[M27Overseer.refoStartingACU] = nil end
@@ -978,6 +1017,7 @@ end
 function FunctionProfiler(sFunctionRef, sStartOrEndRef)
     --sStartOrEndRef: refProfilerStart or refProfilerEnd (0 or 1)
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
+    if bDebugMessages == true then LOG('FunctionProfiler: Function '..sFunctionRef..'; sStartOrEndRef='..sStartOrEndRef) end
     if M27Config.M27RunProfiling then
 
         if sStartOrEndRef == refProfilerStart then

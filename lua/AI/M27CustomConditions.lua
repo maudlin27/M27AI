@@ -289,6 +289,7 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
     local sFunctionRef = 'WantToGetFirstACUUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Returns true if meet all the conditions that mean will want gun upgrade
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if bIgnoreEnemies == nil then bIgnoreEnemies = false end
     local bWantToGetGun = true
     local iGrossEnergyIncome
@@ -354,6 +355,13 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
         end
     end
 
+    --Backup check for mod games that have disabled the gun upgrade as an option
+    if bWantToGetGun and not(M27PlatoonUtilities.GetACUUpgradeWanted(aiBrain, M27Utilities.GetACU(aiBrain))) then
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Cant find any valid ACU upgrades') end
+        bWantToGetGun = false
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, bWantToGetGun='..tostring(bWantToGetGun)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bWantToGetGun
 end

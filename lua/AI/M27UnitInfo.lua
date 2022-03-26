@@ -41,6 +41,12 @@ refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
 refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
 refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adjacency and when first detected enemy SMD, but could be used for other things if want
 
+--TMD:
+refbTMDChecked = 'M27TMDChecked' --Used against enemy TML to flag if we've already checked for TMD we want when it was first detected
+reftTMLDefence = 'M27TMLDefence' --[sTMLRef] - returns either nil if not considered, or the unit object of TMD protecting it
+reftTMLThreats = 'M27TMLThreats' --[sTMLRef] - returns object number of TML that is threatening this unit
+refbCantBuildTMDNearby = 'M27CantBuildTMDNearby'
+
 
 --Factions
 refFactionUEF = 1
@@ -51,11 +57,12 @@ refFactionNomads = 5
 
 --Categories:
 --Buildings - eco
-refCategoryT1Mex = categories.STRUCTURE * categories.TECH1 * categories.MASSEXTRACTION
-refCategoryT2Mex = categories.STRUCTURE * categories.TECH2 * categories.MASSEXTRACTION
-refCategoryT3Mex = categories.STRUCTURE * categories.TECH3 * categories.MASSEXTRACTION
-refCategoryMex = categories.STRUCTURE * categories.MASSEXTRACTION
-refCategoryHydro = categories.HYDROCARBON
+refCategoryMex = categories.STRUCTURE * categories.MASSEXTRACTION - categories.NAVAL --Some mods add a naval mex which causes issues as we will try and build on land mexes without naval exclusion
+refCategoryT1Mex = refCategoryMex * categories.TECH1
+refCategoryT2Mex = refCategoryMex * categories.TECH2
+refCategoryT3Mex = refCategoryMex * categories.TECH3
+refCategoryHydro = categories.HYDROCARBON - categories.NAVAL
+
 refCategoryPower = categories.STRUCTURE * categories.ENERGYPRODUCTION - categories.EXPERIMENTAL - categories.HYDROCARBON
 refCategoryT1Power = categories.STRUCTURE * categories.ENERGYPRODUCTION * categories.TECH1 - categories.EXPERIMENTAL - categories.HYDROCARBON
 refCategoryT2Power = categories.STRUCTURE * categories.ENERGYPRODUCTION * categories.TECH2 - categories.EXPERIMENTAL - categories.HYDROCARBON
@@ -88,7 +95,7 @@ refCategoryAllFactories = refCategoryLandFactory + refCategoryAirFactory + refCa
 refCategoryT2PlusPD = categories.STRUCTURE * categories.DIRECTFIRE - categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH1
 refCategoryPD = categories.STRUCTURE * categories.DIRECTFIRE
 refCategoryT3PD = refCategoryPD * categories.TECH3
-refCategoryTMD = categories.ANTIMISSILE - categories.SILO * categories.TECH3 --Not perfect but should pick up most TMD without picking up SMD
+refCategoryTMD = categories.STRUCTURE * categories.ANTIMISSILE - categories.SILO * categories.TECH3 --Not perfect but should pick up most TMD without picking up SMD
 refCategoryFixedShield = categories.SHIELD * categories.STRUCTURE
 refCategoryFixedT2Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH2
 refCategoryFixedT3Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH3
@@ -136,6 +143,7 @@ refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3
 refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
+refCategoryMercy = categories.HIGHPRIAIR * categories.AEON * categories.BOMBER * categories.TECH2
 
 --Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
@@ -155,6 +163,7 @@ refCategoryDangerousToLand = refCategoryLandCombat + refCategoryIndirect + refCa
 refCategoryAllNonAirScoutUnits = categories.MOBILE + refCategoryStructure + refCategoryAirNonScout
 refCategoryStealthGenerator = categories.STEALTHFIELD
 refCategoryStealthAndCloakPersonal = categories.STEALTH
+refCategoryProtectFromTML = refCategoryT2Mex + refCategoryT3Mex + refCategoryT2Power + refCategoryT3Power + refCategoryFixedT2Arti
 
 
 --Weapon target priorities
