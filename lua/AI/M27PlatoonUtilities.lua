@@ -1999,7 +1999,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local bProceed = true
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -2174,12 +2174,19 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                     end
                                 end
                                 iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftFriendlyNearbyCombatUnits], false)
+                                local iEnemyThreatRatioToRunOn = 1.2
+                                local iMinPercentOfMexesWanted = (1 / M27Overseer.iPlayersAtGameStart) * 0.7
+                                if aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup] >= aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] * iMinPercentOfMexesWanted then iEnemyThreatRatioToRunOn = 1.3
+                                elseif bHaveMostMexes or aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup] >= aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] * (1 / M27Overseer.iPlayersAtGameStart) then iEnemyThreatRatioToRunOn = 0.9 end
+
+
                                 if bDebugMessages == true then LOG(sFunctionRef..': iOurThreatRating='..iOurThreatRating..'; iEnemyThreatRating='..iEnemyThreatRating..'; will run if our threat rating less than 80% of enemy') end
-                                if iOurThreatRating <= iEnemyThreatRating * 1.2 or (bHaveMostMexes and iOurThreatRating <= (iEnemyThreatRating * 2)) then
+
+                                if iOurThreatRating <= iEnemyThreatRating * iEnemyThreatRatioToRunOn or (bHaveMostMexes and iOurThreatRating <= (iEnemyThreatRating * 2)) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Enemy threat level is high enough we want to run, unless most of it is in structure threat; iEnemyStructureThreatRating='..iEnemyStructureThreatRating..'; iEnemyThreatRating='..iEnemyThreatRating..'; aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup]='..aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup]..'; aiBrain[M27Overseer.refiAllMexesInBasePathingGroup]='..aiBrain[M27Overseer.refiAllMexesInBasePathingGroup]..'; M27Overseer.iPlayersAtGameStart='..M27Overseer.iPlayersAtGameStart..'; aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] * ((M27Overseer.iPlayersAtGameStart - 1) / M27Overseer.iPlayersAtGameStart + 0.1)='..aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] * ((M27Overseer.iPlayersAtGameStart - 1) / M27Overseer.iPlayersAtGameStart + 0.1)) end
                                     bACUNeedsToRun = true
                                     --Run if enemy has a larger threat unless we have really bad mexes and need to try and push
-                                    local iMinPercentOfMexesWanted = (1 / M27Overseer.iPlayersAtGameStart) * 0.7
+
                                     if iOurThreatRating > (iEnemyThreatRating - iEnemyStructureThreatRating) * 1.25 or (aiBrain[M27Overseer.refiEnemyHighestTechLevel] <= 2 and aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup] >= aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] * iMinPercentOfMexesWanted and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], GetPlatoonFrontPosition(oPlatoon)) >= 32) then
                                         --Dont run if most of the threat is structures and we arent in range of enemy PD (or if we are in range of PD, the enemy mobile threat is even less)
                                         if bDebugMessages == true then LOG(sFunctionRef..': Our threat rating is more tahn 1.25 of the enemy mobile threat rating, or enemy is only at T2 and we want to try and gain map control with our ACU and their ACU isnt nearby') end
@@ -4511,7 +4518,7 @@ function DeterminePlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
@@ -7139,7 +7146,7 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end

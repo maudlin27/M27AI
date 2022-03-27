@@ -135,7 +135,7 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
                 --if EntityCategoryContains(iCategoryCondition, sBlueprint) then --tBlueprints is already filtered to just those that meet the categories
                 iValidBlueprints = iValidBlueprints + 1
                 tValidBlueprints[iValidBlueprints] = sBlueprint
-                if EntityCategoryContains(categories.TECH3, sBlueprint) then iCurrentTech = 3
+                if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, sBlueprint) then iCurrentTech = 3
                 elseif EntityCategoryContains(categories.TECH2, sBlueprint) then iCurrentTech = 2
                 else iCurrentTech = 1
                 end
@@ -162,6 +162,7 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
                     oCurBlueprint = tAllBlueprints[sBlueprint]
                     iCurMass = oCurBlueprint.Economy.BuildCostMass
                     if iCurMass < tiLowestMassByTech[iCurrentTech] then tiLowestMassByTech[iCurrentTech] = iCurMass end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want to get cheapest; iCurMass='..iCurMass..'; iCurrentTech='..iCurrentTech..'; tiLowestMassByTech[iCurrentTech]='..tiLowestMassByTech[iCurrentTech]) end
                 end
                 --end
             end
@@ -182,7 +183,7 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
 
     for _, sBlueprint in tValidBlueprints do
         bIsValid = false
-        if EntityCategoryContains(categories.TECH3, sBlueprint) then iCurrentTech = 3
+        if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, sBlueprint) then iCurrentTech = 3
         elseif EntityCategoryContains(categories.TECH2, sBlueprint) then iCurrentTech = 2
         else iCurrentTech = 1
         end
@@ -213,7 +214,8 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
                     elseif bGetCheapest then
                         oCurBlueprint = tAllBlueprints[sBlueprint]
                         iCurMass = oCurBlueprint.Economy.BuildCostMass
-                        if iCurMass < tiLowestMassByTech[iCurrentTech] then bIsValid = true end
+                        if iCurMass <= tiLowestMassByTech[iCurrentTech] then bIsValid = true end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want to get cheapest; iCurMass='..iCurMass..'; iCurrentTech='..iCurrentTech..'; tiLowestMassByTech[iCurrentTech]='..tiLowestMassByTech[iCurrentTech]..'; bIsValid='..tostring(bIsValid)) end
                     else M27Utilities.ErrorHandler('Missing code')
                     end
                 end
