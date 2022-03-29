@@ -45,10 +45,15 @@ function OnKilled(self, instigator, type, overkillRatio)
                         M27AirOverseer.CheckForUnseenKiller(aiBrain, self, oKillerUnit)
                     end
                 end
+            else
+                if instigator and IsUnit(instigator) and EntityCategoryContains(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, instigator.UnitId) then
+                    local oKillerBrain = instigator:GetAIBrain()
+                    local iSegmentX, iSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(instigator:GetPosition())
+                    if not(oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX]) then oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX] = {} end
+                    oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX][iSegmentZ] = math.max(0,(oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX][iSegmentZ] or 0) - 1)
+                end
             end
         end
-        local sFunctionRef = 'OnKilled'
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end

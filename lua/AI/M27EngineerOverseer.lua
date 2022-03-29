@@ -2630,7 +2630,7 @@ function GetPartCompleteBuilding(aiBrain, oBuilder, iCategoryToBuild, iBuildingS
 end
 
 function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideOnExperimentalToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -2673,11 +2673,18 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
     --Backup incase nothing noted, and/or if we havent previously assigned
     if not(iCategoryToBuild) then
         --Can we path to enemy base with amphibious unit, and is there a land unit withi n40% of our base? then build land experimental
-        if bDebugMessages == true then LOG(sFunctionRef..': Deciding if want land experimental due to nearby enemy threat; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) end
-        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 0.4 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) <= 3 then
+        local tEnemyPDThreat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(1000, aiBrain[M27AirOverseer.refiMaxScoutRadius]), 'Enemy')
+        local iEnemyPDThreat = 0
+        if M27Utilities.IsTableEmpty(tEnemyPDThreat) == false then
+            iEnemyPDThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyPDThreat, true, nil, nil, false, false)
+        end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Deciding if want land experimental due to nearby enemy threat; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; Enemy PD threat='..iEnemyPDThreat) end
+
+        if (iEnemyPDThreat <= 17500 or iFactionIndex == M27UnitInfo.refFactionUEF) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 0.4 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) <= 3 then
             iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
             if bDebugMessages == true then LOG(sFunctionRef..': WIll build land experimental') end
-        elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 500 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 1) then
+        elseif (iEnemyPDThreat <= 22500 or iFactionIndex == M27UnitInfo.refFactionUEF) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 500 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 1) then
             iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
             if bDebugMessages == true then LOG(sFunctionRef..': WIll build land experimental as havent built any before and are relatively close to enemy base') end
         else
@@ -2787,17 +2794,99 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
                             end
                         end
                     end
-                else
-                    --Other faction logic - for now placeholder for T3 arti
-                    local iCurrentT3Arti = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT3Arti)
-                    if not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3 + iCurrentT3Arti)) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12 then
-                        iCategoryToBuild = M27UnitInfo.refCategoryFixedT3Arti
+                else --Non-UEF faction so have experimental air available
+                    --First consider if want experimental land
+                    --Note - construction logic will automatically seek the cheapest land experimental if we havent built any before, so no need to code specific logic to pick monkeylord over megalith
+
+                    local bNearbyLandExperimental = false
+                    if iEnemyPDThreat <= 20000 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
+                        local iNearbyDist = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.55
+                        for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
+                            if M27UnitInfo.IsUnitValid(oUnit) then
+                                if M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false) <= iNearbyDist then
+                                    bNearbyLandExperimental = true
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': bNearbyLandExperimental='..tostring(bNearbyLandExperimental)..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; aiBrain[M27AirOverseer.refiEnemyMassInGroundAA]='..aiBrain[M27AirOverseer.refiEnemyMassInGroundAA]..'; aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL)='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL)) end
+
+                    --Do we want to build an experimental air unit?
+                    if iFactionIndex == M27UnitInfo.refFactionAeon or iFactionIndex == M27UnitInfo.refFactionCybran or iFactionIndex == M27UnitInfo.refFactionSeraphim then
+                        local iAirRatioWanted = 0.8
+                        if iFactionIndex == M27UnitInfo.refFactionAeon then iAirRatioWanted = 0.7 end
+                        local iMaxT3AA = 5
+                        local iVulnerableMexesWanted = 4 --For aeon - Czar more versatile for maintaining air control and attritional battles
+                        --Soulripper has stealth so easier to target vulnerable mexes; Bomber able to fire from a distance so can also be effective
+                        if iFactionIndex == M27UnitInfo.refFactionCybran then
+                            iMaxT3AA = 8
+                            iVulnerableMexesWanted = 8
+                        elseif iFactionIndex == M27UnitInfo.refFactionSeraphim then
+                            iMaxT3AA = 6
+                            iVulnerableMexesWanted = 6
+                        end
+                        local bEnemyHasLowAA = false
+                        if aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] <= 10000 then bEnemyHasLowAA = true
+                        else
+                            local tEnemyT3AA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
+                            if M27Utilities.IsTableEmpty(tEnemyT3AA) or table.getn(tEnemyT3AA) <= iMaxT3AA then bEnemyHasLowAA = true end
+                        end
+
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if enemy has low AA; bEnemyHasLowAA='..tostring(bEnemyHasLowAA)..'; aiBrain[M27AirOverseer.refiEnemyMassInGroundAA]='..aiBrain[M27AirOverseer.refiEnemyMassInGroundAA]..'; refiOurMassInAirAA wanted='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * iAirRatioWanted) end
+                        if (aiBrain[M27AirOverseer.refiOurMassInAirAA] >= aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * iAirRatioWanted or aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] <= 5000) and aiBrain[M27AirOverseer.refiAirAANeeded] <= 2 and bEnemyHasLowAA then
+                            --Does the enemy have a land experimental within 55% of our base and we dont ahve any experimental air? Then go for air unit
+                            if bDebugMessages == true then LOG(sFunctionRef..': We have air control, so will build experimental air unless we already own one') end
+                            if bNearbyLandExperimental and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) <= 0 then
+                                iCategoryToBuild = M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL
+                                if bDebugMessages == true then LOG(sFunctionRef..' Will build experimental air') end
+                            else
+                                --Calculate how many vulnerable enemy mex targets there are - any T2+ mexes with no T3 AA and not under a heavy shield
+                                if aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] <= 5000 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] <= 2500 and aiBrain[M27AirOverseer.refiAirAANeeded] <= 0 then
+                                    --iCategoryToBuild = M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL
+                                    iCategoryToBuild = M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef..': Enemy has minimal AA so will build air experimental')
+                                        if iCategoryToBuild == M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL then
+                                            LOG('Category to build is air experimental') --Note - for some reason this test doesnt work; however the repr confirms it's still looking at air experimentals
+                                        else
+                                            LOG(repr(EntityCategoryGetUnitList(iCategoryToBuild)))
+                                        end
+                                    end
+
+                                else
+
+                                    local tVulnerableMexes = M27AirOverseer.GetVulnerableMexes(aiBrain, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 14000)
+                                    local iMexesWanted = iVulnerableMexesWanted + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) * iVulnerableMexesWanted * 0.5
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will see if we have enough vulnerable mexes; iVulnerableMexes='..table.getn(tVulnerableMexes)..'; iMexesWanted='..iMexesWanted) end
+                                    if table.getn(tVulnerableMexes) >= iMexesWanted then
+                                        iCategoryToBuild = M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL
+                                        if bDebugMessages == true then LOG(sFunctionRef..' Will build experimental air') end
+                                    end
+                                end
+                            end
+                        end
+                        if not(iCategoryToBuild) then
+                            --Either enemy land experimental on our side of map, or the nearest threat is within 45% of start and is pathable amphibiously
+                            if iEnemyPDThreat <= 20000 and (bNearbyLandExperimental or (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]))) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will build land experimental as nearby experimental or we can path to nearest <=45% threat') end
+                                iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
+                            end
+                        end
+                    else
+
+                        --Other faction logic - T3 arti
+                        local iCurrentT3Arti = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT3Arti)
+                        if not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3 + iCurrentT3Arti)) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12 then
+                            iCategoryToBuild = M27UnitInfo.refCategoryFixedT3Arti
+                        end
                     end
                 end
 
                 if not(iCategoryToBuild) then
                     --Backup - if still nothing to build, then build a land experimental if we can path to the enemy base by amphibious, or a t3 arti if we cant
-                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then
+                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and (iFactionIndex == M27UnitInfo.refFactionUEF or iEnemyPDThreat <= 22000) then
                         iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
                     else
                         iCategoryToBuild = M27UnitInfo.refCategoryFixedT3Arti
@@ -2816,7 +2905,8 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
             local oT3EngiOfOurFaction = tT3EngisOfOurFaction[1]
             if not(M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oT3EngiOfOurFaction)) then
                 --Cant build the desired experimental, try every experimental type category
-                local tPossibleCategory = {M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategoryAllAir * categories.EXPERIMENTAL, M27UnitInfo.refCategoryNovaxCentre, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryExperimentalStructure}
+                if bDebugMessages == true then LOG(sFunctionRef..': Cant build desired experimental, will get other possibilities') end
+                local tPossibleCategory = {M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategoryAllAir * categories.EXPERIMENTAL, M27UnitInfo.refCategoryNovaxCentre, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, M27UnitInfo.refCategoryExperimentalStructure}
                 for _, iAltCategory in tPossibleCategory do
                     if M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oT3EngiOfOurFaction) then
                         iCategoryToBuild = iAltCategory
@@ -2835,8 +2925,11 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
         elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryLandExperimental then LOG('Last experimental was land experimental')
         elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryFixedT3Arti then LOG('Last experimental was T3 arti')
         elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryNovaxCentre then LOG('Last experimental was novax')
+        elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL then LOG('Last experimental was experimental air')
         elseif not(aiBrain[refiLastExperimentalCategory]) then LOG('Last experimental category not specified')
-        else LOG('Unkown last experimental category')
+        else
+            LOG('Unkown last experimental category; will list out all blueprints that meet this category')
+            LOG(repr(EntityCategoryGetUnitList(aiBrain[refiLastExperimentalCategory])))
         end
     end
     return iCategoryToBuild
@@ -4144,7 +4237,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
         if M27Utilities.IsTableEmpty(tAllBuildings) == false then
             for iBuilding, oBuilding in tAllBuildings do
                 if bDebugMessages == true then LOG(sFunctionRef..': iBuilding='..iBuilding..'; oBuilding Id='..oBuilding.UnitId..'; Unit state='..M27Logic.GetUnitState(oBuilding)) end
-                if oBuilding:GetFractionComplete() < 1 or bIgnoreUnitState or (oBuilding.IsUnitState and (oBuilding:IsUnitState(sUnitStateWanted) or (sAltUnitStateWanted and oBuilding:IsUnitState(sAltUnitStateWanted)))) then
+                if not(oBuilding[M27EconomyOverseer.refbWillReclaimUnit]) and (oBuilding:GetFractionComplete() < 1 or bIgnoreUnitState or (oBuilding.IsUnitState and (oBuilding:IsUnitState(sUnitStateWanted) or (sAltUnitStateWanted and oBuilding:IsUnitState(sAltUnitStateWanted))))) then
                     tCurPosition = oBuilding:GetPosition()
                     iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tStartPosition)
                     if bDebugMessages == true then LOG(sFunctionRef..': iBuilding is '..sUnitStateWanted..';  its distance to start='..iCurDistanceToStart) end

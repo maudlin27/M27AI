@@ -741,7 +741,13 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
             end
             if M27Utilities.IsTableEmpty(tIndirect) == false then AddIdleUnitsToPlatoon(aiBrain, tIndirect, aiBrain[M27PlatoonTemplates.refoIdleIndirect]) end
             if M27Utilities.IsTableEmpty(tStructures) == false then AddIdleUnitsToPlatoon(aiBrain, tStructures, aiBrain[M27PlatoonTemplates.refoAllStructures]) end
-            if M27Utilities.IsTableEmpty(tAir) == false then AddIdleUnitsToPlatoon(aiBrain, tAir, aiBrain[M27PlatoonTemplates.refoIdleAir]) end
+            if M27Utilities.IsTableEmpty(tAir) == false then
+                AddIdleUnitsToPlatoon(aiBrain, tAir, aiBrain[M27PlatoonTemplates.refoIdleAir])
+                --Are we dealing with experimental air?
+                for iExperimental, oExperimental in EntityCategoryFilterDown(categories.EXPERIMENTAL, tAir) do
+                    ForkThread(M27AirOverseer.ExperimentalAirManager, oExperimental)
+                end
+            end
             if M27Utilities.IsTableEmpty(tMobileShield) == false then AllocateNewUnitsToPlatoonNotFromFactory(tMobileShield) end
             if M27Utilities.IsTableEmpty(tOther) == false then
                 AddIdleUnitsToPlatoon(aiBrain, tOther, aiBrain[M27PlatoonTemplates.refoIdleOther])

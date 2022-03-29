@@ -1478,6 +1478,15 @@ function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDel
     ForkThread(ForkedDelayedChangedVariable, oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerConditionRef, iMustBeLessThanThisTimeValue, iMustBeMoreThanThisTimeValue, vMustNotEqualThisValue)
 end
 
+function ForkedDelayedChangedSubtable(oVariableOwner, sPrimaryRef, vSubtable1Ref, vSubtable2Ref, iVariableChange, iDelayInSeconds)
+    WaitSeconds(iDelayInSeconds)
+    oVariableOwner[sPrimaryRef][vSubtable1Ref][vSubtable2Ref] = oVariableOwner[vSubtable1Ref][vSubtable2Ref] + iVariableChange
+end
+
+function DelayChangeSubtable(oVariableOwner, sPrimaryRef, vSubtable1Ref, vSubtable2Ref, iVariableChange, iDelayInSeconds)
+    ForkThread(ForkedDelayedChangedSubtable, oVariableOwner, sPrimaryRef, vSubtable1Ref, vSubtable2Ref, iVariableChange, iDelayInSeconds)
+end
+
 
 function DebugArray(Table)
     --Thanks to Uveso who gave me this as a solution for doing a repr of a large table such as a unit or aiBrain that would normally crash the game

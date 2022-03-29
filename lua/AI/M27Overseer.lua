@@ -3720,7 +3720,7 @@ function ACUManager(aiBrain)
                         end
 
                         if oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon] and oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentUnits] > 1 then
-                            if GetGameTimeSeconds() - oACUPlatoon[M27PlatoonUtilities.refiLastTimeWantedEscort] >= 15 then
+                            if GetGameTimeSeconds() - (oACUPlatoon[M27PlatoonUtilities.refiLastTimeWantedEscort] or 0) >= 15 then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will tell escorting platoon to disband') end
                                 oACUPlatoon[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
                             end
@@ -4783,6 +4783,11 @@ end
 function ACUInitialisation(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ACUInitialisation'
+
+    --Wait until 4.5s have elapsed as humans cant start building before 4.5-5s it seems
+    while GetGameTimeSeconds() <= 4.5 do
+        WaitTicks(1)
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local oACU = M27Utilities.GetACU(aiBrain)
@@ -5230,6 +5235,12 @@ function OverseerManager(aiBrain)
     LOG('M27Brain overseer logic is active. Nickname='..aiBrain.Nickname..'; ArmyIndex='..aiBrain:GetArmyIndex()..'; Start position='..aiBrain.M27StartPositionNumber..'; Start position='..repr(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Nearest enemy brain details: Name='..tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain)].Nickname..'; ArmyIndex='..M27Logic.GetNearestEnemyIndex(aiBrain)..'; Start position='..M27Logic.GetNearestEnemyStartNumber(aiBrain)..'; Start position='..repr(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]))
 
     --ForkThread(TempCreateReclaim, aiBrain)
+
+    --Start of game - wait until units can build (seems to be around 4.5-5s)
+    while(GetGameTimeSeconds() <= 4.5) do
+        WaitTicks(1)
+    end
+
 
 
     while(not(aiBrain:IsDefeated())) do
