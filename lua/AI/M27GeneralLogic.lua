@@ -1952,7 +1952,6 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     local sFunctionRef = 'IsUnitIdle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) and M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 32 then bDebugMessages = true end
 
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
@@ -3609,7 +3608,8 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
 
             end
             if iLoopCount > iMaxLoop3 then
-                M27Utilities.ErrorHandler('Couldnt find random point in area after looking more than iMaxLoop3='..iMaxLoop3..' times, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1]))
+
+                M27Utilities.ErrorHandler('Couldnt find random point in area after looking more than iMaxLoop3='..iMaxLoop3..' times, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1])..';hopefully the code that called this should recheck pathing')
                 if bDebugMessages == true then
                     --Draw midpoint in white, draw last place checked in gold
                     M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 4, 20)
@@ -3652,7 +3652,6 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
             end
         end
 
-        --Can we path here?
         iPathingTarget = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iRandX, iRandZ)
 
         if bDebugMessages == true then
@@ -4348,8 +4347,17 @@ function DetermineTMDWantedForTML(aiBrain, oTML, toOptionalUnitsToProtect)
     if toOptionalUnitsToProtect then
         tUnitsToProtect = {}
         for iUnit, oUnit in toOptionalUnitsToProtect do
-            if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTMLPosition) <= iTMLRange then
-                table.insert(tUnitsToProtect, oUnit)
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTMLPosition) <= iTMLRange then
+                    table.insert(tUnitsToProtect, oUnit)
+                end
+            else
+                --If unit is listed in table of units wanting protection then remove it
+                if oUnit.UnitId then
+                    if aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] then
+                        aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil
+                    end
+                end
             end
         end
     else
@@ -4371,48 +4379,50 @@ function DetermineTMDWantedForTML(aiBrain, oTML, toOptionalUnitsToProtect)
         local iAngleTMLToTMD
         local sUnitRef
         for iUnit, oUnit in tUnitsToProtect do
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; IsTable for oUnit[M27UnitInfo.reftTMLDefence] empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftTMLDefence]))..'; oUnit[M27UnitInfo.refbCantBuildTMDNearby]='..tostring((oUnit[M27UnitInfo.refbCantBuildTMDNearby] or false))) end
-            if not(oUnit[M27UnitInfo.reftTMLDefence] and oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]) and not(oUnit[M27UnitInfo.refbCantBuildTMDNearby]) then
-                --Havent considered this TML yet
-                --oUnit[M27UnitInfo.reftTMLDefence][sTMLRef] = false --Decided to clear this as want to be able see if we have any TMD built for a unit by checking if this table is empty
-                --Is the unit in the same pathing group as our base? (if not wont wnat to try and build TMD to cover it)
-                if bDebugMessages == true then LOG(sFunctionRef..': iBasePathingGroup='..iBasePathingGroup..'; Unit pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())) end
-                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) == iBasePathingGroup then
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; IsTable for oUnit[M27UnitInfo.reftTMLDefence] empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftTMLDefence]))..'; oUnit[M27UnitInfo.refbCantBuildTMDNearby]='..tostring((oUnit[M27UnitInfo.refbCantBuildTMDNearby] or false))) end
+                if not(oUnit[M27UnitInfo.reftTMLDefence] and oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]) and not(oUnit[M27UnitInfo.refbCantBuildTMDNearby]) then
+                    --Havent considered this TML yet
+                    --oUnit[M27UnitInfo.reftTMLDefence][sTMLRef] = false --Decided to clear this as want to be able see if we have any TMD built for a unit by checking if this table is empty
+                    --Is the unit in the same pathing group as our base? (if not wont wnat to try and build TMD to cover it)
+                    if bDebugMessages == true then LOG(sFunctionRef..': iBasePathingGroup='..iBasePathingGroup..'; Unit pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())) end
+                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) == iBasePathingGroup then
 
-                    sUnitRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
-                    iBuildingSize = M27UnitInfo.GetBuildingSize(oUnit.UnitId)
-                    iAngleTMLToUnit = M27Utilities.GetAngleFromAToB(tTMLPosition, oUnit:GetPosition())
-                    if not(oUnit[M27UnitInfo.reftTMLDefence]) then oUnit[M27UnitInfo.reftTMLDefence] = {} end
-                    if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
-                        for iTMD, oTMD in tNearbyTMD do
-                            bCanBlock = false
-                            iUnitToTMD = M27Utilities.GetDistanceBetweenPositions(oTMD:GetPosition(), oUnit:GetPosition())
-                            iUnitToTML = M27Utilities.GetDistanceBetweenPositions(tTMLPosition, oUnit:GetPosition())
-                            iTMDToTML = M27Utilities.GetDistanceBetweenPositions(oTMD:GetPosition(), tTMLPosition)
-                            if EntityCategoryContains(categories.AEON, oTMD.UnitId) then
-                                iTMDRange = 12.5
-                            else iTMDRange = (oTMD:GetBlueprint().Weapon[1].MaxRadius or 31) - 10 --Reduce by 10 to factor in effective range (a guess as to how much coverage is needed)
-                            end
-                            --Reduce TMDRange to the effective range
-                            iTMDRange = iTMDRange - iBuildingSize
-                            iAngleTMLToTMD = M27Utilities.GetAngleFromAToB(tTMLPosition, oTMD:GetPosition())
-                            if M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iUnitToTML, iTMDToTML, iUnitToTMD, iAngleTMLToUnit, iAngleTMLToTMD, iTMDRange) then
-                                --TMD can block the TML
-                                if bDebugMessages == true then LOG(sFunctionRef..': oTMD='..oTMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTMD)..' can block the TML so will record it') end
-                                oUnit[M27UnitInfo.reftTMLDefence][sTMLRef] = oTMD
-                                if not(oTMD[M27UnitInfo.reftTMLDefence]) then oTMD[M27UnitInfo.reftTMLDefence] = {} end
-                                oTMD[M27UnitInfo.reftTMLDefence][sUnitRef] = oUnit
-                                break
+                        sUnitRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                        iBuildingSize = M27UnitInfo.GetBuildingSize(oUnit.UnitId)[1]
+                        iAngleTMLToUnit = M27Utilities.GetAngleFromAToB(tTMLPosition, oUnit:GetPosition())
+                        if not(oUnit[M27UnitInfo.reftTMLDefence]) then oUnit[M27UnitInfo.reftTMLDefence] = {} end
+                        if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                            for iTMD, oTMD in tNearbyTMD do
+                                bCanBlock = false
+                                iUnitToTMD = M27Utilities.GetDistanceBetweenPositions(oTMD:GetPosition(), oUnit:GetPosition())
+                                iUnitToTML = M27Utilities.GetDistanceBetweenPositions(tTMLPosition, oUnit:GetPosition())
+                                iTMDToTML = M27Utilities.GetDistanceBetweenPositions(oTMD:GetPosition(), tTMLPosition)
+                                if EntityCategoryContains(categories.AEON, oTMD.UnitId) then
+                                    iTMDRange = 12.5
+                                else iTMDRange = (oTMD:GetBlueprint().Weapon[1].MaxRadius or 31) - 10 --Reduce by 10 to factor in effective range (a guess as to how much coverage is needed)
+                                end
+                                --Reduce TMDRange to the effective range
+                                iTMDRange = iTMDRange - iBuildingSize
+                                iAngleTMLToTMD = M27Utilities.GetAngleFromAToB(tTMLPosition, oTMD:GetPosition())
+                                if M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iUnitToTML, iTMDToTML, iUnitToTMD, iAngleTMLToUnit, iAngleTMLToTMD, iTMDRange) then
+                                    --TMD can block the TML
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oTMD='..oTMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTMD)..' can block the TML so will record it') end
+                                    oUnit[M27UnitInfo.reftTMLDefence][sTMLRef] = oTMD
+                                    if not(oTMD[M27UnitInfo.reftTMLDefence]) then oTMD[M27UnitInfo.reftTMLDefence] = {} end
+                                    oTMD[M27UnitInfo.reftTMLDefence][sUnitRef] = oUnit
+                                    break
+                                end
                             end
                         end
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Is TMD empty for sTMLRef='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]))) end
-                    if not(oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]) then
-                        --Dont have anything to protect this unit, and its in the same pathing group as our base, so add it to list of units that want protection
-                        aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][sUnitRef] = oUnit
-                        if not(oUnit[M27UnitInfo.reftTMLThreats]) then oUnit[M27UnitInfo.reftTMLThreats] = {} end
-                        oUnit[M27UnitInfo.reftTMLThreats][sTMLRef] = oTML
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have recorded oTML with sTMLRef='..sTMLRef..' as a threat for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Is TMD empty for sTMLRef='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]))) end
+                        if not(oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]) then
+                            --Dont have anything to protect this unit, and its in the same pathing group as our base, so add it to list of units that want protection
+                            aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][sUnitRef] = oUnit
+                            if not(oUnit[M27UnitInfo.reftTMLThreats]) then oUnit[M27UnitInfo.reftTMLThreats] = {} end
+                            oUnit[M27UnitInfo.reftTMLThreats][sTMLRef] = oTML
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have recorded oTML with sTMLRef='..sTMLRef..' as a threat for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                        end
                     end
                 end
             end
@@ -4428,12 +4438,36 @@ function DetermineTMDWantedForUnits(aiBrain, tUnits)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --First remove tUnits from the list of units wanting TMD (will re-add them per the below if we still want TMD)
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Start of code, will consider TMD wanted for tUnits.  Log of units in tUnits:')
+        for iUnit, oUnit in tUnits do
+            LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+        end
+    end
     for iUnit, oUnit in tUnits do
         aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil
     end
 
+    --First check we still have valid TML
+    local bValidTML = false
+
     for iTML, oTML in aiBrain[M27Overseer.reftEnemyTML] do
-        DetermineTMDWantedForTML(aiBrain, oTML, tUnits)
+        if M27UnitInfo.IsUnitValid(oTML) then
+            bValidTML = true
+            DetermineTMDWantedForTML(aiBrain, oTML, tUnits)
+        end
+    end
+    if not(bValidTML) then aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] = false end
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Finished updating TMD wanted for all TML.  Will list out units flagged as wanting TMD')
+        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftUnitsWantingTMD]) then
+            LOG(sFunctionRef..': No units wanting TMD')
+        else
+            for iUnit, oUnit in aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] do
+               LOG(sFunctionRef..': '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+            end
+        end
+        LOG(sFunctionRef..': End of code')
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

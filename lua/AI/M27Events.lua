@@ -48,9 +48,15 @@ function OnKilled(self, instigator, type, overkillRatio)
             else
                 if instigator and IsUnit(instigator) and EntityCategoryContains(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, instigator.UnitId) then
                     local oKillerBrain = instigator:GetAIBrain()
-                    local iSegmentX, iSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(instigator:GetPosition())
-                    if not(oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX]) then oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX] = {} end
-                    oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX][iSegmentZ] = math.max(0,(oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX][iSegmentZ] or 0) - 1)
+                    if oKillerBrain.M27AI then
+                        local iSegmentX, iSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(instigator:GetPosition())
+                        for iXAdj = -1, 1 do
+                            for iZAdj = -1, 1 do
+                                if not(oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX + iXAdj]) then oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX + iXAdj] = {} end
+                                oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX+iXAdj][iSegmentZ+iZAdj] = math.max(0,(oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX + iXAdj][iSegmentZ+iZAdj] or 0) - 1)
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -442,15 +448,20 @@ function OnConstructed(oEngineer, oJustBuilt)
 
             --LOG('OnConstructed hook test; oJustBuilt='..oJustBuilt.UnitId..'; oEngineer='..oEngineer.UnitId)
             local aiBrain = oJustBuilt:GetAIBrain()
-            if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] then
+            --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
+            if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then
+                aiBrain[M27Overseer.refbAreBigThreats] = true
+            end
+            if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
                 if EntityCategoryContains(M27UnitInfo.refCategoryProtectFromTML, oJustBuilt.UnitId) then
                     M27Logic.DetermineTMDWantedForUnits(aiBrain, {oJustBuilt})
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryTMD, oJustBuilt.UnitId) then
                     --Update list of units wanting TMD to factor in if they have TMD coverage from all threats now that we have just built a TMD
-                      M27Logic.DetermineTMDWantedForUnits(aiBrain, aiBrain[M27EngineerOverseer.reftUnitsWantingTMD])
+                    M27Logic.DetermineTMDWantedForUnits(aiBrain, aiBrain[M27EngineerOverseer.reftUnitsWantingTMD])
                 end
             end
             if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oJustBuilt.UnitId) and not(oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
+                aiBrain[M27Overseer.refbAreBigThreats] = true
                 --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
                 oJustBuilt[M27UnitInfo.refbActiveTargetChecker] = true
                 ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)

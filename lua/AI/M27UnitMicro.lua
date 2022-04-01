@@ -851,7 +851,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                             elseif bDebugMessages == true then LOG(sFunctionRef..': Dont think the walls are in a line so wont try and OC')
                             end
                         end
-                        if not(oOverchargeTarget) then --Is there enemy T2PD nearby (out of our range)?
+                        if not(oOverchargeTarget) and not(M27Overseer.refbAreBigThreats) then --Is there enemy T2PD nearby (out of our range)?
                             --Check further away incase enemy has T2 PD that can see us and we arent running
                             if oPlatoon[M27PlatoonUtilities.refbHavePreviouslyRun] == true or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionRun or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionTemporaryRetreat or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReturnToBase or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionGoToNearestRallyPoint or (M27Utilities.IsACU(oUnitWithOvercharge) and oUnitWithOvercharge:GetHealth() < aiBrain[M27Overseer.refiACUHealthToRunOn]) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Checking if any T2 PD further away') end

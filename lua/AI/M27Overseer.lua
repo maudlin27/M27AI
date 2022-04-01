@@ -83,6 +83,7 @@ reftEnemySMD = 'M27OverseerEnemySMD'
 reftEnemyTML = 'M27OverseerEnemyTML'
 refbEnemyTMLSightedBefore = 'M27OverseerEnemyTMLSightedBefore'
 refiEnemyHighestTechLevel = 'M27OverseerEnemyHighestTech'
+refbAreBigThreats = 'M27OverseerAreBigThreats'
 
 --Platoon references
 --local bArmyPoolInAvailablePlatoons = false
@@ -3133,6 +3134,8 @@ end
 function ACUManager(aiBrain)
     --A lot of the below code is a hangover from when the ACU would use the built in AIBuilders and platoons;
     --Almost all the functionality has now been integrated into the M27ACUMain platoon logic, with a few exceptions (such as calling for help), although these could probably be moved over as well
+    --Decided to add more global based ACU logic here, e.g. if we want to attack enemy ACU, or if we want to retreat to base immediately rather than waiting for platoon, or if want to cancel upgrade
+
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -3561,67 +3564,73 @@ function ACUManager(aiBrain)
 
 
         --==========ACU Run away and cancel upgrade logic
+
+
+
                     --Is the ACU upgrading?
                     if oACU:IsUnitState('Upgrading') then
                         local bCancelUpgradeAndRun = false
-                        if not(oACU[reftACURecentUpgradeProgress]) then oACU[reftACURecentUpgradeProgress] = {} end
-                        oACU[reftACURecentUpgradeProgress][iCurTime] = oACU:GetWorkProgress()
+                        if M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then bCancelUpgradeAndRun = true
+                        else
+                            if not(oACU[reftACURecentUpgradeProgress]) then oACU[reftACURecentUpgradeProgress] = {} end
+                            oACU[reftACURecentUpgradeProgress][iCurTime] = oACU:GetWorkProgress()
 
-                        --Did we start the upgrade <10s ago but have lost a significant amount of health?
-                        if oACU[reftACURecentUpgradeProgress][iCurTime - 10] == nil and oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] > 1000 and oACU[reftACURecentUpgradeProgress][iCurTime] < 0.7 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': ACU has lost a lot of health recently, oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]) end
-                            bCancelUpgradeAndRun = true
-                            --Is the reason for the health loss because we removed T2 upgrade (e.g. sera)? Note - if changing the time frame from 10s above, need to change the delay variable reset on the upgrade in platoonutilities (currently 11s)
-                            if oACU[M27UnitInfo.refbRecentlyRemovedHealthUpgrade] and (oACU:GetHealthPercent() >= 0.99 or oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] < 3000) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': We recently removed an upgrade that increased our health and have good health or health loss less than 3k') end
-                                bCancelUpgradeAndRun = false
-                            end
-
-                        elseif oACU[reftACURecentUpgradeProgress][iCurTime] < 0.9 then
-
-                            --Based on how our health has changed over the last 10s vs the upgrade progress, are we likely to die?
-                            local iHealthLossPerSec = (oACU[reftACURecentHealth][iCurTime-10] - oACU[reftACURecentHealth][iCurTime])/10
-                            if iHealthLossPerSec > 50 then --If changing these values, consider updating the SafeToGetACUUpgrade thresholds
-                                local iTimeToComplete = (1 - oACU[reftACURecentUpgradeProgress][iCurTime]) / ((oACU[reftACURecentUpgradeProgress][iCurTime] - oACU[reftACURecentUpgradeProgress][iCurTime - 10]) / 10)
-                                if iTimeToComplete * iHealthLossPerSec > math.min(oACU[reftACURecentHealth][iCurTime] * 0.9, oACU:GetMaxHealth() * 0.7) then
-                                    --ACU will be really low health or die if it keeps upgrading
-                                    bCancelUpgradeAndRun = true
+                            --Did we start the upgrade <10s ago but have lost a significant amount of health?
+                            if oACU[reftACURecentUpgradeProgress][iCurTime - 10] == nil and oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] > 1000 and oACU[reftACURecentUpgradeProgress][iCurTime] < 0.7 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': ACU has lost a lot of health recently, oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]) end
+                                bCancelUpgradeAndRun = true
+                                --Is the reason for the health loss because we removed T2 upgrade (e.g. sera)? Note - if changing the time frame from 10s above, need to change the delay variable reset on the upgrade in platoonutilities (currently 11s)
+                                if oACU[M27UnitInfo.refbRecentlyRemovedHealthUpgrade] and (oACU:GetHealthPercent() >= 0.99 or oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] < 3000) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': We recently removed an upgrade that increased our health and have good health or health loss less than 3k') end
+                                    bCancelUpgradeAndRun = false
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec..'; iTimeToComplete='..iTimeToComplete..'; iTimeToComplete * iHealthLossPerSec='..iTimeToComplete * iHealthLossPerSec..'; oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]) end
-                            elseif bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec)
-                            end
 
-                        end
-                        if bCancelUpgradeAndRun == false then
-                            --if >=3 TML nearby, then cancel upgrade
-                            if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false then
-                                --Abort ACU upgrade if >=3 TML and its not safe to upgrade
-                                local iEnemyTML = 0
-                                for iUnit, oUnit in aiBrain[reftEnemyTML] do
-                                    if M27UnitInfo.IsUnitValid(oUnit) then
-                                        iEnemyTML = iEnemyTML + 1
+                            elseif oACU[reftACURecentUpgradeProgress][iCurTime] < 0.9 then
+
+                                --Based on how our health has changed over the last 10s vs the upgrade progress, are we likely to die?
+                                local iHealthLossPerSec = (oACU[reftACURecentHealth][iCurTime-10] - oACU[reftACURecentHealth][iCurTime])/10
+                                if iHealthLossPerSec > 50 then --If changing these values, consider updating the SafeToGetACUUpgrade thresholds
+                                    local iTimeToComplete = (1 - oACU[reftACURecentUpgradeProgress][iCurTime]) / ((oACU[reftACURecentUpgradeProgress][iCurTime] - (oACU[reftACURecentUpgradeProgress][iCurTime - 10] or 0)) / 10)
+                                    if iTimeToComplete * iHealthLossPerSec > math.min(oACU[reftACURecentHealth][iCurTime] * 0.9, oACU:GetMaxHealth() * 0.7) then
+                                        --ACU will be really low health or die if it keeps upgrading
+                                        bCancelUpgradeAndRun = true
                                     end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec..'; iTimeToComplete='..iTimeToComplete..'; iTimeToComplete * iHealthLossPerSec='..iTimeToComplete * iHealthLossPerSec..'; oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]) end
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec)
                                 end
-                                if iEnemyTML >= 3 then
-                                    if M27Conditions.SafeToGetACUUpgrade(aiBrain) == false and oACU:GetWorkProgress() < 0.85 then
-                                        --Double-check all 3 TML are in-range, since safetoget upgrade only uses threshold of 2
-                                        iEnemyTML = 0
-                                        for iUnit, oUnit in aiBrain[reftEnemyTML] do
-                                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tACUPos) <= 259 then
-                                                iEnemyTML = iEnemyTML + 1
+
+                            end
+                            if bCancelUpgradeAndRun == false then
+                                --if >=3 TML nearby, then cancel upgrade
+                                if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false then
+                                    --Abort ACU upgrade if >=3 TML and its not safe to upgrade
+                                    local iEnemyTML = 0
+                                    for iUnit, oUnit in aiBrain[reftEnemyTML] do
+                                        if M27UnitInfo.IsUnitValid(oUnit) then
+                                            iEnemyTML = iEnemyTML + 1
+                                        end
+                                    end
+                                    if iEnemyTML >= 3 then
+                                        if M27Conditions.SafeToGetACUUpgrade(aiBrain) == false and oACU:GetWorkProgress() < 0.85 then
+                                            --Double-check all 3 TML are in-range, since safetoget upgrade only uses threshold of 2
+                                            iEnemyTML = 0
+                                            for iUnit, oUnit in aiBrain[reftEnemyTML] do
+                                                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tACUPos) <= 259 then
+                                                    iEnemyTML = iEnemyTML + 1
+                                                end
+                                            end
+                                            if iEnemyTML >= 3 then
+                                                --Abort upgrade
+                                                bCancelUpgradeAndRun = true
                                             end
                                         end
-                                        if iEnemyTML >= 3 then
-                                            --Abort upgrade
-                                            bCancelUpgradeAndRun = true
-                                        end
                                     end
                                 end
-                            end
-                        else
-                            --Want to cancel but not because of TML
-                            if not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) then
-                                aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
+                            else
+                                --Want to cancel but not because of TML
+                                if not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) then
+                                    aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
+                                end
                             end
                         end
 
@@ -4142,18 +4151,22 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
     local tCurCategoryUnits
     local tReferenceTable, bRemovedUnit
     local sUnitUniqueRef
+    local bWantACUToReturnToBase = false --Affects whether ACU will run or not
 
     for _, iCategory in tEnemyBigThreatCategories do
+        bWantACUToReturnToBase = false
         tCurCategoryUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
         if iCategory == M27UnitInfo.refCategoryExperimentalStructure or iCategory == M27UnitInfo.refCategoryFixedT3Arti then tReferenceTable = aiBrain[reftEnemyArti]
         elseif iCategory == M27UnitInfo.refCategorySML then
             tReferenceTable = aiBrain[reftEnemyNukeLaunchers]
             if bDebugMessages == true then LOG(sFunctionRef..': Looking for enemy nukes') end
+            bWantACUToReturnToBase = true
         elseif iCategory == M27UnitInfo.refCategoryTML then
             tReferenceTable = aiBrain[reftEnemyTML]
             if bDebugMessages == true then LOG(sFunctionRef..': Looking for enemy TML') end
         elseif iCategory == M27UnitInfo.refCategoryLandExperimental then
             tReferenceTable = aiBrain[reftEnemyLandExperimentals]
+            bWantACUToReturnToBase = true
         elseif iCategory == M27UnitInfo.refCategoryFixedT3Arti or iCategory == M27UnitInfo.refCategoryExperimentalStructure then
             tReferenceTable = aiBrain[reftEnemyArti]
         elseif iCategory == M27UnitInfo.refCategorySMD then
@@ -4163,6 +4176,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             break
         end
         if M27Utilities.IsTableEmpty(tCurCategoryUnits) == false then
+            if bWantACUToReturnToBase then aiBrain[refbAreBigThreats] = true end
             if bDebugMessages == true then LOG(sFunctionRef..': Have some units for experimental threat category _='.._..'; will check if its dead and if not add it to the table of threats') end
             for iUnit, oUnit in tCurCategoryUnits do
                 if M27Utilities.CanSeeUnit(aiBrain, oUnit, false) == true then
@@ -4204,6 +4218,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
             aiBrain[refbEnemyTMLSightedBefore] = true
         end
+    else
+        --No TML - remove the flag that we need TMD from units
+        aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] = {}
     end
 
     --Record when we have first had sight of SMD (so can factor in if we decide to fire a nuke)
@@ -4212,6 +4229,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             if not(oUnit[M27UnitInfo.refiTimeOfLastCheck]) and oUnit:GetFractionComplete() == 1 then oUnit[M27UnitInfo.refiTimeOfLastCheck] = GetGameTimeSeconds() end
         end
 
+    end
+
+    --Does enemy have a large air threat?
+    if not(aiBrain[refbAreBigThreats]) and (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 30000 or (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 15000 and (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * 0.8 > aiBrain[M27AirOverseer.refiOurMassInAirAA] or aiBrain[M27AirOverseer.refiAirAANeeded] >= 10))) then
+        aiBrain[refbAreBigThreats] = true
     end
 
     --[[bDebugMessages = true

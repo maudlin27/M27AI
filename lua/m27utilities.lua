@@ -1480,7 +1480,9 @@ end
 
 function ForkedDelayedChangedSubtable(oVariableOwner, sPrimaryRef, vSubtable1Ref, vSubtable2Ref, iVariableChange, iDelayInSeconds)
     WaitSeconds(iDelayInSeconds)
-    oVariableOwner[sPrimaryRef][vSubtable1Ref][vSubtable2Ref] = oVariableOwner[vSubtable1Ref][vSubtable2Ref] + iVariableChange
+    if oVariableOwner and oVariableOwner[sPrimaryRef] and oVariableOwner[sPrimaryRef][vSubtable1Ref] then
+        oVariableOwner[sPrimaryRef][vSubtable1Ref][vSubtable2Ref] = (oVariableOwner[vSubtable1Ref][vSubtable2Ref] or 0) + iVariableChange
+    end
 end
 
 function DelayChangeSubtable(oVariableOwner, sPrimaryRef, vSubtable1Ref, vSubtable2Ref, iVariableChange, iDelayInSeconds)

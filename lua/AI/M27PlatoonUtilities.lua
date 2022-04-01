@@ -2016,49 +2016,55 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     if not(sPlatoonName == 'M27MobileShield') then
         --ACU RunAway logic (highest priority):
         if oPlatoon[refbACUInPlatoon] == true then
-            --Run back to base if low health (unless are already near our base); reset movement path if regained health
-            local iHealthToRunOn = aiBrain[M27Overseer.refiACUHealthToRunOn]
-            if iHealthToRunOn == nil then iHealthToRunOn = 5250 end
-            local iCurrentHealth = M27Utilities.GetACU(aiBrain):GetHealth()
-            --If have mobile shield coverage treat health as being 2k more than it is
-            if M27Conditions.HaveNearbyMobileShield(oPlatoon) then iCurrentHealth = iCurrentHealth + 2000 end
-            if oPlatoon[refbNeedToHeal] == true then iHealthToRunOn = math.max(6250, iHealthToRunOn + 750) end
-            if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU health is low enough that it should run.  refbNeedToHeal='..tostring(oPlatoon[refbNeedToHeal])..'; iHealthToRunOn='..iHealthToRunOn..'; iCurrentHealth='..iCurrentHealth..'; M27Overseer.iACUEmergencyHealthPercentThreshold='..M27Overseer.iACUEmergencyHealthPercentThreshold..'; ACU health %='..M27Utilities.GetACU(aiBrain):GetHealthPercent()) end
-            if iCurrentHealth <= iHealthToRunOn then
-                oPlatoon[refbNeedToHeal] = true
-                --If very low health run back to base, otherwise run back to nearest rally point
-                if M27Utilities.GetACU(aiBrain):GetHealthPercent() <= M27Overseer.iACUEmergencyHealthPercentThreshold then
-                    --Are we already close to the base?
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU needs to run, will check how close we are to base; Distance to base='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; M27Overseer.iDistanceFromBaseToBeSafe='..M27Overseer.iDistanceFromBaseToBeSafe) end
+            if M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then
+                oPlatoon[refiCurrentAction] = refActionReturnToBase
+                if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
+                bProceed = false
+            else
+                --Run back to base if low health (unless are already near our base); reset movement path if regained health
+                local iHealthToRunOn = aiBrain[M27Overseer.refiACUHealthToRunOn]
+                if iHealthToRunOn == nil then iHealthToRunOn = 5250 end
+                local iCurrentHealth = M27Utilities.GetACU(aiBrain):GetHealth()
+                --If have mobile shield coverage treat health as being 2k more than it is
+                if M27Conditions.HaveNearbyMobileShield(oPlatoon) then iCurrentHealth = iCurrentHealth + 2000 end
+                if oPlatoon[refbNeedToHeal] == true then iHealthToRunOn = math.max(6250, iHealthToRunOn + 750) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU health is low enough that it should run.  refbNeedToHeal='..tostring(oPlatoon[refbNeedToHeal])..'; iHealthToRunOn='..iHealthToRunOn..'; iCurrentHealth='..iCurrentHealth..'; M27Overseer.iACUEmergencyHealthPercentThreshold='..M27Overseer.iACUEmergencyHealthPercentThreshold..'; ACU health %='..M27Utilities.GetACU(aiBrain):GetHealthPercent()) end
+                if iCurrentHealth <= iHealthToRunOn then
+                    oPlatoon[refbNeedToHeal] = true
+                    --If very low health run back to base, otherwise run back to nearest rally point
+                    if M27Utilities.GetACU(aiBrain):GetHealthPercent() <= M27Overseer.iACUEmergencyHealthPercentThreshold then
+                        --Are we already close to the base?
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU needs to run, will check how close we are to base; Distance to base='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; M27Overseer.iDistanceFromBaseToBeSafe='..M27Overseer.iDistanceFromBaseToBeSafe) end
 
-                    if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Will return to base; will check if want to use overcharge') end
-                        oPlatoon[refiCurrentAction] = refActionReturnToBase
-                        --Consider adding overcharge
-                        if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
-                        bProceed = false
+                        if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will return to base; will check if want to use overcharge') end
+                            oPlatoon[refiCurrentAction] = refActionReturnToBase
+                            --Consider adding overcharge
+                            if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
+                            bProceed = false
+                        else
+                            --Proceed with normal logic
+                            if bDebugMessages == true then LOG(sFunctionRef..': Are close to base so will just do normal logic as if run now we lose our base anyway') end
+                        end
                     else
-                        --Proceed with normal logic
-                        if bDebugMessages == true then LOG(sFunctionRef..': Are close to base so will just do normal logic as if run now we lose our base anyway') end
+
+                        --Are we close to the nearest rally point?
+                        local tNearestRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
+                        if bDebugMessages == true then LOG(sFunctionRef..': Not at emergency health yet, will see if have reached the nearest rally point yet; distance to it='..M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon))) end
+                        if M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon)) > 5 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will go to nearest rally point, checking if want to overcharge') end
+                            oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                            --Consider adding overcharge
+                            if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
+                            bProceed = false
+                        else
+                            --Proceed with normal logic
+                            if bDebugMessages == true then LOG(sFunctionRef..': Are close to rally point so hopefully a bit safer now so will proceed with normal nearby enemy logic rather tahn running') end
+                        end
                     end
                 else
-
-                    --Are we close to the nearest rally point?
-                    local tNearestRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
-                    if bDebugMessages == true then LOG(sFunctionRef..': Not at emergency health yet, will see if have reached the nearest rally point yet; distance to it='..M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon))) end
-                    if M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon)) > 5 then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Will go to nearest rally point, checking if want to overcharge') end
-                        oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
-                        --Consider adding overcharge
-                        if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
-                        bProceed = false
-                    else
-                        --Proceed with normal logic
-                        if bDebugMessages == true then LOG(sFunctionRef..': Are close to rally point so hopefully a bit safer now so will proceed with normal nearby enemy logic rather tahn running') end
-                    end
+                    oPlatoon[refbNeedToHeal] = false
                 end
-            else
-                oPlatoon[refbNeedToHeal] = false
             end
             if bDebugMessages == true then LOG(sFunctionRef..': iACUHealth='..iCurrentHealth..'; finished checking if should run due to low health, bProceed='..tostring(bProceed)) end
             if bProceed == true then
@@ -3799,69 +3805,71 @@ function DetermineIfACUShouldBuildFactory(oPlatoon)
     if bDebugMessages == true then LOG(sFunctionRef..': About to see if want to build a land factory. EnergyIncome='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; MassNetIncome='..aiBrain:GetEconomyTrend('MASS')..'Stored energy='..aiBrain:GetEconomyStored('ENERGY')..'; StoredMass='..aiBrain:GetEconomyStored('MASS')..'; LandFactoryCount='..iFactoryCount) end
 
     if not(M27Conditions.DoesACUHaveBigGun(aiBrain)) and (not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) or M27Utilities.GetACU(aiBrain):IsUnitState('Building')) then
-        --Is the engineer already building and its previous action was to build a land factory or power?
-        local bAlreadyBuilding = false
-        local bAlreadyTryingToBuild = false
-        if oPlatoon[reftPrevAction] and oPlatoon[reftPrevAction][1] == refActionBuildFactory then
-            bAlreadyTryingToBuild = true
-            local oACU = M27Utilities.GetACU(aiBrain)
-            if oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
-                oPlatoon[refiCurrentAction] = refActionBuildFactory
-                bAlreadyBuilding = true
-                oPlatoon[refbMovingToBuild] = false
+        if oPlatoon[refiEnemiesInRange] == 0 and oPlatoon[refiEnemyStructuresInRange] == 0 and (aiBrain[M27Overseer.refiSearchRangeForEnemyStructures] >= 60 or M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, GetPlatoonFrontPosition(oPlatoon), 60, 'Enemy'))) then
+            --Is the engineer already building and its previous action was to build a land factory or power?
+            local bAlreadyBuilding = false
+            local bAlreadyTryingToBuild = false
+            if oPlatoon[reftPrevAction] and oPlatoon[reftPrevAction][1] == refActionBuildFactory then
+                bAlreadyTryingToBuild = true
+                local oACU = M27Utilities.GetACU(aiBrain)
+                if oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
+                    oPlatoon[refiCurrentAction] = refActionBuildFactory
+                    bAlreadyBuilding = true
+                    oPlatoon[refbMovingToBuild] = false
+                end
             end
-        end
-        if bAlreadyBuilding == false then
-            if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories) < 3 or iFactoryCount < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] then
-                --Are we closer to enemy than base?
-                local tCurPosition = GetPlatoonFrontPosition(oPlatoon)
-                local iDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                local iDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToEnemy='..iDistanceToEnemy..'; iDistanceToStart='..iDistanceToStart) end
-                if iDistanceToEnemy >= iDistanceToStart then
-                    local iStoredEnergy = aiBrain:GetEconomyStored('ENERGY')
-                    if bAlreadyTryingToBuild and iStoredEnergy >= 250 and oPlatoon[refbMovingToBuild] == true then
-                        oPlatoon[refiCurrentAction] = refActionBuildFactory
-                    else
-                        if iFactoryCount < 2 then
-                            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 10 then --Have at least 100 gross energy income per second
-                                if aiBrain:GetEconomyTrend('MASS') >= 0.2 then --At least 2 net mass income per second
-                                    if iStoredEnergy >= 250 then
-                                        if aiBrain:GetEconomyStored('MASS') >= 20 then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': We have the resources to build a land factory so will try to') end
-                                            oPlatoon[refiCurrentAction] = refActionBuildFactory
-                                        end
-                                    end
-                                end
-                            end
-                        elseif iFactoryCount < 4 then
-                            if M27Conditions.DoesACUHaveUpgrade(aiBrain) == false then
-                                if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
-                                    if aiBrain:GetEconomyStored('MASS') >= 400 then
-                                        if iStoredEnergy >= 750 then
-                                            if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
+            if bAlreadyBuilding == false then
+                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories) < 3 or iFactoryCount < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] then
+                    --Are we closer to enemy than base?
+                    local tCurPosition = GetPlatoonFrontPosition(oPlatoon)
+                    local iDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                    local iDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                    if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToEnemy='..iDistanceToEnemy..'; iDistanceToStart='..iDistanceToStart) end
+                    if iDistanceToEnemy >= iDistanceToStart then
+                        local iStoredEnergy = aiBrain:GetEconomyStored('ENERGY')
+                        if bAlreadyTryingToBuild and iStoredEnergy >= 250 and oPlatoon[refbMovingToBuild] == true then
+                            oPlatoon[refiCurrentAction] = refActionBuildFactory
+                        else
+                            if iFactoryCount < 2 then
+                                if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 10 then --Have at least 100 gross energy income per second
+                                    if aiBrain:GetEconomyTrend('MASS') >= 0.2 then --At least 2 net mass income per second
+                                        if iStoredEnergy >= 250 then
+                                            if aiBrain:GetEconomyStored('MASS') >= 20 then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': We have the resources to build a land factory so will try to') end
                                                 oPlatoon[refiCurrentAction] = refActionBuildFactory
                                             end
                                         end
                                     end
                                 end
-                            end
-                        elseif iFactoryCount < 6 then
-                            if M27Conditions.DoesACUHaveUpgrade(aiBrain) == false then
-                                if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
-                                    if aiBrain:GetEconomyStored('MASS') >= 600 then
-                                        if iStoredEnergy >= 1000 then
-                                            if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
-                                                oPlatoon[refiCurrentAction] = refActionBuildFactory
+                            elseif iFactoryCount < 4 then
+                                if M27Conditions.DoesACUHaveUpgrade(aiBrain) == false then
+                                    if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
+                                        if aiBrain:GetEconomyStored('MASS') >= 400 then
+                                            if iStoredEnergy >= 750 then
+                                                if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
+                                                    oPlatoon[refiCurrentAction] = refActionBuildFactory
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            elseif iFactoryCount < 6 then
+                                if M27Conditions.DoesACUHaveUpgrade(aiBrain) == false then
+                                    if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
+                                        if aiBrain:GetEconomyStored('MASS') >= 600 then
+                                            if iStoredEnergy >= 1000 then
+                                                if aiBrain:GetEconomyTrend('MASS') >= 0.4 then --At least 4 net mass income per second
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to build another land fac with ACU to stop overflow') end
+                                                    oPlatoon[refiCurrentAction] = refActionBuildFactory
+                                                end
                                             end
                                         end
                                     end
                                 end
                             end
+                            if oPlatoon[refiCurrentAction] then oPlatoon[refbMovingToBuild] = true end
                         end
-                        if oPlatoon[refiCurrentAction] then oPlatoon[refbMovingToBuild] = true end
                     end
                 end
             end
@@ -4751,7 +4759,7 @@ function DeterminePlatoonAction(oPlatoon)
                                             oPlatoon[refiCurrentAction] = refActionNewMovementPath
                                         else
                                             --INITIAL ACU SPECIFIC ACTIONS
-                                            --If ACU on low health then run; if ACU upgrading then do nothing
+                                            --If ACU on low health or is far from base and are big threats then run; if ACU upgrading then do nothing
                                             if bDebugMessages == true then LOG(sFunctionRef..'; oPlatoon[refbACUInPlatoon]='..tostring(oPlatoon[refbACUInPlatoon])..'; platoon front position='..repr(GetPlatoonFrontPosition(oPlatoon))) end
                                             if oPlatoon[refbACUInPlatoon] == true then
                                                 local oACU = M27Utilities.GetACU(aiBrain)
@@ -4761,7 +4769,7 @@ function DeterminePlatoonAction(oPlatoon)
                                                 if oACU:IsUnitState('Upgrading') then
                                                     if bDebugMessages == true then LOG(sFunctionRef..': ACU unit state is upgrading') end
                                                     local iUpgradePercent = oACU:GetWorkProgress()
-                                                    if iHealthPercentage <= 0.5 and iUpgradePercent < (1 - iHealthPercentage) and M27Conditions.SafeToGetACUUpgrade == false then
+                                                    if iHealthPercentage <= 0.5 and iUpgradePercent < (1 - iHealthPercentage) and M27Conditions.SafeToGetACUUpgrade(aiBrain) == false then
                                                         if bDebugMessages == true then LOG(sFunctionRef..': ACU needs to run as iHealthPercentage='..iHealthPercentage..' and iUpgradePercent='..iUpgradePercent) end
                                                         bRun = true
                                                     else
@@ -4770,7 +4778,7 @@ function DeterminePlatoonAction(oPlatoon)
                                                     end
                                                 else
                                                     if bDebugMessages == true then LOG(sFunctionRef..': ACU not upgrading, will see if low health') end
-                                                    if iHealthPercentage <= 0.35 then bRun = true end
+                                                    if iHealthPercentage <= 0.35 or M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then bRun = true end
                                                 end
                                                 if bRun == true then
                                                     --Nearby enemy action should already consider running
@@ -5532,14 +5540,17 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                             end
                         else
                             local iEnemyGroundExperimentals = 0
-                            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
-                                for iExp, oExp in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
-                                    iEnemyGroundExperimentals = iEnemyGroundExperimentals + 1
+                            local bBigEnemyThreat = false
+                            --Are there any big threats? Then return to base unless we're cloaked, or are a fully upgraded sera com; retreat these anyway if there are 2+ enemy land or air experimentals
+                            --Note - alot of this logic has been moved earlier on, so this is more relevant for TMLs and for if we ahve a cloaked ACU (as cloaked ACU ignore the standard isbigthreat flag)
+                            if aiBrain[M27Overseer.refbAreBigThreats] then
+                                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
+                                    for iExp, oExp in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
+                                        iEnemyGroundExperimentals = iEnemyGroundExperimentals + 1
+                                    end
                                 end
                             end
 
-                            --Are there any big threats? Then return to base unless we're cloaked, or are a fully upgraded sera com; retreat these anyway if there are 2+ enemy land or air experimentals
-                            local bBigEnemyThreat = false
                             if iEnemyGroundExperimentals >= 2 then bBigEnemyThreat = true --Even if have cloaked or maxed sera com want to run from 2+ land experis
                             elseif not(M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator')) and not(M27Utilities.GetACU(aiBrain):HasEnhancement('BlastAttack') and M27Utilities.GetACU(aiBrain):HasEnhancement('DamageStabilizationAdvanced')) then
                                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false then
@@ -5741,6 +5752,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions)
             if bDebugMessages == true then LOG(sFunctionRef..': about to refresh support movement path') end
             RefreshSupportPlatoonMovementPath(oPlatoon)
         else
+
             --Did we get our movement path when we needed to heal and no longer need to heal? If so then want a new movement path instead
             if oPlatoon[refbNeededToHealWhenGotMovementPath] and not(oPlatoon[refbNeedToHeal]) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Needed to heal when last got movement path but we dont need to heal now') end
@@ -5834,6 +5846,9 @@ function ReissueMovementPath(oPlatoon, bDontClearActions)
                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionReissueMovementPath: About to update platoon name and movement path, current target='..oPlatoon[refiCurrentPathTarget]..'; position of this='..repr(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])..'PlatoonUnitCount='..table.getn(oPlatoon[reftCurrentUnits])..'; plaotonaction='..oPlatoon[refiCurrentAction]) end
                         if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..'-'..oPlatoon[refiPlatoonUniqueCount]..': A'..refActionReissueMovementPath) end
                         MoveAlongPath(oPlatoon, oPlatoon[reftMovementPath], oPlatoon[refiCurrentPathTarget], bDontClearActions)
+                        if oPlatoon[refbACUInPlatoon] and not(M27Conditions.DoesACUHaveUpgrade(aiBrain)) and not(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(oPlatoon[reftBuilders][1])])) then
+                            M27EngineerOverseer.UpdateActionsForACUMovementPath(oPlatoon[reftMovementPath], aiBrain, oPlatoon[reftBuilders][1], oPlatoon[refiCurrentPathTarget])
+                        end
                     end
                 end
             end
@@ -8113,12 +8128,14 @@ function ProcessPlatoonAction(oPlatoon)
                                                                         --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild)
                             oPlatoon[reftLastBuildLocation] = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil, false, false, nil, nil, M27UnitInfo.refCategoryEngineer)
                             if not(M27Utilities.IsTableEmpty(oPlatoon[reftLastBuildLocation])) then
-                                --Update engineer trackers so they can assist us
+                                --Update engineer trackers so they can assist us, and clear existing trackers so we dont ahve engineers assisting us when theyre not meant to
+                                M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, tBuilders[1], true)
+
                                 --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers, oUnitToBeDestroyed)
                                 if iCategoryToBuild == M27UnitInfo.refCategoryAirFactory then
-                                    M27EngineerOverseer.UpdateEngineerActionTrackers(aiBrain, tBuilders[1], M27EngineerOverseer.refActionBuildAirFactory, oPlatoon[reftLastBuildLocation], false, nil, nil, false)
+                                    M27EngineerOverseer.UpdateEngineerActionTrackers(aiBrain, tBuilders[1], M27EngineerOverseer.refActionBuildAirFactory, oPlatoon[reftLastBuildLocation], false, nil, nil, false, nil, iCategoryToBuild)
                                 else
-                                    M27EngineerOverseer.UpdateEngineerActionTrackers(aiBrain, tBuilders[1], M27EngineerOverseer.refActionBuildLandFactory, oPlatoon[reftLastBuildLocation], false, nil, nil, false)
+                                    M27EngineerOverseer.UpdateEngineerActionTrackers(aiBrain, tBuilders[1], M27EngineerOverseer.refActionBuildLandFactory, oPlatoon[reftLastBuildLocation], false, nil, nil, false, nil, iCategoryToBuild)
                                 end
                             else
                                 M27Utilities.ErrorHandler('Coudlnt find a location to build a factory at', true)
@@ -8156,16 +8173,18 @@ function ProcessPlatoonAction(oPlatoon)
                             if bDebugMessages == true then LOG(sFunctionRef..': About to tell ACU to build power') end
                             oPlatoon[reftLastBuildLocation] = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil)
                             if M27Utilities.IsTableEmpty(oPlatoon[reftLastBuildLocation]) then M27Utilities.ErrorHandler('Couldnt find location to build power at', true) end
+                            --Update engineer trackers so they can assist us
+                            --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers, oUnitToBeDestroyed, iPrimaryEngineerCategoryBuilt)
+                            M27EngineerOverseer.UpdateEngineerActionTrackers(aiBrain, oACU, M27EngineerOverseer.refActionBuildPower, oPlatoon[reftLastBuildLocation], false, nil, nil, false, nil, iCategoryToBuild)
                             --Move as soon as are done:
                             IssueMove(tBuilders, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': About to tell ACU to assist part-complete power') end
                             IssueGuard(tBuilders, oNearbyUnderConstruction)
+                            --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
+                            M27EngineerOverseer.UpdateEngineerActionTrackers(aiBrain, oACU, M27EngineerOverseer.refActionBuildPower, oPlatoon[reftLastBuildLocation], false, nil, nil, false)
                         end
 
-                        --Update engineer trackers so they can assist us
-                                                        --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers)
-                        M27EngineerOverseer.UpdateEngineerActionTrackers(aiBrain, oACU, M27EngineerOverseer.refActionBuildPower, oPlatoon[reftLastBuildLocation], false, nil, nil, false)
                         --Move as soon as are done:
                         IssueMove(tBuilders, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
                     end

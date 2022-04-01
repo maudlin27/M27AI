@@ -262,6 +262,13 @@ function GetUnitReclaimTargets(aiBrain)
         end
     end
 
+    --TMD if no longer up against TML and have low mass
+    if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(M27Overseer.reftEnemyTML) and M27Conditions.HaveLowMass(aiBrain) then
+        for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryTMD, false, false) do
+           table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+        end
+    end
+
     --Flag any units set to be reclaimed
     if M27Utilities.IsTableEmpty(aiBrain[reftUnitsToReclaim]) == false then
         for iUnit, oUnit in aiBrain[reftUnitsToReclaim] do
