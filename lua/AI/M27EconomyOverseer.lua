@@ -731,8 +731,8 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
         local iUnitUpgrading, iUnitAvailable
         local iRatioOfMexToFactory = 1.1
         if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] < 3 then
-            if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 2 and iT3LandFactories + iT3AirFactories > 0 then aiBrain[M27Overseer.refiOurHighestAirFactoryTech] = 3
-            elseif iT2LandFactories + iT3LandFactories + iT2AirFactories + iT3AirFactories > 0 then aiBrain[M27Overseer.refiOurHighestAirFactoryTech] = 2 end
+            if iT3AirFactories > 0 then aiBrain[M27Overseer.refiOurHighestAirFactoryTech] = 3
+            elseif iT2AirFactories + iT3AirFactories > 0 then aiBrain[M27Overseer.refiOurHighestAirFactoryTech] = 2 end
         end
         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iRatioOfMexToFactory = 3 end
 

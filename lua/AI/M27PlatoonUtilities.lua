@@ -4542,7 +4542,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            --if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+            if sPlatoonName == 'M27MobileShield' and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 26 then bDebugMessages = true end
 
             if bDebugMessages == true then
@@ -5003,7 +5003,10 @@ function DeterminePlatoonAction(oPlatoon)
 
             local bRefreshAction = true
             local iRefreshActionThreshold = -100 --negative value means will refresh by default; If < this then won't refresh (subject to specific logic that might make this to always have a refresh); resets to 0 meaning will be this number + 1 cycles
-            if oPlatoon[refbHoverInPlatoon] then iRefreshActionThreshold = 5 end
+            --[[if oPlatoon[refbHoverInPlatoon] then
+                iRefreshActionThreshold = 5
+                if sPlatoonName == 'M27MobileShield' then iRefreshActionThreshold = 3 end
+            end--]]
             local bConsideredRefreshAlready = false
             --=======Ignore action in certain cases (e.g. we only just gave that action)
             if oPlatoon[refiCurrentAction] == refActionUpgrade then iRefreshActionThreshold = 10 end
@@ -5022,7 +5025,7 @@ function DeterminePlatoonAction(oPlatoon)
                     else
                         if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then
                             if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true then
-                                iRefreshActionThreshold = 3
+                                iRefreshActionThreshold = 2
                             else iRefreshActionThreshold = 20 end
                         end
                     end
@@ -5037,7 +5040,6 @@ function DeterminePlatoonAction(oPlatoon)
                     if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then
                         if oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionTemporaryRetreat or oPlatoon[refiCurrentAction] == refActionKitingRetreat then
                            iRefreshActionThreshold = 3
-                            if oPlatoon[refbHoverInPlatoon] then iRefreshActionThreshold = 5 end
                         else
                             if oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then iRefreshActionThreshold = 20
                             else
@@ -5122,7 +5124,10 @@ function DeterminePlatoonAction(oPlatoon)
                 if bDebugMessages == true then LOG('Prev action is different to current action, so will refresh unless is a movement path special case; bRefreshAction='..tostring(bRefreshAction)) end
             end
             if bRefreshAction == true then
-                if oPlatoon[refbHoverInPlatoon] then iRefreshActionThreshold = iRefreshActionThreshold + 5 end
+                if oPlatoon[refbHoverInPlatoon] and oPlatoon[reftPrevAction][1] == oPlatoon[refiCurrentAction] then
+                    if sPlatoonName == 'M27MobileShield' then iRefreshActionThreshold = iRefreshActionThreshold + 1
+                    else iRefreshActionThreshold = iRefreshActionThreshold + 4 end
+                end
                 --Reduce refresh threshold if front unit is idle
                 if oPlatoon[refoFrontUnit].IsUnitState and M27Logic.IsUnitIdle(oPlatoon[refoFrontUnit]) then iRefreshActionThreshold = math.max(1, iRefreshActionThreshold - 8) end
 
@@ -7006,18 +7011,18 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
                         oPlatoon[refiCurrentAction] = refActionDisband
                     else
                         --Update distance to follow if are meant to be leading the unit that are escorting, based on our platoon size and target platoon size
-                        if oPlatoon[refiSupportHelperFollowDistance] < 0 then
-                            if oPlatoon[M27PlatoonTemplates.refiAirAttackRange] and aiBrain[M27AirOverseer.refbMercySightedRecently] then oPlatoon[refiSupportHelperFollowDistance] = -5
-                            else
+                        if oPlatoon[M27PlatoonTemplates.refiAirAttackRange] and aiBrain[M27AirOverseer.refbMercySightedRecently] then oPlatoon[refiSupportHelperFollowDistance] = -5
+                        else
+                            --Do we want to go infront of the target rather than behind?
+                            if oPlatoon[refiSupportHelperFollowDistance] < 0 then
                                 local iFollowDistance = math.min(20, 10 + oPlatoon[refiCurrentUnits])
                                 --Escort platoons - be closer to target if its small
                                 if oPlatoon[refoPlatoonOrUnitToEscort] and oPlatoon[refoPlatoonOrUnitToEscort][refiCurrentUnits] <= 3 then
                                     iFollowDistance = math.max(10, iFollowDistance - 5)
                                 end
                                 oPlatoon[refiSupportHelperFollowDistance] = -iFollowDistance
+                            elseif oPlatoon[refiSupportHelperFollowDistance] == nil then oPlatoon[refiSupportHelperFollowDistance] = 5
                             end
-                        elseif oPlatoon[refiSupportHelperFollowDistance] == nil then oPlatoon[refiSupportHelperFollowDistance] = 5
-                        elseif oPlatoon[M27PlatoonTemplates.refiAirAttackRange] and aiBrain[M27AirOverseer.refbMercySightedRecently] then oPlatoon[refiSupportHelperFollowDistance] = -5
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonRef..': iFollowDistance='..oPlatoon[refiSupportHelperFollowDistance]) end
 
@@ -7176,7 +7181,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            --if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+            if sPlatoonName == 'M27MobileShield' and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 26 then bDebugMessages = true end
 
             if bDebugMessages == true then

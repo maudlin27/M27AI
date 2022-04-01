@@ -84,6 +84,7 @@ reftEnemyTML = 'M27OverseerEnemyTML'
 refbEnemyTMLSightedBefore = 'M27OverseerEnemyTMLSightedBefore'
 refiEnemyHighestTechLevel = 'M27OverseerEnemyHighestTech'
 refbAreBigThreats = 'M27OverseerAreBigThreats'
+refbCloakedEnemyACU = 'M27OverseerCloakedACU'
 
 --Platoon references
 --local bArmyPoolInAvailablePlatoons = false
@@ -3429,6 +3430,8 @@ function ACUManager(aiBrain)
                         local tNearestACU = oNearestACU:GetPosition()
                         local iDistanceToACU = M27Utilities.GetDistanceBetweenPositions(tNearestACU, tACUPos)
                         if M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
+                            if not(aiBrain[refbCloakedEnemyACU]) and oNearestACU:HasEnhancement('CloakingGenerator') then aiBrain[refbCloakedEnemyACU] = true end
+
                             if oNearestACU == aiBrain[refoLastNearestACU] then
                                 aiBrain[reftLastNearestACU] = tNearestACU
                                 iLastDistanceToACU = iDistanceToACU
@@ -3590,8 +3593,11 @@ function ACUManager(aiBrain)
                                 --Based on how our health has changed over the last 10s vs the upgrade progress, are we likely to die?
                                 local iHealthLossPerSec = (oACU[reftACURecentHealth][iCurTime-10] - oACU[reftACURecentHealth][iCurTime])/10
                                 if iHealthLossPerSec > 50 then --If changing these values, consider updating the SafeToGetACUUpgrade thresholds
-                                    local iTimeToComplete = (1 - oACU[reftACURecentUpgradeProgress][iCurTime]) / ((oACU[reftACURecentUpgradeProgress][iCurTime] - (oACU[reftACURecentUpgradeProgress][iCurTime - 10] or 0)) / 10)
-                                    if iTimeToComplete * iHealthLossPerSec > math.min(oACU[reftACURecentHealth][iCurTime] * 0.9, oACU:GetMaxHealth() * 0.7) then
+                                    local iTimeToComplete = (1 - oACU[reftACURecentUpgradeProgress][iCurTime]) / ((oACU[reftACURecentUpgradeProgress][iCurTime] - oACU[reftACURecentUpgradeProgress][iCurTime - 10]) / 10)
+                                    local iHealthReduction = 0
+                                    if not(M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) then iHealthReduction = 1000 end --If we are getting gun upgrade then we need some health post-upgrade to have any chance of surviving
+                                    if aiBrain[refbEnemyACUNearOurs] then iHealthReduction = iHealthReduction + 1000 end
+                                    if iTimeToComplete * iHealthLossPerSec > math.min(oACU[reftACURecentHealth][iCurTime] * 0.9 - iHealthReduction, oACU:GetMaxHealth() * 0.7 - iHealthReduction) then
                                         --ACU will be really low health or die if it keeps upgrading
                                         bCancelUpgradeAndRun = true
                                     end
@@ -3627,7 +3633,7 @@ function ACUManager(aiBrain)
                                     end
                                 end
                             else
-                                --Want to cancel but not because of TML
+                                --Want to cancel but not because of TML, so need to protect ACU
                                 if not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) then
                                     aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
                                 end
@@ -3642,8 +3648,11 @@ function ACUManager(aiBrain)
                                 IssueClearCommands({M27Utilities.GetACU(aiBrain)})
                                 IssueMove({oACU}, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos))
                             end
-
-
+                        else
+                            --We are upgrading, but dont want to cancel - still switch to protect ACU mode if enemy ACU is near since it can survive long enough once the upgrade is complete to kill us if we are low on health
+                            if aiBrain[refbEnemyACUNearOurs] then
+                                aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
+                            end
                         end
                     end
                 end
@@ -3927,6 +3936,7 @@ function SetMaximumFactoryLevels(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetMaximumFactoryLevels'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
     --NoRush - set factories wanted to 1
@@ -3958,12 +3968,13 @@ function SetMaximumFactoryLevels(aiBrain)
         end
 
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are in eco mode so will adjust factory ratios accordingly. M27Conditions.HaveLowMass(aiBrain)='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; iMexesToBaseCalculationOn='..iMexesToBaseCalculationOn) end
             if not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('MASS') > 0.2 then
                 iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.25))
             elseif not(M27Conditions.HaveLowMass(aiBrain)) then iPrimaryFactoriesWanted = math.max(4 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.20))
             else
                 --Have low mass
-                iPrimaryFactoriesWanted = math.max(1, math.ceil(iMexesToBaseCalculationOn * 0.15))
+                iPrimaryFactoriesWanted = math.max(1, math.floor(iMexesToBaseCalculationOn * 0.15))
             end
         else
             if M27Conditions.HaveLowMass(aiBrain) then
@@ -4024,6 +4035,11 @@ function SetMaximumFactoryLevels(aiBrain)
         if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
             aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 1)
         end
+
+        --Reduce air factories wanted based on gross energy.  Air fac uses 90 energy for intercepter (T1)
+        aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeAir], math.floor(aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] / (13 * aiBrain[refiOurHighestAirFactoryTech] * aiBrain[refiOurHighestAirFactoryTech]))))
+
+
         if bDebugMessages == true then LOG(sFunctionRef..': bActiveExperimental='..tostring(bActiveExperimental)..'; Idle factories='..aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused]) end
 
         aiBrain[refiMinLandFactoryBeforeOtherTypes] = math.min(aiBrain[refiMinLandFactoryBeforeOtherTypes], aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
@@ -4235,6 +4251,21 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
     if not(aiBrain[refbAreBigThreats]) and (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 30000 or (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 15000 and (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * 0.8 > aiBrain[M27AirOverseer.refiOurMassInAirAA] or aiBrain[M27AirOverseer.refiAirAANeeded] >= 10))) then
         aiBrain[refbAreBigThreats] = true
     end
+
+    --are there any cloaked ACUs or SACUs? (will also check for cloacked ACUs in the acu manager for the nearest ACU)
+    if not(aiBrain[refbCloakedEnemyACU]) then
+        local tCybranSACUs = aiBrain:GetUnitsAroundPoint(categories.COMMAND * categories.CYBRAN + categories.SUBCOMMANDER * categories.CYBRAN, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
+        if M27Utilities.IsTableEmpty(tCybranSACUs) == false then
+           for iSACU, oSACU in tCybranSACUs do
+               if oSACU:HasEnhancement('CloakingGenerator') then
+                   aiBrain[refbCloakedEnemyACU] = true
+                   break
+               end
+           end
+        end
+    end
+    if aiBrain[refbCloakedEnemyACU] then aiBrain[refbAreBigThreats] = true end
+
 
     --[[bDebugMessages = true
     if bDebugMessages == true then LOG(repr(ScenarioInfo)) end bDebugMessages = false--]]
@@ -5033,13 +5064,14 @@ function GameSettingWarnings(aiBrain)
                 LOG(sFunctionRef..' About to debug the tModData for mod '..(tModData.name or 'nil'))
                 M27Utilities.DebugArray(tModData)
             end
+            sIncompatibleMessage = sIncompatibleMessage .. '. '
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Finished checking compatibility; compatibility message='..sIncompatibleMessage) end
 
 
 
-    if bIncompatible then M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: "..sIncompatibleMessage..'.  If issues are encountered, report them to maudlin27 via Discord or the forums, and include the replay ID.', 0, 10) end
+    if bIncompatible then M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: "..sIncompatibleMessage..' If issues are encountered, report them to maudlin27 via Discord or the forums, and include the replay ID.', 0, 10) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 

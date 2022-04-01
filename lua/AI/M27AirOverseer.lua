@@ -87,6 +87,7 @@ refoAirStagingAssigned = 'M27AirStagingAssigned' --Store against an air unit sen
 reftAssignedRefuelingUnits = 'M27AirRefuelingUnitsAssigned' --[x]  = UnitID + lifetimecount, returns air unit told to refuel here;Store against air staging unit to track the units assigned to refuel
 refiBombsDropped = 'M27AirBombsDropped'
 refiLastFiredBomb = 'M27AirLastFiredBomb'
+refoAssignedAirScout = 'M27HaveAssignedAirScout' --Assigned to a unit that wants a dedicated air scout (e.g. experimental) - the unit air scout assigned to it; also attached to air scout to indicate the unit it is assisting
 
 --Build order related
 refiExtraAirScoutsWanted = 'M27AirExtraAirScoutsWanted'
@@ -1249,95 +1250,100 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
 
                                     --Unit on assignment - check if its reached it
                                     if iUnitType == iTypeScout then
-                                        tCurWaypointTarget = oUnit[reftMovementPath][oUnit[refiCurMovementPath]]
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Checking if iUnit='..iUnit..' has reached its target; cur target='..repr(tCurWaypointTarget)) end
-                                        if M27Utilities.IsTableEmpty(tCurWaypointTarget) == false then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': tCurWaypointTarget='..repr(tCurWaypointTarget)) end
-                                            iDistanceToComplete = oUnit:GetBlueprint().Intel.VisionRadius * 0.8
-                                            tUnitCurPosition = oUnit:GetPosition()
-                                            local iDistanceToCurTarget = M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, tCurWaypointTarget)
-                                            iCurLoopCount = 0
+                                        --Check its not a scout with a dedicated assist target which uses its own logic`
+                                        if not(oUnit[refoAssignedAirScout]) then
+                                            tCurWaypointTarget = oUnit[reftMovementPath][oUnit[refiCurMovementPath]]
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Checking if iUnit='..iUnit..' has reached its target; cur target='..repr(tCurWaypointTarget)) end
+                                            if M27Utilities.IsTableEmpty(tCurWaypointTarget) == false then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': tCurWaypointTarget='..repr(tCurWaypointTarget)) end
+                                                iDistanceToComplete = oUnit:GetBlueprint().Intel.VisionRadius * 0.8
+                                                tUnitCurPosition = oUnit:GetPosition()
+                                                local iDistanceToCurTarget = M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, tCurWaypointTarget)
+                                                iCurLoopCount = 0
 
-                                            iTotalMovementPaths = table.getn(oUnit[reftMovementPath])
-                                            iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tCurWaypointTarget)
-                                            if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToCurTarget='..iDistanceToCurTarget..'; iDistanceToComplete='..iDistanceToComplete..'; aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]='..aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]..'; iTimeStamp='..iTimeStamp) end
-                                            --Check if are either close to the target, or have had recent visual of the target
+                                                iTotalMovementPaths = table.getn(oUnit[reftMovementPath])
+                                                iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tCurWaypointTarget)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToCurTarget='..iDistanceToCurTarget..'; iDistanceToComplete='..iDistanceToComplete..'; aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]='..aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]..'; iTimeStamp='..iTimeStamp) end
+                                                --Check if are either close to the target, or have had recent visual of the target
 
-                                            while iDistanceToCurTarget <= iDistanceToComplete or iTimeStamp - aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] <= math.max(2, aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] - 10)  do
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Are close enough to target or have already had recent visual of the target, checking unit on assignment, iCurLoopCount='..iCurLoopCount..'; iTimeStamp='..iTimeStamp..'; [refiLastScouted]='..aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]..'; iCurAirSegmentX-Z='..iCurAirSegmentX..'-'..iCurAirSegmentZ) end
-                                                iCurLoopCount = iCurLoopCount + 1
-                                                if iCurLoopCount > iMaxLoopCount then M27Utilities.ErrorHandler('Infinite loop') break end
+                                                while iDistanceToCurTarget <= iDistanceToComplete or iTimeStamp - aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] <= math.max(2, aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] - 10)  do
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Are close enough to target or have already had recent visual of the target, checking unit on assignment, iCurLoopCount='..iCurLoopCount..'; iTimeStamp='..iTimeStamp..'; [refiLastScouted]='..aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]..'; iCurAirSegmentX-Z='..iCurAirSegmentX..'-'..iCurAirSegmentZ) end
+                                                    iCurLoopCount = iCurLoopCount + 1
+                                                    if iCurLoopCount > iMaxLoopCount then M27Utilities.ErrorHandler('Infinite loop') break end
 
-                                                aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] - 1
-                                                oUnit[refiCurMovementPath] = oUnit[refiCurMovementPath] + 1
-                                                if oUnit[refiCurMovementPath] > iTotalMovementPaths then
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': Unit has reached all its movement paths so making it available') end
-                                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
-                                                    bUnitIsUnassigned = true
-                                                    break
-                                                    --oUnit[refbOnAssignment] = false
-                                                else
-                                                    tCurWaypointTarget = oUnit[reftMovementPath][oUnit[refiCurMovementPath]]
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': Scout has reached target, increasing its movement path 1 to '..oUnit[refiCurMovementPath]..'; location of this='..repr(tCurWaypointTarget)) end
-                                                    if M27Utilities.IsTableEmpty(tCurWaypointTarget) == true then
-                                                        if bDebugMessages == true then LOG(sFunctionRef..': Units current target is empty so making it available again') end
+                                                    aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] - 1
+                                                    oUnit[refiCurMovementPath] = oUnit[refiCurMovementPath] + 1
+                                                    if oUnit[refiCurMovementPath] > iTotalMovementPaths then
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Unit has reached all its movement paths so making it available') end
                                                         ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
                                                         bUnitIsUnassigned = true
-                                                        --oUnit[refbOnAssignment] = false
                                                         break
+                                                        --oUnit[refbOnAssignment] = false
                                                     else
-                                                        iDistanceToCurTarget = M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, tCurWaypointTarget)
-                                                        iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tCurWaypointTarget)
+                                                        tCurWaypointTarget = oUnit[reftMovementPath][oUnit[refiCurMovementPath]]
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Scout has reached target, increasing its movement path 1 to '..oUnit[refiCurMovementPath]..'; location of this='..repr(tCurWaypointTarget)) end
+                                                        if M27Utilities.IsTableEmpty(tCurWaypointTarget) == true then
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Units current target is empty so making it available again') end
+                                                            ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
+                                                            bUnitIsUnassigned = true
+                                                            --oUnit[refbOnAssignment] = false
+                                                            break
+                                                        else
+                                                            iDistanceToCurTarget = M27Utilities.GetDistanceBetweenPositions(tUnitCurPosition, tCurWaypointTarget)
+                                                            iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tCurWaypointTarget)
+                                                        end
                                                     end
                                                 end
-                                            end
-                                            if iCurLoopCount == 0 then
-                                                --Scout not close to any destination, check if it's close to the start and reset if it is (unless it has an action to move away and hasnt scouted anywhere yet)
-                                                if M27Utilities.GetDistanceBetweenPositions(tStartPosition, tUnitCurPosition) < iDistanceFromStartForReset then
-                                                    local bConsiderForReset = false
-                                                    if oUnit[refiCurMovementPath] > 1 then bConsiderForReset = true
-                                                    else
-                                                        if oUnit.GetNavigator then
-                                                            oNavigator = oUnit:GetNavigator()
-                                                            if oNavigator.GetCurrentTargetPos then
-                                                                if M27Utilities.GetDistanceBetweenPositions(oNavigator:GetCurrentTargetPos(), tStartPosition) < iDistanceFromStartForReset then
-                                                                    bConsiderForReset = true
+                                                if iCurLoopCount == 0 then
+                                                    --Scout not close to any destination, check if it's close to the start and reset if it is (unless it has an action to move away and hasnt scouted anywhere yet)
+                                                    if M27Utilities.GetDistanceBetweenPositions(tStartPosition, tUnitCurPosition) < iDistanceFromStartForReset then
+                                                        local bConsiderForReset = false
+                                                        if oUnit[refiCurMovementPath] > 1 then bConsiderForReset = true
+                                                        else
+                                                            if oUnit.GetNavigator then
+                                                                oNavigator = oUnit:GetNavigator()
+                                                                if oNavigator.GetCurrentTargetPos then
+                                                                    if M27Utilities.GetDistanceBetweenPositions(oNavigator:GetCurrentTargetPos(), tStartPosition) < iDistanceFromStartForReset then
+                                                                        bConsiderForReset = true
+                                                                    end
                                                                 end
                                                             end
                                                         end
-                                                    end
-                                                    if bConsiderForReset == true then
-                                                        --Reset scout to prevent risk of it reaching a movement path but not registering in above code
-                                                        if bDebugMessages == true then LOG(sFunctionRef..': Reseting scout trackers and clearing its orders') end
-                                                        ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
-                                                    end
-                                                end
-                                            else
-                                                if bDebugMessages == true then LOG(sFunctionRef..': iCurLoopCount='..iCurLoopCount..'; so scout managed to reach at least one destination') end
-                                                --Scout managed to reach at least one destination
-                                                if oUnit[refiCurMovementPath] <= iTotalMovementPaths then
-                                                    if bDebugMessages == true then
-                                                        local iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oUnit)
-                                                        LOG(sFunctionRef..': About to clear scouts path and then reissue remaining paths that scout hasnt reached yet; scout unique count='..iLifetimeCount)
-                                                    end
-                                                    IssueClearCommands({oUnit})
-                                                    ClearPreviousMovementEntries(aiBrain, oUnit) --Will remove earlier movement path entries and update assignment trackers
-
-                                                    for iPath, tPath in oUnit[reftMovementPath] do
-                                                        IssueMove({oUnit}, tPath)
+                                                        if bConsiderForReset == true then
+                                                            --Reset scout to prevent risk of it reaching a movement path but not registering in above code
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Reseting scout trackers and clearing its orders') end
+                                                            ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
+                                                        end
                                                     end
                                                 else
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': CurMovementPath > total movement paths so scout must have reached all its destinations - making scout available again') end
-                                                    bUnitIsUnassigned = true
-                                                    ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
-                                                    --oUnit[refbOnAssignment] = false
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurLoopCount='..iCurLoopCount..'; so scout managed to reach at least one destination') end
+                                                    --Scout managed to reach at least one destination
+                                                    if oUnit[refiCurMovementPath] <= iTotalMovementPaths then
+                                                        if bDebugMessages == true then
+                                                            local iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                                                            LOG(sFunctionRef..': About to clear scouts path and then reissue remaining paths that scout hasnt reached yet; scout unique count='..iLifetimeCount)
+                                                        end
+                                                        IssueClearCommands({oUnit})
+                                                        ClearPreviousMovementEntries(aiBrain, oUnit) --Will remove earlier movement path entries and update assignment trackers
+
+                                                        for iPath, tPath in oUnit[reftMovementPath] do
+                                                            IssueMove({oUnit}, tPath)
+                                                        end
+                                                    else
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': CurMovementPath > total movement paths so scout must have reached all its destinations - making scout available again') end
+                                                        bUnitIsUnassigned = true
+                                                        ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
+                                                        --oUnit[refbOnAssignment] = false
+                                                    end
                                                 end
+
+                                            else
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Current movement path is empty so making scout available') end
+                                                --oUnit[refbOnAssignment] = false
+                                                ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
+                                                bUnitIsUnassigned = true
                                             end
-                                        else
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Current movement path is empty so making scout available') end
-                                            --oUnit[refbOnAssignment] = false
-                                            ClearAirUnitAssignmentTrackers(aiBrain, oUnit)
-                                            bUnitIsUnassigned = true
+                                        elseif bDebugMessages == true then LOG(sFunctionRef..': Scout '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is assigned to assist unit '..oUnit[refoAssignedAirScout].UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit[refoAssignedAirScout]))
                                         end
                                     elseif iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Have a bomber or torp bomber, will check its targets; refbOnAssignment pre check='..tostring(oUnit[refbOnAssignment])) end
@@ -2087,6 +2093,43 @@ function CreateMovementPathFromDestination(aiBrain, tEndDestination, oScout)
     return tMovementPath
 end
 
+function DedicatedScoutManager(aiBrain, oScout, oAssistTarget)
+    oScout[refbOnAssignment] = true
+    IssueClearCommands({oScout})
+    oScout[refoAssignedAirScout] = oAssistTarget
+    oAssistTarget[refoAssignedAirScout] = oScout
+    --local iAngleFromBaseToTarget = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oAssistTarget:GetPosition())
+    --local iCount = 0
+    oScout[refiCurMovementPath] = 1
+    oScout[reftMovementPath] = oAssistTarget:GetPosition()
+    IssueGuard({oScout}, oAssistTarget)
+
+    while M27UnitInfo.IsUnitValid(oAssistTarget) and M27UnitInfo.IsUnitValid(oScout) do
+        --Do we have low fuel?
+        if oScout:GetFuelRatio() <= 0.25 then break
+        else
+            --if iCount == 0 then
+
+                --iAngleFromBaseToTarget = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oAssistTarget:GetPosition())
+
+            --oScout[reftMovementPath][oUnit[refiCurMovementPath]]
+            --if M27Logic.IsUnitIdle(
+            WaitSeconds(1)
+            --[[iCount = iCount + 1
+            if iCount >= 10 then
+               iCount = 0
+            end--]]
+        end
+    end
+    if M27UnitInfo.IsUnitValid(oScout) then
+        --Reset values so can be used by normal overseer functionality
+        oScout[refoAssignedAirScout] = nil
+        oScout[refbOnAssignment] = false
+        IssueClearCommands({oScout})
+        IssueMove({oScout}, M27Logic.GetNearestRallyPoint(aiBrain, oScout:GetPosition()))
+    end
+end
+
 function AirScoutManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirScoutManager'
@@ -2108,39 +2151,60 @@ function AirScoutManager(aiBrain)
         local tOurStart = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
         local iMoveCount
         local oNavigator, tGoalTarget, tNavigatorTarget
+
+        --First work out if we have any high priority units that want a dedicated air scout assigned to them
+        local tDedicatedScoutAssistTargets = {}
+        local tPossibleScoutAssistTargets = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandExperimental, false, true)
+        local iTargetsWantingAssistance = 0
+        if M27Utilities.IsTableEmpty(tPossibleScoutAssistTargets) == false then
+            for iUnit, oUnit in tPossibleScoutAssistTargets do
+               if not(M27UnitInfo.IsUnitValid(oUnit[refoAssignedAirScout])) then
+                   iTargetsWantingAssistance = iTargetsWantingAssistance + 1
+                   tDedicatedScoutAssistTargets[iTargetsWantingAssistance] = oUnit
+               end
+            end
+        end
+
+
         for iUnit, oUnit in aiBrain[reftAvailableScouts] do
-            if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': Not on assignment so getting end destination') end
-            tEndDestination = GetEndDestinationForScout(aiBrain, oUnit)
-            if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': End destination='..repr(tEndDestination)) end
-            if M27Utilities.IsTableEmpty(tEndDestination) == false then
-                tMovementPath = CreateMovementPathFromDestination(aiBrain, tEndDestination, oUnit)
-                if bDebugMessages == true then
-                    LOG(sFunctionRef..'iUnit='..iUnit..': Full movement path='..repr(tMovementPath))
-                    M27Utilities.DrawLocations(tMovementPath)
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': About to issue clear command to scout with unit number='..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
-                IssueClearCommands({oUnit})
-                --Issue moves to the targets and update tracker for this
-                iMoveCount = 0
-                for iWaypoint, tWaypoint in tMovementPath do
-                    iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tWaypoint)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Issuing move command to go to Segment X-Z='..iCurAirSegmentX..iCurAirSegmentZ..'; destination='..repr(tWaypoint)) end
-                    aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] + 1
-                    --M27Logic.IssueDelayedMove({oUnit}, tWaypoint, iMoveCount * 10)
-                    IssueMove({oUnit}, tWaypoint)
-                    iMoveCount = iMoveCount + 1
-                end
-                --Return to base at the end:
-                --M27Logic.IssueDelayedMove({oUnit}, tOurStart, iMoveCount * 10)
-                if bDebugMessages == true then LOG(sFunctionRef..': Setting the unit to be assigned and recording its movement path') end
-                IssueMove({oUnit}, tOurStart)
-                oUnit[refbOnAssignment] = true
-                oUnit[refiCurMovementPath] = 1
-                oUnit[reftMovementPath] = tMovementPath
-                if M27Config.M27ShowUnitNames == true and oUnit.GetUnitId then M27PlatoonUtilities.UpdateUnitNames({oUnit}, oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..':ScoutingThenReturningToBase') end
+            if M27Utilities.IsTableEmpty(tDedicatedScoutAssistTargets) == false then
+                ForkThread(DedicatedScoutManager, aiBrain, oUnit, tDedicatedScoutAssistTargets[iTargetsWantingAssistance])
+                tDedicatedScoutAssistTargets[iTargetsWantingAssistance] = nil
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': No valid final destination so will move to start unless already there') end
-                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > 20 then IssueMove({oUnit}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) end
+
+                if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': Not on assignment so getting end destination') end
+                tEndDestination = GetEndDestinationForScout(aiBrain, oUnit)
+                if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': End destination='..repr(tEndDestination)) end
+                if M27Utilities.IsTableEmpty(tEndDestination) == false then
+                    tMovementPath = CreateMovementPathFromDestination(aiBrain, tEndDestination, oUnit)
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..'iUnit='..iUnit..': Full movement path='..repr(tMovementPath))
+                        M27Utilities.DrawLocations(tMovementPath)
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to issue clear command to scout with unit number='..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                    IssueClearCommands({oUnit})
+                    --Issue moves to the targets and update tracker for this
+                    iMoveCount = 0
+                    for iWaypoint, tWaypoint in tMovementPath do
+                        iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tWaypoint)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Issuing move command to go to Segment X-Z='..iCurAirSegmentX..iCurAirSegmentZ..'; destination='..repr(tWaypoint)) end
+                        aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned] + 1
+                        --M27Logic.IssueDelayedMove({oUnit}, tWaypoint, iMoveCount * 10)
+                        IssueMove({oUnit}, tWaypoint)
+                        iMoveCount = iMoveCount + 1
+                    end
+                    --Return to base at the end:
+                    --M27Logic.IssueDelayedMove({oUnit}, tOurStart, iMoveCount * 10)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Setting the unit to be assigned and recording its movement path') end
+                    IssueMove({oUnit}, tOurStart)
+                    oUnit[refbOnAssignment] = true
+                    oUnit[refiCurMovementPath] = 1
+                    oUnit[reftMovementPath] = tMovementPath
+                    if M27Config.M27ShowUnitNames == true and oUnit.GetUnitId then M27PlatoonUtilities.UpdateUnitNames({oUnit}, oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..':ScoutingThenReturningToBase') end
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': No valid final destination so will move to start unless already there') end
+                    if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > 20 then IssueMove({oUnit}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) end
+                end
             end
         end
     end
@@ -2386,14 +2450,26 @@ function GetBomberTargetShortlist(aiBrain)
                 local iLandExperimentalCat = M27UnitInfo.refCategoryLandExperimental
                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then iLandExperimentalCat = iLandExperimentalCat + M27UnitInfo.refCategoryMAA * categories.TECH3 end
 
-                if iEnemyT3Power == 0 then --Enemies dont have any T3 power constructed, so if we target T2 power we might power stall them
-                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
-                    aiBrain[refiLowPriorityStart] = 11 --if changing this also change the poitn at which to insert
-                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy has no T3 power so will focus down any T2 power first') end
-                else --Enemy has T3 power so focus on mexes rather than power
-                    reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
-                    aiBrain[refiLowPriorityStart] = 7 --if changing this also change the poitn at which to insert
-                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T3 power so will focus on mexes') end
+                if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 2 then
+                    if iEnemyT3Power == 0 then --Enemies dont have any T3 power constructed, so if we target T2 power we might power stall them
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                        aiBrain[refiLowPriorityStart] = 11 --if changing this also change the poitn at which to insert
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has no T3 power so will focus down any T2 power first') end
+                    else --Enemy has T3 power so focus on mexes rather than power
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                        aiBrain[refiLowPriorityStart] = 7 --if changing this also change the poitn at which to insert
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T3 power so will focus on mexes') end
+                    end
+                else --T3+ air - same as T2 for targeting except will include ACU in high priority options
+                    if iEnemyT3Power == 0 then --Enemies dont have any T3 power constructed, so if we target T2 power we might power stall them
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                        aiBrain[refiLowPriorityStart] = 12 --if changing this also change the poitn at which to insert
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has no T3 power so will focus down any T2 power first') end
+                    else --Enemy has T3 power so focus on mexes rather than power
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                        aiBrain[refiLowPriorityStart] = 8 --if changing this also change the poitn at which to insert
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T3 power so will focus on mexes') end
+                    end
                 end
                 --Insert priority targeting of mobile T3 MAA and land experimentals if they ahve land experimental
                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
@@ -3207,6 +3283,23 @@ function AirAAManager(aiBrain)
         local bDidntHaveAnyAirAAToStartWith = false
         local refiDistance = 'AirAADistance'
 
+        --Hold back AirAA units from most air threats if we need to build up our force
+        local bIgnoreUnlessEmergencyThreat = false
+        local iIgnoredThreats = 0
+        if not(aiBrain[refbMercySightedRecently]) and aiBrain[refiHighestEnemyAirThreat] >= 5000 and not((aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill)) then
+            local iTeamAirAAMass = aiBrain[refiOurMassInAirAA]
+            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) then
+                for iAlly, oAllyBrain in aiBrain[M27Overseer.toAllyBrains] do
+                    if oAllyBrain.M27AI then iTeamAirAAMass = iTeamAirAAMass + oAllyBrain[refiOurMassInAirAA] end
+                end
+            end
+            if aiBrain[refiOurMassInAirAA] < aiBrain[refiHighestEnemyAirThreat] * 0.35 then bIgnoreUnlessEmergencyThreat = true end
+
+            if bIgnoreUnlessEmergencyThreat then bDebugMessages = true end
+            if bDebugMessages == true then LOG(sFunctionRef..': Will ignore threats that arent emergency air threats') end
+
+        end
+
         if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then
             if bDebugMessages == true then
 
@@ -3274,6 +3367,10 @@ function AirAAManager(aiBrain)
 
             if bDebugMessages == true then LOG(sFunctionRef..': total enemy threats='..table.getn(tEnemyAirUnits)..'; total vailable inties='..table.getn(aiBrain[reftAvailableAirAA])) end
 
+
+
+
+
             --Create a table with all air threats and their distance
             for iUnit, oUnit in tEnemyAirUnits do
                 bNearPriorityDefence = false
@@ -3330,58 +3427,61 @@ function AirAAManager(aiBrain)
                             end
 
                             if not(bShouldAttackThreat) then
-                                if iCurDistanceToStart <= iMapMidpointDistance then bCloseEnoughToConsider = true
+                                if bIgnoreUnlessEmergencyThreat then iIgnoredThreats = iIgnoredThreats + 1
                                 else
-                                    --Are we in defence coverage?
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Target unit='..oUnit.UnitId..'; iCurTargetModDistanceFromStart='..iCurTargetModDistanceFromStart..'; iDefenceCoverage='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]) end
-                                    if iCurTargetModDistanceFromStart <= aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] then
-                                        bCloseEnoughToConsider = true
+                                    if iCurDistanceToStart <= iMapMidpointDistance then bCloseEnoughToConsider = true
                                     else
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Not on our side of map, not in defence coverage, and not near ACU; will see if we have nearby units we want to protect. iAssistNearbyUnitRange='..iAssistNearbyUnitRange) end
-                                        --Do we have nearby ground units (that we'll want to protect)?
-
-                                        --NOTE: If making changes to the below, also update the logic for an air unit cancelling its attack
-                                        tFriendlyGroundUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + categories.LAND + categories.NAVAL + M27UnitInfo.refCategoryTorpBomber + M27UnitInfo.refCategoryBomber, tUnitCurPosition, iAssistNearbyUnitRange, 'Ally')
-                                        if M27Utilities.IsTableEmpty(tFriendlyGroundUnits) == false then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tFriendlyGroundUnits)..' friendly units nearby so will assist') end
+                                        --Are we in defence coverage?
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Target unit='..oUnit.UnitId..'; iCurTargetModDistanceFromStart='..iCurTargetModDistanceFromStart..'; iDefenceCoverage='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]) end
+                                        if iCurTargetModDistanceFromStart <= aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] then
                                             bCloseEnoughToConsider = true
-                                        elseif bDebugMessages == true then LOG(sFunctionRef..': No friendly units near '..repr(tUnitCurPosition))
+                                        else
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Not on our side of map, not in defence coverage, and not near ACU; will see if we have nearby units we want to protect. iAssistNearbyUnitRange='..iAssistNearbyUnitRange) end
+                                            --Do we have nearby ground units (that we'll want to protect)?
+
+                                            --NOTE: If making changes to the below, also update the logic for an air unit cancelling its attack
+                                            tFriendlyGroundUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + categories.LAND + categories.NAVAL + M27UnitInfo.refCategoryTorpBomber + M27UnitInfo.refCategoryBomber, tUnitCurPosition, iAssistNearbyUnitRange, 'Ally')
+                                            if M27Utilities.IsTableEmpty(tFriendlyGroundUnits) == false then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Have '..table.getn(tFriendlyGroundUnits)..' friendly units nearby so will assist') end
+                                                bCloseEnoughToConsider = true
+                                            elseif bDebugMessages == true then LOG(sFunctionRef..': No friendly units near '..repr(tUnitCurPosition))
+                                            end
                                         end
                                     end
-                                end
-                                if bCloseEnoughToConsider == true then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy is close enough to consider, will check if unit is attached (e.g. still being built by factory) or has nearby enemy ground AA, iEnemyGroundAASearchRange='..iEnemyGroundAASearchRange) end
-                                    if not(oUnit:IsUnitState('Attached')) then
-                                        --Check if ground AA near the target
-                                        tEnemyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tUnitCurPosition, iEnemyGroundAASearchRange, 'Enemy')
-                                        if M27Utilities.IsTableEmpty(tEnemyGroundAA) == true then
-                                            bShouldAttackThreat = true
-                                        else
-                                            --Ignore T1 AA if have asfs
-                                            if iOurHighestAirAATech == 3 then tEnemyGroundAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirAA * categories.TECH2 + M27UnitInfo.refCategoryAllNavy * categories.TECH2 + categories.TECH3, tEnemyGroundAA) end
+                                    if bCloseEnoughToConsider == true then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy is close enough to consider, will check if unit is attached (e.g. still being built by factory) or has nearby enemy ground AA, iEnemyGroundAASearchRange='..iEnemyGroundAASearchRange) end
+                                        if not(oUnit:IsUnitState('Attached')) then
+                                            --Check if ground AA near the target
+                                            tEnemyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tUnitCurPosition, iEnemyGroundAASearchRange, 'Enemy')
                                             if M27Utilities.IsTableEmpty(tEnemyGroundAA) == true then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby ground AA so ok to attack') end
                                                 bShouldAttackThreat = true
                                             else
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef..': Nearby ground AA so dont want to attack unelss its all being transported.  Will list out nearby ground AA')
-                                                    for iEnemyAA, oEnemyAA in tEnemyGroundAA do
-                                                        LOG(sFunctionRef..': oEnemyAA='..oEnemyAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEnemyAA))
+                                                --Ignore T1 AA if have asfs
+                                                if iOurHighestAirAATech == 3 then tEnemyGroundAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirAA * categories.TECH2 + M27UnitInfo.refCategoryAllNavy * categories.TECH2 + categories.TECH3, tEnemyGroundAA) end
+                                                if M27Utilities.IsTableEmpty(tEnemyGroundAA) == true then
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': No nearby ground AA so ok to attack') end
+                                                    bShouldAttackThreat = true
+                                                else
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef..': Nearby ground AA so dont want to attack unelss its all being transported.  Will list out nearby ground AA')
+                                                        for iEnemyAA, oEnemyAA in tEnemyGroundAA do
+                                                            LOG(sFunctionRef..': oEnemyAA='..oEnemyAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEnemyAA))
+                                                        end
                                                     end
-                                                end
-                                                --Ignore if only threat is MAA that is being transported
-                                                bShouldAttackThreat = true
-                                                for iAA, oAA in tEnemyGroundAA do
-                                                   if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA - M27UnitInfo.refCategoryMAA, oAA.UnitId) then
-                                                       bShouldAttackThreat = false
-                                                       break
-                                                   else
-                                                       if bDebugMessages == true then LOG(sFunctionRef..': Enemy has AA with unit ID='..oAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAA)..'; Unit state='..M27Logic.GetUnitState(oAA)) end
-                                                       if not(oAA:IsUnitState('Attached')) then
+                                                    --Ignore if only threat is MAA that is being transported
+                                                    bShouldAttackThreat = true
+                                                    for iAA, oAA in tEnemyGroundAA do
+                                                       if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA - M27UnitInfo.refCategoryMAA, oAA.UnitId) then
                                                            bShouldAttackThreat = false
                                                            break
+                                                       else
+                                                           if bDebugMessages == true then LOG(sFunctionRef..': Enemy has AA with unit ID='..oAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAA)..'; Unit state='..M27Logic.GetUnitState(oAA)) end
+                                                           if not(oAA:IsUnitState('Attached')) then
+                                                               bShouldAttackThreat = false
+                                                               break
+                                                           end
                                                        end
-                                                   end
+                                                    end
                                                 end
                                             end
                                         end
@@ -3554,6 +3654,8 @@ function AirAAManager(aiBrain)
             --Dont need any airAA any more
             if bDebugMessages == true then LOG(sFunctionRef..': No enemy air units to target') end
         end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': bIgnoreUnlessEmergencyThreat='..tostring(bIgnoreUnlessEmergencyThreat)..'; iIgnoredThreats='..iIgnoredThreats) end
         if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then
             aiBrain[refbNonScoutUnassignedAirAATargets] = false --redundancy
             if bDebugMessages == true then LOG(sFunctionRef..': Have available air units after assigning actions to deal with air threats; will send any remaining units to the rally point nearest the enemy unless theyre already near here; are considering aiBrain with armyindex='..aiBrain:GetArmyIndex()) end
@@ -3629,8 +3731,10 @@ function AirAAManager(aiBrain)
                     iEnemyAirUnits = iEnemyAirUnits + 1
                 end
             end
+            iEnemyAirUnits = iEnemyAirUnits + iIgnoredThreats
             aiBrain[refiAirAANeeded] = iEnemyAirUnits * 1.3 + 2
         else
+            iAirThreatShortfall = iAirThreatShortfall + iIgnoredThreats
             if iAirThreatShortfall > 0 then
                 aiBrain[refiAirAANeeded] = math.max(5, math.ceil(iAirThreatShortfall / iExpectedThreatPerCount))
                 if bDebugMessages == true then LOG(sFunctionRef..': End of calculating threat required; iAirThreatShortfall='..iAirThreatShortfall..'; iExpectedThreatPerCount='..iExpectedThreatPerCount..'; aiBrain[refiAirAANeeded]='..aiBrain[refiAirAANeeded]) end
