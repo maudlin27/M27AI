@@ -4233,6 +4233,8 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     local sFunctionRef = 'ExperimentalGunshipCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of loop for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+
 
     local tLocationToMoveTo
     local oAttackTarget
@@ -4248,14 +4250,20 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     local refoLastUnitTarget = 'M27AirLastUnitTarget'
     local refbPreviouslyRun = 'M27AirPreviouslyRun'
     local refiTimeSinceLastRan = 'M27AirTimePreviouslyRan'
+    local refbCanRunFromLastTarget = 'M27AirCanRunFromLastTarget' --i.e. dont want to track how often we have run from our base or rally point since those are meant to be 'safe'
     local iCurShield = 0
     local iMaxShield = 0
-    local bUpdateLocationAttemptCount = true --Used to stop going back and forth to the same location - if true then will increase the count by 1
-    local iMaxPrevTargets = 2
+    local bUpdateLocationAttemptCount = true --Used to stop going back and forth to the same location - if true then will increase the count by 1 when we run
+    local iMaxPrevTargets = 1
     local iTimeSinceLastRan = GetGameTimeSeconds() - (oUnit[refiTimeSinceLastRan] or -10000)
     if iTimeSinceLastRan <= 90 then iMaxPrevTargets = 1 end
     local iCurDistance
     local iNearestDistance = 100000
+    local tNearbyAirExperimental = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, tCurPosition, 90, 'Ally')
+    local iNearbyFriendlyAirExperimental = 0
+    if M27Utilities.IsTableEmpty(tNearbyAirExperimental) == false then iNearbyFriendlyAirExperimental = table.getn(tNearbyAirExperimental) end
+
+    local iSAMThreshold
 
 
     function GetSegmentFailedAttempts(tLocation)
@@ -4309,6 +4317,8 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             --Do we think we can kill the ACU before we die?
             local iOurDPS = 2700
             if bIsCzar then iOurDPS = 3330 end
+            if iNearbyFriendlyAirExperimental > 0 then iOurDPS = iOurDPS * (iNearbyFriendlyAirExperimental + 1) end
+
             local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), tCurPosition)
             local iSpeed = 8
             local iTimeToTarget
@@ -4338,9 +4348,10 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             else
                 iTimeUntilWeDie = iOurTotalHealth / iEstimatedEnemyAADPS
             end
+            if iNearbyFriendlyAirExperimental > 0 then iTimeUntilWeDie = iTimeUntilWeDie * (1+0.25*iNearbyFriendlyAirExperimental) end
             if bDebugMessages == true then LOG(sFunctionRef..': iOurTotalHealth='..iOurTotalHealth..'; iEstimatedEnemyAADPS='..iEstimatedEnemyAADPS..'; iTimeToKillTarget='..iTimeToKillTarget..'; iTimeUntilWeDie='..iTimeUntilWeDie) end
             --Give a small margin of error
-            if (iTimeUntilWeDie * 0.9 - 2) < iTimeToKillTarget then
+            if iTimeToKillTarget > 2 and (iTimeUntilWeDie * 0.9 - 2) < iTimeToKillTarget then
                 if bDebugMessages == true then LOG(sFunctionRef..': We will die before we kill the target so want to revert to normal logic (which will likely ahve us retreat once low on health') end
                 --Dont try and attack enemy ACU
             else
@@ -4382,7 +4393,12 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 if bIsCzar then
                     iASFSearchRange = 112 --(range of 120 on AA, so this means ASF should be close enough that can do some damage)
                     iMaxASF = 4 --Czar has better AA so can be used to kite enemy ASFs, hence want to run away at a lower threshold so can kill the asfs gradually
+                    --Increase max ASF for Czar if have decent shield health and nearby T2+ buildings
+                    if iMaxShield > 0 and iCurShield/iMaxShield >= 0.4 and not(M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - categories.TECH1, tCurPosition, 35, 'Enemy'))) then
+                        iMaxASF = 10
+                    end
                 end
+                if iNearbyFriendlyAirExperimental > 0 then iMaxASF = iMaxASF * (1 + iNearbyFriendlyAirExperimental) end
 
                 local tNearbyASF = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA * categories.TECH3, tCurPosition, iASFSearchRange, 'Enemy')
                 if M27Utilities.IsTableEmpty(tNearbyASF) == false and table.getn(tNearbyASF) >= iMaxASF then
@@ -4428,6 +4444,9 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 tLocationToMoveTo = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
                 oUnit[refbPreviouslyRun] = true
                 if bDebugMessages == true then LOG(sFunctionRef..': We want to run so will return to base') end
+                bWantToRun = true --redundancy
+            else
+                bWantToRun = false
             end
         end
         if M27Utilities.IsTableEmpty(tLocationToMoveTo) and not(oAttackTarget) then
@@ -4435,7 +4454,8 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             --Lots of enemy SAMs or T3 MAA nearby?
             if bDebugMessages == true then LOG(sFunctionRef..': No immediate targets so will consider units nearby') end
             local tNearbySAM = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, 65, 'Enemy')
-            local iSAMThreshold = 6
+            iSAMThreshold = 6
+            if iNearbyFriendlyAirExperimental > 0 then iSAMThreshold = iSAMThreshold * (1 + iNearbyFriendlyAirExperimental) end
             if oUnit:GetHealthPercent() <= 0.9 then
 
                 if oUnit:GetHealthPercent() <= 0.7 then iSAMThreshold = iSAMThreshold - 2
@@ -4461,6 +4481,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                     bUpdateLocationAttemptCount = false
                     tLocationToMoveTo = M27Logic.GetNearestRallyPoint(aiBrain, tCurPosition)
                     oUnit[refbPreviouslyRun] = true
+                    bWantToRun = true
                     if bDebugMessages == true then LOG(sFunctionRef..': No SAMs in range that weh avent already attacked multiple times so will run') end
                 end
             else
@@ -4609,16 +4630,27 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 if iPotentialTargets > 0 then oAttackTarget = M27Utilities.GetNearestUnit(tPotentialTargets, tCurPosition, aiBrain) end
             end
             if not(oAttackTarget) then
-                --Alternative: Vulnerable T2 or T3 mexes (mexes with minimal AA and shielding)
-                local tVulnerableMexes = GetVulnerableMexes(aiBrain, tCurPosition, 14000)
-                if M27Utilities.IsTableEmpty(tVulnerableMexes) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have vulnerable mexes so will target the nearest one') end
-                    iNearestDistance = 100000
-                    for iLocation, tLocation in tVulnerableMexes do
-                        iCurDistance = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tLocation)
-                        if iCurDistance < iNearestDistance and GetSegmentFailedAttempts(tLocation) < iMaxPrevTargets then
-                            tLocationToMoveTo = tLocation
-                            iNearestDistance = iCurDistance
+                --Is the enemy base vulnerable?
+                if GetSegmentFailedAttempts(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) < iMaxPrevTargets then
+                    local tSAMByBase = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 120, 'Enemy')
+                    local iSAMByBase = 0
+                    if M27Utilities.IsTableEmpty(tSAMByBase) == false then iSAMByBase = table.getn(tSAMByBase) end
+                    if iSAMByBase < (iSAMThreshold - 1) then
+                        tLocationToMoveTo = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                    end
+                end
+                if M27Utilities.IsTableEmpty(tLocationToMoveTo) then
+                    --Alternative: Vulnerable T2 or T3 mexes (mexes with minimal AA and shielding)
+                    local tVulnerableMexes = GetVulnerableMexes(aiBrain, tCurPosition, 14000)
+                    if M27Utilities.IsTableEmpty(tVulnerableMexes) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have vulnerable mexes so will target the nearest one') end
+                        iNearestDistance = 100000
+                        for iLocation, tLocation in tVulnerableMexes do
+                            iCurDistance = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tLocation)
+                            if iCurDistance < iNearestDistance and GetSegmentFailedAttempts(tLocation) < iMaxPrevTargets then
+                                tLocationToMoveTo = tLocation
+                                iNearestDistance = iCurDistance
+                            end
                         end
                     end
                 end
@@ -4691,9 +4723,28 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
         end
     end
 
+    --Update tracking - if we want to run, then increase the failed count on our previous target or location
+    if bWantToRun and oUnit[refbCanRunFromLastTarget] then
+        local tRunPosition
+        if oUnit[refoLastUnitTarget] then tRunPosition = oUnit[refoLastUnitTarget]:GetPosition()
+        else tRunPosition = oUnit[reftLastLocationTarget]
+        end
+
+        local iSegmentX, iSegmentZ = GetAirSegmentFromPosition(tRunPosition)
+        for iXAdj = -1, 1 do
+            for iZAdj = -1, 1 do
+                if not(aiBrain[reftPreviousTargetByLocationCount][iSegmentX + iXAdj]) then aiBrain[reftPreviousTargetByLocationCount][iSegmentX + iXAdj] = {} end
+                aiBrain[reftPreviousTargetByLocationCount][iSegmentX + iXAdj][iSegmentZ + iZAdj] = (aiBrain[reftPreviousTargetByLocationCount][iSegmentX + iXAdj][iSegmentZ + iZAdj] or 0) + 1
+                --Reset after 3 minutes
+                M27Utilities.DelayChangeSubtable(aiBrain, reftPreviousTargetByLocationCount, iSegmentX + iXAdj, iSegmentZ + iZAdj, -1, 180)
+            end
+        end
+    end
+
 
     --Process the order to attack/move:
     if oAttackTarget or M27Utilities.IsTableEmpty(tLocationToMoveTo) == false then
+        oUnit[refbCanRunFromLastTarget] = bUpdateLocationAttemptCount
         if bDebugMessages == true then
             LOG(sFunctionRef..': Have a target; unit state='..M27Logic.GetUnitState(oUnit)..'; bUpdateLocationAttemptCount='..tostring(bUpdateLocationAttemptCount))
             local tPosition
@@ -4702,12 +4753,9 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             else
                 tPosition = tLocationToMoveTo
             end
-            local iSegmentX, iSegmentZ = GetAirSegmentFromPosition(tPosition)
-            if not(aiBrain[reftPreviousTargetByLocationCount][iSegmentX]) then aiBrain[reftPreviousTargetByLocationCount][iSegmentX] = {} end
-            LOG(sFunctionRef..': Target position='..repr(tPosition)..'; Number of times gone to segment x-Z='..iSegmentX..iSegmentZ..'='..(aiBrain[reftPreviousTargetByLocationCount][iSegmentX][iSegmentZ] or 0))
         end
 
-        --Wierd bug where can give e.g. a czar a move order, it's shown as being issued the order in the logic, but it then fails to move.  Solution is to check the unit state
+        --Wierd bug where can give e.g. a czar a move order, it's shown as being issued the order in the logic, but it then fails to move.  Happens when its constructed so likely it was given an order while under construction then it was cleared as a 1-off on completion.  Solution is to check the unit state
         local iSegmentX, iSegmentZ
         if oAttackTarget then
 
@@ -4727,7 +4775,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                     IssueAttack({oUnit}, oAttackTarget)
                     if bDebugMessages == true then LOG(sFunctionRef..': Given attack unit order to '..oAttackTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAttackTarget)..' at position '..repr(oAttackTarget:GetPosition())) end
                 end
-                if bUpdateLocationAttemptCount then iSegmentX, iSegmentZ = GetAirSegmentFromPosition(oAttackTarget:GetPosition()) end
+                --if bUpdateLocationAttemptCount then iSegmentX, iSegmentZ = GetAirSegmentFromPosition(oAttackTarget:GetPosition()) end
             end
             if bIsCzar then
                 oUnit[reftLastLocationTarget] = oAttackTarget:GetPosition()
@@ -4741,12 +4789,13 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                IssueClearCommands({oUnit})
                IssueMove({oUnit}, tLocationToMoveTo)
                oUnit[reftLastLocationTarget] = tLocationToMoveTo
-               if bUpdateLocationAttemptCount then iSegmentX, iSegmentZ = GetAirSegmentFromPosition(tLocationToMoveTo) end
+               --if bUpdateLocationAttemptCount then iSegmentX, iSegmentZ = GetAirSegmentFromPosition(tLocationToMoveTo) end
                if bDebugMessages == true then LOG(sFunctionRef..': Given move order to '..repr(tLocationToMoveTo)) end
            end
            oUnit[refoLastUnitTarget] = nil
         end
-        if iSegmentX and bUpdateLocationAttemptCount then
+        --Moved this earlier and changed so only increase on run rather than every time
+        --[[if iSegmentX and bUpdateLocationAttemptCount then
             for iXAdj = -1, 1 do
                 for iZAdj = -1, 1 do
                     if not(aiBrain[reftPreviousTargetByLocationCount][iSegmentX + iXAdj]) then aiBrain[reftPreviousTargetByLocationCount][iSegmentX + iXAdj] = {} end
@@ -4755,7 +4804,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                     M27Utilities.DelayChangeSubtable(aiBrain, reftPreviousTargetByLocationCount, iSegmentX + iXAdj, iSegmentZ + iZAdj, -1, 180)
                 end
             end
-        end
+        end--]]
     else M27Utilities.ErrorHandler('Couldnt find any target location or unit for soulripper with ID='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
     end
 

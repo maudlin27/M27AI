@@ -46,7 +46,8 @@ function OnKilled(self, instigator, type, overkillRatio)
                     end
                 end
             else
-                if instigator and IsUnit(instigator) and EntityCategoryContains(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, instigator.UnitId) then
+                --Decided to remove the below and instead just work off a lower threshold that only increases when we run
+                --[[if instigator and IsUnit(instigator) and EntityCategoryContains(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, instigator.UnitId) then
                     local oKillerBrain = instigator:GetAIBrain()
                     if oKillerBrain.M27AI then
                         local iSegmentX, iSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(instigator:GetPosition())
@@ -57,7 +58,7 @@ function OnKilled(self, instigator, type, overkillRatio)
                             end
                         end
                     end
-                end
+                end--]]
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
