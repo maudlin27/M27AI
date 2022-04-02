@@ -4037,7 +4037,13 @@ function SetMaximumFactoryLevels(aiBrain)
         end
 
         --Reduce air factories wanted based on gross energy.  Air fac uses 90 energy for intercepter (T1)
-        aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeAir], math.floor(aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] / (13 * aiBrain[refiOurHighestAirFactoryTech] * aiBrain[refiOurHighestAirFactoryTech]))))
+        bDebugMessages = true
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..(aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 'nil'))
+            LOG(sFunctionRef..': aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]='..(aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] or 'nil'))
+            LOG(sFunctionRef..': aiBrain[refiOurHighestAirFactoryTech]='..(aiBrain[refiOurHighestAirFactoryTech] or 'nil'))
+        end
+        aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, math.min((aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 1), math.floor(aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] / (13 * aiBrain[refiOurHighestAirFactoryTech] * aiBrain[refiOurHighestAirFactoryTech]))))
 
 
         if bDebugMessages == true then LOG(sFunctionRef..': bActiveExperimental='..tostring(bActiveExperimental)..'; Idle factories='..aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused]) end
@@ -4976,6 +4982,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refiModDistFromStartNearestThreat] = 1000
     aiBrain[reftLocationFromStartNearestThreat] = {0,0,0}
     aiBrain[refiEnemyHighestTechLevel] = 1
+
 
 
     M27MapInfo.SetWhetherCanPathToEnemy(aiBrain)

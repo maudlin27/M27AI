@@ -170,6 +170,7 @@ refCategoryProtectFromTML = refCategoryT2Mex + refCategoryT3Mex + refCategoryT2P
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
 refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN}
 refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
+refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
 
 
 function GetUnitLifetimeCount(oUnit)

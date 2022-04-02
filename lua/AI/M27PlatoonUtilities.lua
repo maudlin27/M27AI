@@ -2014,6 +2014,9 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
     --Mobile shield normal platoon - will be assisting a unit so dont care about whether are nearby enemies, instead only care if shield is failing (handled via separate logic)
     if not(sPlatoonName == 'M27MobileShield') then
+
+        --First do special 'run away' logic for units that the normal threat based and kiting approaches might not work properly for:
+
         --ACU RunAway logic (highest priority):
         if oPlatoon[refbACUInPlatoon] == true then
             if M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then
@@ -2285,6 +2288,71 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     bProceed = false
                 end
             end
+        elseif sPlatoonName == 'M27GroundExperimental' and EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId) then
+            --Run if against enemy experimental or 5+ T2 arti or low shield
+            local bExperimentalWithinRange = false
+            if oPlatoon[refiEnemiesInRange] > 0 then
+                local tLandExperimentals = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandExperimental, oPlatoon[reftEnemiesInRange])
+                if M27Utilities.IsTableEmpty(tLandExperimentals) == false then
+                    for iUnit, oUnit in tLandExperimentals do
+                        if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) < 98 then
+                            bExperimentalWithinRange = true
+                            break
+                        end
+                    end
+                end
+            end
+            if bExperimentalWithinRange then
+                oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                oPlatoon[refbHavePreviouslyRun] = true
+            else
+                --T2 arti in range?
+                local bRunFromArti = false
+                if oPlatoon[refiEnemyStructuresInRange] > 0 then
+                    local tT2Arti = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedT2Arti, oPlatoon[reftEnemyStructuresInRange])
+                    if M27Utilities.IsTableEmpty(tT2Arti) == false then
+                        local iArtiThatCanHitUs = 0
+                        local iClosestDist = 10000
+                        local iCurDist
+                        local oClosestT2Arti
+                        for iUnit, oUnit in tT2Arti do
+                            iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oUnit:GetPosition())
+                            if iCurDist <= 135 then --given margin for error given both size of fatboy and firing variance of t2 arti
+                                iArtiThatCanHitUs = iArtiThatCanHitUs + 1
+                            end
+                            if iCurDist < iClosestDist then
+                                iClosestDist = iCurDist
+                                oClosestT2Arti = oUnit
+                            end
+                        end
+
+                        if iClosestDist > 100 then
+                            local tPositionIfAttacking = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), oClosestT2Arti:GetPosition()), iClosestDist - 100, false)
+                            tT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, tPositionIfAttacking, 135, 'Enemy')
+                            iArtiThatCanHitUs = 0
+                            if M27Utilities.IsTableEmpty(tT2Arti) == false then
+                                iArtiThatCanHitUs = table.getn(tT2Arti)
+                            end
+                        end
+                        --sandbox testing: If against 6 T1 pgen assisted klink hammers and 1 UEF T3 shield, then can kill the shield but then have to retreat and are likely to die.  Will therefore treat threshold for running as 5 to be ultra-cautious given they might be able to build more shields or T2 arti (or have more that we havent scouted)
+                        if iArtiThatCanHitUs >= 7 or (iArtiThatCanHitUs >= 5 and M27Logic.IsTargetUnderShield(aiBrain, oClosestT2Arti, 100, false, false, true)) then
+                            bRunFromArti = true
+                        end
+                    end
+                end
+                if bRunFromArti then
+                    oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                    oPlatoon[refbHavePreviouslyRun] = true
+                else
+                    --Low shield?
+                    local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oPlatoon[refoFrontUnit])
+                    if iMaxShield > 10000 and ((oPlatoon[refbHavePreviouslyRun] and iCurShield < iMaxShield * 0.2) or iCurShield < iMaxShield * 0.15) then
+                        oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                        oPlatoon[refbHavePreviouslyRun] = true
+                    end
+                end
+            end
+            if oPlatoon[refiCurrentAction] then bProceed = false end
         end
 
         --If underwater unit then check for navy units here (aren't checking all the time as only want to include enemy actions re them if are underwater - dont want units chasing them into the water; navy already gets included in nearbyenemies for overwater units
@@ -3526,7 +3594,10 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                         if oPlatoon[reftPlatoonDFTargettingCategories] == nil then
                             if sPlatoonName == 'M27GroundExperimental' then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Updating target priority categories as we are an experimental platoon') end
-                                oPlatoon[reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityOurGroundExperimental
+                                if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId) then
+                                    oPlatoon[reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityOurFatboy
+                                else oPlatoon[reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityOurGroundExperimental
+                                end
                             else --Default
                                 if bDebugMessages == true then LOG(sFunctionRef..': Not an experimental platoon so will use default target priorities') end
                                 oPlatoon[reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityNormal
@@ -3540,7 +3611,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                         if sPlatoonName == 'M27GroundExperimental' then
                             local iRange = M27Logic.GetUnitMaxGroundRange(oPlatoon[reftCurrentUnits])
                             if bDebugMessages == true then LOG(sFunctionRef..': Have an experimental platoon, iRange='..iRange..'; checking if contains fatboy') end
-                            if iRange >= 60 or (M27UnitInfo.IsUnitValid(oPlatoon[reftCurrentUnits][1]) and EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[reftCurrentUnits][1].UnitId)) then
+                            if iRange >= 60 or (M27UnitInfo.IsUnitValid(oPlatoon[reftCurrentUnits][1]) and EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId)) then
                                 oPlatoon[M27PlatoonTemplates.refbAttackMove] = true
                             end
                         end
@@ -7352,6 +7423,8 @@ function ProcessPlatoonAction(oPlatoon)
                         elseif sPlatoonName == 'M27GroundExperimental' then
                             --if bDontClearActions == false and iCurrentUnits > 0 then IssueClearCommands(tCurrentUnits) end
                             --Dont want to apply normal logic, instead keep things simple for now - attack-move or move to the target
+                            local bHaveFatboy = false
+                            if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId) then bHaveFatboy = true end
                             bAlreadyDeterminedTargetEnemy = true
                             bChangedActions = true
 
@@ -7372,32 +7445,69 @@ function ProcessPlatoonAction(oPlatoon)
                             else oPlatoon[M27PlatoonTemplates.refbAttackMove] = false
                             end
 
-
-
-                            if bDebugMessages == true then LOG(sFunctionRef..': Dealing with an experimental platoon, will see if its near enemy ACU by looking for enemies based on iOurRange='..iOurRange..'; oPlatoon[refiIndirectUnits]='..oPlatoon[refiIndirectUnits]..'; oPlatoon[refiDFUnits]='..oPlatoon[refiDFUnits]) end
-                            tNearbyEnemiesOfInterest = aiBrain:GetUnitsAroundPoint(categories.COMMAND, GetPlatoonFrontPosition(oPlatoon), iOurRange + 20, 'Enemy')
-                            if M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest) == false then
-                                oUnitToAttackInstead = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil)
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have nearby ACU, will attack it unless its far enough away that we should keep moving twoards it; distance='..M27Utilities.GetDistanceBetweenPositions(oUnitToAttackInstead:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) > (iOurRange - 10)) end
-                                if M27Utilities.GetDistanceBetweenPositions(oUnitToAttackInstead:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) > (iOurRange - 10) or M27Logic.IsShotBlocked(oPlatoon[refoFrontUnit], oUnitToAttackInstead) then
-                                    tDFTargetPosition = oUnitToAttackInstead:GetPosition()
-                                    oUnitToAttackInstead = nil
+                            if bHaveFatboy and oPlatoon[refiEnemyStructuresInRange] > 0 then
+                                local tNearbyShields = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield, oPlatoon[reftEnemyStructuresInRange])
+                                local oClosestShield
+                                local iClosestShield = 10000
+                                local iCurDistance
+                                if M27Utilities.IsTableEmpty(tNearbyShields) == false then
+                                    for iShield, oShield in tNearbyShields do
+                                        iCurDistance = M27Utilities.GetDistanceBetweenPositions(oShield:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
+                                        if iCurDistance < iClosestShield then
+                                            oClosestShield = oShield
+                                            iClosestShield = iCurDistance
+                                        end
+                                    end
                                 end
-                                oPlatoon[M27PlatoonTemplates.refbAttackMove] = false
+                                if iClosestShield <= iOurRange then
+                                    oUnitToAttackInstead = oClosestShield
+                                elseif iClosestShield <= 125 then --Will be in range of enemy shield soon
+                                    oUnitToAttackInstead = oClosestShield
+                                else --Wont be in range of a shield soon
+                                    local tNearbyT2Arti = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedT2Arti, oPlatoon[reftEnemyStructuresInRange])
+                                    local oClosestT2Arti
+                                    local iClosestT2Arti = 10000
+                                    if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
+                                        for iArti, oArti in tNearbyT2Arti do
+                                            iCurDistance = M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
+                                            if iCurDistance < iClosestT2Arti then
+                                                oClosestT2Arti = oArti
+                                                iClosestT2Arti = iCurDistance
+                                            end
+                                        end
+                                        if iClosestT2Arti <= 135 then
+                                            oUnitToAttackInstead = oClosestT2Arti
+                                        end
+                                    end
+
+                                    --If no shield or t2 arti, the normal logic for pd should work for us so dont need anything special
+                                end
+                            else
+                                --Not a fatboy so consider enemy ACU
+
+
+                                if bDebugMessages == true then LOG(sFunctionRef..': Dealing with an experimental platoon, will see if its near enemy ACU by looking for enemies based on iOurRange='..iOurRange..'; oPlatoon[refiIndirectUnits]='..oPlatoon[refiIndirectUnits]..'; oPlatoon[refiDFUnits]='..oPlatoon[refiDFUnits]) end
+                                --Dont move to enemy com if have fatboy (as it might die)
+                                tNearbyEnemiesOfInterest = aiBrain:GetUnitsAroundPoint(categories.COMMAND, GetPlatoonFrontPosition(oPlatoon), iOurRange + 20, 'Enemy')
+                                if M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest) == false then
+                                    oUnitToAttackInstead = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have nearby ACU, will attack it unless its far enough away that we should keep moving twoards it; distance='..M27Utilities.GetDistanceBetweenPositions(oUnitToAttackInstead:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) > (iOurRange - 10)) end
+                                    if M27Utilities.GetDistanceBetweenPositions(oUnitToAttackInstead:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) > (iOurRange - 10) or M27Logic.IsShotBlocked(oPlatoon[refoFrontUnit], oUnitToAttackInstead) then
+                                        tDFTargetPosition = oUnitToAttackInstead:GetPosition()
+                                        oUnitToAttackInstead = nil
+                                    end
+                                    oPlatoon[M27PlatoonTemplates.refbAttackMove] = false
+                                end
                             end
+
                             if not(tDFTargetPosition) and not(oUnitToAttackInstead) then
                                 --Is there nearby enemy land experimental? If so then target position that would bring us in range of this unless we're a fatboy in which case run
                                 if bDebugMessages == true then LOG(sFunctionRef..': Checking for nearby land experimental. iOurRange='..iOurRange..'; oPlatoon[refiEnemiesInRange]='..oPlatoon[refiEnemiesInRange]) end
 
+                                --Note - will have already checekd for enemy experimental and run away for fatboy as part of the logic for determining nearby enemy
                                 if oPlatoon[refiEnemiesInRange] > 0 then tNearbyEnemiesOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandExperimental, oPlatoon[reftEnemiesInRange]) end
                                 if M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest) == false then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have nearby land experimentals') end
-                                    if iOurRange >= 80 and M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemiesOfInterest, true, 10000, 10000, false, false) >= 8000 then
-                                        tDFTargetPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-                                        oPlatoon[M27PlatoonTemplates.refbAttackMove] = false
-                                    else
-                                        tDFTargetPosition = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil):GetPosition()
-                                    end
+                                    tDFTargetPosition = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil):GetPosition()
                                 else
                                     --Is there nearby enemy PD? Then want to get in range of this
                                     if oPlatoon[refiEnemyStructuresInRange] > 0 then
@@ -7409,6 +7519,7 @@ function ProcessPlatoonAction(oPlatoon)
                                         end
                                     end
                                 end
+
                                 if M27Utilities.IsTableEmpty(tDFTargetPosition) == true or M27MapInfo.IsUnderwater(tDFTargetPosition) then
                                     --Just go for the enemy base if we aren't already there
                                     if HasPlatoonReachedDestination(oPlatoon) then

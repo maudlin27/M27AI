@@ -1897,6 +1897,12 @@ function UpgradeManager(aiBrain)
     aiBrain[refoNearestT2MexToBase] = nil
     aiBrain[reftActiveHQUpgrades] = {}
 
+    --Economy - placeholder
+    aiBrain[refiEnergyGrossBaseIncome] = 2
+    aiBrain[refiMassGrossBaseIncome] = 0.1
+    aiBrain[refiEnergyNetBaseIncome] = 2
+    aiBrain[refiMassNetBaseIncome] = 0.1
+
     --Initial wait:
     WaitTicks(300)
     while(not(aiBrain:IsDefeated())) do
