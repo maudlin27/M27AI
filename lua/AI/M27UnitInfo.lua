@@ -82,6 +82,7 @@ refCategoryT1Sonar = refCategorySonar * categories.TECH1
 refCategoryT2Sonar = refCategorySonar * categories.TECH2
 refCategoryT3Sonar = refCategorySonar * categories.TECH3
 refCategoryStructure = categories.STRUCTURE - categories.WALL
+refCategoryWall = categories.STRUCTURE * categories.WALL --NOTE: Some walls are props; this is for if want a wall that can build
 refCategoryUnitsWithOmni = categories.OMNI + categories.COMMAND + categories.OVERLAYOMNI
 
 
@@ -133,6 +134,7 @@ refCategoryObsidian = categories.AEON * categories.TECH2 * categories.SHIELD * c
 refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD - refCategoryObsidian --Miscategorised obsidian tank
 refCategoryPersonalShield = categories.PERSONALSHIELD + refCategoryObsidian
 refCategoryFatboy = categories.EXPERIMENTAL * categories.UEF * categories.MOBILE * categories.LAND * categories.ARTILLERY
+refCategorySniperBot = categories.MOBILE * categories.SNIPER * categories.LAND
 
 --Air units
 refCategoryAirScout = categories.AIR * categories.SCOUT
@@ -153,7 +155,7 @@ refCategoryCruiser = categories.NAVAL * categories.CRUISER
 refCategoryCruiserCarrier = refCategoryCruiser + categories.NAVAL * categories.NAVALCARRIER
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted
-refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL
+refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL + categories.OVERLAYANTINAVY * categories.LAND --If removing overlayantinavy then think up better solution for fatboy/experimentals so they dont run when in water
 
 --Multi-category:
 --Antinavy mobile units (can include land units - e.g for land factories to build antisub units)

@@ -703,13 +703,13 @@ function GetACU(aiBrain)
     function GetSubstituteACU(aiBrain)
         --Get substitute
         local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
-        local tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirFactory + M27UnitInfo.refCategoryLandFactory)
+        local tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirFactory + M27UnitInfo.refCategoryLandFactory, false, true)
         if IsTableEmpty(tSubstitutes) then
-            tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer)
+            tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer, false, true)
             if IsTableEmpty(tSubstitutes) then
-                tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure)
+                tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure, false, true)
                 if IsTableEmpty(tSubstitutes) then
-                    tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMobileLand)
+                    tSubstitutes = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMobileLand, false, true)
                 end
             end
         end
@@ -720,7 +720,7 @@ function GetACU(aiBrain)
             aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(tSubstitutes, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
             if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
                 --Retry with all of above categories
-                aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
+                aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand, false, true), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
                 if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
                     ErrorHandler('Dont have a valid substitute ACU, will treat aiBrain '..aiBrain:GetArmyIndex()..' as being defeated')
                     aiBrain.M27IsDefeated = true

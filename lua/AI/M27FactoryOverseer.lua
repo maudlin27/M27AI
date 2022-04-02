@@ -1006,7 +1006,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                     --=======AIR FACTORY------------------
                 elseif bIsAirFactory then
-                    if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
                     if iCurrentConditionToTry == 1 and bDebugMessages == true then LOG(sFunctionRef..': About to determine what to build for an air factory, mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; GameTime='..GetGameTimeSeconds()) end
                     local iMinPowerPerTickWantedForAir = 8
                     if iFactoryTechLevel == 2 then iMinPowerPerTickWantedForAir = 13
@@ -1066,9 +1065,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 iTotalWanted = 1
                             end
                         elseif iCurrentConditionToTry == 3 then  --Emergency defence bombers (get T1 bombers even if can get higher tech)
-                            if aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= math.min(125, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4)  and (bHavePowerForAir or aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.8) then
+                            local iEmergencyRange = math.min(math.max(125, (aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * aiBrain[M27AirOverseer.refiBomberDefencePercentRange] - 20)), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4)
+                            if aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= iEmergencyRange  and (bHavePowerForAir or aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.8) then
                                 --Does the enemy have air units within a similar distance? If so then build AA first
-                                if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(110, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35), 'Enemy')) == false then
+                                if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iEmergencyRange - 30, 'Enemy')) == false then
                                     iCategoryToBuild = M27UnitInfo.refCategoryAirAA
                                 else
                                     if bDebugMessages == true then LOG(sFunctionRef..': Enemies are too close to our base so want bombers for emergency defence') end

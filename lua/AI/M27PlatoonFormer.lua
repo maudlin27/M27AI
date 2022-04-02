@@ -777,7 +777,7 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
     if oPlatoon and oPlatoon[M27PlatoonTemplates.refbWantsShieldEscort] and oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] > 0 then
         if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] then
             --bDebugMessages = true
-            iPlatoonValueToShieldRatio = 2.5 end
+            iPlatoonValueToShieldRatio = 2.5 end --Will also require a min of 3 shields in below
         if bCheckIfRemoveExistingShield then
             iPlatoonValueToShieldRatio = 1.5
         end
@@ -826,6 +826,8 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
         if iShieldValueWanted > (iShieldValueHave + iShieldMass) and iShieldUnitsHave < 5 then
             if bDebugMessages == true then LOG(sFunctionRef..': Returning true as the shield value wanted is more than the value we have plus shield mass, and we have fewer than 5 shield units') end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return true
+        elseif iShieldUnitsHave < 3 and oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] then
             return true
         else
             if bDebugMessages == true then LOG(sFunctionRef..': Returning false') end

@@ -3936,7 +3936,6 @@ function SetMaximumFactoryLevels(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetMaximumFactoryLevels'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
     --NoRush - set factories wanted to 1
@@ -4037,7 +4036,6 @@ function SetMaximumFactoryLevels(aiBrain)
         end
 
         --Reduce air factories wanted based on gross energy.  Air fac uses 90 energy for intercepter (T1)
-        bDebugMessages = true
         if bDebugMessages == true then
             LOG(sFunctionRef..': aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..(aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 'nil'))
             LOG(sFunctionRef..': aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]='..(aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] or 'nil'))

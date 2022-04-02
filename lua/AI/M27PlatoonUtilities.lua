@@ -2069,7 +2069,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     oPlatoon[refbNeedToHeal] = false
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': iACUHealth='..iCurrentHealth..'; finished checking if should run due to low health, bProceed='..tostring(bProceed)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': iACUHealth='..oPlatoon[refoFrontUnit]:GetHealth()..'; finished checking if should run due to low health, bProceed='..tostring(bProceed)) end
             if bProceed == true then
                 local bACUNeedsToRun = false
                 --Have we recently taken damage from an unseen source?
@@ -2234,11 +2234,20 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     if aiBrain[M27AirOverseer.refbMercySightedRecently] then iEnemyAirSearchRange = 118 end
                     local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, GetPlatoonFrontPosition(oPlatoon), iEnemyAirSearchRange, 'Enemy')
                     if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
-                        --Do we have nearby MAA?
-                        if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, GetPlatoonFrontPosition(oPlatoon), 90, 'Ally')) then
+                        if aiBrain[M27AirOverseer.refbMercySightedRecently] and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMercy, tNearbyEnemyAir)) == false then
                             bACUNeedsToRun = true
-                        elseif aiBrain[M27AirOverseer.refbMercySightedRecently] and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryMercy, tNearbyEnemyAir)) == false then
-                            bACUNeedsToRun = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy air contains mercies so will run regardless of if we have nearby MAA') end
+                        else
+                            --Do we have nearby MAA?
+                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, GetPlatoonFrontPosition(oPlatoon), 90, 'Ally')) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air, and we dont have nearby MAA; Will run if a significant threat that we cant deal with with our air force, or if we are low on health. aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]) end if aiBrain[M27AirOverseer.refiAirAANeeded] > 3 and (oPlatoon[refoFrontUnit]:GetHealthPercent() <= 0.65 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryAirNonScout - M27UnitInfo.refCategoryAirAA, tNearbyEnemyAir)) == false) then
+                                    --Run unless we are underewater and enemy doesnt have T2 air
+                                    bACUNeedsToRun = true
+                                    if M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit]) and (aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] + aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3]) == 0 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] <= 2000 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpBomber, tNearbyEnemyAir)) then
+                                        bACUNeedsToRun = false
+                                    end
+                                end
+                            end
                         end
                     end
                 end
@@ -4613,7 +4622,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            if sPlatoonName == 'M27MobileShield' and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
+            --if sPlatoonName == 'M27MobileShield' and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 26 then bDebugMessages = true end
 
             if bDebugMessages == true then
@@ -5165,12 +5174,15 @@ function DeterminePlatoonAction(oPlatoon)
                                 bRefreshAction = true
                                 iRefreshActionThreshold = 1
                                 if oPlatoon[refiCurrentAction] == refActionReclaimAllNearby then iRefreshActionThreshold = 0 end --The reclaimallnearby logic already checks if position has moved so dont need a delay
-                                for iReclaimer, oReclaimer in oPlatoon[reftReclaimers] do
-                                    if not(oReclaimer.Dead) then
-                                        if oReclaimer:IsUnitState('Reclaiming') == true then
-                                            if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..oPlatoon[refiPlatoonCount]..': Unit is reclaiming so dont want to refresh') end
-                                            bRefreshAction = false
-                                            break
+
+                                if aiBrain:GetEconomyStoredRatio('MASS') <= 0.95 then
+                                    for iReclaimer, oReclaimer in oPlatoon[reftReclaimers] do
+                                        if not(oReclaimer.Dead) then
+                                            if oReclaimer:IsUnitState('Reclaiming') == true then
+                                                if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..oPlatoon[refiPlatoonCount]..': Unit is reclaiming so dont want to refresh') end
+                                                bRefreshAction = false
+                                                break
+                                            end
                                         end
                                     end
                                 end
@@ -7252,7 +7264,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            if sPlatoonName == 'M27MobileShield' and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
+            --if sPlatoonName == 'M27MobileShield' and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 26 then bDebugMessages = true end
 
             if bDebugMessages == true then
@@ -7640,15 +7652,19 @@ function ProcessPlatoonAction(oPlatoon)
                                 if M27Utilities.IsTableEmpty(tDFTargetPosition) == true then tDFTargetPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain) end
                                 oPlatoon[reftTemporaryMoveTarget] = tDFTargetPosition
 
-                                --Is the target under shield? If so then change the target to the shield itself
+                                --Is the target under shield? If so then change the target to the shield itself unless we are an ACU and doing so brings us in range of T1 PD
                                 local oNearestEnemyShield = M27Logic.GetNearestActiveFixedEnemyShield(aiBrain, tDFTargetPosition)
                                 if oNearestEnemyShield then
                                     --There is an enemy shield covering the target location, so move to within this shield's shield radius instead
                                     --GetPositionAtOrNearTargetInPathingGroup(tStartPos, tTargetPos, iDistanceFromTargetToStart, iAngleAdjust, oPathingUnit, bMoveCloserBeforeFurtherIfBlocked, bCheckIfExistingTargetIsBetter, iMinDistanceFromExistingCommandTarget)
                                     --if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oNearestEnemyShield:GetPosition()) <= oNearestEnemyShield:GetBlueprint().Defense.Shield.ShieldSize - 3 then
+
                                     tDFTargetPosition = GetPositionAtOrNearTargetInPathingGroup(GetPlatoonFrontPosition(oPlatoon), oNearestEnemyShield:GetPosition(), oNearestEnemyShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5 - 3, 0, oPlatoon[refoFrontUnit], true, true, 2)
                                     bMoveNotAttack = true
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have a nearby enemy shield at position '..repr(oNearestEnemyShield:GetPosition())..'; will adjust target location to be near this, tDFTargetPosition='..repr(tDFTargetPosition)) end
+                                    if oPlatoon[refbACUInPlatoon] and not(M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryPD, tDFTargetPosition, 27, 'Enemy'))) then
+                                        bMoveNotAttack = false
+                                    end
                                 end
 
                                 if bMoveNotAttack and M27Conditions.HaveNearbyMobileShield(oPlatoon) and not(oNearestEnemyShield) then bMoveNotAttack = false end
@@ -7783,8 +7799,8 @@ function ProcessPlatoonAction(oPlatoon)
                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Point 1: platoon movement path='..repr(oPlatoon[reftMovementPath])) end
 
                         if oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] == 0 and not(oPlatoon[refiCurrentAction] == refActionKitingRetreat) then
-                            --Head towards rally as we either have low health or just got hit by an unseen unit so dont know that our current move target is safe
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to call returntobase') end
+                            --Head towards rally as we either have low health or just got hit by an unseen unit so dont know that our current move target is safe, unless we are at max health
+                            if bDebugMessages == true then LOG(sFunctionRef..': Either low health or taken unseen damage, so about to call returntobase') end
 
                             ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), iDistanceToRunBackBy, bDontClearActions, bTemporaryRetreat)
                             bTargetAwayFromNearestEnemy = true
@@ -8673,7 +8689,7 @@ function PlatoonInitialSetup(oPlatoon)
         if bDebugMessages == true then LOG('Finished waiting 10 ticks for '..sPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')) end
         tCurrentUnits = oPlatoon:GetPlatoonUnits()
         if M27Utilities.IsTableEmpty(tCurrentUnits) == true then
-            LOG('Platoon still has no units so will disband. Platoon name='..sPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil'))
+            if bDebugMessages == true then LOG('Platoon still has no units so will disband. Platoon name='..sPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')) end
             bAbort = true
             oPlatoon[refbPlatoonLogicActive] = false
             if aiBrain:PlatoonExists(oPlatoon) then oPlatoon:PlatoonDisband() end

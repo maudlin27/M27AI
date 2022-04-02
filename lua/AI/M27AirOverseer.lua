@@ -2101,7 +2101,7 @@ function DedicatedScoutManager(aiBrain, oScout, oAssistTarget)
     --local iAngleFromBaseToTarget = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oAssistTarget:GetPosition())
     --local iCount = 0
     oScout[refiCurMovementPath] = 1
-    oScout[reftMovementPath] = oAssistTarget:GetPosition()
+    oScout[reftMovementPath] = {oAssistTarget:GetPosition()}
     IssueGuard({oScout}, oAssistTarget)
 
     while M27UnitInfo.IsUnitValid(oAssistTarget) and M27UnitInfo.IsUnitValid(oScout) do
@@ -2358,6 +2358,7 @@ function GetBomberTargetShortlist(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 
+
     local tEnemyUnitsOfType
     local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
     local iMaxSearchRange = aiBrain[refiMaxScoutRadius]
@@ -2377,7 +2378,41 @@ function GetBomberTargetShortlist(aiBrain)
     local bOnlyIncludeTargetACU = false
     local tHardToHitTargets = {}
     local iHardToHitTargets = 0
-    aiBrain[refiBomberDefencePercentRange] = 0.25
+    aiBrain[refiBomberDefencePercentRange] = 0.25 --(Will decrease if in air domination mode)
+    --Increase bomber defence range if enemy has a land experimental that is within 40% of the base, or we have high value buildings we want to protect (in which case base the % range on the % that would provide 120 range protection on high value buildings)
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
+        local iClosestEnemyExperimental = 10000
+        local iCurDistance
+        for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                if iCurDistance < iClosestEnemyExperimental then
+                    iClosestEnemyExperimental = iCurDistance
+                end
+            end
+        end
+        if iClosestEnemyExperimental <= 275 then aiBrain[refiBomberDefencePercentRange] = math.max(aiBrain[refiBomberDefencePercentRange],iClosestEnemyExperimental / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
+    end
+    --Consider friendly experimentals under construction, and completed high value structures
+    local tOurHighValueBuildings = aiBrain:GetListOfUnits(categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex, false, false)
+    if M27Utilities.IsTableEmpty(tOurHighValueBuildings) == false then
+        local iFurthestFriendlyHighValueBuilding = 0
+        local iCurDistance
+        for iUnit, oUnit in tOurHighValueBuildings do
+            if oUnit:GetFractionComplete() < 1 or EntityCategoryContains(categories.STRUCTURE, oUnit.UnitId) then
+                iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                if iCurDistance > iFurthestFriendlyHighValueBuilding then iFurthestFriendlyHighValueBuilding = iCurDistance end
+            end
+        end
+        if iFurthestFriendlyHighValueBuilding > 0 then
+            aiBrain[refiBomberDefencePercentRange] = math.max(aiBrain[refiBomberDefencePercentRange], (iFurthestFriendlyHighValueBuilding + 90) / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase])
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiBomberDefencePercentRange]='..aiBrain[refiBomberDefencePercentRange]..'; Numerically this is '..aiBrain[refiBomberDefencePercentRange] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
+    end
+    if aiBrain[refiBomberDefencePercentRange] > 350 then aiBrain[refiBomberDefencePercentRange] = 350 end
+
+
+
     local iMaxLifetimeAssignment = 2 --Max number of bombers that will assign to an individual target ever (considered alongside the mass mod, i.e. must meet both requirements) - used as another way of avoiding constantly sending bombers to the same target where they always die
     local iMaxLifetimeMassMod = 1.5 --If this % of the target's mass has died trying to kill it, treat the target as a low priority
     local bOnlyIncludeAsLowPriorityThreat = false
@@ -2417,19 +2452,19 @@ function GetBomberTargetShortlist(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': In air dominance mode so focus down any ground AA') end
     else
         --Do we have enemies near our base? If so then target only these for now
-        if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[refiBomberDefencePercentRange] or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= 150 then
+        if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[refiBomberDefencePercentRange] or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= 150 or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= (aiBrain[refiBomberDefencePercentRange] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] - 50) then
             --Ignore enemy AA buildings if we only have T1 bombers
             if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 then
                 reftPriorityTargetCategories = {M27UnitInfo.refCategoryGroundAA - categories.STRUCTURE, M27UnitInfo.refCategoryMobileLand - categories.COMMAND, M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryGroundAA, categories.COMMAND}
             else
                 reftPriorityTargetCategories = {M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand - categories.COMMAND, M27UnitInfo.refCategoryStructure, categories.COMMAND}
             end
-            iMaxSearchRange = math.max(150, aiBrain[M27Overseer.refiPercentageOutstandingThreat] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) + 25
+            iMaxSearchRange = math.max(150, aiBrain[M27Overseer.refiPercentageOutstandingThreat] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], aiBrain[refiBomberDefencePercentRange] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] - 40) + 25
             aiBrain[refiLowPriorityStart] = 4
             iFriendlyUnitNormalSearchRange = 0
             iMaxLifetimeAssignment = 5
             iMaxLifetimeMassMod = 5
-            if bDebugMessages == true then LOG(sFunctionRef..': Enemies near base so focus down AA first then land') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Enemies near base so focus down AA first then land; iMaxSearchRange to use='..iMaxSearchRange..'; aiBrain[refiBomberDefencePercentRange]='..aiBrain[refiBomberDefencePercentRange]) end
         else
             if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 2 then --Currently T2 bombers will have same target prioritisation as a T3 bomber
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a T3 air factory so look for targets for a strat bomber') end
@@ -2452,21 +2487,21 @@ function GetBomberTargetShortlist(aiBrain)
 
                 if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 2 then
                     if iEnemyT3Power == 0 then --Enemies dont have any T3 power constructed, so if we target T2 power we might power stall them
-                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
                         aiBrain[refiLowPriorityStart] = 11 --if changing this also change the poitn at which to insert
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy has no T3 power so will focus down any T2 power first') end
                     else --Enemy has T3 power so focus on mexes rather than power
-                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
                         aiBrain[refiLowPriorityStart] = 7 --if changing this also change the poitn at which to insert
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T3 power so will focus on mexes') end
                     end
                 else --T3+ air - same as T2 for targeting except will include ACU in high priority options
                     if iEnemyT3Power == 0 then --Enemies dont have any T3 power constructed, so if we target T2 power we might power stall them
-                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
                         aiBrain[refiLowPriorityStart] = 12 --if changing this also change the poitn at which to insert
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy has no T3 power so will focus down any T2 power first') end
                     else --Enemy has T3 power so focus on mexes rather than power
-                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
+                        reftPriorityTargetCategories = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure}
                         aiBrain[refiLowPriorityStart] = 8 --if changing this also change the poitn at which to insert
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T3 power so will focus on mexes') end
                     end
@@ -3295,7 +3330,6 @@ function AirAAManager(aiBrain)
             end
             if aiBrain[refiOurMassInAirAA] < aiBrain[refiHighestEnemyAirThreat] * 0.35 then bIgnoreUnlessEmergencyThreat = true end
 
-            if bIgnoreUnlessEmergencyThreat then bDebugMessages = true end
             if bDebugMessages == true then LOG(sFunctionRef..': Will ignore threats that arent emergency air threats') end
 
         end

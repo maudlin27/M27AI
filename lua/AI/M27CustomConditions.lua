@@ -398,11 +398,14 @@ function WantToGetAnotherACUUpgrade(aiBrain)
             if M27Utilities.IsACU(oACU) and not(ACUShouldRunFromBigThreat(aiBrain)) then
                 local sUpgradeRef = M27PlatoonUtilities.GetACUUpgradeWanted(aiBrain, oACU)
                 if sUpgradeRef then
+                    --Is it a really expensive upgrade?
                     local iACUBuildRate = oACU:GetBuildRate()
                     local oBP = oACU:GetBlueprint()
                     if bDebugMessages == true then LOG(sFunctionRef..': oBP.Enhancements[sUpgradeRef]='..repr(oBP.Enhancements[sUpgradeRef])) end
                     local iUpgradeBuildTime = oBP.Enhancements[sUpgradeRef].BuildTime
                     local iUpgradeEnergyCost = oBP.Enhancements[sUpgradeRef].BuildCostEnergy
+                    --Double the energy cost if its really high (so we are less likely to get it)
+                    if iUpgradeEnergyCost >= 250000 then iUpgradeEnergyCost = iUpgradeEnergyCost * 2 end
                     local iEnergyWanted = (iUpgradeEnergyCost / (iUpgradeBuildTime / iACUBuildRate)) * 0.1 * 1.2 --Want slight margin for error in case we're just inbetween building power
                     --Increase threshold if we want to eco
                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iEnergyWanted = iEnergyWanted * 2 end
@@ -413,6 +416,8 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                     if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iEnergyWanted then
                         --Do we have enough mass? Want this to represent <20% of our total mass income
                         local iUpgradeMassCost = oBP.Enhancements[sUpgradeRef].BuildCostMass
+                        --Double the mass cost if its a really expensive upgrade
+                        if iUpgradeMassCost >= 2400 then iUpgradeMassCost = iUpgradeMassCost * 2 end
                         local iMassIncomePerTickWanted = iUpgradeMassCost / iUpgradeBuildTime * iACUBuildRate * 0.5 --I.e. if took 10% of this, then that's the mass per tick needed; however we want the mass required for the upgrade to represent <20% of our total mass income
                         --Increase threshold if we want to eco
                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
