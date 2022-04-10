@@ -15,6 +15,7 @@ local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
+local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -309,13 +310,15 @@ function OnBombFired(oWeapon, projectile)
                 M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
                 if oUnit.GetAIBrain and oUnit:GetAIBrain().M27AI then
                     if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repr(projectile:GetPosition())) end
-                    local iDelay = M27UnitInfo.GetUnitTechLevel(oUnit)
-                    if EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionUEF) - categories.TECH3, oUnit.UnitId) or EntityCategoryContains(M27Utilities.FactionIndexToCategory(M27UnitInfo.refFactionAeon) * M27UnitInfo.refCategoryTorpBomber * categories.TECH2, oUnit.UnitId) then iDelay = iDelay + 1 end
-                    ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, iDelay)
-                    if not(oUnit[M27AirOverseer.refiLastFiredBomb]) or GetGameTimeSeconds() - oUnit[M27AirOverseer.refiLastFiredBomb] > 2.5 then
+                    local iDelay = 0
+                    if M27UnitInfo.DoesBomberFireSalvo(oUnit) then iDelay = 3 end
+
+                    if not(oUnit[M27AirOverseer.refiLastFiredBomb]) or GetGameTimeSeconds() - oUnit[M27AirOverseer.refiLastFiredBomb] > iDelay then
                         oUnit[M27AirOverseer.refiLastFiredBomb] = GetGameTimeSeconds()
                         oUnit[M27AirOverseer.refiBombsDropped] = (oUnit[M27AirOverseer.refiBombsDropped] or 0) + 1
+                        oUnit[M27AirOverseer.refoLastBombTarget] = oUnit[M27AirOverseer.reftTargetList][oUnit[M27AirOverseer.refiCurTargetNumber]][M27AirOverseer.refiShortlistUnit]
                     end
+                    ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, iDelay)
                 end
             end
         end
@@ -468,6 +471,8 @@ function OnConstructed(oEngineer, oJustBuilt)
                 ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
             end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        elseif M27Config.M27ShowEnemyUnitNames then
+            oJustBuilt:SetCustomName(oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
         end
         --Engineer callbacks
         if oEngineer:GetAIBrain().M27AI and not(oEngineer.Dead) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then

@@ -58,6 +58,8 @@ refActionBuildT3ArtiPower = 30
 refActionBuildTMD = 31
 refActionBuildAA = 32
 refActionBuildEmergencyPD = 33
+refActionBuildSecondLandFactory = 34
+refActionBuildSecondAirFactory = 35
 tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees}
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 --ALSO update the actions noted in RefreshT3ArtiAdjacencyLocations as being ones that can ignore when deciding whether to clear existing engineer commands
@@ -1092,7 +1094,10 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                     end
                 end
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': No reclaim target; bKeepBuilding='..tostring(bKeepBuilding)) end
+                if bDebugMessages == true then LOG(sFunctionRef..': No reclaim target; bKeepBuilding='..tostring(bKeepBuilding)..'; if engi is near our base then will keep building anyway') end
+                if not(bKeepBuilding) and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oEngineer:GetPosition()) <= 30 then
+                    bKeepBuilding = true
+                end
                 if bKeepBuilding == false then
                     --Nearby enemy but we dont know if its an engineer so we want to run back towards base
                     if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for engi with count='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' and unique ref='..GetEngineerUniqueCount(oEngineer)) end
@@ -2784,39 +2789,85 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
         end
         iCategoryToBuild = aiBrain[refiLastExperimentalCategory]
 
-    else aiBrain[refiLastExperimentalCategory] = nil
-        --[[elseif aiBrain[refiLastExperimentalCategory] and M27UnitInfo.IsUnitValid(aiBrain[refoLastExperimentalUnderConstruction]) and aiBrain[refoLastExperimentalUnderConstruction]:GetFractionComplete() < 1 then
---E.g. if we started on an experimental but the constructing engineers have all died somehow, still want to resume construction
-if bDebugMessages == true then LOG(sFunctionRef..': Started constructing an experimental before, will try and figure out categories it belongs to and return these') end
-local sUnitID = aiBrain[refoLastExperimentalUnderConstruction].UnitId
-if sUnitID then
-local tPossibleCategories = {categories.TECH3, categories.EXPERIMENTAL, categories.STRUCTURE, categories.LAND, categories.AIR, categories.FACTORY, categories.SILO, categories.DIRECTFIRE, categories.INDIRECTFIRE}
-local iActualCategories
-local iCategoryCount = 0
-for iRef, iPossibleCategory in tPossibleCategories do
-    if EntityCategoryContains(iPossibleCategory, sUnitID) then
-        iCategoryCount = iCategoryCount + 1
-        if iCategoryCount == 1 then iActualCategories = iPossibleCategory else iActualCategories = iActualCateries * iPossibleCategory end
+    else
+        --Do we have nearby experimental type units being built by us or an ally? If so pick this category (in the hope we will then assist construction of the existing unit)
+        local tNearbyExperimentals = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalLevel, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 150, 'Ally')
+        local tNearbyExperimentalSubset
+        if M27Utilities.IsTableEmpty(tNearbyExperimentals) == false then
+
+            if aiBrain[refiLastExperimentalCategory] then tNearbyExperimentalSubset = EntityCategoryFilterDown(aiBrain[refiLastExperimentalCategory], tNearbyExperimentals) end
+            if M27Utilities.IsTableEmpty(tNearbyExperimentalSubset) == false then
+                for iUnit, oUnit in tNearbyExperimentalSubset do
+                    if oUnit:GetFractionComplete() >= 0.03 and oUnit:GetFractionComplete() < 1 then
+                        iCategoryToBuild = aiBrain[refiLastExperimentalCategory]
+                        break
+                    end
+                end
+            else
+                --Dont know the category so will cycle through main categories and if still cant figure it out will choose every category
+                for iCatRef, iCategory in {M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalLevel} do
+                    tNearbyExperimentalSubset = EntityCategoryFilterDown(iCategory, tNearbyExperimentals)
+                    if M27Utilities.IsTableEmpty(tNearbyExperimentalSubset) == false then
+                        for iUnit, oUnit in tNearbyExperimentalSubset do
+                            if oUnit:GetFractionComplete() >= 0.03 and oUnit:GetFractionComplete() < 1 then
+                                iCategoryToBuild = iCategory
+                                break
+                            end
+                        end
+                        if iCategoryToBuild then break end
+                    end
+                end
+            end
+        end
+        if not(iCategoryToBuild) then
+            aiBrain[refiLastExperimentalCategory] = nil
+        else
+            aiBrain[refiLastExperimentalCategory] = iCategoryToBuild
+        end
     end
-end
-end
-if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' categories in common') end--]]
-    end
+
+
+
+
+
+
+                --[[elseif aiBrain[refiLastExperimentalCategory] and M27UnitInfo.IsUnitValid(aiBrain[refoLastExperimentalUnderConstruction]) and aiBrain[refoLastExperimentalUnderConstruction]:GetFractionComplete() < 1 then
+        --E.g. if we started on an experimental but the constructing engineers have all died somehow, still want to resume construction
+        if bDebugMessages == true then LOG(sFunctionRef..': Started constructing an experimental before, will try and figure out categories it belongs to and return these') end
+        local sUnitID = aiBrain[refoLastExperimentalUnderConstruction].UnitId
+        if sUnitID then
+        local tPossibleCategories = {categories.TECH3, categories.EXPERIMENTAL, categories.STRUCTURE, categories.LAND, categories.AIR, categories.FACTORY, categories.SILO, categories.DIRECTFIRE, categories.INDIRECTFIRE}
+        local iActualCategories
+        local iCategoryCount = 0
+        for iRef, iPossibleCategory in tPossibleCategories do
+            if EntityCategoryContains(iPossibleCategory, sUnitID) then
+                iCategoryCount = iCategoryCount + 1
+                if iCategoryCount == 1 then iActualCategories = iPossibleCategory else iActualCategories = iActualCateries * iPossibleCategory end
+            end
+        end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' categories in common') end--]]
+
     --Backup incase nothing noted, and/or if we havent previously assigned
     if not(iCategoryToBuild) then
+
         --Can we path to enemy base with amphibious unit, and is there a land unit withi n40% of our base? then build land experimental
         local tEnemyPDThreat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(1000, aiBrain[M27AirOverseer.refiMaxScoutRadius]), 'Enemy')
         local iEnemyPDThreat = 0
+        local tEnemyT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(1000, aiBrain[M27AirOverseer.refiMaxScoutRadius]), 'Enemy')
+        local iEnemyT2ArtiCount = 0
+        if M27Utilities.IsTableEmpty(tEnemyT2Arti) == false then iEnemyT2ArtiCount = table.getn(iEnemyT2ArtiCount) end
         if M27Utilities.IsTableEmpty(tEnemyPDThreat) == false then
             iEnemyPDThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyPDThreat, true, nil, nil, false, false)
         end
+        local iExistingLandExperimentals = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental)
 
-        if bDebugMessages == true then LOG(sFunctionRef..': Deciding if want land experimental due to nearby enemy threat; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; Enemy PD threat='..iEnemyPDThreat) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Deciding if want land experimental due to nearby enemy threat; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; Enemy PD threat='..iEnemyPDThreat..'; iExistingLandExperimentals='..iExistingLandExperimentals..'; iEnemyT2ArtiCount='..iEnemyT2ArtiCount) end
 
-        if (iEnemyPDThreat <= 17500 or iFactionIndex == M27UnitInfo.refFactionUEF) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 0.4 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) <= 3 then
+        if iExistingLandExperimentals <= 2 and (iEnemyPDThreat <= 17500 or (iFactionIndex == M27UnitInfo.refFactionUEF and iEnemyT2ArtiCount <= math.min(8, (iExistingLandExperimentals + 1) * 2)) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 0.4) then
             iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
             if bDebugMessages == true then LOG(sFunctionRef..': WIll build land experimental') end
-        elseif (iEnemyPDThreat <= 22500 or iFactionIndex == M27UnitInfo.refFactionUEF) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 500 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 1) then
+        elseif iExistingLandExperimentals == 0 and (iEnemyPDThreat <= 22500 or (iFactionIndex == M27UnitInfo.refFactionUEF and iEnemyT2ArtiCount <= math.min(8, (iExistingLandExperimentals + 1) * 2))) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 500 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 1) then
             iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
             if bDebugMessages == true then LOG(sFunctionRef..': WIll build land experimental as havent built any before and are relatively close to enemy base') end
         else
@@ -2915,8 +2966,8 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
                     end
                     if not(iCategoryToBuild) then
                         --Do we want a fatboy?
-                        if bDebugMessages == true then LOG(sFunctionRef..': Deciding if we want a fatboy or a T3 arti; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental)='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental)..'; Enemy T2 arti='..table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy'))..'; M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3)='..tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3))) end
-                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 600 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) <= 1 and table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy')) <= 2 and (M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3) or not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryFixedT3Arti, 1))) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Deciding if we want a fatboy or a T3 arti; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; iExistingLandExperimentals='..iExistingLandExperimentals..'; Enemy T2 arti='..table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy'))..'; M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3)='..tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3))) end
+                        if iExistingLandExperimentals <= 2 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 600 and iExistingLandExperimentals <= 1 and (iEnemyT2ArtiCount <= (iExistingLandExperimentals + 1) * 2 or table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy')) <= (iExistingLandExperimentals + 1) * 2) and (M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3) or not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryFixedT3Arti, 1))) then
                             iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
                         else
                             --T3 arti if we have the eco to support it
@@ -3010,7 +3061,7 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
                         end
                         if not(iCategoryToBuild) then
                             --Either enemy land experimental on our side of map, or the nearest threat is within 45% of start and is pathable amphibiously
-                            if iEnemyPDThreat <= 20000 and (bNearbyLandExperimental or (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]))) then
+                            if iExistingLandExperimentals <= 2 and iEnemyPDThreat <= 20000 and (bNearbyLandExperimental or (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]))) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will build land experimental as nearby experimental or we can path to nearest <=45% threat') end
                                 iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
                             end
@@ -3027,7 +3078,7 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
 
                 if not(iCategoryToBuild) then
                     --Backup - if still nothing to build, then build a land experimental if we can path to the enemy base by amphibious, or a t3 arti if we cant
-                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and (iFactionIndex == M27UnitInfo.refFactionUEF or iEnemyPDThreat <= 22000) then
+                    if iExistingLandExperimentals <= 3 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and (iFactionIndex == M27UnitInfo.refFactionUEF or iEnemyPDThreat <= 22000) then
                         iCategoryToBuild = M27UnitInfo.refCategoryLandExperimental
                     else
                         iCategoryToBuild = M27UnitInfo.refCategoryFixedT3Arti
@@ -3091,9 +3142,9 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
         iCategoryToBuild = refCategoryPower
     elseif iActionToAssign == refActionBuildT3ArtiPower then
         iCategoryToBuild = refCategoryPower --Placeholder - will want to override due to defining this against the unit itself
-    elseif iActionToAssign == refActionBuildLandFactory then
+    elseif iActionToAssign == refActionBuildLandFactory or iActionToAssign == refActionBuildSecondLandFactory then
         iCategoryToBuild = refCategoryLandFactory
-    elseif iActionToAssign == refActionBuildAirFactory then
+    elseif iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildSecondAirFactory then
         iCategoryToBuild = refCategoryAirFactory
     elseif iActionToAssign == refActionBuildEnergyStorage then
         iCategoryToBuild = refCategoryEnergyStorage
@@ -3659,57 +3710,73 @@ function CheckForEnemySMD(aiBrain, oSML)
             end
             if bDebugMessages == true then LOG(sFunctionRef..': bEnemyHasConstructedSMD='..tostring(bEnemyHasConstructedSMD)) end
             if bAbortConstruction then
-                local oEngineer
-                if oSML:GetFractionComplete() < 1 then
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef..': Will clear all engis constructing experimental; Is table of engineers with action to build experimental empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental])))
-                        if aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategorySML then LOG('Last experimental category was SML')
-                        elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryLandExperimental then LOG('Last experimental was land experimental')
-                        elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryFixedT3Arti then LOG('Last experimental was T3 arti')
-                        elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryNovaxCentre then LOG('Last experimental was novax')
-                        elseif not(aiBrain[refiLastExperimentalCategory]) then LOG('Last experimental category not specified')
-                        else LOG('Unkown last experimental category')
+                --Dont abort if lots of enemies, since the cost of SMD to protect from nuke will exceed the benefit of reclaiming
+                if oSML:GetFractionComplete() >= 0.5 then
+                    local iEnemyBrainCount = 0
+                    for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
+                        iEnemyBrainCount = iEnemyBrainCount + 1
+                    end
+                    if iEnemyBrainCount >= 3 then
+                        bAbortConstruction = false
+                    end
+                end
+                if not(bAbortConstruction) then
+                    break --No point carrying on with the loop as we are committed to building it now
+                else
+
+
+                    local oEngineer
+                    if oSML:GetFractionComplete() < 1 then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': Will clear all engis constructing experimental; Is table of engineers with action to build experimental empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental])))
+                            if aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategorySML then LOG('Last experimental category was SML')
+                            elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryLandExperimental then LOG('Last experimental was land experimental')
+                            elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryFixedT3Arti then LOG('Last experimental was T3 arti')
+                            elseif aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategoryNovaxCentre then LOG('Last experimental was novax')
+                            elseif not(aiBrain[refiLastExperimentalCategory]) then LOG('Last experimental category not specified')
+                            else LOG('Unkown last experimental category')
+                            end
+                        end
+                        --Abort construction if the SMD impacts on our expected target location and we cant find any other viable targets
+                        if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental]) == false and aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategorySML then
+                            if bDebugMessages == true then LOG(sFunctionRef..'Have engineers building experimental that is SML so will go through and clear them') end
+                            for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental] do
+                                oEngineer = tSubtable[refEngineerAssignmentEngineerRef]
+                                IssueClearCommands({oEngineer})
+                                ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oEngineer)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
+                            end
                         end
                     end
-                    --Abort construction if the SMD impacts on our expected target location and we cant find any other viable targets
-                    if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental]) == false and aiBrain[refiLastExperimentalCategory] == M27UnitInfo.refCategorySML then
-                        if bDebugMessages == true then LOG(sFunctionRef..'Have engineers building experimental that is SML so will go through and clear them') end
-                        for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental] do
+                    --Clear any assisting engineers
+                    if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistNuke]) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have engineers with assist nuke action - will clear') end
+                        for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistNuke] do
                             oEngineer = tSubtable[refEngineerAssignmentEngineerRef]
                             IssueClearCommands({oEngineer})
                             ClearEngineerActionTrackers(aiBrain, oEngineer, true)
                             if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oEngineer)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
                         end
                     end
-                end
-                --Clear any assisting engineers
-                if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistNuke]) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have engineers with assist nuke action - will clear') end
-                    for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistNuke] do
-                        oEngineer = tSubtable[refEngineerAssignmentEngineerRef]
-                        IssueClearCommands({oEngineer})
-                        ClearEngineerActionTrackers(aiBrain, oEngineer, true)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oEngineer)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
-                    end
-                end
 
-                --Add SML to list of units to be reclaimed
-                if bDebugMessages == true then LOG(sFunctionRef..': Have set a flag to reclaim nukes') end
-                aiBrain[M27EconomyOverseer.refbReclaimNukes] = true
-                oSML[M27EconomyOverseer.refbWillReclaimUnit] = true
-                --Disable missile autobuild
-                oSML:SetAutoMode(false)
-                --Pause the SML
-                oSML:SetPaused(true)
-                --Note - is a graphical bug where a paused SML will appear to still use resources - the below commented out code was used to confirm that it doesnt; a manual calculation was also done of energy usage which was consistent with the SML not using energy based on the total displayed energy usage
-                --[[if bDebugMessages == true then
-        while M27UnitInfo.IsUnitValid(oSML) do
-            LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; SML GetConsumptionPerSecondMass='..oSML:GetConsumptionPerSecondMass())
-            WaitSeconds(1)
-        end
-    end--]]
+                    --Add SML to list of units to be reclaimed
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have set a flag to reclaim nukes') end
+                    aiBrain[M27EconomyOverseer.refbReclaimNukes] = true
+                    oSML[M27EconomyOverseer.refbWillReclaimUnit] = true
+                    --Disable missile autobuild
+                    oSML:SetAutoMode(false)
+                    --Pause the SML
+                    oSML:SetPaused(true)
+                    --Note - is a graphical bug where a paused SML will appear to still use resources - the below commented out code was used to confirm that it doesnt; a manual calculation was also done of energy usage which was consistent with the SML not using energy based on the total displayed energy usage
+                    --[[if bDebugMessages == true then
+            while M27UnitInfo.IsUnitValid(oSML) do
+                LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; SML GetConsumptionPerSecondMass='..oSML:GetConsumptionPerSecondMass())
+                WaitSeconds(1)
+            end
+        end--]]
 
-                break
+                    break
+                end
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -3853,7 +3920,9 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             elseif iActionToAssign == refActionBuildLandFactory then
                                 --iCategoryToBuild = refCategoryLandFactory
                                 iCatToBuildBy = refCategoryT1Mex
-                            elseif iActionToAssign == refActionBuildAirFactory then
+                            elseif iActionToAssign == refActionBuildSecondLandFactory then
+                                --Dont build next to anything - we just want a factory quickly
+                            elseif iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildSecondAirFactory then
                                 --iCategoryToBuild = refCategoryAirFactory
                                 --HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable)
                                 if M27Conditions.HydroNearACUAndBase(aiBrain, true, false) == true then
@@ -4715,7 +4784,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                         local iCategoryToBuild = GetCategoryToBuildFromAction(iActionRefToAssign, iMinTechLevelWanted, aiBrain)
                         --Use massive range for experimentals
                         local iSearchRangeForPartBuilt = math.max(iSearchRangeForNearestEngi, 30)
-                        if iActionRefToAssign == refActionBuildExperimental then iSearchRangeForPartBuilt = math.max(iSearchRangeForPartBuilt, 1000) end
+                        if iActionRefToAssign == refActionBuildExperimental then iSearchRangeForPartBuilt = math.max(iSearchRangeForPartBuilt, 150) end
                         local oNearestPartBuilt = GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSearchRangeForPartBuilt)
                         if oNearestPartBuilt then
                             if bDebugMessages == true then LOG(sFunctionRef..': Are assisting part built building') end
@@ -5568,8 +5637,22 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
                             if iAirFactories == nil then iAirFactories = 0 end
                         end
-                        if iLandFactories+iAirFactories < (aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] + aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir]) and (iLandFactories+iAirFactories < 2 or (iLandFactories+iAirFactories < 5 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandEarly and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])) then
-                            if aiBrain:GetEconomyStored('MASS') >= 100 and aiBrain:GetEconomyStored('ENERGY') >= 1000 then
+
+                        local bHaveNoLandHQ = false
+                        local bHaveNoAirHQ = false
+                        if iLandFactories == 0 then bHaveNoLandHQ = true
+                        else
+                            if aiBrain:GetCurrentUnits(refCategoryLandFactory - categories.SUPPORTFACTORY) == 0 then bHaveNoLandHQ = true end
+                        end
+
+                        if iAirFactories == 0 then bHaveNoAirHQ = true
+                        else
+                            if aiBrain:GetCurrentUnits(refCategoryAirFactory - categories.SUPPORTFACTORY) == 0 then bHaveNoAirHQ = true end
+                        end
+
+
+                        if bHaveNoLandHQ or bHaveNoAirHQ or (iLandFactories+iAirFactories < (aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] + aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir]) and (iLandFactories+iAirFactories < 2 or (iLandFactories+iAirFactories < 5 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandEarly and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]))) then
+                            if (aiBrain:GetEconomyStored('MASS') >= 100 and aiBrain:GetEconomyStored('ENERGY') >= 1000) or (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 3 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 40) then
                                 if iLandFactories < aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] then
                                     iActionToAssign = refActionBuildLandFactory
                                     iMaxEngisWanted = 1
@@ -5577,11 +5660,16 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     iActionToAssign = refActionBuildAirFactory
                                     iMaxEngisWanted = 1
                                 else
-                                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
+                                    if bHaveNoLandHQ then
                                         iActionToAssign = refActionBuildLandFactory
-                                        iMaxEngisWanted = 1
-                                    else iActionToAssign = refActionBuildAirFactory
-                                        iMaxEngisWanted = 1
+                                    elseif bHaveNoAirHQ then iActionToAssign = refActionBuildAirFactory
+                                    else
+                                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
+                                            iActionToAssign = refActionBuildLandFactory
+                                            iMaxEngisWanted = 1
+                                        else iActionToAssign = refActionBuildAirFactory
+                                            iMaxEngisWanted = 1
+                                        end
                                     end
                                 end
                             end
@@ -6664,6 +6752,30 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                             end
+                        elseif iCurrentConditionToTry == 41 then
+                            --If about to overflow mass then build a second factory unless we arent using existing factories
+                            if bHaveLowMass == false and bHaveLowPower == false and iMassStoredRatio >= 0.7 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStored('ENERGY') >= 0.99 and aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] == 0 then
+                                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
+
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildLandFactory]) == true then
+                                        iActionToAssign = refActionBuildLandFactory
+                                        iMaxEngisWanted = 6
+                                    else
+                                        --Already building a factory, so build a second factory
+                                        iActionToAssign = refActionBuildSecondLandFactory
+                                        iMaxEngisWanted = 4
+                                    end
+
+                                else
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildAirFactory]) == true then
+                                        iActionToAssign = refActionBuildAirFactory
+                                        iMaxEngisWanted = 6
+                                    else
+                                        iActionToAssign = refActionBuildSecondAirFactory
+                                        iMaxEngisWanted = 4
+                                    end
+                                end
+                            end
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': No priority actions so will assign any remaining engineers to spare action') end
                             iActionToAssign = refActionSpare
@@ -6741,7 +6853,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 --Set minimum engineer tech level if not specified and no existing engineers assigned to the action
                                 if (iHighestFactoryOrEngineerTechAvailable > 1 or iHighestFactoryOrEngineerTechAvailable > 1) and iMinEngiTechLevelWanted == nil then
                                     --Are we building power or factory? If so then only build with the highest tech engi unless action is already in progress
-                                    if iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower or iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildLandFactory then
+                                    if iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower or iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildLandFactory or iActionToAssign == refActionBuildSecondLandFactory or iActionToAssign == refActionBuildSecondAirFactory then
                                         --Do we have at least 440 gross power or minimal mass stored? othwerise dont set any limit
                                         if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > 44 or (aiBrain:GetEconomyStoredRatio('MASS') <= 0.1 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99) then
                                             --Have we already got an engineer assigned to this action?

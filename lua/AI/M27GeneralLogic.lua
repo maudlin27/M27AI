@@ -1654,8 +1654,11 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             iHealthFactor = iHealthPercentage --threat will be mass * iHealthFactor
                             iMassCost = GetACUCombatMassRating(oUnit)
                             if bOurUnits == true then
+                                if aiBrain:GetEconomyStored('ENERGY') >= 6000 then iMassMod = iMassMod * 1.1 end --If we can overcharge then we can take on a greater threat
                                 if iHealthPercentage < 0.5 then iHealthFactor = iHealthPercentage * iHealthPercentage
                                 elseif iHealthPercentage < 0.9 then iHealthFactor = iHealthPercentage * (iHealthPercentage + 0.1) end
+
+
                             else iMassMod = iMassMod * 1.15 --Want to send 15% more than what expect to need against enemy ACU given it can gain veterancy
                             end
                         else
@@ -3481,6 +3484,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repr(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
     local iShieldCurHealth, iShieldMaxHealth
     local iTotalShieldCurHealth = 0
+    local iTotalShieldMaxHealth = 0
     local iMinFractionComplete = 0.95
     if bTreatPartCompleteAsComplete then iMinFractionComplete = 0 end
     if M27Utilities.IsTableEmpty(tNearbyShields) == false then
@@ -3500,6 +3504,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
                             if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
                             iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                             iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth
+                            iTotalShieldMaxHealth = iTotalShieldMaxHealth + iShieldMaxHealth
                             if bTreatPartCompleteAsComplete or (oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1) then iShieldCurHealth = iShieldMaxHealth end
                             if bDebugMessages == true then LOG(sFunctionRef..': iShieldCurHealth='..iShieldCurHealth..'; iIgnoreShieldsWithLessThanThisHealth='..iIgnoreShieldsWithLessThanThisHealth) end
                             if iShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth then
@@ -3520,7 +3525,8 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
         if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    if bReturnShieldHealthInstead then return iTotalShieldCurHealth
+    if bReturnShieldHealthInstead then
+        return iTotalShieldCurHealth, iTotalShieldMaxHealth
     else return bUnderShield
     end
 end
@@ -3671,6 +3677,7 @@ end
 
 function GetNearestRallyPoint(aiBrain, tPosition)
     --Todo - longer term want to integrate this with forward base logic
+    --NOTE: Air overseer uses custom copy of this with some variations to get air rally point
     local sFunctionRef = 'GetNearestRallyPoint'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Refresh rally points if we've not refreshed in a while
@@ -4038,7 +4045,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
             if bTML then
                 tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Mex}
             else
-                tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure}
+                tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure}
             end
             if bDebugMessages == true then LOG(sFunctionRef..': Will consider missile target. iMinRange='..(iMinRange or 'nil')..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')..'; bSML='..tostring((bSML or false))) end
 
@@ -4183,48 +4190,101 @@ function GetT3ArtiTarget(oT3Arti)
     local tEnemyUnitsOfInterest
     local iBestTargetValue
     local iCurTargetValue
-    local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategoryStructure * categories.TECH2, categories.COMMAND}
 
-    --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
-    tTarget = {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[2], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[3]}
-    iBestValueTarget = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage)
+    --First prioritise enemy T3 arti regardless of how well shielded, as if we dont kill them quickly we will die
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure]) == false then
+        --Pick the one in range of the most t3 arti including this one; if there are multiple, then pick the one closest to this (since its accuracy will be best)
+        local iMostT3ArtiInRange = 0
+        local iCurDistance
+        local tT3ArtiInRange
+        local tTargetShortlist = {}
+        local iTargetShortlist = 0
+        for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
+                --Use 15 above normal range due to inaccuracy of shots
+                if iCurDistance <= 840 then
 
-    --Check we dont have key friendly units close to here
-    if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
-        iBestTargetValue = 0
-    end
-
-    --iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage)
-    --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
-    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <15k then will consider other targets') end
-    if iBestTargetValue < 15000 then --If have high value location for nearest enemy start then just go with this
-        for iRef, iCategory in tEnemyCategoriesOfInterest do
-            tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oT3Arti:GetPosition(), iMaxRange, 'Enemy')
-            if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
-                for iUnit, oUnit in tEnemyUnitsOfInterest do
-                    iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
-                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
-                    --Stop looking if tried >=10 targets and have one that is at least 20k of value
-                    if iCurTargetValue > iBestTargetValue then
-                        if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
-                            iCurTargetValue = 0
-                        end
-                        if iCurTargetValue > iBestTargetValue then
-                            iBestTargetValue = iCurTargetValue
-                            tTarget = oUnit:GetPosition()
+                    tT3ArtiInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, oUnit:GetPosition(), 840, 'Ally')
+                    if M27Utilities.IsTableEmpty(tT3ArtiInRange) == false then
+                        if table.getn(tT3ArtiInRange) >= iMostT3ArtiInRange then
+                            if table.getn(tT3ArtiInRange) > iMostT3ArtiInRange then
+                                tTargetShortlist = {}
+                                iTargetShortlist = 0
+                            end
+                            iTargetShortlist = iTargetShortlist + 1
+                            tTargetShortlist[iTargetShortlist] = oUnit
+                            iMostT3ArtiInRange = table.getn(tT3ArtiInRange)
                         end
                     end
-                    if iBestTargetValue > 15000 and iUnit >=10 then break end
                 end
             end
-            if iBestTargetValue >= 2500 then break end
         end
-        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
-        if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
+        if iTargetShortlist > 0 then
+            --Pick the closest target
+            if iTargetShortlist == 1 then
+                tTarget = tTargetShortlist[1]:GetPosition()
+            else
+                local iClosestTarget = 100000
+               for iUnit, oUnit in tTargetShortlist do
+                  iCurDistance =  M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
+                   if iCurDistance < iClosestTarget then
+                       tTarget = oUnit:GetPosition()
+                       iClosestTarget = iCurDistance
+                   end
+               end
+            end
+        end
+        if tTarget and M27Utilities.GetDistanceBetweenPositions(tTarget, oT3Arti:GetPosition()) > 824.99 then
+            tTarget = M27Utilities.MoveInDirection(oT3Arti:GetPosition(), M27Utilities.GetAngleFromAToB(oT3Arti:GetPosition(), tTarget), 824.99, false)
+        end
     end
+    if not(tTarget) then
+        local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategoryStructure * categories.TECH2, categories.COMMAND}
 
+        --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
+        tTarget = {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[2], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[3]}
+        iBestValueTarget = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage)
+
+        --Check we dont have key friendly units close to here
+        if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
+            iBestTargetValue = 0
+        end
+
+        --iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage)
+        --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
+        if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <15k then will consider other targets') end
+        if iBestTargetValue < 15000 then --If have high value location for nearest enemy start then just go with this
+            for iRef, iCategory in tEnemyCategoriesOfInterest do
+                tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oT3Arti:GetPosition(), iMaxRange, 'Enemy')
+                if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
+                    for iUnit, oUnit in tEnemyUnitsOfInterest do
+                        iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                        if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
+                        --Stop looking if tried >=10 targets and have one that is at least 20k of value
+                        if iCurTargetValue > iBestTargetValue then
+                            if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
+                                iCurTargetValue = 0
+                            end
+                            if iCurTargetValue > iBestTargetValue then
+                                iBestTargetValue = iCurTargetValue
+                                tTarget = oUnit:GetPosition()
+                            end
+                        end
+                        if iBestTargetValue > 15000 and iUnit >=10 then break end
+                    end
+                end
+                if iBestTargetValue >= 2500 then break end
+            end
+            if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
+            if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
+        end
+
+        if tTarget then --Dont want to adjust the aoe target if are targeting a high priority unit such as a t3 arti
+            tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage)
+        end
+    end
     if tTarget then
-        tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage)
         IssueClearCommands({oT3Arti})
         IssueAttack({oT3Arti}, tTarget)
     end

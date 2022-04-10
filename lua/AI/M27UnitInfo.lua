@@ -91,6 +91,7 @@ refCategoryLandFactory = categories.LAND * categories.FACTORY * categories.STRUC
 refCategoryAirFactory = categories.AIR * categories.FACTORY * categories.STRUCTURE - categories.ORBITALSYSTEM --Novax is an air factory, so excluded from being treated as an air factory by my logic
 refCategoryNavalFactory = categories.NAVAL * categories.FACTORY * categories.STRUCTURE
 refCategoryAllFactories = refCategoryLandFactory + refCategoryAirFactory + refCategoryNavalFactory
+refCategoryAllHQFactories = refCategoryAllFactories - categories.SUPPORTFACTORY
 
 --Building - defensive
 refCategoryT2PlusPD = categories.STRUCTURE * categories.DIRECTFIRE - categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH1
@@ -114,7 +115,7 @@ refCategoryExperimentalStructure = categories.CYBRAN * categories.ARTILLERY * ca
 refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY - categories.UNSELECTABLE
 refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
-refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT - categories.ANTIAIR --NOTE: Need to specify fastest (for cybran who have mantis and LAB)
+refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT - categories.ANTIAIR -categories.REPAIR --(repair exclusion added as basic way to differentiate between mantis (which has repair category) and LAB; alternative way is to specify the fastest when choosing the blueprint to build
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA --NOTE: Need to specify slowest (so dont pick LAB)
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
@@ -140,6 +141,7 @@ refCategorySniperBot = categories.MOBILE * categories.SNIPER * categories.LAND
 refCategoryAirScout = categories.AIR * categories.SCOUT
 refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - categories.GROUNDATTACK
 refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - categories.CANNOTUSEAIRSTAGING --excludes mercies
+refCategoryFighterBomber = categories.AIR * categories.ANTIAIR * categories.BOMBER
 refCategoryGunship = categories.AIR * categories.GROUNDATTACK
 refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
@@ -166,7 +168,7 @@ refCategoryAllNonAirScoutUnits = categories.MOBILE + refCategoryStructure + refC
 refCategoryStealthGenerator = categories.STEALTHFIELD
 refCategoryStealthAndCloakPersonal = categories.STEALTH
 refCategoryProtectFromTML = refCategoryT2Mex + refCategoryT3Mex + refCategoryT2Power + refCategoryT3Power + refCategoryFixedT2Arti
-
+refCategoryExperimentalLevel = categories.EXPERIMENTAL + refCategoryFixedT3Arti + refCategorySML
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
@@ -635,7 +637,7 @@ end
 function GetBomberAOEAndStrikeDamage(oUnit)
     local oBP = oUnit:GetBlueprint()
     local iAOE = 0
-    local iStrikeDamage
+    local iStrikeDamage = 0
     for sWeaponRef, tWeapon in oBP.Weapon do
         if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' then
             if (tWeapon.DamageRadius or 0) > iAOE then
@@ -643,6 +645,9 @@ function GetBomberAOEAndStrikeDamage(oUnit)
                 iStrikeDamage = tWeapon.Damage * tWeapon.MuzzleSalvoSize
             end
         end
+    end
+    if iStrikeDamage == 0 then
+        M27Utilities.ErrorHandler('Couldnt identify strike damage for bomber '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..'; will refer to predefined value instead')
     end
 
     --Manual floor for strike damage due to complexity of some bomber calculations
@@ -687,13 +692,29 @@ function GetBomberRange(oUnit)
     local oBP = oUnit:GetBlueprint()
     local iRange = 0
     for sWeaponRef, tWeapon in oBP.Weapon do
-        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' then
+        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' or tWeapon.WeaponCategory == 'Anti Navy' then
             if (tWeapon.MaxRadius or 0) > iRange then
                 iRange = tWeapon.MaxRadius
             end
         end
     end
     return iRange
+end
+
+function BomberMultiAttackMuzzle(oUnit)
+    --Done to help with searching
+    return DoesBomberFireSalvo(oUnit)
+end
+function DoesBomberFireSalvo(oUnit)
+    local oBP = oUnit:GetBlueprint()
+    for sWeaponRef, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' or tWeapon.WeaponCategory == 'Anti Navy' then
+            if tWeapon.MuzzleSalvoSize == 1 then
+                return false
+            else return true
+            end
+        end
+    end
 end
 
 function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
@@ -734,4 +755,15 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
+end
+
+function GetNumberOfUpgradesObtained(oACU)
+    --Returns the number of upgrades a unit (e.g. ACU) has got
+    local iUpgradeCount = 0
+    for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
+        if oACU:HasEnhancement(sEnhancement) and tEnhancement.BuildCostMass > 1 then
+            iUpgradeCount = iUpgradeCount + 1
+        end
+    end
+    return iUpgradeCount
 end

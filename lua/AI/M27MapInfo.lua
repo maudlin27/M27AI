@@ -17,6 +17,7 @@ tHydroByPathingAndGrouping = {}
 HydroPoints = {} -- Stores position values i.e. a table with 3 values, x, y, z
 PlayerStartPoints = {} -- Stores position values i.e. a table with 3 values, x, y, z; item 1 = ARMY_1 etc.
 reftPrimaryEnemyBaseLocation = 'M27MapPrimaryEnemyBase'
+reftMidpointToPrimaryEnemyBase = 'M27MapMidpointToPrimaryEnemyBase'
 refiLastTimeCheckedEnemyBaseLocation = 'M27LastTimeChecked'
 tResourceNearStart = {} --[iArmy][iResourceType (1=mex2=hydro)][iCount][tLocation] Stores location of mass extractors and hydrocarbons that are near to start locations; 1st value is the army number, 2nd value the resource type, 3rd the mex number, 4th value the position array (which itself is made up of 3 values)
 MassCount = 0 -- used as a way of checking if have the core markers needed
@@ -1768,6 +1769,7 @@ function RecordMexForPathingGroup()
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordMexForPathingGroup'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': About to record mexes for each pathing group. MassPoints='..repr(MassPoints)) end
     local tsPathingTypes = {M27UnitInfo.refPathingTypeAmphibious, M27UnitInfo.refPathingTypeNavy, M27UnitInfo.refPathingTypeLand}
     local iCurResourceGroup
     local iValidCount = 0
@@ -1785,6 +1787,7 @@ function RecordMexForPathingGroup()
             else iValidCount = table.getn(tMexByPathingAndGrouping[sPathing][iCurResourceGroup]) + 1
             end
             tMexByPathingAndGrouping[sPathing][iCurResourceGroup][iValidCount] = tMexLocation
+            if bDebugMessages == true then LOG(sFunctionRef..': iValidCount='..iValidCount..'; sPathing='..sPathing..'; iCurResourceGroup='..iCurResourceGroup..'; just added tMexLocation='..repr(tMexLocation)..' to this group') end
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..'; tMexByPathingAndGrouping='..repr(tMexByPathingAndGrouping)) end
@@ -1965,13 +1968,14 @@ function GetNumberOfResource (aiBrain, bMexNotHydro, bUnclaimedOnly, bVisibleOnl
     end
 end
 
-function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy, bCanBeQueuedToBeBuilt, iMaxSearchRangeMod, tStartPositionOverride, tMexesToIgnore)
+function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy, bCanBeQueuedToBeBuilt, iMaxSearchRangeMod, tStartPositionOverride, tMexesToIgnore, bCanBePartBuilt)
     --Gets the nearest mex to oBuilder based on oBuilder's build range+iMaxSearchRangeMod. Returns nil if no such mex.  Optional variables:
     --bCanBeBuiltOnByAlly - false if dont want it to have been built on by us
     --bCanBeBuiltOnByEnemy - false if dont want it to have been built on by enemy
     --iMaxSearchRangeMod - defaults to 0
     --tStartPositionOverride - use this instead of the builder start position if its specified
     --tMexesToIgnore - a table of locations to ignore if they're the nearest mex
+    --bCanBePartBuilt - true if location is part built by us, or by an ally if have set it can be be built on by ally
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNearestMexToUnit'
@@ -2021,7 +2025,7 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
                     --M27Conditions.IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed)
                     if bDebugMessages == true then LOG(sFunctionRef..': Checking if iCurMex is unclaimed, iCurMex='..iCurMex..'; MexLocation='..repr(tMexByPathingAndGrouping[sPathing][iUnitPathGroup][iCurMex])) end
                     --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
-                    if M27Conditions.IsMexUnclaimed(aiBrain, tMexLocation, bCanBeBuiltOnByEnemy, bCanBeBuiltOnByAlly, bCanBeQueuedToBeBuilt) == true then
+                    if M27Conditions.IsMexUnclaimed(aiBrain, tMexLocation, bCanBeBuiltOnByEnemy, bCanBeBuiltOnByAlly, bCanBeQueuedToBeBuilt, bCanBePartBuilt) == true then
                         bValidMex = true
                         if bDebugMessages == true then LOG(sFunctionRef..': Have a valid mex, seeing if its in the list of mexes to ignore.  tMexPosition='..repr(tMexLocation)..'; tMexesToIgnore='..repr(tMexesToIgnore)) end
                         if bCheckListOfMexesToIgnore == true then
@@ -3177,6 +3181,9 @@ function SetWhetherCanPathToEnemy(aiBrain)
         aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5
     else aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 0 end
 
+    --Record mitpoint between base (makes it easier to calc mod distance
+    aiBrain[reftMidpointToPrimaryEnemyBase] = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyStartPosition), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], false)
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -3894,4 +3901,8 @@ function GetPrimaryEnemyBaseLocation(aiBrain)
     --Done as a function so easier to adjust in the future if decide we want to
     if not(aiBrain[reftPrimaryEnemyBaseLocation]) then UpdateNewPrimaryBaseLocation(aiBrain) end
     return aiBrain[reftPrimaryEnemyBaseLocation]
+end
+
+function GetMidpointToPrimaryEnemyBase(aiBrain)
+    return aiBrain[reftMidpointToPrimaryEnemyBase]
 end

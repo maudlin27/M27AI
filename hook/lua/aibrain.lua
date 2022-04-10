@@ -58,6 +58,7 @@ AIBrain = Class(M27AIBrainClass) {
             ForkThread(M27Overseer.OverseerManager, self)
         else
             M27AIBrainClass.OnCreateAI(self, planName)
+            ForkThread(M27Overseer.SendWarningIfNoM27, self)
         end
 
     end,

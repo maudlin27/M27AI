@@ -580,12 +580,14 @@ end
 function IsLineFromAToBInRangeOfCircleAtC(iDistFromAToB, iDistFromAToC, iDistFromBToC, iAngleFromAToB, iAngleFromAToC, iCircleRadius)
     --E.g. if TML is at point A, target is at point B, and TMD is at point C, does the TMD block the TML in a straight line?
     if iDistFromAToC <= iCircleRadius or iDistFromBToC <= iCircleRadius then return true
-    elseif iDistFromAToB + iCircleRadius <= iDistFromAToC and iDistFromBToC then
-        if math.sin(iAngleFromAToC - iAngleFromAToB) * iDistFromAToC <= iCircleRadius then
+    elseif iDistFromAToB + iCircleRadius < iDistFromAToC then
+        return false
+    else
+        --Unclear so need more precise calculation
+        if math.abs(math.sin(iAngleFromAToB - iAngleFromAToC)) * iDistFromAToC <= iCircleRadius then
             return true
         else return false
         end
-    else return false
     end
 end
 

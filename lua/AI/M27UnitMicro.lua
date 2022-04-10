@@ -7,6 +7,7 @@ local XZDist = import('/lua/utilities.lua').XZDistanceTwoVectors
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
+local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 
 function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -337,7 +338,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
         local iBomberArmyIndex = oBomber:GetAIBrain():GetArmyIndex()
 
         if bDebugMessages == true then
-            LOG(sFunctionRef..': tBombTarget='..repr(tBombTarget))
+            LOG(sFunctionRef..': oBomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Bomber position='..repr(oBomber:GetPosition())..'; tBombTarget='..repr(tBombTarget)..'; Dist between position and target='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tBombTarget)..'; Angle='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), tBombTarget)..'; Bomber facing direction='..M27UnitInfo.GetUnitFacingAngle(oBomber))
             M27Utilities.DrawLocation(tBombTarget, nil, 3, 20)
         end --black ring around target
 
@@ -692,7 +693,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     local reftiDistFromACUToUnit = 'M27DistFromACUToUnit'
     local toStructuresAndACU
 
-
+--Subfunction
     function IsBuildingOrACUBlockingShot(oFiringUnit, oTargetUnit)
         --Assumes have already been through tBlockingUnits and set their angle to the firing unit, so we just need to compare to firing unit
         if bDebugMessages == true then LOG(sFunctionRef..': Will see if any buildings or ACU are blocking the shot; if dont get log saying result was false then means was true') end
@@ -705,8 +706,8 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 if not(oUnit == oTargetUnit) and iDistToTargetUnit > oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()] then
                     iCurAngleDif = iAngleToTargetUnit - oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]
                     if iCurAngleDif < 0 then iCurAngleDif = iCurAngleDif + 360 end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' will block a shot from the ACU to the target '..oTargetUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; iCurAngleDif='..iCurAngleDif..'; 180 / iDistToTargetUnit='..180 / iDistToTargetUnit..'; oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]='..oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]..'; oUnit[reftiDistFromACUToUnit]='..oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()]) end
-                    if math.max(8, 180 / iDistToTargetUnit) <= iCurAngleDif then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' will block a shot from the ACU to the target '..oTargetUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; iCurAngleDif='..iCurAngleDif..'; 180 / iDistToTargetUnit='..180 / iDistToTargetUnit..'; oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]='..oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]..'; oUnit[reftiDistFromACUToUnit]='..oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()]..'; angle from ACU to unit='..oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()]) end
+                    if iCurAngleDif <= math.max(8, 180 / iDistToTargetUnit) then
                         return true
                     end
                 end
@@ -716,10 +717,11 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
         return false
     end
 
+--Subfunction
     function WillShotHit(oFiringUnit, oTargetUnit)
         --Check for units in a transport
         if oTargetUnit:IsUnitState('Attached') or M27Logic.IsShotBlocked(oFiringUnit, oTargetUnit) or IsBuildingOrACUBlockingShot(oFiringUnit, oTargetUnit) then
-            if bDebugMessages == true then LOG(sFunctionRef..': oTargetUnit='..oTargetUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; shot is blocked so wont hit') end
+            if bDebugMessages == true then LOG(sFunctionRef..': oTargetUnit='..oTargetUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; shot is blocked so wont hit. IsShotBlocked='..tostring(M27Logic.IsShotBlocked(oFiringUnit, oTargetUnit))) end
             return false
         else return true
         end
@@ -929,6 +931,465 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 oPlatoon[M27PlatoonUtilities.refExtraActionTargetUnit] = oOverchargeTarget
             end
         end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function HoverBombTargetOld(aiBrain, oBomber, oTarget)
+    --Called if we dont think our bomb will kill the target; call via fork thread
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'HoverBombTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oBomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; GameTime='..GetGameTimeSeconds()) end
+
+    oBomber[M27UnitInfo.refbSpecialMicroActive] = true
+    local iReloadTime = 5
+    local iBomberRange = 40
+    local oBP = oBomber:GetBlueprint()
+
+    for iWeapon, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' then
+            if tWeapon.RateOfFire > 0 then iReloadTime = 1 / tWeapon.RateOfFire end
+            iBomberRange = tWeapon.MaxRadius
+        end
+    end
+
+    local iStartTime = GetGameTimeSeconds()
+    local iAngleToTarget
+
+    --IssueClearCommands({oBomber})
+    --Config:
+    local iTicksBetweenOrders = 5
+    local tiAngleToUse = {50, -50, 50}
+    local iDistanceAwayToMove = 10
+    local tiReloadTimePercent = {0.25, 0.75}
+
+
+    --Other variables:
+    local tiAngleTimeThresholds = {iStartTime + iReloadTime *tiReloadTimePercent[1], iStartTime + iReloadTime * tiReloadTimePercent[2]}
+    local iActualAngleToUse
+    local iAngleTableRef
+
+    local iCurTick = 0
+
+
+
+
+    while GetGameTimeSeconds() - iStartTime < iReloadTime do
+        iCurTick = iCurTick + 1
+        if iCurTick == 1 then
+            IssueClearCommands({oBomber})
+            iAngleTableRef = 1
+            if GetGameTimeSeconds() >= tiAngleTimeThresholds[1] then
+                if GetGameTimeSeconds() >= tiAngleTimeThresholds[2] then
+                    iAngleTableRef = 3
+                else
+                    iAngleTableRef = 2
+                end
+            end
+            iActualAngleToUse = M27UnitInfo.GetUnitFacingAngle(oBomber) + tiAngleToUse[iAngleTableRef]
+            local tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iActualAngleToUse, iDistanceAwayToMove, true)
+            IssueMove({oBomber}, tTempTarget)
+        elseif iCurTick == iTicksBetweenOrders then iCurTick = 0
+        end
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitTicks(1)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+        if not(M27UnitInfo.IsUnitValid(oBomber)) or not(M27UnitInfo.IsUnitValid(oTarget)) then
+            if bDebugMessages == true then LOG(sFunctionRef..': either the bomber or target is no longer valid so aborting micro') end
+            break
+        end
+    end
+    if M27UnitInfo.IsUnitValid(oBomber) then
+        oBomber[M27UnitInfo.refbSpecialMicroActive] = false
+        if M27UnitInfo.IsUnitValid(oTarget) then
+            --Below function should clear commands and then issue an attack
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Target '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Time to wait between orders='..iTicksBetweenOrders..'; Distance away to move to='..iDistanceAwayToMove..'; Angle to move='..repr(tiAngleToUse)..'; tiReloadTimePercent='..repr(tiReloadTimePercent)..'; Bomber facing direction='..M27UnitInfo.GetUnitFacingAngle(oBomber)..'; Angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())..'; Distance from bomber to target='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition()))
+                LOG(sFunctionRef..': Have valid bomber and target so will issue an attack order for the bomber to attack the target')
+            end
+            M27AirOverseer.IssueNewAttackToBomber(oBomber, oTarget, 1, true)
+        else
+            IssueClearCommands({oBomber})
+            ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber, 0)
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function HoverBombTargetOldBase(aiBrain, oBomber, oTarget)
+    --Called if we dont think our bomb will kill the target; call via fork thread
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'HoverBombTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oBomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; GameTime='..GetGameTimeSeconds()) end
+
+    oBomber[M27UnitInfo.refbSpecialMicroActive] = true
+    local iReloadTime = 5
+    local iBomberRange = 40
+    local oBP = oBomber:GetBlueprint()
+
+    for iWeapon, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' then
+            if tWeapon.RateOfFire > 0 then iReloadTime = 1 / tWeapon.RateOfFire end
+            iBomberRange = tWeapon.MaxRadius
+        end
+    end
+
+    local iStartTime = GetGameTimeSeconds()
+    --local iAngleToTarget
+
+    --IssueClearCommands({oBomber})
+    --Config:
+    local iTicksBetweenOrders = 5
+    --local tiAngleToUse = {50, -50, 50}
+    local iDistanceAwayToMove = 10
+    --local tiReloadTimePercent = {0.25, 0.75}
+    --local iMaxAngleDifference = 10
+    local iAngleAdjust = 50
+
+
+    --Other variables:
+    --local tiAngleTimeThresholds = {iStartTime + iReloadTime *tiReloadTimePercent[1], iStartTime + iReloadTime * tiReloadTimePercent[2]}
+    local iActualAngleToUse
+    --local iAngleTableRef
+    local iCurAngleDif
+    --local iPrevAngleAdjust = iAngleAdjust
+    local iAngleAdjustToUse
+    local iFacingDirection
+    local iAngleToTarget
+
+    local iCurTick = 0
+    local bTriedMovingForwardsAndTurning
+
+
+
+
+    while GetGameTimeSeconds() - iStartTime < iReloadTime do
+        iCurTick = iCurTick + 1
+        if iCurTick == 1 then
+            IssueClearCommands({oBomber})
+            iFacingDirection = M27UnitInfo.GetUnitFacingAngle(oBomber)
+            iAngleToTarget = M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())
+            iCurAngleDif = iFacingDirection - iAngleToTarget
+            --e.g. if bomber is facing 350 degrees, and the target is at 10 degrees, then it means there's only a dif of 20 degrees, but we want the bomber to go 350+50, rather than 350-50.  Facing - Angle would result in a positive value
+            --if instead bomber was facing 10 degrees, and the target was 30 degrees, then would get -20 as the result, and so want to also increase
+            --the effect of the below is that when bomber is facing 350 degrees and target 10 degrees, it will treat the difference as being 350 - 10 - 360 = -20, and want the bomber to go 350+50; if insteadbomber 10 and target 30, then dif = -20 and no adjustment made
+            if math.abs(iCurAngleDif) > 180 then
+                if iCurAngleDif > 180 then
+                    --iFacingDirection is too high so decrease the angle difference
+                    iCurAngleDif = iCurAngleDif - 360
+                else --Curangledif must be < -180, so angletotarget is too high
+                    iCurAngleDif = iCurAngleDif + 360
+                end
+            end
+
+
+            if iCurAngleDif < 0 then
+                iAngleAdjustToUse = iAngleAdjust
+            else iAngleAdjustToUse = -iAngleAdjust
+            end
+
+
+
+
+            iActualAngleToUse = iFacingDirection + iAngleAdjustToUse
+            local tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iActualAngleToUse, iDistanceAwayToMove, true)
+            IssueMove({oBomber}, tTempTarget)
+            if bDebugMessages == true then LOG(sFunctionRef..': iFacingDirection='..iFacingDirection..'; iCurANgleDif='..iCurAngleDif..'; iAngleAdjustToUse='..iAngleAdjustToUse..'; iActualAngleToUse='..iActualAngleToUse..'; angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())) end
+        elseif iCurTick >= iTicksBetweenOrders then iCurTick = 0
+        end
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitTicks(1)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+        if not(M27UnitInfo.IsUnitValid(oBomber)) or not(M27UnitInfo.IsUnitValid(oTarget)) then
+            if bDebugMessages == true then LOG(sFunctionRef..': either the bomber or target is no longer valid so aborting micro') end
+            break
+        end
+
+        --[[if GetGameTimeSeconds() - iStartTime >= iReloadTime then
+            --Only keep going if our angle is far away
+            iFacingDirection = M27UnitInfo.GetUnitFacingAngle(oBomber)
+            iCurAngleDif = iFacingDirection - M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())
+
+            if math.abs(iCurAngleDif) > 180 then
+                if iCurAngleDif > 180 then
+                    --iFacingDirection is too high so decrease the angle difference
+                    iCurAngleDif = iCurAngleDif - 360
+                else --Curangledif must be < -180, so angletotarget is too high
+                    iCurAngleDif = iCurAngleDif + 360
+                end
+            end
+
+            if bDebugMessages == true then LOG(sFunctionRef..': Have reloaded, will see if can get slightly better angle. iCurAngleDif='..iCurAngleDif..'; distance='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition())..'; iFacingDirection='..iFacingDirection..'; Angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())) end
+            if math.abs(iCurAngleDif) >= 170 or M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition()) <= 1 then
+                if bDebugMessages == true then LOG(sFunctionRef..': Angle dif is more than 110 so will give up') end
+                break
+            elseif math.abs(iCurAngleDif) <= 30 then
+                if bDebugMessages == true then LOG(sFunctionRef..': Angle dif is less than 30 so will try and attack') end
+                break
+            --elseif math.abs(iCurAngleDif) <= 35 and M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition()) <= 8 then
+                --if bDebugMessages == true then LOG(sFunctionRef..': Within 45 degrees and 8 distance so will try and attack') end
+                --break
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Angle dif too far to attack but might be able to do better so will keep trying')
+            end
+        end--]]
+    end
+    if M27UnitInfo.IsUnitValid(oBomber) then
+        oBomber[M27UnitInfo.refbSpecialMicroActive] = false
+        if M27UnitInfo.IsUnitValid(oTarget) then
+            --Below function should clear commands and then issue an attack
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Target '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Time to wait between orders='..iTicksBetweenOrders..'; Distance away to move to='..iDistanceAwayToMove..'; iAngleAdjust='..iAngleAdjust..'; Bomber facing direction='..M27UnitInfo.GetUnitFacingAngle(oBomber)..'; Angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())..'; Distance from bomber to target='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition())..'; GameTime='..GetGameTimeSeconds())
+                LOG(sFunctionRef..': Have valid bomber and target so will issue an attack order for the bomber to attack the target')
+            end
+            M27AirOverseer.IssueNewAttackToBomber(oBomber, oTarget, 1, true)
+        else
+            IssueClearCommands({oBomber})
+            ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber, 0)
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function HoverBombTarget(aiBrain, oBomber, oTarget)
+    --Called if we dont think our bomb will kill the target; call via fork thread
+    --See separate xls notes for various different combinations that have tried to get hover-bombing to work.  The range at which a bomber fires it's bomb and the angle is affected by the bomber speed, so the below is an approximate approach that wont always work
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'HoverBombTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oBomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; GameTime='..GetGameTimeSeconds()) end
+
+    oBomber[M27UnitInfo.refbSpecialMicroActive] = true
+    local iReloadTime = 5
+    local iBomberRange = 40
+    local oBP = oBomber:GetBlueprint()
+
+    for iWeapon, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' then
+            if tWeapon.RateOfFire > 0 then iReloadTime = 1 / tWeapon.RateOfFire end
+            iBomberRange = tWeapon.MaxRadius
+        end
+    end
+
+    local iStartTime = GetGameTimeSeconds()
+    --local iAngleToTarget
+
+    --IssueClearCommands({oBomber})
+    --Config:
+    local iTicksBetweenOrders = 5
+    --local tiAngleToUse = {50, -50, 50}
+    local iDistanceAwayToMove = 10
+    --local tiReloadTimePercent = {0.25, 0.75}
+    --local iMaxAngleDifference = 10
+    local iAngleAdjust = 50
+
+
+    --Other variables:
+    --local tiAngleTimeThresholds = {iStartTime + iReloadTime *tiReloadTimePercent[1], iStartTime + iReloadTime * tiReloadTimePercent[2]}
+    local iActualAngleToUse
+    --local iAngleTableRef
+    local iCurAngleDif
+    --local iPrevAngleAdjust = iAngleAdjust
+    local iAngleAdjustToUse
+    local iFacingDirection
+    local iAngleToTarget
+
+    local iCurTick = 0
+    local bTriedMovingForwardsAndTurning = false
+    local iDistToTarget
+    local tTempTarget
+
+
+
+
+    while GetGameTimeSeconds() - iStartTime < iReloadTime + 20 do
+        iCurTick = iCurTick + 1
+
+        iFacingDirection = M27UnitInfo.GetUnitFacingAngle(oBomber)
+        iAngleToTarget = M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())
+        iCurAngleDif = iFacingDirection - iAngleToTarget
+        iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition())
+        --e.g. if bomber is facing 350 degrees, and the target is at 10 degrees, then it means there's only a dif of 20 degrees, but we want the bomber to go 350+50, rather than 350-50.  Facing - Angle would result in a positive value
+        --if instead bomber was facing 10 degrees, and the target was 30 degrees, then would get -20 as the result, and so want to also increase
+        --the effect of the below is that when bomber is facing 350 degrees and target 10 degrees, it will treat the difference as being 350 - 10 - 360 = -20, and want the bomber to go 350+50; if insteadbomber 10 and target 30, then dif = -20 and no adjustment made
+        if math.abs(iCurAngleDif) > 180 then
+            if iCurAngleDif > 180 then
+                --iFacingDirection is too high so decrease the angle difference
+                iCurAngleDif = iCurAngleDif - 360
+            else --Curangledif must be < -180, so angletotarget is too high
+                iCurAngleDif = iCurAngleDif + 360
+            end
+        end
+
+
+        if iCurAngleDif < 0 then
+            iAngleAdjustToUse = iAngleAdjust
+        else iAngleAdjustToUse = -iAngleAdjust
+        end
+
+        if iCurTick == 1 then
+            IssueClearCommands({oBomber})
+
+            iActualAngleToUse = iFacingDirection + iAngleAdjustToUse
+            tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iActualAngleToUse, iDistanceAwayToMove, true)
+            IssueMove({oBomber}, tTempTarget)
+            if bDebugMessages == true then LOG(sFunctionRef..': Just issued move order, iFacingDirection='..iFacingDirection..'; iCurANgleDif='..iCurAngleDif..'; iAngleAdjustToUse='..iAngleAdjustToUse..'; iActualAngleToUse='..iActualAngleToUse..'; angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())) end
+        elseif iCurTick >= iTicksBetweenOrders then iCurTick = 0
+        end
+
+        --Make the angle dif an absolute number for below tests
+        iCurAngleDif = math.abs(iCurAngleDif)
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitTicks(1)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+        if not(M27UnitInfo.IsUnitValid(oBomber)) or not(M27UnitInfo.IsUnitValid(oTarget)) then
+            if bDebugMessages == true then LOG(sFunctionRef..': either the bomber or target is no longer valid so aborting micro') end
+            break
+        elseif iDistToTarget <= 8 and iCurAngleDif >= 30 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Dont expect we will be able to hit from current position, so will try and moving forwards and turning around unless have already done this once. bTriedMovingForwardsAndTurning='..tostring(bTriedMovingForwardsAndTurning)) end
+            if bTriedMovingForwardsAndTurning then
+                break
+            else
+                IssueClearCommands({oBomber})
+                tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iFacingDirection, 20, true)
+                IssueMove({oBomber}, tTempTarget)
+                bTriedMovingForwardsAndTurning = true
+                if bDebugMessages == true then LOG(sFunctionRef..': Telling the bomber to move forwards for a while and will then try and get it to turn around in a bit') end
+                WaitSeconds(2.5)
+                iCurTick = 0
+            end
+        elseif GetGameTimeSeconds() - iStartTime >= iReloadTime then
+            --Angle between 15-30, it appears that at short distances a greater angle might be acceptable
+            if bDebugMessages == true then LOG(sFunctionRef..': Bomb is ready to fire so will check every tick if our angle is close enough.  iCurAngleDif='..iCurAngleDif) end
+            if iCurAngleDif <= math.min(30, math.max(40 - iDistToTarget, 6)) then
+                if bDebugMessages == true then LOG(sFunctionRef..': have reached reload time so will try and attack as curangledif is <=28. iCurAngleDif='..iCurAngleDif..'; iDistToTarget='..iDistToTarget) end
+                break
+            end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': Bomb not loaded yet, will continue loop')
+        end
+
+    end
+    if M27UnitInfo.IsUnitValid(oBomber) then
+        oBomber[M27UnitInfo.refbSpecialMicroActive] = false
+        if M27UnitInfo.IsUnitValid(oTarget) then
+            --Below function should clear commands and then issue an attack
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Target '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Time to wait between orders='..iTicksBetweenOrders..'; Distance away to move to='..iDistanceAwayToMove..'; iAngleAdjust='..iAngleAdjust..'; Bomber facing direction='..M27UnitInfo.GetUnitFacingAngle(oBomber)..'; Angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())..'; Distance from bomber to target='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition())..'; GameTime='..GetGameTimeSeconds())
+                LOG(sFunctionRef..': Have valid bomber and target so will issue an attack order for the bomber to attack the target')
+            end
+            M27AirOverseer.IssueNewAttackToBomber(oBomber, oTarget, 1, true)
+        else
+            IssueClearCommands({oBomber})
+            ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber, 0)
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function TurnAirUnitAndMoveToTarget(aiBrain, oBomber, tDirectionToMoveTo, iMaxAcceptableAngleDif)
+    --Based on hoverbomb logic - may give unexpected results if not using with T3 bombers
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'TurnAirUnitAndMoveToTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oBomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; GameTime='..GetGameTimeSeconds()) end
+
+
+    local iStartTime = GetGameTimeSeconds()
+    --local iAngleToTarget
+
+    --Config:
+    local iTicksBetweenOrders = 5
+    local iDistanceAwayToMove = 10
+    local iAngleAdjust = 50
+
+
+    --Other variables:
+    local iActualAngleToUse
+    local iCurAngleDif
+    local iAngleAdjustToUse
+    local iFacingDirection
+    local iAngleToTarget
+
+    local iCurTick = 0
+    local bTriedMovingForwardsAndTurning = false
+    local iDistToTarget
+    local tTempTarget
+
+    local iMaxMicroTime = 5 --will micro for up to 5 seconds
+
+    local iFacingAngleWanted = M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), tDirectionToMoveTo)
+
+    --Clear trackers so we dont think we're targeting anything
+    M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
+    oBomber[M27UnitInfo.refbSpecialMicroActive] = true
+
+
+
+    while GetGameTimeSeconds() - iStartTime < iMaxMicroTime do
+        iCurTick = iCurTick + 1
+
+        iFacingDirection = M27UnitInfo.GetUnitFacingAngle(oBomber)
+        iAngleToTarget = M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), tDirectionToMoveTo)
+        iCurAngleDif = iFacingDirection - iAngleToTarget
+        iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tDirectionToMoveTo)
+        --e.g. if bomber is facing 350 degrees, and the target is at 10 degrees, then it means there's only a dif of 20 degrees, but we want the bomber to go 350+50, rather than 350-50.  Facing - Angle would result in a positive value
+        --if instead bomber was facing 10 degrees, and the target was 30 degrees, then would get -20 as the result, and so want to also increase
+        --the effect of the below is that when bomber is facing 350 degrees and target 10 degrees, it will treat the difference as being 350 - 10 - 360 = -20, and want the bomber to go 350+50; if insteadbomber 10 and target 30, then dif = -20 and no adjustment made
+        if math.abs(iCurAngleDif) > 180 then
+            if iCurAngleDif > 180 then
+                --iFacingDirection is too high so decrease the angle difference
+                iCurAngleDif = iCurAngleDif - 360
+            else --Curangledif must be < -180, so angletotarget is too high
+                iCurAngleDif = iCurAngleDif + 360
+            end
+        end
+
+
+        if iCurAngleDif < 0 then
+            iAngleAdjustToUse = iAngleAdjust
+        else iAngleAdjustToUse = -iAngleAdjust
+        end
+
+        --Are we close enough to the direction wanted?
+        iCurAngleDif = math.abs(iCurAngleDif)
+        if iCurAngleDif <= (iMaxAcceptableAngleDif or 15) then
+            --Are close enough in angle so can stop the micro
+            break
+        else
+            if iCurTick == 1 then
+                IssueClearCommands({oBomber})
+
+                iActualAngleToUse = iFacingDirection + iAngleAdjustToUse
+                tTempTarget = M27Utilities.MoveInDirection(oBomber:GetPosition(), iActualAngleToUse, iDistanceAwayToMove, true)
+                IssueMove({oBomber}, tTempTarget)
+                if bDebugMessages == true then LOG(sFunctionRef..': Just issued move order, iFacingDirection='..iFacingDirection..'; iCurANgleDif='..iCurAngleDif..'; iAngleAdjustToUse='..iAngleAdjustToUse..'; iActualAngleToUse='..iActualAngleToUse..'; angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), tDirectionToMoveTo)) end
+            elseif iCurTick >= iTicksBetweenOrders then iCurTick = 0
+            end
+
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            WaitTicks(1)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            if not(M27UnitInfo.IsUnitValid(oBomber)) then
+                break
+            end
+        end
+    end
+
+    if M27UnitInfo.IsUnitValid(oBomber) then
+        oBomber[M27UnitInfo.refbSpecialMicroActive] = false
+        IssueClearCommands({oBomber})
+        IssueMove({oBomber}, tDirectionToMoveTo)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
