@@ -1840,7 +1840,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
                 local iSearchRange = 80
                 local tNearbyAntiNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnderwaterUnit:GetPosition(), iSearchRange, 'Enemy')
                 local tOurAntiNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpedoLandAndNavy, GetPlatoonUnitsOrUnitCount(oPlatoon, reftCurrentUnits, false))
-                if M27Utilities.IsTableEmpty(tNearbyAntiNavy) == false and M27Utilities.IsTableEmpty(tOurAntiNavy) == true then
+                if M27Utilities.IsTableEmpty(tNearbyAntiNavy) == false and M27Utilities.IsTableEmpty(tOurAntiNavy) == true and not(oPlatoon:GetPlan() == 'M27GroundExperimental') then
                     oPlatoon[refiCurrentAction] = refActionRun
                 else
                     --Do we have antinavy in our platoon, and the nearest enemy is on water? Then move towards nearest enemy
@@ -4390,21 +4390,25 @@ function GetACUUpgradeWanted(aiBrain, oACU)
         if M27UnitInfo.GetUnitFaction(oACU) == M27UnitInfo.refFactionAeon and not(oACU:HasEnhancement('CrysalisBeam')) then bAeonWithoutRange = true end
         --Get gun upgrade
         for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
-            if bDebugMessages == true then LOG(sFunctionRef..': sEnhancement='..sEnhancement..'; Considering if its one of our priority gun upgrades. tEnhancement='..repr(tEnhancement)) end
-            if bAeonWithoutRange then
+            if bDebugMessages == true then LOG(sFunctionRef..': sEnhancement='..sEnhancement..'; Prerequisite='..(tEnhancement.Prerequisite or 'nil')..'; Considering if its one of our priority gun upgrades. tEnhancement='..repr(tEnhancement)) end
+            --[[if bAeonWithoutRange then
                 if sEnhancement == 'CrysalisBeam' then
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     return sEnhancement
                 end
-            else
-                for iGunEnhancement, sGunEnhancement in M27Conditions.tGunUpgrades do
-                    if sEnhancement == sGunEnhancement and not(oACU:HasEnhancement(sGunEnhancement)) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': About to return sEnhancement='..sEnhancement) end
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        return sEnhancement
+            else--]]
+                if (not(tEnhancement.Prerequisite) or oACU:HasEnhancement(tEnhancement.Prerequisite)) and tEnhancement.BuildCostMass > 1 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': We can build the enhancement so will see if it is in the list of gun upgrades') end
+                    --We can build the upgrade and it shouldnt be a 'remove upgrade' one
+                    for iGunEnhancement, sGunEnhancement in M27Conditions.tGunUpgrades do
+                        if sEnhancement == sGunEnhancement and not(oACU:HasEnhancement(sGunEnhancement)) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to return sEnhancement='..sEnhancement) end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return sEnhancement
+                        end
                     end
                 end
-            end
+            --end
         end
         M27Utilities.ErrorHandler('Failed to find a gun upgrade for ACU')
     else
@@ -4749,7 +4753,7 @@ function DeterminePlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
@@ -5512,7 +5516,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
 
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -7396,7 +7400,7 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -7660,37 +7664,132 @@ function ProcessPlatoonAction(oPlatoon)
                             end
 
                             if not(tDFTargetPosition) and not(oUnitToAttackInstead) then
-                                --Is there nearby enemy land experimental? If so then target position that would bring us in range of this unless we're a fatboy in which case run
-                                if bDebugMessages == true then LOG(sFunctionRef..': Checking for nearby land experimental. iOurRange='..iOurRange..'; oPlatoon[refiEnemiesInRange]='..oPlatoon[refiEnemiesInRange]) end
-
-                                --Note - will have already checekd for enemy experimental and run away for fatboy as part of the logic for determining nearby enemy
-                                if oPlatoon[refiEnemiesInRange] > 0 then tNearbyEnemiesOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandExperimental, oPlatoon[reftEnemiesInRange]) end
-                                if M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest) == false then
-                                    tDFTargetPosition = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil):GetPosition()
-                                else
-                                    --Is there nearby enemy PD? Then want to get in range of this
-                                    if oPlatoon[refiEnemyStructuresInRange] > 0 then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Checking for nearby PD') end
-                                        tNearbyEnemiesOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])
-                                        if M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest) == false then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Have nearby PD') end
-                                            tDFTargetPosition = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil):GetPosition()
+                                --ENemy shield in range? Target it (fatboy has already considered shields above)
+                                local oNearestUnitOfInterest
+                                if oPlatoon[refiEnemyStructuresInRange] > 0 and not(bHaveFatboy) then
+                                    tNearbyEnemiesOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield, oPlatoon[reftEnemyStructuresInRange])
+                                    if not(M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest)) then
+                                        oNearestUnitOfInterest = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain)
+                                        if M27Utilities.GetDistanceBetweenPositions(oNearestUnitOfInterest:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iOurRange + 10 then
+                                            if M27Utilities.GetDistanceBetweenPositions(oNearestUnitOfInterest:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iOurRange then
+                                                oUnitToAttackInstead = oNearestUnitOfInterest
+                                            else
+                                                tDFTargetPosition = oNearestUnitOfInterest:GetPosition()
+                                            end
                                         end
                                     end
                                 end
+                                if not(tDFTargetPosition) and not(oUnitToAttackInstead) then
 
-                                if M27Utilities.IsTableEmpty(tDFTargetPosition) == true or M27MapInfo.IsUnderwater(tDFTargetPosition) then
-                                    --Just go for the enemy base if we aren't already there
-                                    if HasPlatoonReachedDestination(oPlatoon) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Have reached destination so will get a new movement path') end
-                                        GetNewMovementPath(oPlatoon)
-                                        tDFTargetPosition = oPlatoon[reftMovementPath][1]
+
+                                    --Is there nearby enemy land experimental? If so then target position that would bring us in range of this unless we're a fatboy in which case run
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Checking for nearby land experimental. iOurRange='..iOurRange..'; oPlatoon[refiEnemiesInRange]='..oPlatoon[refiEnemiesInRange]) end
+
+                                    --Note - will have already checekd for enemy experimental and run away for fatboy as part of the logic for determining nearby enemy
+                                    if oPlatoon[refiEnemiesInRange] > 0 then
+                                        tNearbyEnemiesOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandExperimental, oPlatoon[reftEnemiesInRange]) end
+                                        if M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest) == false then
+                                            tDFTargetPosition = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil):GetPosition()
+                                        end
+                                    end
+                                    if not(tDFTargetPosition) and not(oUnitToAttackInstead) then
+                                        --Is there nearby enemy PD? Then want to get in range of this
+                                        if oPlatoon[refiEnemyStructuresInRange] > 0 then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Checking for nearby PD') end
+                                            tNearbyEnemiesOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD + M27UnitInfo.refCategoryFixedT2Arti, oPlatoon[reftEnemyStructuresInRange])
+                                            if M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest) == false then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Have nearby PD') end
+                                                tDFTargetPosition = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil):GetPosition()
+                                            end
+                                        end
+                                    end
+
+                                if not(tDFTargetPosition) and not(oUnitToAttackInstead) then
+                                    --Nearby T3 land?
+                                    if oPlatoon[refiEnemiesInRange] > 0 then
+                                        tNearbyEnemiesOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLand * categories.TECH3, oPlatoon[refiEnemiesInRange])
+                                        if M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest) == false then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have nearby T3 mobile land') end
+                                            tDFTargetPosition = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil, nil):GetPosition()
+                                        end
+                                    end
+
+                                    if not(tDFTargetPosition) and not(oUnitToAttackInstead) then
+                                        if oPlatoon[refiEnemyStructuresInRange] > 0 then
+                                            tNearbyEnemiesOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryStructure - categories.TECH1, oPlatoon[reftEnemyStructuresInRange])
+                                            if not(M27Utilities.IsTableEmpty(tNearbyEnemiesOfInterest)) then
+                                                oNearestUnitOfInterest = M27Utilities.GetNearestUnit(tNearbyEnemiesOfInterest, GetPlatoonFrontPosition(oPlatoon), aiBrain)
+                                                if M27Utilities.GetDistanceBetweenPositions(oNearestUnitOfInterest:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iOurRange + 10 then
+                                                    tDFTargetPosition = oNearestUnitOfInterest:GetPosition()
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+
+
+
+
+                            --Check we can path to the target?
+                            local bCanReachTarget = false
+                            local iOurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tLocation)
+                            if oUnitToAttackInstead then
+                                if M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit]) then
+                                    --Want to attack a unit but we are underwater; is the target on land and we can path there?
+                                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnitToAttackInstead:GetPosition()) == iOurPathingGroup then
+                                        bCanReachTarget = true
+                                        tDFTargetPosition = oUnitToAttackInstead:GetPosition()
+                                        oUnitToAttackInstead = nil
                                     else
-                                        if bDebugMessages == true then LOG(sFunctionRef..': No priority locations to go to so will just target movement path') end
-                                        tDFTargetPosition = oPlatoon[reftMovementPath][1]
+                                        bCanReachTarget = false --Redundancy
                                     end
                                 else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have a target location after considering nearby units of interest='..repr(tDFTargetPosition)) end
+                                    --We arent underwater; is the target unit in range?
+                                    if M27Utilities.GetDistanceBetweenPositions(oUnitToAttackInstead:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iOurRange and not(M27UnitInfo.IsUnitUnderwater(oUnitToAttackInstead)) then
+                                        --Target is in range, is our shot blocked?
+                                        if M27Logic.IsShotBlocked(oPlatoon[refoFrontUnit], oUnitToAttackInstead) then
+                                            --Can we path there?
+                                            if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnitToAttackInstead:GetPosition()) == iOurPathingGroup then
+                                                bCanReachTarget = true
+                                                tDFTargetPosition = oUnitToAttackInstead:GetPosition()
+                                                oUnitToAttackInstead = nil
+                                            else
+                                                bCanReachTarget = false --redundancy
+                                            end
+                                        else
+                                            --Shot not blocked, target on land, we are on land, and it is in range
+                                            bCanReachTarget = true
+                                        end
+                                    else
+                                        --Target is out of range, can we path to it?
+                                        if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnitToAttackInstead:GetPosition()) == iOurPathingGroup then
+                                            bCanReachTarget = true
+                                        else
+                                            bCanReachTarget = false --redundancy
+                                        end
+                                    end
+                                end
+                            elseif M27Utilities.IsTableEmpty(tDFTargetPosition) == false then
+                                --Are trying to move to a destination - can we path there?
+                                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tDFTargetPosition) == iOurPathingGroup then
+                                    bCanReachTarget = true
+                                else bCanReachTarget = false --redundancy
+                                end
+                            else
+                                --Have no target
+                                bCanReachTarget = false --redundancy
+                            end
+
+                            if not(bCanReachTarget) then
+                                --Just go for the enemy base if we aren't already there
+                                if HasPlatoonReachedDestination(oPlatoon) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have reached destination so will get a new movement path') end
+                                    GetNewMovementPath(oPlatoon)
+                                    tDFTargetPosition = oPlatoon[reftMovementPath][1]
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': No priority locations to go to so will just target movement path') end
+                                    tDFTargetPosition = oPlatoon[reftMovementPath][1]
                                 end
                             end
                             --Get position near the target in the same group

@@ -139,9 +139,9 @@ refCategorySniperBot = categories.MOBILE * categories.SNIPER * categories.LAND
 
 --Air units
 refCategoryAirScout = categories.AIR * categories.SCOUT
-refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - categories.GROUNDATTACK
+refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - categories.GROUNDATTACK - categories.EXPERIMENTAL
 refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - categories.CANNOTUSEAIRSTAGING --excludes mercies
-refCategoryFighterBomber = categories.AIR * categories.ANTIAIR * categories.BOMBER
+refCategoryFighterBomber = categories.AIR * categories.ANTIAIR * categories.BOMBER - categories.EXPERIMENTAL
 refCategoryGunship = categories.AIR * categories.GROUNDATTACK
 refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
@@ -638,11 +638,13 @@ function GetBomberAOEAndStrikeDamage(oUnit)
     local oBP = oUnit:GetBlueprint()
     local iAOE = 0
     local iStrikeDamage = 0
+    local iFiringRandomness
     for sWeaponRef, tWeapon in oBP.Weapon do
         if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' then
             if (tWeapon.DamageRadius or 0) > iAOE then
                 iAOE = tWeapon.DamageRadius
                 iStrikeDamage = tWeapon.Damage * tWeapon.MuzzleSalvoSize
+                iFiringRandomness = (tWeapon.FiringRandomness or 0)
             end
         end
     end
@@ -663,7 +665,7 @@ function GetBomberAOEAndStrikeDamage(oUnit)
     iStrikeDamage = math.max(iStrikeDamage, tiBomberStrikeDamageByFactionAndTech[GetUnitTechLevel(oUnit)][GetFactionFromBP(oBP)])
 
 
-    return iAOE, iStrikeDamage
+    return iAOE, iStrikeDamage, iFiringRandomness
 end
 
 function GetLauncherAOEStrikeDamageMinAndMaxRange(oUnit)

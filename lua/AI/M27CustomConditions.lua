@@ -8,6 +8,7 @@ local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 
+--NOTE: Below are replaced by GameSettingWarningsAndChecks if sim mods are detected that expand the acu enhancement list
 tGunUpgrades = { 'HeavyAntiMatterCannon',
                        'CrysalisBeam', --Range
                        'HeatSink', --Aeon
@@ -563,15 +564,28 @@ function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
     if bROFAndRange == nil then bROFAndRange = true end
     local oACU = (oAltACU or M27Utilities.GetACU(aiBrain))
     local bACUHasUpgrade = false
-    local bHaveOne = false
+    local iGunUpgradesGot = 0
+    local oBP = oACU:GetBlueprint()
     if bDebugMessages == true then LOG(sFunctionRef..': About to check if ACU has gun upgrade') end
     if M27Utilities.IsACU(oACU) then
         for iUpgrade, sUpgrade in tGunUpgrades do
             if bDebugMessages == true then LOG(sFunctionRef..': sUpgrade to check='..sUpgrade..'; oACU:HasEnhancement(sUpgrade)='..tostring(oACU:HasEnhancement(sUpgrade))) end
             if oACU:HasEnhancement(sUpgrade) then
-                if bDebugMessages == true then LOG(sFunctionRef..': ACU has enhancement '..sUpgrade..'; returning true unless Aeon and only 1 upgrade') end
-                bACUHasUpgrade = true
-                if sUpgrade == 'CrysalisBeam' or sUpgrade == 'HeatSink' then
+                iGunUpgradesGot = iGunUpgradesGot + 1
+                if oBP.Enhancements[sUpgrade].Prerequisite then iGunUpgradesGot = iGunUpgradesGot + 1 end
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU has enhancement '..sUpgrade..'; returning true unless Aeon and only 1 upgrade. iGunUpgradesGot='..iGunUpgradesGot..'; bROFAndRange='..tostring((bROFAndRange or false))) end
+
+                if not(bROFAndRange) then
+                    bACUHasUpgrade = true
+                    break
+                else
+                    if iGunUpgradesGot >= 2 or not(EntityCategoryContains(categories.AEON, oACU.UnitId)) then
+                        bACUHasUpgrade = true
+                    end
+                end
+
+
+                --[[if sUpgrade == 'CrysalisBeam' or sUpgrade == 'HeatSink' then
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU has either Crysalis or Heat sink, sUpgrade='..sUpgrade) end
                     if bROFAndRange == false then
                         break
@@ -586,8 +600,8 @@ function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
                         end
                     end
                 else
-                break
-                end
+                    break
+                end--]]
             end
         end
         if bACUHasUpgrade == false then bACUHasUpgrade = DoesACUHaveBigGun(aiBrain, oACU) end

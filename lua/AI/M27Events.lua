@@ -306,8 +306,11 @@ function OnBombFired(oWeapon, projectile)
         if oUnit and oUnit.GetUnitId then
             local sUnitID = oUnit.UnitId
             if bDebugMessages == true then LOG(sFunctionRef..': bomber position when firing bomb='..repr(oUnit:GetPosition())) end
-            if EntityCategoryContains(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber - categories.EXPERIMENTAL, sUnitID) then
-                M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
+            if EntityCategoryContains(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, sUnitID) then
+                --Dont bother trying to dodge an experimental bomb
+                if not(EntityCategoryContains(categories.EXPERIMENTAL, sUnitID)) then
+                    M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
+                end
                 if oUnit.GetAIBrain and oUnit:GetAIBrain().M27AI then
                     if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repr(projectile:GetPosition())) end
                     local iDelay = 0
@@ -414,9 +417,34 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
             oConstruction['M27FirstConstructionStart'] = true
             local aiBrain = oEngineer:GetAIBrain()
             --Decide if we want to shield the construction
-            if oConstruction:GetBlueprint().Economy.BuildCostMass >= 2000 then
-                if oConstruction:GetBlueprint().Defense.Health / oConstruction:GetBlueprint().Economy.BuildCostMass < 1 then
+            local oBP = oConstruction:GetBlueprint()
+            if oBP.Economy.BuildCostMass >= 2000 then
+                if oBP.Defense.Health / oBP.Economy.BuildCostMass < 1 or (aiBrain[M27Overseer.refbDefendAgainstArti] and oBP.Economy.BuildCostMass >= 3000 and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oConstruction.UnitId)) then
+                    oConstruction[M27EngineerOverseer.refiShieldsWanted] = 1
                     table.insert(aiBrain[M27EngineerOverseer.reftUnitsWantingFixedShield], oConstruction)
+                    --Flag if we want it to have a heavy shield
+                    if aiBrain[M27Overseer.refbDefendAgainstArti] then
+                        oConstruction[M27EngineerOverseer.refbNeedsLargeShield] = true
+                        aiBrain[M27EngineerOverseer.refbHaveUnitsWantingHeavyShield] = true --Redundancy (should already check for the defendagainstarti flag)
+                        if oBP.Economy.BuildCostMass >= 12000 then
+                            oConstruction[M27EngineerOverseer.refiShieldsWanted] = 2
+                        end
+                    else
+                        if oBP.Economy.BuildCostMass >= 12000 then
+
+                            if oBP.Economy.BuildCostMass >= 20000 then
+                                oConstruction[M27EngineerOverseer.refbNeedsLargeShield] = true
+                                aiBrain[M27EngineerOverseer.refbHaveUnitsWantingHeavyShield] = true
+                            else
+                                --Cybran - shield nukes with T3 shields.  Other factions can use t2
+                                if EntityCategoryContains(categories.CYBRAN, oConstruction.UnitId) then
+                                    oConstruction[M27EngineerOverseer.refbNeedsLargeShield] = true
+                                    aiBrain[M27EngineerOverseer.refbHaveUnitsWantingHeavyShield] = true
+                                end
+                            end
+
+                        end
+                    end
                 end
             end
 

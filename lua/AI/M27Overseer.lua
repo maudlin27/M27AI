@@ -86,6 +86,7 @@ reftEnemyTML = 'M27OverseerEnemyTML'
 refbEnemyTMLSightedBefore = 'M27OverseerEnemyTMLSightedBefore'
 refiEnemyHighestTechLevel = 'M27OverseerEnemyHighestTech'
 refbAreBigThreats = 'M27OverseerAreBigThreats'
+refbDefendAgainstArti = 'M27OverseerDefendAgainstArti' --set to true if have activated logic to defend against enemy arti or novax
 refbCloakedEnemyACU = 'M27OverseerCloakedACU'
 
 --Platoon references
@@ -190,6 +191,9 @@ refiTimeOfLastMexIncomeCheck = 'M27OverseerTimeOfLastMexIncomeCheck'
 iLongTermMassIncomeChangeInterval = 180 --3m
 
 refiIgnoreMexesUntilThisManyUnits = 'M27ThresholdToAttackMexes'
+
+--Other
+bUnitNameUpdateActive = false --true if are cycling through every unit and updating the name
 
 
 
@@ -4174,7 +4178,7 @@ function DetermineInitialBuildOrder(aiBrain)
 end
 
 function UpdateHighestFactoryTechTracker(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateHighestFactoryTechTracker'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, gametime='..GetGameTimeSeconds()) end
@@ -4205,6 +4209,46 @@ function UpdateHighestFactoryTechTracker(aiBrain)
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Number of tech2 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllHQFactories * categories.TECH2)..'; Number of tech3 factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllHQFactories * categories.TECH3)..'; iHighestTechLevel='..iHighestTechLevel..'; aiBrain[refiOurHighestFactoryTechLevel]='..aiBrain[refiOurHighestFactoryTechLevel]..'; aiBrain[refiOurHighestAirFactoryTech]='..aiBrain[refiOurHighestAirFactoryTech]..'; Number of T3 land factories='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3)..'; Highest land factory tech='..aiBrain[refiOurHighestLandFactoryTech]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function UpdateAllNonM27Names()
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'UpdateAllNonM27Names'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. bUnitNameUpdateActive='..tostring(bUnitNameUpdateActive)..'; M27Config.M27ShowEnemyUnitNames='..tostring(M27Config.M27ShowEnemyUnitNames)) end
+    if not(bUnitNameUpdateActive) and M27Config.M27ShowEnemyUnitNames then
+        bUnitNameUpdateActive = true
+        local iMaxUpdatePerTick = 10
+        local iCurUpdateCount = 0
+
+
+        if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through every unit owned by a player and update its name if its not an M27AI brain.  Size of table of brains='..table.getn(tAllAIBrainsByArmyIndex)) end
+        for iBrain, oBrain in tAllAIBrainsByArmyIndex do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering iBrain='..iBrain..'; armyindex='..oBrain:GetArmyIndex()..'; .M27AI='..tostring((oBrain.M27AI or false))) end
+           if not(oBrain.M27AI) then
+               local tAllUnits = oBrain:GetListOfUnits(categories.ALLUNITS - categories.BENIGN, false, false)
+               if bDebugMessages == true then LOG(sFunctionRef..': Size of tAllUnits='..table.getn(tAllUnits)) end
+               if not(M27Utilities.IsTableEmpty(tAllUnits)) then
+                    for iUnit, oUnit in tAllUnits do
+                        if oUnit.SetCustomName and M27UnitInfo.IsUnitValid(oUnit) then
+                            oUnit:SetCustomName(oUnit.UnitId..':LC='..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                        end
+                       iCurUpdateCount = iCurUpdateCount + 1
+                        if iCurUpdateCount >= iMaxUpdatePerTick then
+                            WaitTicks(1)
+                            iCurUpdateCount = 0
+                        end
+                    end
+               end
+
+           end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+
+        bUnitNameUpdateActive = false
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
 end
 
 function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of game' logs
@@ -4341,6 +4385,24 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         end
         if bEnemyHasAlmostCompleteArti then
            ForkThread(CoordinateNovax, aiBrain)
+        end
+
+        --Protect against arti - 1-off event to udpate shielding, and then flag going forwards to keep shields updated
+        if not(aiBrain[refbDefendAgainstArti]) then
+            local bWantToDefend = false
+            for iUnit, oUnit in aiBrain[reftEnemyArtiAndExpStructure] do
+                if oUnit:GetFractionComplete() >= 0.2 then
+                    --Check it isnt a paragon or mavor (since no point shielding against either of these)
+                    if not(EntityCategoryContains(categories.EXPERIMENTAL * categories.MASSFABRICATION + categories.ARTILLERY * categories.STRUCTURE * categories.UEF * categories.EXPERIMENTAL, oUnit.UnitId)) then
+                        bWantToDefend = true
+                        break
+                    end
+                end
+            end
+            if bWantToDefend then
+                aiBrain[refbDefendAgainstArti] = true
+                ForkThread(M27EngineerOverseer.UpdateShieldingToDefendAgainstArti, aiBrain)
+            end
         end
     end
 
@@ -4827,14 +4889,15 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
         aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
         --Play safe with ACU if we have almost half or more of mexes
+        local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
+        local iUpgradesWanted = 2
         if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 0.9 then
             if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.1 then
                 --We have 55% of mexes on map so shoudl be ahead on eco
                 aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
                 if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.2 then
                    --Set equal to max health (so run) if we dont have a supporting upgrade
-                    local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
-                    local iUpgradesWanted = 2
+
                     if EntityCategoryContains(categories.AEON, oACU) then iUpgradesWanted = 3 end
                     if bDebugMessages == true then LOG(sFunctionRef..': iUpgradeCount='..iUpgradeCount..'; iUpgradesWanted='..iUpgradesWanted) end
                     if iUpgradeCount < iUpgradesWanted then
@@ -4848,6 +4911,22 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 else
                     --ACU doesnt have gun so be very careful
                     aiBrain[refiACUHealthToRunOn] = math.max(9000, oACU:GetMaxHealth() * 0.8)
+                end
+            end
+        end
+        --Also set health to run as a high value if we have high mass income
+        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 then
+            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 then
+                if not(M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
+                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                else
+                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
+                end
+            else
+                if iUpgradeCount < 1 then
+                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                elseif iUpgradeCount < iUpgradesWanted then
+                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
                 end
             end
         end
@@ -5148,10 +5227,10 @@ function SendWarningIfNoM27(aiBrain)
     end
 end
 
-function GameSettingWarnings(aiBrain)
+function GameSettingWarningsAndChecks(aiBrain)
     --If unsupported settings then note at start of the game
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'GameSettingWarnings'
+    local sFunctionRef = 'GameSettingWarningsAndChecks'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of compatibility check') end
     local sIncompatibleMessage = ''
@@ -5196,10 +5275,44 @@ function GameSettingWarnings(aiBrain)
                 LOG(sFunctionRef..' About to debug the tModData for mod '..(tModData.name or 'nil'))
                 M27Utilities.DebugArray(tModData)
             end
-            sIncompatibleMessage = sIncompatibleMessage .. '. '
         end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': Finished checking compatibility; compatibility message='..sIncompatibleMessage) end
+    if iSimModCount > 0 then sIncompatibleMessage = sIncompatibleMessage..'. ' end
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished checking compatibility; compatibility message='..sIncompatibleMessage..'; iSimModCount='..iSimModCount) end
+
+    if iSimModCount > 0 then
+        --Compatibility settings - check for ACU upgrades, and change the list of preferred upgrades if a change is expected
+        local iACUEnhancementCount = 0
+        local tACUBPs = EntityCategoryGetUnitList(categories.COMMAND)
+        local oBP
+        for iBP, sUnitID in tACUBPs do
+            oBP = __blueprints[sUnitID]
+            for sEnhancement, tEnhancement in oBP.Enhancements do
+                iACUEnhancementCount = iACUEnhancementCount + 1
+                if bDebugMessages == true then LOG('oBP='..oBP.BlueprintId..'; sEnhancement='..sEnhancement..'; tEnhancement='..repr(tEnhancement)) end
+            end
+        end
+        local iExpectedCount = 0
+        if not(iACUEnhancementCount == iExpectedCount) then
+            --Use bigger list of ACU gun upgrades
+            M27Conditions.tGunUpgrades = { 'HeavyAntiMatterCannon',
+                             'CrysalisBeam', --Range
+                             'HeatSink', --Aeon
+                             'CoolingUpgrade',
+                             'RateOfFire',
+                                           --Blackops:
+                               'JuryRiggedDisruptor',
+                               'AntiMatterCannon',
+                               'JuryRiggedZephyr',
+                               'JuryRiggedRipper',
+                               'JuryRiggedChronotron',
+                               'HeavyAntiMatterCannon',
+                               'DisruptorAmplifier',
+            }
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': iACUEnhancementCount='..iACUEnhancementCount..'; iExpectedCount='..iExpectedCount..'; tGunUpgrades='..repr(M27Conditions.tGunUpgrades)) end
+    end
+
 
 
 
@@ -5209,7 +5322,7 @@ function GameSettingWarnings(aiBrain)
 end
 
 function CoordinateNovax(aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CoordinateNovax'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, does our team have an active coordinator='..tostring((tTeamData[aiBrain.M27Team][refbActiveNovaxCoordinator] or false))) end
@@ -5227,9 +5340,11 @@ function CoordinateNovax(aiBrain)
                 local iAvailableNovax = 0
                 local tAvailableNovax = {}
                 for iUnit, oUnit in tFriendlyNovax do
-                    if oUnit:GetAIBrain().M27AI then
-                        iAvailableNovax = iAvailableNovax + 1
-                        tAvailableNovax[iAvailableNovax] = oUnit
+                    if oUnit:GetFractionComplete() == 1 then
+                        if oUnit:GetAIBrain().M27AI then
+                            iAvailableNovax = iAvailableNovax + 1
+                            tAvailableNovax[iAvailableNovax] = oUnit
+                        end
                     end
                 end
                 --Do we have a likely shield power of at least 2?
@@ -5240,9 +5355,11 @@ function CoordinateNovax(aiBrain)
                     local iFriendlyM27T3Arti = 0
                     if M27Utilities.IsTableEmpty(tFriendlyT3Arti) == false then
                         for iUnit, oUnit in tFriendlyT3Arti do
-                            if oUnit:GetAIBraion().M27AI then
-                                iFriendlyM27T3Arti = iFriendlyM27T3Arti + 1
-                                tFriendlyM27T3Arti[iFriendlyM27T3Arti] = oUnit
+                            if oUnit:GetFractionComplete() == 1 then
+                                if oUnit:GetAIBrain().M27AI then
+                                    iFriendlyM27T3Arti = iFriendlyM27T3Arti + 1
+                                    tFriendlyM27T3Arti[iFriendlyM27T3Arti] = oUnit
+                                end
                             end
                         end
                     end
@@ -5566,6 +5683,18 @@ function TempCreateReclaim(aiBrain)
     return prop
 end
 
+function TempListAllEnhancementsForACU()
+    --Use e.g. for mods so can see what upgrades they have for ACUs
+    local tACUBPs = EntityCategoryGetUnitList(categories.COMMAND)
+    local oBP
+    for iBP, sUnitID in tACUBPs do
+        oBP = __blueprints[sUnitID]
+        for sEnhancement, tEnhancement in oBP.Enhancements do
+            LOG('oBP='..oBP.BlueprintId..'; sEnhancement='..sEnhancement..'; tEnhancement='..repr(tEnhancement))
+        end
+    end
+end
+
 
 
 
@@ -5617,7 +5746,7 @@ function OverseerManager(aiBrain)
     if M27Config.M27ShowPathingGraphically then M27MapInfo.TempCanPathToEveryMex(M27Utilities.GetACU(aiBrain)) end
     ForkThread(DetermineInitialBuildOrder, aiBrain)
 
-    ForkThread(GameSettingWarnings, aiBrain)
+    ForkThread(GameSettingWarningsAndChecks, aiBrain)
 
     --TestCustom(aiBrain)
 
@@ -5634,6 +5763,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
+    TempListAllEnhancementsForACU()
 
 
 
@@ -5716,6 +5846,9 @@ function OverseerManager(aiBrain)
 
         if not(WaitTicksSpecial(aiBrain, 1)) then break end
         ForkThread(M27EconomyOverseer.RefreshEconomyData, aiBrain)
+
+        --Update enemy unit names (only does if the config setting is set, and caps the number of units that will be updated; also ignores if are already in the process of updating)
+        ForkThread(UpdateAllNonM27Names)
 
         --NOTE: We dont have the number of ticks below as 'available' for use, since on initialisation we're waiting ticks as well when initialising things such as the engineer and upgrade overseers which work off their own loops
         --therefore the actual available tick count will be the below number less the number of ticks we're already waiting

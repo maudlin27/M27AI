@@ -2887,7 +2887,7 @@ function RecordBaseLevelPathability()
             bCheckForWater = true
             bCheckForLand = true
             bNavyPathfinding = true
-        else M27Utilities.ErrorHandler('Need to add code')
+        else M27Utilities.ErrorHandler('Need to add code') --Redundancy
         end
 
         --LOG(sFunctionRef..'; bMapContainsWater='..tostring(bMapContainsWater)..'; bLandPathing='..tostring(bLandPathing)..'; sPathing='..sPathing..'; sPathingAmphibious='..sPathingAmphibious)
@@ -3401,7 +3401,7 @@ end
 end--]]
 
 function RedoPathingForGroup(iPathingGroupToRedo, iNewPathingHeightThreshold)
-    M27Utilities.ErrorHandler('Need to add code')
+    M27Utilities.ErrorHandler('Need to add code') --Not being used currently
 end
 
 function RecheckPathingToMexes(aiBrain)

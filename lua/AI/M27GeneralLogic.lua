@@ -4199,6 +4199,7 @@ function GetT3ArtiTarget(oT3Arti)
         local tT3ArtiInRange
         local tTargetShortlist = {}
         local iTargetShortlist = 0
+        local iFriendlyT3ArtiInRange = 0
         for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
             if M27UnitInfo.IsUnitValid(oUnit) then
                 iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
@@ -4207,14 +4208,21 @@ function GetT3ArtiTarget(oT3Arti)
 
                     tT3ArtiInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, oUnit:GetPosition(), 840, 'Ally')
                     if M27Utilities.IsTableEmpty(tT3ArtiInRange) == false then
-                        if table.getn(tT3ArtiInRange) >= iMostT3ArtiInRange then
-                            if table.getn(tT3ArtiInRange) > iMostT3ArtiInRange then
+                        iFriendlyT3ArtiInRange = 0
+                        for iUnit, oUnit in tT3ArtiInRange do
+                            if oUnit:GetFractionComplete() == 1 then
+                                iFriendlyT3ArtiInRange = iFriendlyT3ArtiInRange + 1
+                            end
+                        end
+
+                        if iFriendlyT3ArtiInRange >= iMostT3ArtiInRange then
+                            if iFriendlyT3ArtiInRange > iMostT3ArtiInRange then
                                 tTargetShortlist = {}
                                 iTargetShortlist = 0
                             end
                             iTargetShortlist = iTargetShortlist + 1
                             tTargetShortlist[iTargetShortlist] = oUnit
-                            iMostT3ArtiInRange = table.getn(tT3ArtiInRange)
+                            iMostT3ArtiInRange = iFriendlyT3ArtiInRange
                         end
                     end
                 end
