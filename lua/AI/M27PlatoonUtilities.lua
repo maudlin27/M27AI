@@ -2178,11 +2178,37 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         if bDebugMessages == true then LOG(sFunctionRef..': ACU against too many PD htat would be in range of it; iPDInRange='..iPDInRange..'; iPDThreshold='..iPDThreshold..'; tEnemyT2PlusPD size='..table.getn(tEnemyT2PlusPD)) end
                                         --Are we cloaked and enemy has no omni and no spy planes, and we are still at least 10 away from the nearest PD?
                                         if M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') then
-                                            --Are we already close to the nearest PD?
-                                            if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetNearestUnit(tEnemyT2PlusPD, GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition()) <= 40 then
-                                                --Almost in range of the PD so dont run now
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Almost in range of enemy PD so wont run now') end
-                                                bACUNeedsToRun = false
+                                            --Are we already close to the nearest PD and there are fewer than 8?
+                                            local bEnemyHasOmni = false
+                                            local tPotentialOmniUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryUnitsWithOmni, GetPlatoonFrontPosition(oPlatoon), 225, 'Enemy')
+                                            local iEnemyOmniRange
+                                            local iEnemyDistToUs
+                                            if M27Utilities.IsTableEmpty(tPotentialOmniUnits) == false then
+                                                for iUnit, oUnit in tPotentialOmniUnits do
+                                                    iEnemyDistToUs = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oUnit:GetPosition())
+                                                    iEnemyOmniRange = oUnit:GetBlueprint().Intel.OmniRadius
+                                                    if EntityCategoryContains(categories.AIR) then iEnemyOmniRange = iEnemyOmniRange + 100
+                                                    elseif EntityCategoryContains(categories.MOBILE) then
+                                                        if EntityCategoryContains(categories.COMMAND) and oUnit:HasEnhancement('EnhancedSensors') then iEnemyOmniRange = math.max(iEnemyOmniRange, 80)
+                                                        else
+                                                            iEnemyOmniRange = iEnemyOmniRange + 20
+                                                        end
+                                                    end
+
+                                                    if iEnemyDistToUs <= (iEnemyOmniRange or 20) then
+                                                        bEnemyHasOmni = true
+                                                        break
+                                                    end
+                                                end
+                                            end
+                                            if bEnemyHasOmni == false then
+                                                local iNearestPD = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetNearestUnit(tEnemyT2PlusPD, GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition())
+                                                if bDebugMessages == true then LOG(sFunctionRef..': iNearestPD='..iNearestPD..'; iPDInRange='..iPDInRange..'; Platoon front unit health percent='..oPlatoon[refoFrontUnit]:GetHealthPercent()) end
+                                                if iNearestPD <= 22 or iPDInRange <= 8 and iNearestPD <= 40 or oPlatoon[refoFrontUnit]:GetHealthPercent() >= 0.99 then
+                                                     --Almost in range of the PD so dont run now
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Almost in range of enemy PD or 99% health so wont run now') end
+                                                    bACUNeedsToRun = false
+                                                end
                                             end
                                         end
                                     elseif bDebugMessages == true then LOG(sFunctionRef..': Will only have iPDInRange='..iPDInRange..'; so dont need to run')
