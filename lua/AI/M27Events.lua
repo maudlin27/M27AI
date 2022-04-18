@@ -394,6 +394,7 @@ function OnMissileBuilt(self, weapon)
             end
             --Start logic to periodically check for targets to fire the missile at (in case there are no targets initially)
             if not(self[M27UnitInfo.refbActiveMissileChecker]) and not(EntityCategoryContains(M27UnitInfo.refCategorySMD, self.UnitId)) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Calling logic to consider launching a missile') end
                 ForkThread(M27Logic.ConsiderLaunchingMissile, self, weapon)
             end
 

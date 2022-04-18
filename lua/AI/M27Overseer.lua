@@ -235,24 +235,33 @@ end
 
 function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tTarget, bUseEnemyStartInstead)
     local sFunctionRef = 'GetDistanceFromStartAdjustedForDistanceFromMid'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Start of code, GameTime='..GetGameTimeSeconds()..'; aiBrain army index='..aiBrain:GetArmyIndex()..'; tTarget='..repr(tTarget)..'; bUseEnemyStartInstead='..tostring((bUseEnemyStartInstead or false))..'; will draw the location in white')
+        M27Utilities.DrawLocation(tTarget, false, 7, 20, nil)
+    end
 
     local tStartPos
-    if bUseEnemyStartInstead then tStartPos = GetPrimaryEnemyBaseLocation(aiBrain)
+    if bUseEnemyStartInstead then tStartPos = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
     else tStartPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
     end
 
     local iDistStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPos, tTarget)
+    if bDebugMessages == true then LOG(sFunctionRef..': tStartPos='..repr(tStartPos)..'; iDistStartToTarget='..iDistStartToTarget..'; aiBrain[refiModDistEmergencyRange]='..aiBrain[refiModDistEmergencyRange]) end
     if iDistStartToTarget <= aiBrain[refiModDistEmergencyRange] then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        if bDebugMessages == true then LOG(sFunctionRef..': Are within emergency range so will just return actual dist, iDistStartToTarget='..iDistStartToTarget..'; if instead we only had 1 enemy and got mod dist for this the result would be '..math.cos(math.abs(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Utilities.GetAngleFromAToB(tStartPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)))) * iDistStartToTarget) end
         return iDistStartToTarget
     else
         --If only 1 enemy group then treat anywhere behind us as the emergency range
         if bUseEnemyStartInstead then
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            return math.cos(math.abs(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Utilities.GetAngleFromAToB(tStartPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))) * iDistStartToTarget
+            if bDebugMessages == true then LOG(sFunctionRef..': will ignore multiple enemies since have flagged to use enemy start instead, will return '..math.cos(math.abs(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Utilities.GetAngleFromAToB(tStartPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))) * iDistStartToTarget) end
+            return aiBrain[refiModDistEmergencyRange], math.cos(math.abs(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Utilities.GetAngleFromAToB(tStartPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))) * iDistStartToTarget
         else
             local bIsBehindUs = true
+            if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy brains empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftoNearestEnemyBrainByGroup]))) end
             for iEnemyGroup, oBrain in aiBrain[reftoNearestEnemyBrainByGroup] do
                 if M27Utilities.GetDistanceBetweenPositions(tTarget, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tStartPos, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) then
                     bIsBehindUs = false
@@ -261,6 +270,7 @@ function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tTarget, bUseEn
             end
             if bIsBehindUs then
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                if bDebugMessages == true then LOG(sFunctionRef..': Will return emergency range as enemy is behind us, so returning '..aiBrain[refiModDistEmergencyRange]) end
                 return aiBrain[refiModDistEmergencyRange]
             else
                 --Cycle through each enemy group and get lowest value, but stop if <= emergency range
@@ -277,6 +287,7 @@ function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tTarget, bUseEn
                     end
                 end
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                if bDebugMessages == true then LOG(sFunctionRef..': iLowestDist='..iLowestDist) end
                 return iLowestDist
             end
         end
@@ -1069,7 +1080,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                                     break
                                 end
                                 --Need MAAs in the platoon
-                                oMAAToAdd = GetNearestMAAOrScout(aiBrain, tPlatoonUnits[1]:GetPosition(), false, true, true, oPlatoon)
+                                oMAAToAdd = GetNearestMAAOrScout(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), false, true, true, oPlatoon)
                                 if oMAAToAdd == nil then
                                     bNeedMoreMAA = true
                                     break
@@ -2518,7 +2529,7 @@ function ThreatAssessAndRespond(aiBrain)
             tEnemyThreatGroup[refiDistanceFromOurBase] = M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             tEnemyThreatGroup[refiModDistanceFromOurStart] = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tEnemyThreatGroup[reftAveragePosition])
             if tEnemyThreatGroup[refiHighestThreatRecorded] == nil or tEnemyThreatGroup[refiHighestThreatRecorded] < tEnemyThreatGroup[refiTotalThreat] then tEnemyThreatGroup[refiHighestThreatRecorded] = tEnemyThreatGroup[refiTotalThreat] end
-            if bDebugMessages == true then LOG(sFunctionRef..': iCurGroup='..iCurGroup..'; refiHighestThreatRecorded='..tEnemyThreatGroup[refiHighestThreatRecorded]..'; refiTotalThreat='..tEnemyThreatGroup[refiTotalThreat]) end
+            if bDebugMessages == true then LOG(sFunctionRef..': iCurGroup='..iCurGroup..'; refiHighestThreatRecorded='..tEnemyThreatGroup[refiHighestThreatRecorded]..'; refiTotalThreat='..tEnemyThreatGroup[refiTotalThreat]..'; Actual distance to base='..M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Mod distance='..tEnemyThreatGroup[refiModDistanceFromOurStart]) end
 
             tEnemyDistanceForSorting[iCurGroup] = {}
             tEnemyDistanceForSorting[iCurGroup] = tEnemyThreatGroup[refiModDistanceFromOurStart]
@@ -5012,10 +5023,10 @@ end
 function RecordAllEnemiesAndAllies(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAllEnemiesAndAllies'
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of attempt to get backup list of enemies, called for brain with armyindex='..aiBrain:GetArmyIndex()..'; will wait 5 seconds first') end
-    WaitSeconds(5)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of attempt to get backup list of enemies for aiBrain with army index='..aiBrain:GetArmyIndex()..', called for brain with armyindex='..aiBrain:GetArmyIndex()..'; will wait 2 seconds first') end
+    WaitSeconds(1) --Note - when waited 4 seconds this would run after the strategic overseer code, which would be checking things like unclaimedm exes and lead to an error
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': Finished waiting 1s for brain with armyindex='..aiBrain:GetArmyIndex()..'; will proceed with updating enemy and ally list') end
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished waiting 1.5s for brain with armyindex='..aiBrain:GetArmyIndex()..'; will proceed with updating enemy and ally list. GameTime='..GetGameTimeSeconds()) end
     local iOurIndex = aiBrain:GetArmyIndex()
     local iEnemyCount = 0
     local iAllyCount = 0
@@ -5083,7 +5094,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
     local tOurBase = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
     local tBrainsNeedingAGroup = {}
     for iEnemy, oBrain in aiBrain[toEnemyBrains] do
-        tBrainsNeedingAGroup[iEnemy] = oBrain
+        if not(oBrain:IsDefeated()) then tBrainsNeedingAGroup[iEnemy] = oBrain end
     end
     while iLastGroup < iCurGroup do
         --[[if iCurGroup > 1 then
@@ -5106,21 +5117,33 @@ function RecordAllEnemiesAndAllies(aiBrain)
         end
         local tNearestEnemyBase = M27MapInfo.PlayerStartPoints[tBrainsNeedingAGroup[iNearestBrainRef].M27StartPositionNumber]
         aiBrain[reftoNearestEnemyBrainByGroup][iLastGroup] = tBrainsNeedingAGroup[iNearestBrainRef]
+        if bDebugMessages == true then LOG(sFunctionRef..': Nearest enemy brain for group '..iLastGroup..'='..tBrainsNeedingAGroup[iNearestBrainRef]:GetArmyIndex()) end
         --Calc angle to nearest enemy and if any remaining enemies outside this
         iNearestAngle = M27Utilities.GetAngleFromAToB(tOurBase, tNearestEnemyBase)
         for iEnemy, oBrain in tBrainsNeedingAGroup do
             iCurAngle = M27Utilities.GetAngleFromAToB(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
             if math.abs(iNearestAngle - iCurAngle) > 45 then
+                if bDebugMessages == true then LOG(sFunctionRef..': oBrain with index '..oBrain:GetArmyIndex()..' has iCurAngle='..iCurAngle..'; iNearestAngle='..iNearestAngle..'; >45 so need another group after this one.  Cur group='..iLastGroup) end
                 if iCurGroup == iLastGroup then
                     iCurGroup = iCurGroup + 1
-                    tEnemyBrainsByGroup[iCurGroup] = {}
                 end
             else
                 --Dont need to keep looking for this brain
+                if bDebugMessages == true then LOG(sFunctionRef..': Dont need to keep looking for brain '..oBrain:GetArmyIndex()..' as it is close to this group so removing it from list of brains needing a group') end
                 tBrainsNeedingAGroup[iEnemy] = nil
             end
         end
+        if bDebugMessages == true then
+            local iRemainingBrains = 0
+            if M27Utilities.IsTableEmpty(tBrainsNeedingAGroup) == false then
+                for iBrain, oBrain in tBrainsNeedingAGroup do
+                    iRemainingBrains = iRemainingBrains + 1
+                    LOG(sFunctionRef..': Remaining brain: iBrain='..iBrain ..'; ArmyIndex='..oBrain:GetArmyIndex()..'; total remaining brains so far='..iRemainingBrains)
+                end
+            end
+        end
     end
+    if M27Utilities.IsTableEmpty(aiBrain[reftoNearestEnemyBrainByGroup]) then M27Utilities.ErrorHandler('No enemy brains detected for any group') end
 
     --Set mod distance emergency range
     aiBrain[refiModDistEmergencyRange] = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.4, 150), aiBrain[refiDistanceToNearestEnemyBase] * 0.15)
@@ -5547,6 +5570,8 @@ function CoordinateLandExperimentals(aiBrain)
     local sFunctionRef = 'CoordinateLandExperimentals'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, refbActiveLandExperimentalCoordinator='..tostring((tTeamData[aiBrain.M27Team][refbActiveLandExperimentalCoordinator] or false))) end
+
 
     if not(tTeamData[aiBrain.M27Team][refbActiveLandExperimentalCoordinator]) then
         tTeamData[aiBrain.M27Team][refbActiveLandExperimentalCoordinator] = true
@@ -5555,15 +5580,22 @@ function CoordinateLandExperimentals(aiBrain)
         local tAlliedLandExperimentals = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandExperimental, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
 
         local bExperimentalsAreFarApart = true
+        if bDebugMessages == true then
+            if M27Utilities.IsTableEmpty(tAlliedLandExperimentals) then LOG(sFunctionRef..': tAlliedLandExperimentals is empty')
+            else
+                LOG(sFunctionRef..': Size of tAlliedLandExperimentals='..table.getn(tAlliedLandExperimentals))
+            end
+        end
         while bExperimentalsAreFarApart do
             bExperimentalsAreFarApart = false
             if M27Utilities.IsTableEmpty(tAlliedLandExperimentals) == false and table.getn(tAlliedLandExperimentals) >= 2 then
                 for iUnit, oUnit in tAlliedLandExperimentals do
-                   if oUnit:GetAIBrain().M27AI then
-                       iM27LandExperimentals = iM27LandExperimentals + 1
-                       tM27LandExperimentals[iM27LandExperimentals] = oUnit
-                   end
+                    if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain().M27AI then
+                        iM27LandExperimentals = iM27LandExperimentals + 1
+                        tM27LandExperimentals[iM27LandExperimentals] = oUnit
+                    end
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': iM27LandExperimentals='..iM27LandExperimentals) end
 
                 if iM27LandExperimentals >= 2 then
                     local tDistanceByBase = {}
@@ -5572,6 +5604,7 @@ function CoordinateLandExperimentals(aiBrain)
                     local oClosestBrain
 
                     --Work out the closest base to the experimentals to use
+
                     for iBrain, oBrain in aiBrain[toAllyBrains] do
                         if oBrain.M27AI then
                             tDistanceByBase[oBrain.M27StartPositionNumber] = 0
@@ -5592,15 +5625,18 @@ function CoordinateLandExperimentals(aiBrain)
 
 
                     --Only consider experimentals within 400 of this location, that aren't already within 50 of another experimental
-                    local tRevisedM27LandExperimentals = {}
-                    iM27LandExperimentals = 0
                     local tRallyPoint = M27Logic.GetNearestRallyPoint(oClosestBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(oClosestBrain))
 
-                    for iUnit, oUnit in iM27LandExperimentals do
-                        if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[iClosestStartPointNumber]) <= 400 and M27Utiliites.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint) >= 50 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will be considering experimentals close to tRallyPoint='..repr(tRallyPoint)) end
+
+                    for iUnit, oUnit in tM27LandExperimentals do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering M27 experimental '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' with aiBrain owner army index='..oUnit:GetAIBrain():GetArmyIndex()..'; Position='..repr(oUnit:GetPosition())..'; Distance to rally point='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint)..'; Dist to base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[iClosestStartPointNumber])) end
+                        if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[iClosestStartPointNumber]) <= 400 and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint) >= 50 then
                             --Do we not have allied land experimentals within 50?
-                            if M27Utilities.IsTableEmpty(M27UnitInfo.refCategoryLandExperimental, oUnit:GetPosition(), 50, 'Ally') then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Checking there are no friendly experimentals within 40 of us; Is table empty='..tostring(M27Utilities.IsTableEmpty(M27UnitInfo.refCategoryLandExperimental, oUnit:GetPosition(), 40, 'Ally'))) end
+                            if M27Utilities.IsTableEmpty(M27UnitInfo.refCategoryLandExperimental, oUnit:GetPosition(), 40, 'Ally') then
                                 --Update movement path to be the rally point
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will update movement path to send it to the rally point tRallyPoint '..repr(tRallyPoint)) end
                                 if oUnit.PlatoonHandle then
                                     bExperimentalsAreFarApart = true
                                     oUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath] = {tRallyPoint}

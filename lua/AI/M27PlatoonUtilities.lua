@@ -2022,7 +2022,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local bProceed = true
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' and aiBrain:GetArmyIndex() == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -2443,13 +2443,13 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         local iDistanceToNearestPD = M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
                         --Dont run if we are almost in range
                         if iDistanceToNearestPD > (iRange + 5) then
-                            local tExpectedPosition = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrotnPosition(oPlatoon), oNearestPD:GetPosition()), iDistanceToNearestPD - iRange, true)
+                            local tExpectedPosition = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), oNearestPD:GetPosition()), iDistanceToNearestPD - iRange, true)
                             local tInRangePD = {}
                             local iInRangePD = 0
                             local iCurDistance
                             local iCurRange
                             for iUnit, oUnit in tEnemyPD do
-                                iCurDistance = oUnit:GetDistanceBetweenPositions(oUnit:GetPosition(), tExpectedPosition)
+                                iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tExpectedPosition)
                                 iCurRange = M27Logic.GetUnitMaxGroundRange({ oUnit})
                                 if iCurDistance <= iCurRange then
                                     iInRangePD = iInRangePD + 1
@@ -3292,6 +3292,48 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                     end
                                                 else
                                                     --Do nothing - will already have assigned a run away command in a previous cycle, dont need to change things now
+                                                    --Exception for experimental platoons - still attack if have friendly land experimental nearby.  If it's an M27 experimental that is running away then have it clear its run away flag and have a movement path set to our position so it will consider helping us
+                                                    if sPlatoonName == 'M27GroundExperimental' then
+                                                        if M27Utilities.IsTableEmpty(oPlatoon[reftFriendlyNearbyCombatUnits]) == false then
+                                                            local tNearbyExperimental = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandExperimental - M27UnitInfo.refCategoryFatboy, oPlatoon[reftFriendlyNearbyCombatUnits])
+                                                            if M27Utilities.IsTableEmpty(tNearbyExperimental) == false then
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': Are an experimental with nearby friendly experimentals so will clear any order to run and will attack always, and will override any movement path that would have had us retreating so we will attack.  Will do the same for the friendly experimentals if they are M27 experimentals') end
+                                                                oPlatoon[refiCurrentAction] = refActionAttack
+                                                                oPlatoon[refbHavePreviouslyRun] = false
+                                                                oPlatoon[M27PlatoonTemplates.refbAlwaysAttack] = true
+                                                                --Update our movement path
+                                                                if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                                                                    oPlatoon[reftMovementPath] = {}
+                                                                    oPlatoon[reftMovementPath][1] = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                                                                    oPlatoon[refiCurrentPathTarget] = 1
+                                                                end
+
+
+                                                                for iNearbyExperimental, oNearbyExperimental in tNearbyExperimental do
+                                                                    if oNearbyExperimental:GetAIBrain().M27AI then
+                                                                        --Change flag for the platoons to make them always attack
+                                                                        oNearbyExperimental.PlatoonHandle[refbHavePreviouslyRun] = false
+                                                                        oNearbyExperimental.PlatoonHandle[M27PlatoonTemplates.refbAlwaysAttack] = true
+                                                                        local oCurBrain = oNearbyExperimental:GetAIBrain()
+                                                                        --If the platoon's movement path is closer to enemy base than the unit, then have it change to nearest enemy base
+                                                                        if M27Utilities.GetDistanceBetweenPositions(oNearbyExperimental:GetPosition(), M27MapInfo.PlayerStartPoints[oCurBrain.M27StartPositionNumber]) > M27Utilities.GetDistanceBetweenPositions(oNearbyExperimental.PlatoonHandle[reftMovementPath][oNearbyExperimental.PlatoonHandle[refiCurrentPathTarget]], M27MapInfo.PlayerStartPoints[oCurBrain.M27StartPositionNumber]) then
+                                                                            oNearbyExperimental.PlatoonHandle[reftMovementPath] = {}
+                                                                            oNearbyExperimental.PlatoonHandle[reftMovementPath][1] = M27MapInfo.GetPrimaryEnemyBaseLocation(oCurBrain)
+                                                                            oNearbyExperimental.PlatoonHandle[refiCurrentPathTarget] = 1
+                                                                        end
+
+
+                                                                        --[[--Amalgamate into this platoon so they attack together - didnt seem to work, presumably need to trnasfer ownership
+                                                                        if not(oNearbyExperimental.PlatoonHandle == oPlatoon) then
+                                                                            MergePlatoons(oPlatoon, oNearbyExperimental.PlatoonHandle)
+                                                                            --Reset our flag for having run as we have extra experimentals now
+                                                                            oPlatoon[refbHavePreviouslyRun] = false
+                                                                        end--]]
+                                                                    end
+                                                                end
+                                                            end
+                                                        end
+                                                    end
                                                 end
                                             else
                                                 --Will lose attack - run
@@ -4780,7 +4822,7 @@ function DeterminePlatoonAction(oPlatoon)
             local sPlatoonName = oPlatoon:GetPlan()
 
             --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' and aiBrain:GetArmyIndex() == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -7428,7 +7470,7 @@ function ProcessPlatoonAction(oPlatoon)
 
             --if oPlatoon[refbACUInPlatoon] == true then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' and aiBrain:GetArmyIndex() == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -7759,7 +7801,7 @@ function ProcessPlatoonAction(oPlatoon)
 
                             --Check we can path to the target?
                             local bCanReachTarget = false
-                            local iOurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tLocation)
+                            local iOurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition(oPlatoon))
                             if oUnitToAttackInstead then
                                 if M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit]) then
                                     --Want to attack a unit but we are underwater; is the target on land and we can path there?

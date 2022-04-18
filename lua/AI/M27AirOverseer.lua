@@ -315,7 +315,7 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearAirUnitAssignmentTrackers'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if M27UnitInfo.GetUnitTechLevel(oAirUnit) == 4 and M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 1 then bDebugMessages = true end
+    --if M27UnitInfo.GetUnitTechLevel(oAirUnit) == 4 and M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 1 then bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oAirUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 1 then bDebugMessages = true end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': oAirUnit=' .. oAirUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAirUnit) .. '; Gametime=' .. GetGameTimeSeconds())
@@ -621,7 +621,7 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
     local sFunctionRef = 'CheckForBetterBomberTargets'
     --bOneOff - if true, then only run this once (e.g. in response to bomb being fired); otherwise will create a loop
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
+    --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code, oBomber=' .. oBomber.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBomber))
         LOG(sFunctionRef .. ': Current target=' .. oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit].UnitId)
@@ -981,7 +981,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
     local sFunctionRef = 'UpdateBomberTargets'
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
+    --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
     local bRemoveCurTarget
     local bHaveMoveCommand = false
@@ -1459,7 +1459,7 @@ end
 function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
     local sFunctionRef = 'DelayedBomberTargetRecheck'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
+    --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
     --if EntityCategoryContains(categories.TECH3, oBomber.UnitId) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
 
     CheckIfTargetHardToHit(oBomber, oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit])
@@ -1612,7 +1612,7 @@ function AirThreatChecker(aiBrain)
     local tEnemyAirUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAir, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
     local tEnemyAirAAUnits, tEnemyAirGroundUnits
 
-    aiBrain[reftNearestEnemyAirThreat] = GetPrimaryEnemyBaseLocation(aiBrain) --Will update below if are any detected threats
+    aiBrain[reftNearestEnemyAirThreat] = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain) --Will update below if are any detected threats
 
     if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then
         tEnemyAirAAUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryAirAA, tEnemyAirUnits)
@@ -1831,7 +1831,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             local iDistanceFromStartForReset = 20 --If unit is this close to start then will reset it if its not on its first assignment/doesnt have a target thats further away
             local iFuelPercent, iHealthPercent, iCurTechLevel
             for iUnit, oUnit in tAllAirOfType do
-                if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
+                --if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
                 bUnitIsUnassigned = false
                 if bDebugMessages == true then
@@ -4012,7 +4012,7 @@ function TellBomberToAttackTarget(oBomber, oTarget, bClearCommands, bAreHoverBom
     local sFunctionRef = 'TellBomberToAttackTarget'
     local aiBrain = oBomber:GetAIBrain()
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
+    --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code for bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' which is attacking oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)) end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 then bDebugMessages = true end
 
@@ -4588,7 +4588,6 @@ function AirBomberManager(aiBrain)
                         elseif bDebugMessages == true then LOG(sFunctionRef..': Have targets from emergency defence and t2 vulnerable mexes so wont look for more targets. iTargetCount='..iTargetCount)
                         end
                     elseif iTechLevel == 4 then
-                        bDebugMessages = true
                         if iAvailableBombers == 1 then
                             tStartPoint = tBombersOfTechLevel[iAvailableBombers]:GetPosition()
                         else
@@ -5054,7 +5053,7 @@ function AirBomberManager(aiBrain)
                         else
                             tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, oBomber:GetPosition())
                         end--]]
-                        if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
+                        --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
                         oNavigator = oBomber:GetNavigator()
                         if oNavigator and oNavigator.GetCurrentTargetPos then
                             tCurTarget = oNavigator:GetCurrentTargetPos()
@@ -6400,9 +6399,9 @@ function GetNovaxTarget(aiBrain, oNovax)
                 local iCurShield, iMaxShield
                 local iLowestShield = 5000
                 for iUnit, oUnit in tNearbyEnemyShields do
-                    iCurShield, iMaxShield = GetCurrentAndMaximumShield(oUnit)
+                    iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                     if iCurShield <= iLowestShield then
-                        if not (M27UnitInfo.IsTargetUnderShield(aiBrain, oUnit, iLowestShield + 1, false, false, false)) then
+                        if not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, iLowestShield + 1, false, false, false)) then
                             oTarget = oUnit
                             iLowestShield = iCurShield
                         end
@@ -6572,7 +6571,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                                     --Dont do mobile shields since risk thinking no mobile shields, then revealing them and aborting attack, then losing intle on the mobile shield and repeating attack; so better to just attack if there's a mobile shield
                                     if M27Utilities.IsTableEmpty(tPossibleShields) == false then
                                         for iShield, oShield in tPossibleShields do
-                                            iCurShieldDistance = M27Utilities:GetDistanceBetweenPositions(oShield:GetPosition(), oUnit:GetPosition()) - oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5
+                                            iCurShieldDistance = M27Utilities.GetDistanceBetweenPositions(oShield:GetPosition(), oUnit:GetPosition()) - oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5
                                             if iCurShieldDistance < iNearestShield then
                                                 iNearestShield = iCurShieldDistance
                                             end

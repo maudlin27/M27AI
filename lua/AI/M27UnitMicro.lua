@@ -1076,7 +1076,7 @@ end
 function HoverBombTarget(aiBrain, oBomber, oTarget)
     --Called if we dont think our bomb will kill the target; call via fork thread
     --See separate xls notes for various different combinations that have tried to get hover-bombing to work.  The range at which a bomber fires it's bomb and the angle is affected by the bomber speed, so the below is an approximate approach that wont always work
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'HoverBombTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -1234,7 +1234,7 @@ end
 
 function TurnAirUnitAndMoveToTarget(aiBrain, oBomber, tDirectionToMoveTo, iMaxAcceptableAngleDif)
     --Based on hoverbomb logic - may give unexpected results if not using with T3 bombers
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'TurnAirUnitAndMoveToTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -1342,7 +1342,7 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
 
     --Called if we dont think our bomb will kill the target; call via fork thread
     --See separate xls notes for various different combinations that have tried to get hover-bombing to work.  The range at which a bomber fires it's bomb and the angle is affected by the bomber speed, so the below is an approximate approach that wont always work
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ExperimentalSAMHitAndRun'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 

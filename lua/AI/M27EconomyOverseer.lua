@@ -263,10 +263,20 @@ function GetUnitReclaimTargets(aiBrain)
         end
     end
 
+    --TML - units are added to a table to be reclaimed when we decide we no longer want to use them
+    if M27Utilities.IsTableEmpty(aiBrain[reftoTMLToReclaim]) == false then
+        for iUnit, oUnit in aiBrain[reftoTMLToReclaim] do
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+                if bDebugMessages == true then LOG(sFunctionRef..': Adding TML unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to list of units to reclaim') end
+            end
+        end
+    end
+
     --TMD if no longer up against TML and have low mass
     if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(M27Overseer.reftEnemyTML) and M27Conditions.HaveLowMass(aiBrain) then
         for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryTMD, false, false) do
-           table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+            table.insert(aiBrain[reftUnitsToReclaim], oUnit)
         end
     end
 

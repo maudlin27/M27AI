@@ -4025,6 +4025,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if M27UnitInfo.IsUnitValid(oLauncher) then
         oLauncher[M27UnitInfo.refbActiveMissileChecker] = true
 
@@ -4111,7 +4112,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                             if GetGameTimeSeconds() - oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] >= 150 and not(M27Utilities.IsTableEmpty(tEnemyTMD)) then
                                 --Reclaim the unit
                                 oLauncher[M27EconomyOverseer.refbWillReclaimUnit] = true
-                                table.insert(M27EconomyOverseer.reftoTMLToReclaim, oLauncher)
+                                table.insert(aiBrain[M27EconomyOverseer.reftoTMLToReclaim], oLauncher)
                             end
                         else
                             --Already set to be reclaimed so just need to check for targets
@@ -4135,6 +4136,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                             oBestTarget[M27EngineerOverseer.refiTMLShotsFired] = (oBestTarget[M27EngineerOverseer.refiTMLShotsFired] or 0) + 1
                         end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iValidTargets='..iValidTargets..'; tTarget='..repr((tTarget or {'nil'}))) end
 
 
 

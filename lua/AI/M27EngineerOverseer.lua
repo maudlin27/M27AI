@@ -1689,6 +1689,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
         if not(bDontHaveBuilder) then M27Utilities.ErrorHandler('oBuilder is nil or has no position but were expecingt one to have been specified') end
         tBuilderPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
         sPathing = M27UnitInfo.refPathingTypeAmphibious
+        iBuilderRange = 0
     end
     if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
 
@@ -1702,7 +1703,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     end
     local fSizeMod = 0.5
     local iNewBuildingRadius = tNewBuildingSize[1] * fSizeMod
-    local iMaxDistanceToBuildWithoutMoving = iBuilderRange + iNewBuildingRadius
+    local iMaxDistanceToBuildWithoutMoving = (iBuilderRange or 0) + iNewBuildingRadius
 
     local iBuilderPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tBuilderPosition)
     --local iCurPathingGroup
@@ -2384,15 +2385,15 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'BuildStructureAtLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if iCategoryToBuild == M27UnitInfo.refCategoryTML then bDebugMessages = true end
 
-    --if iCategoryToBuild == M27UnitInfo.refCategoryTMD then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Engineer UC='..GetEngineerUniqueCount(oEngineer)..'; Engineer LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; Techlevel='..M27UnitInfo.GetUnitTechLevel(oEngineer)..'; tAlternativePositionToLookFrom='..repr(tAlternativePositionToLookFrom or {'nil'})..'; bBuildCheapestStructure='..tostring((bBuildCheapestStructure or false))..'; bNeverBuildRandom='..tostring((bNeverBuildRandom or false))) end
 
 
     local bAbortConstruction = false
 
-                                    --GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFactory, bGetSlowest, bGetFastest, iOptionalCategoryThatMustBeAbleToBuild, bGetCheapest)
+    --GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFactory, bGetSlowest, bGetFastest, iOptionalCategoryThatMustBeAbleToBuild, bGetCheapest)
     local sBlueprintToBuild = M27FactoryOverseer.GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oEngineer, false, false, iOptionalCategoryForStructureToBuild, bBuildCheapestStructure)
 
     --Increase max area to search if dealing with czar or similarly large unit due to its size
@@ -2876,7 +2877,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
         local iEnemyPDThreat = 0
         local tEnemyT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(1000, aiBrain[M27AirOverseer.refiMaxScoutRadius]), 'Enemy')
         local iEnemyT2ArtiCount = 0
-        if M27Utilities.IsTableEmpty(tEnemyT2Arti) == false then iEnemyT2ArtiCount = table.getn(iEnemyT2ArtiCount) end
+        if M27Utilities.IsTableEmpty(tEnemyT2Arti) == false then iEnemyT2ArtiCount = table.getn(tEnemyT2Arti) end
         if M27Utilities.IsTableEmpty(tEnemyPDThreat) == false then
             iEnemyPDThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyPDThreat, true, nil, nil, false, false)
         end
@@ -3230,8 +3231,8 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
         M27Utilities.ErrorHandler('Need to add code for action='..iActionToAssign)
     end
         if iMinTechLevel > 1 then
-        if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
-        else iCategoryToBuild = iCategoryToBuild - categories.TECH1
+    if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
+    else iCategoryToBuild = iCategoryToBuild - categories.TECH1
         end
         end
         return iCategoryToBuild
@@ -3678,7 +3679,7 @@ function IsValidTMLTarget(aiBrain, tStartPos, oTarget, tEnemyTMD)
         local iDistStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPos, oTarget:GetPosition())
         --local iMaxShieldHealth = math.max(0, 6000 - oTarget:GetHealth() * 1.1 - 100) --Decided not to do, since unclear whether the shield could still stop the missile if strong enough - recall when testing mobile shields they could block a missile and survive
         --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
-        if iDistStartToTarget >= iTMLMinMissileRange and iDistStartToTarget <= iTMLMaxMissileRange and not(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, true)) then
+        if iDistStartToTarget >= iTMLMinMissileRange and iDistStartToTarget <= iTMLMissileRange and not(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, true)) then
             local bIsBlockedByTMD = false
             if M27Utilities.IsTableEmpty(tEnemyTMD) == false then
                 local iDistFromStartToTMD
@@ -3688,7 +3689,7 @@ function IsValidTMLTarget(aiBrain, tStartPos, oTarget, tEnemyTMD)
                     iAngleFromStartToTMD = M27Utilities.GetAngleFromAToB(tStartPos, oTMD:GetPosition())
                     iDistFromStartToTMD = M27Utilities.GetDistanceBetweenPositions(tStartPos, oTMD:GetPosition())
                     iDistFromTargetToTMD = M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oTMD:GetPosition())
-                    if IsLineFromAToBInRangeOfCircleAtC(iDistStartToTarget, iDistFromStartToTMD, iDistFromTargetToTMD, M27Utilities.GetAngleFromAToB(tStartPos, oTarget:GetPosition()), iAngleFromStartToTMD, 31) then
+                    if M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iDistStartToTarget, iDistFromStartToTMD, iDistFromTargetToTMD, M27Utilities.GetAngleFromAToB(tStartPos, oTarget:GetPosition()), iAngleFromStartToTMD, 31) then
                         bIsBlockedByTMD = true
                         break
                     end
@@ -3762,9 +3763,9 @@ function RecordPossibleTMLTargets(aiBrain, bForceRefresh)
         aiBrain[refiTimeOfLastTMLTargetRefresh] = GetGameTimeSeconds()
         if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
             local iValidTargets = 0
-            local tEnemyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionUmber], iSearchRange + 31, 'Enemy')
+            local tEnemyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange + 31, 'Enemy')
             for iUnit, oUnit in tPotentialTargets do
-                if IsValidTMLTarget(aiBrain, tStartPos, oUnit, tEnemyTMD) then
+                if IsValidTMLTarget(aiBrain, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit, tEnemyTMD) then
                     iValidTargets = iValidTargets + 1
                     aiBrain[reftoTMLTargetsOfInterest][iValidTargets] = oUnit
                 end
@@ -3928,8 +3929,8 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
 
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
-        --if GetEngineerUniqueCount(oEngineer) == 71 and GetGameTimeSeconds() >= 750 then bDebugMessages = true end
-    --if iActionToAssign == refActionBuildExperimental then bDebugMessages = true end
+    --if iActionToAssign == refActionBuildTML then bDebugMessages = true end
+    --if GetEngineerUniqueCount(oEngineer) == 71 and GetGameTimeSeconds() >= 750 then bDebugMessages = true end
 
 
     if oEngineer then
@@ -4088,6 +4089,8 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             elseif iActionToAssign == refActionBuildSMD then
                                 iCatToBuildBy = M27UnitInfo.refCategoryT3Power
                                 iMaxAreaToSearch = 70
+                            elseif iActionToAssign == refActionBuildTML then
+                                --Use default values
                             elseif iActionToAssign == refActionBuildTMD then
                                 --Will use custom logic
                                 iMaxAreaToSearch = 20
@@ -4105,15 +4108,15 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                         if M27Utilities.IsTableEmpty(oTempUnit[M27UnitInfo.reftTMLThreats]) == false then
                                             if bDebugMessages == true then LOG(sFunctionRef..': oTempUnit has some TML threats identified, will get the first valid TML and use that as the one we want to protect from') end
                                             for sTMLRef, oTML in tAssumedUnitWantingProtection[1][M27UnitInfo.reftTMLThreats] do
-                                               if M27UnitInfo.IsUnitValid(oTML) then
-                                                   if bDebugMessages == true then LOG(sFunctionRef..': Have TML '..oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)..' that is still valid identified, will see if we have TMD protecting from it') end
-                                                   --Do we already have a valid TMD that protects from this?
-                                                   if not(oTempUnit[M27UnitInfo.reftTMLDefence] and M27UnitInfo.IsUnitValid(oTempUnit[M27UnitInfo.reftTMLDefence][oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)])) then
+                                                if M27UnitInfo.IsUnitValid(oTML) then
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Have TML '..oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)..' that is still valid identified, will see if we have TMD protecting from it') end
+                                                    --Do we already have a valid TMD that protects from this?
+                                                    if not(oTempUnit[M27UnitInfo.reftTMLDefence] and M27UnitInfo.IsUnitValid(oTempUnit[M27UnitInfo.reftTMLDefence][oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)])) then
                                                         tLocationToMoveTowards = oTML:GetPosition()
-                                                       if bDebugMessages == true then LOG(sFunctionRef..': We arent protected from this TML so returning its position, tLocationToMoveTowards='..repr(tLocationToMoveTowards)) end
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': We arent protected from this TML so returning its position, tLocationToMoveTowards='..repr(tLocationToMoveTowards)) end
                                                         break
-                                                   end
-                                               end
+                                                    end
+                                                end
                                             end
                                         end
                                     end
@@ -4159,8 +4162,8 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 oUnitToBuildBy = oActionTargetObject
                                 if oUnitToBuildBy[refbNeedsLargeShield] then iCategoryToBuild = M27UnitInfo.refCategoryFixedShield * categories.TECH3 end
                             else
-                                M27Utilities.ErrorHandler('Need to add code for action='..iActionToAssign)
-                                bConstructBuilding = false
+                                M27Utilities.ErrorHandler('Need to add code for action='..iActionToAssign..'; will assume will use default values and have something to build')
+                                --bConstructBuilding = false
                             end
                         end
                         if bAbort then
@@ -4179,7 +4182,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                     if not(tTargetLocation) then tTargetLocation = oEngineer:GetPosition() end
                                 else
                                     --Build the first structure (including for queueupmultiple where not using special logic
-                                                    --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild, bBuildCheapestStructure)
+                                    --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild, bBuildCheapestStructure)
                                     if bDebugMessages == true then LOG(sFunctionRef..': About to tell engineer to build the category using the location '..repr(tTargetLocation)..' as a starting point') end
                                     tTargetLocation = BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tTargetLocation, nil, nil, oUnitToBuildBy, nil, nil,  bBuildCheapest)
                                     if M27Utilities.IsTableEmpty(tTargetLocation) == true and iActionToAssign == refActionBuildShield then
@@ -4698,8 +4701,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetActionTargetAndObject'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if iActionRefToAssign == refActionBuildTMD then bDebugMessages = true end
-    --if iActionRefToAssign == refActionBuildTMD then bDebugMessages = true end
+    --if iActionRefToAssign == refActionBuildTML then bDebugMessages = true end
 
 
 
@@ -5050,7 +5052,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                     if iActionRefToAssign == refActionBuildMex or iActionRefToAssign == refActionBuildMassStorage or iActionRefToAssign == refActionBuildTMD then
                         --Find the nearest unassigned engineer
                         --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore, iMaxRangeForPrevEngi, iMaxRangeForNearestEngi, bOnlyGetIdleEngis, bGetInitialEngineer)
-                                        --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore, iMaxRangeForPrevEngi, iMaxRangeForNearestEngi, bOnlyGetIdleEngis, bGetInitialEngineer, iMinTechLevelWanted)
+                        --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore, iMaxRangeForPrevEngi, iMaxRangeForNearestEngi, bOnlyGetIdleEngis, bGetInitialEngineer, iMinTechLevelWanted)
                         oNearestEngineer = GetNearestEngineerWithLowerPriority(aiBrain, tIdleEngineers, iActionPriority, tLocation, iActionRefToAssign, tsUnitStatesToIgnoreCurrent, iSearchRangeForPrevEngi, iSearchRangeForNearestEngi, bOnlyReassignIdle, bGetInitialEngineer, iMinTechLevelWanted)
                         if oNearestEngineer and oNearestEngineer.GetPosition then
                             if bDebugMessages == true then LOG(sFunctionRef..': Found an engi '..oNearestEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestEngineer)..' UC'..GetEngineerUniqueCount(oNearestEngineer)..' near to the mex, so will use this as the base position to see how close the mex is to it') end
@@ -5126,7 +5128,7 @@ function UpdateShieldingToDefendAgainstArti(aiBrain)
                     end
 
                     if bAddToTableOfUnitsWantingShielding then
-                        table.insert(aiBrain[reftUnitsWantingFixedShield])
+                        table.insert(aiBrain[reftUnitsWantingFixedShield], oUnit)
                         oUnit[refbNeedsLargeShield] = true
                     end
                 end
@@ -6405,14 +6407,16 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             else
                                 RecordPossibleTMLTargets(aiBrain, false)
-                                if M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]) == false and tab.elgetn(aiBrain[reftoTMLTargetsOfInterest]) >= 3 then
+                                if M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]) == false and table.getn(aiBrain[reftoTMLTargetsOfInterest]) >= 3 then
                                     tExistingLocationsToPickFrom = {}
                                     tExistingLocationsToPickFrom[1] = GetTMLBuildLocation(aiBrain)
-                                    if M27Utilities.IsTableEmpty(tLocationToUse) == false then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': TML build location in tExistingLocationsToPickFrom='..repr(tExistingLocationsToPickFrom)) end
+                                    if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom[1]) == false then
                                         iActionToAssign = refActionBuildTML
                                         iMinEngiTechLevelWanted = 2
                                         iMaxEngisWanted = 3
                                         if bHaveLowMass then iMaxEngisWanted = 2 end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will try to build TML.  Available engineers='..repr(tiAvailableEngineersByTech)) end
                                     end
                                 end
                             end
