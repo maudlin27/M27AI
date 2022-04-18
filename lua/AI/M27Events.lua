@@ -174,6 +174,15 @@ function OnUnitDeath(oUnit)
                                 if M27UnitInfo.IsUnitValid(oUnit) then table.insert(tUnitsWantingTMD, oUnit) end
                             end
                             if M27Utilities.IsTableEmpty(tUnitsWantingTMD) == false then M27Logic.DetermineTMDWantedForUnits(aiBrain, tUnitsWantingTMD) end
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, sUnitBP) then
+                            if (oUnit.Sync.totalMassKilled or 0) >= 800 then
+                                aiBrain[M27EngineerOverseer.refiTimeOfLastFailedTML] = nil
+                            else
+                                local iTime = GetGameTimeSeconds()
+                                aiBrain[M27EngineerOverseer.refiTimeOfLastFailedTML] = iTime
+                                --Reset after 5m (unless another TML dies between now and then)
+                                M27Utilities.DelayChangeVariable(aiBrain, M27EngineerOverseer.refiTimeOfLastFailedTML, nil, 300, M27EngineerOverseer.refiTimeOfLastFailedTML, iTime + 0.01, nil, nil)
+                            end
                         end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then

@@ -60,6 +60,7 @@ refActionBuildAA = 32
 refActionBuildEmergencyPD = 33
 refActionBuildSecondLandFactory = 34
 refActionBuildSecondAirFactory = 35
+refActionBuildTML = 36
 tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees}
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 --ALSO update the actions noted in RefreshT3ArtiAdjacencyLocations as being ones that can ignore when deciding whether to clear existing engineer commands
@@ -142,6 +143,16 @@ refbHaveUnitsWantingHeavyShield = 'M27EngineerHaveUnitsWantingHeavyShield' --set
 
 --TMD
 reftUnitsWantingTMD = 'M27EngineerUnitsWantingTMD' --[key] is the UnitId..LifetimeCount; returns the unit object
+
+--TML
+reftoTMLTargetsOfInterest = 'M27EngineerTMLTargetsOfInterest' --General targets based on our base rather than a specific TML we have (used to decide if want to build a TML)
+refiTimeOfLastTMLTargetRefresh = 'M27EngineerTimeOfLastTMLTargetRefresh' --Time we last refreshed the targetsofinterest
+refiTMLShotsFired = 'M27EngineerTMLShotsFired' --times we have fired TML at a unit
+iTMLMissileRange = 256 --e.g. use if dont have access to a unit blueprint
+iTMLMinMissileRange = 15
+refiFirstTimeNoTargetsAvailable = 'M27EngineerFirstTimeNoTargetsAvailable' --For TML - Gametimeseconds so if its been a while of having no targets we can reclaim
+refiTimeOfLastFailedTML = 'M27EngineerTimeLastFailedTML' --GameTime that TML died doing minimal damage
+iTMLHighPriorityCategories = M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryT3Mex * categories.CYBRAN + M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryTML + M27UnitInfo.refCategorySML + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Radar
 
 
 --local refoCurrentlyGuarding = 'M27CurrentlyGuarding' -- Unit object stored on a particular unit when its guarding another
@@ -1624,7 +1635,7 @@ function AreMobileUnitsInRect(rRectangleToSearch, bOnlyLookForMobileLand)
     return bAreUnits
 end
 
-function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride, bAlreadyRecheckedPathing)
+function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, bForcedDebug, iOptionalMaxCycleOverride, bAlreadyRecheckedPathing, bDontHaveBuilder)
     --Returns nil if cant find anywhere
     --tries finding somewhere with enough space to build sBuildingBPToBuild - e.g. to be used as a backup when fail to find adjacency location
     --Can also be used for general movement
@@ -1667,15 +1678,19 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     local iCurPriority = 0
     local iMaxPriority = -1000000
     local tBuilderPosition
-    local oBuilderBP, iBuilderRange
+    local oBuilderBP, iBuilderRange, sPathing
+
     if oBuilder and oBuilder.GetPosition then
         tBuilderPosition = oBuilder:GetPosition()
         oBuilderBP = oBuilder:GetBlueprint()
         if oBuilderBP.Economy and oBuilderBP.Economy.MaxBuildDistance then iBuilderRange = oBuilderBP.Economy.MaxBuildDistance end
+        sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
     else
-        M27Utilities.ErrorHandler('oBuilder is nil or has no position')
+        if not(bDontHaveBuilder) then M27Utilities.ErrorHandler('oBuilder is nil or has no position but were expecingt one to have been specified') end
         tBuilderPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        sPathing = M27UnitInfo.refPathingTypeAmphibious
     end
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
 
 
     local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
@@ -1688,9 +1703,8 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     local fSizeMod = 0.5
     local iNewBuildingRadius = tNewBuildingSize[1] * fSizeMod
     local iMaxDistanceToBuildWithoutMoving = iBuilderRange + iNewBuildingRadius
-    local sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
-    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
-    local iBuilderPathingGroup = M27MapInfo.GetUnitSegmentGroup(oBuilder)
+
+    local iBuilderPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tBuilderPosition)
     --local iCurPathingGroup
     --local iCurSegmentX, iCurSegmentZ
     local iGroupCycleCount = 0
@@ -1720,7 +1734,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
         if iGroupCycleCount > iMaxCycles then
             if iMaxCycles >= iCycleAbortCount then --Sometimes we may be ok with not finding anywhere to build, e.g. for rally points
                 M27Utilities.ErrorHandler('Possible infinite loop - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax..'; aiBrain index='..aiBrain:GetArmyIndex()..'; start number='..aiBrain.M27StartPositionNumber..'; sBlueprintToBuild='..(sBlueprintToBuild or 'nil')..'; Builder='..oBuilder.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBuilder)..'; UC='..GetEngineerUniqueCount(oBuilder)..'; will check pathing and rerun if pathing changes if not already checked, bAlreadyRecheckedPathing='..tostring(bAlreadyRecheckedPathing or false))
-                if not(bAlreadyRecheckedPathing) and M27MapInfo.RecheckPathingOfLocation(sPathing, oBuilder, tStartPosition, nil) then
+                if not(bAlreadyRecheckedPathing) and M27UnitInfo.IsUnitValid(oBuilder) and M27MapInfo.RecheckPathingOfLocation(sPathing, oBuilder, tStartPosition, nil) then
                     LOG(sFunctionRef..': Pathing was incorrect and has now changed so will refun function')
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     return FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, false, nil, true)
@@ -3181,6 +3195,8 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
         iCategoryToBuild = refCategoryAirStaging
     elseif iActionToAssign == refActionBuildSMD then
         iCategoryToBuild = M27UnitInfo.refCategorySMD
+    elseif iActionToAssign == refActionBuildTML then
+        iCategoryToBuild = M27UnitInfo.refCategoryTML
     elseif iActionToAssign == refActionBuildTMD then
         iCategoryToBuild = M27UnitInfo.refCategoryTMD
     elseif iActionToAssign == refActionBuildT1Radar then
@@ -3204,7 +3220,7 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
     elseif iActionToAssign == refActionBuildT2Sonar then
         iCategoryToBuild = M27UnitInfo.refCategoryT2Sonar
     elseif iActionToAssign == refActionBuildShield then
-    --NOTE: Separately this gets changed to tech3 if need increased range
+        --NOTE: Separately this gets changed to tech3 if need increased range
         if not(aiBrain[M27Overseer.refbDefendAgainstArti]) then
             iCategoryToBuild = M27UnitInfo.refCategoryFixedShield * categories.TECH2
         else
@@ -3213,12 +3229,12 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
     else
         M27Utilities.ErrorHandler('Need to add code for action='..iActionToAssign)
     end
-    if iMinTechLevel > 1 then
+        if iMinTechLevel > 1 then
         if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
         else iCategoryToBuild = iCategoryToBuild - categories.TECH1
         end
-    end
-    return iCategoryToBuild
+        end
+        return iCategoryToBuild
 end
 
 function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpgrade)
@@ -3655,6 +3671,106 @@ function GetLikelySMLTarget(aiBrain, oSML)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tLikelyTarget, iBestDamage
+end
+
+function IsValidTMLTarget(aiBrain, tStartPos, oTarget, tEnemyTMD)
+    if M27UnitInfo.IsUnitValid(oTarget) and oTarget:GetFractionComplete() >= 0.5 and (oTarget[refiTMLShotsFired] or 0) == 0 and (oTarget[M27AirOverseer.refiStrikeDamageAssigned] or 0) == 0 then
+        local iDistStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPos, oTarget:GetPosition())
+        --local iMaxShieldHealth = math.max(0, 6000 - oTarget:GetHealth() * 1.1 - 100) --Decided not to do, since unclear whether the shield could still stop the missile if strong enough - recall when testing mobile shields they could block a missile and survive
+        --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
+        if iDistStartToTarget >= iTMLMinMissileRange and iDistStartToTarget <= iTMLMaxMissileRange and not(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, true)) then
+            local bIsBlockedByTMD = false
+            if M27Utilities.IsTableEmpty(tEnemyTMD) == false then
+                local iDistFromStartToTMD
+                local iAngleFromStartToTMD
+                local iDistFromTargetToTMD
+                for iTMD, oTMD in tEnemyTMD do
+                    iAngleFromStartToTMD = M27Utilities.GetAngleFromAToB(tStartPos, oTMD:GetPosition())
+                    iDistFromStartToTMD = M27Utilities.GetDistanceBetweenPositions(tStartPos, oTMD:GetPosition())
+                    iDistFromTargetToTMD = M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oTMD:GetPosition())
+                    if IsLineFromAToBInRangeOfCircleAtC(iDistStartToTarget, iDistFromStartToTMD, iDistFromTargetToTMD, M27Utilities.GetAngleFromAToB(tStartPos, oTarget:GetPosition()), iAngleFromStartToTMD, 31) then
+                        bIsBlockedByTMD = true
+                        break
+                    end
+                end
+            end
+
+
+            if bIsBlockedByTMD == false then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function GetTMLBuildLocation(aiBrain)
+    --Returns nil if cant find at least 2 valid TML targets
+    if GetGameTimeSeconds() - (aiBrain[refiTimeOfLastTMLTargetRefresh] or -100) > 1 then
+        RecordPossibleTMLTargets(aiBrain)
+    end
+    local tStartPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    if M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]) == false and table.getn(aiBrain[reftoTMLTargetsOfInterest]) >= 2 then
+        local oNearestTargetOfInterest = M27Utilities.GetNearestUnit(aiBrain[reftoTMLTargetsOfInterest], tStartPos, aiBrain)
+        if M27UnitInfo.IsUnitValid(oNearestTargetOfInterest) then
+            --Get rough build location so can look for enemies in range of it
+            local iInitialDistanceFromBase = math.max(math.min(M27Utilities.GetDistanceBetweenPositions(oNearestTargetOfInterest:GetPosition(), tStartPos) - 100, 125), 25)
+            local iAngleToFirstTarget = M27Utilities.GetAngleFromAToB(tStartPos, oNearestTargetOfInterest:GetPosition())
+            local tPositionToCheckForBuildingLocation = M27Utilities.MoveTowardsTarget(tStartPos, oNearestTargetOfInterest:GetPosition(), iInitialDistanceFromBase, iAngleToFirstTarget)
+            local tLikelyBuildLocation = FindRandomPlaceToBuild(aiBrain, nil, tPositionToCheckForBuildingLocation, 'ueb2108', 0, 8, false, nil, true, true)
+            if M27Utilities.IsTableEmpty(tLikelyBuildLocation) == false then
+                local iTargetsInRange = 0
+                local toTargetsInRange = {}
+                local iDistHeadroom = 10000
+                local tEnemyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, tLikelyBuildLocation, iTMLMissileRange + 30, 'Enemy')
+                for iTarget, oTarget in aiBrain[reftoTMLTargetsOfInterest] do
+                    if IsValidTMLTarget(aiBrain, tStartPos, oTarget, tEnemyTMD) then
+                        iTargetsInRange = iTargetsInRange + 1
+                        toTargetsInRange[iTargetsInRange] = oTarget
+                        iDistHeadroom = math.min(iDistHeadroom, iTMLMissileRange, M27Utilities.GetDistanceBetweenPositions(tStartPos, oTarget:GetPosition()))
+                    end
+                end
+                if iTargetsInRange < 2 then
+                    return nil
+                else
+                    --Can the build position be moved closer to base while keeping within range?
+                    if iDistHeadroom > 2 and iDistHeadroom < iTMLMissileRange then
+                        --Move in a line starting closest towards our base and moving towards the location found
+                        local tPossibleBuildLocation
+                        local iAngleToLocation = M27Utilities.GetAngleFromAToB(tStartPos, tLikelyBuildLocation)
+                        local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tStartPos)
+                        local iMaxDist = M27Utilities.GetDistanceBetweenPositions(tStartPos, tLikelyBuildLocation)
+                        for iDistAdjust = -(iDistHeadroom - 1), -2, 2 do
+                            tPossibleBuildLocation = M27Utilities.MoveInDirection(tStartPos, iAngleToLocation, iMaxDist + iDistAdjust, true)
+                            if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossibleBuildLocation) == iPathingGroupWanted and CanBuildAtLocation(aiBrain, 'ueb2108', tPossibleBuildLocation, nil, false, true)  then
+                                return tPossibleBuildLocation
+                            end
+                        end
+                    end
+                    return tLikelyBuildLocation
+                end
+            end
+        end
+    end
+end
+
+function RecordPossibleTMLTargets(aiBrain, bForceRefresh)
+    if bForceRefresh or GetGameTimeSeconds() - (aiBrain[refiTimeOfLastTMLTargetRefresh] or -100) >= 10 then
+        local iSearchRange = iTMLMissileRange + math.min(125, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)
+        local tPotentialTargets = aiBrain:GetUnitsAroundPoint(iTMLHighPriorityCategories, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Enemy')
+        aiBrain[reftoTMLTargetsOfInterest] = {}
+        aiBrain[refiTimeOfLastTMLTargetRefresh] = GetGameTimeSeconds()
+        if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
+            local iValidTargets = 0
+            local tEnemyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionUmber], iSearchRange + 31, 'Enemy')
+            for iUnit, oUnit in tPotentialTargets do
+                if IsValidTMLTarget(aiBrain, tStartPos, oUnit, tEnemyTMD) then
+                    iValidTargets = iValidTargets + 1
+                    aiBrain[reftoTMLTargetsOfInterest][iValidTargets] = oUnit
+                end
+            end
+        end
+    end
 end
 
 function CheckForEnemySMD(aiBrain, oSML)
@@ -6275,7 +6391,35 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 M27Utilities.DrawLocation(tExistingLocationsToPickFrom[1], nil, 1, 100)
                             end
                         end
-                    elseif iCurrentConditionToTry == 22 then --T3 mexes in place of existing T2 mexes
+                    elseif iCurrentConditionToTry == 22 then --TML if think enough targets
+                        if iHighestFactoryOrEngineerTechAvailable >= 2 and not(aiBrain[refiTimeOfLastFailedTML]) and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= aiBrain[M27AirOverseer.refiBomberDefenceModDistance] and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML) == 0 or M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) == false) then
+                            if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) == false then
+                                iActionToAssign = refActionBuildTML
+                                iMinEngiTechLevelWanted = 2
+                                iMaxEngisWanted = 3
+                                if bHaveLowMass then iMaxEngisWanted = 2 end
+                                for iEntry, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML] do
+                                    tExistingLocationsToPickFrom = {}
+                                    tExistingLocationsToPickFrom[1] = tSubtable[refEngineerAssignmentActualLocation]
+                                    break
+                                end
+                            else
+                                RecordPossibleTMLTargets(aiBrain, false)
+                                if M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]) == false and tab.elgetn(aiBrain[reftoTMLTargetsOfInterest]) >= 3 then
+                                    tExistingLocationsToPickFrom = {}
+                                    tExistingLocationsToPickFrom[1] = GetTMLBuildLocation(aiBrain)
+                                    if M27Utilities.IsTableEmpty(tLocationToUse) == false then
+                                        iActionToAssign = refActionBuildTML
+                                        iMinEngiTechLevelWanted = 2
+                                        iMaxEngisWanted = 3
+                                        if bHaveLowMass then iMaxEngisWanted = 2 end
+                                    end
+                                end
+                            end
+
+                        end
+
+                    elseif iCurrentConditionToTry == 23 then --T3 mexes in place of existing T2 mexes
                         if iHighestFactoryOrEngineerTechAvailable >= 3 then
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if shoudl assign action to ctrlK mex. Is tMexesToCtrlK empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftMexesToCtrlK]))..'; Existing engi assignments='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildT3MexOverT2]))) end
                             if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
@@ -6363,7 +6507,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 23 then --Queue up an experimental if we have significant mass as it may take time to find the right position
+                    elseif iCurrentConditionToTry == 24 then --Queue up an experimental if we have significant mass as it may take time to find the right position
                         if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
                         if not(bHaveLowPower) and not(bHaveLowMass) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7 and iMassStored >= 1000 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 1 and iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7 and (not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, 1)) or (aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 10 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 14)) then
                             --Have the resources to build an experimental - is it safe to do so?
@@ -6376,7 +6520,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 iMinEngiTechLevelWanted = 3
                             end
                         end
-                    elseif iCurrentConditionToTry == 24 then --Build factories (or upgrade HQ) if getting too much mass
+                    elseif iCurrentConditionToTry == 25 then --Build factories (or upgrade HQ) if getting too much mass
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; bHaveVeryLowPower='..tostring(bHaveVeryLowPower)) end
                         if bHaveVeryLowPower == false and bHaveLowMass == false then
                             if iLandFactories == nil then
@@ -6467,7 +6611,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
 
                         end
-                    elseif iCurrentConditionToTry == 25 then --Air staging if we need one for low fuel air units
+                    elseif iCurrentConditionToTry == 26 then --Air staging if we need one for low fuel air units
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..': bHaveLowPower='..tostring(bHaveLowPower)..'; aiBrain[M27AirOverseer.refiAirStagingWanted]='..(aiBrain[M27AirOverseer.refiAirStagingWanted] or 'nil')) end
                         if bHaveLowPower == false and aiBrain[M27AirOverseer.refiAirStagingWanted] and aiBrain[M27AirOverseer.refiAirStagingWanted] > 0 then
                             local iCurAirStaging = aiBrain:GetCurrentUnits(refCategoryAirStaging)
@@ -6482,7 +6626,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
                         end
                         --end
-                    elseif iCurrentConditionToTry == 26 then --Energy storage once have certain level of power
+                    elseif iCurrentConditionToTry == 27 then --Energy storage once have certain level of power
                         if bHaveLowPower == false then
                             if iGrossCurEnergyIncome >= 28 then
                                 if iEnergyStoredRatio == nil then iEnergyStoredRatio = aiBrain:GetEconomyStoredRatio('ENERGY') end
@@ -6516,7 +6660,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 27 then --Get reclaim
+                    elseif iCurrentConditionToTry == 28 then --Get reclaim
                         bThresholdPreReclaimEngineerCondition = true
 
                         if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
@@ -6531,13 +6675,13 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 iSearchRangeForNearestEngi = 10000
                             end
                         end
-                    elseif iCurrentConditionToTry == 28 then
+                    elseif iCurrentConditionToTry == 29 then
                         if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftUnitsToReclaim]) == false then
                             iActionToAssign = refActionReclaimUnit
                             iMaxEngisWanted = math.min(4, table.getn(aiBrain[M27EconomyOverseer.reftUnitsToReclaim]))
                             iSearchRangeForNearestEngi = 200
                         end
-                    elseif iCurrentConditionToTry == 29 then --Try to get nearest unclaimed mex (i.e. this will only run if are no mexes within defensive area or our side of map):
+                    elseif iCurrentConditionToTry == 30 then --Try to get nearest unclaimed mex (i.e. this will only run if are no mexes within defensive area or our side of map):
                         if iAllUnclaimedMexesInPathingGroup == nil then
                             tAllUnclaimedMexesInPathingGroup = GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, false, false, false)
                             if M27Utilities.IsTableEmpty(tAllUnclaimedMexesInPathingGroup) == false then iAllUnclaimedMexesInPathingGroup = table.getn(tAllUnclaimedMexesInPathingGroup)
@@ -6551,7 +6695,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and iMaxEngisWanted > 3 then iMaxEngisWanted = 3 end
                             tExistingLocationsToPickFrom = tAllUnclaimedMexesInPathingGroup
                         end
-                    elseif iCurrentConditionToTry == 30 then --2nd T1 power construction with low priority engineers
+                    elseif iCurrentConditionToTry == 31 then --2nd T1 power construction with low priority engineers
                         if bHaveVeryLowPower == false and bHaveLowMass == false then --If almost power stalling then want to focus on the first T1 power rather than trying multiple at once
                             if bDebugMessages == true then LOG(sFunctionRef..': Separate power action; bWantMorePower='..tostring(bWantMorePower)) end
                             if iT3Power == nil then iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower * categories.TECH3) end
@@ -6569,7 +6713,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 31 then --Radar near base
+                    elseif iCurrentConditionToTry == 32 then --Radar near base
                         if bHaveLowPower == false then
                             if iCurRadarCount == nil then iCurRadarCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryRadar) end
                             if iCurRadarCount == 0 and iNetCurEnergyIncome > 5 and iEnergyStored >= 2000 then
@@ -6618,7 +6762,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 32 then --Shields
+                    elseif iCurrentConditionToTry == 33 then --Shields
                         if bHaveLowPower == false and bHaveLowMass == false and (iHighestFactoryOrEngineerTechAvailable >= 3 or (not(aiBrain[M27Overseer.refbDefendAgainstArti]) and not(aiBrain[refbHaveUnitsWantingHeavyShield]) and iHighestFactoryOrEngineerTechAvailable >= 2)) and M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingFixedShield]) == false then
                             --Refresh table of units wanting a shield to make sure its correct
                             RefreshUnitsWantingFixedShields(aiBrain)
@@ -6633,13 +6777,13 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 33 then --reclaim on enemy side of map
+                    elseif iCurrentConditionToTry == 34 then --reclaim on enemy side of map
                         if iMassStoredRatio <= 0.25 and aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3] > 0 then
                             iActionToAssign = refActionReclaimArea
                             iMaxEngisWanted = math.min(15, math.max(1, math.min(math.ceil(aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1] * 0.5 + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][2] * 0.3 + aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][3] * 0.1))))
                             iSearchRangeForNearestEngi = 10000
                         end
-                    elseif iCurrentConditionToTry == 34 then --Assist air
+                    elseif iCurrentConditionToTry == 35 then --Assist air
                         if bHaveLowPower == false and aiBrain:GetEconomyStoredRatio('Energy') >= 0.99 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 15 then
                             if iAirFactories == nil then
                                 iAirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory)
@@ -6662,7 +6806,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 iSearchRangeForNearestEngi = 75
                             end
                         end
-                    elseif iCurrentConditionToTry == 35 then --Sonar
+                    elseif iCurrentConditionToTry == 36 then --Sonar
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if we want sonar, aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 1)='..tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryTorpBomber, 1))) end
                         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then
                             --Want sonar if we have built at least 1 torp bomber, or if we have a naval factory, or if we have a T3 air factory (broader range of conditions to help reduce risk of unit restrictions interfering)
@@ -6686,7 +6830,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 36 then --More reclaim (lower priority locations)
+                    elseif iCurrentConditionToTry == 37 then --More reclaim (lower priority locations)
                         if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; iMassStoredRatio='..iMassStoredRatio..'; M27MapInfo.iMapTotalMass='..M27MapInfo.iMapTotalMass..'; aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]='..aiBrain[M27MapInfo.refiTotalReclaimAreasOfInterestByPriority][1]) end
                         if iMassStoredRatio < 0.98 then
@@ -6700,7 +6844,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Reclaim: iMaxEngisWanted='..iMaxEngisWanted) end
                             end
                         end
-                    elseif iCurrentConditionToTry == 37 then --Experimental if have loads of mass or satisfy other tests; one of these will be if we ahve already started on an experimental
+                    elseif iCurrentConditionToTry == 38 then --Experimental if have loads of mass or satisfy other tests; one of these will be if we ahve already started on an experimental
                         if iHighestFactoryOrEngineerTechAvailable >= 3 then --at least 250 gross income ignoring reclaim
                             if aiBrain:GetEconomyStored('MASS') >= 10000 or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandEarly and aiBrain:GetEconomyStored('MASS') >= 8000) or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and aiBrain:GetEconomyStored('MASS') >= 4000 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] >= 1 and bHaveLowPower == false and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7) then
                                 iActionToAssign = refActionBuildExperimental
@@ -6744,7 +6888,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         --SPARE ACTIONS BELOW
                     else
                         bAreOnSpareActions = true
-                        if iCurrentConditionToTry == 38 then
+                        if iCurrentConditionToTry == 39 then
                             if bHaveVeryLowPower == false and bHaveLowMass == false then
                                 if bWantMorePower then
                                     if iHighestFactoryOrEngineerTechAvailable == 1 then
@@ -6789,7 +6933,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 39 then
+                        elseif iCurrentConditionToTry == 40 then
                             if bHaveLowMass == false and bHaveLowPower == false then
                                 if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                                 if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
@@ -6799,12 +6943,12 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     iMaxEngisWanted = 10
                                 end
                             end
-                        elseif iCurrentConditionToTry == 40 then
+                        elseif iCurrentConditionToTry == 41 then
                             if bHaveLowMass == false and iHighestFactoryOrEngineerTechAvailable == 1 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
                                 iActionToAssign = refActionBuildThirdPower
                                 iMaxEngisWanted = 4
                             end
-                        elseif iCurrentConditionToTry == 41 then
+                        elseif iCurrentConditionToTry == 42 then
                             if bHaveLowMass == false and bHaveLowPower == false then
                                 iMaxEngisWanted = 10
                                 if (iMassStoredRatio > 0.6 or iMassStored > 12000) then --About to overflow so try to build something
@@ -6840,7 +6984,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
                             end
-                        elseif iCurrentConditionToTry == 42 then
+                        elseif iCurrentConditionToTry == 43 then
                             --If about to overflow mass then build a second factory unless we arent using existing factories
                             if bHaveLowMass == false and bHaveLowPower == false and iMassStoredRatio >= 0.7 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStored('ENERGY') >= 0.99 and aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] == 0 then
                                 if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then

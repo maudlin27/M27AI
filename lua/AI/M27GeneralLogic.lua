@@ -9,6 +9,7 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
+local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
 refiNearestEnemyIndex = 'M27NearestEnemyIndex'
@@ -4013,6 +4014,11 @@ function IsSMDBlockingTarget(aiBrain, tTarget, tSMLPosition, iIgnoreSMDCreatedTh
     return bEnemySMDInRange
 end
 
+function RecheckForTMLMissileTarget(aiBrain, oLauncher)
+    --Call via fork thread - called if couldnt find any targets for TML
+    WaitSeconds(30)
+    if M27UnitInfo.IsUnitValid(oLauncher) then ConsiderLaunchingMissile(oLauncher) end
+end
 
 function ConsiderLaunchingMissile(oLauncher, oWeapon)
     --Should be called via forkthread when missile created due to creating a loop
@@ -4043,14 +4049,98 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
             iAOE, iDamage, iMinRange, iMaxRange = M27UnitInfo.GetLauncherAOEStrikeDamageMinAndMaxRange(oLauncher)
 
             if bTML then
-                tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Mex}
-            else
+                --tEnemyCategoriesOfInterest = M27EngineerOverseer.iTMLHighPriorityCategories
+            else --SML
                 tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure}
             end
             if bDebugMessages == true then LOG(sFunctionRef..': Will consider missile target. iMinRange='..(iMinRange or 'nil')..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')..'; bSML='..tostring((bSML or false))) end
 
             while M27UnitInfo.IsUnitValid(oLauncher) do
                 if bTML then
+                    local tHighHealthTargets = {}
+                    local tStartPos = oLauncher:GetPosition()
+                    local tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27EngineerOverseer.iTMLHighPriorityCategories, tStartPos, iMaxRange, 'Enemy')
+                    local tEnemyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, tStartPos, iMaxRange + 30, 'Enemy')
+                    local iValidTargets = 0
+                    local tValidTargets = {}
+                    local oBestTarget
+                    if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
+                        for iUnit, oUnit in tPotentialTargets do
+                            if M27EngineerOverseer.IsValidTMLTarget(aiBrain, tStartPos, oUnit, tEnemyTMD) then
+                                iValidTargets = iValidTargets + 1
+                                tValidTargets[iValidTargets] = oUnit
+                            end
+                        end
+                    end
+                    if iValidTargets == 0 then
+                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH2 + M27UnitInfo.refCategoryStructure * categories.TECH3 - M27EngineerOverseer.iTMLHighPriorityCategories -M27UnitInfo.refCategoryTMD, tStartPos, iMaxRange, 'Enemy')
+                        if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
+                            for iUnit, oUnit in tPotentialTargets do
+                                if oUnit:GetHealth() <= 6000 then
+                                    if M27EngineerOverseer.IsValidTMLTarget(aiBrain, tStartPos, oUnit, tEnemyTMD) then
+                                        iValidTargets = iValidTargets + 1
+                                        tValidTargets[iValidTargets] = oUnit
+                                    end
+                                else
+                                    table.insert(tHighHealthTargets, oUnit)
+                                end
+                            end
+                        end
+                        if iValidTargets == 0 then
+                            --Target valid high health targets
+                            if M27Utilities.IsTableEmpty(tHighHealthTargets) == false then
+                                for iUnit, oUnit in tHighHealthTargets do
+                                    if M27EngineerOverseer.IsValidTMLTarget(aiBrain, tStartPos, oUnit, tEnemyTMD) then
+                                        iValidTargets = iValidTargets + 1
+                                        tValidTargets[iValidTargets] = oUnit
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    if iValidTargets == 0 then
+                        if not(oLauncher[M27EconomyOverseer.refbWillReclaimUnit]) then
+                            --Disable autobuild and pause the TML since we have no targets, so this missile will be our last
+                            oLauncher:SetAutoMode(false)
+                            oLauncher:SetPaused(true)
+                            if not(oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable]) then
+                                --First time we have no target
+                                oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] = GetGameTimeSeconds()
+                            end
+                            if GetGameTimeSeconds() - oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] >= 150 and not(M27Utilities.IsTableEmpty(tEnemyTMD)) then
+                                --Reclaim the unit
+                                oLauncher[M27EconomyOverseer.refbWillReclaimUnit] = true
+                                table.insert(M27EconomyOverseer.reftoTMLToReclaim, oLauncher)
+                            end
+                        else
+                            --Already set to be reclaimed so just need to check for targets
+                        end
+                        --Wait a while then call this function again:
+                        ForkThread(RecheckForTMLMissileTarget, aiBrain, oLauncher)
+                    else
+                        --Have at least 1 valid target, so want to pick the best one
+
+                        iBestTargetValue = 0
+                        for iUnit, oUnit in tValidTargets do
+                            iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                            if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then iCurTargetValue = iCurTargetValue * 1.5 end
+                            if iBestTargetValue < iCurTargetValue then
+                                iBestTargetValue = iCurTargetValue
+                                oBestTarget = oUnit
+                            end
+                        end
+                        if oBestTarget then
+                            tTarget = oBestTarget:GetPosition()
+                            oBestTarget[M27EngineerOverseer.refiTMLShotsFired] = (oBestTarget[M27EngineerOverseer.refiTMLShotsFired] or 0) + 1
+                        end
+                    end
+
+
+
+
+
+                    --[[ Prev logic for choosing target (never actually tested)
                     iBestTargetValue = 1000
                     for iRef, iCategory in tEnemyCategoriesOfInterest do
                         tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
@@ -4064,7 +4154,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                             end
                             break
                         end
-                    end
+                    end--]]
                 else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
                     --First get the best location if just target the start position or locations near here
                     tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage, bSML, oLauncher:GetPosition())

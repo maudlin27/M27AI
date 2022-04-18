@@ -68,8 +68,10 @@ refbUnitAlreadyConsidered = 'M27UnitAlreadyConsidered'
 refiAssignedThreat = 'M27OverseerUnitAssignedThreat' --recorded against oEnemyUnit[iOurBrainArmyIndex]
 refiUnitNavalAAThreat = 'M27OverseerUnitThreat' --Recored against individual oEnemyUnit[iOurBrainArmyIndex]
 local reftUnitGroupPreviousReferences = 'M27UnitGroupPreviousReferences'
+reftoNearestEnemyBrainByGroup = 'M27NearestEnemyBrainsByGroup' --groups enemies based on the angle to our base so enemies in a similar part of the map are grouped togehter; used for mod distance calculation
 refiModDistFromStartNearestOutstandingThreat = 'M27NearestOutstandingThreat' --Mod distance of the closest enemy threat (using GetDistanceFromStartAdjustedForDistanceFromMid)
 refiModDistFromStartNearestThreat = 'M27OverseerNearestThreat' --Mod distance of the closest enemy, even if we have enough defenders to deal with it
+refiModDistEmergencyRange = 'M27OverseerModDistEmergencyRange'
 reftLocationFromStartNearestThreat = 'M27OverseerLocationNearestLandThreat' --Distance of closest enemy
 refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddistance
 refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
@@ -231,7 +233,59 @@ function DebugPrintACUPlatoon(aiBrain, bReturnPlanOnly)
     LOG('DebugPrintACUPlatoon: ACU platoon ref='..sPlan..iCount..': Action='..iAction..'; UnitState='..M27Logic.GetUnitState(oACUUnit))
 end
 
-function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tLocationTarget, bUseEnemyStartInstead)
+function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tTarget, bUseEnemyStartInstead)
+    local sFunctionRef = 'GetDistanceFromStartAdjustedForDistanceFromMid'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local tStartPos
+    if bUseEnemyStartInstead then tStartPos = GetPrimaryEnemyBaseLocation(aiBrain)
+    else tStartPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    end
+
+    local iDistStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPos, tTarget)
+    if iDistStartToTarget <= aiBrain[refiModDistEmergencyRange] then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return iDistStartToTarget
+    else
+        --If only 1 enemy group then treat anywhere behind us as the emergency range
+        if bUseEnemyStartInstead then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return math.cos(math.abs(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Utilities.GetAngleFromAToB(tStartPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))) * iDistStartToTarget
+        else
+            local bIsBehindUs = true
+            for iEnemyGroup, oBrain in aiBrain[reftoNearestEnemyBrainByGroup] do
+                if M27Utilities.GetDistanceBetweenPositions(tTarget, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tStartPos, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) then
+                    bIsBehindUs = false
+                    break
+                end
+            end
+            if bIsBehindUs then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return aiBrain[refiModDistEmergencyRange]
+            else
+                --Cycle through each enemy group and get lowest value, but stop if <= emergency range
+                local iCurDist
+                local iLowestDist = 10000
+                for iBrain, oBrain in aiBrain[reftoNearestEnemyBrainByGroup] do
+                    iCurDist = math.cos(math.abs(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Utilities.GetAngleFromAToB(tStartPos, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]))) * iDistStartToTarget
+                    if iCurDist < iLowestDist then
+                        iLowestDist = iCurDist
+                        if iLowestDist < aiBrain[refiModDistEmergencyRange] then
+                            iLowestDist = aiBrain[refiModDistEmergencyRange]
+                            break
+                        end
+                    end
+                end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return iLowestDist
+            end
+        end
+    end
+end
+
+
+
+function GetDistanceFromStartAdjustedForDistanceFromMidOld(aiBrain, tLocationTarget, bUseEnemyStartInstead)
     --Instead of the actual distance, it reduces the distance based on how far away it is from the centre of the map
     --bUseEnemyStartInstead - instead of basing on dist from our start, uses from enemy start
     local sFunctionRef = 'GetDistanceFromStartAdjustedForDistanceFromMid'
@@ -5018,6 +5072,58 @@ function RecordAllEnemiesAndAllies(aiBrain)
         end
         if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team]) then tTeamData[aiBrain.M27Team] = {} end
     end
+
+    --Group enemies
+    aiBrain[reftoNearestEnemyBrainByGroup] = {}
+    local iCurAngle, iNearestAngle, iCurDistance, iNearestDistance
+    local iLastGroup = 0
+    local iCurGroup = 1
+    local iNearestBrainRef
+    --local tEnemyBrainsByGroup = {}
+    local tOurBase = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    local tBrainsNeedingAGroup = {}
+    for iEnemy, oBrain in aiBrain[toEnemyBrains] do
+        tBrainsNeedingAGroup[iEnemy] = oBrain
+    end
+    while iLastGroup < iCurGroup do
+        --[[if iCurGroup > 1 then
+            for iEnemy, oBrain in tEnemyBrainsByGroup[iLastGroup] do
+                tBrainsNeedingAGroup[iEnemy] = nil
+            end
+        end--]]
+
+        iLastGroup = iCurGroup
+        --tEnemyBrainsByGroup[iCurGroup] = {}
+        iNearestDistance = 10000
+        iNearestBrainRef = nil
+        for iEnemy, oBrain in tBrainsNeedingAGroup do
+            --Get nearest enemy
+            iCurDistance = M27Utilities.GetDistanceBetweenPositions(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
+            if iCurDistance < iNearestDistance then
+                iNearestDistance = iCurDistance
+                iNearestBrainRef = iEnemy
+            end
+        end
+        local tNearestEnemyBase = M27MapInfo.PlayerStartPoints[tBrainsNeedingAGroup[iNearestBrainRef].M27StartPositionNumber]
+        aiBrain[reftoNearestEnemyBrainByGroup][iLastGroup] = tBrainsNeedingAGroup[iNearestBrainRef]
+        --Calc angle to nearest enemy and if any remaining enemies outside this
+        iNearestAngle = M27Utilities.GetAngleFromAToB(tOurBase, tNearestEnemyBase)
+        for iEnemy, oBrain in tBrainsNeedingAGroup do
+            iCurAngle = M27Utilities.GetAngleFromAToB(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
+            if math.abs(iNearestAngle - iCurAngle) > 45 then
+                if iCurGroup == iLastGroup then
+                    iCurGroup = iCurGroup + 1
+                    tEnemyBrainsByGroup[iCurGroup] = {}
+                end
+            else
+                --Dont need to keep looking for this brain
+                tBrainsNeedingAGroup[iEnemy] = nil
+            end
+        end
+    end
+
+    --Set mod distance emergency range
+    aiBrain[refiModDistEmergencyRange] = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.4, 150), aiBrain[refiDistanceToNearestEnemyBase] * 0.15)
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
