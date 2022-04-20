@@ -747,6 +747,12 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                 for iExperimental, oExperimental in EntityCategoryFilterDown(categories.EXPERIMENTAL, tAir) do
                     ForkThread(M27AirOverseer.ExperimentalAirManager, oExperimental)
                 end
+                local tTorpBombers = EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpBomber, tAir)
+                if M27Utilities.IsTableEmpty(tTorpBombers) == false then
+                    for iUnit, oUnit in tTorpBombers do
+                        M27UnitInfo.SetUnitTargetPriorities(oUnit, M27UnitInfo.refWeaponPriorityTorpBomber) --Dont think this actually does anything to change how torps attack-move
+                    end
+                end
             end
             if M27Utilities.IsTableEmpty(tMobileShield) == false then AllocateNewUnitsToPlatoonNotFromFactory(tMobileShield) end
             if M27Utilities.IsTableEmpty(tOther) == false then

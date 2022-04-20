@@ -222,8 +222,8 @@ function OnDamaged(self, instigator)
                 if self.GetAIBrain and not(self.Dead) then
                     local aiBrain = self:GetAIBrain()
                     if aiBrain.M27AI then
-                        --Has our ACU been hit by an enemy we have no sight of? Or a mex taking damage?
-                        if (M27Utilities.IsACU(self) and self == M27Utilities.GetACU(aiBrain)) or (EntityCategoryContains(M27UnitInfo.refCategoryMex, self.UnitId) and M27UnitInfo.IsUnitValid(self)) then
+                        --Has our ACU been hit by an enemy we have no sight of? Or a mex taking damage? Or a land experimental taking naval damage?
+                        if M27UnitInfo.IsUnitValid(self) and ((M27Utilities.IsACU(self) and self == M27Utilities.GetACU(aiBrain)) or EntityCategoryContains(M27UnitInfo.refCategoryMex, self.UnitId) or (EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, self.UnitId) and M27UnitInfo.IsUnitUnderwater(self))) then
                             if bDebugMessages == true then LOG(sFunctionRef..': ACU has just taken damage, checking if can see the unit that damaged it') end
                             --Do we have a unit that damaged us?
                             local oUnitCausingDamage
@@ -239,8 +239,8 @@ function OnDamaged(self, instigator)
                                     --Can we see the unit?
                                     if bDebugMessages == true then LOG(sFunctionRef..': Checking if can see the unit that dealt us damage') end
                                     if not(M27Utilities.CanSeeUnit(aiBrain, oUnitCausingDamage, true)) then
-                                        if M27Utilities.IsACU(self) then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': cant see unit that caused damage, will ask for an air scout and flag the ACU has taken damage recently') end
+                                        if M27Utilities.IsACU(self) or EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, self.UnitId) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': self='..self.UnitId..M27UnitInfo.GetUnitLifetimeCount(self)..'; cant see unit that caused damage, will ask for an air scout and flag the ACU/experimental has taken damage recently') end
                                             self[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] = GetGameTimeSeconds()
                                             self[M27Overseer.refoUnitDealingUnseenDamage] = oUnitCausingDamage
                                         else
@@ -251,12 +251,13 @@ function OnDamaged(self, instigator)
                                                 M27Utilities.DelayChangeVariable(aiBrain[M27Overseer.reftPriorityLandScoutTargets], self.UnitId..M27UnitInfo.GetUnitLifetimeCount(self), nil, 120)
                                             end
                                         end
-                                        --Flag that we want the location (and +- 2 segments around it) the shot came from scouted asap
-                                        M27AirOverseer.MakeSegmentsAroundPositionHighPriority(aiBrain, oUnitCausingDamage:GetPosition(), 2)
+                                            --Flag that we want the location (and +- 2 segments around it) the shot came from scouted asap
+                                            M27AirOverseer.MakeSegmentsAroundPositionHighPriority(aiBrain, oUnitCausingDamage:GetPosition(), 2)
                                     else
                                         if oUnitCausingDamage.GetUnitId and EntityCategoryContains(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnitCausingDamage.UnitId) then
                                             self[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] = GetGameTimeSeconds()
                                             self[M27Overseer.refoUnitDealingUnseenDamage] = oUnitCausingDamage
+                                            if bDebugMessages == true then LOG(sFunctionRef..': self='..self.UnitId..M27UnitInfo.GetUnitLifetimeCount(self)..'; Can see unit and it is a torpedo unit so will flag that we have taken unseen or torpedo damage. self[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]='..self[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]) end
                                         end
                                     end
                                     --If we're upgrading consider cancelling
@@ -460,7 +461,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
 
 
             --Check for construction of nuke
-            --if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] then
+            --if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] then
                 local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
                 local sFunctionRef = 'OnConstructionStarted'
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have just started construction on a nuke; if so then will start a monitor; UnitID='..oConstruction.UnitId..'; oConstruction[M27UnitInfo.refbActiveSMDChecker]='..(tostring(oConstruction[M27UnitInfo.refbActiveSMDChecker] or false))) end
@@ -468,7 +469,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                 if EntityCategoryContains(M27UnitInfo.refCategorySML, oConstruction.UnitId) then
                     --Are building a nuke, check if already monitoring SMD somehow
                     if not(oConstruction[M27UnitInfo.refbActiveSMDChecker]) and oConstruction:GetFractionComplete() < 1 then
-                    --if aiBrain[M27EngineerOverseer.refiLastExperimentalCategory] == M27UnitInfo.refCategorySML and not(aiBrain[M27UnitInfo.refbActiveSMDChecker]) then
+                    --if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27UnitInfo.refCategorySML and not(aiBrain[M27UnitInfo.refbActiveSMDChecker]) then
                         ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oConstruction)
                     end
                 end

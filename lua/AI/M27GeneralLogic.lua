@@ -3294,7 +3294,7 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
     local iFlatDistance = M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition)
     local tTerrainPositionAtPoint = {}
     if iFlatDistance > 1 then
-        local iAngle = math.atan((tShotEndPosition[2] - tShotStartPosition[2]) / iFlatDistance)
+        local iAngle = math.atan(M27Utilities.ConvertAngleToRadians((tShotEndPosition[2] - tShotStartPosition[2]) / iFlatDistance))
         local iShotHeightAtPoint
         if bDebugMessages == true then LOG(sFunctionRef..': About to check if at any point on path shot will be lower than terrain; iAngle='..iAngle..'; startshot height='..tShotStartPosition[2]..'; target height='..tShotEndPosition[2]..'; iFlatDistance='..iFlatDistance) end
         local iEndPoint = math.max(1, math.floor(iFlatDistance - (iAOE or 0)))
@@ -3303,7 +3303,7 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
             --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
             tTerrainPositionAtPoint = M27Utilities.MoveTowardsTarget(tShotStartPosition, tShotEndPosition, iPointToTarget, 0)
             if bDebugMessages == true then LOG(sFunctionRef..': iPointToTarget='..iPointToTarget..'; tTerrainPositionAtPoint='..repr(tTerrainPositionAtPoint)) end
-            iShotHeightAtPoint = math.tan(iAngle) * iPointToTarget + tShotStartPosition[2]
+            iShotHeightAtPoint = math.tan(M27Utilities.ConvertAngleToRadians(iAngle)) * iPointToTarget + tShotStartPosition[2]
             if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
                 if not(iPointToTarget == iEndPoint and iShotHeightAtPoint == tTerrainPositionAtPoint[2]) then
                     if bDebugMessages == true then
@@ -3809,7 +3809,7 @@ function CheckIfWantToBuildAnotherMissile(oUnit)
 end
 
 function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDamageFromBomb'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -3822,7 +3822,7 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
 
     if M27Utilities.IsTableEmpty(tEnemiesInRange) == false then
         for iUnit, oUnit in tEnemiesInRange do
-           if oUnit.GetBlueprint then
+           if oUnit.GetBlueprint and not(oUnit.Dead) then
                oCurBP = oUnit:GetBlueprint()
                --Is the unit within range of the aoe?
                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation) <= iAOE then
@@ -3843,11 +3843,11 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
                        if oUnit:GetFractionComplete() == 1 then
                            if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then iMassFactor = iMassFactor * 0.2
                            --Is it a mex that will be killed outright? Then increase the value of killing it
-                           elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION, oUnit.UnitId) then iMassFactor = iMassFactor * 3
+                           elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION, oUnit.UnitId) then iMassFactor = iMassFactor * 2
                            end
                        end
                        iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
-                       if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
+                       if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
                    end
                end
            end
@@ -3969,47 +3969,50 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckF
 end
 
 function IsSMDBlockingTarget(aiBrain, tTarget, tSMLPosition, iIgnoreSMDCreatedThisManySecondsAgo, iSMDRangeAdjust)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsSMDBlockingTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if tTarget[1] == 323.5 and tTarget[3] == 180.5 then bDebugMessages = true end
 
     local bEnemySMDInRange = false
     local iSMLToTarget = M27Utilities.GetDistanceBetweenPositions(tTarget, tSMLPosition)
-    local iAngleSMLToTarget = M27Utilities.GetAngleFromAToB(tTarget, tSMLPosition)
+    local iAngleSMLToTarget = M27Utilities.GetAngleFromAToB(tSMLPosition, tTarget)
     local iTargetToSMD
 
     local iSMLToSMD
     local iSMDRange
     local iAngleToSMD
-    local bInRangeBeforeTimeCheck
+    local bSMDInRangeOfMissile
 
     if bDebugMessages == true then LOG(sFunctionRef..': Considering tTarget='..repr(tTarget)..'; iIgnoreSMDCreatedThisManySecondsAgo='..(iIgnoreSMDCreatedThisManySecondsAgo or 1)..'; Current game time='..GetGameTimeSeconds()) end
 
     if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemySMD]) == false then
-       for iSMD, oSMD in aiBrain[M27Overseer.reftEnemySMD] do
-           if M27UnitInfo.IsUnitValid(oSMD) then
-               bInRangeBeforeTimeCheck = false
-               iSMDRange = (oSMD:GetBlueprint().Weapon[1].MaxRadius or 90) + 2 + (iSMDRangeAdjust or 0)
-               iTargetToSMD = M27Utilities.GetDistanceBetweenPositions(tTarget, oSMD:GetPosition())
+        for iSMD, oSMD in aiBrain[M27Overseer.reftEnemySMD] do
+            if M27UnitInfo.IsUnitValid(oSMD) then
+                if GetGameTimeSeconds() - (oSMD[M27UnitInfo.refiTimeOfLastCheck] or (GetGameTimeSeconds() - 10)) > (iIgnoreSMDCreatedThisManySecondsAgo or 0) then
+                    bSMDInRangeOfMissile = false
+                    iSMDRange = (oSMD:GetBlueprint().Weapon[1].MaxRadius or 90) + 1 + (iSMDRangeAdjust or 0)
+                    iTargetToSMD = M27Utilities.GetDistanceBetweenPositions(tTarget, oSMD:GetPosition())
 
-               iSMLToSMD = M27Utilities.GetDistanceBetweenPositions(oSMD:GetPosition(), tSMLPosition)
-               iAngleToSMD = M27Utilities.GetAngleFromAToB(oSMD:GetPosition(), tSMLPosition)
-               if bDebugMessages == true then LOG(sFunctionRef..': oSMD='..oSMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSMD)..'; iTargetToSMD='..iTargetToSMD..'; iSMLToSMD='..iSMLToSMD..'; iSMLToTarget='..iSMLToTarget..'; iSMDRange='..iSMDRange..'; oSMD[M27UnitInfo.refiTimeOfLastCheck]='..(oSMD[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
+                    iSMLToSMD = M27Utilities.GetDistanceBetweenPositions(oSMD:GetPosition(), tSMLPosition)
+                    iAngleToSMD = M27Utilities.GetAngleFromAToB(tSMLPosition, oSMD:GetPosition())
+                    if bDebugMessages == true then LOG(sFunctionRef..': oSMD='..oSMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSMD)..'; iTargetToSMD='..iTargetToSMD..'; iSMLToSMD='..iSMLToSMD..'; iSMLToTarget='..iSMLToTarget..'; iSMDRange='..iSMDRange..'; oSMD[M27UnitInfo.refiTimeOfLastCheck]='..(oSMD[M27UnitInfo.refiTimeOfLastCheck] or 'nil')..'; Distance from target to oSMD='..M27Utilities.GetDistanceBetweenPositions(tTarget, oSMD:GetPosition())..'; iSMDRange='..iSMDRange..'; iAngleToSMD='..iAngleToSMD..'; iAngleSMLToTarget='..iAngleSMLToTarget..'; SMD position='..repr(oSMD:GetPosition())..'; tSMLPosition='..repr(tSMLPosition)..'; TargetPos='..repr(tTarget)..'; iAngleFromAToB - iAngleFromAToC='..(iAngleSMLToTarget - iAngleToSMD)..'; ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC)='..M27Utilities.ConvertAngleToRadians(iAngleSMLToTarget - iAngleToSMD)..'; math.tan(math.abs(ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC)))='..math.tan(math.abs(M27Utilities.ConvertAngleToRadians(iAngleSMLToTarget - iAngleToSMD)))..'; iDistFromAToC='..iSMLToSMD..'; Tan result times this distance='..iSMLToSMD*math.tan(math.abs(M27Utilities.ConvertAngleToRadians(iAngleSMLToTarget - iAngleToSMD)))) end
 
-               bInRangeBeforeTimeCheck = M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iSMLToTarget, iSMLToSMD, iTargetToSMD, iAngleSMLToTarget, iAngleToSMD, iSMDRange)
+                    bSMDInRangeOfMissile = M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iSMLToTarget, iSMLToSMD, iTargetToSMD, iAngleSMLToTarget, iAngleToSMD, iSMDRange)
 
-               if bInRangeBeforeTimeCheck then
-                   if bDebugMessages == true then LOG(sFunctionRef..': SMD is in range, checking how recently it has been built') end
-                   if GetGameTimeSeconds() - (oSMD[M27UnitInfo.refiTimeOfLastCheck] or (GetGameTimeSeconds() - 10)) > (iIgnoreSMDCreatedThisManySecondsAgo or 0) then
+                    if bSMDInRangeOfMissile then
                         if bDebugMessages == true then LOG(sFunctionRef..': SMD is in range and was built a while ago') end
                         bEnemySMDInRange = true
                         break
-                   end
-               end
-           end
-       end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': SMD is not blocking the target') end
+                elseif bDebugMessages == true then LOG(sFunctionRef..': SMD was only recently built, time we think the SMD was active='..GetGameTimeSeconds() - (oSMD[M27UnitInfo.refiTimeOfLastCheck] or (GetGameTimeSeconds() - 10)))
+                end
+            end
+        end
     elseif bDebugMessages == true then LOG(sFunctionRef..': No enemy SMD detected')
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': bEnemySMDInRange='..tostring(bEnemySMDInRange)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bEnemySMDInRange
 end
@@ -4020,9 +4023,10 @@ function RecheckForTMLMissileTarget(aiBrain, oLauncher)
     if M27UnitInfo.IsUnitValid(oLauncher) then ConsiderLaunchingMissile(oLauncher) end
 end
 
+function DecideToLaunchNukeSMLOrTMLMissile()  end --Done only to make it easier to find considerlaunchingmissile
 function ConsiderLaunchingMissile(oLauncher, oWeapon)
     --Should be called via forkthread when missile created due to creating a loop
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -4052,7 +4056,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
             if bTML then
                 --tEnemyCategoriesOfInterest = M27EngineerOverseer.iTMLHighPriorityCategories
             else --SML
-                tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure}
+                tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryLandExperimental + M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryFixedT2Arti - M27UnitInfo.refCategoryExperimentalStructure - M27UnitInfo.refCategoryFixedT3Arti - M27UnitInfo.refCategorySML - M27UnitInfo.refCategoryT3Mex - M27UnitInfo.refCategorySMD}
             end
             if bDebugMessages == true then LOG(sFunctionRef..': Will consider missile target. iMinRange='..(iMinRange or 'nil')..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')..'; bSML='..tostring((bSML or false))) end
 
@@ -4163,16 +4167,19 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                     local iAirSegmentX, iAirSegmentZ
 
                     --Cycle through other start positions to see if can get a better target, but reduce value of target if we havent scouted it in the last 5 minutes
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering best target for nuke.  If target enemy base then iBestTargetValue='..iBestTargetValue) end
                     for iStartPoint = 1, table.getn(M27MapInfo.PlayerStartPoints) do
                         if not(iStartPoint == aiBrain.M27StartPositionNumber) and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iStartPoint], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= 30 then
                             --Have we scouted this location recently?
                             iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[iStartPoint])
-                            if GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] <= 300 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Cycling through start points, iStartPoint='..iStartPoint..'; time last scouted='..(GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted])) end
+                            if GetGameTimeSeconds() - (aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] or -300) <= 300 then
                                 iCurTargetValue = GetDamageFromBomb(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], iAOE, iDamage)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering the start position '..iStartPoint..'='..repr(M27MapInfo.PlayerStartPoints[iStartPoint])..'; value ignroign SMD='..iCurTargetValue) end
                                 if iCurTargetValue > iBestTargetValue then
                                     if IsSMDBlockingTarget(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], oLauncher:GetPosition(), 200) then
                                         iCurTargetValue = 4000
+                                        if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking target so reducing value to 4k') end
                                     end
                                     if iCurTargetValue > iBestTargetValue then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Have a better start position target, for the start position='..iStartPoint..' dealing damage of '..iCurTargetValue..' vs prev best value of '..iBestTargetValue) end
@@ -4198,13 +4205,15 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
 
                     --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
                     if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <20k then will consider other targets') end
-                    if iBestTargetValue < 27000 then --If have high value location for nearest enemy start then just go with this
+                    local iEnemyUnitsConsidered = 0
+                    if iBestTargetValue < 40000 then --If have high value location for nearest enemy start then just go with this
                         for iRef, iCategory in tEnemyCategoriesOfInterest do
                             tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
                             if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                                 for iUnit, oUnit in tEnemyUnitsOfInterest do
+                                    iEnemyUnitsConsidered = iEnemyUnitsConsidered + 1
                                     iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
                                     --Stop looking if tried >=10 targets and have one that is at least 20k of value
                                     if iCurTargetValue > iBestTargetValue then
                                         if IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), 200) then
@@ -4216,7 +4225,11 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                                             if bDebugMessages == true then LOG(sFunctionRef..': New best target with value='..iBestTargetValue) end
                                         end
                                     end
-                                    if iBestTargetValue > 20000 and iUnit >=10 then break end
+                                    --Note: Mass value of mexes is doubled, so 3 T3 mexes would give a value of 27600
+                                    if iEnemyUnitsConsidered >= 15 and iBestTargetValue >= 20000 and ((iBestTargetValue > 40000 and iEnemyUnitsConsidered >=15) or (iBestTargetValue > 30000 and iEnemyUnitsConsidered >= 30) or (iBestTargetValue >= 20000 and iEnemyUnitsConsidered >= 45)) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a target with a decent amount of value and have already tried quite a few units.  iBestTargetValue='..iBestTargetValue..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
+                                        break
+                                    end
                                 end
                             end
                         end
