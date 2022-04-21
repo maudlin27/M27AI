@@ -2443,7 +2443,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     --iCatToBuildBy: Optional, specify if want to look for adjacency locations; Note to factor in 50% of the builder's size and 50% of the likely adjacency building size
     --bLookForQueuedBuildings: Optional, if true, then doesnt choose a target if another engineer already has that target function ref assigned to build something
     --Returns nil if dealing with a non-resource based building
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'BuildStructureAtLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if iCategoryToBuild == M27UnitInfo.refCategoryTML then bDebugMessages = true end
@@ -2876,6 +2876,8 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
     --Have we already started construction on an experimental?
     --reftEngineerAssignmentsByActionRef --Records all engineers. [x][y]{1,2} - x is the action ref; y is the engineer unique ref, 1 is the location ref, 2 is the engineer object (use the subtable ref keys instead of numbers to refer to these)
     if bDebugMessages == true then LOG(sFunctionRef..': iActionToAssign='..iActionToAssign..'; Is the table of engi actions for this empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionToAssign]))..'; aiBrain[refiLastExperimentalReference]='..(aiBrain[refiLastExperimentalReference] or 'nil')..'; aiBrain[refiLastSecondExperimentalRef]='..(aiBrain[refiLastSecondExperimentalRef] or 'nil')) end
+
+--CHECK IF ALREADY BUILDING EXPERIMENTAL OR ALLY IS
     if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionToAssign]) == false then
         if bDebugMessages == true then LOG(sFunctionRef..': Already have an experimental category from before, will use this. Category='..(aiBrain[refiLastExperimentalReference] or 'nil')..'; aiBrain[refiLastSecondExperimentalRef]='..(aiBrain[refiLastSecondExperimentalRef] or 'nil')) end
         if not(iActionToAssign == refActionBuildSecondExperimental) then iCategoryRef = aiBrain[refiLastExperimentalReference]
@@ -2925,32 +2927,8 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
         end
     end
 
-
-
-
-
-
-    --[[elseif aiBrain[refiLastExperimentalReference] and M27UnitInfo.IsUnitValid(aiBrain[refoLastExperimentalUnderConstruction]) and aiBrain[refoLastExperimentalUnderConstruction]:GetFractionComplete() < 1 then
---E.g. if we started on an experimental but the constructing engineers have all died somehow, still want to resume construction
-if bDebugMessages == true then LOG(sFunctionRef..': Started constructing an experimental before, will try and figure out categories it belongs to and return these') end
-local sUnitID = aiBrain[refoLastExperimentalUnderConstruction].UnitId
-if sUnitID then
-local tPossibleCategories = {categories.TECH3, categories.EXPERIMENTAL, categories.STRUCTURE, categories.LAND, categories.AIR, categories.FACTORY, categories.SILO, categories.DIRECTFIRE, categories.INDIRECTFIRE}
-local iActualCategories
-local iCategoryCount = 0
-for iRef, iPossibleCategory in tPossibleCategories do
-if EntityCategoryContains(iPossibleCategory, sUnitID) then
-    iCategoryCount = iCategoryCount + 1
-    if iCategoryCount == 1 then iActualCategories = iPossibleCategory else iActualCategories = iActualCateries * iPossibleCategory end
-end
-end
-end
-if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' categories in common') end--]]
-
     --Backup incase nothing noted, and/or if we havent previously assigned
     if not(iCategoryRef) then
-
-
         --Can we path to enemy base with amphibious unit, and is there a land unit withi n40% of our base? then build land experimental
         local tEnemyPDThreat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(1000, aiBrain[M27AirOverseer.refiMaxScoutRadius]), 'Enemy')
         local iEnemyPDThreat = 0
@@ -3004,18 +2982,24 @@ if bDebugMessages == true then LOG(sFunctionRef..': Found '..iCategoryCount..' c
             end
         end
 
+        --MAIN LOGIC FOR DECIDING EXPERIMENTAL
+
 
         if bDebugMessages == true then LOG(sFunctionRef..': Deciding if want land experimental due to nearby enemy threat; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; Enemy PD threat='..iEnemyPDThreat..'; iExistingLandExperimentals='..iExistingLandExperimentals..'; iEnemyT2ArtiCount='..iEnemyT2ArtiCount) end
         --Dont worry about building land experimental if enemy is turtling
+        local bNearbyLandPathableThreat = false
+        if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 0.4 and ((aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 175 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 0.35) or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat])) then
+            bNearbyLandPathableThreat = true
+        end
         if not(bEnemyIsTurtling) then
-            if iExistingLandExperimentals <= 1 and ((iEnemyPDThreat <= 12500 + 5000 * iTotalEnemyPlayers and not(iFactionIndex == M27UnitInfo.refFactionUEF)) or (iFactionIndex == M27UnitInfo.refFactionUEF and iEnemyT2ArtiCount <= math.min(8, (iExistingLandExperimentals + 1) * 2)) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 0.4) then
+            if iExistingLandExperimentals <= 1 and ((iEnemyPDThreat <= 12500 + 5000 * iTotalEnemyPlayers and not(iFactionIndex == M27UnitInfo.refFactionUEF)) or (iFactionIndex == M27UnitInfo.refFactionUEF and iEnemyT2ArtiCount <= math.min(8, (iExistingLandExperimentals + 1) * 2)) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and bNearbyLandPathableThreat) then
                 iCategoryRef = refiExperimentalLand
                 if bDebugMessages == true then LOG(sFunctionRef..': WIll build land experimental') end
             elseif iExistingLandExperimentals == 0 and ((iEnemyPDThreat <= 17500 + 5000 * iTotalEnemyPlayers and not(iFactionIndex == M27UnitInfo.refFactionUEF)) or (iFactionIndex == M27UnitInfo.refFactionUEF and iEnemyT2ArtiCount <= math.min(8, (iExistingLandExperimentals + 1) * 2))) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 500 and M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 1) then
                 iCategoryRef = refiExperimentalLand
                 if bDebugMessages == true then LOG(sFunctionRef..': WIll build land experimental as havent built any before and are relatively close to enemy base') end
                 --Do we have a T3 arti and no active land experimental, but can path to enemy base amphibiously? Then build a land experimental
-            elseif iExistingLandExperimentals == 0 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT3Arti) > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) == 0 then
+            elseif iExistingLandExperimentals == 0 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT3Arti) > 0 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) == 0 and (bNearbyLandPathableThreat or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= math.max(200, math.min(350, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6))) then
                 if bDebugMessages == true then LOG(sFunctionRef..': We have a t3 arti and no land experimentals or air experimentals so will build a land experimental') end
                 iCategoryRef = refiExperimentalLand
             end

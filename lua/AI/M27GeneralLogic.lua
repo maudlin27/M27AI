@@ -3809,7 +3809,7 @@ function CheckIfWantToBuildAnotherMissile(oUnit)
 end
 
 function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDamageFromBomb'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -3969,10 +3969,9 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckF
 end
 
 function IsSMDBlockingTarget(aiBrain, tTarget, tSMLPosition, iIgnoreSMDCreatedThisManySecondsAgo, iSMDRangeAdjust)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsSMDBlockingTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if tTarget[1] == 323.5 and tTarget[3] == 180.5 then bDebugMessages = true end
 
     local bEnemySMDInRange = false
     local iSMLToTarget = M27Utilities.GetDistanceBetweenPositions(tTarget, tSMLPosition)
@@ -4026,7 +4025,7 @@ end
 function DecideToLaunchNukeSMLOrTMLMissile()  end --Done only to make it easier to find considerlaunchingmissile
 function ConsiderLaunchingMissile(oLauncher, oWeapon)
     --Should be called via forkthread when missile created due to creating a loop
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end

@@ -554,8 +554,8 @@ function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
     --iAngle: 0 = north, 90 = east, etc.; use GetAngleFromAToB if need angle from 2 positions
     --tStart = {x,y,z} (y isnt used)
     --if bKeepInMapBounds is true then will limit to map bounds
-    local bDebugMessages = true if bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'MoveInDirection'
+    --local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
+    --local sFunctionRef = 'MoveInDirection'
     local iTheta
     --local iFactor
 
@@ -570,7 +570,7 @@ function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
     end--]]
 
     iTheta = ConvertAngleToRadians(iAngle)
-    if bDebugMessages == true then LOG(sFunctionRef..': iAngle='..(iAngle or 'nil')..'; iTheta='..(iTheta or 'nil')..'; iDistance='..(iDistance or 'nil')) end
+    --if bDebugMessages == true then LOG(sFunctionRef..': iAngle='..(iAngle or 'nil')..'; iTheta='..(iTheta or 'nil')..'; iDistance='..(iDistance or 'nil')) end
     local iXAdj = math.sin(iTheta) * iDistance
     local iZAdj = -(math.cos(iTheta) * iDistance)
     --local iXAdj = math.cos(iTheta) * iDistance * iFactor[1]
@@ -578,7 +578,7 @@ function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
 
 
     if not(bKeepInMapBounds) then
-        if bDebugMessages == true then LOG(sFunctionRef..': Are within map bounds, iXAdj='..iXAdj..'; iZAdj='..iZAdj..'; iTheta='..iTheta..'; position='..repr({tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj})) end
+        --if bDebugMessages == true then LOG(sFunctionRef..': Are within map bounds, iXAdj='..iXAdj..'; iZAdj='..iZAdj..'; iTheta='..iTheta..'; position='..repr({tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj})) end
         return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
     else
         local tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}

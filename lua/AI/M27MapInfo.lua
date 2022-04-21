@@ -129,6 +129,7 @@ function DetermineMaxTerrainHeightDif()
     ['Corona'] = 0.15,
     ['Adaptive Flooded Corona'] = 0.15,
     ['Fields of Isis'] = 0.15, --minor for completeness - one of cliffs reclaim looks like its pathable but default settings show it as non-pathable
+    ['Selkie Mirror'] = 0.15,
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
