@@ -2842,6 +2842,17 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                                     if bDebugMessages == true then LOG(sFunctionRef..': Think enemy may be getting away so will move towards them') end
                                                                 end
                                                             end
+                                                            --Dont do kiting retreat if closest enemy isnt moving towards us
+                                                            if oPlatoon[refiCurrentAction] == refActionKitingRetreat and iDistanceInsideOurRange < 7 then
+                                                                --Dont kite if the nearest enemy unit is stationery and not attacking, instead just attack it if no enemy indirect fire units nearby
+                                                                if M27Utilities.IsTableEmpty(M27Utilities.EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirect, oPlatoon[reftEnemiesInRange])) then
+                                                                    local oNearestMobileEnemy = M27Utilities.GetNearestUnit(oPlatoon[reftEnemiesInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain)
+                                                                    if not(oNearestMobileEnemy:IsUnitState('Moving')) and not(oNearestMobileEnemy:IsUnitState('Attacking')) and not(oNearestMobileEnemy:IsUnitState('Guarding')) and not(oNearestMobileEnemy:IsUnitState('Patrolling')) then
+                                                                        --Nearest unit isnt moving so can just attack
+                                                                        oPlatoon[refiCurrentAction] = refActionAttack
+                                                                    end
+                                                                end
+                                                            end
                                                         end
                                                     end
                                                 end

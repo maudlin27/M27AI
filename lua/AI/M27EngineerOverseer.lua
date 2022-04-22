@@ -3787,10 +3787,17 @@ function GetLikelySMLTarget(aiBrain, oSML)
 end
 
 function IsValidTMLTarget(aiBrain, tStartPos, oTarget, tEnemyTMD)
-    if M27UnitInfo.IsUnitValid(oTarget) and oTarget:GetFractionComplete() >= 0.5 and (oTarget[refiTMLShotsFired] or 0) == 0 and (oTarget[M27AirOverseer.refiStrikeDamageAssigned] or 0) == 0 then
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IsValidTMLTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering whether oTarget '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..' is a valid TML target.  Is TMD table empty='..tostring(M27Utilities.IsTableEmpty(tEnemyTMD))..'; target faction complete='..oTarget:GetFractionComplete()..'; TML shots fired at target='..(oTarget[refiTMLShotsFired] or 'nil')..'; Strike damage assigned='..(oTarget[M27AirOverseer.refiStrikeDamageAssigned] or 'nil')..'; Unit max health='..oTarget:GetMaxHealth()) end
+
+    if M27UnitInfo.IsUnitValid(oTarget) and oTarget:GetFractionComplete() >= 0.5 and ((oTarget[refiTMLShotsFired] or 0) == 0 or oTarget[refiTMLShotsFired] <= math.floor(oTarget:GetMaxHealth() / 6000)) and (oTarget[M27AirOverseer.refiStrikeDamageAssigned] or 0) == 0 then
         local iDistStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPos, oTarget:GetPosition())
         --local iMaxShieldHealth = math.max(0, 6000 - oTarget:GetHealth() * 1.1 - 100) --Decided not to do, since unclear whether the shield could still stop the missile if strong enough - recall when testing mobile shields they could block a missile and survive
         --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
+        if bDebugMessages == true then LOG(sFunctionRef..': iDistStartToTarget='..iDistStartToTarget..'; iTMLMinMissileRange='..iTMLMinMissileRange..'; iTMLMissileRange='..iTMLMissileRange..'; Is target under shield='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, true))) end
         if iDistStartToTarget >= iTMLMinMissileRange and iDistStartToTarget <= iTMLMissileRange and not(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, true)) then
             local bIsBlockedByTMD = false
             if M27Utilities.IsTableEmpty(tEnemyTMD) == false then
@@ -3808,12 +3815,16 @@ function IsValidTMLTarget(aiBrain, tStartPos, oTarget, tEnemyTMD)
                 end
             end
 
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished checking if blocked by TMD. bIsBlockedByTMD='..tostring(bIsBlockedByTMD)) end
+
 
             if bIsBlockedByTMD == false then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return true
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return false
 end
 
@@ -3868,22 +3879,30 @@ function GetTMLBuildLocation(aiBrain)
 end
 
 function RecordPossibleTMLTargets(aiBrain, bForceRefresh)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RecordPossibleTMLTargets'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if bForceRefresh or GetGameTimeSeconds() - (aiBrain[refiTimeOfLastTMLTargetRefresh] or -100) >= 10 then
         local iSearchRange = iTMLMissileRange + math.min(125, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)
         local tPotentialTargets = aiBrain:GetUnitsAroundPoint(iTMLHighPriorityCategories, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Enemy')
         aiBrain[reftoTMLTargetsOfInterest] = {}
         aiBrain[refiTimeOfLastTMLTargetRefresh] = GetGameTimeSeconds()
+        if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..aiBrain[refiTimeOfLastTMLTargetRefresh]..'; SearchRange='..iSearchRange..'; Is tPotentialTargets empty='..tostring(M27Utilities.IsTableEmpty(tPotentialTargets))) end
         if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
             local iValidTargets = 0
             local tEnemyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange + 31, 'Enemy')
             for iUnit, oUnit in tPotentialTargets do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering whether oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is a valid TML target.  Is table of TMD empty='..tostring(M27Utilities.IsTableEmpty(tEnemyTMD))) end
                 if IsValidTMLTarget(aiBrain, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit, tEnemyTMD) then
                     iValidTargets = iValidTargets + 1
                     aiBrain[reftoTMLTargetsOfInterest][iValidTargets] = oUnit
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a valid target, iValidTargets='..iValidTargets..'; recording for oUnit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                 end
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function CheckForEnemySMD(aiBrain, oSML)
@@ -5685,6 +5704,10 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
 
             local iCount = 0
+
+            bThresholdInitialEngineerCondition = false --Dont want inside while loop or else it gets reset to false while the line setting it to true only gets called once (when on that specific condition)
+            bThresholdPreReclaimEngineerCondition = false
+
             while iEngineersToConsider >= 0 do --want >= rather than > so get correct calculation of engineers needed
                 M27Utilities.FunctionProfiler(sFunctionRef..': EngiConditions', M27Utilities.refProfilerStart)
                 M27Utilities.FunctionProfiler(sFunctionRef..': Condition'..iCurrentConditionToTry..'Strat'..aiBrain[M27Overseer.refiAIBrainCurrentStrategy], M27Utilities.refProfilerStart)
@@ -5699,8 +5722,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         break
                     end
                 end
-                bThresholdInitialEngineerCondition = false
-                bThresholdPreReclaimEngineerCondition = false
+
                 --TEMPTEST(aiBrain, sFunctionRef..': just after while loop start')
                 if bDebugMessages == true then LOG(sFunctionRef..': Start of loop to assign engineer action; iEngineersToConsider='..iEngineersToConsider..'; iCurrentConditionToTry='..iCurrentConditionToTry..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; iAbsolutePowerBufferWanted='..iAbsolutePowerBufferWanted) end
                 tExistingLocationsToPickFrom = {}
@@ -6531,7 +6553,9 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
                         end
                     elseif iCurrentConditionToTry == 23 then --TML if think enough targets
-                        if iHighestFactoryOrEngineerTechAvailable >= 2 and not(aiBrain[refiTimeOfLastFailedTML]) and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= aiBrain[M27AirOverseer.refiBomberDefenceModDistance] and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML) == 0 or M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) == false) then
+                        --if iHighestFactoryOrEngineerTechAvailable >= 2 and tiAvailableEngineersByTech[2] > 0 then bDebugMessages = true end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to build a TML. iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; aiBrain[refiTimeOfLastFailedTML]='..(aiBrain[refiTimeOfLastFailedTML] or 'nil')..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; refbNeedIndirect='..tostring(aiBrain[M27Overseer.refbNeedIndirect])..'; aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML)..'; M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]))..'; bHaveLowMass='..tostring(bHaveLowMass)) end
+                        if iHighestFactoryOrEngineerTechAvailable >= 2 and not(aiBrain[refiTimeOfLastFailedTML]) and (aiBrain[M27Overseer.refbNeedIndirect] or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= math.min(aiBrain[M27AirOverseer.refiBomberDefenceModDistance], 150)) and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML) == 0 or M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) == false) then
                             if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) == false then
                                 iActionToAssign = refActionBuildTML
                                 iMinEngiTechLevelWanted = 2
@@ -6542,8 +6566,10 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     tExistingLocationsToPickFrom[1] = tSubtable[refEngineerAssignmentActualLocation]
                                     break
                                 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Already have an action to build TML, will make sure we have enough engis assigned. iMaxEngisWanted='..iMaxEngisWanted) end
                             else
                                 RecordPossibleTMLTargets(aiBrain, false)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have recorded possible TML targets.  Is the table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]))..'; size of targets='..table.getn(aiBrain[reftoTMLTargetsOfInterest])) end
                                 if M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]) == false and table.getn(aiBrain[reftoTMLTargetsOfInterest]) >= 3 then
                                     tExistingLocationsToPickFrom = {}
                                     tExistingLocationsToPickFrom[1] = GetTMLBuildLocation(aiBrain)
@@ -7199,7 +7225,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             iMaxEngisWanted = 1000
                         end
                     end
-                end
+                    end
                 M27Utilities.FunctionProfiler(sFunctionRef..': Condition'..iCurrentConditionToTry..'Strat'..aiBrain[M27Overseer.refiAIBrainCurrentStrategy], M27Utilities.refProfilerEnd)
                 M27Utilities.FunctionProfiler(sFunctionRef..': EngiConditions', M27Utilities.refProfilerEnd)
 
@@ -7384,7 +7410,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 if M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryEngineer, aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]) then
                     aiBrain[refiBOInitialEngineersWanted] = math.max(aiBrain[refiBOInitialEngineersWanted], aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] - aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer))
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': iCurConditionEngiShortfall='..iCurConditionEngiShortfall..'; aiBrain[refiBOInitialEngineersWanted]='..aiBrain[refiBOInitialEngineersWanted]..'; aiBrain[refiBOPreReclaimEngineersWanted]='..aiBrain[refiBOPreReclaimEngineersWanted]..'; aiBrain[refiBOPreSpareEngineersWanted]='..aiBrain[refiBOPreSpareEngineersWanted]) end
+                if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry='..iCurrentConditionToTry..'; iCurConditionEngiShortfall='..iCurConditionEngiShortfall..'; aiBrain[refiBOInitialEngineersWanted]='..aiBrain[refiBOInitialEngineersWanted]..'; aiBrain[refiBOPreReclaimEngineersWanted]='..aiBrain[refiBOPreReclaimEngineersWanted]..'; aiBrain[refiBOPreSpareEngineersWanted]='..aiBrain[refiBOPreSpareEngineersWanted]) end
 
 
 

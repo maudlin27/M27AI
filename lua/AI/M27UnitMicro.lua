@@ -8,6 +8,7 @@ local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
+local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 
 function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -805,11 +806,11 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                         end
                     end
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': Finished searching through enemy mobile untis and PD in range, iMostMassDamage='..iMostMassDamage..'; iKillsExpected='..(iKillsExpected or 0)) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Finished searching through enemy mobile untis and PD in range, iMostMassDamage='..iMostMassDamage..'; iKillsExpected='..(iKillsExpected or 0)..'; Energy stored %='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; E stored='..aiBrain:GetEconomyStored('ENERGY')) end
 
                 --if iMostMobileCombatMassDamage >= 80 then
                 --    oOverchargeTarget = oMostCombatMassDamage
-                if iMostMassDamage >= 200 or iKillsExpected >= 3 or (iKillsExpected >= 1 and iMostMassDamage >= 112) or (iMostMassDamage >= 60 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain:GetEconomyStored('ENERGY') >= 10000) then --e.g. striker is 56 mass; lobo is 36
+                if iMostMassDamage >= 200 or iKillsExpected >= 3 or (iKillsExpected >= 1 and iMostMassDamage >= 100) or (iMostMassDamage >= 60 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9 and (aiBrain:GetEconomyStored('ENERGY') >= 10000 or (aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 1 and aiBrain:GetEconomyStored('ENERGY') >= 8000))) then --e.g. striker is 56 mass; lobo is 36
                     oOverchargeTarget = oMostMassDamage
                     if bDebugMessages == true then LOG(sFunctionRef..': Have a mobile or PD unit in range that will do enough damage to, oOverchargeTarget='..oOverchargeTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOverchargeTarget)) end
                 else

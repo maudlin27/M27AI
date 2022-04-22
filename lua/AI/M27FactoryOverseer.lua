@@ -481,7 +481,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             --if aiBrain[M27Overseer.refbNeedScoutsBuilt] == true then iCategoryToBuild = refCategoryLandScout end
                         elseif iCurrentConditionToTry == 8 then --Emergency defence - enemies are within 27% of our base
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence') end
-                            if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < 0.275 and (M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])  or (aiBrain:GetCurrentUnits(refCategoryDFTank) <= aiBrain[refiMinimumTanksWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])) then
+                            if (aiBrain[M27Overseer.refiPercentageOutstandingThreat] < 0.275 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) or (aiBrain:GetCurrentUnits(refCategoryDFTank) <= aiBrain[refiMinimumTanksWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech)) then
                                 if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                     iCategoryToBuild = refCategoryIndirect
                                 else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
@@ -504,13 +504,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     iTotalWanted = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted]
                                 end
                             elseif iCurrentConditionToTry == 11 then --Engis if small number of land factories (land attack mode) so engis can get more factories
-                                if iStrategy == M27Overseer.refStrategyLandEarly and aiBrain:GetListOfUnits(refCategoryLandFactory, false, true) < 4 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
+                                if iStrategy == M27Overseer.refStrategyLandEarly and aiBrain:GetListOfUnits(refCategoryLandFactory, false, true) < math.min(4, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > -0.3) then
                                     if aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 then
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
                                     end
                                 end
-                            elseif aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] == false or M27Conditions.HaveLowMass == false then
+                            elseif aiBrain[M27EngineerOverseer.refbNeedResourcesForMissile] == false or M27Conditions.HaveLowMass(aiBrain) == false then
                                 if iCurrentConditionToTry == 12 then --Escort units
                                     if aiBrain[M27PlatoonUtilities.refbNeedEscortUnits] == true and (iStrategy == M27Overseer.refStrategyLandEarly or not(M27Conditions.HaveLowMass(aiBrain))) then
                                         iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, false)
@@ -1452,6 +1452,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Cur factory isnt our highest tech factory, and are either exceeding half the cap, or 20. aiBrain[refiEngineerCap]='..aiBrain[refiEngineerCap]) end
                                 iCategoryToBuild = nil
                             end
+                        end
+                        --Low mass override - dont get more engieners if already have a decent number of that tech level and are stalling
+                        if iExistingEngis >= 12 and aiBrain:GetEconomyStoredRatio('MASS') == 0 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < -math.max(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] * 0.35, 0.6) and (iFactoryTechLevel == 1 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel) >= 6)) then
+                            iCategoryToBuild = nil
                         end
                     end
                     if bReachedLastOption and aiBrain:GetEconomyStoredRatio('MASS') >= 0.6 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 50 then

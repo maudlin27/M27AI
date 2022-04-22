@@ -2711,9 +2711,9 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                                 iSegmentX = tSegments[1]
                                 iSegmentZ = tSegments[2]
 
-                        --for iSegmentX, tVal in M27MapInfo.tReclaimAreas do
-                            if math.abs(iSegmentX - iACUSegmentX) <= iMaxSegmentDistanceX then
-                                --for iSegmentZ, tReclaimInfo in tVal do
+                                --for iSegmentX, tVal in M27MapInfo.tReclaimAreas do
+                                if math.abs(iSegmentX - iACUSegmentX) <= iMaxSegmentDistanceX then
+                                    --for iSegmentZ, tReclaimInfo in tVal do
                                     if math.abs(iSegmentZ - iACUSegmentZ) <= iMaxSegmentDistanceZ then
                                         --Is there enough reclaim in this segment?
                                         if (M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass] or 0) >= iMinReclaimWanted then
@@ -2761,8 +2761,8 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                                                             end--]]
                                                                     if bIsFarEnoughFromStart == true then
                                                                         --Have a segment that might have enough reclaim, and is far enough from the start
-                                                                            --bHaveEnoughReclaim = true
-                                                                            --if iSecondMinReclaimCheck and iReclaimInCurrentArea < iSecondMinReclaimCheck then bHaveEnoughReclaim = false end
+                                                                        --bHaveEnoughReclaim = true
+                                                                        --if iSecondMinReclaimCheck and iReclaimInCurrentArea < iSecondMinReclaimCheck then bHaveEnoughReclaim = false end
 
                                                                         if bDebugMessages == true then LOG(sFunctionRef..': position '..repr(tCurSegmentPosition)..' has enough reclaim - recording as a possible location') end
 
@@ -3048,6 +3048,11 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     return tExpansionPath
                 end --]]
+            end
+
+            --If final destination is near enemy base then instead use GetPriorityACUDestination
+            if bHaveFinalDestination == false or M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= 50 then
+                tFinalDestination = GetPriorityACUDestination(aiBrain, oPathingUnit.PlatoonHandle)
             end
 
             --Update final destination to move near it:
