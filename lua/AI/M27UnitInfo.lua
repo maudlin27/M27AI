@@ -659,7 +659,7 @@ function GetBomberAOEAndStrikeDamage(oUnit)
     local tiBomberStrikeDamageByFactionAndTech =
     {
         --UEF, Aeon, Cybran, Sera, Nomads (are using default), Default
-        { 125, 200, 125, 250, 150, 150 }, --Tech 1
+        { 145, 200, 145, 250, 150, 150 }, --Tech 1
         { 350, 300, 850, 1175, 550, 550 }, --Tech 2
         { 2500, 2500, 2500, 2500, 2500, 2500}, --Tech 3 - the strike damage calculation above should be accurate so this is just as a backup, and set at a low level due to potential for more balance changes affecting this
         { 11000,11000,11000,11000,11000,11000} --Tech 4 - again as a backup

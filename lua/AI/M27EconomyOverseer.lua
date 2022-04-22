@@ -987,7 +987,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                         end
                         iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH2
 
-                    elseif M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain)) and M27Utilities.GetACU(aiBrain)[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] and GetGameTimeSeconds() - M27Utilities.GetACU(aiBrain)[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] <= 30 then
+                    elseif M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain)) and M27Utilities.GetACU(aiBrain)[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] and GetGameTimeSeconds() - M27Utilities.GetACU(aiBrain)[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] <= 30 and M27UnitInfo.IsUnitValid(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitDealingUnseenDamage]) and EntityCategoryContains(categories.ANTINAVY + categories.OVERLAYANTINAVY, M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitDealingUnseenDamage].UnitId) then
                         --Upgrade land if we need torp bombers to help the ACU
                         iFactoryToUpgrade = M27UnitInfo.refCategoryLandFactory * categories.TECH2
                     elseif not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) then

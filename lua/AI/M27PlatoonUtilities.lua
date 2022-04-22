@@ -3475,7 +3475,7 @@ function MergeNearbyPlatoons(oBasePlatoon)
         if iMergeCycleCount >= iMergeRefreshPoint then
             local iMaxGroundPlatoonSize = oPlatoonToMergeInto[M27PlatoonTemplates.refiPlatoonAmalgamationMaxSize]
             if iMaxGroundPlatoonSize == nil then
-                M27Utilities.ErrorHandler('No max size specified for amalgamation - will default to 10')
+                M27Utilities.ErrorHandler('No max size specified for amalgamation - will default to 10.  PlatoonToMergeInto='..oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount], true)
                 iMaxGroundPlatoonSize = 10
             end
             if oPlatoonToMergeInto[refiCurrentUnits] < iMaxGroundPlatoonSize then

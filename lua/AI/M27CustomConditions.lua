@@ -764,13 +764,11 @@ function AtLeastXMassStored(aiBrain, iResourceStored)
     return bEnoughStored
 end
 
-function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
-    --Returns true if have built >= iBuiltThreshold
+function GetLifetimeBuildCount(aiBrain, category)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'LifetimeBuildCountLessThan'
+    local sFunctionRef = 'GetLifetimeBuildCount'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iTotalBuilt = 0
-    if bDebugMessages == true then LOG(sFunctionRef..' - start') end
     local testCat = category
     if type(category) == 'string' then
         testCat = ParseEntityCategory(category)
@@ -792,11 +790,12 @@ function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
             iTotalBuilt = iTotalBuilt + iCurCount
         end
     end
-    local bBuiltLessThan = true
-    if iTotalBuilt >= iBuiltThreshold then bBuiltLessThan = false end
-    if bDebugMessages == true then LOG(sFunctionRef..': iTotalBuilt='..iTotalBuilt..'; iBuiltThreshold='..iBuiltThreshold..'; bBuiltLessThan='..tostring(bBuiltLessThan)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return bBuiltLessThan
+    return iTotalBuilt
+end
+
+function LifetimeBuildCountLessThan(aiBrain, category, iBuiltThreshold)
+    if GetLifetimeBuildCount(aiBrain, category) >= iBuiltThreshold then return false else return true end
 end
 
 function IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal, iMinIndividual)
