@@ -62,7 +62,7 @@ end
 
 function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder, relative, buildingTemplate, baseTemplate, reference, NearMarkerType)
     -- aiBrain - various functions that can be used for this, including aiBrain:GetArmyStartPos()
-    -- builder - error message suggests it's a table value, but doesn't return anything using log; however builder:GetUnitId() returns a string with the unit blueprint ID, e.g. ual0001 is the aeon ACU
+    -- builder - error message suggests it's a table value, but doesn't return anything using log; however builder.UnitId returns a string with the unit blueprint ID, e.g. ual0001 is the aeon ACU
         --Other functions: builder:getarmy(); builder:GetPosition()
     -- buildingType is a string, e.g. 'T1LandFactory'
     -- buildingTemplate is a table value, containing table values, which gives the blueprint in question, so baseTemplate[i1][i2]
@@ -100,7 +100,7 @@ function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder,
 
             -- Record values in this:
             if bDebugMessages == true then LOG('M27AI: aibuildstructures.lua: buildingType='..buildingType) end
-            if bDebugMessages == true then LOG('IsACU(builder:GetUnitId())='..tostring(M27Utilities.IsACU(builder))) end
+            if bDebugMessages == true then LOG('IsACU(builder.UnitId)='..tostring(M27Utilities.IsACU(builder))) end
             -- local army = builder:GetArmy()
             -- local BuilderPosition = builder:GetPosition()
             -- LOG('GetPosition='..BuilderPosition[1])
@@ -131,7 +131,7 @@ function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder,
             --Check if are building a unit where have special code to determine location:
             local bSpecialBehaviour = false
             local relativeLoc = {}
-            if bDebugMessages == true then LOG('builder:GetUnitId()='..tostring(builder:GetUnitId())) end
+            if bDebugMessages == true then LOG('builder.UnitId='..tostring(builder.UnitId)) end
 
             if buildingType == 'T1LandFactory' or buildingType == 'T1EnergyProduction' then
                 -- Check if it's an ACU building it
@@ -208,9 +208,9 @@ function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder,
                     --baseTemplate = M27Utilities.ConvertLocationsToBuildTemplate({'T1LandFactory'},TempTable)
                 end
             elseif buildingType == 'T1HydroCarbon' then
-                if bDebugMessages == true then LOG('GetUnitId for builder='..tostring(builder:GetUnitId())) end
+                if bDebugMessages == true then LOG('GetUnitId for builder='..tostring(builder.UnitId)) end
                 M27ConUtility.RecordHydroConstructor(aiBrain, builder)
-                if bDebugMessages == true then LOG('Have just recorded hydro constroctor engineer; UnitID='..M27ConUtility.tHydroBuilder[M27Utilities.GetAIBrainArmyNumber(aiBrain)][1]:GetUnitId()) end
+                if bDebugMessages == true then LOG('Have just recorded hydro constroctor engineer; UnitID='..M27ConUtility.tHydroBuilder[M27Utilities.GetAIBrainArmyNumber(aiBrain)][1].UnitId) end
             end
 
 

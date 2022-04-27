@@ -34,6 +34,19 @@ refbFullyUpgraded = 'M27UnitFullyUpgraded' --used on ACU to avoid running some c
 refbRecentlyRemovedHealthUpgrade = 'M27UnitRecentlyRemovedHealthUpgrade' --Used on ACU to flag if e.g. we removed T2 which will decrease our health
 refbActiveMissileChecker = 'M27UnitMissileTracker' --True if are actively checking for missile targets
 refbActiveSMDChecker = 'M27UnitSMDChecker' -- true if unit is checking for enemy SMD (use on nuke)
+refbActiveTargetChecker = 'M27UnitActiveTargetChecker' --e.g. used for T3 fixed arti
+refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will update this when given an IssueAttack order
+reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
+refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
+refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
+refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adjacency and when first detected enemy SMD, but could be used for other things if want
+
+--TMD:
+refbTMDChecked = 'M27TMDChecked' --Used against enemy TML to flag if we've already checked for TMD we want when it was first detected
+reftTMLDefence = 'M27TMLDefence' --[sTMLRef] - returns either nil if not considered, or the unit object of TMD protecting it
+reftTMLThreats = 'M27TMLThreats' --[sTMLRef] - returns object number of TML that is threatening this unit
+refbCantBuildTMDNearby = 'M27CantBuildTMDNearby'
+
 
 --Factions
 refFactionUEF = 1
@@ -41,14 +54,16 @@ refFactionAeon = 2
 refFactionCybran = 3
 refFactionSeraphim = 4
 refFactionNomads = 5
+refFactionUnrecognised = 6
 
 --Categories:
 --Buildings - eco
-refCategoryT1Mex = categories.STRUCTURE * categories.TECH1 * categories.MASSEXTRACTION
-refCategoryT2Mex = categories.STRUCTURE * categories.TECH2 * categories.MASSEXTRACTION
-refCategoryT3Mex = categories.STRUCTURE * categories.TECH3 * categories.MASSEXTRACTION
-refCategoryMex = categories.STRUCTURE * categories.MASSEXTRACTION
-refCategoryHydro = categories.HYDROCARBON
+refCategoryMex = categories.STRUCTURE * categories.MASSEXTRACTION - categories.NAVAL --Some mods add a naval mex which causes issues as we will try and build on land mexes without naval exclusion
+refCategoryT1Mex = refCategoryMex * categories.TECH1
+refCategoryT2Mex = refCategoryMex * categories.TECH2
+refCategoryT3Mex = refCategoryMex * categories.TECH3
+refCategoryHydro = categories.HYDROCARBON - categories.NAVAL
+
 refCategoryPower = categories.STRUCTURE * categories.ENERGYPRODUCTION - categories.EXPERIMENTAL - categories.HYDROCARBON
 refCategoryT1Power = categories.STRUCTURE * categories.ENERGYPRODUCTION * categories.TECH1 - categories.EXPERIMENTAL - categories.HYDROCARBON
 refCategoryT2Power = categories.STRUCTURE * categories.ENERGYPRODUCTION * categories.TECH2 - categories.EXPERIMENTAL - categories.HYDROCARBON
@@ -68,6 +83,7 @@ refCategoryT1Sonar = refCategorySonar * categories.TECH1
 refCategoryT2Sonar = refCategorySonar * categories.TECH2
 refCategoryT3Sonar = refCategorySonar * categories.TECH3
 refCategoryStructure = categories.STRUCTURE - categories.WALL
+refCategoryWall = categories.STRUCTURE * categories.WALL --NOTE: Some walls are props; this is for if want a wall that can build
 refCategoryUnitsWithOmni = categories.OMNI + categories.COMMAND + categories.OVERLAYOMNI
 
 
@@ -76,12 +92,13 @@ refCategoryLandFactory = categories.LAND * categories.FACTORY * categories.STRUC
 refCategoryAirFactory = categories.AIR * categories.FACTORY * categories.STRUCTURE - categories.ORBITALSYSTEM --Novax is an air factory, so excluded from being treated as an air factory by my logic
 refCategoryNavalFactory = categories.NAVAL * categories.FACTORY * categories.STRUCTURE
 refCategoryAllFactories = refCategoryLandFactory + refCategoryAirFactory + refCategoryNavalFactory
+refCategoryAllHQFactories = refCategoryAllFactories - categories.SUPPORTFACTORY
 
 --Building - defensive
 refCategoryT2PlusPD = categories.STRUCTURE * categories.DIRECTFIRE - categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH1
 refCategoryPD = categories.STRUCTURE * categories.DIRECTFIRE
 refCategoryT3PD = refCategoryPD * categories.TECH3
-refCategoryTMD = categories.ANTIMISSILE - categories.SILO * categories.TECH3 --Not perfect but should pick up most TMD without picking up SMD
+refCategoryTMD = categories.STRUCTURE * categories.ANTIMISSILE - categories.SILO * categories.TECH3 --Not perfect but should pick up most TMD without picking up SMD
 refCategoryFixedShield = categories.SHIELD * categories.STRUCTURE
 refCategoryFixedT2Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH2
 refCategoryFixedT3Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH3
@@ -92,12 +109,14 @@ refCategoryNovaxCentre = categories.EXPERIMENTAL * categories.STRUCTURE * catego
 refCategorySatellite = categories.EXPERIMENTAL * categories.SATELLITE
 --refCategorySAM = categories.ANTIAIR * categories.STRUCTURE * categories.TECH3
 
+refCategoryUpgraded = refCategoryT2Radar + refCategoryT3Radar + refCategoryT2Sonar + refCategoryT3Sonar + refCategoryAllFactories * categories.TECH2 + refCategoryAllFactories * categories.TECH3 + refCategoryFixedShield * categories.TECH3 + refCategoryT2Mex + refCategoryT3Mex
+
 --Land units
 refCategoryExperimentalStructure = categories.CYBRAN * categories.ARTILLERY * categories.EXPERIMENTAL + categories.STRUCTURE * categories.EXPERIMENTAL
-refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY
-refCategoryMobileLand = categories.LAND * categories.MOBILE
+refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY - categories.UNSELECTABLE
+refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
-refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT - categories.ANTIAIR --NOTE: Need to specify fastest (for cybran who have mantis and LAB)
+refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT + categories.LAND * categories.MOBILE * categories.TANK * categories.TECH1 * categories.SERAPHIM - categories.ANTIAIR -categories.REPAIR --(repair exclusion added as basic way to differentiate between mantis (which has repair category) and LAB; alternative way is to specify the fastest when choosing the blueprint to build
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA --NOTE: Need to specify slowest (so dont pick LAB)
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
@@ -117,16 +136,20 @@ refCategoryObsidian = categories.AEON * categories.TECH2 * categories.SHIELD * c
 refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD - refCategoryObsidian --Miscategorised obsidian tank
 refCategoryPersonalShield = categories.PERSONALSHIELD + refCategoryObsidian
 refCategoryFatboy = categories.EXPERIMENTAL * categories.UEF * categories.MOBILE * categories.LAND * categories.ARTILLERY
+refCategorySniperBot = categories.MOBILE * categories.SNIPER * categories.LAND
 
 --Air units
 refCategoryAirScout = categories.AIR * categories.SCOUT
-refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - categories.GROUNDATTACK
+refCategoryAirAA = categories.AIR * categories.ANTIAIR - categories.BOMBER - categories.GROUNDATTACK - categories.EXPERIMENTAL
 refCategoryBomber = categories.AIR * categories.BOMBER - categories.ANTINAVY - categories.CANNOTUSEAIRSTAGING --excludes mercies
+refCategoryFighterBomber = categories.AIR * categories.ANTIAIR * categories.BOMBER - categories.EXPERIMENTAL
 refCategoryGunship = categories.AIR * categories.GROUNDATTACK
 refCategoryTorpBomber = categories.AIR * categories.BOMBER * categories.ANTINAVY
 refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE --Excludes novax
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3
 refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
+refCategoryMercy = categories.HIGHPRIAIR * categories.AEON * categories.BOMBER * categories.TECH2
+refCategoryTransport = categories.AIR * categories.TRANSPORTATION - categories.UEF * categories.GROUNDATTACK
 
 --Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
@@ -136,7 +159,7 @@ refCategoryCruiser = categories.NAVAL * categories.CRUISER
 refCategoryCruiserCarrier = refCategoryCruiser + categories.NAVAL * categories.NAVALCARRIER
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted
-refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL
+refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL + categories.OVERLAYANTINAVY * categories.LAND --If removing overlayantinavy then think up better solution for fatboy/experimentals so they dont run when in water
 
 --Multi-category:
 --Antinavy mobile units (can include land units - e.g for land factories to build antisub units)
@@ -146,12 +169,15 @@ refCategoryDangerousToLand = refCategoryLandCombat + refCategoryIndirect + refCa
 refCategoryAllNonAirScoutUnits = categories.MOBILE + refCategoryStructure + refCategoryAirNonScout
 refCategoryStealthGenerator = categories.STEALTHFIELD
 refCategoryStealthAndCloakPersonal = categories.STEALTH
-
+refCategoryProtectFromTML = refCategoryT2Mex + refCategoryT3Mex + refCategoryT2Power + refCategoryT3Power + refCategoryFixedT2Arti
+refCategoryExperimentalLevel = categories.EXPERIMENTAL + refCategoryFixedT3Arti + refCategorySML
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
-refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
-refWeaponPriorityOurGroundExperimental = {refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, categories.COMMAND, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
+refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN}
+refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
+refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
+refWeaponPriorityTorpBomber = {refCategoryCruiser, refCategoryCruiserCarrier, refCategoryFrigate, refCategoryNavyThatCanBeTorpedoed}
 
 
 function GetUnitLifetimeCount(oUnit)
@@ -160,7 +186,7 @@ function GetUnitLifetimeCount(oUnit)
     if sCount == nil then
         if oUnit.GetAIBrain and oUnit.GetUnitId then
             local aiBrain = oUnit:GetAIBrain()
-            local sUnitId = oUnit:GetUnitId()
+            local sUnitId = oUnit.UnitId
             if aiBrain.M27LifetimeUnitCount == nil then aiBrain.M27LifetimeUnitCount = {} end
             if aiBrain.M27LifetimeUnitCount[sUnitId] == nil then
                 aiBrain.M27LifetimeUnitCount[sUnitId] = 1
@@ -250,12 +276,13 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     --Returns support factory ID if it can be built, otherwise returns normal upgrade unit (works for any unit, not just factory)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitUpgradeBlueprint'
+    --if EntityCategoryContains(refCategoryAirFactory, oUnitToUpgrade.UnitId) then bDebugMessages = true end
 
     if bGetSupportFactory == nil then bGetSupportFactory = true end
     --Gets the support factory blueprint, and checks if it can be built; if not then returns the normal UpgradesTo blueprint
     local sUpgradeBP
     if not(oUnitToUpgrade.Dead) and oUnitToUpgrade.CanBuild then
-        if bDebugMessages == true then LOG(sFunctionRef..': Start of code, UnitToUpgrade='..oUnitToUpgrade:GetUnitId()..GetUnitLifetimeCount(oUnitToUpgrade)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Start of code, UnitToUpgrade='..oUnitToUpgrade.UnitId..GetUnitLifetimeCount(oUnitToUpgrade)) end
         if bGetSupportFactory == true and oUnitToUpgrade.CanBuild then
             local tsSupportFactoryBP = {
 
@@ -292,7 +319,7 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
                 ['xsb0203'] = 'zsb9603',
             }
 
-            local sFactoryBP = oUnitToUpgrade:GetUnitId()
+            local sFactoryBP = oUnitToUpgrade.UnitId
             if tsSupportFactoryBP[sFactoryBP] then
                 if bDebugMessages == true then LOG(sFunctionRef..': Support factoryBP='..tsSupportFactoryBP[sFactoryBP]) end
                 sUpgradeBP = tsSupportFactoryBP[sFactoryBP]
@@ -342,7 +369,7 @@ function GetUnitIDTechLevel(sUnitId)
 end
 
 function GetUnitTechLevel(oUnit)
-    local sUnitId = oUnit:GetUnitId()
+    local sUnitId = oUnit.UnitId
     local iTechLevel = 1
     if EntityCategoryContains(categories.TECH1, sUnitId) then iTechLevel = 1
     elseif EntityCategoryContains(categories.TECH2, sUnitId) then iTechLevel = 2
@@ -364,7 +391,7 @@ function GetUnitStrikeDamage(oUnit)
     --Gets strike damage of the first weapon in oUnit (longer term might want to make better so it considers other weapons)
     --For bombers will be subject to a minimum value as some bombers will have
     local oBP = oUnit:GetBlueprint()
-    local sBP = oUnit:GetUnitId()
+    local sBP = oUnit.UnitId
     local iStrikeDamage = 0
 
 
@@ -379,7 +406,10 @@ function GetUnitStrikeDamage(oUnit)
 end
 
 function IsUnitUnderwater(oUnit)
-    return M27MapInfo.IsUnderwater({oUnit:GetPosition()[1], oUnit:GetPosition()[2] + oUnit:GetBlueprint().SizeY, oUnit:GetPosition()[3]}, false)
+    if oUnit.GetPosition and oUnit.GetBlueprint then
+        return M27MapInfo.IsUnderwater({oUnit:GetPosition()[1], oUnit:GetPosition()[2] + (oUnit:GetBlueprint().SizeY or 0), oUnit:GetPosition()[3]}, false)
+    else return false
+    end
 end
 
 function IsUnitOnOrUnderWater(oUnit)
@@ -397,7 +427,7 @@ function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
     local iEnemySpeed
     if oEnemyUnit.GetUnitId then
 
-        local sEnemyID = oEnemyUnit:GetUnitId()
+        local sEnemyID = oEnemyUnit.UnitId
 
         if EntityCategoryContains(categories.STRUCTURE, sEnemyID) then bIsEngineer = false
         else
@@ -416,6 +446,17 @@ function IsEnemyUnitAnEngineer(aiBrain, oEnemyUnit)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bIsEngineer
+end
+
+function GetACUShieldRegenRate(oUnit)
+    --Cycles through every possible enhancement, sees if the unit has it, and if so what its shield regen rate is, and returns the max value
+    local iRegenRate = 0
+    for sEnhancement, tEnhancement in oUnit:GetBlueprint().Enhancements do
+        if oUnit:HasEnhancement(sEnhancement) and tEnhancement.ShieldRegenRate then
+            iRegenRate = math.max(iRegenRate, tEnhancement.ShieldRegenRate)
+        end
+    end
+    return iRegenRate
 end
 
 function GetCurrentAndMaximumShield(oUnit)
@@ -570,15 +611,17 @@ function GetUnitIndirectRange(oUnit)
 end
 
 function GetUpgradeBuildTime(oUnit, sUpgradeRef)
+    --Returns nil if unit cant get enhancements
     local oBP = oUnit:GetBlueprint()
     local iUpgradeTime
-    for sUpgradeID, tUpgrade in oBP.Enhancements do
-        if sUpgradeID == sUpgradeRef then
-            iUpgradeTime = tUpgrade.BuildTime
-        end
+    if oBP.Enhancements then
+        for sUpgradeID, tUpgrade in oBP.Enhancements do
+            if sUpgradeID == sUpgradeRef then
+                iUpgradeTime = tUpgrade.BuildTime
+            end
 
+        end
     end
-    if not(iUpgradeTime) then M27Utilities.ErrorHandler('oUnit '..oUnit:GetUnitId()..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeTime
 end
 
@@ -591,21 +634,26 @@ function GetUpgradeEnergyCost(oUnit, sUpgradeRef)
         end
 
     end
-    if not(iUpgradeEnergy) then M27Utilities.ErrorHandler('oUnit '..oUnit:GetUnitId()..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
+    if not(iUpgradeEnergy) then M27Utilities.ErrorHandler('oUnit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeEnergy
 end
 
 function GetBomberAOEAndStrikeDamage(oUnit)
     local oBP = oUnit:GetBlueprint()
     local iAOE = 0
-    local iStrikeDamage
+    local iStrikeDamage = 0
+    local iFiringRandomness
     for sWeaponRef, tWeapon in oBP.Weapon do
         if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' then
             if (tWeapon.DamageRadius or 0) > iAOE then
                 iAOE = tWeapon.DamageRadius
                 iStrikeDamage = tWeapon.Damage * tWeapon.MuzzleSalvoSize
+                iFiringRandomness = (tWeapon.FiringRandomness or 0)
             end
         end
+    end
+    if iStrikeDamage == 0 then
+        M27Utilities.ErrorHandler('Couldnt identify strike damage for bomber '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..'; will refer to predefined value instead')
     end
 
     --Manual floor for strike damage due to complexity of some bomber calculations
@@ -613,7 +661,7 @@ function GetBomberAOEAndStrikeDamage(oUnit)
     local tiBomberStrikeDamageByFactionAndTech =
     {
         --UEF, Aeon, Cybran, Sera, Nomads (are using default), Default
-        { 125, 200, 125, 250, 150, 150 }, --Tech 1
+        { 150, 200, 155, 250, 150, 150 }, --Tech 1
         { 350, 300, 850, 1175, 550, 550 }, --Tech 2
         { 2500, 2500, 2500, 2500, 2500, 2500}, --Tech 3 - the strike damage calculation above should be accurate so this is just as a backup, and set at a low level due to potential for more balance changes affecting this
         { 11000,11000,11000,11000,11000,11000} --Tech 4 - again as a backup
@@ -621,7 +669,7 @@ function GetBomberAOEAndStrikeDamage(oUnit)
     iStrikeDamage = math.max(iStrikeDamage, tiBomberStrikeDamageByFactionAndTech[GetUnitTechLevel(oUnit)][GetFactionFromBP(oBP)])
 
 
-    return iAOE, iStrikeDamage
+    return iAOE, iStrikeDamage, iFiringRandomness
 end
 
 function GetLauncherAOEStrikeDamageMinAndMaxRange(oUnit)
@@ -650,7 +698,7 @@ function GetBomberRange(oUnit)
     local oBP = oUnit:GetBlueprint()
     local iRange = 0
     for sWeaponRef, tWeapon in oBP.Weapon do
-        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' then
+        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' or tWeapon.WeaponCategory == 'Anti Navy' then
             if (tWeapon.MaxRadius or 0) > iRange then
                 iRange = tWeapon.MaxRadius
             end
@@ -659,10 +707,32 @@ function GetBomberRange(oUnit)
     return iRange
 end
 
+function BomberMultiAttackMuzzle(oUnit)
+    --Done to help with searching
+    return DoesBomberFireSalvo(oUnit)
+end
+function DoesBomberFireSalvo(oUnit)
+    local oBP = oUnit:GetBlueprint()
+    for sWeaponRef, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' or tWeapon.WeaponCategory == 'Anti Navy' then
+            if tWeapon.MuzzleSalvoSize == 1 then
+                return false
+            else return true
+            end
+        end
+    end
+end
+
 function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PauseOrUnpauseEnergyUsage'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if EntityCategoryContains(categories.COMMAND + refCategoryAirFactory, oUnit.UnitId) then bDebugMessages = true end
+
+    if bDebugMessages == true then
+        local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
+        LOG(sFunctionRef..': Start of code, oUnit='..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; Unit state='..M27Logic.GetUnitState(oUnit))
+    end
 
 
     --Jamming - check via blueprint since no reliable category
@@ -672,7 +742,7 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
         else EnableUnitJamming(oUnit)
         end
     end
-    
+
     --Want to pause unit, check for any special logic for pausing
     local bWasUnitPaused = (oUnit[refbPaused] or false)
     oUnit[refbPaused] = bPauseNotUnpause
@@ -689,12 +759,67 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
         if bPauseNotUnpause then DisableUnitStealth(oUnit)
         else EnableUnitStealth(oUnit)
         end
-    else
-        --Normal logic - just pause unit
-        oUnit:SetPaused(bPauseNotUnpause)
-        if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
     end
+    --Normal logic - just pause unit
+    oUnit:SetPaused(bPauseNotUnpause)
+    if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
+end
+
+function GetNumberOfUpgradesObtained(oACU)
+    --Returns the number of upgrades a unit (e.g. ACU) has got
+    local iUpgradeCount = 0
+    for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
+        if oACU:HasEnhancement(sEnhancement) and tEnhancement.BuildCostMass > 1 then
+            iUpgradeCount = iUpgradeCount + 1
+        end
+    end
+    return iUpgradeCount
+end
+
+function GetTransportMaxCapacity(oTransport, iTechLevelToLoad)
+    --https://forums.faforever.com/viewtopic.php?f=2&t=17511#:~:text=It%20can%20carry%20exactly%201,and%20more%20T2%20than%20T3.
+    local iFaction = GetUnitFaction(oTransport)
+    local tiCapacityByTechAndFaction --[TransportTechLevel][FactionNumber][UnitTechToHold]
+    if EntityCategoryContains(categories.UEF * categories.GROUNDATTACK * categories.TECH2 * categories.AIR, oTransport.UnitId) then
+        tiCapacityByTechAndFaction = {[2]={[refFactionUEF]={[1]=1,[2]=1,[3]=0,[4]=0}}}
+    else tiCapacityByTechAndFaction =
+        {[1]={ --T1 transports
+            [refFactionUEF]={[1]=6,[2]=2,[3]=1,[4]=0},
+            [refFactionAeon]={[1]=6,[2]=3,[3]=1,[4]=0},
+            [refFactionCybran]={[1]=6,[2]=2,[3]=1,[4]=0},
+            [refFactionSeraphim]={[1]=8,[2]=4,[3]=1,[4]=0},
+            [refFactionNomads]={[1]=4,[2]=2,[3]=0,[4]=0}, --Assumed
+            [refFactionUnrecognised]={[1]=2,[2]=1,[3]=0,[4]=0}, --assumed
+        },
+         [2]={
+             [refFactionUEF]={[1]=14,[2]=6,[3]=3,[4]=0},
+             [refFactionAeon]={[1]=12,[2]=6,[3]=2,[4]=0},
+             [refFactionCybran]={[1]=10,[2]=4,[3]=2,[4]=0},
+             [refFactionSeraphim]={[1]=16,[2]=8,[3]=4,[4]=0},
+             [refFactionNomads]={[1]=8,[2]=4,[3]=2,[4]=0}, --Assumed
+             [refFactionUnrecognised]={[1]=2,[2]=1,[3]=0,[4]=0}, --assumed
+         },
+         [3]={
+             [refFactionUEF]={[1]=28,[2]=12,[3]=6,[4]=0},
+             [refFactionAeon]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionCybran]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionSeraphim]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionNomads]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionUnrecognised]={[1]=1,[2]=1,[3]=1,[4]=0},
+         },
+         [4]={ --dummy values
+             [refFactionUEF]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionAeon]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionCybran]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionSeraphim]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionNomads]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionUnrecognised]={[1]=1,[2]=1,[3]=1,[4]=0},
+         },
+        }
+    end
+
+    return tiCapacityByTechAndFaction[GetUnitTechLevel(oTransport)][iFaction][iTechLevelToLoad]
 end

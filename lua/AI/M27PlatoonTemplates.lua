@@ -148,9 +148,9 @@ PlatoonTemplate = {
         [refiFormMoveCloseDistanceThreshold] = nil,
         [refbDisbandIfReachDestination] = false,
         [refbDisbandAfterRunningAway] = false,
-        [refbSwitchToAttackIfReachDestination] = true,
+        [refbSwitchToAttackIfReachDestination] = false,
         [refbRunFromAllEnemies] = false,
-        [refbAlwaysAttack] = true,
+        [refbAlwaysAttack] = false,
         [refbAttackMove] = false,
         [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = false,
@@ -229,7 +229,7 @@ PlatoonTemplate = {
         [refbSwitchToAttackIfReachDestination] = false,
         [refbRunFromAllEnemies] = false,
         [refbAlwaysAttack] = false,
-        [refbAttackMove] = false,
+        [refbAttackMove] = true,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
@@ -419,6 +419,86 @@ PlatoonTemplate = {
 
 
     --Note when adding more - see above re any functions that will need specific behaviour if dont want default
+
+    ----------------------PLATEAU PLATOONS
+    ['M27PlateauLandCombat'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'AttackFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 20,
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = false,
+    },
+    ['M27PlateauIndirect'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = true,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbUsedByThreatDefender] = true,
+        [refbWantsShieldEscort] = false,
+    },
+    ['M27PlateauMAA'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbRequiresSingleLocationToGuard] = false,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = false, --Dont want on assister platoons as they refresh too often and cause wierd results
+        [refiFormMoveCloseDistanceThreshold] = 30,
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = true,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = false,
+        [refiAirAttackRange] = 40,
+    },
+    ['M27PlateauScout'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = true,
+        [refbIgnoreStuckAction] = true,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = true,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbWantsShieldEscort] = false,
+    },
+
 
 
     ------------------IDLE PLATOONS BELOW===================

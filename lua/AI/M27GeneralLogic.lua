@@ -9,6 +9,8 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
+local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
+local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
 refiNearestEnemyIndex = 'M27NearestEnemyIndex'
@@ -95,6 +97,7 @@ function ReturnUnitsInTargetSegmentGroup(tUnits, iTargetGroup)
                 tCurPosition = oUnit:GetPosition()
                 iCurSegmentX, iCurSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tCurPosition)
                 sPathing = M27UnitInfo.GetUnitPathingType(oUnit)
+                if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
                 iUnitPathGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iCurSegmentX, iCurSegmentZ)
                 if iTargetGroup == iUnitPathGroup then
                     iMatchingUnitCount = iMatchingUnitCount + 1
@@ -136,7 +139,9 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
         local tNearbyReclaim
         local iCurReclaimDist
         local iNearestReclaim = 10000
-        for iSearchRadius = 10, 50, 10 do
+        local bCoveredByEngi
+        local tEngineerActions = {M27EngineerOverseer.refActionReclaimArea, M27EngineerOverseer.refActionReclaimTrees}
+        for iSearchRadius = 10, 100, 10 do
             rCurRect = Rect(tEngiPosition[1] - iSearchRadius, tEngiPosition[3] - iSearchRadius, tEngiPosition[3] + iSearchRadius, tEngiPosition[3] + iSearchRadius)
             if M27MapInfo.GetReclaimInRectangle(5, rCurRect) > 100 then --At least 100 energy income nearby
                 tNearbyReclaim = M27MapInfo.GetReclaimInRectangle(4, rCurRect)
@@ -144,15 +149,31 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                     if oReclaim.MaxEnergyReclaim > 5 then
                         iCurReclaimDist = M27Utilities.GetDistanceBetweenPositions(oReclaim.CachePosition, tEngiPosition)
                         if iCurReclaimDist < iNearestReclaim then
-                            iNearestReclaim = iCurReclaimDist
-                            tClosestLocationToEngi = oReclaim.CachePosition
+                            --Is this location within 10 of existing engineer reclaim targets?
+                            bCoveredByEngi = false
+                            for _, iActionRef in tEngineerActions do
+                                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][iActionRef]) == false then
+                                    for iSubtable, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][iActionRef] do
+                                        if M27Utilities.GetDistanceBetweenPositions(tSubtable[M27EngineerOverseer.refEngineerAssignmentActualLocation], oReclaim.CachePosition) <= 10 then
+                                            bCoveredByEngi = true
+                                            break
+                                        end
+                                    end
+                                end
+                                if bCoveredByEngi then break end
+                            end
+                            if not(bCoveredByEngi) then
+                                iNearestReclaim = iCurReclaimDist
+                                tClosestLocationToEngi = oReclaim.CachePosition
+                            end
                         end
                     end
                 end
                 if M27Utilities.IsTableEmpty(tClosestLocationToEngi) == true then
-                    M27Utilities.ErrorHandler('Couldnt find any energy reclaim, only scenario where expected is if lots of very tiny energy reclaim; will just pick a random location', nil, true)
+                    M27Utilities.ErrorHandler('Couldnt find any energy reclaim, only scenario where expected is if lots of very tiny energy reclaim or have lots of engis already reclaiming; will just pick a random location', true)
                     tClosestLocationToEngi = {tEngiPosition[1] + math.random(iSearchRadius - 10, iSearchRadius), nil, tEngiPosition[3] + math.random(iSearchRadius - 10, iSearchRadius)}
                     tClosestLocationToEngi[2] = GetSurfaceHeight(tClosestLocationToEngi[1], tClosestLocationToEngi[3])
+                    aiBrain[M27EngineerOverseer.refiTimeOfLastFailure][M27EngineerOverseer.refActionReclaimTrees] = GetGameTimeSeconds()
                 end
                 break
             end
@@ -203,8 +224,8 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
     local tEngPosition = oEngineer:GetPosition()
     local iEngSegmentX, iEngSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tEngPosition)
     if bDebugMessages == true then LOG(sFunctionRef..': iEngSegmentXZ='..iEngSegmentX..'-'..iEngSegmentZ) end
-    local sPathingType = M27UnitInfo.GetUnitPathingType(oEngineer)
-    local iEngSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iEngSegmentX, iEngSegmentZ)
+    local sPathing = M27UnitInfo.GetUnitPathingType(oEngineer)
+    local iEngSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iEngSegmentX, iEngSegmentZ)
 
     if not(iEngSegmentGroup) then
         M27Utilities.ErrorHandler('iEngSegmentGroup is nil')
@@ -212,8 +233,8 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
         local iCurSegmentX, iCurSegmentZ, iSegmentMass
         --Go through tReclaimAreas to determine optimal choice:
         -- M27MapInfo.tReclaimAreas = {} --Stores key reclaim area locations; tReclaimAreas[iSegmentX][iSegmentZ][x]; if x=1 returns total mass in area; if x=2 then returns position of largest reclaim in the area, if x=3 returns how many platoons have been sent here since the game started
-        if bDebugMessages == true then LOG(sFunctionRef..': iEngSegmentGroup='..iEngSegmentGroup..'; sPathingType='..sPathingType) end
-        if M27MapInfo.tSegmentBySegmentGroup[sPathingType][iEngSegmentGroup] == nil then
+        if bDebugMessages == true then LOG(sFunctionRef..': iEngSegmentGroup='..iEngSegmentGroup..'; sPathing='..sPathing) end
+        if M27MapInfo.tSegmentBySegmentGroup[sPathing][iEngSegmentGroup] == nil then
             M27Utilities.ErrorHandler('No segments that can path to; returning eng current position iEngSegmentGroup='..iEngSegmentGroup..'; Engineer will attack move to its own segment')
             return tEngPosition
         else
@@ -237,7 +258,7 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                 --for iCurSegmentZ = 1, math.ceil(iMapSizeZ / M27MapInfo.iSegmentSizeZ) do
 
 
-            --for iCurReclaimGroupSegment, v in M27MapInfo.tSegmentBySegmentGroup[sPathingType][iEngSegmentGroup] do
+            --for iCurReclaimGroupSegment, v in M27MapInfo.tSegmentBySegmentGroup[sPathing][iEngSegmentGroup] do
                 --if not (v[1] == nil) then
                     --iCurSegmentX = v[1]
                     --iCurSegmentZ = v[2]
@@ -247,7 +268,7 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                         --Can we path to this segment?
                         --function InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly)
                         --GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
-                        if M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iCurSegmentX, iCurSegmentZ) == iEngSegmentGroup then
+                        if M27MapInfo.GetSegmentGroupOfTarget(sPathing, iCurSegmentX, iCurSegmentZ) == iEngSegmentGroup then
                             if bDebugMessages == true then LOG(sFunctionRef..': iEngSegmentGroup='..iEngSegmentGroup..'; iCurReclaimGroupSegment='..'iCurSegmentX-Z='..iCurSegmentX..'-'..iCurSegmentZ..'; iSegmentMass='..iSegmentMass) end
                             iCurDistance = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.tReclaimAreas[iCurSegmentX][iCurSegmentZ][2], tEngPosition)
                             if iSegmentMass > iHighestReclaim then iHighestReclaim = iSegmentMass end
@@ -270,7 +291,7 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
             local sLocationRef, iAlreadyAssignedEngis
 
             --Since have mapped every location with reclaim the below should now include any such locations:
-            for iCurReclaimGroupSegment, v in M27MapInfo.tSegmentBySegmentGroup[sPathingType][iEngSegmentGroup] do
+            for iCurReclaimGroupSegment, v in M27MapInfo.tSegmentBySegmentGroup[sPathing][iEngSegmentGroup] do
                 if not (v[1] == nil) then
                     iCurSegmentX = v[1]
                     iCurSegmentZ = v[2]
@@ -304,9 +325,9 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                 --No notable mass left in any segment
                 return tEngPosition
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': About to get iCurSegmentX and Z; sPathingType='..sPathingType..'iEngSegmentGroup='..iEngSegmentGroup..'; iBestMatchSegment='..iBestMatchSegment) end
-                iCurSegmentX = M27MapInfo.tSegmentBySegmentGroup[sPathingType][iEngSegmentGroup][iBestMatchSegment][1]
-                iCurSegmentZ = M27MapInfo.tSegmentBySegmentGroup[sPathingType][iEngSegmentGroup][iBestMatchSegment][2]
+                if bDebugMessages == true then LOG(sFunctionRef..': About to get iCurSegmentX and Z; sPathing='..sPathing..'iEngSegmentGroup='..iEngSegmentGroup..'; iBestMatchSegment='..iBestMatchSegment) end
+                iCurSegmentX = M27MapInfo.tSegmentBySegmentGroup[sPathing][iEngSegmentGroup][iBestMatchSegment][1]
+                iCurSegmentZ = M27MapInfo.tSegmentBySegmentGroup[sPathing][iEngSegmentGroup][iBestMatchSegment][2]
                 if bDebugMessages == true then LOG(sFunctionRef..': Returning best match, iMaxPriority = '..iMaxPriority..'; iBestMatchSegment='..iBestMatchSegment..';iCurSegmentX-Z='..iCurSegmentX..'-'..iCurSegmentZ) end
                 --Update engineer count and return target position:
                 if M27MapInfo.tReclaimAreas[iCurSegmentX][iCurSegmentZ] == nil then
@@ -441,7 +462,7 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                         WaitSeconds(1)
                         return GetNearestEnemyIndex(aiBrain, true)
                     else
-                        M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will wait 1 second then call again; gametime='..GetGameTimeSeconds())
+                        M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will wait 1 second then call again')
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         WaitSeconds(1)
                         return GetNearestEnemyIndex(aiBrain, true)
@@ -468,7 +489,7 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                     aiBrain[refiNearestEnemyIndex] = iNearestEnemyIndex
                     --Update intel path as nearest enemy has changed
                     aiBrain[M27Overseer.refbIntelPathsGenerated] = false
-                    M27MapInfo.SetWhetherCanPathToEnemy(aiBrain)
+                    ForkThread(M27MapInfo.SetWhetherCanPathToEnemy,aiBrain)
                 end
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 return iNearestEnemyIndex
@@ -517,12 +538,12 @@ function GetUnitNearestEnemy(aiBrain, tUnits)
     if (iTimeOfLastBrainAllDefeated or 0) > 10 then
         return nil
     else
-        return M27Utilities.GetNearestUnit(tUnits, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], aiBrain, false)
+        return M27Utilities.GetNearestUnit(tUnits, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
     end
     --[[
     local iNearestDistance = 100000
     local oNearestUnit
-    local tEnemyStart = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]
+    local tEnemyStart = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
     local iCurDistanceToEnemy
     for iUnit, oUnit in tUnits do
         if not(oUnit.Dead) and oUnit.GetPosition then
@@ -627,7 +648,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
     end
     local tSortedFinalWaypoints = {}
     if bHaveAliveUnit == false then
-        M27Utilities.ErrorHandler('Cant find valid unit in platoon, will set platoon to disband and return start position as the movement path.  Will send log with platoon plan and count after this', nil, true)
+        M27Utilities.ErrorHandler('Cant find valid unit in platoon, will set platoon to disband and return start position as the movement path.  Will send log with platoon plan and count after this', true)
         if oPlatoonHandle.GetPlan then LOG(oPlatoonHandle:GetPlan()..(oPlatoonHandle[M27PlatoonUtilities.refiPlatoonCount] or 'nil')) end
         oPlatoonHandle[M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
         tSortedFinalWaypoints = {M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]}
@@ -636,19 +657,20 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
     else
         local tUnitStart = oUnit:GetPosition()
         local iPlayerArmyIndex = aiBrain:GetArmyIndex()
-        local iEnemyStartPos = GetNearestEnemyStartNumber(aiBrain)
-        if iEnemyStartPos then
-            local sPathingType = M27UnitInfo.GetUnitPathingType(oUnit)
-            local iBaseStartGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        if GetNearestEnemyStartNumber(aiBrain) then
+            local sPathing = M27UnitInfo.GetUnitPathingType(oUnit)
+            if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+            local iBaseStartGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             --function InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly)
             local iUnitSegmentX, iUnitSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tUnitStart)
-            local iUnitSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iUnitSegmentX, iUnitSegmentZ)
+            local iUnitSegmentGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iUnitSegmentX, iUnitSegmentZ)
             local tPossibleMexTargets = {} --Table storing the mex number within tMexByPathingAndGrouping for mexes that aren't in enemy base (or other player base where other player is alive) but are nearer enemy than us
+
             --Determine PlayerStartPoints:
             local tActivePlayerStartLocations = {}
             local iActivePlayerCount = 0
             local iCurPlayerStartNumber = 0
-            if bDebugMessages == true then LOG(sFunctionRef..': sPathingType='..sPathingType..'; iUnitSegmentGroup='..iUnitSegmentGroup) end
+            if bDebugMessages == true then LOG(sFunctionRef..': sPathing='..sPathing..'; iUnitSegmentGroup='..iUnitSegmentGroup) end
             for iCurBrain, brain in ArmyBrains do
                 if not(brain:IsDefeated()) and not(brain.M27IsDefeated) then
                     iCurPlayerStartNumber = brain.M27StartPositionNumber
@@ -675,7 +697,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             local bIsEnemyMex
             local bIsStartMex
             local bIsEndDestinationMex
-            local tMexesInGroup = M27MapInfo.tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup]
+            local tMexesInGroup = M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup]
 
             local iTotalMexesInGroup
             if M27Utilities.IsTableEmpty(tMexesInGroup) == true then iTotalMexesInGroup = 0
@@ -686,7 +708,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                 --M27Utilities.DrawLocations(tMexesInGroup, nil, 7, 1000)
             end
             local bNoBetterTargets
-            if bDebugMessages == true then LOG(sFunctionRef..': iActivePlayerCount='..iActivePlayerCount..'; size of tMexByPathingAndGrouping='..iTotalMexesInGroup..'; sPathingType='..sPathingType..'; iUnitSegmentGroup='..iUnitSegmentGroup) end
+            if bDebugMessages == true then LOG(sFunctionRef..': iActivePlayerCount='..iActivePlayerCount..'; size of tMexByPathingAndGrouping='..iTotalMexesInGroup..'; sPathing='..sPathing..'; iUnitSegmentGroup='..iUnitSegmentGroup) end
             if iTotalMexesInGroup == 0 then
                 bNoBetterTargets = true
                 --No mexes in group; check if are in the base group (as if a platoon is spread out some units may be on other segments):
@@ -699,9 +721,10 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                 end
                 if bNoBetterTargets == false then
                     oUnit = tAltUnits[math.random(1, iAltUnits)]
-                    sPathingType = M27UnitInfo.GetUnitPathingType(oUnit)
+                    sPathing = M27UnitInfo.GetUnitPathingType(oUnit)
+                    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
                     iUnitSegmentGroup = 1
-                    iTotalMexesInGroup = table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup])
+                    iTotalMexesInGroup = table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup])
                     if iTotalMexesInGroup == nil then
                         M27Utilities.ErrorHandler('iTotalMexesInGroup is nil after looking for iUnitSegmentGroup1')
                         bNoBetterTargets = true
@@ -711,7 +734,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                     end
                     if bNoBetterTargets == true then
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
+                        return {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)}
                     end
                 end
             end
@@ -719,9 +742,9 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
 
             for iCurMex = 1, iTotalMexesInGroup do
                 --Is the mex closer to the enemy than to us?
-                tCurMexPosition = M27MapInfo.tMexByPathingAndGrouping[sPathingType][iUnitSegmentGroup][iCurMex]
+                tCurMexPosition = M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitSegmentGroup][iCurMex]
                 if M27Utilities.IsTableEmpty(tCurMexPosition) == false then
-                    iDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPos])
+                    iDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                     iDistanceToOurBase = M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.PlayerStartPoints[iPlayerArmyIndex])
                     if bDebugMessages == true then LOG(sFunctionRef..': Looping through mex, iCurMex='..iCurMex..'; iDistanceToEnemyBase='..iDistanceToEnemyBase..'; iDistanceToOurBase='..iDistanceToOurBase) end
                     --Check if mex is too close to any player start:
@@ -765,7 +788,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                                     --Only consider if will be a valid end position:
                                     bIsEndDestinationMex = false
                                     if iEndPointMaxDistFromEnemyStart == nil then bIsEndDestinationMex = true
-                                    elseif M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPos]) <= iEndPointMaxDistFromEnemyStart then bIsEndDestinationMex = true end
+                                    elseif M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= iEndPointMaxDistFromEnemyStart then bIsEndDestinationMex = true end
                                     if bIsEndDestinationMex == true then iMinRaidsAlreadySent = tPlatoonRaiderTargets[iPlayerArmyIndex][sMexLocationRef] end
                                 end
                             end
@@ -800,7 +823,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                     --if have specified a distance from enemy base, check if are close enough:
                     bIsEndDestinationMex = false
                     if iEndPointMaxDistFromEnemyStart == nil then bIsEndDestinationMex = true
-                    elseif M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPos]) <= iEndPointMaxDistFromEnemyStart then bIsEndDestinationMex = true end
+                    elseif M27Utilities.GetDistanceBetweenPositions(tCurMexPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= iEndPointMaxDistFromEnemyStart then bIsEndDestinationMex = true end
 
                     if bIsEndDestinationMex == true then
                         sMexLocationRef = M27Utilities.ConvertLocationToStringRef(tCurMexPosition)
@@ -828,7 +851,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                 elseif iPossibleTargetCount == 0 then bErrorControl = true end
                 if bErrorControl then
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                    return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
+                    return {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)}
                 else
                     M27Utilities.ErrorHandler('iRevisedPossibleMex is nil or 0 but iPossibleTargetCount > 0 so reverting to that')
                     iFinalMex = math.random(1, iPossibleTargetCount)
@@ -853,7 +876,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
             if bNoBetterTargets == true then
                 M27Utilities.ErrorHandler('bNoBetterTargets is true, returning player start point')
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                return {M27MapInfo.PlayerStartPoints[iEnemyStartPos]}
+                return {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)}
             end
 
             if bDebugMessages == true then LOG(sFunctionRef..': iRevisedPossibleMex='..iRevisedPossibleMex..'; iFinalMex='..iFinalMex) end
@@ -909,8 +932,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                         iLoopCount = iLoopCount + 1
                         iWaitCount = iWaitCount + 1
                         if iLoopCount > iMaxLoopCountBeforeChecks then
-                            M27Utilities.ErrorHandler('iLoopCount has exceeded iMaxLoopCountBeforeChecks, likely infinite loop; slowing down script')
-                            bDebugMessages = true --for error control - want these enabled to help debugging where get this error arising
+                            M27Utilities.ErrorHandler('iLoopCount has exceeded iMaxLoopCountBeforeChecks, likely infinite loop; slowing down script') bDebugMessages = true --for error control - want these enabled to help debugging where get this error arising
                             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             WaitTicks(5)
                             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -976,10 +998,12 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                         end
                     end
                 end
+                --Logic for adding via point near friendly mexes - have decided to ignore in v29 for performance reasons
+                --[[
                 if bAbort == false then
                     --Are there any mexes on our side of the map that wouldn't result in a significant detour to pass by? If so then add to queue
                     if iFriendlyPossibleMexes > 0 then
-                        if M27Utilities.GetDistanceBetweenPositions(tUnitStart, M27MapInfo.PlayerStartPoints[iPlayerArmyIndex]) > M27Utilities.GetDistanceBetweenPositions(tUnitStart, M27MapInfo.PlayerStartPoints[iEnemyStartPos]) then
+                        if M27Utilities.GetDistanceBetweenPositions(tUnitStart, M27MapInfo.PlayerStartPoints[iPlayerArmyIndex]) > M27Utilities.GetDistanceBetweenPositions(tUnitStart, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
                             --Dont search for friendly mexes as are closer to enemy base than our own
                         else
                             --To avoid significant slowdown, if >10 friendly mexes then split them into groups of 10
@@ -1071,7 +1095,7 @@ function GetMexRaidingPath(oPlatoonHandle, iIgnoreDistanceFromStartLocation, iEn
                             end
                         end
                     end
-                end
+                end --]]
             end
             if M27Utilities.IsTableEmpty(tFinalWaypoints) == true then
                 bAbort = true
@@ -1130,14 +1154,21 @@ function SetFactoryRallyPoint(oFactory)
     if iEnemyZ > iRallyZ then iRallyZ = iRallyZ + iDistFromFactory
     else iRallyZ = iRallyZ - iDistFromFactory end
 
-    local tRallyPoint = {iRallyX, GetTerrainHeight(iRallyX, iRallyZ), iRallyZ}
-    local tNearestRallyPoint = GetNearestRallyPoint(aiBrain, tFactoryPos)
-    if M27Utilities.GetDistanceBetweenPositions(tRallyPoint, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]) > M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]) then
-        tRallyPoint = {tNearestRallyPoint[1], tNearestRallyPoint[2], tNearestRallyPoint[3]}
+    --Is this a plateau factory?
+    local iFactoryGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFactory:GetPosition())
+    if iFactoryGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup] then
+
+        local tRallyPoint = {iRallyX, GetTerrainHeight(iRallyX, iRallyZ), iRallyZ}
+        local tNearestRallyPoint = GetNearestRallyPoint(aiBrain, tFactoryPos)
+        if M27Utilities.GetDistanceBetweenPositions(tRallyPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) > M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
+            tRallyPoint = {tNearestRallyPoint[1], tNearestRallyPoint[2], tNearestRallyPoint[3]}
+        end
+        if bDebugMessages == true then LOG('SetFactoryRallyPoint: tFactoryPos='..tFactoryPos[1]..'-'..tFactoryPos[3]..'; iRallyXZ='..iRallyX..'-'..iRallyZ..'; iEnemyXZ='..iEnemyX..'-'..iEnemyZ) end
+        IssueClearFactoryCommands({oFactory})
+        IssueFactoryRallyPoint({oFactory}, tRallyPoint)
+    else
+        if not(oFactory[M27Transport.refiAssignedPlateau]) then oFactory[M27Transport.refiAssignedPlateau] = iFactoryGroup end
     end
-    if bDebugMessages == true then LOG('SetFactoryRallyPoint: tFactoryPos='..tFactoryPos[1]..'-'..tFactoryPos[3]..'; iRallyXZ='..iRallyX..'-'..iRallyZ..'; iEnemyXZ='..iEnemyX..'-'..iEnemyZ) end
-    IssueClearFactoryCommands({oFactory})
-    IssueFactoryRallyPoint({oFactory}, tRallyPoint)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -1588,7 +1619,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                 end
             end
             if bCalcActualThreat == true then
-                if bDebugMessages == true then LOG(sFunctionRef..': About to calculate threat using actual unit data; unitID='..oUnit:GetUnitId()) end
+                if bDebugMessages == true then LOG(sFunctionRef..': About to calculate threat using actual unit data; unitID='..oUnit.UnitId) end
                 --get actual threat calc
                 if bJustGetMassValue == true then iCurThreat = oUnit:GetBlueprint().Economy.BuildCostMass
                 else
@@ -1632,8 +1663,11 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             iHealthFactor = iHealthPercentage --threat will be mass * iHealthFactor
                             iMassCost = GetACUCombatMassRating(oUnit)
                             if bOurUnits == true then
+                                if aiBrain:GetEconomyStored('ENERGY') >= 6000 then iMassMod = iMassMod * 1.1 end --If we can overcharge then we can take on a greater threat
                                 if iHealthPercentage < 0.5 then iHealthFactor = iHealthPercentage * iHealthPercentage
                                 elseif iHealthPercentage < 0.9 then iHealthFactor = iHealthPercentage * (iHealthPercentage + 0.1) end
+
+
                             else iMassMod = iMassMod * 1.15 --Want to send 15% more than what expect to need against enemy ACU given it can gain veterancy
                             end
                         else
@@ -1645,7 +1679,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             end
                         end
                         iCurThreat = iMassCost * iMassMod * iHealthFactor
-                        if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit:GetUnitId()..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'; iHealthPercentage='..iHealthPercentage..'; UnitHealth='..oUnit:GetHealth()..'; UnitMaxHealth='..oUnit:GetBlueprint().Defense.MaxHealth..'; UnitHealth='..oUnit:GetBlueprint().Defense.Health) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'; iHealthPercentage='..iHealthPercentage..'; UnitHealth='..oUnit:GetHealth()..'; UnitMaxHealth='..oUnit:GetBlueprint().Defense.MaxHealth..'; UnitHealth='..oUnit:GetBlueprint().Defense.Health) end
                     end
                 end
                 --Reduce threat if its under construction
@@ -1739,13 +1773,15 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
         local sCurUnitPathing
         local oCurUnitBlueprint
         local sCurUnitBP
+        local iGhettoGunshipAdjust = 0
         for iUnit, oUnit in tUnits do
             iCurThreat = 0
+            iGhettoGunshipAdjust = 0
             bCalcActualThreat = false
             if bDebugMessages == true then LOG(sFunctionRef..': About to check if unit is dead') end
             if not(oUnit.Dead) then
                 sCurUnitPathing = M27UnitInfo.GetUnitPathingType(oUnit)
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering threat calculation for oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering threat calculation for oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                 if oUnit:GetAIBrain() == aiBrain then
                     bOurUnits = true
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and has same ai brain so will determine actual threat') end
@@ -1799,9 +1835,41 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                         if sCurUnitPathing == M27UnitInfo.refPathingTypeAir then
                             if bIncludeNonCombatAir == true then
                                 iMassMod = 1
+                                --Increase for cargo of transports
+                                if EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
+                                    --Include threat of cargo if cargo are LABs
+                                    tCargo = oUnit:GetCargo()
+                                    --Filter to just LABs (note unfortunately it doesnt distinguish between mantis and LABs so matnis get treated as LABs to be prudent)
+                                    if tCargo then
+                                        tCargo = EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)
+                                        if M27Utilities.IsTableEmpty(tCargo) == false then
+                                            --Get mass value ignoring health:
+                                            --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
+                                            iGhettoGunshipAdjust = GetCombatThreatRating(aiBrain, tCargo, true, 35, 35, false, true)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Contains LABs so will increase threat by '..iGhettoGunshipAdjust) end
+                                        end
+                                    end
+                                end
                             else
                                 if bIncludeAirToGround == true then
-                                    if EntityCategoryContains(categories.BOMBER + categories.GROUNDATTACK + categories.OVERLAYDIRECTFIRE, sCurUnitBP) == true then iMassMod = 1 end
+                                    if EntityCategoryContains(categories.BOMBER + categories.GROUNDATTACK + categories.OVERLAYDIRECTFIRE, sCurUnitBP) == true then iMassMod = 1
+                                    elseif EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
+                                        --Include threat of cargo if cargo are LABs
+                                        tCargo = oUnit:GetCargo()
+                                        --Filter to just LABs (note unfortunately it doesnt distinguish between mantis and LABs so matnis get treated as LABs to be prudent)
+                                        if tCargo then
+                                            tCargo = EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)
+                                            if M27Utilities.IsTableEmpty(tCargo) == false then
+                                                iMassMod = 1
+                                                --Get mass value ignoring health:
+                                                --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
+                                                iGhettoGunshipAdjust = GetCombatThreatRating(aiBrain, tCargo, true, 35, 35, false, true)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Contains LABs so will increase threat by '..iGhettoGunshipAdjust) end
+                                            end
+                                        end
+                                    end
                                 end
                                 if bIncludeAirTorpedo == true and EntityCategoryContains(categories.ANTINAVY, sCurUnitBP) == true then iMassMod = 1 end
                                 if bDebugMessages == true then LOG(sFunctionRef..': bIncludeAirTorpedo='..tostring(bIncludeAirTorpedo)..'; iMassMod='..iMassMod) end
@@ -1847,8 +1915,8 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                         --Only GroundToAir: Increase structure value by 100%
                         if bIncludeGroundToAir == true and sCurUnitPathing == M27UnitInfo.refPathingTypeNone then iMassMod = iMassMod * 2 end
                         iMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
-                        iCurThreat = iMassCost * iMassMod
-                        if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit:GetUnitId()..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'iCurThreat='..iCurThreat) end
+                        iCurThreat = iMassCost * iMassMod + iGhettoGunshipAdjust
+                        if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'iCurThreat='..iCurThreat) end
                     end
                 end
                 iTotalThreat = iTotalThreat + iCurThreat
@@ -1872,7 +1940,7 @@ function CategoriesInVisibleUnits(aiBrain, tEnemyUnits, category, iReturnType)
     for iUnit, oUnit in tIndirectUnits do
         bIsSeen = M27Utilities.CanSeeUnit(aiBrain, oUnit)
         if bIsSeen == true then
-            if bDebugMessages == true then LOG('CategoriesInVisibleUnits: iUnit='..iUnit..'; is seen; ID='..oUnit:GetUnitId()) end
+            if bDebugMessages == true then LOG('CategoriesInVisibleUnits: iUnit='..iUnit..'; is seen; ID='..oUnit.UnitId) end
             if iReturnType == 1 then return true
             else
                 iValidCount = iValidCount + 1
@@ -1896,14 +1964,13 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     local sFunctionRef = 'IsUnitIdle'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit:GetUnitId()) and M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 32 then bDebugMessages = true end
 
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
         --Note this is increased for engineers with an action to build a T3 mex
     --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit) and (M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 59) then bDebugMessages = true end
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit '..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is idle; unit state='..(GetUnitState(oUnit) or 'nil')) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is idle; unit state='..(GetUnitState(oUnit) or 'nil')) end
     if oUnit[M27UnitInfo.refbSpecialMicroActive] then bIsIdle = false
     else
 
@@ -1915,7 +1982,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
             bIsIdle = false
         elseif oUnit:IsUnitState('Moving') then
             if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Moving') end
-            if bMovingUnassignedEngiIsIdle == true and not(oUnit[M27EngineerOverseer.refiEngineerCurrentAction]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit:GetUnitId()) then
+            if bMovingUnassignedEngiIsIdle == true and not(oUnit[M27EngineerOverseer.refiEngineerCurrentAction]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) then
                 bIsIdle = true
             else
                 bIsIdle = false
@@ -2002,7 +2069,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
     else
         if not(bDontIncreaseIdleCount) then oUnit[refiIdleCount] = (oUnit[refiIdleCount] or 0) + 1 end
         if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildT3MexOverT2 and not(oUnit[M27EngineerOverseer.rebToldToStartBuildingT3Mex]) then
-            iIdleCountThreshold = 60 --can take a long time to start building if units nearby blocking the mex or if pathfinding issues due to units
+            iIdleCountThreshold = 20 --can take a long time to start building if units nearby blocking the mex or if pathfinding issues due to units; was set to 60 but have changed reassignment so it should typically only happen once every 4 seconds (made 20 as compromise as sometimes will be more often)
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Unit appears idle, but checking against idle threshold. Unit idle count='..(oUnit[refiIdleCount] or 'nil')..'; Idle threshold='..iIdleCountThreshold..'; if >= idle threshold then will return true. Engineer action (nil for non engineers)='..(oUnit[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -2019,6 +2086,7 @@ function GetReclaimDetourLocation(tCurStartPosition, tEndPosition, iMaxDetourAbs
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetReclaimDetourLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if iMinDistanceFromStartAndEnd == nil then iMinDistanceFromStartAndEnd = 0 end
     local iAngleToTarget = M27Utilities.GetAngleFromAToB(tCurStartPosition, tEndPosition)
     local tCurPointAlongLine
@@ -2037,15 +2105,19 @@ function GetReclaimDetourLocation(tCurStartPosition, tEndPosition, iMaxDetourAbs
 
     tCurPointAlongLine = {tCurStartPosition[1], tCurStartPosition[2], tCurStartPosition[3]}
     for iCurPointAlongLine = 1, iMaxPointsAlongLine do
+        if bDebugMessages == true then LOG(sFunctionRef..': iCurPointAlongLine='..iCurPointAlongLine..'; iMaxPointsALongLine='..iMaxPointsAlongLine..'; iAngleToTarget='..iAngleToTarget..'; iBaseDistanceInterval='..iBaseDistanceInterval..'; iMaxSegmentRange='..(iMaxSegmentRange or 'nil')) end
         tCurPointAlongLine = M27Utilities.MoveInDirection(tCurPointAlongLine, iAngleToTarget, iBaseDistanceInterval)
+        if bDebugMessages == true then LOG(sFunctionRef..': tCurPointAlongLine='..repr((tCurPointAlongLine or {'nil'}))) end
         iBaseSegmentX, iBaseSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tCurPointAlongLine)
+        if bDebugMessages == true then LOG(sFunctionRef..': iBaseSegmentX='..iBaseSegmentX..'; iBaseSegmentZ='..iBaseSegmentZ) end
         for iAdjX = -iMaxSegmentRange, iMaxSegmentRange do
             for iAdjZ = -iMaxSegmentRange, iMaxSegmentRange do
+                if bDebugMessages == true then LOG(sFunctionRef..': iAdjX='..iAdjX..'; iAdjZ='..iAdjZ) end
                 --Different segment to the start and end positions?
                 if not({iBaseSegmentX + iAdjX, iBaseSegmentZ + iAdjZ} == {iStartSegmentX, iStartSegmentZ}) and not({iBaseSegmentX + iAdjX, iBaseSegmentZ + iAdjZ} == {iEndSegmentX, iEndSegmentZ}) then
 
                     --Has at least 30 mass with at least a 7.5+ reclaim item in it?
-                    if M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX] and M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ] and M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] >= 30 and M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ][M27MapInfo.refReclaimHighestIndividualReclaim] >= 7.5 then
+                    if M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX] and M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ] and (M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 0) >= 30 and (M27MapInfo.tReclaimAreas[iBaseSegmentX + iAdjX][iBaseSegmentZ + iAdjZ][M27MapInfo.refReclaimHighestIndividualReclaim] or 0) >= 7.5 then
                         --In same pathing group?
                         tPossibleDetour = M27MapInfo.GetReclaimLocationFromSegment(iBaseSegmentX + iAdjX, iBaseSegmentZ + iAdjZ)
                         if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPossibleDetour) == iBasePathingGroup then
@@ -2072,6 +2144,7 @@ function GetReclaimDetourLocation(tCurStartPosition, tEndPosition, iMaxDetourAbs
             break
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code; tClosestDetour='..repr((tClosestDetour or {'nil'}))) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tClosestDetour
 end
@@ -2079,200 +2152,223 @@ end
 function AddMexesAndReclaimToMovementPath(oPathingUnit, tFinalDestination, iPassingSearchRadius)
     --Considers mex locations and reclaim that are near the path that would take to reach tFinalDestination
     --iPassingSearchRadius - defaults to build distance+10 if not specified
-    --Config variables
-    local iMinReclaimToConsider = 29 --Will consider a detour if reclaim is more than this
 
-    --Other variables:
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddMexesAndReclaimToMovementPath'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local oUnitBP = oPathingUnit:GetBlueprint()
-    local iBuildDistance = oUnitBP.Economy.MaxBuildDistance
-    local iUnitSpeed = oUnitBP.Physics.MaxSpeed
-    local aiBrain = oPathingUnit:GetAIBrain()
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
-    if iBuildDistance == nil then iBuildDistance = 5 end
-    if iPassingSearchRadius == nil then iPassingSearchRadius = iBuildDistance + 10 end --look for mexes and reclaim within this distance of the path
-    local iSearchIntervals = iPassingSearchRadius * 0.5 --will look every x points along the path from start to end to identify places where want to stop off on the way
-    local tCurStartPosition = {}
-    tCurStartPosition = oPathingUnit:GetPosition()
-    local iMaxLoopCount = 200
-    local iCurLoopCount = 0
-    local tAllTargetLocations = {}
-    local iPassingLocationCount = 0
-    local bHavePassThrough
-    --Get shortlist of mexes so not having to cycle through every mex on the map at every point
-    local tMexShortlist = {}
-    local iPossibleMex = 0
-    local iDestinationSegmentX, iDestinationSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tFinalDestination)
-    local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnit)
-    local iACUSegmentX, iACUSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tCurStartPosition)
-    local iUnitPathGroup = M27MapInfo.InSameSegmentGroup(oPathingUnit, tCurStartPosition, true)
-    local iReclaimLoopCount
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to loop through mexes in pathing group') end
-    if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
-        for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
-            local iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
-            if iSegmentX <= math.max(iDestinationSegmentX, iACUSegmentX) then
-                if iSegmentX >= math.min(iDestinationSegmentX, iACUSegmentX) then
-                    if iSegmentZ <= math.max(iDestinationSegmentZ, iACUSegmentZ) then
-                        if iSegmentZ >= math.min(iDestinationSegmentZ, iACUSegmentZ) then
-                            iPossibleMex = iPossibleMex + 1
-                            tMexShortlist[iPossibleMex] = {}
-                            tMexShortlist[iPossibleMex] = tMexLocation
+
+    --Avoid infinite loop caused by dividing by 0 later on - check reclaim segment size has been determined
+    if (M27MapInfo.iReclaimSegmentSizeX or 0) == 0 then --Not yet determined reclaim sizes
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return {tFinalDestination}
+    else
+
+        --Config variables
+        local iMinReclaimToConsider = 29 --Will consider a detour if reclaim is more than this
+
+        --Other variables:
+
+        local oUnitBP = oPathingUnit:GetBlueprint()
+        local iBuildDistance = oUnitBP.Economy.MaxBuildDistance
+        local iUnitSpeed = oUnitBP.Physics.MaxSpeed
+        local aiBrain = oPathingUnit:GetAIBrain()
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Start of code') end
+        if iBuildDistance == nil then iBuildDistance = 5 end
+        if iPassingSearchRadius == nil then iPassingSearchRadius = iBuildDistance + 10 end --look for mexes and reclaim within this distance of the path
+        local iSearchIntervals = iPassingSearchRadius * 0.5 --will look every x points along the path from start to end to identify places where want to stop off on the way
+        local tCurStartPosition = {}
+        tCurStartPosition = oPathingUnit:GetPosition()
+        local iMaxLoopCount = 200
+        local iCurLoopCount = 0
+        local tAllTargetLocations = {}
+        local iPassingLocationCount = 0
+        local bHavePassThrough
+        --Get shortlist of mexes so not having to cycle through every mex on the map at every point
+        local tMexShortlist = {}
+        local iPossibleMex = 0
+        local iDestinationSegmentX, iDestinationSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tFinalDestination)
+        local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnit)
+        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+        local iACUSegmentX, iACUSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tCurStartPosition)
+        local iUnitPathGroup = M27MapInfo.InSameSegmentGroup(oPathingUnit, tCurStartPosition, true)
+        local iReclaimLoopCount
+        local iReclaimSegmentBaseX, iReclaimSegmentBaseZ, iHighestReclaimValue
+        local tBestReclaimSegmentXZ = {}
+        local iReclaimSegmentSearchSize = math.ceil(iPassingSearchRadius / M27MapInfo.iReclaimSegmentSizeX)
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to loop through mexes in pathing group') end
+        if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
+            for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
+                local iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
+                if iSegmentX <= math.max(iDestinationSegmentX, iACUSegmentX) then
+                    if iSegmentX >= math.min(iDestinationSegmentX, iACUSegmentX) then
+                        if iSegmentZ <= math.max(iDestinationSegmentZ, iACUSegmentZ) then
+                            if iSegmentZ >= math.min(iDestinationSegmentZ, iACUSegmentZ) then
+                                --Ignore if we or an ally already has a mex near here (i.e. below will say its unclaimed if enemy built there or noone built there)
+                                if M27Conditions.IsMexOrHydroUnclaimed(aiBrain, tMexLocation, true, true, false, true) then
+                                    iPossibleMex = iPossibleMex + 1
+                                    tMexShortlist[iPossibleMex] = {}
+                                    tMexShortlist[iPossibleMex] = tMexLocation
+                                end
+                            end
                         end
                     end
                 end
             end
         end
-    end
-    local iMinDistanceToMex, iCurDistanceToMex
-    local tClosestMex, bFoundPassThroughMex
-    local iCurDistanceToEnd = M27Utilities.GetDistanceBetweenPositions(tCurStartPosition, tFinalDestination)
-    local tPassThroughLocation, iTempDistanceToEnd
-    local tLastPassThroughPosition = {}
-    local tHighestValidReclaim, ReclaimRectangle, tReclaimables, iMassValue
-    local iTempDistanceToCurStart
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': just before while loop') end
-    while iCurDistanceToEnd > iSearchIntervals do
-        bHavePassThrough = false
-        iCurLoopCount = iCurLoopCount + 1
-        if iCurLoopCount > iMaxLoopCount then
-            LOG(sFunctionRef..': LIKELY ERROR - Infinite loop count exceeded')
-            break
-        end
-        tPassThroughLocation = {}
-        --Search for nearby mex within shortlist
-        if iPossibleMex > 0 then
-            iMinDistanceToMex = 10000
-            tClosestMex = {}
-            bFoundPassThroughMex = false
-            if bDebugMessages == true then LOG(sFunctionRef..': tMexShortlist='..repr(tMexShortlist)..'; iPassingLocationCount='..iPassingLocationCount) end
-            for iCurMex, tMexLocation in tMexShortlist do
-                if not(tLastPassThroughPosition == tMexLocation) then
-                    if M27Utilities.IsTableEmpty(tMexLocation) == false then
-                        --Check it's not close to our current position
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..'; tCurStartPosition='..repr(tCurStartPosition))
-                            if tLastPassThroughPosition == nil then LOG(sFunctionRef..'; tLastPassThroughPosition is nil')
-                            else LOG(sFunctionRef..': tLastPassThroughPosition='..repr(tLastPassThroughPosition))
+        local iMinDistanceToMex, iCurDistanceToMex
+        local tClosestMex, bFoundPassThroughMex
+        local iCurDistanceToEnd = M27Utilities.GetDistanceBetweenPositions(tCurStartPosition, tFinalDestination)
+        local tPassThroughLocation, iTempDistanceToEnd
+        local tLastPassThroughPosition = {}
+        local tHighestValidReclaim, ReclaimRectangle, tReclaimables, iMassValue
+        local iTempDistanceToCurStart
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': just before while loop') end
+        while iCurDistanceToEnd > iSearchIntervals do
+            bHavePassThrough = false
+            iCurLoopCount = iCurLoopCount + 1
+            if iCurLoopCount > iMaxLoopCount then
+                LOG(sFunctionRef..': LIKELY ERROR - Infinite loop count exceeded')
+                break
+            end
+            tPassThroughLocation = {}
+            --Search for nearby mex within shortlist
+            if iPossibleMex > 0 then
+                iMinDistanceToMex = 10000
+                tClosestMex = {}
+                bFoundPassThroughMex = false
+                if bDebugMessages == true then LOG(sFunctionRef..': tMexShortlist='..repr(tMexShortlist)..'; iPassingLocationCount='..iPassingLocationCount) end
+                for iCurMex, tMexLocation in tMexShortlist do
+                    if not(tLastPassThroughPosition == tMexLocation) then
+                        if M27Utilities.IsTableEmpty(tMexLocation) == false then
+                            --Check it's not close to our current position
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..'; tCurStartPosition='..repr(tCurStartPosition))
+                                if tLastPassThroughPosition == nil then LOG(sFunctionRef..'; tLastPassThroughPosition is nil')
+                                else LOG(sFunctionRef..': tLastPassThroughPosition='..repr(tLastPassThroughPosition))
+                                end
+                            end
+                            iCurDistanceToMex = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tCurStartPosition)
+                            if iCurDistanceToMex <= iPassingSearchRadius then
+                                if iCurDistanceToMex < iMinDistanceToMex then
+                                    iMinDistanceToMex = iCurDistanceToMex
+                                    tClosestMex = tMexLocation
+                                    bHavePassThrough = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have at least 1 passthrough mex, current tClosestMex='..repr(tClosestMex)) end
+                                end
                             end
                         end
-                        iCurDistanceToMex = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tCurStartPosition)
-                        if iCurDistanceToMex <= iPassingSearchRadius then
-                            if iCurDistanceToMex < iMinDistanceToMex then
-                                iMinDistanceToMex = iCurDistanceToMex
-                                tClosestMex = tMexLocation
-                                bHavePassThrough = true
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have at least 1 passthrough mex, current tClosestMex='..repr(tClosestMex)) end
+                    end
+                    --Add closest mex:
+                    if bHavePassThrough == true then
+                        tPassThroughLocation = tClosestMex
+                    end
+                end
+            end
+
+
+            --Search for nearby reclaim as a detour (if no mexes were found)
+            if bHavePassThrough == false then
+                iHighestReclaimValue = 0
+                iReclaimSegmentBaseX, iReclaimSegmentBaseZ = M27MapInfo.GetReclaimSegmentsFromLocation(tCurStartPosition)
+
+                for iReclaimSegmentX = iReclaimSegmentBaseX - iReclaimSegmentSearchSize, iReclaimSegmentBaseX + iReclaimSegmentSearchSize do
+                    for iReclaimSegmentZ = iReclaimSegmentBaseZ - iReclaimSegmentSearchSize, iReclaimSegmentBaseZ + iReclaimSegmentSearchSize do
+                        if (M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimTotalMass] or 0) > iMinReclaimToConsider then
+                            if (M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimHighestIndividualReclaim] or 0) > iHighestReclaimValue then
+                                iHighestReclaimValue = (M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimHighestIndividualReclaim] or 0)
+                                tBestReclaimSegmentXZ = {iReclaimSegmentX, iReclaimSegmentZ}
                             end
                         end
                     end
                 end
-                --Add closest mex:
-                if bHavePassThrough == true then
-                    tPassThroughLocation = tClosestMex
-                end
-            end
-        end
-
-
-        --Search for nearby reclaim as a detour (if no mexes were found)
-        if bHavePassThrough == false then
-            --GetReclaimablesResourceValue(tReclaimables, bAlsoReturnLargestReclaimPosition, iIgnoreReclaimIfNotMoreThanThis)
-            ReclaimRectangle = {}
-            tReclaimables = {}
-            ReclaimRectangle = Rect(tCurStartPosition[1] - iPassingSearchRadius,tCurStartPosition[3] - iPassingSearchRadius, tCurStartPosition[1] + iPassingSearchRadius, tCurStartPosition[3] + iPassingSearchRadius)
-            tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
-            tHighestValidReclaim = {}
-
-            iMassValue, tHighestValidReclaim = M27MapInfo.GetReclaimablesResourceValue(tReclaimables, true, iMinReclaimToConsider)
-            if M27Utilities.IsTableEmpty(tHighestValidReclaim) == false then
-                if not(tHighestValidReclaim == tLastPassThroughPosition) then
+                if iHighestReclaimValue > 0 then
                     bHavePassThrough = true
-                    tPassThroughLocation = tHighestValidReclaim
+                    tPassThroughLocation = M27MapInfo.GetReclaimLocationFromSegment(tBestReclaimSegmentXZ[1], tBestReclaimSegmentXZ[2])
                 end
             end
-        end
 
 
-        --Update the start position if have added a via point:
-      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': just before updating start position') end
-        if bHavePassThrough == true then
-            --Check won't be moving further away from the end destination than we currently are:
-            iTempDistanceToEnd = M27Utilities.GetDistanceBetweenPositions(tPassThroughLocation, tFinalDestination)
-            if iTempDistanceToEnd < iCurDistanceToEnd then
-                iTempDistanceToCurStart = M27Utilities.GetDistanceBetweenPositions(tPassThroughLocation, tCurStartPosition)
-                if iTempDistanceToCurStart <= iTempDistanceToEnd then
-                    tLastPassThroughPosition = tPassThroughLocation --needed so dont consider this in next loop (given aren't moving all the way to the target)
+            --Update the start position if have added a via point:
+          --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': just before updating start position') end
+            if bHavePassThrough == true then
+                --Check won't be moving further away from the end destination than we currently are:
+                iTempDistanceToEnd = M27Utilities.GetDistanceBetweenPositions(tPassThroughLocation, tFinalDestination)
+                if iTempDistanceToEnd < iCurDistanceToEnd then
+                    iTempDistanceToCurStart = M27Utilities.GetDistanceBetweenPositions(tPassThroughLocation, tCurStartPosition)
+                    if iTempDistanceToCurStart <= iTempDistanceToEnd then
+                        tLastPassThroughPosition = tPassThroughLocation --needed so dont consider this in next loop (given aren't moving all the way to the target)
 
-                    iPassingLocationCount = iPassingLocationCount + 1
-                    tAllTargetLocations[iPassingLocationCount] = {}
-                    --Dont move all the way to the target, just close enough that should spend at least 1 second in its build range
-
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have a pass-through location, iPassingLocationCount='..iPassingLocationCount..'; location='..repr(tPassThroughLocation)..'; about to get position to move near it for construction') end
-                    --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
-                    tAllTargetLocations[iPassingLocationCount] = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tPassThroughLocation, nil, -iUnitSpeed, true, false, false)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Move position='..repr(tAllTargetLocations[iPassingLocationCount])) end
-                    tCurStartPosition = tAllTargetLocations[iPassingLocationCount]
-                    if bDebugMessages == true then LOG(sFunctionRef..': CurStartPosition='..repr(tCurStartPosition)) end
-                    iCurDistanceToEnd = iTempDistanceToEnd
-                else
-                    bHavePassThrough = false
-                end
-            else bHavePassThrough = false
-            end
-
-            --Check for reclaim alone a line from the start to the next position on the path
-            iReclaimLoopCount = 0
-            if bDebugMessages == true then LOG(sFunctionRef..': Have pass through location, tAllTargetLocations[iPassingLocationCount]='..repr(tAllTargetLocations[iPassingLocationCount])..'; tCurStartPosition='..repr(tCurStartPosition)..'; about to add any reclaim along the path') end
-            while bHavePassThrough == true do
-                iReclaimLoopCount = iReclaimLoopCount + 1
-                if iReclaimLoopCount > iMaxLoopCount then
-                    M27Utilities.ErrorHandler('Infinite loop')
-                    bHavePassThrough = false
-                    break
-                else
-                    local tCurPassThrough = {tPassThroughLocation[1], tPassThroughLocation[2], tPassThroughLocation[3]}
-                    tPassThroughLocation = GetReclaimDetourLocation(tCurStartPosition, tCurPassThrough, iPassingSearchRadius, iBuildDistance)
-                    if bDebugMessages == true then LOG(sFunctionRef..'; iReclaimLoopCount='..iReclaimLoopCount..'; tPassThroughLocation='..repr(tPassThroughLocation or {'nil'})) end
-                    if tPassThroughLocation then
                         iPassingLocationCount = iPassingLocationCount + 1
                         tAllTargetLocations[iPassingLocationCount] = {}
-                                                                            --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
+                        --Dont move all the way to the target, just close enough that should spend at least 1 second in its build range
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a pass-through location, iPassingLocationCount='..iPassingLocationCount..'; location='..repr(tPassThroughLocation)..'; about to get position to move near it for construction') end
+                        --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
                         tAllTargetLocations[iPassingLocationCount] = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tPassThroughLocation, nil, -iUnitSpeed, true, false, false)
-                        tCurStartPosition = {tAllTargetLocations[iPassingLocationCount][1], tAllTargetLocations[iPassingLocationCount][2], tAllTargetLocations[iPassingLocationCount][3]}
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have a valid apssthrough location, so moving near here and adding that to the movement path; tAllTargetLocations[iPassingLocationCount]='..repr(tAllTargetLocations[iPassingLocationCount])..'; tCurStartPosition='..repr(tCurStartPosition)) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Move position='..repr(tAllTargetLocations[iPassingLocationCount])) end
+                        tCurStartPosition = tAllTargetLocations[iPassingLocationCount]
+                        if bDebugMessages == true then LOG(sFunctionRef..': CurStartPosition='..repr(tCurStartPosition)) end
+                        iCurDistanceToEnd = iTempDistanceToEnd
                     else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have no passthrough location') end
                         bHavePassThrough = false
+                    end
+                else bHavePassThrough = false
+                end
+
+                --Check for reclaim alone a line from the start to the next position on the path
+                iReclaimLoopCount = 0
+                if bDebugMessages == true then LOG(sFunctionRef..': Have pass through location, tAllTargetLocations[iPassingLocationCount]='..repr(tAllTargetLocations[iPassingLocationCount])..'; tCurStartPosition='..repr(tCurStartPosition)..'; about to add any reclaim along the path') end
+                while bHavePassThrough == true do
+                    iReclaimLoopCount = iReclaimLoopCount + 1
+                    if bDebugMessages == true then LOG(sFunctionRef..': Start of loop for passthrough; iReclaimLoopCount='..iReclaimLoopCount) end
+                    if iReclaimLoopCount > iMaxLoopCount then
+                        M27Utilities.ErrorHandler('Infinite loop')
+                        bHavePassThrough = false
+                        break
+                    else
+                        local tCurPassThrough = {tPassThroughLocation[1], tPassThroughLocation[2], tPassThroughLocation[3]}
+                        tPassThroughLocation = GetReclaimDetourLocation(tCurStartPosition, tCurPassThrough, iPassingSearchRadius, iBuildDistance)
+                        if bDebugMessages == true then LOG(sFunctionRef..'; iReclaimLoopCount='..iReclaimLoopCount..'; tPassThroughLocation='..repr(tPassThroughLocation or {'nil'})) end
+                        if tPassThroughLocation then
+                            iPassingLocationCount = iPassingLocationCount + 1
+                            tAllTargetLocations[iPassingLocationCount] = {}
+                                                                                --MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
+                            tAllTargetLocations[iPassingLocationCount] = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tPassThroughLocation, nil, -iUnitSpeed, true, false, false)
+                            tCurStartPosition = {tAllTargetLocations[iPassingLocationCount][1], tAllTargetLocations[iPassingLocationCount][2], tAllTargetLocations[iPassingLocationCount][3]}
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have a valid apssthrough location, so moving near here and adding that to the movement path; tAllTargetLocations[iPassingLocationCount]='..repr(tAllTargetLocations[iPassingLocationCount])..'; tCurStartPosition='..repr(tCurStartPosition)) end
+                        else
+                            bHavePassThrough = false
+                        end
                     end
                 end
             end
+            if bHavePassThrough == false then
+                --No move points - move forwards by iSearchIntervals
+                if bDebugMessages == true then LOG(sFunctionRef..': No nearby pass-points - moving forwards along path by 10. Position before moving forwards='..repr(tCurStartPosition)) end
+                --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
+                tCurStartPosition = M27Utilities.MoveTowardsTarget(tCurStartPosition, tFinalDestination, iSearchIntervals, 0)
+                if bDebugMessages == true then LOG(sFunctionRef..': Position after moving forwards by '..iSearchIntervals..' ='..repr(tCurStartPosition)) end
+                iCurDistanceToEnd = iCurDistanceToEnd - iSearchIntervals
+            end
         end
-        if bHavePassThrough == false then
-            --No move points - move forwards by iSearchIntervals
-            if bDebugMessages == true then LOG(sFunctionRef..': No nearby pass-points - moving forwards along path by 10. Position before moving forwards='..repr(tCurStartPosition)) end
-            --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
-            tCurStartPosition = M27Utilities.MoveTowardsTarget(tCurStartPosition, tFinalDestination, iSearchIntervals, 0)
-            if bDebugMessages == true then LOG(sFunctionRef..': Position after moving forwards by '..iSearchIntervals..' ='..repr(tCurStartPosition)) end
-            iCurDistanceToEnd = iCurDistanceToEnd - iSearchIntervals
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': about to add final destination at the end') end
+        tAllTargetLocations[iPassingLocationCount + 1] = {}
+        tAllTargetLocations[iPassingLocationCount + 1] = tFinalDestination
+        if bDebugMessages == true then
+            if bDebugMessages == true then LOG(sFunctionRef..': Will draw alltargetlocations in blue') end
+            --DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+            M27Utilities.DrawLocations(tAllTargetLocations)
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': End of function, iPassingLocationCount='..iPassingLocationCount..'; tAllTargetLocations='..repr(tAllTargetLocations)) end
+      --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': End of code') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return tAllTargetLocations
     end
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': about to add final destination at the end') end
-    tAllTargetLocations[iPassingLocationCount + 1] = {}
-    tAllTargetLocations[iPassingLocationCount + 1] = tFinalDestination
-    if bDebugMessages == true then
-        --DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
-        M27Utilities.DrawLocations(tAllTargetLocations)
-    end
-    if bDebugMessages == true then LOG(sFunctionRef..': End of function, iPassingLocationCount='..iPassingLocationCount..'; tAllTargetLocations='..repr(tAllTargetLocations)) end
-  --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': End of code') end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return tAllTargetLocations
 
 end
 
-function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathingType, iSegmentGroup)
+function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathing, iSegmentGroup)
     --Considers the value of a location for being targeted by a strong combat unit such as a guncom
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetLocationValue'
@@ -2281,7 +2377,7 @@ function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathingType, iSegmen
     local iTotalValue = 0
 
     --Value of all nearby mexes
-    for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathingType][iSegmentGroup] do
+    for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
         if math.abs(tMex[1] - tLocation[1]) <= 30 and math.abs(tMex[3] - tLocation[3]) <= 30 then
             --have a mex, check who has built on item
             iTotalValue = iTotalValue + 25
@@ -2311,7 +2407,7 @@ function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathingType, iSegmen
 
     --Factor in reclaim: 60% of cur segment, 30% of adjacent segments (i.e. would rather target units than reclaim)
     local iBaseReclaimSegmentX, iBaseReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tLocation)
-    iTotalValue = iTotalValue + 0.3 * M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimTotalMass]
+    iTotalValue = iTotalValue + 0.3 * (M27MapInfo.tReclaimAreas[iBaseReclaimSegmentX][iBaseReclaimSegmentZ][M27MapInfo.refReclaimTotalMass] or 0)
     for iAdjustX = -1, 1, 1 do
         for iAdjustZ = -1, 1, 1 do
             if iBaseReclaimSegmentX + iAdjustX > 0 and iBaseReclaimSegmentZ + iAdjustZ > 0 then
@@ -2322,9 +2418,9 @@ function GetLocationValue(aiBrain, tLocation, tStartPoint, sPathingType, iSegmen
 
 
     --Adjust value based on distance
-    local iStartToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tStartPoint, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)])
+    local iStartToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tStartPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
     local iStartToTarget = M27Utilities.GetDistanceBetweenPositions(tStartPoint, tLocation)
-    local iTargetToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tLocation, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)])
+    local iTargetToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
 
     --% reduction based on how much of a detour to enemy base
     iTotalValue = iTotalValue * iStartToEnemyBase / (iStartToTarget + iTargetToEnemyBase)
@@ -2345,37 +2441,95 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tHighestValueLocation
 
-
+    --Check we can path to the enemy base or (if we cant) that the last intel path is reasonably far away from our base
     if oPlatoon[M27PlatoonUtilities.refbNeedToHeal] then
-        tHighestValueLocation = M27MapInfo.GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
+        if bDebugMessages == true then LOG(sFunctionRef..': ACU flagged as needing to heal so will go to nearest rally point') end
+        tHighestValueLocation = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
     else
-        --First calculate the value for the enemy start position
-        local sPathingType = M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit])
-        local iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
-        local iHighestValueLocation = GetLocationValue(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathingType, iSegmentGroup)
-        local iCurValueLocation
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] or M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]) > math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25) then
+            --First calculate the value for the enemy start position
+            local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit])
+            if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+            local iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
+            local iHighestValueLocation = GetLocationValue(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
+            local iCurValueLocation
 
-
-
-
-
-        --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
-        for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathingType][M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))] do
-            if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 then
-                --Check not tried going here here lots before
-                if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathingType, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
-                    iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathingType, iSegmentGroup)
-                    if iCurValueLocation > iHighestValueLocation then
-                        iHighestValueLocation = iCurValueLocation
-                        tHighestValueLocation = tMex
+            if bDebugMessages == true then LOG(sFunctionRef..': Value of enemy start location='..iHighestValueLocation..'; will consider if any mexes have a better value') end
+            --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
+            for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))] do
+                if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 then
+                    --Check not tried going here here lots before
+                    if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
+                        iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
+                        if iCurValueLocation > iHighestValueLocation then
+                            if bDebugMessages == true then LOG(sFunctionRef..': tMex='..repr(tMex)..'; value of location='..iCurValueLocation) end
+                            iHighestValueLocation = iCurValueLocation
+                            tHighestValueLocation = tMex
+                        end
                     end
                 end
             end
+        else
+            --Cant path to enemy base so find a building to assist
+            tHighestValueLocation = GetNearbyUnderConstructionBuilding(aiBrain, oPlatoon[M27PlatoonUtilities.refoPathingUnit], 100)
+            if bDebugMessages == true then LOG(sFunctionRef..': Just seen if any under construction buildings we want to head towards; tHighestValueLocation='..repr(tHighestValueLocation or {'nil'})) end
+
         end
     end
-    if tHighestValueLocation == nil then tHighestValueLocation = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)] end
+    if tHighestValueLocation == nil then
+        if bDebugMessages == true then LOG(sFunctionRef..': Dont have a highest value location so will pick enemy start if can path to it, otherwise will pick closest intel path') end
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then
+            tHighestValueLocation = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..': refiMaxIntelBasePaths='..(aiBrain[M27Overseer.refiMaxIntelBasePaths] or 'nil')..'; Intel line positions='..repr(aiBrain[M27Overseer.reftIntelLinePositions])) end
+            --Are we already close to intel path? If so then go for the previous intel path
+            if M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]) <= 10 then
+                if aiBrain[M27Overseer.refiMaxIntelBasePaths] <= 1 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Only have 1 intel path so will get random position around base (and attack-move to it)') end
+                    tHighestValueLocation = M27EngineerOverseer.AttackMoveToRandomPositionAroundBase(aiBrain, oPlatoon[M27PlatoonUtilities.refoFrontUnit], 50, 30)
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have more than 1 intel path, so will get preceding one, i.e. intel path number '..aiBrain[M27Overseer.refiMaxIntelBasePaths]-1) end
+                    tHighestValueLocation = aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]-1][1]
+                end
+            else
+                if bDebugMessages == true then LOG(sFunctionRef..': Arent at the intel path nearest enemy so will move to the last intel path') end
+                tHighestValueLocation = aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]
+            end
+        end
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tHighestValueLocation
+end
+
+function GetNearbyUnderConstructionBuilding(aiBrain, oPathingUnit, iMaxSearchRange)
+    --Returns either the locatino of the nearest building under construction, or nil
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetNearbyUnderConstructionBuilding'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local tDestination
+    if bDebugMessages == true then LOG(sFunctionRef..': About to look for buildings in a range of '..iMaxSearchRange..' around the point '..repr(oPathingUnit:GetPosition())) end
+    local tNearbyBuildings = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, oPathingUnit:GetPosition(), iMaxSearchRange, 'Ally')
+    if M27Utilities.IsTableEmpty(tNearbyBuildings) == false then
+        local iNearestBuilding = 10000
+        local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnit)
+        local tUnitPosition = oPathingUnit:GetPosition()
+        local iPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tUnitPosition)
+        if bDebugMessages == true then LOG(sFunctionRef..': Checking if any of the buildings are under construction and have a pathing group of '..iPathingGroup) end
+        for iBuilding, oBuilding in tNearbyBuildings do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering building '..oBuilding.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBuilding)..'with pathing group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, oBuilding:GetPosition())..' and fraction complete='..oBuilding:GetFractionComplete()) end
+            if oBuilding:GetFractionComplete() < 1 and M27MapInfo.GetSegmentGroupOfLocation(sPathing, oBuilding:GetPosition()) == iPathingGroup then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have a building under construction, distance to ACU='..M27Utilities.GetDistanceBetweenPositions(oBuilding:GetPosition(), tUnitPosition)..'; iNearestBuilding prior to this='..iNearestBuilding) end
+                if M27Utilities.GetDistanceBetweenPositions(oBuilding:GetPosition(), tUnitPosition) < iNearestBuilding then
+                    tDestination = oBuilding:GetPosition()
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a new nearest building as our destination') end
+                end
+            end
+        end
+    elseif bDebugMessages == true then LOG(sFunctionRef..': No buildings found')
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return tDestination
 end
 
 function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOverride, iMaxDistanceOverride)
@@ -2418,6 +2572,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
     local iACUSegmentX, iACUSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tUnitPos)
     local iUnitPathGroup = M27MapInfo.InSameSegmentGroup(oPathingUnit, tUnitPos, true)
     local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnit)
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
     if bDebugMessages == true then LOG(sFunctionRef..': Start; tUnitPos='..repr(tUnitPos)) end
     local iTargetGroup
     local rPlayableArea = M27MapInfo.rMapPlayableArea
@@ -2430,203 +2585,212 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
     local iMaxSegmentDistanceZ = iMaxDistanceAbsolute / iSegmentSizeZ
     local tCurSegmentPosition = {}
     local iPlayerStartPoint = aiBrain.M27StartPositionNumber
-    local iEnemyStartPoint = GetNearestEnemyStartNumber(aiBrain)
     local iMaxDistanceFromEnemy, iMaxDistanceFromStart, iMinDistanceFromStart, iMinDistanceFromEnemy, iCurDistanceFromUnit, bIsFarEnoughFromStart
     local tCurPosition = oPathingUnit:GetPosition()
     local iSegmentX, iSegmentZ
 
 
 
-    if iEnemyStartPoint == nil then
-        LOG(sFunctionRef..': ERROR unless enemy is dead - iEnemyStartPoint is nil; returning our start position')
+    if GetNearestEnemyStartNumber(aiBrain) == nil then
+        LOG(sFunctionRef..': ERROR unless enemy is dead - GetNearestEnemyStartNumber(aiBrain) is nil; returning our start position')
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return M27MapInfo.PlayerStartPoints[iPlayerStartPoint]
     else
         --Do we have an ACU with gun? If so then just pick enemy base
         if M27Utilities.IsACU(oPathingUnit) and M27Conditions.DoesACUHaveGun(aiBrain, true, oPathingUnit) then
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            return M27MapInfo.PlayerStartPoints[iEnemyStartPoint]
+            return M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
         else
-            if bDebugMessages == true then LOG(sFunctionRef..': iEnemyStartPoint='..iEnemyStartPoint..'; iPlayerStartPoint='..iPlayerStartPoint) end
-            local iDistanceBetweenBases = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
-            iMinDistanceFromEnemy = iDistanceBetweenBases * iMinDistancePercentage
-            iMaxDistanceFromEnemy = iDistanceBetweenBases * iMaxDistancePercentage
-            iMaxDistanceFromStart = iDistanceBetweenBases * iMaxDistancePercentage
-            iMinDistanceFromStart = iDistanceBetweenBases * iMinDistancePercentage
-            local ReclaimRectangle = {}
-            local tReclaimables = {}
-            local iReclaimInCurrentArea
+            --Ignore detailed/complicated pathing logic if we cant path to the enemy base, and go to rally point if we want to heal
+            if oPathingUnit.PlatoonHandle and oPathingUnit.PlatoonHandle[M27PlatoonUtilities.refbNeedToHeal] then
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU flagged as needing to heal so will go to nearest rally point') end
+                bHaveFinalDestination = true
+                tFinalDestination = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPathingUnit.PlatoonHandle))
+            elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] or M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]) > math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25) then
 
-            local tPossibleMexLocationsAndNumber = {}
-            local refiMassValue = 1
-            local reftMexPosition = 2
-            local refiDistanceFromStart = 3
-            local refiDistanceFromEnemy = 4
-            local refiDistanceFromACU = 5
-            local refiDistanceFromMiddle = 6
-            local iMaxMassInArea = 1
-            local iMaxMexesInArea = 0
-            local iMaxDistanceFromMiddle = 0
-            local iCurDistanceFromMiddle = 0
-            local iPossibleMexLocations = 0
-            iCurDistanceFromUnit = 0
-            local iMaxDistanceToACU = 0
 
-            local iDistanceFromStartToEnd = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
+                if bDebugMessages == true then LOG(sFunctionRef..': GetNearestEnemyStartNumber(aiBrain)='..GetNearestEnemyStartNumber(aiBrain)..'; iPlayerStartPoint='..iPlayerStartPoint) end
+                local iDistanceBetweenBases = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                iMinDistanceFromEnemy = iDistanceBetweenBases * iMinDistancePercentage
+                iMaxDistanceFromEnemy = iDistanceBetweenBases * iMaxDistancePercentage
+                iMaxDistanceFromStart = iDistanceBetweenBases * iMaxDistancePercentage
+                iMinDistanceFromStart = iDistanceBetweenBases * iMinDistancePercentage
+                local ReclaimRectangle = {}
+                local tReclaimables = {}
+                local iReclaimInCurrentArea
 
-            M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimNearACU', M27Utilities.refProfilerStart)
-            --First check if overseer has flagged there's nearby reclaim (in which case have this as the end destination)
-            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to check overseer reclaim flag') end
-            if bDebugMessages == true then LOG(sFunctionRef..': About to check if significant reclaim near ACU in which case will have this as final destination') end
-            local bReclaimNearACU = false
-            local iACUReclaimSegmentX, iACUReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tCurPosition)
-            local iHighestReclaimLocationMass = 0
-            for iAdjX = -1, 1 do
-                for iAdjZ = -1, 1 do
-                    if M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX] and M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ] and M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] >= iMinReclaimIfCloseToACU then
-                        bReclaimNearACU = true
-                        if iHighestReclaimLocationMass < M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] then
-                            iHighestReclaimLocationMass = M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass]
-                            tFinalDestination = M27MapInfo.GetReclaimLocationFromSegment(iACUReclaimSegmentX + iAdjX, iACUReclaimSegmentZ + iAdjZ)
+                local tPossibleMexLocationsAndNumber = {}
+                local refiMassValue = 1
+                local reftMexPosition = 2
+                local refiDistanceFromStart = 3
+                local refiDistanceFromEnemy = 4
+                local refiDistanceFromACU = 5
+                local refiDistanceFromMiddle = 6
+                local iMaxMassInArea = 1
+                local iMaxMexesInArea = 0
+                local iMaxDistanceFromMiddle = 0
+                local iCurDistanceFromMiddle = 0
+                local iPossibleMexLocations = 0
+                iCurDistanceFromUnit = 0
+                local iMaxDistanceToACU = 0
+
+                local iDistanceFromStartToEnd = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+
+                M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimNearACU', M27Utilities.refProfilerStart)
+                --First check if overseer has flagged there's nearby reclaim (in which case have this as the end destination)
+                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to check overseer reclaim flag') end
+                if bDebugMessages == true then LOG(sFunctionRef..': About to check if significant reclaim near ACU in which case will have this as final destination') end
+                local bReclaimNearACU = false
+                local iACUReclaimSegmentX, iACUReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tCurPosition)
+                local iHighestReclaimLocationMass = 0
+                for iAdjX = -1, 1 do
+                    for iAdjZ = -1, 1 do
+                        if M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX] and M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ] and (M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 0) >= iMinReclaimIfCloseToACU then
+                            bReclaimNearACU = true
+                            if iHighestReclaimLocationMass < (M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 0) then
+                                iHighestReclaimLocationMass = (M27MapInfo.tReclaimAreas[iACUReclaimSegmentX + iAdjX][iACUReclaimSegmentZ + iAdjZ][M27MapInfo.refReclaimTotalMass] or 0)
+                                tFinalDestination = M27MapInfo.GetReclaimLocationFromSegment(iACUReclaimSegmentX + iAdjX, iACUReclaimSegmentZ + iAdjZ)
+                            end
                         end
                     end
                 end
-            end
 
-            if bReclaimNearACU == true then
-                if bDebugMessages == true then LOG(sFunctionRef..': Is reclaim near ACU, checking if platoon contains an ACU') end
-                local oUnitBP = oPathingUnit:GetBlueprint()
-                if M27Utilities.IsACU(oUnitBP) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Platoon contains an ACU, obtaining location of reclaim') end
-                    if M27Utilities.IsTableEmpty(tFinalDestination) == false then
-                        --Check its far enough away from our start (as dont want ACU running behind its base at the start of the game)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Reclaim location='..repr(tFinalDestination)..'; checking how far it is from player start') end
-                        if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.PlayerStartPoints[iPlayerStartPoint]) <= iMinDistanceAwayFromStart then
-                            if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, tCurPosition) >= iMinDistanceAwayForReclaim then
-                                --Its close to our base, so only consider if we could use the mass and its closer to enemy than us
-                                if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, checking if we have enough available storage') end
-                                local iStorageRatio = aiBrain:GetEconomyStoredRatio('MASS')
-                                if iStorageRatio == 0 then
-                                    bHaveFinalDestination = true
-                                else
-                                    local iSpareStorage = aiBrain:GetEconomyStored('MASS') / iStorageRatio
-                                    if iSpareStorage >= 100 then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, and we have enough storage, checking its closer to enemy than ACU') end
-                                        if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.PlayerStartPoints[iEnemyStartPoint]) <= M27Utilities.GetDistanceBetweenPositions(tUnitPos, M27MapInfo.PlayerStartPoints[iEnemyStartPoint]) then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, but closer to enemy than us, so choosing it as final destination') end
-                                            bHaveFinalDestination = true
+                if bReclaimNearACU == true then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is reclaim near ACU, checking if platoon contains an ACU') end
+                    local oUnitBP = oPathingUnit:GetBlueprint()
+                    if M27Utilities.IsACU(oUnitBP) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Platoon contains an ACU, obtaining location of reclaim') end
+                        if M27Utilities.IsTableEmpty(tFinalDestination) == false then
+                            --Check its far enough away from our start (as dont want ACU running behind its base at the start of the game)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Reclaim location='..repr(tFinalDestination)..'; checking how far it is from player start') end
+                            if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.PlayerStartPoints[iPlayerStartPoint]) <= iMinDistanceAwayFromStart then
+                                if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, tCurPosition) >= iMinDistanceAwayForReclaim then
+                                    --Its close to our base, so only consider if we could use the mass and its closer to enemy than us
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, checking if we have enough available storage') end
+                                    local iStorageRatio = aiBrain:GetEconomyStoredRatio('MASS')
+                                    if iStorageRatio == 0 then
+                                        bHaveFinalDestination = true
+                                    else
+                                        local iSpareStorage = aiBrain:GetEconomyStored('MASS') / iStorageRatio
+                                        if iSpareStorage >= 100 then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, and we have enough storage, checking its closer to enemy than ACU') end
+                                            if M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= M27Utilities.GetDistanceBetweenPositions(tUnitPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is close to our base, but closer to enemy than us, so choosing it as final destination') end
+                                                bHaveFinalDestination = true
+                                            end
                                         end
                                     end
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Location is too close to current position') end
                                 end
                             else
-                                if bDebugMessages == true then LOG(sFunctionRef..': Location is too close to current position') end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is far enough from our start, choosing it as final destination') end
+                                bHaveFinalDestination = true
                             end
-                        else
-                            if bDebugMessages == true then LOG(sFunctionRef..': Reclaim is far enough from our start, choosing it as final destination') end
-                            bHaveFinalDestination = true
                         end
                     end
                 end
-            end
-            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Finished check of overseer reclaim flag') end
+                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Finished check of overseer reclaim flag') end
 
-            --Draw range circles
-            if bDebugMessages == true then
-                local iDisplayCount = 500         --DrawLocation(tLocation, relativeStart, iColour, iDisplayCount, iCircleSize)
-                M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], false, 2, iDisplayCount, iMinDistanceFromStart)
-                M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iEnemyStartPoint], false, 2,iDisplayCount, iMinDistanceFromStart)
-                M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], false, 4,iDisplayCount, iMaxDistanceFromStart)
-                M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iEnemyStartPoint], false, 4,iDisplayCount, iMaxDistanceFromStart)
-            end
+                --Draw range circles
+                if bDebugMessages == true then
+                    local iDisplayCount = 500         --DrawLocation(tLocation, relativeStart, iColour, iDisplayCount, iCircleSize)
+                    M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], false, 2, iDisplayCount, iMinDistanceFromStart)
+                    M27Utilities.DrawLocation(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), false, 2,iDisplayCount, iMinDistanceFromStart)
+                    M27Utilities.DrawLocation(M27MapInfo.PlayerStartPoints[iPlayerStartPoint], false, 4,iDisplayCount, iMaxDistanceFromStart)
+                    M27Utilities.DrawLocation(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), false, 4,iDisplayCount, iMaxDistanceFromStart)
+                end
 
 
-            --Update max distances - want to be between 35-65% of the way to enemy base and our base
-            local iCurDistanceFromEnemy, iCurDistanceFromStart
-            --================High value reclaim locations (ignoring mexes)================
-            --Consider if high value reclaim locations on the map:
-            local iChosenReclaimLocationMass = 0
-            M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimNearACU', M27Utilities.refProfilerEnd)
-            if bHaveFinalDestination == false then
-                --M27MapInfo.UpdateReclaimMarkers() --Moved this to overseer so dont risk ACU waiting a while for this to complete
-                M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimAreas', M27Utilities.refProfilerStart)
-                if math.max(M27MapInfo.iHighestReclaimInASegment, M27MapInfo.iPreviousHighestReclaimInASegment) >= iMinReclaimWanted and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftReclaimAreasOfInterest]) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have enough reclaim in a segment somewhere on map, so want to go through all segments to see if any have enough reclaim to warrant consideration even if no mex') end
-                    --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to loop through segments looking at reclaim') end
-                    for iPriority, tSubtable in aiBrain[M27MapInfo.reftReclaimAreasOfInterest] do
-                        for iSegments, tSegments in aiBrain[M27MapInfo.reftReclaimAreasOfInterest][iPriority] do
-                            iSegmentX = tSegments[1]
-                            iSegmentZ = tSegments[2]
+                --Update max distances - want to be between 35-65% of the way to enemy base and our base
+                local iCurDistanceFromEnemy, iCurDistanceFromStart
+                --================High value reclaim locations (ignoring mexes)================
+                --Consider if high value reclaim locations on the map:
+                local iChosenReclaimLocationMass = 0
+                M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimNearACU', M27Utilities.refProfilerEnd)
+                if bHaveFinalDestination == false then
+                    --M27MapInfo.UpdateReclaimMarkers() --Moved this to overseer so dont risk ACU waiting a while for this to complete
+                    M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimAreas', M27Utilities.refProfilerStart)
+                    if math.max(M27MapInfo.iHighestReclaimInASegment, M27MapInfo.iPreviousHighestReclaimInASegment) >= iMinReclaimWanted and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftReclaimAreasOfInterest]) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have enough reclaim in a segment somewhere on map, so want to go through all segments to see if any have enough reclaim to warrant consideration even if no mex') end
+                        --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to loop through segments looking at reclaim') end
+                        for iPriority, tSubtable in aiBrain[M27MapInfo.reftReclaimAreasOfInterest] do
+                            for iSegments, tSegments in aiBrain[M27MapInfo.reftReclaimAreasOfInterest][iPriority] do
+                                iSegmentX = tSegments[1]
+                                iSegmentZ = tSegments[2]
 
-                    --for iSegmentX, tVal in M27MapInfo.tReclaimAreas do
-                        if math.abs(iSegmentX - iACUSegmentX) <= iMaxSegmentDistanceX then
-                            --for iSegmentZ, tReclaimInfo in tVal do
-                                if math.abs(iSegmentZ - iACUSegmentZ) <= iMaxSegmentDistanceZ then
-                                    --Is there enough reclaim in this segment?
-                                    if M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass] >= iMinReclaimWanted then
-                                        --Are we in the same pathing group?
-                                        --GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
-                                        iTargetGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ)
-                                        if iTargetGroup == iUnitPathGroup then
-                                            --iSecondMinReclaimCheck = nil --This is set if want an up to date reading on reclaim
-                                            --Is the location close enough to warrant consideration?
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iSegmentX..'-'..iSegmentZ..' might be close enough; ReclaimAmount='..tReclaimInfo[1]) end
-                                            tCurSegmentPosition = M27MapInfo.GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
-                                            iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tCurSegmentPosition, M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
-                                            if iCurDistanceFromEnemy <= iMaxDistanceFromEnemy then
-                                                if iCurDistanceFromEnemy >= iMinDistanceFromEnemy then
-                                                    iCurDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(tCurSegmentPosition, M27MapInfo.PlayerStartPoints[iPlayerStartPoint])
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iSegmentX..'-'..iSegmentZ..' position='..repr(tCurSegmentPosition)..'; iCurDistanceFromEnemy='..iCurDistanceFromEnemy..'; iCurDistanceFromStart='..iCurDistanceFromStart..'; iMaxDistanceFromEnemy='..iMaxDistanceFromEnemy..'; iMinDistanceFromEnemy='..iMinDistanceFromEnemy..'; iMaxDistanceAbsolute='..iMaxDistanceAbsolute..'; iMaxDistanceFromStart='..iMaxDistanceFromStart..'; iMinDistanceFromStart='..iMinDistanceFromStart) end
-                                                    if iCurDistanceFromStart <= iMaxDistanceAbsolute then
-                                                        if iCurDistanceFromStart <= iMaxDistanceFromStart then
-                                                            if iCurDistanceFromStart >= iMinDistanceFromStart then
+                                --for iSegmentX, tVal in M27MapInfo.tReclaimAreas do
+                                if math.abs(iSegmentX - iACUSegmentX) <= iMaxSegmentDistanceX then
+                                    --for iSegmentZ, tReclaimInfo in tVal do
+                                    if math.abs(iSegmentZ - iACUSegmentZ) <= iMaxSegmentDistanceZ then
+                                        --Is there enough reclaim in this segment?
+                                        if (M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass] or 0) >= iMinReclaimWanted then
+                                            --Are we in the same pathing group?
+                                            --GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
+                                            iTargetGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ)
+                                            if iTargetGroup == iUnitPathGroup then
+                                                --iSecondMinReclaimCheck = nil --This is set if want an up to date reading on reclaim
+                                                --Is the location close enough to warrant consideration?
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iSegmentX..'-'..iSegmentZ..' might be close enough') end
+                                                tCurSegmentPosition = M27MapInfo.GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
+                                                iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tCurSegmentPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                                                if iCurDistanceFromEnemy <= iMaxDistanceFromEnemy then
+                                                    if iCurDistanceFromEnemy >= iMinDistanceFromEnemy then
+                                                        iCurDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(tCurSegmentPosition, M27MapInfo.PlayerStartPoints[iPlayerStartPoint])
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iSegmentX..'-'..iSegmentZ..' position='..repr(tCurSegmentPosition)..'; iCurDistanceFromEnemy='..iCurDistanceFromEnemy..'; iCurDistanceFromStart='..iCurDistanceFromStart..'; iMaxDistanceFromEnemy='..iMaxDistanceFromEnemy..'; iMinDistanceFromEnemy='..iMinDistanceFromEnemy..'; iMaxDistanceAbsolute='..iMaxDistanceAbsolute..'; iMaxDistanceFromStart='..iMaxDistanceFromStart..'; iMinDistanceFromStart='..iMinDistanceFromStart) end
+                                                        if iCurDistanceFromStart <= iMaxDistanceAbsolute then
+                                                            if iCurDistanceFromStart <= iMaxDistanceFromStart then
+                                                                if iCurDistanceFromStart >= iMinDistanceFromStart then
 
-                                                                if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iSegmentX..'-'..iSegmentZ..' is within the target area by distance') end
-                                                                --Check its far enough away from unit's current position, if unit has already been assigned such a movement path
-                                                                --v7 will comment this out as even if reclaim is close it may still be valid to move to it to gain reclaim; recall this was put in due to acu alternating between mexes that were claimed
-                                                                bIsFarEnoughFromStart = true
-                                                                --[[
-                                                                bIsFarEnoughFromStart = false
-                                                                if oPathingUnit.GetPriorityExpansionMovementPath == nil then
+                                                                    if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iSegmentX..'-'..iSegmentZ..' is within the target area by distance') end
+                                                                    --Check its far enough away from unit's current position, if unit has already been assigned such a movement path
+                                                                    --v7 will comment this out as even if reclaim is close it may still be valid to move to it to gain reclaim; recall this was put in due to acu alternating between mexes that were claimed
                                                                     bIsFarEnoughFromStart = true
-                                                                else
-                                                                    if oPathingUnit.GetPriorityExpansionMovementPath == false then
+                                                                    --[[
+                                                                    bIsFarEnoughFromStart = false
+                                                                    if oPathingUnit.GetPriorityExpansionMovementPath == nil then
                                                                         bIsFarEnoughFromStart = true
-                                                                    else --]]
+                                                                    else
+                                                                        if oPathingUnit.GetPriorityExpansionMovementPath == false then
+                                                                            bIsFarEnoughFromStart = true
+                                                                        else --]]
 
-                                                                iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tCurSegmentPosition, tUnitPos)
-                                                                if iCurDistanceFromUnit <= iMinDistanceAwayForReclaim then bIsFarEnoughFromStart = false end
-                                                                --[[if bDebugMessages == true then LOG(sFunctionRef..': Checking if min distance from unit, iCurDistanceFromUnit='..iCurDistanceFromUnit..'; iMinDistanceAwayFromUnit='..iMinDistanceAwayFromUnit) end
-                                                                if iCurDistanceFromUnit >= iMinDistanceAwayFromUnit then
-                                                                    if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iSegmentX..'-'..iSegmentZ..' position='..repr(tCurSegmentPosition)..'; iCurDistanceFromUnit='..iCurDistanceFromUnit..'; far enough away that can consider as final destination') end
-                                                                    bIsFarEnoughFromStart = true
-                                                                else
-                                                                    --Is a reclaim location so check if is actually still enough reclaim in this area
-                                                                    iSecondMinReclaimCheck = math.min(math.max(tReclaimInfo[1] * 0.5, 100),200)
+                                                                    iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tCurSegmentPosition, tUnitPos)
+                                                                    if iCurDistanceFromUnit <= iMinDistanceAwayForReclaim then bIsFarEnoughFromStart = false end
+                                                                    --[[if bDebugMessages == true then LOG(sFunctionRef..': Checking if min distance from unit, iCurDistanceFromUnit='..iCurDistanceFromUnit..'; iMinDistanceAwayFromUnit='..iMinDistanceAwayFromUnit) end
+                                                                    if iCurDistanceFromUnit >= iMinDistanceAwayFromUnit then
+                                                                        if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iSegmentX..'-'..iSegmentZ..' position='..repr(tCurSegmentPosition)..'; iCurDistanceFromUnit='..iCurDistanceFromUnit..'; far enough away that can consider as final destination') end
+                                                                        bIsFarEnoughFromStart = true
+                                                                    else
+                                                                        --Is a reclaim location so check if is actually still enough reclaim in this area
+                                                                        iSecondMinReclaimCheck = math.min(math.max(tReclaimInfo[1] * 0.5, 100),200)
+                                                                    end
                                                                 end
-                                                            end
-                                                        end--]]
-                                                                if bIsFarEnoughFromStart == true then
-                                                                    --Have a segment that might have enough reclaim, and is far enough from the start
+                                                            end--]]
+                                                                    if bIsFarEnoughFromStart == true then
+                                                                        --Have a segment that might have enough reclaim, and is far enough from the start
                                                                         --bHaveEnoughReclaim = true
                                                                         --if iSecondMinReclaimCheck and iReclaimInCurrentArea < iSecondMinReclaimCheck then bHaveEnoughReclaim = false end
 
-                                                                    if bDebugMessages == true then LOG(sFunctionRef..': position '..repr(tCurSegmentPosition)..' has enough reclaim - recording as a possible location') end
+                                                                        if bDebugMessages == true then LOG(sFunctionRef..': position '..repr(tCurSegmentPosition)..' has enough reclaim - recording as a possible location') end
 
-                                                                    iPossibleMexLocations = iPossibleMexLocations + 1
+                                                                        iPossibleMexLocations = iPossibleMexLocations + 1
+                                                                        iReclaimInCurrentArea = (M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass] or 0)
 
-                                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations] = {}
-                                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] = M27MapInfo.tReclaimAreas[iSegmentX][iSegmentZ][M27MapInfo.refReclaimTotalMass]
-                                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {}
-                                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = tCurSegmentPosition
-                                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromStart] = iCurDistanceFromStart
-                                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromEnemy] = iCurDistanceFromEnemy
-                                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromACU] = iCurDistanceFromUnit
-                                                                    iCurDistanceFromMiddle = math.abs(iCurDistanceFromEnemy - iCurDistanceFromStart)
-                                                                    tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromMiddle] = iCurDistanceFromMiddle
-                                                                    if iReclaimInCurrentArea > iMaxMassInArea then iMaxMassInArea = iReclaimInCurrentArea end
-                                                                    if iCurDistanceFromMiddle > iMaxDistanceFromMiddle then iMaxDistanceFromMiddle = iCurDistanceFromMiddle end
-                                                                    if iCurDistanceFromUnit > iMaxDistanceToACU then iMaxDistanceToACU = iCurDistanceFromUnit end
-                                                                    if bDebugMessages == true then LOG(sFunctionRef..': iReclaimInCurrentArea='..iReclaimInCurrentArea..'; iMaxMassInArea='..iMaxMassInArea) end
+                                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations] = {}
+                                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] = iReclaimInCurrentArea
+                                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {}
+                                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = tCurSegmentPosition
+                                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromStart] = iCurDistanceFromStart
+                                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromEnemy] = iCurDistanceFromEnemy
+                                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromACU] = iCurDistanceFromUnit
+                                                                        iCurDistanceFromMiddle = math.abs(iCurDistanceFromEnemy - iCurDistanceFromStart)
+                                                                        tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromMiddle] = iCurDistanceFromMiddle
+                                                                        if iReclaimInCurrentArea > iMaxMassInArea then iMaxMassInArea = iReclaimInCurrentArea end
+                                                                        if iCurDistanceFromMiddle > iMaxDistanceFromMiddle then iMaxDistanceFromMiddle = iCurDistanceFromMiddle end
+                                                                        if iCurDistanceFromUnit > iMaxDistanceToACU then iMaxDistanceToACU = iCurDistanceFromUnit end
+                                                                        if bDebugMessages == true then LOG(sFunctionRef..': iReclaimInCurrentArea='..iReclaimInCurrentArea..'; iMaxMassInArea='..iMaxMassInArea) end
+                                                                    end
                                                                 end
                                                             end
                                                         end
@@ -2639,157 +2803,166 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                             end
                         end
                     end
-                end
-                M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimAreas', M27Utilities.refProfilerEnd)
+                    M27Utilities.FunctionProfiler(sFunctionRef..'ReclaimAreas', M27Utilities.refProfilerEnd)
 
-                --[[if table.getn(tPossibleReclaimLocationAndReclaim) > 0 then
-                    local iNewMinReclaimWanted = iMaxReclaimFound * iReclaimPercentageOfMaxWanted
-                    local iDistanceFromACU
-                    local iMinDistanceFromACU = 10000
-                    local iMinDistanceAreaRef
-                    for iCurArea, tAreaInfo in tPossibleReclaimLocationAndReclaim do
-                        if tAreaInfo[refiReclaimAmount] >= iNewMinReclaimWanted then
-                            iDistanceFromACU = M27Utilities.GetDistanceBetweenPositions(tAreaInfo[refiSegmentPosition], tUnitPos)
-                            if iDistanceFromACU <= iMinDistanceFromACU then
-                                iMinDistanceFromACU = iDistanceFromACU
-                                iMinDistanceAreaRef = iCurArea
+                    --[[if table.getn(tPossibleReclaimLocationAndReclaim) > 0 then
+                        local iNewMinReclaimWanted = iMaxReclaimFound * iReclaimPercentageOfMaxWanted
+                        local iDistanceFromACU
+                        local iMinDistanceFromACU = 10000
+                        local iMinDistanceAreaRef
+                        for iCurArea, tAreaInfo in tPossibleReclaimLocationAndReclaim do
+                            if tAreaInfo[refiReclaimAmount] >= iNewMinReclaimWanted then
+                                iDistanceFromACU = M27Utilities.GetDistanceBetweenPositions(tAreaInfo[refiSegmentPosition], tUnitPos)
+                                if iDistanceFromACU <= iMinDistanceFromACU then
+                                    iMinDistanceFromACU = iDistanceFromACU
+                                    iMinDistanceAreaRef = iCurArea
+                                end
                             end
+                            --DrawLocation(tableLocations, relativeStart, iColour, iDisplayCount)
+                            if bDebugMessages == true then M27Utilities.DrawLocation(tAreaInfo[refiSegmentPosition], false, 3) end
                         end
-                        --DrawLocation(tableLocations, relativeStart, iColour, iDisplayCount)
-                        if bDebugMessages == true then M27Utilities.DrawLocation(tAreaInfo[refiSegmentPosition], false, 3) end
-                    end
-                    tFinalDestination = tPossibleReclaimLocationAndReclaim[iMinDistanceAreaRef][refiSegmentPosition]
-                    if bDebugMessages == true then M27Utilities.DrawLocation(tFinalDestination, false, 1) end
-                    bHaveFinalDestination = true
-                    iChosenReclaimLocationMass = tPossibleReclaimLocationAndReclaim[iMinDistanceAreaRef][refiSegmentPosition] = iReclaimInCurrentArea
-                end ]]--
-            else
-                if bDebugMessages == true then LOG(sFunctionRef..': Already have final destination from overseer = '..repr(tFinalDestination)) end
-            end
+                        tFinalDestination = tPossibleReclaimLocationAndReclaim[iMinDistanceAreaRef][refiSegmentPosition]
+                        if bDebugMessages == true then M27Utilities.DrawLocation(tFinalDestination, false, 1) end
+                        bHaveFinalDestination = true
+                        iChosenReclaimLocationMass = tPossibleReclaimLocationAndReclaim[iMinDistanceAreaRef][refiSegmentPosition] = iReclaimInCurrentArea
+                    end ]]--
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Already have final destination from overseer = '..repr(tFinalDestination)) end
+                end
 
-            --================High value mex locations (including reclaim)================
+                --================High value mex locations (including reclaim)================
 
-            --if bHaveFinalDestination == false then
-            --consider mexes
-            --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering mexes') end
-            local iSegmentX, iSegmentZ
-            local iMexesInCurArea
-            --local tPossibleMexLocationsAndNumber = {}
-            --[[local refiMexCount = 1
-            local reftMexPosition = 2
-            local refiDistanceFromStart = 3
-            local refiDistanceFromEnemy = 4
-            local refiDistanceFromACU = 5
-            local refiDistanceFromMiddle = 6
-            local iMaxMexesInArea = 0
-            local iMaxDistanceFromMiddle = 0
-            local iCurDistanceFromMiddle = 0
-            local iPossibleMexLocations = 0
-            iCurDistanceFromUnit = 0
-            local iMaxDistanceToACU = 0]]--
-            local iClaimedMexesInArea = 0
-            local bIsCurMexUnclaimed
-            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to record mex for pathing group') end
-            --M27MapInfo.RecordMexForPathingGroup(oPathingUnit)
-            if bDebugMessages == true then LOG(sFunctionRef..': table of MexByPathingAndGrouping='..table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup])..'; sPathing='..sPathing..'; iUnitPathGroup='..iUnitPathGroup) end
-            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to cycle through mexes in pathing group') end
-            if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
-                M27Utilities.FunctionProfiler(sFunctionRef..'Mexes', M27Utilities.refProfilerStart)
-                for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
-                    --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': Start of loop') end
-                    iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering mex position='..repr(tMexLocation)..'; iSegmentX,Z='..iSegmentX..'-'..iSegmentZ..'; iACUSegmentX-Z='..iACUSegmentX..'-'..iACUSegmentZ..'; iMaxSegmentDistanceX,Z='..iMaxSegmentDistanceX..'-'..iMaxSegmentDistanceZ) end
-                    if math.abs(iSegmentX - iACUSegmentX) <= iMaxSegmentDistanceX then
-                        if math.abs(iSegmentZ - iACUSegmentZ) <= iMaxSegmentDistanceZ then
-                            --Is the location close enough to warrant consideration?
-                            iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.PlayerStartPoints[iEnemyStartPoint])
-                            if iCurDistanceFromEnemy <= iMaxDistanceFromEnemy then
-                                if iCurDistanceFromEnemy >= iMinDistanceFromEnemy then
-                                    iCurDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.PlayerStartPoints[iPlayerStartPoint])
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering distance from start; iCurDistanceFromEnemy='..iCurDistanceFromEnemy..'; iCurDistanceFromStart='..iCurDistanceFromStart) end
-                                    if iCurDistanceFromStart <= iMaxDistanceAbsolute then
-                                        if iCurDistanceFromStart <= iMaxDistanceFromStart then
-                                            if iCurDistanceFromStart >= iMinDistanceFromStart then
-                                                iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tUnitPos)
-                                                if iCurDistanceFromUnit <= iMaxDistanceAbsolute then
-                                                    --Check its far enough away from unit's current position, if unit has already been assigned such a movement path
-                                                    bIsFarEnoughFromStart = false
-                                                    if oPathingUnit.GetPriorityExpansionMovementPath == nil then
-                                                        bIsFarEnoughFromStart = true
-                                                    else
-                                                        if oPathingUnit.GetPriorityExpansionMovementPath == false then
+                --if bHaveFinalDestination == false then
+                --consider mexes
+                --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering mexes') end
+                local iSegmentX, iSegmentZ
+                local iMexesInCurArea
+                --local tPossibleMexLocationsAndNumber = {}
+                --[[local refiMexCount = 1
+                local reftMexPosition = 2
+                local refiDistanceFromStart = 3
+                local refiDistanceFromEnemy = 4
+                local refiDistanceFromACU = 5
+                local refiDistanceFromMiddle = 6
+                local iMaxMexesInArea = 0
+                local iMaxDistanceFromMiddle = 0
+                local iCurDistanceFromMiddle = 0
+                local iPossibleMexLocations = 0
+                iCurDistanceFromUnit = 0
+                local iMaxDistanceToACU = 0]]--
+                local iClaimedMexesInArea = 0
+                local iReclaimSegmentX, iReclaimSegmentZ
+                local iReclaimSegmentSearchRange = math.ceil(iSearchRadius / M27MapInfo.iReclaimSegmentSizeX)
+                local bIsCurMexUnclaimed
+                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to record mex for pathing group') end
+                --M27MapInfo.RecordMexForPathingGroup(oPathingUnit)
+                if bDebugMessages == true then LOG(sFunctionRef..': table of MexByPathingAndGrouping='..table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup])..'; sPathing='..sPathing..'; iUnitPathGroup='..iUnitPathGroup) end
+                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to cycle through mexes in pathing group') end
+                if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup]) == false then
+                    M27Utilities.FunctionProfiler(sFunctionRef..'Mexes', M27Utilities.refProfilerStart)
+                    for iCurMex, tMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
+                        --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': Start of loop') end
+                        iSegmentX, iSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMexLocation)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering mex position='..repr(tMexLocation)..'; iSegmentX,Z='..iSegmentX..'-'..iSegmentZ..'; iACUSegmentX-Z='..iACUSegmentX..'-'..iACUSegmentZ..'; iMaxSegmentDistanceX,Z='..iMaxSegmentDistanceX..'-'..iMaxSegmentDistanceZ) end
+                        if math.abs(iSegmentX - iACUSegmentX) <= iMaxSegmentDistanceX then
+                            if math.abs(iSegmentZ - iACUSegmentZ) <= iMaxSegmentDistanceZ then
+                                --Is the location close enough to warrant consideration?
+                                iCurDistanceFromEnemy = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                                if iCurDistanceFromEnemy <= iMaxDistanceFromEnemy then
+                                    if iCurDistanceFromEnemy >= iMinDistanceFromEnemy then
+                                        iCurDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(tMexLocation, M27MapInfo.PlayerStartPoints[iPlayerStartPoint])
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Considering distance from start; iCurDistanceFromEnemy='..iCurDistanceFromEnemy..'; iCurDistanceFromStart='..iCurDistanceFromStart) end
+                                        if iCurDistanceFromStart <= iMaxDistanceAbsolute then
+                                            if iCurDistanceFromStart <= iMaxDistanceFromStart then
+                                                if iCurDistanceFromStart >= iMinDistanceFromStart then
+                                                    iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tUnitPos)
+                                                    if iCurDistanceFromUnit <= iMaxDistanceAbsolute then
+                                                        --Check its far enough away from unit's current position, if unit has already been assigned such a movement path
+                                                        bIsFarEnoughFromStart = false
+                                                        if oPathingUnit.GetPriorityExpansionMovementPath == nil then
                                                             bIsFarEnoughFromStart = true
                                                         else
-                                                            iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tUnitPos)
-                                                            if iCurDistanceFromUnit >= iMinDistanceAwayFromUnit then
-                                                                if bDebugMessages == true then LOG(sFunctionRef..': tMexLocation='..repr(tMexLocation)..'; iCurDistanceFromUnit='..iCurDistanceFromUnit..'; far enough away that can consider as final destination') end
+                                                            if oPathingUnit.GetPriorityExpansionMovementPath == false then
                                                                 bIsFarEnoughFromStart = true
+                                                            else
+                                                                iCurDistanceFromUnit = M27Utilities.GetDistanceBetweenPositions(tMexLocation, tUnitPos)
+                                                                if iCurDistanceFromUnit >= iMinDistanceAwayFromUnit then
+                                                                    if bDebugMessages == true then LOG(sFunctionRef..': tMexLocation='..repr(tMexLocation)..'; iCurDistanceFromUnit='..iCurDistanceFromUnit..'; far enough away that can consider as final destination') end
+                                                                    bIsFarEnoughFromStart = true
+                                                                end
                                                             end
                                                         end
-                                                    end
-                                                    if bIsFarEnoughFromStart == true then
-                                                        --The mex is close enough to us and enemy for consideration - determine how many mexes are nearby that we havent got mexes on
-                                                        --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
-                                                        --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just before checking if mex is unclaimed') end
-                                                        if M27Conditions.IsMexUnclaimed(aiBrain, tMexLocation, true, false, false) == true then
-                                                            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just after checking if mex is unclaimed - it is unclaimed') end
-                                                            iMexesInCurArea = 1
-                                                            iPossibleMexLocations = iPossibleMexLocations + 1
+                                                        if bIsFarEnoughFromStart == true then
+                                                            --The mex is close enough to us and enemy for consideration - determine how many mexes are nearby that we havent got mexes on
+                                                            --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
+                                                            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just before checking if mex is unclaimed') end
+                                                            if M27Conditions.IsMexUnclaimed(aiBrain, tMexLocation, true, false, false) == true then
+                                                                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just after checking if mex is unclaimed - it is unclaimed') end
+                                                                iMexesInCurArea = 1
+                                                                iPossibleMexLocations = iPossibleMexLocations + 1
 
-                                                            --Record other mexes in the area: First unclaimed mexes:
+                                                                --Record other mexes in the area: First unclaimed mexes:
 
-                                                            for iAltMex, tAltMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
-                                                                if not(iAltMex == iCurMex) then
-                                                                    if M27Utilities.GetDistanceBetweenPositions(tAltMexLocation, tMexLocation) <= iSearchRadius then
-                                                                        --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
-                                                                        if M27Conditions.IsMexUnclaimed(aiBrain, tAltMexLocation, true, false, false) == true then
-                                                                            iMexesInCurArea = iMexesInCurArea + 1
+                                                                for iAltMex, tAltMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
+                                                                    if not(iAltMex == iCurMex) then
+                                                                        if M27Utilities.GetDistanceBetweenPositions(tAltMexLocation, tMexLocation) <= iSearchRadius then
+                                                                            --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
+                                                                            if M27Conditions.IsMexUnclaimed(aiBrain, tAltMexLocation, true, false, false) == true then
+                                                                                iMexesInCurArea = iMexesInCurArea + 1
+                                                                            end
                                                                         end
                                                                     end
                                                                 end
-                                                            end
 
-                                                            --Next claimed mexes:
-                                                            iClaimedMexesInArea = 0
-                                                            for iAltMex, tAltMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
-                                                                --if not(iAltMex == iCurMex) then
-                                                                if M27Utilities.GetDistanceBetweenPositions(tAltMexLocation, tMexLocation) <= iSearchRadius then
-                                                                    --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
-                                                                    if M27Conditions.IsMexUnclaimed(aiBrain, tAltMexLocation, true, true, true) == true then
-                                                                        iClaimedMexesInArea = iClaimedMexesInArea + 1
+                                                                --Next claimed mexes:
+                                                                iClaimedMexesInArea = 0
+                                                                for iAltMex, tAltMexLocation in M27MapInfo.tMexByPathingAndGrouping[sPathing][iUnitPathGroup] do
+                                                                    --if not(iAltMex == iCurMex) then
+                                                                    if M27Utilities.GetDistanceBetweenPositions(tAltMexLocation, tMexLocation) <= iSearchRadius then
+                                                                        --IsMexUnclaimed(aiBrain, tMexPosition, bTreatEnemyMexAsUnclaimed, bTreatAllyMexAsUnclaimed, bTreatQueuedBuildingsAsUnclaimed)
+                                                                        if M27Conditions.IsMexUnclaimed(aiBrain, tAltMexLocation, true, true, true) == true then
+                                                                            iClaimedMexesInArea = iClaimedMexesInArea + 1
+                                                                        end
+                                                                    end
+                                                                    --end
+                                                                end
+                                                                iClaimedMexesInArea = iClaimedMexesInArea - iMexesInCurArea
+                                                                if iClaimedMexesInArea < 0 then iClaimedMexesInArea = 0 LOG(sFunctionRef..': ERROR - shouldnt be possible for claimed mexes to be negative') end
+
+                                                                --Now get reclaim in the area:
+                                                                iReclaimSegmentX, iReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tMexLocation)
+                                                                iReclaimInCurrentArea = 0
+                                                                for iBaseX = iReclaimSegmentX - iReclaimSegmentSearchRange, iReclaimSegmentX + iReclaimSegmentSearchRange do
+                                                                    for iBaseZ = iReclaimSegmentZ - iReclaimSegmentSearchRange, iReclaimSegmentZ + iReclaimSegmentSearchRange do
+                                                                        iReclaimInCurrentArea = iReclaimInCurrentArea + (M27MapInfo.tReclaimAreas[iBaseX][iBaseZ][M27MapInfo.refReclaimTotalMass] or 0)
                                                                     end
                                                                 end
-                                                                --end
+                                                                --ReclaimRectangle = Rect(tMexLocation[1] - iSearchRadius,tMexLocation[3] - iSearchRadius, tMexLocation[1] + iSearchRadius, tMexLocation[3] + iSearchRadius)
+                                                                --tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
+                                                                --iReclaimInCurrentArea = M27MapInfo.GetReclaimablesResourceValue(tReclaimables, false, iSmallestReclaimSizeToConsider)
+
+                                                                iCurDistanceFromMiddle = math.abs(iCurDistanceFromEnemy - iCurDistanceFromStart)
+
+                                                                tPossibleMexLocationsAndNumber[iPossibleMexLocations] = {}
+                                                                --tPossibleMexLocationsAndNumber[iPossibleMexLocations][iMexesInCurArea] = {}
+                                                                tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] = iMexesInCurArea * iMassValueOfUnclaimedMex + iClaimedMexesInArea * iMassValueOfClaimedMex + iReclaimInCurrentArea
+                                                                tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {}
+                                                                tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {tMexLocation[1], tMexLocation[2], tMexLocation[3]} --Need this rather than table reference or mess up engineer tracking
+                                                                tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromStart] = iCurDistanceFromStart
+                                                                tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromEnemy] = iCurDistanceFromEnemy
+                                                                tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromACU] = iCurDistanceFromUnit
+                                                                tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromMiddle] = iCurDistanceFromMiddle
+                                                                --if iMexesInCurArea > iMaxMexesInArea then iMaxMexesInArea = iMexesInCurArea end
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': iPossibleMexLocations='..iPossibleMexLocations..'; tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue]='..tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue]..'; iMaxMassInArea='..iMaxMassInArea..'; Location='..repr(tMexLocation)) end
+                                                                if tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] > iMaxMassInArea then iMaxMassInArea = tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] end
+                                                                if iCurDistanceFromMiddle > iMaxDistanceFromMiddle then iMaxDistanceFromMiddle = iCurDistanceFromMiddle end
+                                                                if iCurDistanceFromUnit > iMaxDistanceToACU then iMaxDistanceToACU = iCurDistanceFromUnit end
+                                                                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': End of recording possible mex locations main section') end
+                                                            else
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': Mex is claimed so ignoring this location') end
+                                                                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just after checking if mex is unclaimed - it was already claimed') end
                                                             end
-                                                            iClaimedMexesInArea = iClaimedMexesInArea - iMexesInCurArea
-                                                            if iClaimedMexesInArea < 0 then iClaimedMexesInArea = 0 LOG(sFunctionRef..': ERROR - shouldnt be possible for claimed mexes to be negative') end
-
-                                                            --Now get reclaim in the area:
-                                                            ReclaimRectangle = Rect(tMexLocation[1] - iSearchRadius,tMexLocation[3] - iSearchRadius, tMexLocation[1] + iSearchRadius, tMexLocation[3] + iSearchRadius)
-                                                            tReclaimables = GetReclaimablesInRect(ReclaimRectangle)
-                                                            iReclaimInCurrentArea = M27MapInfo.GetReclaimablesResourceValue(tReclaimables, false, iSmallestReclaimSizeToConsider)
-
-                                                            iCurDistanceFromMiddle = math.abs(iCurDistanceFromEnemy - iCurDistanceFromStart)
-
-                                                            tPossibleMexLocationsAndNumber[iPossibleMexLocations] = {}
-                                                            --tPossibleMexLocationsAndNumber[iPossibleMexLocations][iMexesInCurArea] = {}
-                                                            tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] = iMexesInCurArea * iMassValueOfUnclaimedMex + iClaimedMexesInArea * iMassValueOfClaimedMex + iReclaimInCurrentArea
-                                                            tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {}
-                                                            tPossibleMexLocationsAndNumber[iPossibleMexLocations][reftMexPosition] = {tMexLocation[1], tMexLocation[2], tMexLocation[3]} --Need this rather than table reference or mess up engineer tracking
-                                                            tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromStart] = iCurDistanceFromStart
-                                                            tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromEnemy] = iCurDistanceFromEnemy
-                                                            tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromACU] = iCurDistanceFromUnit
-                                                            tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiDistanceFromMiddle] = iCurDistanceFromMiddle
-                                                            --if iMexesInCurArea > iMaxMexesInArea then iMaxMexesInArea = iMexesInCurArea end
-                                                            if bDebugMessages == true then LOG(sFunctionRef..': iPossibleMexLocations='..iPossibleMexLocations..'; tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue]='..tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue]..'; iMaxMassInArea='..iMaxMassInArea..'; Location='..repr(tMexLocation)) end
-                                                            if tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] > iMaxMassInArea then iMaxMassInArea = tPossibleMexLocationsAndNumber[iPossibleMexLocations][refiMassValue] end
-                                                            if iCurDistanceFromMiddle > iMaxDistanceFromMiddle then iMaxDistanceFromMiddle = iCurDistanceFromMiddle end
-                                                            if iCurDistanceFromUnit > iMaxDistanceToACU then iMaxDistanceToACU = iCurDistanceFromUnit end
-                                                            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': End of recording possible mex locations main section') end
-                                                        else
-                                                            if bDebugMessages == true then LOG(sFunctionRef..': Mex is claimed so ignoring this location') end
-                                                            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Just after checking if mex is unclaimed - it was already claimed') end
                                                         end
                                                     end
                                                 end
@@ -2799,55 +2972,80 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                                 end
                             end
                         end
+                        --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': End of loop') end
                     end
-                    --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': iCurMex='..iCurMex..'; tMexLocation='..repr(tMexLocation)..': End of loop') end
+                    M27Utilities.FunctionProfiler(sFunctionRef..'Mexes', M27Utilities.refProfilerEnd)
                 end
-                M27Utilities.FunctionProfiler(sFunctionRef..'Mexes', M27Utilities.refProfilerEnd)
-            end
-            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to consider possible locations to pass through') end
-            if table.getn(tPossibleMexLocationsAndNumber) > 0 then
-                M27Utilities.FunctionProfiler(sFunctionRef..'Prioritisation', M27Utilities.refProfilerStart)
-                local iMaxPriority = 0
-                local iAreaWithMaxPriority
-                local iCurPriority
-                if bDebugMessages == true then LOG(sFunctionRef..' About to cycle through all possible locations and determine their priority; Total possible locations='..table.getn(tPossibleMexLocationsAndNumber)..'; iMaxMassInArea='..iMaxMassInArea..'; iDistanceFromStartToEnd='..iDistanceFromStartToEnd) end
-                for iCurArea, tAreaInfo in tPossibleMexLocationsAndNumber do
+                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to consider possible locations to pass through') end
+                if table.getn(tPossibleMexLocationsAndNumber) > 0 then
+                    M27Utilities.FunctionProfiler(sFunctionRef..'Prioritisation', M27Utilities.refProfilerStart)
+                    local iMaxPriority = 0
+                    local iAreaWithMaxPriority
+                    local iCurPriority
+                    if bDebugMessages == true then LOG(sFunctionRef..' About to cycle through all possible locations and determine their priority; Total possible locations='..table.getn(tPossibleMexLocationsAndNumber)..'; iMaxMassInArea='..iMaxMassInArea..'; iDistanceFromStartToEnd='..iDistanceFromStartToEnd) end
+                    for iCurArea, tAreaInfo in tPossibleMexLocationsAndNumber do
 
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef..'iCurArea='..iCurArea..'; about to reproduce tAreaInfo')
-                        LOG(repr(tAreaInfo))
-                    end
-                    iCurPriority = 0
-                    --[[Pick a location with the following priority:
-                        +2 if closer to enemy start than ours
-                        +0-4 based no how close to the middle of the map it is (+4 for closest to middle)
-                        +0-4 based on how close to our ACU it is (the closer the better)
-                        +0 to 8, based on max no. of mexes of any position (0) to most (8)
-                        -0 to 4 based on how far it deviates from the centre of the map (in rare cases it may be higher than 4; i.e. if symmetrical map with both bases in each corner, then pickign one of the other map corners would result in a value of approx 4 ]]
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..'iCurArea='..iCurArea..'; about to reproduce tAreaInfo')
+                            LOG(repr(tAreaInfo))
+                        end
+                        iCurPriority = 0
+                        --[[Pick a location with the following priority:
+                            +2 if closer to enemy start than ours
+                            +0-4 based no how close to the middle of the map it is (+4 for closest to middle)
+                            +0-4 based on how close to our ACU it is (the closer the better)
+                            +0 to 8, based on max no. of mexes of any position (0) to most (8)
+                            -0 to 4 based on how far it deviates from the centre of the map (in rare cases it may be higher than 4; i.e. if symmetrical map with both bases in each corner, then pickign one of the other map corners would result in a value of approx 4 ]]
 
-                    if tAreaInfo[refiDistanceFromEnemy] <= tAreaInfo[refiDistanceFromStart] then iCurPriority = iCurPriority + 2 end
-                    iCurPriority = iCurPriority + 4 * (1 - tAreaInfo[refiDistanceFromMiddle] / iMaxDistanceFromMiddle)
-                    iCurPriority = iCurPriority + 4 * (1 - tAreaInfo[refiDistanceFromACU] / iMaxDistanceToACU)
-                    iCurPriority = iCurPriority - (4 / 0.415) * (tAreaInfo[refiDistanceFromStart] + tAreaInfo[refiDistanceFromEnemy] - iDistanceFromStartToEnd) / iDistanceFromStartToEnd
-                    iCurPriority = iCurPriority + 8 * tAreaInfo[refiMassValue] / iMaxMassInArea
-                    if iCurPriority > iMaxPriority then
-                        iAreaWithMaxPriority = iCurArea
-                        iMaxPriority = iCurPriority
+                        if tAreaInfo[refiDistanceFromEnemy] <= tAreaInfo[refiDistanceFromStart] then iCurPriority = iCurPriority + 2 end
+                        iCurPriority = iCurPriority + 4 * (1 - tAreaInfo[refiDistanceFromMiddle] / iMaxDistanceFromMiddle)
+                        iCurPriority = iCurPriority + 4 * (1 - tAreaInfo[refiDistanceFromACU] / iMaxDistanceToACU)
+                        iCurPriority = iCurPriority - (4 / 0.415) * (tAreaInfo[refiDistanceFromStart] + tAreaInfo[refiDistanceFromEnemy] - iDistanceFromStartToEnd) / iDistanceFromStartToEnd
+                        iCurPriority = iCurPriority + 8 * tAreaInfo[refiMassValue] / iMaxMassInArea
+                        if iCurPriority > iMaxPriority then
+                            iAreaWithMaxPriority = iCurArea
+                            iMaxPriority = iCurPriority
+                        end
+                        if bDebugMessages == true then M27Utilities.DrawLocation(tAreaInfo[reftMexPosition], false, 4) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Mass in location='..tAreaInfo[refiMassValue]..'; max mass in area='..iMaxMassInArea..'; iCurPriority='..iCurPriority..'; iMaxPriority='..iMaxPriority) end
                     end
-                    if bDebugMessages == true then M27Utilities.DrawLocation(tAreaInfo[reftMexPosition], false, 4) end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Mass in location='..tAreaInfo[refiMassValue]..'; max mass in area='..iMaxMassInArea..'; iCurPriority='..iCurPriority..'; iMaxPriority='..iMaxPriority) end
+                    --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to settle on final destination') end
+                    tFinalDestination = tPossibleMexLocationsAndNumber[iAreaWithMaxPriority][reftMexPosition]
+                    if bDebugMessages == true then M27Utilities.DrawLocation(tFinalDestination, false, 1) end
+                    bHaveFinalDestination = true
+                    M27Utilities.FunctionProfiler(sFunctionRef..'Prioritisation', M27Utilities.refProfilerEnd)
                 end
-                --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to settle on final destination') end
-                tFinalDestination = tPossibleMexLocationsAndNumber[iAreaWithMaxPriority][reftMexPosition]
-                if bDebugMessages == true then M27Utilities.DrawLocation(tFinalDestination, false, 1) end
-                bHaveFinalDestination = true
-                M27Utilities.FunctionProfiler(sFunctionRef..'Prioritisation', M27Utilities.refProfilerEnd)
+            else
+                --Cant path to enemy base, look for the nearest underconstrucntion building to assist
+                if bDebugMessages == true then LOG(sFunctionRef..': About to check for under construction buildings to head to') end
+                tFinalDestination = GetNearbyUnderConstructionBuilding(aiBrain, oPathingUnit, 100)
+                if tFinalDestination then bHaveFinalDestination = true end
+                if bDebugMessages == true then LOG(sFunctionRef..': Just seen if any under construction buildings we want to head towards; tFinalDestination='..repr(tFinalDestination or {'nil'})) end
             end
             --end
             if bDebugMessages == true then LOG(sFunctionRef..': Near end of code, will return value based on specifics') end
             if bHaveFinalDestination == false then
-                tFinalDestination = M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)]
-                if bDebugMessages == true then LOG(sFunctionRef..': Failed to find a final destination, will just use enemy base') end
+                if bDebugMessages == true then LOG(sFunctionRef..': Failed to find a final destination, will just use enemy base if can path there, or closest rally point if cant path there') end
+                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] then
+                    tFinalDestination = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': refiMaxIntelBasePaths='..(aiBrain[M27Overseer.refiMaxIntelBasePaths] or 'nil')..'; Intel line positions='..repr(aiBrain[M27Overseer.reftIntelLinePositions])) end
+                    --Are we already close to intel path? If so then go for the previous intel path
+                    if M27Utilities.GetDistanceBetweenPositions(tUnitPos, aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]) <= 10 then
+                        if aiBrain[M27Overseer.refiMaxIntelBasePaths] <= 1 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Only have 1 intel path so will get random position around base (and attack-move to it)') end
+                            tFinalDestination = M27EngineerOverseer.AttackMoveToRandomPositionAroundBase(aiBrain, oPathingUnit, 50, 30)
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have more than 1 intel path, so will get preceding one, i.e. intel path number '..aiBrain[M27Overseer.refiMaxIntelBasePaths]-1) end
+                            tFinalDestination = aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]-1][1]
+                        end
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Arent at the intel path nearest enemy so will move to the last intel path') end
+                        tFinalDestination = aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]
+                    end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Backup tFinalDestination='..repr(tFinalDestination)) end
+
                 --[[ As of v15 removed this since performance on this function is already terrible
                 --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Failed to get final destination, repeating again') end
                 if bDebugMessages == true then LOG(sFunctionRef..': Failed to find a final destination, will retry with higher bounds unless already done that or no mexes in pathing group') end
@@ -2860,6 +3058,11 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
                 end --]]
             end
 
+            --If final destination is near enemy base then instead use GetPriorityACUDestination
+            if bHaveFinalDestination == false or M27Utilities.GetDistanceBetweenPositions(tFinalDestination, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= 50 then
+                tFinalDestination = GetPriorityACUDestination(aiBrain, oPathingUnit.PlatoonHandle)
+            end
+
             --Update final destination to move near it:
             M27Utilities.FunctionProfiler(sFunctionRef..'AddingDetours', M27Utilities.refProfilerStart)
             local tRevisedDestination = {}
@@ -2868,15 +3071,16 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             tRevisedDestination = M27PlatoonUtilities.MoveNearConstruction(aiBrain, oPathingUnit, tFinalDestination, nil, -3, true, false, false)
             --=========Get mexes and high value reclaim en-route================
             if bDebugMessages == true then
-                LOG(sFunctionRef..': tFinalDestination determined, ='..repr(tFinalDestination)..'; tRevisedDestination='..repr(tRevisedDestination))
+                LOG(sFunctionRef..': tFinalDestination determined, ='..repr(tFinalDestination)..'; tRevisedDestination='..repr(tRevisedDestination)..'; will now add mexes as via points')
                 M27Utilities.DrawLocation(tRevisedDestination, nil, 1, 100)
                 --Below may cause desync so only enable temporarily
                 --if bDebugMessages == true then LOG(sFunctionRef..': SegmentGroup of tFinalDestination='..M27MapInfo.InSameSegmentGroup(oPathingUnit, tFinalDestination, true)) end
                 --if bDebugMessages == true then LOG(sFunctionRef..': CanPathToManual for tFinalDestination='..tostring(oPathingUnit:CanPathTo(tFinalDestination))) end
             end
             oPathingUnit.GetPriorityExpansionMovementPath = true
-            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to add nearby reclaim and mexes to movement path') end
+            --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to add nearby reclaim and mexes to movement path') end'
             local tRevisedPath = AddMexesAndReclaimToMovementPath(oPathingUnit, tRevisedDestination)
+
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             M27Utilities.FunctionProfiler(sFunctionRef..'AddingDetours', M27Utilities.refProfilerEnd)
             return tRevisedPath
@@ -3103,7 +3307,7 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
     local iFlatDistance = M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition)
     local tTerrainPositionAtPoint = {}
     if iFlatDistance > 1 then
-        local iAngle = math.atan((tShotEndPosition[2] - tShotStartPosition[2]) / iFlatDistance)
+        local iAngle = math.atan(M27Utilities.ConvertAngleToRadians((tShotEndPosition[2] - tShotStartPosition[2]) / iFlatDistance))
         local iShotHeightAtPoint
         if bDebugMessages == true then LOG(sFunctionRef..': About to check if at any point on path shot will be lower than terrain; iAngle='..iAngle..'; startshot height='..tShotStartPosition[2]..'; target height='..tShotEndPosition[2]..'; iFlatDistance='..iFlatDistance) end
         local iEndPoint = math.max(1, math.floor(iFlatDistance - (iAOE or 0)))
@@ -3112,7 +3316,7 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
             --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
             tTerrainPositionAtPoint = M27Utilities.MoveTowardsTarget(tShotStartPosition, tShotEndPosition, iPointToTarget, 0)
             if bDebugMessages == true then LOG(sFunctionRef..': iPointToTarget='..iPointToTarget..'; tTerrainPositionAtPoint='..repr(tTerrainPositionAtPoint)) end
-            iShotHeightAtPoint = math.tan(iAngle) * iPointToTarget + tShotStartPosition[2]
+            iShotHeightAtPoint = math.tan(M27Utilities.ConvertAngleToRadians(iAngle)) * iPointToTarget + tShotStartPosition[2]
             if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
                 if not(iPointToTarget == iEndPoint and iShotHeightAtPoint == tTerrainPositionAtPoint[2]) then
                     if bDebugMessages == true then
@@ -3141,6 +3345,7 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsShotBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local bShotIsBlocked = false
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -3293,6 +3498,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repr(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
     local iShieldCurHealth, iShieldMaxHealth
     local iTotalShieldCurHealth = 0
+    local iTotalShieldMaxHealth = 0
     local iMinFractionComplete = 0.95
     if bTreatPartCompleteAsComplete then iMinFractionComplete = 0 end
     if M27Utilities.IsTableEmpty(tNearbyShields) == false then
@@ -3312,6 +3518,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
                             if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
                             iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                             iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth
+                            iTotalShieldMaxHealth = iTotalShieldMaxHealth + iShieldMaxHealth
                             if bTreatPartCompleteAsComplete or (oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1) then iShieldCurHealth = iShieldMaxHealth end
                             if bDebugMessages == true then LOG(sFunctionRef..': iShieldCurHealth='..iShieldCurHealth..'; iIgnoreShieldsWithLessThanThisHealth='..iIgnoreShieldsWithLessThanThisHealth) end
                             if iShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth then
@@ -3323,7 +3530,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
                     elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
                     end
                 else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit:GetUnitId()) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit.UnitId) end
                 end
             elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is dead')
             end
@@ -3332,32 +3539,39 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
         if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    if bReturnShieldHealthInstead then return iTotalShieldCurHealth
+    if bReturnShieldHealthInstead then
+        return iTotalShieldCurHealth, iTotalShieldMaxHealth
     else return bUnderShield
     end
 end
 
-function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoint, iMaxDistance, iMinDistance)
+function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, iMaxDistance, iMinDistance, bDebugMode)
     --Tries to find a random location in a square around tMidpoint that can path to; returns nil if couldnt find anywhere
     local sFunctionRef = 'GetRandomPointInAreaThatCanPathTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = (bDebugMode or false) if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
+
 
 
 
     local iLoopCount = 0
     local iMaxLoop1 = 6
     local iMaxLoop2 = iMaxLoop1 + 8
+    local iMaxLoop3 = iMaxLoop2 + 4
     local tEndDestination
 
     local iMidSegmentX, iMidSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tMidpoint)
-    local iSegmentMaxRange = iMaxDistance / M27MapInfo.iPathingIntervalSize
-    local iSegmentMinRange = iMinDistance / M27MapInfo.iPathingIntervalSize
+    local iSegmentMaxRange = iMaxDistance / M27MapInfo.iSizeOfBaseLevelSegment
+    local iSegmentMinRange = iMinDistance / M27MapInfo.iSizeOfBaseLevelSegment
+
 
     local iMinSegmentX = math.max(1, iMidSegmentX - iSegmentMaxRange)
     local iMaxSegmentX = math.min(M27MapInfo.iMaxBaseSegmentX, iMidSegmentX + iSegmentMaxRange)
     local iMinSegmentZ = math.max(1, iMidSegmentZ - iSegmentMaxRange)
     local iMaxSegmentZ = math.min(M27MapInfo.iMaxBaseSegmentZ, iMidSegmentZ + iSegmentMaxRange)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; Mid segments='..iMidSegmentX..'-'..iMidSegmentZ..'; iMinSegmentX-Z='..iMinSegmentX..'-'..iMinSegmentZ..'; iMaxSegmentX-Z='..iMaxSegmentX..'-'..iMaxSegmentZ..'; M27MapInfo.iSizeOfBaseLevelSegment='..M27MapInfo.iSizeOfBaseLevelSegment) end
 
     local iConstraintMinX = math.max(1, iMidSegmentX - iSegmentMinRange)
     local iConstraintMaxX = math.min(M27MapInfo.iMaxBaseSegmentX, iMidSegmentX + iSegmentMinRange)
@@ -3368,22 +3582,29 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
     local iRandX, iRandZ
     local iRandFlag
     local iPathingTarget
-    local bTryManualAlterantive = false
-    local iManualRandomStart
+    local bTryManualAlternative = false
+    local tiManualRandomStart
     local tiManualSegments --
     local iSegmentThickness
+    local tiMinRangeAttempt = {
+        {iMinSegmentX, iMinSegmentZ},
+        {iMinSegmentX, -iMinSegmentZ},
+        {-iMinSegmentX, -iMinSegmentZ},
+        {iMinSegmentX, -iMinSegmentZ},
+    }
 
     if bDebugMessages == true then
-        LOG(sFunctionRef..': About to search between Segment min and max X of '..iMinSegmentX..'-'..iMaxSegmentX..'; and Z min and max of '..iMinSegmentZ..'-'..iMaxSegmentZ..' if the pathing target of each point checked is different to iSegmentGroup'..iSegmentGroup)
+        LOG(sFunctionRef..': About to search between Segment min and max X of '..iMinSegmentX..'-'..iMaxSegmentX..'; and Z min and max of '..iMinSegmentZ..'-'..iMaxSegmentZ..' if the pathing target of each point checked is different to iSegmentGroup'..iSegmentGroup..'; iMidSegmentX='..iMidSegmentX..'; iSegmentMaxRange='..iSegmentMaxRange..'; iMidSegment'..iMidSegmentZ)
 
     end
     while not(iPathingTarget == iSegmentGroup) do
         iLoopCount = iLoopCount + 1
         if iLoopCount > iMaxLoop1 then
-            if bTryManualAlterantive == false then
-                bTryManualAlterantive = true
-                iSegmentThickness = math.max(1, math.floor((iMaxDistance - iMinDistance) / M27MapInfo.iPathingIntervalSize))
-                iManualRandomStart = math.random(0, 7)
+            if bDebugMessages == true then LOG(sFunctionRef..': Failed to find anywhere in the first '..iMaxLoop1..' attempts so will try alternative approach. bTryManualAlternative='..tostring(bTryManualAlternative)) end
+            if bTryManualAlternative == false then
+                bTryManualAlternative = true
+                iSegmentThickness = math.max(1, math.floor((iMaxDistance - iMinDistance) / M27MapInfo.iSizeOfBaseLevelSegment))
+                tiManualRandomStart = {math.random(0, 7), math.random(0, 7)}
                 tiManualSegments = {
                     {iMinSegmentX + iSegmentThickness, iMinSegmentZ + iSegmentThickness },
                     {math.floor((iMaxSegmentX - iMinSegmentX) * 0.5), iMinSegmentZ + iSegmentThickness },
@@ -3403,10 +3624,12 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
                     {iMinSegmentX + iSegmentThickness, iMaxSegmentZ - iSegmentThickness},
                     {iMinSegmentX + iSegmentThickness, math.floor((iMaxSegmentZ - iMinSegmentZ) * 0.5)}
                 }
+                if bDebugMessages == true then LOG(sFunctionRef..': tiManualSegments='..repr(tiManualSegments)..'; tiManualRandomStart='..repr(tiManualRandomStart)..'; iSegmentThickness='..iSegmentThickness) end
 
             end
-            if iLoopCount > iMaxLoop2 then
-                M27Utilities.ErrorHandler('Couldnt find random point in area after looking '..iLoopCount..' times, tMidpoint='..repr(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathingType='..sPathingType..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathingType, M27MapInfo.PlayerStartPoints[1]))
+            if iLoopCount > iMaxLoop3 then
+
+                M27Utilities.ErrorHandler('Couldnt find random point in area after looking more than iMaxLoop3='..iMaxLoop3..' times, tMidpoint='..repr({tMidpoint[1], tMidpoint[2], tMidpoint[3]})..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1])..';hopefully the code that called this should recheck pathing')
                 if bDebugMessages == true then
                     --Draw midpoint in white, draw last place checked in gold
                     M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 4, 20)
@@ -3416,7 +3639,7 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
                 return nil
             end
         end
-        if bTryManualAlterantive == false then
+        if bTryManualAlternative == false then
 
             --Get random position in the X range first
             iRandX = math.random(iMinSegmentX, iMaxSegmentX)
@@ -3439,16 +3662,24 @@ function GetRandomPointInAreaThatCanPathTo(sPathingType, iSegmentGroup, tMidpoin
             iRandZ = math.random(iCurMinSegmentZ, iCurMaxSegmentZ)
         else
             --Have tried randomly and failed, now just try by looking at NW/N/NE/E etc. randomly
-            iRandX = tiManualSegments[iLoopCount - iMaxLoop1 + iManualRandomStart][1]
-            iRandZ = tiManualSegments[iLoopCount - iMaxLoop1 + iManualRandomStart][2]
+            if iLoopCount < iMaxLoop2 then
+                iRandX = tiManualSegments[iLoopCount - iMaxLoop1 + tiManualRandomStart[1]][1]
+                iRandZ = tiManualSegments[iLoopCount - iMaxLoop1 + tiManualRandomStart[2]][2]
+                if bDebugMessages == true then LOG(sFunctionRef..': tiManualRandomStart='..repr(tiManualRandomStart)..'; X segment to use='..(iLoopCount - iMaxLoop1 + tiManualRandomStart[1])..'; Z segment to use='..(iLoopCount - iMaxLoop1 + tiManualRandomStart[2])..'; iRandX='..iRandX..'; iRandZ='..iRandZ) end
+            else
+                iRandX = tiMinRangeAttempt[iMaxLoop3 - iLoopCount][1]
+                iRandZ = tiMinRangeAttempt[iMaxLoop3 - iLoopCount][2]
+            end
         end
 
-        --Can we path here?
-        iPathingTarget = M27MapInfo.GetSegmentGroupOfTarget(sPathingType, iRandX, iRandZ)
+        iPathingTarget = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iRandX, iRandZ)
 
         if bDebugMessages == true then
-            LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; Target='..repr(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ))..'; iRandX='..iRandX..'; iRandZ='..iRandZ..'; iPathingTarget (i.e. group) ='..iPathingTarget..'; will draw in red')
-            M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 2, 20)
+            LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; Target='..repr(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ))..'; iRandX='..iRandX..'; iRandZ='..iRandZ..'; iPathingTarget (i.e. group) ='..iPathingTarget..'; will draw in red unless can path there in which case in blue')
+            if not(iPathingTarget == iSegmentGroup) then
+                M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 2, 100)
+            else M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 1, 100)
+            end
         end
     end
     if iPathingTarget == iSegmentGroup then
@@ -3460,47 +3691,85 @@ end
 
 function GetNearestRallyPoint(aiBrain, tPosition)
     --Todo - longer term want to integrate this with forward base logic
+    --NOTE: Air overseer uses custom copy of this with some variations to get air rally point
     local sFunctionRef = 'GetNearestRallyPoint'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --Refresh rally points if we've not refreshed in a while
-    M27MapInfo.RecordAllRallyPoints(aiBrain)
 
-    --Cycle through all rally points and pick the closest to tPosition
-    local iNearestToStart = 10000
-    local iNearestRallyPoint, iCurDistanceToStart
-    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftRallyPoints]) then
-        if GetGameTimeSeconds() >= 150 then
-            M27Utilities.ErrorHandler('Dont have any rally point >=2.5m into the game, wouldve expected to have generated intel paths by now; will return base as a rally point', nil, true)
+    --Are we in same amphibious pathing group? If not then will want to get alternative position to move to
+    local iPlateauGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPosition)
+    if not(iPlateauGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+        --Do we have any land factories in the plateau? If so then go to the nearest of these
+        local iNearestDist = 10000
+        local iCurDist
+        local tPotentialLocation
+        if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) == false and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) == false then
+            for iFactory, oFactory in aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories] do
+                iCurDist = M27Utilities.GetDistanceBetweenPositions(tPosition, oFactory:GetPosition())
+                if iCurDist < iNearestDist then
+                    iNearestDist = iCurDist
+                    tPotentialLocation = oFactory:GetPosition()
+                end
+            end
         end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        return M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    else
-
-
-        for iRallyPoint, tRallyPoint in aiBrain[M27MapInfo.reftRallyPoints] do
-            iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tPosition, aiBrain[M27MapInfo.reftRallyPoints][iRallyPoint])
-            if iCurDistanceToStart < iNearestToStart then
-                iNearestRallyPoint = iRallyPoint
+        if not(tPotentialLocation) then
+            --Do we have a mex location to go to? If so pick the one closest to our base
+            if M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup]) == false then
+                for iMex, tMex in M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][subrefPlateauMexes] do
+                    iCurDist = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tMex)
+                    if iCurDist < iNearestDist then
+                        tPotentialLocation = tMex
+                        iNearestDist = iCurDist
+                    end
+                end
+            end
+            if not(tPotentialLocation) then
+                M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..' so will just return the current position '..repr(tPosition), true)
+                tPotentialLocation = tPosition
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
-    end
-    --[[ Previous code based on mex patrol locations:
-    local tMexPatrolLocations = M27MapInfo.GetMexPatrolLocations(aiBrain)
-    local iNearestToStart = 10000
-    local tNearestMex
-    local iCurDistanceToStart
-    local tOurStart = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    for iMex, tMexLocation in tMexPatrolLocations do
-        iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tOurStart, tMexLocation)
-        if iCurDistanceToStart < iNearestToStart then
-            iNearestToStart = iCurDistanceToStart
-            tNearestMex = tMexLocation
+        return tPotentialLocation
+    else
+        --Refresh rally points if we've not refreshed in a while
+        M27MapInfo.RecordAllRallyPoints(aiBrain)
+
+        --Cycle through all rally points and pick the closest to tPosition
+        local iNearestToStart = 10000
+        local iNearestRallyPoint, iCurDistanceToStart
+        if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftRallyPoints]) then
+            if GetGameTimeSeconds() >= 150 then
+                M27Utilities.ErrorHandler('Dont have any rally point >=2.5m into the game, wouldve expected to have generated intel paths by now; will return base as a rally point', true)
+            end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        else
+
+
+            for iRallyPoint, tRallyPoint in aiBrain[M27MapInfo.reftRallyPoints] do
+                iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tPosition, aiBrain[M27MapInfo.reftRallyPoints][iRallyPoint])
+                if iCurDistanceToStart < iNearestToStart then
+                    iNearestRallyPoint = iRallyPoint
+                end
+            end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
         end
+        --[[ Previous code based on mex patrol locations:
+        local tMexPatrolLocations = M27MapInfo.GetMexPatrolLocations(aiBrain)
+        local iNearestToStart = 10000
+        local tNearestMex
+        local iCurDistanceToStart
+        local tOurStart = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        for iMex, tMexLocation in tMexPatrolLocations do
+            iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tOurStart, tMexLocation)
+            if iCurDistanceToStart < iNearestToStart then
+                iNearestToStart = iCurDistanceToStart
+                tNearestMex = tMexLocation
+            end
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return tNearestMex--]]
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return tNearestMex--]]
 end
 
 function GetPositionToSideOfTarget(oUnit, tTargetLocation, iBaseAngleToTarget, iDistanceToMove)
@@ -3603,7 +3872,7 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
 
     if M27Utilities.IsTableEmpty(tEnemiesInRange) == false then
         for iUnit, oUnit in tEnemiesInRange do
-           if oUnit.GetBlueprint then
+           if oUnit.GetBlueprint and not(oUnit.Dead) then
                oCurBP = oUnit:GetBlueprint()
                --Is the unit within range of the aoe?
                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation) <= iAOE then
@@ -3617,13 +3886,18 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
                        else
                            --Still some value in damaging a unit (as might get a second strike), but far less than killing it
                            iMassFactor = 0.1
-                           if EntityCategoryContains(categories.EXPERIMENTAL, oUnit:GetUnitId()) then iMassFactor = 0.5 end
+                           if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then iMassFactor = 0.5 end
                        end
-                       if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit:GetUnitId()..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
+                       if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
                        --Is the target mobile and not under construction? Then reduce to 20% as unit might dodge or not be there when bomb lands
-                       if oUnit:GetFractionComplete() == 1 and EntityCategoryContains(categories.MOBILE, oUnit:GetUnitId()) then iMassFactor = iMassFactor * 0.2 end
+                       if oUnit:GetFractionComplete() == 1 then
+                           if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then iMassFactor = iMassFactor * 0.2
+                           --Is it a mex that will be killed outright? Then increase the value of killing it
+                           elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION, oUnit.UnitId) then iMassFactor = iMassFactor * 2
+                           end
+                       end
                        iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
-                       if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
+                       if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
                    end
                end
            end
@@ -3635,12 +3909,82 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
     return iTotalDamage
 end
 
-function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
+function GetDamageFromOvercharge(aiBrain, oTargetUnit, iAOE, iDamage, bTargetWalls)
+    --Originally copied from the 'getdamagefrombomb' function, but adjusted since OC doesnt deal full damage to ACU or structures
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetDamageFromOvercharge'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    local iTotalDamage = 0
+
+    local tEnemiesInRange
+    if bTargetWalls then tEnemiesInRange =  aiBrain:GetUnitsAroundPoint(categories.WALL + M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryAllNavy, oTargetUnit:GetPosition(), iAOE, 'Enemy')
+    else tEnemiesInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryAllNavy, oTargetUnit:GetPosition(), iAOE, 'Enemy')
+    end
+
+    local oCurBP
+    local iMassFactor
+    local iCurHealth, iMaxHealth, iCurShield, iMaxShield
+    local iActualDamage
+    local iKillsExpected = 0
+    local iUnitsHit = 0 --E.g. if targeting walls then this means we target the most walls assuming no nearby other units
+    if bDebugMessages == true then LOG(sFunctionRef..': About to loop through all enemies in range; iDamage='..iDamage..'; iAOE='..iAOE..'; Base target unit='..oTargetUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTargetUnit)..'; position='..repr(oTargetUnit:GetPosition())) end
+
+    if M27Utilities.IsTableEmpty(tEnemiesInRange) == false then
+        for iUnit, oUnit in tEnemiesInRange do
+            if oUnit.GetBlueprint then
+                oCurBP = oUnit:GetBlueprint()
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; dist to postiion='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition())) end
+                --Is the unit within range of the aoe?
+                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition()) <= iAOE then
+                    --Is the unit shielded by a non-mobile shield (mobile shields should take full damage I think)
+                    --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
+                    if not(IsTargetUnderShield(aiBrain, oUnit, 800, false, true, false)) then
+                        iActualDamage = iDamage
+                        if EntityCategoryContains(categories.STRUCTURE, oUnit.UnitId) then
+                            iActualDamage = 800
+                        elseif EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
+                            iActualDamage = 400
+                        end
+
+                        iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                        iCurHealth = iCurShield + oUnit:GetHealth()
+                        iMaxHealth = iMaxShield + oUnit:GetMaxHealth()
+                        --Set base mass value based on health
+                        if iDamage >= iMaxHealth or iDamage >= math.min(iCurHealth * 3, iCurHealth + 1000) then
+                            iMassFactor = 1
+                            iKillsExpected = iKillsExpected + 1
+                            --Was the unit almost dead already?
+                            if (iCurShield + iCurHealth) <= iMaxHealth * 0.4 then iMassFactor = math.max(0.25, (iCurShield + iCurHealth) / iMaxHealth) end
+                        else
+                            --Still some value in damaging a unit (as might get a second strike), but far less than killing it
+                            iMassFactor = 0.4
+                            if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then iMassFactor = 0.5 end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor..'; Unit max health='..iMaxHealth..'; CurHealth='..iCurHealth) end
+                        --Is the target mobile and within 1 of the AOE edge? If so then reduce to 25% as it might move out of the wayif
+                        if oUnit:GetFractionComplete() == 1 and EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and iAOE - 0.5 < M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTargetUnit:GetPosition()) then iMassFactor = iMassFactor * 0.25 end
+                        iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor) end
+                    end
+                end
+            end
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished going through units in the aoe, iTotalDamage in mass='..iTotalDamage..'; iAOE='..iAOE..'; iDamage='..iDamage) end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return iTotalDamage, iKillsExpected
+end
+
+function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckForSMD, tSMLLocationForSMDCheck, iOptionalTimeSMDNeedsToHaveBeenBuiltFor, iSMDRangeAdjust)
     --Calcualtes the most damaging location for an aoe target; also returns the damage dealt
+    --if bOptionalCheckForSMD is true then will ignore targest that are near an SMD
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBestAOETarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': About to find the best target for bomb, tBaseLocation='..repr(tBaseLocation)..'; iAOE='..iAOE..'; iDamage='..iDamage) end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to find the best target for bomb, tBaseLocation='..repr(tBaseLocation)..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')) end
 
     local tBestTarget = {tBaseLocation[1], tBaseLocation[2], tBaseLocation[3]}
     --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
@@ -3649,6 +3993,7 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
     local iMaxDistanceChecks = math.min(4, math.ceil(iAOE / 2))
     local iDistanceFromBase = 0
     local tPossibleTarget
+    if bOptionalCheckForSMD and IsSMDBlockingTarget(aiBrain, tBaseLocation, tSMLLocationForSMDCheck, (iOptionalTimeSMDNeedsToHaveBeenBuiltFor or 200), iSMDRangeAdjust) then iMaxTargetDamage = math.min(4000, iMaxTargetDamage) end
 
     for iCurDistanceCheck = iMaxDistanceChecks, 1, -1 do
         iDistanceFromBase = iAOE / iCurDistanceCheck
@@ -3656,8 +4001,11 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
             tPossibleTarget = M27Utilities.MoveInDirection(tBaseLocation, iAngle, iDistanceFromBase)
             iCurTargetDamage = GetDamageFromBomb(aiBrain, tPossibleTarget, iAOE, iDamage)
             if iCurTargetDamage > iMaxTargetDamage then
-                tBestTarget = tPossibleTarget
-                iMaxTargetDamage = iCurTargetDamage
+                if bOptionalCheckForSMD and IsSMDBlockingTarget(aiBrain, tPossibleTarget, tSMLLocationForSMDCheck, (iOptionalTimeSMDNeedsToHaveBeenBuiltFor or 200), iSMDRangeAdjust) then iCurTargetDamage = math.min(4000, iCurTargetDamage) end
+                if iCurTargetDamage > iMaxTargetDamage then
+                    tBestTarget = tPossibleTarget
+                    iMaxTargetDamage = iCurTargetDamage
+                end
             end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Finished checking every angle for iDistanceFromBase='..iDistanceFromBase..'; iMaxTargetDamage='..iMaxTargetDamage..'; tBestTarget='..repr(tBestTarget)) end
@@ -3670,107 +4018,678 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage)
     return tBestTarget, iMaxTargetDamage
 end
 
+function IsSMDBlockingTarget(aiBrain, tTarget, tSMLPosition, iIgnoreSMDCreatedThisManySecondsAgo, iSMDRangeAdjust)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IsSMDBlockingTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    local bEnemySMDInRange = false
+    local iSMLToTarget = M27Utilities.GetDistanceBetweenPositions(tTarget, tSMLPosition)
+    local iAngleSMLToTarget = M27Utilities.GetAngleFromAToB(tSMLPosition, tTarget)
+    local iTargetToSMD
+
+    local iSMLToSMD
+    local iSMDRange
+    local iAngleToSMD
+    local bSMDInRangeOfMissile
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Considering tTarget='..repr(tTarget)..'; iIgnoreSMDCreatedThisManySecondsAgo='..(iIgnoreSMDCreatedThisManySecondsAgo or 1)..'; Current game time='..GetGameTimeSeconds()) end
+
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemySMD]) == false then
+        for iSMD, oSMD in aiBrain[M27Overseer.reftEnemySMD] do
+            if M27UnitInfo.IsUnitValid(oSMD) then
+                if GetGameTimeSeconds() - (oSMD[M27UnitInfo.refiTimeOfLastCheck] or (GetGameTimeSeconds() - 10)) > (iIgnoreSMDCreatedThisManySecondsAgo or 0) then
+                    bSMDInRangeOfMissile = false
+                    iSMDRange = (oSMD:GetBlueprint().Weapon[1].MaxRadius or 90) + 1 + (iSMDRangeAdjust or 0)
+                    iTargetToSMD = M27Utilities.GetDistanceBetweenPositions(tTarget, oSMD:GetPosition())
+
+                    iSMLToSMD = M27Utilities.GetDistanceBetweenPositions(oSMD:GetPosition(), tSMLPosition)
+                    iAngleToSMD = M27Utilities.GetAngleFromAToB(tSMLPosition, oSMD:GetPosition())
+                    if bDebugMessages == true then LOG(sFunctionRef..': oSMD='..oSMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSMD)..'; iTargetToSMD='..iTargetToSMD..'; iSMLToSMD='..iSMLToSMD..'; iSMLToTarget='..iSMLToTarget..'; iSMDRange='..iSMDRange..'; oSMD[M27UnitInfo.refiTimeOfLastCheck]='..(oSMD[M27UnitInfo.refiTimeOfLastCheck] or 'nil')..'; Distance from target to oSMD='..M27Utilities.GetDistanceBetweenPositions(tTarget, oSMD:GetPosition())..'; iSMDRange='..iSMDRange..'; iAngleToSMD='..iAngleToSMD..'; iAngleSMLToTarget='..iAngleSMLToTarget..'; SMD position='..repr(oSMD:GetPosition())..'; tSMLPosition='..repr(tSMLPosition)..'; TargetPos='..repr(tTarget)..'; iAngleFromAToB - iAngleFromAToC='..(iAngleSMLToTarget - iAngleToSMD)..'; ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC)='..M27Utilities.ConvertAngleToRadians(iAngleSMLToTarget - iAngleToSMD)..'; math.tan(math.abs(ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC)))='..math.tan(math.abs(M27Utilities.ConvertAngleToRadians(iAngleSMLToTarget - iAngleToSMD)))..'; iDistFromAToC='..iSMLToSMD..'; Tan result times this distance='..iSMLToSMD*math.tan(math.abs(M27Utilities.ConvertAngleToRadians(iAngleSMLToTarget - iAngleToSMD)))) end
+
+                    bSMDInRangeOfMissile = M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iSMLToTarget, iSMLToSMD, iTargetToSMD, iAngleSMLToTarget, iAngleToSMD, iSMDRange)
+
+                    if bSMDInRangeOfMissile then
+                        if bDebugMessages == true then LOG(sFunctionRef..': SMD is in range and was built a while ago') end
+                        bEnemySMDInRange = true
+                        break
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': SMD is not blocking the target') end
+                elseif bDebugMessages == true then LOG(sFunctionRef..': SMD was only recently built, time we think the SMD was active='..GetGameTimeSeconds() - (oSMD[M27UnitInfo.refiTimeOfLastCheck] or (GetGameTimeSeconds() - 10)))
+                end
+            end
+        end
+    elseif bDebugMessages == true then LOG(sFunctionRef..': No enemy SMD detected')
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': bEnemySMDInRange='..tostring(bEnemySMDInRange)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return bEnemySMDInRange
+end
+
+function RecheckForTMLMissileTarget(aiBrain, oLauncher)
+    --Call via fork thread - called if couldnt find any targets for TML
+    WaitSeconds(30)
+    if M27UnitInfo.IsUnitValid(oLauncher) then ConsiderLaunchingMissile(oLauncher) end
+end
+
+function DecideToLaunchNukeSMLOrTMLMissile()  end --Done only to make it easier to find considerlaunchingmissile
 function ConsiderLaunchingMissile(oLauncher, oWeapon)
     --Should be called via forkthread when missile created due to creating a loop
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderLaunchingMissile'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    oLauncher[M27UnitInfo.refbActiveMissileChecker] = true
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+    if M27UnitInfo.IsUnitValid(oLauncher) then
+        oLauncher[M27UnitInfo.refbActiveMissileChecker] = true
 
 
-    local tTarget
-    local tEnemyUnitsOfInterest
-    local iBestTargetValue
-    local iCurTargetValue
-    local tEnemyCategoriesOfInterest
-    local aiBrain = oLauncher:GetAIBrain()
-    local iMaxRange = 250 --basic default, should get overwritten
-    local iMinRange = 0
-    local iAOE, iDamage
+        local tTarget
+        local tEnemyUnitsOfInterest
+        local iBestTargetValue
+        local iCurTargetValue
+        local tEnemyCategoriesOfInterest
+        local aiBrain = oLauncher:GetAIBrain()
+        local iMaxRange = 250 --basic default, should get overwritten
+        local iMinRange = 0
+        local iAOE, iDamage
 
-    local bTML = false
-    local bSML = false
-    if EntityCategoryContains(M27UnitInfo.refCategoryTML, oLauncher:GetUnitId()) then bTML = true
-    elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher:GetUnitId()) then bSML = true
-    else M27Utilities.ErrorHandler('Unknown type of launcher, code to fire a missile wont work') end
+        local bTML = false
+        local bSML = false
+        if EntityCategoryContains(M27UnitInfo.refCategoryTML, oLauncher.UnitId) then bTML = true
+        elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher.UnitId) then bSML = true
+        else M27Utilities.ErrorHandler('Unknown type of launcher, code to fire a missile wont work; oLauncher='..oLauncher.UnitId..M27UnitInfo.GetUnitLifetimeCount(oLauncher)) end
 
-    if bTML or bSML then
-        iAOE, iDamage, iMinRange, iMaxRange = M27UnitInfo.GetLauncherAOEStrikeDamageMinAndMaxRange(oLauncher)
+        if bTML or bSML then
+            iAOE, iDamage, iMinRange, iMaxRange = M27UnitInfo.GetLauncherAOEStrikeDamageMinAndMaxRange(oLauncher)
 
-        if bTML then
-            tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Mex}
-        else
-            tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllFactories * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL}
-        end
-        if bDebugMessages == true then LOG(sFunctionRef..': Will consider missile target. iMinRange='..(iMinRange or 'nil')..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')..'; bSML='..tostring((bSML or false))) end
-
-        while M27UnitInfo.IsUnitValid(oLauncher) do
             if bTML then
-                --Just target the nearest enemy unit
-                iBestTargetValue = 1000
-                for iRef, iCategory in tEnemyCategoriesOfInterest do
-                    tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
-                    if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
-                        for iUnit, oUnit in tEnemyUnitsOfInterest do
-                            iCurTargetValue = M27Utilities.GetDistanceBetweenPositions(oLauncher:GetPosition(), oUnit:GetPosition())
-                            if iCurTargetValue < iBestTargetValue and iCurTargetValue > MinRadius then
-                                iBestTargetValue = iCurTargetValue
-                                tTarget = oUnit:GetPosition()
+                --tEnemyCategoriesOfInterest = M27EngineerOverseer.iTMLHighPriorityCategories
+            else --SML
+                tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryLandExperimental + M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryFixedT2Arti - M27UnitInfo.refCategoryExperimentalStructure - M27UnitInfo.refCategoryFixedT3Arti - M27UnitInfo.refCategorySML - M27UnitInfo.refCategoryT3Mex - M27UnitInfo.refCategorySMD}
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Will consider missile target. iMinRange='..(iMinRange or 'nil')..'; iAOE='..(iAOE or 'nil')..'; iDamage='..(iDamage or 'nil')..'; bSML='..tostring((bSML or false))) end
+
+            while M27UnitInfo.IsUnitValid(oLauncher) do
+                if bTML then
+                    local tHighHealthTargets = {}
+                    local tStartPos = oLauncher:GetPosition()
+                    local tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27EngineerOverseer.iTMLHighPriorityCategories, tStartPos, iMaxRange, 'Enemy')
+                    local tEnemyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, tStartPos, iMaxRange + 30, 'Enemy')
+                    local iValidTargets = 0
+                    local tValidTargets = {}
+                    local oBestTarget
+                    if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
+                        for iUnit, oUnit in tPotentialTargets do
+                            if M27EngineerOverseer.IsValidTMLTarget(aiBrain, tStartPos, oUnit, tEnemyTMD) then
+                                iValidTargets = iValidTargets + 1
+                                tValidTargets[iValidTargets] = oUnit
                             end
                         end
-                        break
                     end
-                end
+                    if iValidTargets == 0 then
+                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH2 + M27UnitInfo.refCategoryStructure * categories.TECH3 - M27EngineerOverseer.iTMLHighPriorityCategories -M27UnitInfo.refCategoryTMD, tStartPos, iMaxRange, 'Enemy')
+                        if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
+                            for iUnit, oUnit in tPotentialTargets do
+                                if oUnit:GetHealth() <= 6000 then
+                                    if M27EngineerOverseer.IsValidTMLTarget(aiBrain, tStartPos, oUnit, tEnemyTMD) then
+                                        iValidTargets = iValidTargets + 1
+                                        tValidTargets[iValidTargets] = oUnit
+                                    end
+                                else
+                                    table.insert(tHighHealthTargets, oUnit)
+                                end
+                            end
+                        end
+                        if iValidTargets == 0 then
+                            --Target valid high health targets
+                            if M27Utilities.IsTableEmpty(tHighHealthTargets) == false then
+                                for iUnit, oUnit in tHighHealthTargets do
+                                    if M27EngineerOverseer.IsValidTMLTarget(aiBrain, tStartPos, oUnit, tEnemyTMD) then
+                                        iValidTargets = iValidTargets + 1
+                                        tValidTargets[iValidTargets] = oUnit
+                                    end
+                                end
+                            end
+                        end
+                    end
 
-            else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
-                --First get the best location if just target the start position or locations near here
-                tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.PlayerStartPoints[GetNearestEnemyStartNumber(aiBrain)], iAOE, iDamage)
-                --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
-                if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <20k then will consider other targets') end
-                if iBestTargetValue < 20000 then --If have high value location for nearest enemy start then just go with this
+                    if iValidTargets == 0 then
+                        if not(oLauncher[M27EconomyOverseer.refbWillReclaimUnit]) then
+                            --Disable autobuild and pause the TML since we have no targets, so this missile will be our last
+                            oLauncher:SetAutoMode(false)
+                            oLauncher:SetPaused(true)
+                            if not(oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable]) then
+                                --First time we have no target
+                                oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] = GetGameTimeSeconds()
+                            end
+                            if GetGameTimeSeconds() - oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] >= 150 and not(M27Utilities.IsTableEmpty(tEnemyTMD)) then
+                                --Reclaim the unit
+                                oLauncher[M27EconomyOverseer.refbWillReclaimUnit] = true
+                                table.insert(aiBrain[M27EconomyOverseer.reftoTMLToReclaim], oLauncher)
+                            end
+                        else
+                            --Already set to be reclaimed so just need to check for targets
+                        end
+                        --Wait a while then call this function again:
+                        ForkThread(RecheckForTMLMissileTarget, aiBrain, oLauncher)
+                    else
+                        --Have at least 1 valid target, so want to pick the best one
+
+                        iBestTargetValue = 0
+                        for iUnit, oUnit in tValidTargets do
+                            iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                            if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then iCurTargetValue = iCurTargetValue * 1.5 end
+                            if iBestTargetValue < iCurTargetValue then
+                                iBestTargetValue = iCurTargetValue
+                                oBestTarget = oUnit
+                            end
+                        end
+                        if oBestTarget then
+                            tTarget = oBestTarget:GetPosition()
+                            oBestTarget[M27EngineerOverseer.refiTMLShotsFired] = (oBestTarget[M27EngineerOverseer.refiTMLShotsFired] or 0) + 1
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iValidTargets='..iValidTargets..'; tTarget='..repr((tTarget or {'nil'}))) end
+
+
+
+
+
+                    --[[ Prev logic for choosing target (never actually tested)
+                    iBestTargetValue = 1000
                     for iRef, iCategory in tEnemyCategoriesOfInterest do
                         tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                             for iUnit, oUnit in tEnemyUnitsOfInterest do
-                                iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
-                                if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit:GetUnitId()..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
-                                --Stop looking if tried >=10 targets and have one that is at least 20k of value
-                                if iCurTargetValue > iBestTargetValue then
+                                iCurTargetValue = M27Utilities.GetDistanceBetweenPositions(oLauncher:GetPosition(), oUnit:GetPosition())
+                                if iCurTargetValue > iBestTargetValue and iCurTargetValue > iMinRange then
                                     iBestTargetValue = iCurTargetValue
                                     tTarget = oUnit:GetPosition()
                                 end
-                                if iBestTargetValue > 20000 and iUnit >=10 then break end
+                            end
+                            break
+                        end
+                    end--]]
+                else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
+                    --First get the best location if just target the start position or locations near here
+                    tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage, bSML, oLauncher:GetPosition())
+                    local iAirSegmentX, iAirSegmentZ
+
+                    --Cycle through other start positions to see if can get a better target, but reduce value of target if we havent scouted it in the last 5 minutes
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering best target for nuke.  If target enemy base then iBestTargetValue='..iBestTargetValue) end
+                    for iStartPoint = 1, table.getn(M27MapInfo.PlayerStartPoints) do
+                        if not(iStartPoint == aiBrain.M27StartPositionNumber) and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iStartPoint], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= 30 then
+                            --Have we scouted this location recently?
+                            iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[iStartPoint])
+                            if bDebugMessages == true then LOG(sFunctionRef..': Cycling through start points, iStartPoint='..iStartPoint..'; time last scouted='..(GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted])) end
+                            if GetGameTimeSeconds() - (aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] or -300) <= 300 then
+                                iCurTargetValue = GetDamageFromBomb(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], iAOE, iDamage)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering the start position '..iStartPoint..'='..repr(M27MapInfo.PlayerStartPoints[iStartPoint])..'; value ignroign SMD='..iCurTargetValue) end
+                                if iCurTargetValue > iBestTargetValue then
+                                    if IsSMDBlockingTarget(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], oLauncher:GetPosition(), 200) then
+                                        iCurTargetValue = 4000
+                                        if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking target so reducing value to 4k') end
+                                    end
+                                    if iCurTargetValue > iBestTargetValue then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a better start position target, for the start position='..iStartPoint..' dealing damage of '..iCurTargetValue..' vs prev best value of '..iBestTargetValue) end
+                                        iBestTargetValue = iCurTargetValue
+                                        tTarget = {M27MapInfo.PlayerStartPoints[iStartPoint][1], M27MapInfo.PlayerStartPoints[iStartPoint][2], M27MapInfo.PlayerStartPoints[iStartPoint][3]}
+                                    end
+                                end
                             end
                         end
                     end
-                    if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
-                    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': If value is <12k then will clear target; iBestTargetValue='..iBestTargetValue..'; tTarget='..repr(tTarget or {'nil'})) end
-                if iBestTargetValue < 12000 then tTarget = nil end
-            end
 
-            if tTarget then
-                --Launch missile
-                if bDebugMessages == true then LOG(sFunctionRef..': Will launch missile at tTarget='..repr(tTarget)) end
-                if bTML then IssueTactical({oLauncher}, tTarget)
-                else
-                    IssueNuke({oLauncher}, tTarget)
-                    --Restart SMD monitor after giving time for missile to fire
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                    WaitSeconds(10)
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                    if not(oLauncher[M27UnitInfo.refbActiveSMDChecker]) then ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oLauncher) end
-                    --Send a voice taunt if havent in last 6m
-                    ForkThread(M27Chat.SendGloatingMessage, aiBrain, 10, 360)
+
+
+
+
+                    --Reduce value if enemy has SMD within range of here - already incorporated into getbestaoetarget
+                    --[[if IsSMDBlockingTarget(aiBrain, tTarget, oLauncher:GetPosition(), 200) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking the nearest enemy base so will limit damage to 4k') end
+                        iBestTargetValue = 4000
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': SMD not blockign enemy base, value of that='..iBestTargetValue)
+                    end--]]
+
+
+                    --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
+                    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <20k then will consider other targets') end
+                    local iEnemyUnitsConsidered = 0
+                    if iBestTargetValue < 40000 then --If have high value location for nearest enemy start then just go with this
+                        for iRef, iCategory in tEnemyCategoriesOfInterest do
+                            tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oLauncher:GetPosition(), iMaxRange, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
+                                for iUnit, oUnit in tEnemyUnitsOfInterest do
+                                    iEnemyUnitsConsidered = iEnemyUnitsConsidered + 1
+                                    iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
+                                    --Stop looking if tried >=10 targets and have one that is at least 20k of value
+                                    if iCurTargetValue > iBestTargetValue then
+                                        if IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), 200) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking the unit target '..repr(oUnit:GetPosition())..'; will limit damage to 4k') end
+                                            iCurTargetValue = 4000 end
+                                        if iCurTargetValue > iBestTargetValue then
+                                            iBestTargetValue = iCurTargetValue
+                                            tTarget = oUnit:GetPosition()
+                                            if bDebugMessages == true then LOG(sFunctionRef..': New best target with value='..iBestTargetValue) end
+                                        end
+                                    end
+                                    --Note: Mass value of mexes is doubled, so 3 T3 mexes would give a value of 27600
+                                    if iEnemyUnitsConsidered >= 15 and iBestTargetValue >= 20000 and ((iBestTargetValue > 40000 and iEnemyUnitsConsidered >=15) or (iBestTargetValue > 30000 and iEnemyUnitsConsidered >= 30) or (iBestTargetValue >= 20000 and iEnemyUnitsConsidered >= 45)) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a target with a decent amount of value and have already tried quite a few units.  iBestTargetValue='..iBestTargetValue..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage, bSML, oLauncher:GetPosition()) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue..'; Best location for this target='..repr(tTarget)) end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': If value is <12k then will clear target; iBestTargetValue='..iBestTargetValue..'; tTarget='..repr(tTarget or {'nil'})) end
+                    if iBestTargetValue < 12000 then tTarget = nil end
                 end
-                break
+
+                if tTarget then
+                    --Launch missile
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will launch missile at tTarget='..repr(tTarget)) end
+                    if bTML then IssueTactical({oLauncher}, tTarget)
+                    else
+                        IssueNuke({oLauncher}, tTarget)
+                        --Restart SMD monitor after giving time for missile to fire
+                        if oLauncher then oLauncher[M27UnitInfo.refbActiveSMDChecker] = false end
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        WaitSeconds(10)
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                        if not(oLauncher[M27UnitInfo.refbActiveSMDChecker]) then ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oLauncher) end
+                        --Send a voice taunt if havent in last 6m
+                        ForkThread(M27Chat.SendGloatingMessage, aiBrain, 10, 360)
+                    end
+                    break
+                end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                WaitSeconds(10)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            WaitSeconds(10)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+        end
+        oLauncher[M27UnitInfo.refbActiveMissileChecker] = false
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function GetT3ArtiTarget(oT3Arti)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetT3ArtiTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iMinRange = 0
+    local iMaxRange = 0
+    local iAOE = 1
+    local iDamage = 2500
+    local iRandomness = 0
+    for iWeapon, tWeapon in oT3Arti:GetBlueprint().Weapon do
+        iMinRange = math.max(tWeapon.MinRadius, iMinRange)
+        iMaxRange = math.max(tWeapon.MaxRadius, iMaxRange)
+        iAOE = math.max(iAOE, tWeapon.DamageRadius)
+        iDamage = math.max(iDamage, tWeapon.Damage)
+        iRandomness = math.max(iRandomness, (tWeapon.FiringRandomness or 0))
+    end
+    --Assume that 2.7 shots will land on this target for deciding aoe targets (i.e. unit would need to have massive health to not die)
+    iDamage = math.min(14000, iDamage * 2.7) --Want to ignore shields less than this
+
+    --Adjust aoe for firing randomness
+    iAOE = iAOE * (1 + iRandomness * 3)
+
+    local aiBrain = oT3Arti:GetAIBrain()
+    local tTarget
+    local tEnemyUnitsOfInterest
+    local iBestTargetValue
+    local iCurTargetValue
+
+    --First prioritise enemy T3 arti regardless of how well shielded, as if we dont kill them quickly we will die
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure]) == false then
+        --Pick the one in range of the most t3 arti including this one; if there are multiple, then pick the one closest to this (since its accuracy will be best)
+        local iMostT3ArtiInRange = 0
+        local iCurDistance
+        local tT3ArtiInRange
+        local tTargetShortlist = {}
+        local iTargetShortlist = 0
+        local iFriendlyT3ArtiInRange = 0
+        for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
+                --Use 15 above normal range due to inaccuracy of shots
+                if iCurDistance <= 840 then
+
+                    tT3ArtiInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, oUnit:GetPosition(), 840, 'Ally')
+                    if M27Utilities.IsTableEmpty(tT3ArtiInRange) == false then
+                        iFriendlyT3ArtiInRange = 0
+                        for iUnit, oUnit in tT3ArtiInRange do
+                            if oUnit:GetFractionComplete() == 1 then
+                                iFriendlyT3ArtiInRange = iFriendlyT3ArtiInRange + 1
+                            end
+                        end
+
+                        if iFriendlyT3ArtiInRange >= iMostT3ArtiInRange then
+                            if iFriendlyT3ArtiInRange > iMostT3ArtiInRange then
+                                tTargetShortlist = {}
+                                iTargetShortlist = 0
+                            end
+                            iTargetShortlist = iTargetShortlist + 1
+                            tTargetShortlist[iTargetShortlist] = oUnit
+                            iMostT3ArtiInRange = iFriendlyT3ArtiInRange
+                        end
+                    end
+                end
+            end
+        end
+        if iTargetShortlist > 0 then
+            --Pick the closest target
+            if iTargetShortlist == 1 then
+                tTarget = tTargetShortlist[1]:GetPosition()
+            else
+                local iClosestTarget = 100000
+               for iUnit, oUnit in tTargetShortlist do
+                  iCurDistance =  M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
+                   if iCurDistance < iClosestTarget then
+                       tTarget = oUnit:GetPosition()
+                       iClosestTarget = iCurDistance
+                   end
+               end
+            end
+        end
+        if tTarget and M27Utilities.GetDistanceBetweenPositions(tTarget, oT3Arti:GetPosition()) > 824.99 then
+            tTarget = M27Utilities.MoveInDirection(oT3Arti:GetPosition(), M27Utilities.GetAngleFromAToB(oT3Arti:GetPosition(), tTarget), 824.99, false)
         end
     end
-    oLauncher[M27UnitInfo.refbActiveMissileChecker] = false
+    if not(tTarget) then
+        local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategoryStructure * categories.TECH2, categories.COMMAND}
+
+        --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
+        tTarget = {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[2], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[3]}
+        iBestValueTarget = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage)
+
+        --Check we dont have key friendly units close to here
+        if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
+            iBestTargetValue = 0
+        end
+
+        --iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage)
+        --Will assume that even if are in range of SMD it isnt loaded, as wouldve reclaimed the nuke if they built SMD in time
+        if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue for enemy base='..iBestTargetValue..'; if <15k then will consider other targets') end
+        if iBestTargetValue < 15000 then --If have high value location for nearest enemy start then just go with this
+            for iRef, iCategory in tEnemyCategoriesOfInterest do
+                tEnemyUnitsOfInterest = aiBrain:GetUnitsAroundPoint(iCategory, oT3Arti:GetPosition(), iMaxRange, 'Enemy')
+                if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
+                    for iUnit, oUnit in tEnemyUnitsOfInterest do
+                        iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
+                        if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repr(oUnit:GetPosition())) end
+                        --Stop looking if tried >=10 targets and have one that is at least 20k of value
+                        if iCurTargetValue > iBestTargetValue then
+                            if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
+                                iCurTargetValue = 0
+                            end
+                            if iCurTargetValue > iBestTargetValue then
+                                iBestTargetValue = iCurTargetValue
+                                tTarget = oUnit:GetPosition()
+                            end
+                        end
+                        if iBestTargetValue > 15000 and iUnit >=10 then break end
+                    end
+                end
+                if iBestTargetValue >= 2500 then break end
+            end
+            if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage) end
+            if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
+        end
+
+        if tTarget then --Dont want to adjust the aoe target if are targeting a high priority unit such as a t3 arti
+            tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage)
+        end
+    end
+    if tTarget then
+        IssueClearCommands({oT3Arti})
+        IssueAttack({oT3Arti}, tTarget)
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function RefreshT3ArtiAdjacencyLocations(oT3Arti)
+    --M27UnitInfo variables:
+    --reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
+    --refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
+    --refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
+
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RefreshT3ArtiAdjacencyLocations'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --If the arti has no valid adjacency locations, then check we haven't recently done this (as dont want to use up too many resources)
+    if bDebugMessages == true then LOG(sFunctionRef..': Arti='..oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..' - is the list of adjacencylocations empty='..tostring(M27Utilities.IsTableEmpty(oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted]))..'; Time of last check='..GetGameTimeSeconds() - (oT3Arti[M27UnitInfo.refiTimeOfLastCheck] or -100)..'; ArtiPosition='..repr(oT3Arti:GetPosition())) end
+    if not(M27Utilities.IsTableEmpty(oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted])) or GetGameTimeSeconds() - (oT3Arti[M27UnitInfo.refiTimeOfLastCheck] or -100) > 30 then
+        oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted] = {}
+        local tsPowerBlueprints = {[1]='ueb1101', [2]='ueb1201', [3]='ueb1301'}
+        local iT3ArtiRadius = math.max(oT3Arti:GetBlueprint().Physics.SkirtSizeX, oT3Arti:GetBlueprint().Physics.SkirtSizeZ) * 0.5
+        local iPowerRadius
+        local tPossibleAdjacencyPosition
+        local iMaxAdjust
+        local tStartingPosition
+        local aiBrain = oT3Arti:GetAIBrain()
+        local iCurBuildingCount = 0
+        local iBuildingCountForSide
+        local iT1FurtherAdjust
+        for iSide = 1, 4 do
+            iBuildingCountForSide = 0
+            for iPowerLevel = 3, 1, -1 do
+                if not(iPowerLevel == 2 and iBuildingCountForSide > 0) then
+                    if iPowerLevel > 1 then iT1FurtherAdjust = 0 end
+                    iPowerRadius = __blueprints[tsPowerBlueprints[iPowerLevel]].Physics.SkirtSizeX * 0.5
+                    iMaxAdjust = iT3ArtiRadius - iPowerRadius
+                    tStartingPosition = M27Utilities.MoveInDirection(oT3Arti:GetPosition(), iSide * 90, iT3ArtiRadius + iPowerRadius, true)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if can build power with tech level='..iPowerLevel..'; tStartingPosition='..repr(tStartingPosition)) end
+                    for iCurAdjust = -iMaxAdjust, iMaxAdjust, 1 do
+
+                        if iCurAdjust == 0 and iBuildingCountForSide == 0 then tPossibleAdjacencyPosition = {tStartingPosition[1], tStartingPosition[2], tStartingPosition[3]}
+                        else tPossibleAdjacencyPosition = M27Utilities.MoveInDirection(tStartingPosition, (iSide - 1) * 90, iCurAdjust + iBuildingCountForSide + iT1FurtherAdjust, true) end
+
+                        if M27EngineerOverseer.CanBuildAtLocation(aiBrain, tsPowerBlueprints[iPowerLevel], tPossibleAdjacencyPosition, M27EngineerOverseer.refActionBuildT3ArtiPower, true) then
+
+                        --[[if aiBrain:CanBuildStructureAt(tsPowerBlueprints[iPowerLevel], tPossibleAdjacencyPosition) then
+                            --Cancel any queued up orders that might be preventing us building here, unless the order is to build T3 arti adjacency
+                            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)][M27EngineerOverseer.refActionBuildT3ArtiPower]) == true then bDebugMessages = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will cancel any queued up buildings around here so we can build t3 power and tPossibleAdjacencyPosition='..repr(tPossibleAdjacencyPosition)) end
+                                local tLocationToCancel
+                                local sCancelLocationRef
+                                for iAdjustX = -iPowerRadius, iPowerRadius do
+                                    for iAdjustZ = -iPowerRadius, iPowerRadius do
+                                        tLocationToCancel = {tPossibleAdjacencyPosition[1] + iAdjustX, 0, tPossibleAdjacencyPosition[3] + iAdjustZ}
+                                        tLocationToCancel[2] = GetTerrainHeight(tLocationToCancel[1], tLocationToCancel[3])
+                                        sCancelLocationRef = M27Utilities.ConvertLocationToStringRef(tLocationToCancel)
+                                        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sCancelLocationRef]) == false then
+                                            for iActionRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sCancelLocationRef] do
+                                                for iUniqueEngiRef, oEngineer in tSubtable do
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': About to clear oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' which was recorded as having iActionRef='..iActionRef) end
+                                                    IssueClearCommands({oEngineer})
+                                                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': FInished clearing all recorded engi actions in the area needed for building the PGen; IsTableEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]))) end
+                            local bIgnoreQueuedBuildings = false
+                            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]) == false then
+
+                            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][M27Utilities.ConvertLocationToStringRef(tPossibleAdjacencyPosition)]) then
+                            --]]
+                            --We can build here
+                            iCurBuildingCount = iCurBuildingCount + 1
+                            iBuildingCountForSide = iBuildingCountForSide + 1
+                            oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted][iCurBuildingCount] = {}
+                            oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted][iCurBuildingCount][M27UnitInfo.refiSubrefCategory] = M27UnitInfo.refCategoryPower * M27UnitInfo.ConvertTechLevelToCategory(iPowerLevel)
+                            oT3Arti[M27UnitInfo.reftAdjacencyPGensWanted][iCurBuildingCount][M27UnitInfo.refiSubrefBuildLocation] = {tPossibleAdjacencyPosition[1], tPossibleAdjacencyPosition[2], tPossibleAdjacencyPosition[3]}
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': Can build at location '..repr(tPossibleAdjacencyPosition)..' for power='..iPowerLevel..'; side='..iSide..'; will draw in blue')
+                                M27Utilities.DrawLocation(tPossibleAdjacencyPosition, nil, 1, 100)
+                            end
+                            if iPowerLevel > 1 then
+                                if iPowerLevel == 2 then
+                                    if iCurAdjust == -iMaxAdjust then
+                                        iT1FurtherAdjust = 5 --Would be 6, but we already adjust for the number of buildings on the size (which will be 1)
+                                    end --Not perfect as means if T2 power had to be adjusted in order to move we wont be able to build t1 power
+                                end
+                                break
+                            end
+                            --end
+                        elseif bDebugMessages == true then
+                            LOG(sFunctionRef..': Cant build at location '..repr(tPossibleAdjacencyPosition)..' for power='..iPowerLevel..'; side='..iSide..'; will draw in red; aiBrain:CanBuildStructure result='..tostring(aiBrain:CanBuildStructureAt(tsPowerBlueprints[iPowerLevel], tPossibleAdjacencyPosition)))
+                            M27Utilities.DrawLocation(tPossibleAdjacencyPosition, nil, 2, 100)
+                        end
+                        if iPowerLevel == 1 and iBuildingCountForSide + iCurAdjust + iT1FurtherAdjust >= iMaxAdjust then break end
+                    end
+                    --Dont want lower tech PGens if managed to find space for higher tech PGen; can only fit 1 t3 or 1 t2 power on a side
+                    if iBuildingCountForSide > 0 and (iPowerLevel > 2 or iPowerLevel == 2 and iT1FurtherAdjust == 0) then break end
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished considering PGen locations for iSide='..iSide..'; iCurBuildingCount='..iCurBuildingCount) end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function DetermineTMDWantedForTML(aiBrain, oTML, toOptionalUnitsToProtect)
+    --toOptionalUnitsToProtect - so can call this function when just considering a single unit
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'DetermineTMDWantedForTML'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local iTMLRange = (oTML:GetBlueprint().Weapon[1].MaxRadius or 256) + 4 --slight buffer given aoe and building sizes
+    local tUnitsToProtect
+    local tTMLPosition = oTML:GetPosition()
+    if toOptionalUnitsToProtect then
+        tUnitsToProtect = {}
+        for iUnit, oUnit in toOptionalUnitsToProtect do
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTMLPosition) <= iTMLRange then
+                    table.insert(tUnitsToProtect, oUnit)
+                end
+            else
+                --If unit is listed in table of units wanting protection then remove it
+                if oUnit.UnitId then
+                    if aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] then
+                        aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil
+                    end
+                end
+            end
+        end
+    else
+        tUnitsToProtect = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryProtectFromTML, oTML:GetPosition(), iTMLRange, 'Ally')
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Identifying any units we want to protect within range of enemy TML '..oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)..'; Is tUnitsToProtect empty='..tostring(M27Utilities.IsTableEmpty(tUnitsToProtect))) end
+    if M27Utilities.IsTableEmpty(tUnitsToProtect) == false then
+        local iBasePathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local sTMLRef = oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)
+        local tNearbyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, oTML:GetPosition(), iTMLRange + 21, 'Ally')
+        local iUnitToTML
+        local iTMDToTML
+        local iUnitToTMD
+
+        local iTMDRange
+        local iBuildingSize
+        local bCanBlock
+        local iAngleTMLToUnit
+        local iAngleTMLToTMD
+        local sUnitRef
+        for iUnit, oUnit in tUnitsToProtect do
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; IsTable for oUnit[M27UnitInfo.reftTMLDefence] empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftTMLDefence]))..'; oUnit[M27UnitInfo.refbCantBuildTMDNearby]='..tostring((oUnit[M27UnitInfo.refbCantBuildTMDNearby] or false))) end
+                if not(oUnit[M27UnitInfo.reftTMLDefence] and oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]) and not(oUnit[M27UnitInfo.refbCantBuildTMDNearby]) then
+                    --Havent considered this TML yet
+                    --oUnit[M27UnitInfo.reftTMLDefence][sTMLRef] = false --Decided to clear this as want to be able see if we have any TMD built for a unit by checking if this table is empty
+                    --Is the unit in the same pathing group as our base? (if not wont wnat to try and build TMD to cover it)
+                    if bDebugMessages == true then LOG(sFunctionRef..': iBasePathingGroup='..iBasePathingGroup..'; Unit pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())) end
+                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) == iBasePathingGroup then
+
+                        sUnitRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                        iBuildingSize = M27UnitInfo.GetBuildingSize(oUnit.UnitId)[1]
+                        iAngleTMLToUnit = M27Utilities.GetAngleFromAToB(tTMLPosition, oUnit:GetPosition())
+                        if not(oUnit[M27UnitInfo.reftTMLDefence]) then oUnit[M27UnitInfo.reftTMLDefence] = {} end
+                        if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                            for iTMD, oTMD in tNearbyTMD do
+                                bCanBlock = false
+                                iUnitToTMD = M27Utilities.GetDistanceBetweenPositions(oTMD:GetPosition(), oUnit:GetPosition())
+                                iUnitToTML = M27Utilities.GetDistanceBetweenPositions(tTMLPosition, oUnit:GetPosition())
+                                iTMDToTML = M27Utilities.GetDistanceBetweenPositions(oTMD:GetPosition(), tTMLPosition)
+                                if EntityCategoryContains(categories.AEON, oTMD.UnitId) then
+                                    iTMDRange = 12.5
+                                else iTMDRange = (oTMD:GetBlueprint().Weapon[1].MaxRadius or 31) - 10 --Reduce by 10 to factor in effective range (a guess as to how much coverage is needed)
+                                end
+                                --Reduce TMDRange to the effective range
+                                iTMDRange = iTMDRange - iBuildingSize
+                                iAngleTMLToTMD = M27Utilities.GetAngleFromAToB(tTMLPosition, oTMD:GetPosition())
+                                if M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iUnitToTML, iTMDToTML, iUnitToTMD, iAngleTMLToUnit, iAngleTMLToTMD, iTMDRange) then
+                                    --TMD can block the TML
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oTMD='..oTMD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTMD)..' can block the TML so will record it') end
+                                    oUnit[M27UnitInfo.reftTMLDefence][sTMLRef] = oTMD
+                                    if not(oTMD[M27UnitInfo.reftTMLDefence]) then oTMD[M27UnitInfo.reftTMLDefence] = {} end
+                                    oTMD[M27UnitInfo.reftTMLDefence][sUnitRef] = oUnit
+                                    break
+                                end
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Is TMD empty for sTMLRef='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]))) end
+                        if not(oUnit[M27UnitInfo.reftTMLDefence][sTMLRef]) then
+                            --Dont have anything to protect this unit, and its in the same pathing group as our base, so add it to list of units that want protection
+                            aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][sUnitRef] = oUnit
+                            if not(oUnit[M27UnitInfo.reftTMLThreats]) then oUnit[M27UnitInfo.reftTMLThreats] = {} end
+                            oUnit[M27UnitInfo.reftTMLThreats][sTMLRef] = oTML
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have recorded oTML with sTMLRef='..sTMLRef..' as a threat for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function DetermineTMDWantedForUnits(aiBrain, tUnits)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'DetermineTMDWantedForUnits'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --First remove tUnits from the list of units wanting TMD (will re-add them per the below if we still want TMD)
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Start of code, will consider TMD wanted for tUnits.  Log of units in tUnits:')
+        for iUnit, oUnit in tUnits do
+            LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+        end
+    end
+    for iUnit, oUnit in tUnits do
+        aiBrain[M27EngineerOverseer.reftUnitsWantingTMD][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil
+    end
+
+    --First check we still have valid TML
+    local bValidTML = false
+
+    for iTML, oTML in aiBrain[M27Overseer.reftEnemyTML] do
+        if M27UnitInfo.IsUnitValid(oTML) then
+            bValidTML = true
+            DetermineTMDWantedForTML(aiBrain, oTML, tUnits)
+        end
+    end
+    if not(bValidTML) then aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] = false end
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Finished updating TMD wanted for all TML.  Will list out units flagged as wanting TMD')
+        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftUnitsWantingTMD]) then
+            LOG(sFunctionRef..': No units wanting TMD')
+        else
+            for iUnit, oUnit in aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] do
+               LOG(sFunctionRef..': '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+            end
+        end
+        LOG(sFunctionRef..': End of code')
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

@@ -26,14 +26,31 @@ do --Per Balthazaar - encasing the code in do .... end means that you dont have 
         OnStartBuild = function(self, built, order, ...)
             ForkThread(M27Events.OnConstructionStarted, self, built, order)
             return M27OldUnit.OnStartBuild(self, built, order, unpack(arg))
-        end, --[[
-        OnStopBuild = function(self, unitBuilding, ...)
-            if self.GetBlueprint then
-                M27OldUnit.OnStopBuild(self, unitBuilding, unpack(arg))
-            end
-        end,--]]
-    
-        --[[CreateEnhancementEffects = function(self, enhancement)
+        end,
+        OnStopReclaim = function(self, target)
+            ForkThread(M27Events.OnReclaimFinished, self, target)
+            return M27OldUnit.OnStopReclaim(self, target)
+        end,
+
+        OnStopBuild = function(self, unit)
+            if unit and not(unit.Dead) and unit.GetFractionComplete and unit:GetFractionComplete() == 1 then ForkThread(M27Events.OnConstructed, self, unit) end
+            return M27OldUnit.OnStopBuild(self, unit)
+        end,
+
+        OnAttachedToTransport = function(self, transport, bone)
+            ForkThread(M27Events.OnTransportLoad, self, transport, bone)
+            return M27OldUnit.OnAttachedToTransport(self, transport, bone)
+        end,
+        OnDetachedFromTransport = function(self, transport, bone)
+            ForkThread(M27Events.OnTransportUnload, self, transport, bone)
+            return M27OldUnit.OnDetachedFromTransport(self, transport, bone)
+        end
+    }
+end
+
+
+--Hooks not used:
+--[[CreateEnhancementEffects = function(self, enhancement)
             local bp = self:GetBlueprint().Enhancements[enhancement]
             local effects = TrashBag()
             local bpTime = bp.BuildTime
@@ -44,7 +61,7 @@ do --Per Balthazaar - encasing the code in do .... end means that you dont have 
                 LOG('ERROR: CreateEnhancementEffects: bp.BuildCostEnergy is nil; bp='..self:GetBlueprint().BlueprintId)
                 bpBuildCostEnergy = 1 end
             local scale = math.min(4, math.max(1, (bpBuildCostEnergy / bpTime or 1) / 50))
-    
+
             if bp.UpgradeEffectBones then
                 for _, v in bp.UpgradeEffectBones do
                     if self:IsValidBone(v) then
@@ -52,7 +69,7 @@ do --Per Balthazaar - encasing the code in do .... end means that you dont have 
                     end
                 end
             end
-    
+
             if bp.UpgradeUnitAmbientBones then
                 for _, v in bp.UpgradeUnitAmbientBones do
                     if self:IsValidBone(v) then
@@ -60,12 +77,9 @@ do --Per Balthazaar - encasing the code in do .... end means that you dont have 
                     end
                 end
             end
-    
+
             for _, e in effects do
                 e:ScaleEmitter(scale)
                 self.UpgradeEffectsBag:Add(e)
             end
         end, ]]--
-    
-    }
-end

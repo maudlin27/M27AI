@@ -33,6 +33,7 @@ AIBrain = Class(M27AIBrainClass) {
             -- case sensitive
             if bDebugMessages == true then LOG('* M27AI: personality (' .. personality .. ') is being used by army name: (' .. self.Name .. '); self.M27AI set to true') end
             self.M27AI = true
+            M27Utilities.bM27AIInGame = true
 
             --self:CreateBrainShared(planName)
 
@@ -57,6 +58,7 @@ AIBrain = Class(M27AIBrainClass) {
             ForkThread(M27Overseer.OverseerManager, self)
         else
             M27AIBrainClass.OnCreateAI(self, planName)
+            ForkThread(M27Overseer.SendWarningIfNoM27, self)
         end
 
     end,

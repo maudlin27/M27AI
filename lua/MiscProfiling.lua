@@ -253,3 +253,7 @@ function LocalVariableImpact()
 
     end
 end
+
+function BlueprintMethods()
+    local sFunctionRef = 'BlueprintMethods'
+end

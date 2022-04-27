@@ -37,7 +37,7 @@ function EngineerTryReclaimCaptureArea(aiBrain, eng, pos, iAreaSize)
             end
         end
         -- reclaim rocks etc or we can't build mexes or hydros
-        local Reclaimables = GetReclaimablesInRect(Rect(pos[1], pos[3], pos[1], pos[3]))
+        local Reclaimables = GetReclaimablesInRect(Rect(pos[1], pos[3], pos[1], pos[3])) --(dont think we use this function anymore)
         if Reclaimables and table.getn( Reclaimables ) > 0 then
             local ReclaimPos
             for k,v in Reclaimables do
