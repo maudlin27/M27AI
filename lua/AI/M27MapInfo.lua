@@ -8,6 +8,7 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
+local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 
 
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
@@ -112,6 +113,33 @@ iNoRushTimer = 0
 iNoRushRange = 0
 reftNoRushCentre = 'M27MapNoRushCentre' --Centrepoint of the norush radius, recorded against M27 aiBrains
 
+--Plateaus
+tAllPlateausWithMexes = 'M27PlateausWithMexes' --[x] = AmphibiousPathingGroup, [y]: subrefs, e.g. subrefPlateauMexes;
+    --aibrain variables for plateaus:
+reftPlateausOfInterest = 'M27PlateausOfInterest' --[x] = Amphibious pathing group; will record a table of the pathing groups we're interested in expanding to, returns the location of then earest mex
+refiLastPlateausUpdate = 'M27LastTimeUpdatedPlateau' --gametime that we last updated the plateaus
+reftOurPlateauInformation = 'M27OurPlateauInformation' --[x] = AmphibiousPathingGroup; [y] = subref, e.g. subrefPlateauLandFactories; Used to store details such as factories on the plateau
+refiOurBasePlateauGroup = 'M27PlateausOurBaseGroup' --Segment group of our base (so can easily check somewhere is in a dif plateau)
+
+    --subrefs for tables
+    --tAllPlateausWithMexes subrefs
+subrefPlateauMexes = 'M27PlateauMex' --[x] = mex count, returns mex position
+subrefPlateauMinXZ = 'M27PlateauMinXZ' --{x,z} min values
+subrefPlateauMaxXZ = 'M27PlateauMaxXZ' --{x,z} max values - i.e. can create a rectangle covering entire plateau using min and max xz values
+subrefPlateauTotalMexCount = 'M27PlateauMexCount' --Number of mexes on the plateau
+subrefPlateauReclaimSegments = 'M27PlateauReclaimSegments' --[x] = reclaim segment x, [z] = reclaim segment z, returns true if part of plateau
+subrefPlateauMidpoint = 'M27PlateauMidpoint' --Location of the midpoint of the plateau
+subrefPlateauMaxRadius = 'M27PlateauMaxRadius' --Radius to use to ensure the circle coveres the square of the plateau
+subrefPlateauContainsActiveStart = 'M27PlateauContainsActiveStart' --True if the plateau is pathable amphibiously to a start position that was active at the start of the game
+
+    --reftOurPlateauInformation subrefs
+subrefPlateauLandFactories = 'M27PlateauLandFactories'
+subrefPlateauLandCombatPlatoons = 'M27PlateauLandCombatPlatoons'
+subrefPlateauIndirectPlatoons = 'M27PlateauIndirectPlatoons'
+subrefPlateauMAAPlatoons = 'M27PlateauMAAPlatoons'
+subrefPlateauScoutPlatoons = 'M27PlateauScoutPlatoons'
+
+subrefPlateauEngineers = 'M27PlateauEngineers' --[x] is engineer unique ref (per m27engineeroverseer), returns engineer object
 
 
 function DetermineMaxTerrainHeightDif()
@@ -1294,6 +1322,14 @@ function UpdateReclaimDataNearLocation(tLocation, iSegmentRange, tBrainsToAlways
     return UpdateReclaimDataNearSegments(iBaseSegmentX, iBaseSegmentZ, iSegmentRange, tBrainsToAlwaysUpdateFor)
 end
 
+function DetermineReclaimSegmentSize()
+    local iMinReclaimSegmentSize = 8.5 --Engineer build range is 6; means that a square of about 4.2 will fit inside this circle; If have 2 separate engineers assigned to adjacent reclaim segments, and want their build range to cover the two areas, then would want a gap twice this, so 8.4; will therefore go with min size of 8
+    local iMapSizeX = rMapPlayableArea[3] - rMapPlayableArea[1]
+    local iMapSizeZ = rMapPlayableArea[4] - rMapPlayableArea[2]
+    iReclaimSegmentSizeX = math.max(iMinReclaimSegmentSize, iMapSizeX / iMaxSegmentInterval)
+    iReclaimSegmentSizeZ = math.max(iMinReclaimSegmentSize, iMapSizeZ / iMaxSegmentInterval)
+end
+
 function UpdateReclaimMarkers()
     --v29 - trying new method, have copied original and set to old in case want to revert
 
@@ -1349,9 +1385,7 @@ function UpdateReclaimMarkers()
 
 
         if iReclaimSegmentSizeX == 0 then --Not yet determined reclaim sizes
-            local iMinReclaimSegmentSize = 8.5 --Engineer build range is 6; means that a square of about 4.2 will fit inside this circle; If have 2 separate engineers assigned to adjacent reclaim segments, and want their build range to cover the two areas, then would want a gap twice this, so 8.4; will therefore go with min size of 8
-            iReclaimSegmentSizeX = math.max(iMinReclaimSegmentSize, iMapSizeX / iMaxSegmentInterval)
-            iReclaimSegmentSizeZ = math.max(iMinReclaimSegmentSize, iMapSizeZ / iMaxSegmentInterval)
+            DetermineReclaimSegmentSize()
             if bDebugMessages == true then LOG(sFunctionRef..': Have updated iReclaimSegmentSizeX and iReclaimSegmentSizeZ to '..iReclaimSegmentSizeX..'-'..iReclaimSegmentSizeZ) end
         end
 
@@ -3086,6 +3120,206 @@ function NoRushMonitor()
     bNoRushActive = false
 end
 
+function RecordAllPlateaus()
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RecordAllPlateaus'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --Records any plateaus that contain mexes, along with info on the plateau such as a rectangle that covers the entire plateau
+
+    --tMexByPathingAndGrouping --[a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
+    tAllPlateausWithMexes = {}
+
+
+    local iCurPlateauMex, iMinX, iMaxX, iMinZ, iMaxZ, iSegmentCount
+    local iMinSegmentX, iMinSegmentZ, iMaxSegmentX, iMaxSegmentZ, iCurSegmentGroup
+
+    if bDebugMessages == true then LOG(sFunctionRef..': About to get max map segment X and Z based on rMapPlayableArea='..repr(rMapPlayableArea)) end
+    local iMapMaxSegmentX, iMapMaxSegmentZ = GetPathingSegmentFromPosition({rMapPlayableArea[3], 0, rMapPlayableArea[4]})
+    local iStartSegmentX, iStartSegmentZ
+    local bSearchingForBoundary
+    local iCurCount
+    local tSegmentPosition
+    local iReclaimSegmentStartX, iReclaimSegmentStartZ, iReclaimSegmentEndX, iReclaimSegmentEndZ
+    local sPathing = M27UnitInfo.refPathingTypeAmphibious
+
+
+
+
+    for iSegmentGroup, tSubtable in tMexByPathingAndGrouping[sPathing] do
+        if not(tAllPlateausWithMexes[iSegmentGroup]) then
+
+            --if not(tiBasePathingGroups[iSegmentGroup]) and not(tAllPlateausWithMexes[iSegmentGroup]) then
+            --Have a plateau with mexes that havent already recorded
+            tAllPlateausWithMexes[iSegmentGroup] = {}
+            tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMexes] = {}
+            iCurPlateauMex = 0
+            for iMex, tMex in tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
+                iCurPlateauMex = iCurPlateauMex + 1
+                tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMexes][iCurPlateauMex] = tMex
+            end
+            tAllPlateausWithMexes[iSegmentGroup][subrefPlateauTotalMexCount] = iCurPlateauMex
+            if iCurPlateauMex > 0 then
+                --Record size information
+
+                --Start from mex, and move up on map to determine top point; then move left to determine left point, and right to determine right point
+                --i.e. dont want to go through every segment on map every time since could take ages if lots of plateaus and may only be dealing with small area
+                iStartSegmentX, iStartSegmentZ = GetPathingSegmentFromPosition(tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMexes][1])
+
+                --First find the smallest z (so go up)
+                bSearchingForBoundary = true
+                iCurCount = 0
+                while bSearchingForBoundary do
+                    iCurCount = iCurCount + 1
+                    if iCurCount > 10000 then
+                        M27Utilities.ErrorHandler('Infinite loop')
+                        break
+                    end
+                    --Stop if we will exceed map bounds
+                    if iCurCount > iStartSegmentZ then break end
+                    --Are we still in the same pathing group?
+                    iCurSegmentGroup = tPathingSegmentGroupBySegment[sPathing][iStartSegmentX][iStartSegmentZ - iCurCount]
+                    if not(iCurSegmentGroup == iSegmentGroup) then
+                        --Can we find anywhere else with the same Z value in the pathing group?
+                        bSearchingForBoundary = false
+                        for iAltStartX = 1, iMapMaxSegmentX do
+                            iCurSegmentGroup = tPathingSegmentGroupBySegment[sPathing][iAltStartX][iStartSegmentZ - iCurCount]
+                            if iCurSegmentGroup == iSegmentGroup then
+                                iStartSegmentX = iAltStartX
+                                bSearchingForBoundary = true
+                                break
+                            end
+                        end
+                    end
+                end
+                --Will have the min Z value now
+                iMinSegmentZ = iStartSegmentZ - iCurCount + 1
+
+
+                --Now check for the min X value
+                bSearchingForBoundary = true
+                iCurCount = 0
+                while bSearchingForBoundary do
+                    iCurCount = iCurCount + 1
+                    if iCurCount > 10000 then
+                        M27Utilities.ErrorHandler('Infinite loop')
+                        break
+                    end
+                    --Stop if we will exceed map bounds
+                    if iCurCount > iStartSegmentX then break end
+                    --Are we still in the same pathing group?
+                    iCurSegmentGroup = tPathingSegmentGroupBySegment[sPathing][iStartSegmentX - iCurCount][iStartSegmentZ]
+                    if not(iCurSegmentGroup == iSegmentGroup) then
+                        --Can we find anywhere else with the same X value in the pathing group?
+                        bSearchingForBoundary = false
+                        for iAltStartZ = iMinSegmentZ, iMapMaxSegmentZ do
+                            iCurSegmentGroup = tPathingSegmentGroupBySegment[sPathing][iStartSegmentX - iCurCount][iAltStartZ]
+                            if iCurSegmentGroup == iSegmentGroup then
+                                iStartSegmentZ = iAltStartZ
+                                bSearchingForBoundary = true
+                                break
+                            end
+                        end
+                    end
+                end
+
+                --Will now have the min X value
+                iMinSegmentX = iStartSegmentX - iCurCount + 1
+
+                --Now get max Z value
+                bSearchingForBoundary = true
+                iCurCount = 0
+                while bSearchingForBoundary do
+                    iCurCount = iCurCount + 1
+                    if iCurCount > 10000 then
+                        M27Utilities.ErrorHandler('Infinite loop')
+                        break
+                    end
+                    --Stop if we will exceed map bounds
+                    if iCurCount + iStartSegmentZ > iMapMaxSegmentZ then break end
+                    --Are we still in the same pathing group?
+                    iCurSegmentGroup = tPathingSegmentGroupBySegment[sPathing][iStartSegmentX][iStartSegmentZ + iCurCount]
+                    if not(iCurSegmentGroup == iSegmentGroup) then
+                        --Can we find anywhere else with the same Z value in the pathing group?
+                        bSearchingForBoundary = false
+                        for iAltStartX = iMinSegmentX, iMapMaxSegmentX do
+                            iCurSegmentGroup = tPathingSegmentGroupBySegment[sPathing][iAltStartX][iStartSegmentZ + iCurCount]
+                            if iCurSegmentGroup == iSegmentGroup then
+                                iStartSegmentX = iAltStartX
+                                bSearchingForBoundary = true
+                                break
+                            end
+                        end
+                    end
+                end
+                iMaxSegmentZ = iStartSegmentZ + iCurCount - 1
+
+                --Now get the max X value
+                bSearchingForBoundary = true
+                iCurCount = 0
+                while bSearchingForBoundary do
+                    iCurCount = iCurCount + 1
+                    if iCurCount > 10000 then
+                        M27Utilities.ErrorHandler('Infinite loop')
+                        break
+                    end
+                    --Stop if we will exceed map bounds
+                    if iCurCount + iStartSegmentX > iMapMaxSegmentX then break end
+                    --Are we still in the same pathing group?
+                    iCurSegmentGroup = tPathingSegmentGroupBySegment[sPathing][iStartSegmentX + iCurCount][iStartSegmentZ]
+                    if not(iCurSegmentGroup == iSegmentGroup) then
+                        --Can we find anywhere else with the same Z value in the pathing group?
+                        bSearchingForBoundary = false
+                        for iAltStartZ = iMinSegmentZ, iMaxSegmentZ do
+                            iCurSegmentGroup = tPathingSegmentGroupBySegment[sPathing][iStartSegmentX + iCurCount][iAltStartZ]
+                            if iCurSegmentGroup == iSegmentGroup then
+                                iStartSegmentZ = iAltStartZ
+                                bSearchingForBoundary = true
+                                break
+                            end
+                        end
+                    end
+                end
+                iMaxSegmentX = iStartSegmentX + iCurCount - 1
+
+                tSegmentPosition = GetPositionFromPathingSegments(iMinSegmentX, iMinSegmentZ)
+                tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMinXZ] = {tSegmentPosition[1], tSegmentPosition[3]}
+                iReclaimSegmentStartX, iReclaimSegmentStartZ = GetReclaimSegmentsFromLocation(tSegmentPosition)
+
+                tSegmentPosition = GetPositionFromPathingSegments(iMaxSegmentX, iMaxSegmentZ)
+                tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMaxXZ] = {tSegmentPosition[1], tSegmentPosition[3]}
+                iReclaimSegmentEndX, iReclaimSegmentEndZ = GetReclaimSegmentsFromLocation(tSegmentPosition)
+
+
+                --Record all reclaim segments that are part of the plateau
+                tAllPlateausWithMexes[iSegmentGroup][subrefPlateauReclaimSegments] = {}
+                for iCurReclaimSegmentX = iReclaimSegmentStartX, iReclaimSegmentEndX do
+                    tAllPlateausWithMexes[iSegmentGroup][subrefPlateauReclaimSegments][iCurReclaimSegmentX] = {}
+                    for iCurReclaimSegmentZ = iReclaimSegmentStartZ, iReclaimSegmentEndZ do
+                        if iSegmentGroup == GetSegmentGroupOfLocation(sPathing, GetReclaimLocationFromSegment(iCurReclaimSegmentX, iCurReclaimSegmentZ)) then
+                            tAllPlateausWithMexes[iSegmentGroup][subrefPlateauReclaimSegments][iCurReclaimSegmentX][iCurReclaimSegmentZ] = true
+                        end
+                    end
+                end
+                --Clear any empty values
+                for iCurReclaimSegmentX = iReclaimSegmentStartX, iReclaimSegmentEndX do
+                    if tAllPlateausWithMexes[iSegmentGroup][subrefPlateauReclaimSegments][iCurReclaimSegmentX] and M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iSegmentGroup][subrefPlateauReclaimSegments][iCurReclaimSegmentX]) then tAllPlateausWithMexes[iSegmentGroup][subrefPlateauReclaimSegments][iCurReclaimSegmentX] = nil end
+                end
+
+                --Record midpoint
+                local iXRadius = (tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMaxXZ][1] - tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMinXZ][1])*0.5
+                local iZRadius = (tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMaxXZ][2] - tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMinXZ][2])*0.5
+                tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMidpoint] = {tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMinXZ][1] + iXRadius, 0, tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMinXZ][2] + iZRadius}
+                tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMidpoint][2] = GetTerrainHeight(tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMidpoint][1], tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMidpoint][3])
+                --CIrcle radius will be the square/rectangle diagonal, so (square radius^2*2)^0.5 for a square, or (x^2+z^2)^0.5
+
+                tAllPlateausWithMexes[iSegmentGroup][subrefPlateauMaxRadius] = (iXRadius^2+iZRadius^2)^0.5
+            end
+        end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, listing tAllPlateausWithMexes='..repr(tAllPlateausWithMexes)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function MappingInitialisation(aiBrain)
     --aiBrain needed for waterpercent function.  This is only called once; other 'one globally' things like bNoRushActive are also referenced here
     local bProfiling = true
@@ -3151,6 +3385,12 @@ function MappingInitialisation(aiBrain)
     aiBrain[reftReclaimAreaPriorityByLocationRef] = {}
     aiBrain[refiPreviousThreatPercentCoverage] = 0
     aiBrain[refiPreviousFrontUnitPercentFromOurBase] = 0
+
+    --Reclaim segment size (as use for plateaus):
+    DetermineReclaimSegmentSize()
+
+    --Plateau info
+    RecordAllPlateaus()
 
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -3906,4 +4146,198 @@ end
 
 function GetMidpointToPrimaryEnemyBase(aiBrain)
     return aiBrain[reftMidpointToPrimaryEnemyBase]
+end
+
+function UpdatePlateausToExpandTo(aiBrain, bForceRefresh)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'UpdatePlateausToExpandTo'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --Records table with the amphibious pathing group of plateaus that we are interested in expanding to
+    --tAllPlateausWithMexes = 'M27PlateausWithMexes' --[x] = AmphibiousPathingGroup
+    --reftPlateausOfInterest = 'M27PlateausOfInterest' --[x] = Amphibious pathing group
+    --refiLastPlateausUpdate = 'M27LastTimeUpdatedPlateau' --gametime that we last updated the plateaus
+
+    --First time calling - update variables for all plateaus that require aibrain info
+    if not(aiBrain[refiLastPlateausUpdate]) then
+        local iCurPathingGroup
+        local tiBasePathingGroups = {}
+        local sPathing = M27UnitInfo.refPathingTypeAmphibious
+        for iRefBrain, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
+            iCurPathingGroup = GetSegmentGroupOfLocation(sPathing, PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            if not(tiBasePathingGroups[iCurPathingGroup]) then
+                tiBasePathingGroups[iCurPathingGroup] = true
+            end
+        end
+        --Record if active start position in this plateau
+        for iPlateauGroup, tSubtable in tAllPlateausWithMexes do
+            if tiBasePathingGroups[iPlateauGroup] then tAllPlateausWithMexes[iPlateauGroup][subrefPlateauContainsActiveStart] = true end
+        end
+    end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': bForceRefresh='..tostring((bForceRefresh or false))..'; Time since last updated plateaus of interest='..GetGameTimeSeconds() - (aiBrain[refiLastPlateausUpdate] or -100)..'; Cur gametime='..GetGameTimeSeconds()) end
+
+    if bForceRefresh or GetGameTimeSeconds() - (aiBrain[refiLastPlateausUpdate] or -100) > 10 then
+        aiBrain[refiLastPlateausUpdate] = GetGameTimeSeconds()
+
+        --Cycle through each plateau and check if we already control it, and if not if it is safe
+        aiBrain[reftPlateausOfInterest] = {}
+        if M27Utilities.IsTableEmpty(tAllPlateausWithMexes) == false then
+
+
+            local iCurModDistance
+            local tClosestMex
+            local iCurDist
+            local tStartPos = PlayerStartPoints[aiBrain.M27StartPositionNumber]
+            local iClosestMexRef, iClosestMexDist
+            local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tStartPos, aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
+            local tEnemyGround
+            local bNearbyEnemyLand
+            local sLocationRef
+            local iExistingEngis
+            local iExistingFactories
+            local bAlreadyOwnPlateau
+            local tAlliedUnits
+            local iAlliedMexes
+            local bCheckForAlliedUnits = false
+            local sPathing = M27UnitInfo.refPathingTypeAmphibious
+
+            for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+                if not(oBrain == aiBrain) then bCheckForAlliedUnits = true break end
+            end
+
+            if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation]) then
+                aiBrain[reftOurPlateauInformation] = {}
+            end
+
+            for iPlateauGroup, tSubtable in tAllPlateausWithMexes do
+                --Ignore plateaus that we already have engies or factories on
+                iExistingEngis = 0
+                iExistingFactories = 0
+                iAlliedMexes = 0
+                bAlreadyOwnPlateau = false
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; considering if we have friendly units in the plateau already. IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup])='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]))) end
+                if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of engineers assigned to plateau empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]))) end
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]) == false then
+                        for iEngi, oEngi in aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers] do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering engineer '..oEngi.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngi)..'; is unit valid='..tostring(M27UnitInfo.IsUnitValid(oEngi))) end
+                            if M27UnitInfo.IsUnitValid(oEngi) then iExistingEngis = iExistingEngis + 1 end
+                        end
+                    end
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories]) == false then
+                        for iFactory, oFactory in aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories] do
+                            if M27UnitInfo.IsUnitValid(oFactory) and oFactory:GetFractionComplete() == 1 then iExistingFactories = iExistingFactories + 1 end
+                        end
+                    end
+                end
+
+                if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) then
+                    bAlreadyOwnPlateau = true
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngis='..iExistingEngis..'; iExistingFactories='..iExistingFactories..'; Mexes on plateau='..tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount]..'; bAlreadyOwnPlateau='..tostring(bAlreadyOwnPlateau)) end
+                if not(bAlreadyOwnPlateau) then
+                    --Look for allied units on the plateau
+
+                    if bCheckForAlliedUnits then
+                        tAlliedUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandFactory + M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryMex, tSubtable[subrefPlateauMidpoint], tSubtable[subrefPlateauMaxRadius], 'Ally')
+                        if M27Utilities.IsTableEmpty(tAlliedUnits) == false then
+                            for iUnit, oUnit in tAlliedUnits do
+                                --Is it an allied unit not our own?
+                                if oUnit:GetFractionComplete() == 1 and not(oUnit:GetBrain() == aiBrain) and GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == iPlateauGroup then
+                                    if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
+                                        iAlliedMexes = iAlliedMexes + 1
+                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oUnit.UnitId) then
+                                        iExistingFactories = iExistingFactories + 1
+                                    else iExistingEngis = iExistingEngis + 1
+                                    end
+                                end
+                            end
+                            if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) or iAlliedMexes >= tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] * 0.75 then
+                                bAlreadyOwnPlateau = true
+                            end
+                        end
+                    end
+
+                    if bDebugMessages == true then LOG(sFunctionRef..': Finished checking for allied units on the plateau, bAlreadyOwnPlateau='..tostring(bAlreadyOwnPlateau)) end
+
+                    if not(bAlreadyOwnPlateau) then
+                        --Ignore plateaus that contain an enemy base
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will ignore plateaus containing an active start point. tSubtable[subrefPlateauContainsActiveStart]='..tostring(tSubtable[subrefPlateauContainsActiveStart])) end
+                        if not(tSubtable[subrefPlateauContainsActiveStart]) then
+                            --Is the location safe? First check if the nearest mex is closer than the nearest enemy threat
+                            if not (aiBrain[reftOurPlateauInformation][iPlateauGroup]) then
+                                aiBrain[reftOurPlateauInformation][iPlateauGroup] = {}
+                            end
+
+                            iClosestMexDist = 10000
+                            for iMex, tMex in tSubtable[subrefPlateauMexes] do
+                                iCurDist = M27Utilities.GetDistanceBetweenPositions(tMex, tStartPos)
+                                if iCurDist < iClosestMexDist then
+                                    iClosestMexDist = iCurDist
+                                    iClosestMexRef = iMex
+                                end
+                            end
+                            tClosestMex = tSubtable[subrefPlateauMexes][iClosestMexRef]
+
+                            iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tClosestMex, false)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if nearest threat is too close to risk sending transport. aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; iCurModDistance='..iCurModDistance..'; will allow a threshold above this.  Will also allow if have radar coverage of the plateau.  Have radar coverage='..tostring(M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true))) end
+                            if iCurModDistance <= (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] + 60) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true) then
+                                --Are we outside norush range?
+                                if not(bNoRushActive) or M27Utilities.GetDistanceBetweenPositions(tClosestMex, aiBrain[reftNoRushCentre]) <= iNoRushRange then
+
+                                    --Is there any enemy AA in range of this mex?
+                                    if not (M27AirOverseer.IsTargetPositionCoveredByAA(tClosestMex, tEnemyAA, tStartPos, false)) then
+                                        bNearbyEnemyLand = false
+                                        tEnemyGround = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tClosestMex, 100, 'Enemy')
+                                        if M27Utilities.IsTableEmpty(tEnemyGround) == false then
+                                            for iEnemy, oEnemy in tEnemyGround do
+                                                if GetSegmentGroupOfLocation(sPathing, tClosestMex) == iPlateauGroup then
+                                                    bNearbyEnemyLand = true
+                                                    break
+                                                end
+                                            end
+                                        end
+
+                                        if not (bNearbyEnemyLand) then
+                                            --Have we tried targeting this mex recently?
+                                            sLocationRef = M27Utilities.ConvertLocationToStringRef(tClosestMex)
+                                            if GetGameTimeSeconds() - (aiBrain[M27Transport.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300) >= 300 then
+                                                --Add to shortlist of locations to try and expand to
+                                                aiBrain[reftPlateausOfInterest][iPlateauGroup] = tClosestMex
+                                            end
+                                        end
+                                    elseif bDebugMessages == true then LOG(sFunctionRef..': Enemy AA is covering this point')
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Finished determining all plateaus of interest.  Will cycle through them and list them out (but not full repr due to units potentially being in here. Is table empty='..tostring(aiBrain[reftPlateausOfInterest]))
+                if M27Utilities.IsTableEmpty(aiBrain[reftPlateausOfInterest]) == false then
+                    for iPlateauGroup, tSubtable in aiBrain[reftPlateausOfInterest] do
+                        LOG(sFunctionRef..': iPlateauGroup='..iPlateauGroup)
+                    end
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function RefreshPlateauPlatoons(aiBrain, iPlateauGroup)
+    local tsPlatoonRefs = { subrefPlateauLandCombatPlatoons, subrefPlateauIndirectPlatoons, subrefPlateauMAAPlatoons, subrefPlateauScoutPlatoons }
+    for iRef, sRef in tsPlatoonRefs do
+        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][sRef]) == false then
+            for iPlatoon, oPlatoon in aiBrain[reftOurPlateauInformation][iPlateauGroup][sRef] do
+                if not (aiBrain:PlatoonExists(oPlatoon)) then
+                    aiBrain[reftOurPlateauInformation][iPlateauGroup][sRef][iRef] = nil
+                end
+            end
+        end
+    end
+
 end

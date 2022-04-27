@@ -10,6 +10,7 @@ local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
+local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
 refiNearestEnemyIndex = 'M27NearestEnemyIndex'
@@ -1153,14 +1154,21 @@ function SetFactoryRallyPoint(oFactory)
     if iEnemyZ > iRallyZ then iRallyZ = iRallyZ + iDistFromFactory
     else iRallyZ = iRallyZ - iDistFromFactory end
 
-    local tRallyPoint = {iRallyX, GetTerrainHeight(iRallyX, iRallyZ), iRallyZ}
-    local tNearestRallyPoint = GetNearestRallyPoint(aiBrain, tFactoryPos)
-    if M27Utilities.GetDistanceBetweenPositions(tRallyPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) > M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
-        tRallyPoint = {tNearestRallyPoint[1], tNearestRallyPoint[2], tNearestRallyPoint[3]}
+    --Is this a plateau factory?
+    local iFactoryGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFactory:GetPosition())
+    if iFactoryGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup] then
+
+        local tRallyPoint = {iRallyX, GetTerrainHeight(iRallyX, iRallyZ), iRallyZ}
+        local tNearestRallyPoint = GetNearestRallyPoint(aiBrain, tFactoryPos)
+        if M27Utilities.GetDistanceBetweenPositions(tRallyPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) > M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
+            tRallyPoint = {tNearestRallyPoint[1], tNearestRallyPoint[2], tNearestRallyPoint[3]}
+        end
+        if bDebugMessages == true then LOG('SetFactoryRallyPoint: tFactoryPos='..tFactoryPos[1]..'-'..tFactoryPos[3]..'; iRallyXZ='..iRallyX..'-'..iRallyZ..'; iEnemyXZ='..iEnemyX..'-'..iEnemyZ) end
+        IssueClearFactoryCommands({oFactory})
+        IssueFactoryRallyPoint({oFactory}, tRallyPoint)
+    else
+        if not(oFactory[M27Transport.refiAssignedPlateau]) then oFactory[M27Transport.refiAssignedPlateau] = iFactoryGroup end
     end
-    if bDebugMessages == true then LOG('SetFactoryRallyPoint: tFactoryPos='..tFactoryPos[1]..'-'..tFactoryPos[3]..'; iRallyXZ='..iRallyX..'-'..iRallyZ..'; iEnemyXZ='..iEnemyX..'-'..iEnemyZ) end
-    IssueClearFactoryCommands({oFactory})
-    IssueFactoryRallyPoint({oFactory}, tRallyPoint)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -3686,45 +3694,82 @@ function GetNearestRallyPoint(aiBrain, tPosition)
     --NOTE: Air overseer uses custom copy of this with some variations to get air rally point
     local sFunctionRef = 'GetNearestRallyPoint'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --Refresh rally points if we've not refreshed in a while
-    M27MapInfo.RecordAllRallyPoints(aiBrain)
 
-    --Cycle through all rally points and pick the closest to tPosition
-    local iNearestToStart = 10000
-    local iNearestRallyPoint, iCurDistanceToStart
-    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftRallyPoints]) then
-        if GetGameTimeSeconds() >= 150 then
-            M27Utilities.ErrorHandler('Dont have any rally point >=2.5m into the game, wouldve expected to have generated intel paths by now; will return base as a rally point', true)
+    --Are we in same amphibious pathing group? If not then will want to get alternative position to move to
+    local iPlateauGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPosition)
+    if not(iPlateauGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+        --Do we have any land factories in the plateau? If so then go to the nearest of these
+        local iNearestDist = 10000
+        local iCurDist
+        local tPotentialLocation
+        if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) == false and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) == false then
+            for iFactory, oFactory in aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories] do
+                iCurDist = M27Utilities.GetDistanceBetweenPositions(tPosition, oFactory:GetPosition())
+                if iCurDist < iNearestDist then
+                    iNearestDist = iCurDist
+                    tPotentialLocation = oFactory:GetPosition()
+                end
+            end
         end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        return M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    else
-
-
-        for iRallyPoint, tRallyPoint in aiBrain[M27MapInfo.reftRallyPoints] do
-            iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tPosition, aiBrain[M27MapInfo.reftRallyPoints][iRallyPoint])
-            if iCurDistanceToStart < iNearestToStart then
-                iNearestRallyPoint = iRallyPoint
+        if not(tPotentialLocation) then
+            --Do we have a mex location to go to? If so pick the one closest to our base
+            if M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup]) == false then
+                for iMex, tMex in M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][subrefPlateauMexes] do
+                    iCurDist = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tMex)
+                    if iCurDist < iNearestDist then
+                        tPotentialLocation = tMex
+                        iNearestDist = iCurDist
+                    end
+                end
+            end
+            if not(tPotentialLocation) then
+                M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..' so will just return the current position '..repr(tPosition), true)
+                tPotentialLocation = tPosition
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
-    end
-    --[[ Previous code based on mex patrol locations:
-    local tMexPatrolLocations = M27MapInfo.GetMexPatrolLocations(aiBrain)
-    local iNearestToStart = 10000
-    local tNearestMex
-    local iCurDistanceToStart
-    local tOurStart = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    for iMex, tMexLocation in tMexPatrolLocations do
-        iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tOurStart, tMexLocation)
-        if iCurDistanceToStart < iNearestToStart then
-            iNearestToStart = iCurDistanceToStart
-            tNearestMex = tMexLocation
+        return tPotentialLocation
+    else
+        --Refresh rally points if we've not refreshed in a while
+        M27MapInfo.RecordAllRallyPoints(aiBrain)
+
+        --Cycle through all rally points and pick the closest to tPosition
+        local iNearestToStart = 10000
+        local iNearestRallyPoint, iCurDistanceToStart
+        if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftRallyPoints]) then
+            if GetGameTimeSeconds() >= 150 then
+                M27Utilities.ErrorHandler('Dont have any rally point >=2.5m into the game, wouldve expected to have generated intel paths by now; will return base as a rally point', true)
+            end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        else
+
+
+            for iRallyPoint, tRallyPoint in aiBrain[M27MapInfo.reftRallyPoints] do
+                iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tPosition, aiBrain[M27MapInfo.reftRallyPoints][iRallyPoint])
+                if iCurDistanceToStart < iNearestToStart then
+                    iNearestRallyPoint = iRallyPoint
+                end
+            end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
         end
+        --[[ Previous code based on mex patrol locations:
+        local tMexPatrolLocations = M27MapInfo.GetMexPatrolLocations(aiBrain)
+        local iNearestToStart = 10000
+        local tNearestMex
+        local iCurDistanceToStart
+        local tOurStart = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        for iMex, tMexLocation in tMexPatrolLocations do
+            iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tOurStart, tMexLocation)
+            if iCurDistanceToStart < iNearestToStart then
+                iNearestToStart = iCurDistanceToStart
+                tNearestMex = tMexLocation
+            end
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return tNearestMex--]]
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return tNearestMex--]]
 end
 
 function GetPositionToSideOfTarget(oUnit, tTargetLocation, iBaseAngleToTarget, iDistanceToMove)

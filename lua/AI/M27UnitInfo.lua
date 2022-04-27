@@ -54,6 +54,7 @@ refFactionAeon = 2
 refFactionCybran = 3
 refFactionSeraphim = 4
 refFactionNomads = 5
+refFactionUnrecognised = 6
 
 --Categories:
 --Buildings - eco
@@ -148,6 +149,7 @@ refCategoryAllAir = categories.MOBILE * categories.AIR - categories.UNTARGETABLE
 refCategoryAllNonExpAir = categories.MOBILE * categories.AIR * categories.TECH1 + categories.MOBILE * categories.AIR * categories.TECH2 + categories.MOBILE * categories.AIR * categories.TECH3
 refCategoryAirNonScout = refCategoryAllAir - categories.SCOUT
 refCategoryMercy = categories.HIGHPRIAIR * categories.AEON * categories.BOMBER * categories.TECH2
+refCategoryTransport = categories.AIR * categories.TRANSPORTATION - categories.UEF * categories.GROUNDATTACK
 
 --Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
@@ -659,7 +661,7 @@ function GetBomberAOEAndStrikeDamage(oUnit)
     local tiBomberStrikeDamageByFactionAndTech =
     {
         --UEF, Aeon, Cybran, Sera, Nomads (are using default), Default
-        { 145, 200, 145, 250, 150, 150 }, --Tech 1
+        { 150, 200, 155, 250, 150, 150 }, --Tech 1
         { 350, 300, 850, 1175, 550, 550 }, --Tech 2
         { 2500, 2500, 2500, 2500, 2500, 2500}, --Tech 3 - the strike damage calculation above should be accurate so this is just as a backup, and set at a low level due to potential for more balance changes affecting this
         { 11000,11000,11000,11000,11000,11000} --Tech 4 - again as a backup
@@ -725,6 +727,12 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PauseOrUnpauseEnergyUsage'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if EntityCategoryContains(categories.COMMAND + refCategoryAirFactory, oUnit.UnitId) then bDebugMessages = true end
+
+    if bDebugMessages == true then
+        local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
+        LOG(sFunctionRef..': Start of code, oUnit='..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; Unit state='..M27Logic.GetUnitState(oUnit))
+    end
 
 
     --Jamming - check via blueprint since no reliable category
@@ -734,7 +742,7 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
         else EnableUnitJamming(oUnit)
         end
     end
-    
+
     --Want to pause unit, check for any special logic for pausing
     local bWasUnitPaused = (oUnit[refbPaused] or false)
     oUnit[refbPaused] = bPauseNotUnpause
@@ -751,11 +759,10 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
         if bPauseNotUnpause then DisableUnitStealth(oUnit)
         else EnableUnitStealth(oUnit)
         end
-    else
-        --Normal logic - just pause unit
-        oUnit:SetPaused(bPauseNotUnpause)
-        if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
     end
+    --Normal logic - just pause unit
+    oUnit:SetPaused(bPauseNotUnpause)
+    if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
@@ -770,4 +777,49 @@ function GetNumberOfUpgradesObtained(oACU)
         end
     end
     return iUpgradeCount
+end
+
+function GetTransportMaxCapacity(oTransport, iTechLevelToLoad)
+    --https://forums.faforever.com/viewtopic.php?f=2&t=17511#:~:text=It%20can%20carry%20exactly%201,and%20more%20T2%20than%20T3.
+    local iFaction = GetUnitFaction(oTransport)
+    local tiCapacityByTechAndFaction --[TransportTechLevel][FactionNumber][UnitTechToHold]
+    if EntityCategoryContains(categories.UEF * categories.GROUNDATTACK * categories.TECH2 * categories.AIR, oTransport.UnitId) then
+        tiCapacityByTechAndFaction = {[2]={[refFactionUEF]={[1]=1,[2]=1,[3]=0,[4]=0}}}
+    else tiCapacityByTechAndFaction =
+        {[1]={ --T1 transports
+            [refFactionUEF]={[1]=6,[2]=2,[3]=1,[4]=0},
+            [refFactionAeon]={[1]=6,[2]=3,[3]=1,[4]=0},
+            [refFactionCybran]={[1]=6,[2]=2,[3]=1,[4]=0},
+            [refFactionSeraphim]={[1]=8,[2]=4,[3]=1,[4]=0},
+            [refFactionNomads]={[1]=4,[2]=2,[3]=0,[4]=0}, --Assumed
+            [refFactionUnrecognised]={[1]=2,[2]=1,[3]=0,[4]=0}, --assumed
+        },
+         [2]={
+             [refFactionUEF]={[1]=14,[2]=6,[3]=3,[4]=0},
+             [refFactionAeon]={[1]=12,[2]=6,[3]=2,[4]=0},
+             [refFactionCybran]={[1]=10,[2]=4,[3]=2,[4]=0},
+             [refFactionSeraphim]={[1]=16,[2]=8,[3]=4,[4]=0},
+             [refFactionNomads]={[1]=8,[2]=4,[3]=2,[4]=0}, --Assumed
+             [refFactionUnrecognised]={[1]=2,[2]=1,[3]=0,[4]=0}, --assumed
+         },
+         [3]={
+             [refFactionUEF]={[1]=28,[2]=12,[3]=6,[4]=0},
+             [refFactionAeon]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionCybran]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionSeraphim]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionNomads]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionUnrecognised]={[1]=1,[2]=1,[3]=1,[4]=0},
+         },
+         [4]={ --dummy values
+             [refFactionUEF]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionAeon]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionCybran]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionSeraphim]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionNomads]={[1]=1,[2]=1,[3]=1,[4]=0},
+             [refFactionUnrecognised]={[1]=1,[2]=1,[3]=1,[4]=0},
+         },
+        }
+    end
+
+    return tiCapacityByTechAndFaction[GetUnitTechLevel(oTransport)][iFaction][iTechLevelToLoad]
 end

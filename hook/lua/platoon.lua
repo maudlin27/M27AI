@@ -732,6 +732,21 @@ Platoon = Class(M27PlatoonClass) {
     M27SuicideSquad = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    --Plateau platoons
+    M27PlateauLandCombat = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27PlateauIndirect = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27PlateauMAA = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27PlateauScout = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+
+    --Idle platoons
     M27IdleScouts = function(self)
         M27PlatoonUtilities.PlatoonInitialSetup(self)
     end,

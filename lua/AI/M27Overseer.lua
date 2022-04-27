@@ -16,6 +16,8 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
+local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
+
 
 --Semi-Global for this code:
 refbACUOnInitialBuildOrder = 'M27ACUOnInitialBuildOrder' --local variable for ACU, determines whether ACUmanager is running or not
@@ -766,7 +768,10 @@ function GetNearestMAAOrScout(aiBrain, tPosition, bScoutNotMAA, bDontTakeFromIni
                 if oUnit.GetFractionComplete and oUnit:GetFractionComplete() < 1 then
                     if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': Still being constructed') end
                 else
-                    if not(oUnit[M27PlatoonFormer.refbJustBuilt] == true) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering whether unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is available as a scout/MAA. oUnit[M27PlatoonFormer.refbJustBuilt]='..tostring((oUnit[M27PlatoonFormer.refbJustBuilt] or false))..'; oUnit[M27Transport.refiAssignedPlateau]='..(oUnit[M27Transport.refiAssignedPlateau] or 'nil')..'; aiBrain[M27MapInfo.refiOurBasePlateauGroup]='..aiBrain[M27MapInfo.refiOurBasePlateauGroup]) end
+                    --Ignore if scout/MAA waiting to be released for duty or is assigned to a plateau
+                    if not(oUnit[M27Transport.refiAssignedPlateau]) then oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) end
+                    if not(oUnit[M27PlatoonFormer.refbJustBuilt] == true) and oUnit[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup] then
                         bValidSupport = true
                         if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': Is alive and constructed, checking if has a platoon handle') end
                         oCurPlatoon = oUnit.PlatoonHandle
@@ -787,7 +792,7 @@ function GetNearestMAAOrScout(aiBrain, tPosition, bScoutNotMAA, bDontTakeFromIni
                                         end
                                     end
                                 end
-                            --Looking in all platoons - check we're not looking in one already assigned for the purpose wanted
+                                --Looking in all platoons - check we're not looking in one already assigned for the purpose wanted
                             elseif oCurPlatoon == oTargetPlatoon or oCurPlatoon == oExistingHelperPlatoon then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Platoon handle equals the target platoon or existing helper platoon handle') end
                                 bValidSupport = false
@@ -3765,6 +3770,10 @@ function ACUManager(aiBrain)
                         bIncludeACUInAttack = false
                     end
                 end
+                --Override - dont include ACU in attack if we are massively ahead on eco
+                if bIncludeACUInAttack and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[refiMassGrossBaseIncome] >= 16 and not(M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
+                    bIncludeACUInAttack = false
+                end
 
 
 
@@ -4220,6 +4229,7 @@ function SetMaximumFactoryLevels(aiBrain)
             end
         end
         local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(3, math.ceil(aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]/10)) + math.min(5, aiBrain[M27AirOverseer.refiBombersWanted]) + iTorpBomberShortfall
+        if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTransport) == 0 then iAirUnitsWanted = iAirUnitsWanted + 1 end
         aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(iAirFactoryMin, iAirFactoriesOwned + math.floor((iAirUnitsWanted - iAirFactoriesOwned * 4)))
         if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 
@@ -4775,6 +4785,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 if bDebugMessages == true then LOG(sFunctionRef..': Enemy doesnt have enough AA, checking if they have any AA that is under fixed shields') end
                 local tEnemyFixedShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
                 local bHaveAAUnderShield = false
+                local iAACategoryToSearchFor
+                if aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 2 then iAACategoryToSearchFor = M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiserCarrier
+                else iAACategoryToSearchFor = M27UnitInfo.refCategoryGroundAA + M27UnitInfo.refCategoryCruiserCarrier
+                end
                 if M27Utilities.IsTableEmpty(tEnemyFixedShields) == false then
                     local tNearbyGroundAA, iShieldRadius
                     for iShield, oShield in tEnemyFixedShields do
@@ -5053,6 +5067,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         end
         if bDebugMessages == true then LOG(sFunctionRef..': iMexesInPathingGroupWeHaveClaimed='..iMexesInPathingGroupWeHaveClaimed..'; iOurShareOfMexesOnMap='..iOurShareOfMexesOnMap..'; iAllMexesInPathingGroupWeHaventClaimed='..iAllMexesInPathingGroupWeHaventClaimed) end
 
+
         aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
         --Play safe with ACU if we have almost half or more of mexes
         local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
@@ -5066,7 +5081,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
                     if EntityCategoryContains(categories.AEON, oACU) then iUpgradesWanted = 3 end
                     if bDebugMessages == true then LOG(sFunctionRef..': iUpgradeCount='..iUpgradeCount..'; iUpgradesWanted='..iUpgradesWanted) end
-                    if iUpgradeCount < iUpgradesWanted then
+                    if iUpgradeCount < iUpgradesWanted and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 3.5 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 45 then
                         aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
                     end
                 end
@@ -5080,22 +5095,29 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 end
             end
         end
-        --Also set health to run as a high value if we have high mass income
-        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 then
-            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 then
+        --Also set health to run as a high value if we have high mass and energy income
+        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
+            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
                 if not(M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
-                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                    --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
+                    if not(M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 18 then
+                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() + 15000
+                    else
+                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                    end
                 else
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
                 end
-            else
+                else
                 if iUpgradeCount < 1 then
-                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have any ugprade on ACU yet so want to retreat it') end
+                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() + 5000)
                 elseif iUpgradeCount < iUpgradesWanted then
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
                 end
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished setting ACU health to run on. ACU max health='..oACU:GetMaxHealth()..'; ACU health to run on='..aiBrain[refiACUHealthToRunOn]) end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -5248,6 +5270,9 @@ function RecordAllEnemiesAndAllies(aiBrain)
 
     --Set mod distance emergency range
     aiBrain[refiModDistEmergencyRange] = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.4, 150), aiBrain[refiDistanceToNearestEnemyBase] * 0.15)
+
+    --Update plateau info since those of interest may have changed
+    ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain)
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -5434,6 +5459,9 @@ function OverseerInitialisation(aiBrain)
 
     ForkThread(M27MapInfo.RecordStartingPathingGroups, aiBrain)
 
+    --Record base plateau pathing gropu
+    aiBrain[M27MapInfo.refiOurBasePlateauGroup] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+
     ForkThread(ACUInitialisation, aiBrain) --Gets ACU to build its first building and then form ACUMain platoon once its done
 
     ForkThread(RevealCiviliansToAI, aiBrain)
@@ -5441,6 +5469,8 @@ function OverseerInitialisation(aiBrain)
     ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain) --Will figure out the speed of scouts (except seraphim)
     ForkThread(M27MapInfo.UpdateReclaimMarkers)
     ForkThread(M27MapInfo.ReclaimManager)
+    ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain)
+    ForkThread(M27Transport.TransportInitialisation, aiBrain)
 
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
 

@@ -16,6 +16,7 @@ local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
+local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -183,6 +184,10 @@ function OnUnitDeath(oUnit)
                                 --Reset after 5m (unless another TML dies between now and then)
                                 M27Utilities.DelayChangeVariable(aiBrain, M27EngineerOverseer.refiTimeOfLastFailedTML, nil, 300, M27EngineerOverseer.refiTimeOfLastFailedTML, iTime + 0.01, nil, nil)
                             end
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, sUnitBP) then
+                            if not(oUnit[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+                                aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil
+                            end
                         end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
@@ -291,7 +296,7 @@ function OnDamaged(self, instigator)
                             if self.PlatoonHandle and aiBrain:PlatoonExists(self.PlatoonHandle) then M27PlatoonUtilities.RetreatLowHealthShields(self.PlatoonHandle, aiBrain)
                             else
                                 --Assign to a retreating platoon
-                                local oShieldPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', {self}, true)
+                                local oShieldPlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27RetreatingShieldUnits', {self})
                             end
                         end
                     end
@@ -491,28 +496,53 @@ function OnConstructed(oEngineer, oJustBuilt)
 
             --LOG('OnConstructed hook test; oJustBuilt='..oJustBuilt.UnitId..'; oEngineer='..oEngineer.UnitId)
             local aiBrain = oJustBuilt:GetAIBrain()
-            --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
-            if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then
-                aiBrain[M27Overseer.refbAreBigThreats] = true
+
+            --Mexes built by spare engineers - want to clear already assigned engineers
+            if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oJustBuilt.UnitId) then
+                if oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionSpare then
+                    --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location; returns the engineer object
+                    local sLocationRef = M27Utilities.ConvertLocationToStringRef(oJustBuilt:GetPosition())
+                    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex]) == false then
+                        for iEngi, oEngi in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex] do
+                            IssueClearCommands({oEngi})
+                            M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+                        end
+                    end
+                end
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oJustBuilt.UnitId) then
+                --Is this a land factory on a plateau?
+                local iPlateauGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oJustBuilt:GetPosition())
+                if not(iPlateauGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+                    oJustBuilt[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                    if not(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) then aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup] = {} end
+                    if not(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) then aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories] = {} end
+                    aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories][oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
+                    LOG('Have just recorded factory '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..' in the list of factories for iPlateauGroup='..iPlateauGroup)
             end
-            if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
-                if EntityCategoryContains(M27UnitInfo.refCategoryProtectFromTML, oJustBuilt.UnitId) then
-                    M27Logic.DetermineTMDWantedForUnits(aiBrain, {oJustBuilt})
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryTMD, oJustBuilt.UnitId) then
-                    --Update list of units wanting TMD to factor in if they have TMD coverage from all threats now that we have just built a TMD
-                    M27Logic.DetermineTMDWantedForUnits(aiBrain, aiBrain[M27EngineerOverseer.reftUnitsWantingTMD])
+            else
+                --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
+                if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then
+                    aiBrain[M27Overseer.refbAreBigThreats] = true
+                end
+                if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
+                    if EntityCategoryContains(M27UnitInfo.refCategoryProtectFromTML, oJustBuilt.UnitId) then
+                        M27Logic.DetermineTMDWantedForUnits(aiBrain, {oJustBuilt})
+                    elseif EntityCategoryContains(M27UnitInfo.refCategoryTMD, oJustBuilt.UnitId) then
+                        --Update list of units wanting TMD to factor in if they have TMD coverage from all threats now that we have just built a TMD
+                        M27Logic.DetermineTMDWantedForUnits(aiBrain, aiBrain[M27EngineerOverseer.reftUnitsWantingTMD])
+                    end
+                end
+                if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oJustBuilt.UnitId) and not(oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
+                    aiBrain[M27Overseer.refbAreBigThreats] = true
+                    --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
+                    oJustBuilt[M27UnitInfo.refbActiveTargetChecker] = true
+                    ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
                 end
             end
-            if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oJustBuilt.UnitId) and not(oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
-                aiBrain[M27Overseer.refbAreBigThreats] = true
-                --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
-                oJustBuilt[M27UnitInfo.refbActiveTargetChecker] = true
-                ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
-            end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        elseif M27Config.M27ShowEnemyUnitNames then
-            oJustBuilt:SetCustomName(oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
-        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    elseif M27Config.M27ShowEnemyUnitNames then
+        oJustBuilt:SetCustomName(oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
+    end
         --Engineer callbacks
         if oEngineer:GetAIBrain().M27AI and not(oEngineer.Dead) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
             local sFunctionRef = 'OnConstructed'
@@ -558,5 +588,18 @@ function OnCreateWreck(tPosition, iMass, iEnergy)
         end
         --M27MapInfo.UpdateReclaimDataNearLocation(tPosition, 0, nil)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    end
+end
+
+function OnTransportLoad(oUnit, oTransport, bone)
+    if oUnit:GetAIBrain().M27AI and oTransport:GetAIBrain().M27AI then
+        M27Transport.UpdateTransportForLoadedUnit(oUnit, oTransport)
+    end
+end
+
+function OnTransportUnload(oUnit, oTransport, bone)
+    if oUnit:GetAIBrain().M27AI then
+        IssueClearCommands({oUnit})
+        oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
     end
 end
