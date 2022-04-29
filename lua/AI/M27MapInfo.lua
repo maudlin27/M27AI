@@ -4163,10 +4163,13 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh)
         local iCurPathingGroup
         local tiBasePathingGroups = {}
         local sPathing = M27UnitInfo.refPathingTypeAmphibious
-        for iRefBrain, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
-            iCurPathingGroup = GetSegmentGroupOfLocation(sPathing, PlayerStartPoints[aiBrain.M27StartPositionNumber])
-            if not(tiBasePathingGroups[iCurPathingGroup]) then
-                tiBasePathingGroups[iCurPathingGroup] = true
+        for iRefBrain, oBrain in M27Overseer.tAllAIBrainsByArmyIndex do
+            if not(M27Logic.IsCivilianBrain(oBrain)) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering brain with armyindex='..oBrain:GetArmyIndex()) end
+                iCurPathingGroup = GetSegmentGroupOfLocation(sPathing, PlayerStartPoints[oBrain.M27StartPositionNumber])
+                if not(tiBasePathingGroups[iCurPathingGroup]) then
+                    tiBasePathingGroups[iCurPathingGroup] = true
+                end
             end
         end
         --Record if active start position in this plateau
@@ -4244,7 +4247,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh)
                         if M27Utilities.IsTableEmpty(tAlliedUnits) == false then
                             for iUnit, oUnit in tAlliedUnits do
                                 --Is it an allied unit not our own?
-                                if oUnit:GetFractionComplete() == 1 and not(oUnit:GetBrain() == aiBrain) and GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == iPlateauGroup then
+                                if oUnit:GetFractionComplete() == 1 and not(oUnit:GetAIBrain() == aiBrain) and GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == iPlateauGroup then
                                     if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
                                         iAlliedMexes = iAlliedMexes + 1
                                     elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oUnit.UnitId) then

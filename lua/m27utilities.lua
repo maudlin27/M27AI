@@ -726,6 +726,19 @@ function IsACU(oUnit)
 --        return true
 end
 
+function OnPlayerDefeated(aiBrain)
+    aiBrain.M27IsDefeated = true
+    for iArmyIndex, oBrain in M27Overseer.tAllAIBrainsByArmyIndex do
+        if aiBrain == oBrain then
+            M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
+            M27Overseer.tAllActiveM27Brains[iArmyIndex] = nil
+        elseif oBrain.M27AI then
+            ForkThread(M27Overseer.RecordAllEnemiesAndAllies, oBrain)
+        end
+    end
+end
+
+
 function GetACU(aiBrain)
     function GetSubstituteACU(aiBrain)
         --Get substitute
@@ -742,7 +755,7 @@ function GetACU(aiBrain)
         end
         if IsTableEmpty(tSubstitutes) then
             ErrorHandler('Dont have a valid substitute ACU so will treat aiBrain '..aiBrain:GetArmyIndex()..' as being defeated')
-            aiBrain.M27IsDefeated = true
+            OnPlayerDefeated(aiBrain)
         else
             aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(tSubstitutes, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
             if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
@@ -750,7 +763,7 @@ function GetACU(aiBrain)
                 aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand, false, true), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
                 if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
                     ErrorHandler('Dont have a valid substitute ACU, will treat aiBrain '..aiBrain:GetArmyIndex()..' as being defeated')
-                    aiBrain.M27IsDefeated = true
+                    OnPlayerDefeated(aiBrain)
                 end
             else
                 aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] = true
@@ -771,7 +784,7 @@ function GetACU(aiBrain)
             else
                 if ScenarioInfo.Options.Victory == "demoralization" then
                     ErrorHandler('Cant find any ACUs that we own for brain'..aiBrain:GetArmyIndex()..', and in assassination game mode, so will treat us as being defeated')
-                    aiBrain.M27IsDefeated = true
+                    OnPlayerDefeated(aiBrain)
                 else
                     GetSubstituteACU(aiBrain)
                     --WaitSeconds(30)
@@ -794,10 +807,10 @@ function GetACU(aiBrain)
                 M27Overseer.iACUAlternativeFailureCount = M27Overseer.iACUAlternativeFailureCount + 1
                 if ScenarioInfo.Options.Victory == "demoralization" then
                     ErrorHandler('ACU is dead for brain'..aiBrain:GetArmyIndex()..', will return nil as are in assassination; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
-                    aiBrain.M27IsDefeated = true
+                    OnPlayerDefeated(aiBrain)
                 elseif aiBrain:IsDefeated() then
                     ErrorHandler('AI brain '..aiBrain:GetArmyIndex()..' is showing as defeated; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
-                    aiBrain.M27IsDefeated = true
+                    OnPlayerDefeated(aiBrain)
                 else
                     ErrorHandler('ACU is dead for brain'..aiBrain:GetArmyIndex()..', so will try and get a substitute as arent in assassination; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount, true)
                     GetSubstituteACU(aiBrain)
@@ -805,7 +818,7 @@ function GetACU(aiBrain)
             end
         elseif aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] and aiBrain:IsDefeated() then
             ErrorHandler('aiBrain '..aiBrain:GetArmyIndex()..' is showing as having been defeated')
-            aiBrain.M27IsDefeated = true
+            OnPlayerDefeated(aiBrain)
         end
     end
     if aiBrain.M27IsDefeated then aiBrain[M27Overseer.refoStartingACU] = nil end

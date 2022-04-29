@@ -438,6 +438,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
+        [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = false,
     },
     ['M27PlateauIndirect'] =
@@ -457,7 +458,7 @@ PlatoonTemplate = {
         [refbAttackMove] = true,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
-        [refbUsedByThreatDefender] = true,
+        [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = false,
     },
     ['M27PlateauMAA'] =

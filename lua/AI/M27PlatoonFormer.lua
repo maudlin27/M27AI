@@ -1077,7 +1077,7 @@ function MobileShieldPlatoonFormer(aiBrain, tMobileShieldUnits)
                     aiBrain[refbUsingMobileShieldsForPlatoons] = false
                     --Retreat the shield
                     IssueClearCommands({oCurUnitToAssign})
-                    IssueMove({oCurUnitToAssign}, M27Logic.GetNearestRallyPoint(aiBrain, oCurUnitToAssign:GetPosition()))
+                    IssueMove({oCurUnitToAssign}, M27Logic.GetNearestRallyPoint(aiBrain, oCurUnitToAssign:GetPosition(), oCurUnitToAssign))
                 else
                     if bDebugMessages == true then
                         local sPlan = 'nil'
@@ -1411,7 +1411,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                         --Give the new unit a move command to try and make sure its away from the factory
                         --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
                         if tStartPosition then
-                            local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                            local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), tNewUnits[1])
                             --local tRallyPoint = M27Utilities.MoveTowardsTarget(tStartPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 10, 0)
                             if EntityCategoryContains(refCategoryLandCombat, sUnitID) then
                                 IssueAggressiveMove(tNewUnits, tRallyPoint)

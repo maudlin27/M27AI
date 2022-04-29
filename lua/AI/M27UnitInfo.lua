@@ -732,37 +732,45 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
     if bDebugMessages == true then
         local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
         LOG(sFunctionRef..': Start of code, oUnit='..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; Unit state='..M27Logic.GetUnitState(oUnit))
+        if oUnit.GetWorkProgress then LOG(sFunctionRef..': Unit work progress='..oUnit:GetWorkProgress()) end
     end
+    if IsUnitValid(oUnit, true) and oUnit.SetPaused then
 
 
-    --Jamming - check via blueprint since no reliable category
-    local oBP = oUnit:GetBlueprint()
-    if oBP.Intel.JamRadius then
-        if bPauseNotUnpause then DisableUnitJamming(oUnit)
-        else EnableUnitJamming(oUnit)
+        --Jamming - check via blueprint since no reliable category
+        local oBP = oUnit:GetBlueprint()
+        if oBP.Intel.JamRadius then
+            if bPauseNotUnpause then DisableUnitJamming(oUnit)
+            else EnableUnitJamming(oUnit)
+            end
         end
-    end
 
-    --Want to pause unit, check for any special logic for pausing
-    local bWasUnitPaused = (oUnit[refbPaused] or false)
-    oUnit[refbPaused] = bPauseNotUnpause
-    if oUnit.MyShield and oUnit.MyShield:GetMaxHealth() > 0 then
-        if IsUnitShieldEnabled(oUnit) == bPauseNotUnpause then
-            if bPauseNotUnpause then DisableUnitShield(oUnit)
-            else EnableUnitShield(oUnit) end
+        --Want to pause unit, check for any special logic for pausing
+        local bWasUnitPaused = (oUnit[refbPaused] or false)
+        oUnit[refbPaused] = bPauseNotUnpause
+        if oUnit.MyShield and oUnit.MyShield:GetMaxHealth() > 0 then
+            if IsUnitShieldEnabled(oUnit) == bPauseNotUnpause then
+                if bPauseNotUnpause then DisableUnitShield(oUnit)
+                else EnableUnitShield(oUnit) end
+            end
+        elseif oBP.Intel.ReactivateTime and (oBP.Intel.SonarRadius or oBP.Intel.RadarRadius) then
+            if bPauseNotUnpause then DisableUnitIntel(oUnit)
+            else EnableUnitIntel(oUnit)
+            end
+        elseif oBP.Intel.Cloak or oBP.Intel.RadarStealth or oBP.Intel.RadarStealthFieldRadius then
+            if bPauseNotUnpause then DisableUnitStealth(oUnit)
+            else EnableUnitStealth(oUnit)
+            end
         end
-    elseif oBP.Intel.ReactivateTime and (oBP.Intel.SonarRadius or oBP.Intel.RadarRadius) then
-        if bPauseNotUnpause then DisableUnitIntel(oUnit)
-        else EnableUnitIntel(oUnit)
+        --Normal logic - just pause unit - exception if are dealing with a factory whose workcomplete is 100%
+        if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
+            oUnit:SetPaused(bPauseNotUnpause)if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
+        elseif bDebugMessages == true then
+            LOG(sFunctionRef..': Factory with either no workprogress or workprogress that isnt <1')
+            if oUnit.GetWorkProgress then LOG(sFunctionRef..': Workprogress='..oUnit:GetWorkProgress()) end
         end
-    elseif oBP.Intel.Cloak or oBP.Intel.RadarStealth or oBP.Intel.RadarStealthFieldRadius then
-        if bPauseNotUnpause then DisableUnitStealth(oUnit)
-        else EnableUnitStealth(oUnit)
-        end
+
     end
-    --Normal logic - just pause unit
-    oUnit:SetPaused(bPauseNotUnpause)
-    if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 

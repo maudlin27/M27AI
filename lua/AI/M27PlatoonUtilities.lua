@@ -2143,14 +2143,20 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     else
 
                         --Are we close to the nearest rally point?
-                        local tNearestRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
+                        local tNearestRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
                         if bDebugMessages == true then LOG(sFunctionRef..': Not at emergency health yet, will see if have reached the nearest rally point yet; distance to it='..M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon))) end
                         if M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon)) > 5 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Will go to nearest rally point, checking if want to overcharge') end
-                            oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
-                            --Consider adding overcharge
-                            if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
-                            bProceed = false
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will go to nearest rally point unless we are close to base with decent health, checking if want to overcharge. M27Utilities.GetACU(aiBrain):GetHealthPercent()='..M27Utilities.GetACU(aiBrain):GetHealthPercent()..'; Dist to base='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Dist wanted='..math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25))..'; Dist to rally='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]))) end
+                            --Are we close to the nearest rally point, with >=75% health, and close to our base? then dont set an action to run (as it may be e.g. we are just running to be prudent due to high eco)
+                            if M27Utilities.GetACU(aiBrain):GetHealthPercent() >= 0.75 and (M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25)) or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tNearestRallyPoint) <= 30) then
+                                --Do nothing - proceed with normal logic
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have decent health, are near rally point and base, so will ignore the order to retreat and carry on with normal logic') end
+                            else
+                                oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                                --Consider adding overcharge
+                                if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
+                                bProceed = false
+                            end
                         else
                             --Proceed with normal logic
                             if bDebugMessages == true then LOG(sFunctionRef..': Are close to rally point so hopefully a bit safer now so will proceed with normal nearby enemy logic rather tahn running') end
@@ -2406,13 +2412,18 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 if bDebugMessages == true then LOG(sFunctionRef..': Finished considering if too many PD or enemy threat nearby, bACUNeedsToRun='..tostring(bACUNeedsToRun)) end
                 if bACUNeedsToRun == true then
                     --If have stealth or cloak, and no big enemy threats, do a temporary retreat
-                    if (M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') or M27Utilities.GetACU(aiBrain):HasEnhancement('StealthGenerator')) and M27Utilities.GetDistanceBetweenPositions(M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), GetPlatoonFrontPosition(oPlatoon)) > 50 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) then
+                    if (M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') or M27Utilities.GetACU(aiBrain):HasEnhancement('StealthGenerator')) and M27Utilities.GetDistanceBetweenPositions(M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]) > 50 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Have cloak or stealth so want to do temporary retreat') end
                         oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
                         oPlatoon[refbHavePreviouslyRun] = true
                     else
-                        oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
-                        oPlatoon[refbHavePreviouslyRun] = true
+                        --Are we close to the nearest rally point, with >=75% health, and close to our base? then dont set an action to run (as it may be e.g. we are just running to be prudent due to high eco)
+                        if M27Utilities.GetACU(aiBrain):GetHealthPercent() >= 0.75 and (M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25)) or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])) <= 30) then
+                            --Do nothing
+                        else
+                            oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                            oPlatoon[refbHavePreviouslyRun] = true
+                        end
                     end
                     --Add in overcharge
                     if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
@@ -4021,9 +4032,18 @@ function DetermineActionForNearbyMex(oPlatoon)
                 --Early game: Only build max 1 mex if no nearby hydro (until have 4 pgens), max 3 mex if nearby Hydro, until have got hydro/power in place
                 if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 11 then bHaveEnoughPower = true
                 elseif M27Conditions.HydroNearACUAndBase(aiBrain, true, false) then
-                    if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex) < 3 then bHaveEnoughPower = true end
+                    local iCurMexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex)
+                    if iCurMexes < 3 then bHaveEnoughPower = true
+                    elseif iCurMexes < 4 then
+                        --Sometimes want to get 4 mexes before hydro
+                        if M27Utilities.IsTableEmpty(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber]) == false and table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1]) <= 5 then
+                            bHaveEnoughPower = true
+                        end
+
+                    end
                 elseif aiBrain:GetEconomyIncome('MASS') <= 0.2 or (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Power) >= 4 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex) < 2) then bHaveEnoughPower = true
                 elseif (aiBrain:GetEconomyStored('MASS') <= 30 and aiBrain:GetEconomyStored('ENERGY') >= 1400) or (aiBrain:GetEconomyStored('MASS') <= 15 and aiBrain:GetEconomyStored('ENERGY') >= 500 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower)) >= math.max(4, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex)+1) then bHaveEnoughPower = true
+
                 end
                 if bHaveEnoughPower == true then
 
@@ -4551,6 +4571,8 @@ function GetACUUpgradeWanted(aiBrain, oACU)
         local bAeonWithoutRange = false
         if M27UnitInfo.GetUnitFaction(oACU) == M27UnitInfo.refFactionAeon and not(oACU:HasEnhancement('CrysalisBeam')) then bAeonWithoutRange = true end
         --Get gun upgrade
+        local bUpgradeGivesRangeBoost
+        local sAltUpgrade
         for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
             if bDebugMessages == true then LOG(sFunctionRef..': sEnhancement='..sEnhancement..'; Prerequisite='..(tEnhancement.Prerequisite or 'nil')..'; Considering if its one of our priority gun upgrades. tEnhancement='..repr(tEnhancement)) end
             --[[if bAeonWithoutRange then
@@ -4559,20 +4581,34 @@ function GetACUUpgradeWanted(aiBrain, oACU)
                     return sEnhancement
                 end
             else--]]
-                if (not(tEnhancement.Prerequisite) or oACU:HasEnhancement(tEnhancement.Prerequisite)) and tEnhancement.BuildCostMass > 1 then
-                    if bDebugMessages == true then LOG(sFunctionRef..': We can build the enhancement so will see if it is in the list of gun upgrades') end
-                    --We can build the upgrade and it shouldnt be a 'remove upgrade' one
-                    for iGunEnhancement, sGunEnhancement in M27Conditions.tGunUpgrades do
-                        if sEnhancement == sGunEnhancement and not(oACU:HasEnhancement(sGunEnhancement)) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to return sEnhancement='..sEnhancement) end
+            if (not(tEnhancement.Prerequisite) or oACU:HasEnhancement(tEnhancement.Prerequisite)) and tEnhancement.BuildCostMass > 1 then
+                if bDebugMessages == true then LOG(sFunctionRef..': We can build the enhancement so will see if it is in the list of gun upgrades') end
+                --We can build the upgrade and it shouldnt be a 'remove upgrade' one
+                for iGunEnhancement, sGunEnhancement in M27Conditions.tGunUpgrades do
+                    if sEnhancement == sGunEnhancement and not (oACU:HasEnhancement(sGunEnhancement)) then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Have a valid gun upgrade; will see if it increases range; if not will keep looking to see if there are any that increase range. sEnhancement=' .. sEnhancement .. '; NewMaxRadius=' .. (tEnhancement.NewMaxRadius or 'nil'))
+                        end
+                        if tEnhancement.NewMaxRadius then
                             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             return sEnhancement
+                        else
+                            sAltUpgrade = sEnhancement
                         end
                     end
                 end
+            end
             --end
         end
-        M27Utilities.ErrorHandler('Failed to find a gun upgrade for ACU')
+        if sAltUpgrade then
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': sAltUpgrade=' .. sAltUpgrade)
+            end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return sAltUpgrade
+        else
+            M27Utilities.ErrorHandler('Failed to find a gun upgrade for ACU')
+        end
     else
         local iFactionRef = M27UnitInfo.GetUnitFaction(oACU)
         local tUpgradesWanted = {}
@@ -4581,14 +4617,15 @@ function GetACUUpgradeWanted(aiBrain, oACU)
             --Dont want to get gun, instead want to focus just on defensive upgrades
             if iFactionRef == M27UnitInfo.refFactionUEF then
                 --Want t2 and then personal shield
-                tUpgradesWanted = {'AdvancedEngineering', 'Shield'}
+                tUpgradesWanted = { 'AdvancedEngineering', 'Shield' }
             elseif iFactionRef == M27UnitInfo.refFactionCybran then
-                tUpgradesWanted = {'StealthGenerator', 'AdvancedEngineering'}
+                tUpgradesWanted = { 'StealthGenerator', 'AdvancedEngineering' }
             elseif iFactionRef == M27UnitInfo.refFactionAeon then
-                tUpgradesWanted = {'AdvancedEngineering', 'Shield'}
+                tUpgradesWanted = { 'AdvancedEngineering', 'Shield' }
             elseif iFactionRef == M27UnitInfo.refFactionSeraphim then
-                tUpgradesWanted = {'AdvancedEngineering', 'DamageStabilization'}
-            else M27Utilities.ErrorHandler('Dont recognise the ACU faction so wont be getting any further upgrades', true)
+                tUpgradesWanted = { 'AdvancedEngineering', 'DamageStabilization' }
+            else
+                M27Utilities.ErrorHandler('Dont recognise the ACU faction so wont be getting any further upgrades', true)
             end
 
         else
@@ -4598,28 +4635,31 @@ function GetACUUpgradeWanted(aiBrain, oACU)
             --NOTE: If any upgrades conflict, need to add in code to remove the conflicting upgrade first, and also to not get the earlier ugprade after we have removed it
             if iFactionRef == M27UnitInfo.refFactionUEF then
                 --Want t2 and then personal shield
-                tUpgradesWanted = {'AdvancedEngineering', 'Shield'}
+                tUpgradesWanted = { 'AdvancedEngineering', 'Shield' }
             elseif iFactionRef == M27UnitInfo.refFactionCybran then
-                tUpgradesWanted = {'StealthGenerator', 'CloakingGenerator', 'MicrowaveLaserGenerator'}
+                tUpgradesWanted = { 'StealthGenerator', 'CloakingGenerator', 'MicrowaveLaserGenerator' }
             elseif iFactionRef == M27UnitInfo.refFactionAeon then
-                tUpgradesWanted = {'Shield'}
+                tUpgradesWanted = { 'Shield' }
             elseif iFactionRef == M27UnitInfo.refFactionSeraphim then
                 --Want damagestabilization before blast attack, as blast attack removes advanced engineering; dont want advanced engineering if we already have blast attack
                 --[[if oACU:HasEnhancement('BlastAttack') then
                     tUpgradesWanted = nil
                 else--]]
-                tUpgradesWanted = {'AdvancedEngineering', 'DamageStabilization', 'DamageStabilizationAdvanced', 'BlastAttack'}
+                tUpgradesWanted = { 'AdvancedEngineering', 'DamageStabilization', 'DamageStabilizationAdvanced', 'BlastAttack' }
                 --end
-            else M27Utilities.ErrorHandler('Dont recognise the ACU faction so wont be getting any further upgrades', true)
+            else
+                M27Utilities.ErrorHandler('Dont recognise the ACU faction so wont be getting any further upgrades', true)
             end
         end
 
-        if bDebugMessages == true then LOG(sFunctionRef..': ACU has gun; tUpgradesWanted='..repr(tUpgradesWanted)..'; iFactionRef='..iFactionRef) end
+        if bDebugMessages == true then
+            LOG(sFunctionRef .. ': ACU has gun; tUpgradesWanted=' .. repr(tUpgradesWanted) .. '; iFactionRef=' .. iFactionRef)
+        end
         local bHaveLaterUpgrade
         if tUpgradesWanted then
             for iUpgrade, sPossibleUpgrade in tUpgradesWanted do
                 --Do we already have the upgrade?
-                if not(oACU:HasEnhancement(sPossibleUpgrade)) then
+                if not (oACU:HasEnhancement(sPossibleUpgrade)) then
                     bHaveLaterUpgrade = false
                     --Does ACU have another enhancement which lists this as a prerequisite?
                     for iBPUpgrade, tBPUpgrade in oACU:GetBlueprint().Enhancements do
@@ -4632,12 +4672,16 @@ function GetACUUpgradeWanted(aiBrain, oACU)
                         --Manually check certain categories
                         --Sera ACU - dont get T2 if we have later upgrade as e.g. we may have removed T2 so we could get blast attack
                         if sPossibleUpgrade == 'AdvancedEngineering' and (oACU:HasEnhancement('DamageStabilizationAdvanced') or oACU:HasEnhancement('BlastAttack')) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Dont want to get T2 as already have later upgrades so want gun splash instead if we dont already have it') end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Dont want to get T2 as already have later upgrades so want gun splash instead if we dont already have it')
+                            end
                             bHaveLaterUpgrade = true
                         end
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU doesnt have the upgrade '..sPossibleUpgrade..'; bHaveLaterUpgrade='..tostring(bHaveLaterUpgrade)) end
-                    if not(bHaveLaterUpgrade) then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': ACU doesnt have the upgrade ' .. sPossibleUpgrade .. '; bHaveLaterUpgrade=' .. tostring(bHaveLaterUpgrade))
+                    end
+                    if not (bHaveLaterUpgrade) then
                         --Check we can actually build this enhancement - for compatibility with mods that might remove base game enhancements
                         local bCanGetEnhancement = false
                         for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
@@ -4646,7 +4690,6 @@ function GetACUUpgradeWanted(aiBrain, oACU)
                                 break
                             end
                         end
-
 
                         if bCanGetEnhancement then
                             sUpgradeID = sPossibleUpgrade
@@ -5722,6 +5765,7 @@ function GetPlateauMovementPath(oPlatoon, bDontClearActions)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPlateauMovementPath'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if oPlatoon:GetPlan() == 'M27PlateauScout' then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Start of code') end
 
     local bGetSupportPath = false
@@ -5840,8 +5884,12 @@ function GetPlateauMovementPath(oPlatoon, bDontClearActions)
         elseif sPlatoonName == 'M27PlateauScout' then
             oPlatoon[reftMovementPath][1] = GetNearestLocationWithFewestVisitations(oPlatoon, M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes], true)
         else
-            M27Utilities.ErrorHandler('Unrecognised plateau platoon type; plan name='..oPlatoon:GetPlan()..'; will tell it to go to a random point nearby')
+            local bPathingWasWrong = M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oPlatoon[refoFrontUnit], GetPlatoonFrontPosition(oPlatoon))
+            M27Utilities.ErrorHandler('Unrecognised plateau platoon type; plan name='..oPlatoon:GetPlan()..'; will tell it to go to a random point nearby, and will check pathing. bPathingWasWrong='..tostring(bPathingWasWrong))
             oPlatoon[reftMovementPath][1] = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, iPlateauGroup, GetPlatoonFrontPosition(oPlatoon), 25, 5)
+            if bPathingWasWrong then
+                oPlatoon[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition(oPlatoon))
+            end
         end
 
         if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath]) then
@@ -5859,8 +5907,9 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNewMovementPath'
     M27Utilities.FunctionProfiler(sFunctionRef..': Total', M27Utilities.refProfilerStart)
+    local aiBrain = oPlatoon:GetBrain()
 
-    if oPlatoon[M27Transport.refiAssignedPlateau] then
+    if oPlatoon[M27Transport.refiAssignedPlateau] and not(oPlatoon[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
         GetPlateauMovementPath(oPlatoon, bDontClearActions)
     else
         local sPlatoonName = oPlatoon:GetPlan()
@@ -5955,7 +6004,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                         else
                             --Already targeting nearest enemy - go back to nearest rally point instead if we arent close to the nearest enemy
                             if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tTargetBase) <= 20 then
-                                oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
+                                oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
                             else
                                 --Still retain target base
                                 oPlatoon[reftMovementPath][1] = tTargetBase
@@ -6008,7 +6057,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                             oPlatoon[reftMovementPath][1] = oNearestUnit:GetPosition()
                                         else
                                             if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find any nearby structures so will target the nearest rally point we have') end
-                                            oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
+                                            oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
                                         end
                                     else
                                         if bDebugMessages == true then LOG(sFunctionRef..': Still have T2+ units around here so will return the enemy base') end
@@ -6217,7 +6266,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                 if M27Utilities.GetDistanceBetweenPositions(tTargetBase, M27Utilities.GetACU(aiBrain):GetPosition()) <= 5 then
                                     if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= 5 then
                                         --return to nearest rally point
-                                        tTargetBase = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
+                                        tTargetBase = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
                                     else
                                         tTargetBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                                     end
@@ -7483,7 +7532,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
         if oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then
             --Are we the MAA platoon that is meant to patrol the last rally point? If so then first update its movement path if its not the latest rally point
             if oPlatoon == aiBrain[M27PlatoonFormer.refoMAARallyPatrolPlatoon] then
-                local tRallyPointWanted = M27MapInfo.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                local tRallyPointWanted = M27MapInfo.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), oPlatoon[refoFrontUnit])
                 oPlatoon[reftLocationToGuard] = {tRallyPointWanted[1], tRallyPointWanted[2], tRallyPointWanted[3]}
             end
             oPlatoon[reftMovementPath][1] = oPlatoon[reftLocationToGuard]
@@ -7597,7 +7646,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
                     oPlatoon[refoSupportHelperPlatoonTarget] = nil
                     oPlatoon[refoPlatoonOrUnitToEscort] = nil
                     oPlatoon[refoSupportHelperUnitTarget] = nil
-                    ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), nil, false, false)
+                    ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]), nil, false, false)
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonRef..': Have '..iFollowingUnitCount..' units that are following') end
                     local oUnitPather = oPlatoon[reftCurrentUnits][1]
@@ -8227,7 +8276,7 @@ function ProcessPlatoonAction(oPlatoon)
                                         if bDontClearActions == false and iCurrentUnits > 0 then
                                             if bDebugMessages == true then LOG(sFunctionRef..': No mobile units or structures in range, will clear commands') end
                                             IssueClearCommands(tCurrentUnits) end
-                                        ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)))
+                                        ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]))
                                     end
                                 end
                                 if bAlreadyDeterminedTargetEnemy == false then
@@ -8432,7 +8481,7 @@ function ProcessPlatoonAction(oPlatoon)
                             --Head towards rally as we either have low health or just got hit by an unseen unit so dont know that our current move target is safe, unless we are at max health
                             if bDebugMessages == true then LOG(sFunctionRef..': Either low health or taken unseen damage, so about to call returntobase') end
 
-                            ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), iDistanceToRunBackBy, bDontClearActions, bTemporaryRetreat)
+                            ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]), iDistanceToRunBackBy, bDontClearActions, bTemporaryRetreat)
                             bTargetAwayFromNearestEnemy = true
                         else
                             --Can detect enemy units, so will see if current move target will take us far enough away from them
@@ -8522,7 +8571,7 @@ function ProcessPlatoonAction(oPlatoon)
                                         local iReturnToBaseDistance --nil unless special case
                                         if oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies] == true then iReturnToBaseDistance = iDistanceToRunBackBy end
                                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Point 2B: platoon movement path='..repr(oPlatoon[reftMovementPath])) end
-                                        ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), iDistanceToRunBackBy, bDontClearActions, bTemporaryRetreat)
+                                        ReturnToBaseOrRally(oPlatoon, M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]), iDistanceToRunBackBy, bDontClearActions, bTemporaryRetreat)
                                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Point 2c: platoon movement path='..repr(oPlatoon[reftMovementPath])) end
                                     end
                                 end
@@ -8576,7 +8625,7 @@ function ProcessPlatoonAction(oPlatoon)
                         IssueClearCommands(tCurrentUnits)
                     end
                     oPlatoon[reftMovementPath] = {}
-                    oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
+                    oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
                     oPlatoon[refiCurrentPathTarget] = 1
                     PlatoonMove(oPlatoon, oPlatoon[reftMovementPath][1])
                     if bDebugMessages == true then LOG(sFunctionRef..': Have updated '..sPlatoonName..oPlatoon[refiPlatoonCount]..' movement path to the nearest rally point='..repr(oPlatoon[reftMovementPath][1])..'; platoon front position='..repr(GetPlatoonFrontPosition(oPlatoon))) end
@@ -8640,7 +8689,7 @@ function ProcessPlatoonAction(oPlatoon)
 
 
                                 local iRallyPointIntelLine = aiBrain[M27Overseer.refiCurIntelLineTarget]
-                                local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, (GetPlatoonFrontPosition(oPlatoon) or M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+                                local tRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, (GetPlatoonFrontPosition(oPlatoon) or M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), oPlatoon[refoFrontUnit])
                                 --[[if iRallyPointIntelLine then
                                     iRallyPointIntelLine = iRallyPointIntelLine - 2
                                     if iRallyPointIntelLine < 0 then iRallyPointIntelLine = 1 end
@@ -8769,7 +8818,7 @@ function ProcessPlatoonAction(oPlatoon)
                         tBasePositionToUse = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
                     else
                         --Dealing with a plateau platoon
-                        tBasePositionToUse = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon))
+                        tBasePositionToUse = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
                     end
 
                     ReturnToBaseOrRally(oPlatoon, tBasePositionToUse, nil, bDontClearActions)
@@ -9413,7 +9462,7 @@ function PlatoonInitialSetup(oPlatoon)
                         if not(aiBrain[M27MapInfo.reftOurPlateauInformation][oPlatoon[M27Transport.refiAssignedPlateau]][sPlatoonSubref]) then aiBrain[M27MapInfo.reftOurPlateauInformation][oPlatoon[M27Transport.refiAssignedPlateau]][sPlatoonSubref] = {} end
                         aiBrain[M27MapInfo.reftOurPlateauInformation][oPlatoon[M27Transport.refiAssignedPlateau]][sPlatoonSubref][oPlatoon[refiPlatoonCount]] = oPlatoon
                         if bDebugMessages == true then LOG(sFunctionRef..': Have recorded platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' in the aiBrain tracker. sPlatoonSubref='..sPlatoonSubref) end
-                    else M27Utilities.ErrorHandler('Unrecognised plateau platoon plan')
+                    else M27Utilities.ErrorHandler('Unrecognised plateau platoon plan '..sPlatoonName..oPlatoon[refiPlatoonCount])
                     end
                 end
 

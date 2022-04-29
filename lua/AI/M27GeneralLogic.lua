@@ -2444,7 +2444,7 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
     --Check we can path to the enemy base or (if we cant) that the last intel path is reasonably far away from our base
     if oPlatoon[M27PlatoonUtilities.refbNeedToHeal] then
         if bDebugMessages == true then LOG(sFunctionRef..': ACU flagged as needing to heal so will go to nearest rally point') end
-        tHighestValueLocation = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
+        tHighestValueLocation = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), oPlatoon[M27PlatoonUtilities.refoFrontUnit])
     else
         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] or M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]) > math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25) then
             --First calculate the value for the enemy start position
@@ -2605,7 +2605,7 @@ function GetPriorityExpansionMovementPath(aiBrain, oPathingUnit, iMinDistanceOve
             if oPathingUnit.PlatoonHandle and oPathingUnit.PlatoonHandle[M27PlatoonUtilities.refbNeedToHeal] then
                 if bDebugMessages == true then LOG(sFunctionRef..': ACU flagged as needing to heal so will go to nearest rally point') end
                 bHaveFinalDestination = true
-                tFinalDestination = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPathingUnit.PlatoonHandle))
+                tFinalDestination = GetNearestRallyPoint(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPathingUnit.PlatoonHandle), oPathingUnit)
             elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] or M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]) > math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25) then
 
 
@@ -3689,9 +3689,11 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
     return tEndDestination
 end
 
-function GetNearestRallyPoint(aiBrain, tPosition)
+function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondTimeRun)
     --Todo - longer term want to integrate this with forward base logic
     --NOTE: Air overseer uses custom copy of this with some variations to get air rally point
+    --OptionalPathingUnit - mainly for issues caused by units thinking they are on a plateau
+
     local sFunctionRef = 'GetNearestRallyPoint'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -3723,8 +3725,23 @@ function GetNearestRallyPoint(aiBrain, tPosition)
                 end
             end
             if not(tPotentialLocation) then
-                M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..' so will just return the current position '..repr(tPosition), true)
-                tPotentialLocation = tPosition
+                --Check the pathing
+                if M27UnitInfo.IsUnitValid(oOptionalPathingUnit) and M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.GetUnitPathingType(oOptionalPathingUnit), oOptionalPathingUnit, tPosition) then
+                    if not(bSecondTimeRun) then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, true)
+                    else
+                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..' so will just return the current position '..repr(tPosition), true)
+                        tPotentialLocation = tPosition
+                    end
+                else
+                    if M27UnitInfo.IsUnitValid(oOptionalPathingUnit) then
+                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..'; already done a check of pathing, and we also have a valid pathing unit='..oOptionalPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOptionalPathingUnit)..'; will just return the current position '..repr(tPosition), true)
+                    else
+                        --No pathing unit so could be expected - e.g. one cause is a platoon being disbanded will call the nearest rally point - if there is no front unit then it may return an error
+                    end
+                    tPotentialLocation = tPosition
+                end
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

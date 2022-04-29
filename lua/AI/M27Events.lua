@@ -120,7 +120,7 @@ function OnUnitDeath(oUnit)
             local oACUBrain = oUnit:GetAIBrain()
             if ScenarioInfo.Options.Victory == "demoralization" then
                 M27Utilities.ErrorHandler('ACU has died for brain='..oACUBrain:GetArmyIndex()..'; are in assassination so will flag the brain is defeated', true)
-                oACUBrain.M27IsDefeated = true
+                M27Utilities.OnPlayerDefeated(oACUBrain)
             end
 
             for iArmyIndex, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
@@ -186,7 +186,7 @@ function OnUnitDeath(oUnit)
                             end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, sUnitBP) then
                             if not(oUnit[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
-                                aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil
+                                if aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories] then aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil end
                             end
                         end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

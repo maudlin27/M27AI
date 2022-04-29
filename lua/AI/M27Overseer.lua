@@ -3686,6 +3686,26 @@ function ACUManager(aiBrain)
                             bIncludeACUInAttack = true
                             bCheckThreatBeforeCommitting = true
                         end
+                        if bIncludeACUInAttack then
+                            if GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100) <= 20 and M27UnitInfo.IsUnitValid(oACU[refoUnitDealingUnseenDamage]) and EntityCategoryContains(categories.STRUCTURE + categories.TECH2 + categories.TECH3 + categories.EXPERIMENTAL, oACU[refoUnitDealingUnseenDamage].UnitId) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': ACU taking damage from T2 PD') end
+                                bIncludeACUInAttack = false
+                            else
+                                --Is there complete T2 PD nearby?
+                                local tNearbyPD
+                                if oACU.PlatoonHandle and oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemyStructuresInRange] > 0 then
+                                    tNearbyPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oACU.PlatoonHandle[M27PlatoonUtilities.reftEnemyStructuresInRange])
+                                    if M27Utilities.IsTableEmpty(tNearbyPD) == false then
+                                        for iPD, oPD in tNearbyPD do
+                                            if oPD:GetFractionComplete() >= 0.9 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oPD:GetPosition()) <= 56 then
+                                                bIncludeACUInAttack = false
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
                     end
                     if bDebugMessages == true then LOG(sFunctionRef..': bAllInAttack after considering our ACU vs their ACU='..tostring(bAllInAttack)) end
 
@@ -3771,7 +3791,7 @@ function ACUManager(aiBrain)
                     end
                 end
                 --Override - dont include ACU in attack if we are massively ahead on eco
-                if bIncludeACUInAttack and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[refiMassGrossBaseIncome] >= 16 and not(M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
+                if bIncludeACUInAttack and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 16 and not(M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                     bIncludeACUInAttack = false
                 end
 
@@ -3863,7 +3883,7 @@ function ACUManager(aiBrain)
                         if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
                             if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for ACU') end
                             IssueClearCommands({M27Utilities.GetACU(aiBrain)})
-                            IssueMove({oACU}, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos))
+                            IssueMove({oACU}, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos, oACU))
                         end
                     else
                         --We are upgrading, but dont want to cancel - still switch to protect ACU mode if enemy ACU is near since it can survive long enough once the upgrade is complete to kill us if we are low on health
@@ -4836,6 +4856,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                     aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
                 else
                     if bKeepProtectingACU == false then
+
                         --How far away is the enemy?
                         local bBigEnemyThreat = false
                         if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then bBigEnemyThreat = true end
@@ -4884,6 +4905,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                         if bWantToEco == true then
                             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
                                 bWantToEco = false
+                            --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
+                            elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then bWantToEco = false
                                 --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
                             elseif oACU:GetHealthPercent() < 0.45 then
                                 bWantToEco = false

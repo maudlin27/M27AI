@@ -67,7 +67,6 @@ local reftMexOnOurSideOfMap = 'M27MexOnOurSideOfMap'
 local refbPauseForPowerStall = 'M27PauseForPowerStall'
 
 function GetMexCountOnOurSideOfMap(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetMexCountOnOurSideOfMap'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -115,7 +114,6 @@ end
 
 function GetUnitReclaimTargets(aiBrain)
     --Prepares a shortlist of targets we want engineers to reclaim
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitReclaimTargets'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -291,12 +289,12 @@ function GetUnitReclaimTargets(aiBrain)
         end
     end
 
-    --TMD if no longer up against TML and have low mass
-    if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(M27Overseer.reftEnemyTML) and M27Conditions.HaveLowMass(aiBrain) then
+    --TMD if no longer up against TML and have low mass - v32 decided to disable as too risky as may not see enemy tml and doesnt give that much mass
+    --[[if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(M27Overseer.reftEnemyTML) and M27Conditions.HaveLowMass(aiBrain) then
         for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryTMD, false, false) do
             table.insert(aiBrain[reftUnitsToReclaim], oUnit)
         end
-    end
+    end--]]
 
     --Flag any units set to be reclaimed
     if M27Utilities.IsTableEmpty(aiBrain[reftUnitsToReclaim]) == false then
@@ -309,7 +307,6 @@ function GetUnitReclaimTargets(aiBrain)
 end
 
 function GetMassStorageTargets(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetMassStorageTargets'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -460,7 +457,6 @@ end
 
 function RefreshT2MexesNearBase(aiBrain)
     --Updates list of T2 mexes that are near to base and pathable by amphibious units, and arent upgrading, along with the varaible with the nearest one to our base
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshT2MexesNearBase'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -529,7 +525,6 @@ end
 
 function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCategory, bIgnoreT2SupportFactories)
     --Doesnt factor in if a unit is paused
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -582,7 +577,6 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
 end
 
 function TrackHQUpgrade(oUnitUpgradingToHQ)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'TrackHQUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -661,7 +655,6 @@ end
 
 function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
     --Work out the upgrade ID wanted; if bUpdateUpgradeTracker is true then records upgrade against unit's aiBrain
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -711,7 +704,6 @@ end
 function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     --Looks for the nearest non-upgrading unit of iunitcategory to tStartPoint
     --Returns nil if cant find one
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -826,7 +818,6 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
 end
 
 function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1392,7 +1383,6 @@ end
 
 function ClearOldRecords(aiBrain, iOldRecordsExpected)
     --iOldRecordsExpected - optional - allows optimisation by having this called from loops which can already determine this for minimal extra cost
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ClearOldRecords'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1457,7 +1447,6 @@ end
 
 function UnpauseUpgrades(aiBrain, iMaxToUnpause)
     --Note - this will try and unpause any units that have been paused previously.  However, in some cases there may not be a unit to unpause e.g. if engineers have assisted it while its paused
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UnpauseUpgrades'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1543,7 +1532,6 @@ function UnpauseUpgrades(aiBrain, iMaxToUnpause)
 end
 
 function PauseLastUpgrade(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PauseLastUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1656,7 +1644,6 @@ end
 
 function DecideMaxAmountToBeUpgrading(aiBrain)
     --Returns max number to upgrade
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -2004,7 +1991,6 @@ end
 
 function RefreshEconomyData(aiBrain)
     --Yes, hardcoding resource values will make it really hard to support mods or patches that change these values
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshEconomyData'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -2084,7 +2070,6 @@ function RefreshEconomyData(aiBrain)
 end
 
 function UpgradeMainLoop(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -2211,7 +2196,6 @@ function UpgradeMainLoop(aiBrain)
 end
 
 function ManageEnergyStalls(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageEnergyStalls'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -2583,7 +2567,6 @@ function ManageEnergyStalls(aiBrain)
 end
 
 function UpgradeManager(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
 

@@ -763,20 +763,20 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 --Target enemy ACU if its low health as a top priority unless it's about to move out of our range
                 if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) then
                     oEnemyACU = aiBrain[M27Overseer.refoLastNearestACU]
-                    if aiBrain[M27Overseer.refoLastNearestACU]:GetHealthPercent() < 0.2 then
+                    if aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() < 1400 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is almost dead so want to target it, and not target anything else if we cant hit it') end
                         iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition)
                         if iDistanceToEnemyACU < (iACURange - 2) and WillShotHit(oUnitWithOvercharge, oEnemyACU) then
                             oOverchargeTarget = aiBrain[M27Overseer.refoLastNearestACU]
                         else
-                            bAbort = true
+                            --bAbort = true
                         end
                     end
                 end
                 if bAbort == false then
                     if iDistanceToEnemyACU == nil then iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition) end
                     --Is ACU about to fall out of our vision or weapon range?
-                    if iDistanceToEnemyACU + 4 > math.min(iACURange, 26) then
+                    if iDistanceToEnemyACU + 4 > math.min(iACURange, 26) and oUnitWithOvercharge:GetHealthPercent() >= 0.8 and oUnitWithOvercharge.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] <= 4 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU about to fall out of our vision or range so will abort as want to keep moving') end
                         bAbort = true
                     end
