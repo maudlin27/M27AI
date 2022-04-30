@@ -835,6 +835,7 @@ function DoesPlatoonWantAnotherMobileShield(oPlatoon, iShieldMass, bCheckIfRemov
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return true
         elseif iShieldUnitsHave < 3 and oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return true
         else
             if bDebugMessages == true then LOG(sFunctionRef..': Returning false') end

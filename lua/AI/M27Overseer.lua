@@ -45,7 +45,7 @@ reftACURecentHealth = 'M27ACURecentHealth' --Records the ACU health every second
 reftACURecentUpgradeProgress = 'M27ACURecentUpgradeProgress' --[gametimesecond] - Records the % upgrade every second the ACU is upgrading, by gametimesecond
 refbACUCantPathAwayFromBase = 'M27OverseerACUCantPathAwayFromBase' --e.g. used to decide if should ignore gun upgrade on ACU
 
-refiUnclaimedMexesInBasePathingGroup = 'M27UnclaimedMexesInBaseGroup'
+refiUnclaimedMexesInBasePathingGroup = 'M27UnclaimedMexesInBaseGroup' --Mexes we havent claimed, so includes enemy mexes
 refiAllMexesInBasePathingGroup = 'M27AllMexesInBaseGroup'
 iPlayersAtGameStart = 2
 
@@ -2539,667 +2539,676 @@ function ThreatAssessAndRespond(aiBrain)
     if iCurThreatGroup > 0 then
         --oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
         oACU = M27Utilities.GetACU(aiBrain)
-        tACUPos = oACU:GetPosition()
-        if bDebugMessages == true then LOG(sFunctionRef..': tACUPos='..repr(tACUPos)) end
-        --if bDebugMessages == true then LOG(sFunctionRef..': ACU ID='..oACU.UnitId) end
-        for iCurGroup, tEnemyThreatGroup in aiBrain[reftEnemyThreatGroup] do
-            UpdatePreviousPlatoonThreatReferences(aiBrain, tEnemyThreatGroup)
-            bConsideringNavy = false
-            if tEnemyThreatGroup[refiThreatGroupCategory] == iNavyUnitCategories then bConsideringNavy = true end
-            --function GetCombatThreatRating(aiBrain, tUnits, bUseBlip, iMassValueOfBlipsOverride)
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished updating previous platoon threat references; iCurGroup='..iCurGroup..';  through enemy units, iCurThreatGroup='..iCurThreatGroup..'; bConsideringNavy='..tostring(bConsideringNavy)) end
-            if bDebugMessages == true then LOG('Units in tEnemyThreatGroup='..table.getn(tEnemyThreatGroup[refoEnemyGroupUnits])..'; reference of first unit='..tEnemyThreatGroup[refoEnemyGroupUnits][1].UnitId..M27UnitInfo.GetUnitLifetimeCount(tEnemyThreatGroup[refoEnemyGroupUnits][1])) end
-            --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
-            if bConsideringNavy == true then
-                --Already recorded naval AA threat when added individual units to the threat group
-                iCurThreat = tEnemyThreatGroup[refiTotalThreat]
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering navy, so will use the enemy threat group total threat already recorded='..(tEnemyThreatGroup[refiTotalThreat] or 0)) end
-            else
-                iCurThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyThreatGroup[refoEnemyGroupUnits], true)
-            end
-
-            tEnemyThreatGroup[refiTotalThreat] = math.max(10, iCurThreat)
-            tEnemyThreatGroup[reftAveragePosition] = M27Utilities.GetAveragePosition(tEnemyThreatGroup[refoEnemyGroupUnits])
-            tEnemyThreatGroup[refiDistanceFromOurBase] = M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-            tEnemyThreatGroup[refiModDistanceFromOurStart] = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tEnemyThreatGroup[reftAveragePosition])
-            if tEnemyThreatGroup[refiHighestThreatRecorded] == nil or tEnemyThreatGroup[refiHighestThreatRecorded] < tEnemyThreatGroup[refiTotalThreat] then tEnemyThreatGroup[refiHighestThreatRecorded] = tEnemyThreatGroup[refiTotalThreat] end
-            if bDebugMessages == true then LOG(sFunctionRef..': iCurGroup='..iCurGroup..'; refiHighestThreatRecorded='..tEnemyThreatGroup[refiHighestThreatRecorded]..'; refiTotalThreat='..tEnemyThreatGroup[refiTotalThreat]..'; Actual distance to base='..M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Mod distance='..tEnemyThreatGroup[refiModDistanceFromOurStart]) end
-
-            tEnemyDistanceForSorting[iCurGroup] = {}
-            tEnemyDistanceForSorting[iCurGroup] = tEnemyThreatGroup[refiModDistanceFromOurStart]
-        end
-
-        --Sort threat groups by distance to our base:
-        if bDebugMessages == true then LOG(sFunctionRef..': About to sort table of enemy threat groups') end
-        if bDebugMessages == true then
-            LOG('Threat groups before sorting:')
-            for i1, o1 in aiBrain[reftEnemyThreatGroup] do
-                LOG('i1='..i1..'; o1.refiModDistanceFromOurStart='..o1[refiModDistanceFromOurStart]..'; threat group threat='..o1[refiTotalThreat]) end
-        end
-
-        aiBrain[refbNeedDefenders] = false
-        aiBrain[refbNeedIndirect] = false
-        aiBrain[refiMinIndirectTechLevel] = 1
-        local iTotalEnemyThreatGroups = table.getn(aiBrain[reftEnemyThreatGroup])
-        local bPlatoonHasRelevantUnits
-        local bIndirectThreatOnly
-        local bIgnoreRemainingLandThreats = false
-
-        for iEnemyGroup, tEnemyThreatGroup in M27Utilities.SortTableBySubtable(aiBrain[reftEnemyThreatGroup], refiModDistanceFromOurStart, true) do
-            if bFirstThreatGroup then
-                bFirstThreatGroup = false
-                aiBrain[refiModDistFromStartNearestThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
-                aiBrain[reftLocationFromStartNearestThreat] = M27Utilities.GetNearestUnit(tEnemyThreatGroup[refoEnemyGroupUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, nil, nil):GetPosition()
-            end
-            bIndirectThreatOnly = false
-            bConsideringNavy = false
-            if tEnemyThreatGroup[refiThreatGroupCategory] == M27UnitInfo.refCategoryPD then bIndirectThreatOnly = true
-            elseif tEnemyThreatGroup[refiThreatGroupCategory] == iNavyUnitCategories then bConsideringNavy = true end
-            if bConsideringNavy == true or bIgnoreRemainingLandThreats == false then
-                if bDebugMessages == true then LOG(sFunctionRef..': Start of cycle through sorted table of each enemy threat group; iEnemyGroup='..iEnemyGroup..'; distance from our base='..tEnemyThreatGroup[refiModDistanceFromOurStart]..'; bIndirectThreatOnly='..tostring(bIndirectThreatOnly)..'; bConsideringNavy='..tostring(bConsideringNavy)) end
-
-                bNoMorePlatoons = false
-                --Get total threat of non-committed platoons closer to our base than enemy:
-                iAvailableThreat = 0
-                iCurAvailablePlatoons = 0
-                tAvailablePlatoons = {}
-                tNilDefenderPlatoons = {}
-                --bArmyPoolInAvailablePlatoons = false
-
-                --Ensure enemy engis will have a unit capable of killing them quickly
-                if tEnemyThreatGroup[refiTotalThreat] < 20 then tEnemyThreatGroup[refiTotalThreat] = 20 end
-                -- Do we have enough threat available? If not, add ACU if enemy is near
-                iThreatNeeded = tEnemyThreatGroup[refiTotalThreat]
-                iThreatWanted = tEnemyThreatGroup[refiHighestThreatRecorded] * iThreatMaxFactor
-                if bIndirectThreatOnly then
-
-                    iThreatNeeded = math.max(iThreatNeeded * 0.12, math.min(iThreatNeeded * 0.2, 400)) --i.e. 2 MMLs
-                    iThreatWanted = iThreatWanted * 0.7 --Structures are given double threat, so really this is saying send up to 140% of the mass value of enemy PD in indirect fire units
-                elseif bConsideringNavy == true then
-                    iThreatWanted = iThreatNeeded * iNavalThreatMaxFactor
-                    iThreatNeeded = iThreatNeeded * 0.75
+        if oACU then
+            tACUPos = oACU:GetPosition()
+            if bDebugMessages == true then LOG(sFunctionRef..': tACUPos='..repr(tACUPos)) end
+            --if bDebugMessages == true then LOG(sFunctionRef..': ACU ID='..oACU.UnitId) end
+            for iCurGroup, tEnemyThreatGroup in aiBrain[reftEnemyThreatGroup] do
+                UpdatePreviousPlatoonThreatReferences(aiBrain, tEnemyThreatGroup)
+                bConsideringNavy = false
+                if tEnemyThreatGroup[refiThreatGroupCategory] == iNavyUnitCategories then bConsideringNavy = true end
+                --function GetCombatThreatRating(aiBrain, tUnits, bUseBlip, iMassValueOfBlipsOverride)
+                if bDebugMessages == true then LOG(sFunctionRef..': Finished updating previous platoon threat references; iCurGroup='..iCurGroup..';  through enemy units, iCurThreatGroup='..iCurThreatGroup..'; bConsideringNavy='..tostring(bConsideringNavy)) end
+                if bDebugMessages == true then LOG('Units in tEnemyThreatGroup='..table.getn(tEnemyThreatGroup[refoEnemyGroupUnits])..'; reference of first unit='..tEnemyThreatGroup[refoEnemyGroupUnits][1].UnitId..M27UnitInfo.GetUnitLifetimeCount(tEnemyThreatGroup[refoEnemyGroupUnits][1])) end
+                --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
+                if bConsideringNavy == true then
+                    --Already recorded naval AA threat when added individual units to the threat group
+                    iCurThreat = tEnemyThreatGroup[refiTotalThreat]
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering navy, so will use the enemy threat group total threat already recorded='..(tEnemyThreatGroup[refiTotalThreat] or 0)) end
+                else
+                    iCurThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyThreatGroup[refoEnemyGroupUnits], true)
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': iThreatNeeded='..iThreatNeeded..'; iThreatWanted='..iThreatWanted) end
 
-                --Land based threats: send platoons to deal with them
-                if bConsideringNavy == false then
-                    for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-                        if bDebugMessages == true then LOG(sFunctionRef..': iPlatoon='..iPlatoon..'; Platoon unit count='..table.getn(oPlatoon:GetPlatoonUnits())) end
-                        if oPlatoon[M27PlatoonTemplates.refbUsedByThreatDefender] == true then
-                            --if not(oPlatoon == oArmyPoolPlatoon) then
-                            bPlatoonIsAvailable = false
-                            sPlan = oPlatoon:GetPlan()
-                            iPlatoonNumber = oPlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                            if iPlatoonNumber == nil then iPlatoonNumber = 0 end
-                            sPlatoonRef = sPlan..iPlatoonNumber
+                tEnemyThreatGroup[refiTotalThreat] = math.max(10, iCurThreat)
+                tEnemyThreatGroup[reftAveragePosition] = M27Utilities.GetAveragePosition(tEnemyThreatGroup[refoEnemyGroupUnits])
+                tEnemyThreatGroup[refiDistanceFromOurBase] = M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                tEnemyThreatGroup[refiModDistanceFromOurStart] = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tEnemyThreatGroup[reftAveragePosition])
+                if tEnemyThreatGroup[refiHighestThreatRecorded] == nil or tEnemyThreatGroup[refiHighestThreatRecorded] < tEnemyThreatGroup[refiTotalThreat] then tEnemyThreatGroup[refiHighestThreatRecorded] = tEnemyThreatGroup[refiTotalThreat] end
+                if bDebugMessages == true then LOG(sFunctionRef..': iCurGroup='..iCurGroup..'; refiHighestThreatRecorded='..tEnemyThreatGroup[refiHighestThreatRecorded]..'; refiTotalThreat='..tEnemyThreatGroup[refiTotalThreat]..'; Actual distance to base='..M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Mod distance='..tEnemyThreatGroup[refiModDistanceFromOurStart]) end
 
-                            --If dealing with a structure threat then dont include platoons with DF units; if dealing with a mobile threat dont include platoons with only indirect units
-                            bPlatoonHasRelevantUnits = false
-                            if bIndirectThreatOnly then
-                                if oPlatoon[M27PlatoonUtilities.refiIndirectUnits] and oPlatoon[M27PlatoonUtilities.refiIndirectUnits] > 0 then bPlatoonHasRelevantUnits = true end
-                                --[[
-                                if sPlan == M27PlatoonTemplates.refoIdleIndirect or sPlan == 'M27IndirectSpareAttacker' then bPlatoonHasRelevantUnits = true
-                                elseif oPlatoon[M27PlatoonUtilities.refiIndirectUnits] and oPlatoon[M27PlatoonUtilities.refiIndirectUnits] > 0 then
-                                    bPlatoonHasRelevantUnits = true
-                                end--]]
-                                --Check that have units of the desired tech level
-                                if tEnemyThreatGroup[refiThreatGroupHighestTech] > 1 and bPlatoonHasRelevantUnits == true then
-                                    bPlatoonHasRelevantUnits = false
-                                    if oPlatoon[M27PlatoonUtilities.refiIndirectUnits] > 0 then
-                                        --Check we have at least 1 T2 unit in here
-                                        if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus, oPlatoon[M27PlatoonUtilities.reftIndirectUnits])) == false then
-                                            bPlatoonHasRelevantUnits = true
-                                        end
-                                    end
-                                end
-                            else
-                                if oPlatoon[M27PlatoonUtilities.refiDFUnits] and oPlatoon[M27PlatoonUtilities.refiDFUnits] > 0 then bPlatoonHasRelevantUnits = true end
-                                --[[if sPlan == M27PlatoonTemplates.refoIdleCombat then bPlatoonHasRelevantUnits = true
-                                elseif oPlatoon[M27PlatoonUtilities.refiDFUnits] and oPlatoon[M27PlatoonUtilities.refiDFUnits] > 0 then bPlatoonHasRelevantUnits = true end--]]
-                            end
-                            if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; finished checking if have relevant units for the threat type, bPlatoonHasRelevantUnits='..tostring(bPlatoonHasRelevantUnits)) end
-                            if bPlatoonHasRelevantUnits == true then
-                                --Only include defender platoons that are closer to our base than enemy threat, and which aren't already dealing with a threat
-                                if oPlatoon[M27PlatoonUtilities.refiPlatoonCount] == nil then oPlatoon[M27PlatoonUtilities.refiPlatoonCount] = 0 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering available platoons; iPlatoon='..iPlatoon..'; sPlatoonRef='..sPlatoonRef..'; iEnemyGroup='..iEnemyGroup) end
-                                --if sPlan == sDefenderPlatoonRef or sPlan == 'M27AttackNearestUnits' or sPlan == M27PlatoonTemplates.refoIdleIndirect or sPlan == 'M27IndirectSpareAttacker' or sPlan == 'M27IndirectDefender' or sPlan == 'M27CombatPatrolAI' then
-                                tCurPos = M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)
-                                iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tCurPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                if iDistToOurBase <= tEnemyThreatGroup[refiDistanceFromOurBase] then
-                                    if oPlatoon[refsEnemyThreatGroup] == nil then
-                                        bPlatoonIsAvailable = true
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Platoons current target is nil so platoon is available; iPlatoon='..iPlatoon) end
-                                    else
-                                        if bDebugMessages == true then LOG(sFunctionRef..': iPlatoon='..iPlatoon..'; Is busy targetting '..oPlatoon[refsEnemyThreatGroup]..'; curent threat group considering is: '..iEnemyGroup) end
-                                        if sThreatGroup == nil then LOG(repr(aiBrain[reftEnemyThreatGroup])) end
-                                        --aiBrain[reftEnemyThreatGroup][sThreatGroup][refsEnemyGroupName] = sThreatGroup
-                                        if oPlatoon[refsEnemyThreatGroup] == iEnemyGroup then bPlatoonIsAvailable = true end
-                                    end
-                                else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Platoon is too far away to be of help; iPlatoon='..iPlatoon..'; sPlatoonRef='..sPlatoonRef..'; iEnemyGroup='..iEnemyGroup..'; iDistToOurBase='..iDistToOurBase..'; tEnemyThreatGroup[refiDistanceFromOurBase]='..tEnemyThreatGroup[refiDistanceFromOurBase]) end
-                                end
-                                --else
-                                --if bDebugMessages == true then LOG(sFunctionRef..': Platoon plan isnt equal to defender plan. iPlatoon='..iPlatoon..'; sPlatoonRef='..sPlatoonRef..'; iEnemyGroup='..iEnemyGroup) end
-                                --end
-                                if bPlatoonIsAvailable == true then
-                                    --Does the platoon have the ACU in it? If so remove it (it can get re-added later if an emergency response is required)
-                                    if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true then
-                                        if not(oPlatoon[refsEnemyThreatGroup] == iEnemyGroup) then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': ACU is in platoon so will only make platoon available for threat response if ACU is targetting the same threat group') end
-                                            bPlatoonIsAvailable = false
-                                        end
-                                    end
-                                    if bPlatoonIsAvailable == true then
-                                        --Does the platoon have DF units in it but we're targetting structures?
-                                        if oPlatoon[M27PlatoonUtilities.refiDFUnits] > 0 and bIndirectThreatOnly then
-                                            --RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo)
-                                            M27PlatoonUtilities.RemoveUnitsFromPlatoon(oPlatoon, oPlatoon[M27PlatoonUtilities.reftDFUnits], false, nil)
-                                        end
-                                        --Add current platoon details:
-                                        iDistFromEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPos, tEnemyThreatGroup[reftAveragePosition])
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Platoon is available, will record the threat; iAvailableThreat pre updating='..iAvailableThreat) end
-                                        iAvailableThreat, iCurAvailablePlatoons = RecordAvailablePlatoonAndReturnValues(aiBrain, oPlatoon, iAvailableThreat, iCurAvailablePlatoons, tCurPos, iDistFromEnemy, iDistToOurBase, tAvailablePlatoons, tNilDefenderPlatoons, bIndirectThreatOnly)
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Platoon is available, have recorded the threat; iAvailableThreat post updating='..iAvailableThreat) end
-                                    end
-                                end
-                            end
-                            --end
-                        end
+                tEnemyDistanceForSorting[iCurGroup] = {}
+                tEnemyDistanceForSorting[iCurGroup] = tEnemyThreatGroup[refiModDistanceFromOurStart]
+            end
+
+            --Sort threat groups by distance to our base:
+            if bDebugMessages == true then LOG(sFunctionRef..': About to sort table of enemy threat groups') end
+            if bDebugMessages == true then
+                LOG('Threat groups before sorting:')
+                for i1, o1 in aiBrain[reftEnemyThreatGroup] do
+                    LOG('i1='..i1..'; o1.refiModDistanceFromOurStart='..o1[refiModDistanceFromOurStart]..'; threat group threat='..o1[refiTotalThreat]) end
+            end
+
+            aiBrain[refbNeedDefenders] = false
+            aiBrain[refbNeedIndirect] = false
+            aiBrain[refiMinIndirectTechLevel] = 1
+            local iTotalEnemyThreatGroups = table.getn(aiBrain[reftEnemyThreatGroup])
+            local bPlatoonHasRelevantUnits
+            local bIndirectThreatOnly
+            local bIgnoreRemainingLandThreats = false
+
+            for iEnemyGroup, tEnemyThreatGroup in M27Utilities.SortTableBySubtable(aiBrain[reftEnemyThreatGroup], refiModDistanceFromOurStart, true) do
+                if bFirstThreatGroup then
+                    bFirstThreatGroup = false
+                    aiBrain[refiModDistFromStartNearestThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
+                    aiBrain[reftLocationFromStartNearestThreat] = M27Utilities.GetNearestUnit(tEnemyThreatGroup[refoEnemyGroupUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, nil, nil):GetPosition()
+                end
+                bIndirectThreatOnly = false
+                bConsideringNavy = false
+                if tEnemyThreatGroup[refiThreatGroupCategory] == M27UnitInfo.refCategoryPD then bIndirectThreatOnly = true
+                elseif tEnemyThreatGroup[refiThreatGroupCategory] == iNavyUnitCategories then bConsideringNavy = true end
+                if bConsideringNavy == true or bIgnoreRemainingLandThreats == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Start of cycle through sorted table of each enemy threat group; iEnemyGroup='..iEnemyGroup..'; distance from our base='..tEnemyThreatGroup[refiModDistanceFromOurStart]..'; bIndirectThreatOnly='..tostring(bIndirectThreatOnly)..'; bConsideringNavy='..tostring(bConsideringNavy)) end
+
+                    bNoMorePlatoons = false
+                    --Get total threat of non-committed platoons closer to our base than enemy:
+                    iAvailableThreat = 0
+                    iCurAvailablePlatoons = 0
+                    tAvailablePlatoons = {}
+                    tNilDefenderPlatoons = {}
+                    --bArmyPoolInAvailablePlatoons = false
+
+                    --Ensure enemy engis will have a unit capable of killing them quickly
+                    if tEnemyThreatGroup[refiTotalThreat] < 20 then tEnemyThreatGroup[refiTotalThreat] = 20 end
+                    -- Do we have enough threat available? If not, add ACU if enemy is near
+                    iThreatNeeded = tEnemyThreatGroup[refiTotalThreat]
+                    iThreatWanted = tEnemyThreatGroup[refiHighestThreatRecorded] * iThreatMaxFactor
+                    if bIndirectThreatOnly then
+
+                        iThreatNeeded = math.max(iThreatNeeded * 0.12, math.min(iThreatNeeded * 0.2, 400)) --i.e. 2 MMLs
+                        iThreatWanted = iThreatWanted * 0.7 --Structures are given double threat, so really this is saying send up to 140% of the mass value of enemy PD in indirect fire units
+                    elseif bConsideringNavy == true then
+                        iThreatWanted = iThreatNeeded * iNavalThreatMaxFactor
+                        iThreatNeeded = iThreatNeeded * 0.75
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iThreatNeeded='..iThreatNeeded..'; iThreatWanted='..iThreatWanted) end
 
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering action based on our threat vs enemy; EnemyThreat='..tEnemyThreatGroup[refiTotalThreat]..'; iAvailableThreat='..iAvailableThreat) end
+                    --Land based threats: send platoons to deal with them
+                    if bConsideringNavy == false then
+                        for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
+                            if bDebugMessages == true then LOG(sFunctionRef..': iPlatoon='..iPlatoon..'; Platoon unit count='..table.getn(oPlatoon:GetPlatoonUnits())) end
+                            if oPlatoon[M27PlatoonTemplates.refbUsedByThreatDefender] == true then
+                                --if not(oPlatoon == oArmyPoolPlatoon) then
+                                bPlatoonIsAvailable = false
+                                sPlan = oPlatoon:GetPlan()
+                                iPlatoonNumber = oPlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                if iPlatoonNumber == nil then iPlatoonNumber = 0 end
+                                sPlatoonRef = sPlan..iPlatoonNumber
 
-                    if iAvailableThreat < iThreatNeeded and not(bIndirectThreatOnly) and not(bConsideringNavy) then
-                        --Check if should add ACU to help fight - is enemy relatively close to ACU, relatively close to our start, and ACU is closer to start than enemy?
-                        bGetACUHelp = false
-                        iDistFromEnemy = M27Utilities.GetDistanceBetweenPositions(tACUPos, tEnemyThreatGroup[reftAveragePosition])
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering whether should get ACU to help; iDistFromEnemy ='..iDistFromEnemy) end
-                        if iDistFromEnemy < iACUDistanceToConsider then
-                            if tEnemyThreatGroup[refiDistanceFromOurBase] < iACUEnemyDistanceFromBase then
-                                iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                if iDistToOurBase < tEnemyThreatGroup[refiDistanceFromOurBase] then
-                                    --are we closer to our base than enemy?
-                                    if M27Logic.GetNearestEnemyStartNumber(aiBrain) then
-                                        local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                                        if iDistToEnemyBase > 0 and iDistToOurBase / iDistToEnemyBase < 0.85 then bGetACUHelp = true end
-                                    end
-                                end
-                            end
-                        end
-                        if bDebugMessages == true then LOG(sFunctionRef..': bGetACUHelp='..tostring(bGetACUHelp)..'; if this is false then will check if emergency response required') end
-                        --Check if emergency response required:
-                        if bGetACUHelp == false then
-                            if tEnemyThreatGroup[refiDistanceFromOurBase] < iACUEnemyDistanceFromBase then
-                                if iThreatNeeded - iAvailableThreat > iEmergencyExcessEnemyThreatNearBase and iThreatNeeded > 0 and iAvailableThreat / iThreatNeeded < 0.85 then
-                                    if iDistToOurBase <= iMaxACUEmergencyThreatRange then
-                                        bGetACUHelp = true
-                                        if bDebugMessages == true then LOG(sFunctionRef..': bGetACUHelp='..tostring(bGetACUHelp)..'; Emergency response is required') end
-                                    end
-                                end
-                            end
-                        end
-
-
-                        --Check ACU isn't upgrading
-                        if bGetACUHelp == true then
-                            if bDebugMessages == true then LOG(sFunctionRef..': checking if ACU is upgrading') end
-                            if oACU:IsUnitState('Upgrading') == true then
-                                if bDebugMessages == true then LOG(sFunctionRef..': ACU is upgrading so dont want it to help') end
-                                bGetACUHelp = false
-                            end
-                        end
-                        --Check ACU hasn't finished its gun upgrade (want both for aeon):
-                        if bGetACUHelp == true then
-                            if M27Conditions.DoesACUHaveGun(aiBrain, true) == true then
-                                if bDebugMessages == true then LOG(sFunctionRef..': ACU has gun upgrade so dont want it to help as it should be attacking') end
-                                bGetACUHelp = false end
-                        end
-                        --Check ACU doesnt have nearby enemies
-                        if bGetACUHelp == true then
-                            if oACU.PlatoonHandle and oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0 then
-                                local iEnemySearchRange = math.max(22, M27Logic.GetUnitMaxGroundRange({oACU}))
-                                local tEnemiesNearACU = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, oACU:GetPosition(), iEnemySearchRange, 'Enemy')
-                                if M27Utilities.IsTableEmpty(tEnemiesNearACU) == false then bGetACUHelp = false end
-                            end
-                        end
-
-                        oACU[refbACUHelpWanted] = bGetACUHelp
-                        -- v15 - decided to instead use the ACUMain platoon logic and just change the movement path as having too many issues with ACU logic getting messed up
-                        --[[
-                        if bGetACUHelp == true then
-
-                            --Check if ACU not already in a defender platoon:
-                            sACUPlan = DebugPrintACUPlatoon(aiBrain, true)
-                            if not(sACUPlan == sDefenderPlatoonRef) then
-                                --Flag that ACU has been added to defenders if its using the main AI
-                                aiBrain[refbACUWasDefending] = true
-                                --Add ACU to defenders
-
-
-                                if bDebugMessages == true then LOG(sFunctionRef..': Getting ACU threat rating before adding to defenders; iAvailableThreat before adding ACU='..iAvailableThreat) end
-                                local oACUPlatoon = oACU.PlatoonHandle
-                                if oACUPlatoon == nil then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': oACUs platoon handle is nil, creating new plan for ACU') end
-                                    oACUPlatoon = aiBrain:MakePlatoon('', '')
-                                    aiBrain:AssignUnitsToPlatoon(oACUPlatoon, {oACU},'Attack', 'None')
-                                    oACUPlatoon:SetAIPlan(sDefenderPlatoonRef)
-
-                                    if bDebugMessages == true then
-                                        local iPlatoonCount = oACUPlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                                        if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['sDefenderPlatoonRef']
-                                            if iPlatoonCount == nil then iPlatoonCount = 1
-                                            else iPlatoonCount = iPlatoonCount + 1 end
-                                        end
-                                        LOG(sFunctionRef..': Created new defender platoon to be used, platoon name+count='..sDefenderPlatoonRef..iPlatoonCount)
-                                    end
-                                else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': ACU will help so have enough threat; iAvailableThreat before adding ACU='..iAvailableThreat..'; changing ACUs plan to use defender plan') end
-                                    oACU.PlatoonHandle:SetAIPlan(sDefenderPlatoonRef)
-                                end
-                                iAvailableThreat, iCurAvailablePlatoons = RecordAvailablePlatoonAndReturnValues(aiBrain, oACU.PlatoonHandle, iAvailableThreat, iCurAvailablePlatoons, tACUPos, iDistFromEnemy, iDistToOurBase, tAvailablePlatoons, tNilDefenderPlatoons, bIndirectThreatOnly)
-                                if bDebugMessages == true then LOG(sFunctionRef..': iAvailableThreat after adding ACU to available platoons='..iAvailableThreat) end
-                                --iAvailableThreat = iAvailableThreat + M27Logic.GetCombatThreatRating(aiBrain, {oACU}, false)
-
-                            end
-                        end --]]
-                        if bDebugMessages == true then LOG(sFunctionRef..': Finished considering if ACU should help; bGetACUHelp='..tostring(bGetACUHelp)) end
-                    else
-                        --Threat higher than needed, so flag that don't need ACU help
-                        oACU[refbACUHelpWanted] = false
-                    end
-
-                    if bDebugMessages == true then LOG(sFunctionRef..': Finished identifying all platoons/units that can help deal with the threat, now will decide on what action to take; iAvailableThreat='..iAvailableThreat..'; iThreatNeeded='..iThreatNeeded) end
-                    --Now that have all available units, decide on action based on enemy threat
-                    --First update trackers - want to base on whether we have all the units we want to respond to the threat (rather than whether we have just enough units to attack)
-                    if iAvailableThreat < iThreatWanted then
-                        local iCurModDistToEnemyBase = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tEnemyThreatGroup[reftAveragePosition], true)
-                        --M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                        aiBrain[refiModDistFromStartNearestOutstandingThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
-                        aiBrain[refiPercentageOutstandingThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart] / (tEnemyThreatGroup[refiModDistanceFromOurStart] + iCurModDistToEnemyBase)
-                        aiBrain[refiMinIndirectTechLevel] = 1 --default
-                        if bIndirectThreatOnly then
-                            aiBrain[refbNeedIndirect] = true
-                            aiBrain[refbNeedDefenders] = false
-                            if tEnemyThreatGroup[refiThreatGroupHighestTech] >= 2 then aiBrain[refiMinIndirectTechLevel] = math.min(tEnemyThreatGroup[refiThreatGroupHighestTech], 3) end
-                        else
-                            aiBrain[refbNeedDefenders] = true --will assign more units to defender platoon
-                            aiBrain[refbNeedIndirect] = false
-                        end
-                    else
-                        if iEnemyGroup >= iTotalEnemyThreatGroups then
-                            --is the furthest away enemy threat group and we can beat it, so we have full defensive coverage; will set to 90% to avoid trying to e.g. get mexes in the enemy base itself
-                            aiBrain[refiPercentageOutstandingThreat] = 0.9
-                            aiBrain[refiModDistFromStartNearestOutstandingThreat] = aiBrain[refiDistanceToNearestEnemyBase]
-                        end
-                    end
-
-                    --Now decide whether we will attack with the platoon, based on whether we have the minimum threat needed
-                    if iAvailableThreat < iThreatNeeded and bGetACUHelp == false then
-
-                        --Dont have enough units yet, so get units in position so when have enough can respond
-                        --Go to midpoint, or if enemy too close then to base
-                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough threat to deal with enemy - iAvailableThreat='..iAvailableThreat..'; iThreatNeeded='..iThreatNeeded..'; set refbNeedDefenders to true; getting rally point for any available platoons to retreat to') end
-                        --if bDebugMessages == true then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(M27Utilities.GetACU(aiBrain))) end
-                        tRallyPoint = {}
-                        if tEnemyThreatGroup[refiDistanceFromOurBase] > 60 then
-                            tRallyPoint[1] = (tEnemyThreatGroup[reftAveragePosition][1] + M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1]) / 2
-                            tRallyPoint[3] = (tEnemyThreatGroup[reftAveragePosition][3] + M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]) / 2
-                            tRallyPoint[2] = GetTerrainHeight(tRallyPoint[1], tRallyPoint[3])
-                        else
-                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy is clsoe to our base, so rally point is our base') end
-                            tRallyPoint = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] end
-                        for iPlatoon, oPlatoon in tAvailablePlatoons do
-                            oPlatoon[refsEnemyThreatGroup] = nil
-                            if not(oPlatoon==oArmyPoolPlatoon) then --redundancy/from old code - armypool shouldnt be in availableplatoons any more
-                                oPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
-                                if M27Utilities.IsTableEmpty(oPlatoon[M27PlatoonUtilities.reftMovementPath]) == false and M27Utilities.GetDistanceBetweenPositions((oPlatoon[M27PlatoonUtilities.reftMovementPath][(oPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] or 1)] or {0,0,0}), (tRallyPoint or {0,0,0})) > 10 then
-                                    M27PlatoonUtilities.ForceActionRefresh(oPlatoon)
-                                    oPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
-                                elseif M27Utilities.IsTableEmpty(oPlatoon[M27PlatoonUtilities.reftMovementPath]) then oPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
-                                end
-                                oPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tRallyPoint
-                                oPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
-                                --oPlatoon[M27PlatoonUtilities.refiLastPathTarget] = 1
-                                oPlatoon[M27PlatoonUtilities.refbOverseerAction] = true
-                                --IssueClearCommands(oPlatoon:GetPlatoonUnits())
-                                if bDebugMessages == true then
-                                    local iPlatoonCount = oPlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                                    if iPlatoonCount == nil then iPlatoonCount = 'nil' end
-                                    LOG(sFunctionRef..': Given override action and Set tMovementPath[1] to tRallyPoint='..tRallyPoint[1]..'-'..tRallyPoint[3]..' and then stop looking at remaining threats; iPlatoon='..iPlatoon..'; PlatoonCount='..iPlatoonCount) end
-                            else
-                                M27Utilities.ErrorHandler('oPlatoon is army pool')
-                                --Armypool platoon - do nothing - shouldve already had combat units added to an available platoon; rely on new platoons being created soon that get sent commands (as if try issuing commands to army pool it can stop platoons being created)
-                            end
-                        end
-                        bIgnoreRemainingLandThreats = true
-                    else
-
-                        --Can beat enemy (or for indirect may be able to beat them, or if ACU helping then we have to try to beat them) so attack them - filter to just those platoons that need to deal with the threat if we have more than what is needed:
-                        --if iAvailableThreat >= iThreatWanted then
-                        --Only need some of the platoon units, pick the ones nearest the enemy
-                        --tAvailablePlatoons =
-                        --M27Utilities.SortTableBySubtable(tAvailablePlatoons, refiActualDistanceFromEnemy, true)
-                        --end
-                        iMinScouts = 1 --Want to make sure defender platoon has at least 1 scout if one is available
-                        iMinMAA = 1 --as per scouts
-                        bIsFirstPlatoon = true
-                        --TODO - if run into performance issues could see if it works by setting a new variable equal to the sorted table where need sorting, and not where don't need sorting; however may not work as repeated calls to a variable that uses the sorttables causes errors since sorttables is a function of a table
-                        local bNeedBasePlatoon = true
-                        bAddedUnitsToPlatoon = false
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have enough threat to respond, will now sort platoons to find the nearest one; available platoon size='..table.getn(tAvailablePlatoons)) end
-                        local bRefreshPlatoonAction
-                        for iPlatoonRef, oAvailablePlatoon in M27Utilities.SortTableBySubtable(tAvailablePlatoons, refiActualDistanceFromEnemy, true) do
-                            --for iCurPlatoon = 1, iCurAvailablePlatoons do
-                            bRefreshPlatoonAction = false
-                            if bDebugMessages == true then LOG(sFunctionRef..': iPlatoonRef='..iPlatoonRef..'; platoon unit count='..table.getn(oAvailablePlatoon:GetPlatoonUnits())) end
-                            sPlan = oAvailablePlatoon:GetPlan()
-                            iPlatoonNumber = oAvailablePlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                            if iPlatoonNumber == nil then iPlatoonNumber = 0 end
-                            sPlatoonRef = sPlan..iPlatoonNumber
-
-                            oDefenderPlatoon = oAvailablePlatoon--tAvailablePlatoons[iPlatoonRef]
-                            if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; iThreatWanted='..iThreatWanted..'; bNeedBasePlatoon='..tostring(bNeedBasePlatoon)..'; units in platoon='..table.getn(oAvailablePlatoon:GetPlatoonUnits())) end
-                            if iThreatWanted <= 0 then
-                                --Ensure platoon is available to target other platoons as it's not needed for this one
-                                if bDebugMessages == true then LOG(sFunctionRef..': Threat wanted is <= 0 so making platoon available for other threat groups') end
-                                oAvailablePlatoon[refsEnemyThreatGroup] = nil
-                            else
-                                if bDebugMessages == true then LOG(sFunctionRef..': bNeedBasePlatoon='..tostring(bNeedBasePlatoon)) end
-                                if bNeedBasePlatoon == true then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Need a base platoon, checking if we dont ahve an army pool platoon; bIndirectThreatOnly='..tostring(bIndirectThreatOnly)) end
-                                    if not(oBasePlatoon == oArmyPoolPlatoon) then
-                                        oBasePlatoon = oAvailablePlatoon
-                                        bNeedBasePlatoon = false
-                                        if bIndirectThreatOnly then
-                                            if not(sPlan == 'M27IndirectDefender') then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': sPlan='..sPlan..'; refbIdlePlatoon='..tostring(oBasePlatoon[M27PlatoonTemplates.refbIdlePlatoon])) end
-                                                if oBasePlatoon[M27PlatoonTemplates.refbIdlePlatoon] then
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': Have an idle platoon so will create a new platoon as the base platoon and assign it the cufrrent indirectdefenders units') end
-                                                    local tPlatoonUnits = oBasePlatoon:GetPlatoonUnits()
-                                                    if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
-
-                                                        oBasePlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27IndirectDefender', tPlatoonUnits)
-                                                        if bDebugMessages == true then LOG(sFunctionRef..'oBasePlatoon plan='..oBasePlatoon:GetPlan()..'; iPlatoonRef='..iPlatoonRef..'; size of base platoon units='..table.getn(tPlatoonUnits)) end
-                                                        TransferPlatoonTrackers(oAvailablePlatoon, oBasePlatoon)
-                                                    else
-                                                        if bDebugMessages == true then LOG(sFunctionRef..': Base platoon units is empty') end
-                                                        bNeedBasePlatoon = true
-                                                    end
-                                                else
-                                                    oBasePlatoon:SetAIPlan('M27IndirectDefender')
-                                                end
-                                                oDefenderPlatoon = oBasePlatoon
-                                            end
-                                            oBasePlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = true
-                                        else oBasePlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = false
-                                        end
-                                    else
-                                        M27Utilities.ErrorHandler('The first platoon considered wasnt suitable as a base platoon')
-                                    end
-                                end
-
-                                if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; Totalthreat group IDd = '..iCurThreatGroup..'; Cur threat group iEnemyGroup='..iEnemyGroup..'iPlatoonRef='..iPlatoonRef..'; iThreatNeeded='..iThreatNeeded..'; iThreatWanted='..iThreatWanted) end
-                                if bNeedBasePlatoon == false then
-                                    --Check if have at least 1 T1 tank too many (otherwise ignore) - 52 is lowest mass cost of a tank (56 is highest)
-                                    if oDefenderPlatoon[refiTotalThreat] == nil then --e.g. army pool will be nil
-                                        --GetCombatThreatRating(aiBrain, tUnits, bUseBlip, iMassValueOfBlipsOverride)
-                                        oDefenderPlatoon[refiTotalThreat] = M27Logic.GetCombatThreatRating(aiBrain, oDefenderPlatoon:GetPlatoonUnits(), false)
-                                    end
-                                    if bDebugMessages == true then LOG('sPlatoonRef='..sPlatoonRef..'; oDefenderPlatoon[refiTotalThreat]='..oDefenderPlatoon[refiTotalThreat]..'; Defender platoon units='..table.getn(oDefenderPlatoon:GetPlatoonUnits())) end
-                                    if oDefenderPlatoon[refiTotalThreat] - iThreatWanted >= iThresholdToRemoveSpareUnitsAbsolute and oDefenderPlatoon[refiTotalThreat] > (iThreatWanted * iThresholdToRemoveSpareUnitsPercent) then
-                                        --Determine the first nil platoon that hasn't been assigned to merge units into:
-                                        if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; Dont need all of the platoon, locate the first different nil defender platoon so spare units can be assigned to this; iPlatoonRef='..iPlatoonRef) end
-                                        oCombatPlatoonToMergeInto = nil
-                                        for iNilPlatoon, oNilPlatoon in tNilDefenderPlatoons do
-                                            if oNilPlatoon[refsEnemyThreatGroup] == nil then
-                                                if not(oNilPlatoon == oDefenderPlatoon) then oCombatPlatoonToMergeInto = oNilPlatoon break end
+                                --If dealing with a structure threat then dont include platoons with DF units; if dealing with a mobile threat dont include platoons with only indirect units
+                                bPlatoonHasRelevantUnits = false
+                                if bIndirectThreatOnly then
+                                    if oPlatoon[M27PlatoonUtilities.refiIndirectUnits] and oPlatoon[M27PlatoonUtilities.refiIndirectUnits] > 0 then bPlatoonHasRelevantUnits = true end
+                                    --[[
+                                    if sPlan == M27PlatoonTemplates.refoIdleIndirect or sPlan == 'M27IndirectSpareAttacker' then bPlatoonHasRelevantUnits = true
+                                    elseif oPlatoon[M27PlatoonUtilities.refiIndirectUnits] and oPlatoon[M27PlatoonUtilities.refiIndirectUnits] > 0 then
+                                        bPlatoonHasRelevantUnits = true
+                                    end--]]
+                                    --Check that have units of the desired tech level
+                                    if tEnemyThreatGroup[refiThreatGroupHighestTech] > 1 and bPlatoonHasRelevantUnits == true then
+                                        bPlatoonHasRelevantUnits = false
+                                        if oPlatoon[M27PlatoonUtilities.refiIndirectUnits] > 0 then
+                                            --Check we have at least 1 T2 unit in here
+                                            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus, oPlatoon[M27PlatoonUtilities.reftIndirectUnits])) == false then
+                                                bPlatoonHasRelevantUnits = true
                                             end
                                         end
-                                        if oCombatPlatoonToMergeInto == nil then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; About to merge into the army pool platoon') end
-                                            oCombatPlatoonToMergeInto = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
-                                        end
-                                        if oDefenderPlatoon == oArmyPoolPlatoon then
-                                            M27Utilities.ErrorHandler('Defender platoon is army pool')
-                                            if bDebugMessages == true then LOG('oDefenderPlatoon is army pool already, so dont want to try and remove') end
+                                    end
+                                else
+                                    if oPlatoon[M27PlatoonUtilities.refiDFUnits] and oPlatoon[M27PlatoonUtilities.refiDFUnits] > 0 then bPlatoonHasRelevantUnits = true end
+                                    --[[if sPlan == M27PlatoonTemplates.refoIdleCombat then bPlatoonHasRelevantUnits = true
+                                    elseif oPlatoon[M27PlatoonUtilities.refiDFUnits] and oPlatoon[M27PlatoonUtilities.refiDFUnits] > 0 then bPlatoonHasRelevantUnits = true end--]]
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; finished checking if have relevant units for the threat type, bPlatoonHasRelevantUnits='..tostring(bPlatoonHasRelevantUnits)) end
+                                if bPlatoonHasRelevantUnits == true then
+                                    --Only include defender platoons that are closer to our base than enemy threat, and which aren't already dealing with a threat
+                                    if oPlatoon[M27PlatoonUtilities.refiPlatoonCount] == nil then oPlatoon[M27PlatoonUtilities.refiPlatoonCount] = 0 end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering available platoons; iPlatoon='..iPlatoon..'; sPlatoonRef='..sPlatoonRef..'; iEnemyGroup='..iEnemyGroup) end
+                                    --if sPlan == sDefenderPlatoonRef or sPlan == 'M27AttackNearestUnits' or sPlan == M27PlatoonTemplates.refoIdleIndirect or sPlan == 'M27IndirectSpareAttacker' or sPlan == 'M27IndirectDefender' or sPlan == 'M27CombatPatrolAI' then
+                                    tCurPos = M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)
+                                    iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tCurPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                    if iDistToOurBase <= tEnemyThreatGroup[refiDistanceFromOurBase] then
+                                        if oPlatoon[refsEnemyThreatGroup] == nil then
+                                            bPlatoonIsAvailable = true
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Platoons current target is nil so platoon is available; iPlatoon='..iPlatoon) end
                                         else
-                                            if bDebugMessages == true then
-                                                local iPlatoonCount = oDefenderPlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                                                if iPlatoonCount == nil then iPlatoonCount = 'nil' end
-                                                LOG('sPlatoonRef='..sPlatoonRef..'; oDefenderPlatoon count='..iPlatoonCount) end
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Removing spare units from oDefenderPlatoon; iThreatNeeded='..iThreatNeeded..'; oDefenderPlatoon[refiTotalThreat]='..oDefenderPlatoon[refiTotalThreat]..'; size of platoon='..table.getn(oDefenderPlatoon:GetPlatoonUnits())) end
-                                            RemoveSpareUnits(oDefenderPlatoon, iThreatWanted, iMinScouts, iMinMAA, oCombatPlatoonToMergeInto, true)
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Finished removing spare units from oDefenderPlatoon; Platoon Total threat='..oDefenderPlatoon[refiTotalThreat]..'; size of platoon='..table.getn(oDefenderPlatoon:GetPlatoonUnits())) end
-                                            if bIsFirstPlatoon == false then
-                                                --function MergePlatoons(oPlatoonToMergeInto, oPlatoonToBeMerged)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': iPlatoon='..iPlatoon..'; Is busy targetting '..oPlatoon[refsEnemyThreatGroup]..'; curent threat group considering is: '..iEnemyGroup) end
+                                            if sThreatGroup == nil then LOG(repr(aiBrain[reftEnemyThreatGroup])) end
+                                            --aiBrain[reftEnemyThreatGroup][sThreatGroup][refsEnemyGroupName] = sThreatGroup
+                                            if oPlatoon[refsEnemyThreatGroup] == iEnemyGroup then bPlatoonIsAvailable = true end
+                                        end
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Platoon is too far away to be of help; iPlatoon='..iPlatoon..'; sPlatoonRef='..sPlatoonRef..'; iEnemyGroup='..iEnemyGroup..'; iDistToOurBase='..iDistToOurBase..'; tEnemyThreatGroup[refiDistanceFromOurBase]='..tEnemyThreatGroup[refiDistanceFromOurBase]) end
+                                    end
+                                    --else
+                                    --if bDebugMessages == true then LOG(sFunctionRef..': Platoon plan isnt equal to defender plan. iPlatoon='..iPlatoon..'; sPlatoonRef='..sPlatoonRef..'; iEnemyGroup='..iEnemyGroup) end
+                                    --end
+                                    if bPlatoonIsAvailable == true then
+                                        --Does the platoon have the ACU in it? If so remove it (it can get re-added later if an emergency response is required)
+                                        if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true then
+                                            if not(oPlatoon[refsEnemyThreatGroup] == iEnemyGroup) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': ACU is in platoon so will only make platoon available for threat response if ACU is targetting the same threat group') end
+                                                bPlatoonIsAvailable = false
+                                            end
+                                        end
+                                        if bPlatoonIsAvailable == true then
+                                            --Does the platoon have DF units in it but we're targetting structures?
+                                            if oPlatoon[M27PlatoonUtilities.refiDFUnits] > 0 and bIndirectThreatOnly then
+                                                --RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo)
+                                                M27PlatoonUtilities.RemoveUnitsFromPlatoon(oPlatoon, oPlatoon[M27PlatoonUtilities.reftDFUnits], false, nil)
+                                            end
+                                            --Add current platoon details:
+                                            iDistFromEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPos, tEnemyThreatGroup[reftAveragePosition])
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Platoon is available, will record the threat; iAvailableThreat pre updating='..iAvailableThreat) end
+                                            iAvailableThreat, iCurAvailablePlatoons = RecordAvailablePlatoonAndReturnValues(aiBrain, oPlatoon, iAvailableThreat, iCurAvailablePlatoons, tCurPos, iDistFromEnemy, iDistToOurBase, tAvailablePlatoons, tNilDefenderPlatoons, bIndirectThreatOnly)
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Platoon is available, have recorded the threat; iAvailableThreat post updating='..iAvailableThreat) end
+                                        end
+                                    end
+                                end
+                                --end
+                            end
+                        end
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering action based on our threat vs enemy; EnemyThreat='..tEnemyThreatGroup[refiTotalThreat]..'; iAvailableThreat='..iAvailableThreat) end
+
+                        if iAvailableThreat < iThreatNeeded and not(bIndirectThreatOnly) and not(bConsideringNavy) then
+                            --Check if should add ACU to help fight - is enemy relatively close to ACU, relatively close to our start, and ACU is closer to start than enemy?
+                            bGetACUHelp = false
+                            iDistFromEnemy = M27Utilities.GetDistanceBetweenPositions(tACUPos, tEnemyThreatGroup[reftAveragePosition])
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering whether should get ACU to help; iDistFromEnemy ='..iDistFromEnemy) end
+                            if iDistFromEnemy < iACUDistanceToConsider then
+                                if tEnemyThreatGroup[refiDistanceFromOurBase] < iACUEnemyDistanceFromBase then
+                                    iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                    if iDistToOurBase < tEnemyThreatGroup[refiDistanceFromOurBase] then
+                                        --are we closer to our base than enemy?
+                                        if M27Logic.GetNearestEnemyStartNumber(aiBrain) then
+                                            local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                                            if iDistToEnemyBase > 0 and iDistToOurBase / iDistToEnemyBase < 0.85 then bGetACUHelp = true end
+                                        end
+                                    end
+                                end
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': bGetACUHelp='..tostring(bGetACUHelp)..'; if this is false then will check if emergency response required') end
+                            --Check if emergency response required:
+                            if bGetACUHelp == false then
+                                if tEnemyThreatGroup[refiDistanceFromOurBase] < iACUEnemyDistanceFromBase then
+                                    if iThreatNeeded - iAvailableThreat > iEmergencyExcessEnemyThreatNearBase and iThreatNeeded > 0 and iAvailableThreat / iThreatNeeded < 0.85 then
+                                        if iDistToOurBase <= iMaxACUEmergencyThreatRange then
+                                            bGetACUHelp = true
+                                            if bDebugMessages == true then LOG(sFunctionRef..': bGetACUHelp='..tostring(bGetACUHelp)..'; Emergency response is required') end
+                                        end
+                                    end
+                                end
+                            end
+
+
+                            --Check ACU isn't upgrading
+                            if bGetACUHelp == true then
+                                if bDebugMessages == true then LOG(sFunctionRef..': checking if ACU is upgrading') end
+                                if oACU:IsUnitState('Upgrading') == true then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': ACU is upgrading so dont want it to help') end
+                                    bGetACUHelp = false
+                                end
+                            end
+                            --Check ACU hasn't finished its gun upgrade (want both for aeon):
+                            if bGetACUHelp == true then
+                                if M27Conditions.DoesACUHaveGun(aiBrain, true) == true then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': ACU has gun upgrade so dont want it to help as it should be attacking') end
+                                    bGetACUHelp = false end
+                            end
+                            --Check ACU doesnt have nearby enemies
+                            if bGetACUHelp == true then
+                                if oACU.PlatoonHandle and oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0 then
+                                    local iEnemySearchRange = math.max(22, M27Logic.GetUnitMaxGroundRange({oACU}))
+                                    local tEnemiesNearACU = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, oACU:GetPosition(), iEnemySearchRange, 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tEnemiesNearACU) == false then bGetACUHelp = false end
+                                end
+                            end
+
+                            oACU[refbACUHelpWanted] = bGetACUHelp
+                            -- v15 - decided to instead use the ACUMain platoon logic and just change the movement path as having too many issues with ACU logic getting messed up
+                            --[[
+                            if bGetACUHelp == true then
+
+                                --Check if ACU not already in a defender platoon:
+                                sACUPlan = DebugPrintACUPlatoon(aiBrain, true)
+                                if not(sACUPlan == sDefenderPlatoonRef) then
+                                    --Flag that ACU has been added to defenders if its using the main AI
+                                    aiBrain[refbACUWasDefending] = true
+                                    --Add ACU to defenders
+
+
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Getting ACU threat rating before adding to defenders; iAvailableThreat before adding ACU='..iAvailableThreat) end
+                                    local oACUPlatoon = oACU.PlatoonHandle
+                                    if oACUPlatoon == nil then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': oACUs platoon handle is nil, creating new plan for ACU') end
+                                        oACUPlatoon = aiBrain:MakePlatoon('', '')
+                                        aiBrain:AssignUnitsToPlatoon(oACUPlatoon, {oACU},'Attack', 'None')
+                                        oACUPlatoon:SetAIPlan(sDefenderPlatoonRef)
+
+                                        if bDebugMessages == true then
+                                            local iPlatoonCount = oACUPlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                            if iPlatoonCount == nil then iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['sDefenderPlatoonRef']
+                                                if iPlatoonCount == nil then iPlatoonCount = 1
+                                                else iPlatoonCount = iPlatoonCount + 1 end
+                                            end
+                                            LOG(sFunctionRef..': Created new defender platoon to be used, platoon name+count='..sDefenderPlatoonRef..iPlatoonCount)
+                                        end
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU will help so have enough threat; iAvailableThreat before adding ACU='..iAvailableThreat..'; changing ACUs plan to use defender plan') end
+                                        oACU.PlatoonHandle:SetAIPlan(sDefenderPlatoonRef)
+                                    end
+                                    iAvailableThreat, iCurAvailablePlatoons = RecordAvailablePlatoonAndReturnValues(aiBrain, oACU.PlatoonHandle, iAvailableThreat, iCurAvailablePlatoons, tACUPos, iDistFromEnemy, iDistToOurBase, tAvailablePlatoons, tNilDefenderPlatoons, bIndirectThreatOnly)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iAvailableThreat after adding ACU to available platoons='..iAvailableThreat) end
+                                    --iAvailableThreat = iAvailableThreat + M27Logic.GetCombatThreatRating(aiBrain, {oACU}, false)
+
+                                end
+                            end --]]
+                            if bDebugMessages == true then LOG(sFunctionRef..': Finished considering if ACU should help; bGetACUHelp='..tostring(bGetACUHelp)) end
+                        else
+                            --Threat higher than needed, so flag that don't need ACU help
+                            oACU[refbACUHelpWanted] = false
+                        end
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished identifying all platoons/units that can help deal with the threat, now will decide on what action to take; iAvailableThreat='..iAvailableThreat..'; iThreatNeeded='..iThreatNeeded) end
+                        --Now that have all available units, decide on action based on enemy threat
+                        --First update trackers - want to base on whether we have all the units we want to respond to the threat (rather than whether we have just enough units to attack)
+                        if iAvailableThreat < iThreatWanted then
+                            local iCurModDistToEnemyBase = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tEnemyThreatGroup[reftAveragePosition], true)
+                            --M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                            aiBrain[refiModDistFromStartNearestOutstandingThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
+                            aiBrain[refiPercentageOutstandingThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart] / (tEnemyThreatGroup[refiModDistanceFromOurStart] + iCurModDistToEnemyBase)
+                            aiBrain[refiMinIndirectTechLevel] = 1 --default
+                            if bIndirectThreatOnly then
+                                aiBrain[refbNeedIndirect] = true
+                                aiBrain[refbNeedDefenders] = false
+                                if tEnemyThreatGroup[refiThreatGroupHighestTech] >= 2 then aiBrain[refiMinIndirectTechLevel] = math.min(tEnemyThreatGroup[refiThreatGroupHighestTech], 3) end
+                            else
+                                aiBrain[refbNeedDefenders] = true --will assign more units to defender platoon
+                                aiBrain[refbNeedIndirect] = false
+                            end
+                        else
+                            if iEnemyGroup >= iTotalEnemyThreatGroups then
+                                --is the furthest away enemy threat group and we can beat it, so we have full defensive coverage; will set to 90% to avoid trying to e.g. get mexes in the enemy base itself
+                                aiBrain[refiPercentageOutstandingThreat] = 0.9
+                                aiBrain[refiModDistFromStartNearestOutstandingThreat] = aiBrain[refiDistanceToNearestEnemyBase]
+                            end
+                        end
+
+                        --Now decide whether we will attack with the platoon, based on whether we have the minimum threat needed
+                        if iAvailableThreat < iThreatNeeded and bGetACUHelp == false then
+
+                            --Dont have enough units yet, so get units in position so when have enough can respond
+                            --Go to midpoint, or if enemy too close then to base
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough threat to deal with enemy - iAvailableThreat='..iAvailableThreat..'; iThreatNeeded='..iThreatNeeded..'; set refbNeedDefenders to true; getting rally point for any available platoons to retreat to') end
+                            --if bDebugMessages == true then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(M27Utilities.GetACU(aiBrain))) end
+                            tRallyPoint = {}
+                            if tEnemyThreatGroup[refiDistanceFromOurBase] > 60 then
+                                tRallyPoint[1] = (tEnemyThreatGroup[reftAveragePosition][1] + M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1]) / 2
+                                tRallyPoint[3] = (tEnemyThreatGroup[reftAveragePosition][3] + M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]) / 2
+                                tRallyPoint[2] = GetTerrainHeight(tRallyPoint[1], tRallyPoint[3])
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy is clsoe to our base, so rally point is our base') end
+                                tRallyPoint = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber] end
+                            for iPlatoon, oPlatoon in tAvailablePlatoons do
+                                oPlatoon[refsEnemyThreatGroup] = nil
+                                if not(oPlatoon==oArmyPoolPlatoon) then --redundancy/from old code - armypool shouldnt be in availableplatoons any more
+                                    oPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
+                                    if M27Utilities.IsTableEmpty(oPlatoon[M27PlatoonUtilities.reftMovementPath]) == false and M27Utilities.GetDistanceBetweenPositions((oPlatoon[M27PlatoonUtilities.reftMovementPath][(oPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] or 1)] or {0,0,0}), (tRallyPoint or {0,0,0})) > 10 then
+                                        M27PlatoonUtilities.ForceActionRefresh(oPlatoon)
+                                        oPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                    elseif M27Utilities.IsTableEmpty(oPlatoon[M27PlatoonUtilities.reftMovementPath]) then oPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                    end
+                                    oPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tRallyPoint
+                                    oPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
+                                    --oPlatoon[M27PlatoonUtilities.refiLastPathTarget] = 1
+                                    oPlatoon[M27PlatoonUtilities.refbOverseerAction] = true
+                                    --IssueClearCommands(oPlatoon:GetPlatoonUnits())
+                                    if bDebugMessages == true then
+                                        local iPlatoonCount = oPlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                        if iPlatoonCount == nil then iPlatoonCount = 'nil' end
+                                        LOG(sFunctionRef..': Given override action and Set tMovementPath[1] to tRallyPoint='..tRallyPoint[1]..'-'..tRallyPoint[3]..' and then stop looking at remaining threats; iPlatoon='..iPlatoon..'; PlatoonCount='..iPlatoonCount) end
+                                else
+                                    M27Utilities.ErrorHandler('oPlatoon is army pool')
+                                    --Armypool platoon - do nothing - shouldve already had combat units added to an available platoon; rely on new platoons being created soon that get sent commands (as if try issuing commands to army pool it can stop platoons being created)
+                                end
+                            end
+                            bIgnoreRemainingLandThreats = true
+                        else
+
+                            --Can beat enemy (or for indirect may be able to beat them, or if ACU helping then we have to try to beat them) so attack them - filter to just those platoons that need to deal with the threat if we have more than what is needed:
+                            --if iAvailableThreat >= iThreatWanted then
+                            --Only need some of the platoon units, pick the ones nearest the enemy
+                            --tAvailablePlatoons =
+                            --M27Utilities.SortTableBySubtable(tAvailablePlatoons, refiActualDistanceFromEnemy, true)
+                            --end
+                            iMinScouts = 1 --Want to make sure defender platoon has at least 1 scout if one is available
+                            iMinMAA = 1 --as per scouts
+                            bIsFirstPlatoon = true
+                            --TODO - if run into performance issues could see if it works by setting a new variable equal to the sorted table where need sorting, and not where don't need sorting; however may not work as repeated calls to a variable that uses the sorttables causes errors since sorttables is a function of a table
+                            local bNeedBasePlatoon = true
+                            bAddedUnitsToPlatoon = false
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have enough threat to respond, will now sort platoons to find the nearest one; available platoon size='..table.getn(tAvailablePlatoons)) end
+                            local bRefreshPlatoonAction
+                            for iPlatoonRef, oAvailablePlatoon in M27Utilities.SortTableBySubtable(tAvailablePlatoons, refiActualDistanceFromEnemy, true) do
+                                --for iCurPlatoon = 1, iCurAvailablePlatoons do
+                                bRefreshPlatoonAction = false
+                                if bDebugMessages == true then LOG(sFunctionRef..': iPlatoonRef='..iPlatoonRef..'; platoon unit count='..table.getn(oAvailablePlatoon:GetPlatoonUnits())) end
+                                sPlan = oAvailablePlatoon:GetPlan()
+                                iPlatoonNumber = oAvailablePlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                if iPlatoonNumber == nil then iPlatoonNumber = 0 end
+                                sPlatoonRef = sPlan..iPlatoonNumber
+
+                                oDefenderPlatoon = oAvailablePlatoon--tAvailablePlatoons[iPlatoonRef]
+                                if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; iThreatWanted='..iThreatWanted..'; bNeedBasePlatoon='..tostring(bNeedBasePlatoon)..'; units in platoon='..table.getn(oAvailablePlatoon:GetPlatoonUnits())) end
+                                if iThreatWanted <= 0 then
+                                    --Ensure platoon is available to target other platoons as it's not needed for this one
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Threat wanted is <= 0 so making platoon available for other threat groups') end
+                                    oAvailablePlatoon[refsEnemyThreatGroup] = nil
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': bNeedBasePlatoon='..tostring(bNeedBasePlatoon)) end
+                                    if bNeedBasePlatoon == true then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Need a base platoon, checking if we dont ahve an army pool platoon; bIndirectThreatOnly='..tostring(bIndirectThreatOnly)) end
+                                        if not(oBasePlatoon == oArmyPoolPlatoon) then
+                                            oBasePlatoon = oAvailablePlatoon
+                                            bNeedBasePlatoon = false
+                                            if bIndirectThreatOnly then
+                                                if not(sPlan == 'M27IndirectDefender') then
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': sPlan='..sPlan..'; refbIdlePlatoon='..tostring(oBasePlatoon[M27PlatoonTemplates.refbIdlePlatoon])) end
+                                                    if oBasePlatoon[M27PlatoonTemplates.refbIdlePlatoon] then
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Have an idle platoon so will create a new platoon as the base platoon and assign it the cufrrent indirectdefenders units') end
+                                                        local tPlatoonUnits = oBasePlatoon:GetPlatoonUnits()
+                                                        if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
+
+                                                            oBasePlatoon = M27PlatoonFormer.CreatePlatoon(aiBrain, 'M27IndirectDefender', tPlatoonUnits)
+                                                            if bDebugMessages == true then LOG(sFunctionRef..'oBasePlatoon plan='..oBasePlatoon:GetPlan()..'; iPlatoonRef='..iPlatoonRef..'; size of base platoon units='..table.getn(tPlatoonUnits)) end
+                                                            TransferPlatoonTrackers(oAvailablePlatoon, oBasePlatoon)
+                                                        else
+                                                            if bDebugMessages == true then LOG(sFunctionRef..': Base platoon units is empty') end
+                                                            bNeedBasePlatoon = true
+                                                        end
+                                                    else
+                                                        oBasePlatoon:SetAIPlan('M27IndirectDefender')
+                                                    end
+                                                    oDefenderPlatoon = oBasePlatoon
+                                                end
+                                                oBasePlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = true
+                                            else oBasePlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = false
+                                            end
+                                        else
+                                            M27Utilities.ErrorHandler('The first platoon considered wasnt suitable as a base platoon')
+                                        end
+                                    end
+
+                                    if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; Totalthreat group IDd = '..iCurThreatGroup..'; Cur threat group iEnemyGroup='..iEnemyGroup..'iPlatoonRef='..iPlatoonRef..'; iThreatNeeded='..iThreatNeeded..'; iThreatWanted='..iThreatWanted) end
+                                    if bNeedBasePlatoon == false then
+                                        --Check if have at least 1 T1 tank too many (otherwise ignore) - 52 is lowest mass cost of a tank (56 is highest)
+                                        if oDefenderPlatoon[refiTotalThreat] == nil then --e.g. army pool will be nil
+                                            --GetCombatThreatRating(aiBrain, tUnits, bUseBlip, iMassValueOfBlipsOverride)
+                                            oDefenderPlatoon[refiTotalThreat] = M27Logic.GetCombatThreatRating(aiBrain, oDefenderPlatoon:GetPlatoonUnits(), false)
+                                        end
+                                        if bDebugMessages == true then LOG('sPlatoonRef='..sPlatoonRef..'; oDefenderPlatoon[refiTotalThreat]='..oDefenderPlatoon[refiTotalThreat]..'; Defender platoon units='..table.getn(oDefenderPlatoon:GetPlatoonUnits())) end
+                                        if oDefenderPlatoon[refiTotalThreat] - iThreatWanted >= iThresholdToRemoveSpareUnitsAbsolute and oDefenderPlatoon[refiTotalThreat] > (iThreatWanted * iThresholdToRemoveSpareUnitsPercent) then
+                                            --Determine the first nil platoon that hasn't been assigned to merge units into:
+                                            if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; Dont need all of the platoon, locate the first different nil defender platoon so spare units can be assigned to this; iPlatoonRef='..iPlatoonRef) end
+                                            oCombatPlatoonToMergeInto = nil
+                                            for iNilPlatoon, oNilPlatoon in tNilDefenderPlatoons do
+                                                if oNilPlatoon[refsEnemyThreatGroup] == nil then
+                                                    if not(oNilPlatoon == oDefenderPlatoon) then oCombatPlatoonToMergeInto = oNilPlatoon break end
+                                                end
+                                            end
+                                            if oCombatPlatoonToMergeInto == nil then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; About to merge into the army pool platoon') end
+                                                oCombatPlatoonToMergeInto = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
+                                            end
+                                            if oDefenderPlatoon == oArmyPoolPlatoon then
+                                                M27Utilities.ErrorHandler('Defender platoon is army pool')
+                                                if bDebugMessages == true then LOG('oDefenderPlatoon is army pool already, so dont want to try and remove') end
+                                            else
                                                 if bDebugMessages == true then
-                                                    local iPlatoonCount = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                                    local iPlatoonCount = oDefenderPlatoon[M27PlatoonUtilities.refiPlatoonCount]
                                                     if iPlatoonCount == nil then iPlatoonCount = 'nil' end
-                                                    LOG(sFunctionRef..': About to merge remaining units in defender platoon into base platoon; oBasePlatoon Count='..iPlatoonCount) end
+                                                    LOG('sPlatoonRef='..sPlatoonRef..'; oDefenderPlatoon count='..iPlatoonCount) end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Removing spare units from oDefenderPlatoon; iThreatNeeded='..iThreatNeeded..'; oDefenderPlatoon[refiTotalThreat]='..oDefenderPlatoon[refiTotalThreat]..'; size of platoon='..table.getn(oDefenderPlatoon:GetPlatoonUnits())) end
+                                                RemoveSpareUnits(oDefenderPlatoon, iThreatWanted, iMinScouts, iMinMAA, oCombatPlatoonToMergeInto, true)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Finished removing spare units from oDefenderPlatoon; Platoon Total threat='..oDefenderPlatoon[refiTotalThreat]..'; size of platoon='..table.getn(oDefenderPlatoon:GetPlatoonUnits())) end
+                                                if bIsFirstPlatoon == false then
+                                                    --function MergePlatoons(oPlatoonToMergeInto, oPlatoonToBeMerged)
+                                                    if bDebugMessages == true then
+                                                        local iPlatoonCount = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                                        if iPlatoonCount == nil then iPlatoonCount = 'nil' end
+                                                        LOG(sFunctionRef..': About to merge remaining units in defender platoon into base platoon; oBasePlatoon Count='..iPlatoonCount) end
+                                                    M27PlatoonUtilities.MergePlatoons(oBasePlatoon, oDefenderPlatoon)
+                                                    bAddedUnitsToPlatoon = true
+                                                end
+                                            end
+                                            iThreatWanted = 0
+                                            iThreatNeeded = 0
+                                            bIgnoreRemainingLandThreats = true
+                                        else
+                                            --need all of platoon:
+                                            if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; About to adjust threat needed for the threat of the available platoon that have just used; iEnemyThreat='..iEnemyGroup..'; iPlatoonRef='..iPlatoonRef..'; iThreatNeeded='..iThreatNeeded..'; oDefenderPlatoon[refiTotalThreat]='..oDefenderPlatoon[refiTotalThreat]) end
+                                            iThreatNeeded = iThreatNeeded - oDefenderPlatoon[refiTotalThreat]
+                                            iThreatWanted = iThreatWanted - oDefenderPlatoon[refiTotalThreat]
+                                            if iThreatWanted <= 0 then bNoMorePlatoons = true end
+                                            if bIsFirstPlatoon == false then
                                                 M27PlatoonUtilities.MergePlatoons(oBasePlatoon, oDefenderPlatoon)
                                                 bAddedUnitsToPlatoon = true
                                             end
                                         end
-                                        iThreatWanted = 0
-                                        iThreatNeeded = 0
-                                        bIgnoreRemainingLandThreats = true
-                                    else
-                                        --need all of platoon:
-                                        if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; About to adjust threat needed for the threat of the available platoon that have just used; iEnemyThreat='..iEnemyGroup..'; iPlatoonRef='..iPlatoonRef..'; iThreatNeeded='..iThreatNeeded..'; oDefenderPlatoon[refiTotalThreat]='..oDefenderPlatoon[refiTotalThreat]) end
-                                        iThreatNeeded = iThreatNeeded - oDefenderPlatoon[refiTotalThreat]
-                                        iThreatWanted = iThreatWanted - oDefenderPlatoon[refiTotalThreat]
-                                        if iThreatWanted <= 0 then bNoMorePlatoons = true end
-                                        if bIsFirstPlatoon == false then
-                                            M27PlatoonUtilities.MergePlatoons(oBasePlatoon, oDefenderPlatoon)
-                                            bAddedUnitsToPlatoon = true
-                                        end
                                     end
                                 end
-                            end
-                            if bIgnoreRemainingLandThreats == false and oBasePlatoon and oBasePlatoon.GetPlatoonUnits then
-                                local tBasePlatoonUnits = oBasePlatoon:GetPlatoonUnits()
-                                if M27Utilities.IsTableEmpty(tBasePlatoonUnits) == false then
-                                    if iMinScouts > 0 then
-                                        if not(EntityCategoryFilterDown(categories.SCOUT, tBasePlatoonUnits) == nil) then iMinScouts = 0 end
-                                    end
-                                    if iMinMAA > 0 then
-                                        if not(EntityCategoryFilterDown(categories.ANTIAIR, tBasePlatoonUnits) == nil) then iMinMAA = 0 end
-                                    end
-                                    if not(oBasePlatoon == oArmyPoolPlatoon) then bIsFirstPlatoon = false end
+                                if bIgnoreRemainingLandThreats == false and oBasePlatoon and oBasePlatoon.GetPlatoonUnits then
+                                    local tBasePlatoonUnits = oBasePlatoon:GetPlatoonUnits()
+                                    if M27Utilities.IsTableEmpty(tBasePlatoonUnits) == false then
+                                        if iMinScouts > 0 then
+                                            if not(EntityCategoryFilterDown(categories.SCOUT, tBasePlatoonUnits) == nil) then iMinScouts = 0 end
+                                        end
+                                        if iMinMAA > 0 then
+                                            if not(EntityCategoryFilterDown(categories.ANTIAIR, tBasePlatoonUnits) == nil) then iMinMAA = 0 end
+                                        end
+                                        if not(oBasePlatoon == oArmyPoolPlatoon) then bIsFirstPlatoon = false end
+                                    else iMinScouts = 0 iMinMAA = 0 end
                                 else iMinScouts = 0 iMinMAA = 0 end
-                            else iMinScouts = 0 iMinMAA = 0 end
-                        end
-                        --Base platoon should now be able to beat enemy (or shoudl at least try to if ACU is helping)
-                        if bIgnoreRemainingLandThreats == false and oBasePlatoon == nil then
-                            if bGetACUHelp == false then M27Utilities.ErrorHandler('oBasePlatoon is nil but had thought could beat the enemy, and ACU isnt part of attack - likely error') end
-                        elseif bIgnoreRemainingLandThreats == false then
-                            if oBasePlatoon == oArmyPoolPlatoon then
-                                M27Utilities.ErrorHandler('WARNING - oArmyPoolPlatoon is oBasePlatoon - will abort threat intereception logic and flag that want defender platoons to be created')
-                                if table.getn(tAvailablePlatoons) <= 1 then aiBrain[refbNeedDefenders] = true end
-                            else
-                                if (oBasePlatoon[refiTotalThreat] or 0) > 0 and M27Utilities.IsTableEmpty(oBasePlatoon:GetPlatoonUnits()) == false then
-                                    if oBasePlatoon:GetPlan() == nil then
-                                        LOG(sFunctionRef..': ERROR - oBasePlatoons plan is nil, will set to be the defender AI, bIndirectThreatOnly='..tostring(bIndirectThreatOnly))
-                                        if bIndirectThreatOnly then
-                                            oBasePlatoon:SetAIPlan('M27IndirectDefender')
-                                            oBasePlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = true
-                                        else oBasePlatoon:SetAIPlan(sDefenderPlatoonRef) end
-                                    end
-                                    sPlan = oBasePlatoon:GetPlan()
-                                    iPlatoonNumber = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                                    if iPlatoonNumber == nil then iPlatoonNumber = 0 end
-                                    sPlatoonRef = sPlan..iPlatoonNumber
-                                    oBasePlatoon[reftAveragePosition] = oBasePlatoon:GetPlatoonPosition()
-                                    if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; Base platoon av position='..repr(oBasePlatoon[reftAveragePosition])..'; tEnemyThreatGroup[reftAveragePosition]='..repr(tEnemyThreatGroup[reftAveragePosition])) end
-                                    oBasePlatoon[refiActualDistanceFromEnemy] = M27Utilities.GetDistanceBetweenPositions(oBasePlatoon[reftAveragePosition], tEnemyThreatGroup[reftAveragePosition])
-                                    bRefreshPlatoonAction = true
-                                    if bDebugMessages == true then LOG(sFunctionRef..': BasePlatoonRef='..sPlatoonRef..': Considering whether base platoon should have an overseer action override. bAddedUnitsToPlatoon='..tostring(bAddedUnitsToPlatoon)..'; base platoon size='..table.getn(oBasePlatoon:GetPlatoonUnits())) end
-                                    --if not(bAddedUnitsToPlatoon) then
-                                    local iOverseerRefreshCountThreshold = 4
-                                    if oBasePlatoon[M27PlatoonUtilities.refbHoverInPlatoon] then iOverseerRefreshCountThreshold = iOverseerRefreshCountThreshold + 5 end
-                                    if bIndirectThreatOnly == true then iOverseerRefreshCountThreshold = 9 end
-                                    if M27Utilities.IsTableEmpty(oBasePlatoon[M27PlatoonUtilities.reftPrevAction]) == false then
-                                        local iPrevAction = oBasePlatoon[M27PlatoonUtilities.reftPrevAction][1]
-                                        if iPrevAction == M27PlatoonUtilities.refActionRun or iPrevAction == M27PlatoonUtilities.refActionTemporaryRetreat or iPrevAction == M27PlatoonUtilities.refActionAttack then
-                                            bRefreshPlatoonAction = false
-                                        elseif oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] and oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] <= iOverseerRefreshCountThreshold then
-                                            bRefreshPlatoonAction = false
-                                        end
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Base platoon has at least 1 previous action, iPrevAction='..iPrevAction..'; bRefreshPlatoonAction='..tostring(bRefreshPlatoonAction)..'; oBasePlatoon[M27PlatoonUtilities.refbOverseerAction]='..tostring(oBasePlatoon[M27PlatoonUtilities.refbOverseerAction])) end
-                                    end
-                                    --end
-
-                                    if bRefreshPlatoonAction == true then
-                                        oBasePlatoon[M27PlatoonUtilities.refbOverseerAction] = true
-                                        if bDebugMessages == true then
-                                            local iPlatoonCount = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                                            if iPlatoonCount == nil then iPlatoonCount = 'nil' end
-                                            LOG(sFunctionRef..': Given override action to Base platoon sPlatoonRef='..sPlatoonRef..'; About to issue new orders to oBasePlatoon; oBasePlatoon count='..iPlatoonCount..'; oBasePlatoon[refiActualDistanceFromEnemy]='..oBasePlatoon[refiActualDistanceFromEnemy])
-                                        end
-                                        if oBasePlatoon[refiActualDistanceFromEnemy] <= 30 then
-                                            --if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; Telling base platoon to have actionattack') end
-                                            oBasePlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionAttack
-                                            --oBasePlatoon[M27PlatoonUtilities.refiEnemiesInRange] = tEnemyThreatGroup[refiEnemyThreatGroupUnitCount]
-                                            --oBasePlatoon[M27PlatoonUtilities.reftEnemiesInRange] = tEnemyThreatGroup[refoEnemyGroupUnits]
-                                            if bAddedUnitsToPlatoon == true then M27PlatoonUtilities.ForceActionRefresh(oBasePlatoon) end
-                                        else
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; Telling base platoon to refresh its movement path') end
-                                            M27PlatoonUtilities.ForceActionRefresh(oBasePlatoon)
-                                            oBasePlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
-                                        end
-                                    end
-                                    --IssueClearCommands(oBasePlatoon:GetPlatoonUnits())
-                                    oBasePlatoon[M27PlatoonUtilities.reftMovementPath] = {}
-                                    oBasePlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftAveragePosition]
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; oBasePlatoon now has movementpath='..repr(oBasePlatoon[M27PlatoonUtilities.reftMovementPath])) end
-                                    oBasePlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
-                                    --oBasePlatoon[M27PlatoonUtilities.refiLastPathTarget] = 1
-                                    oBasePlatoon[refsEnemyThreatGroup] = iEnemyGroup
-                                    --Free up any spare scouts and MAA post-platoon merger:
-                                    RemoveSpareNonCombatUnits(oBasePlatoon)
-                                    --Remove DF units if are attacking a structure
-                                    if sPlan == 'M27IndirectDefender' and oBasePlatoon[M27PlatoonUtilities.refiDFUnits] and oBasePlatoon[M27PlatoonUtilities.refiDFUnits] > 0 then M27PlatoonUtilities.RemoveUnitsFromPlatoon(oBasePlatoon, oBasePlatoon[M27PlatoonUtilities.reftDFUnits], nil, nil) end
-                                    --Set whether should move in formation or rush towards enemy
-                                    local sCurFormation = 'AttackFormation'
-                                    if tEnemyThreatGroup[refiDistanceFromOurBase] <= 60 then sCurFormation = 'GrowthFormation'
-                                    elseif oBasePlatoon[refiActualDistanceFromEnemy] <= 35 then sCurFormation = 'GrowthFormation'
-                                    end
-                                    oBasePlatoon:SetPlatoonFormationOverride(sCurFormation)
+                            end
+                            --Base platoon should now be able to beat enemy (or shoudl at least try to if ACU is helping)
+                            if bIgnoreRemainingLandThreats == false and oBasePlatoon == nil then
+                                if bGetACUHelp == false then M27Utilities.ErrorHandler('oBasePlatoon is nil but had thought could beat the enemy, and ACU isnt part of attack - likely error') end
+                            elseif bIgnoreRemainingLandThreats == false then
+                                if oBasePlatoon == oArmyPoolPlatoon then
+                                    M27Utilities.ErrorHandler('WARNING - oArmyPoolPlatoon is oBasePlatoon - will abort threat intereception logic and flag that want defender platoons to be created')
+                                    if table.getn(tAvailablePlatoons) <= 1 then aiBrain[refbNeedDefenders] = true end
                                 else
-                                    if bGetACUHelp == false then M27Utilities.ErrorHandler('oBasePlatoon is nil but had thought could beat the enemy, and ACU isnt part of attack - likely error') end
-                                end
-                            end
-                        end
-                        if bGetACUHelp then
-                            --Make sure ACU is moving where we want already; if not then tell it to
-                            local oACUPlatoon = M27Utilities.GetACU(aiBrain).PlatoonHandle
-                            if oACUPlatoon and M27Utilities.IsACU(M27Utilities.GetACU(aiBrain)) then
-                                if M27Utilities.IsTableEmpty(oACUPlatoon[M27PlatoonUtilities.reftMovementPath][oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget]]) or M27Utilities.GetDistanceBetweenPositions(oACUPlatoon[M27PlatoonUtilities.reftMovementPath][oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget]], tEnemyThreatGroup[reftAveragePosition]) > 10 then
-                                    --ACU isnt moving near where we want it to, update its movement path if it doesnt have nearby enemies
-                                    if oACUPlatoon[M27PlatoonUtilities.refiEnemiesInRange] == 0 or M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE, M27Utilities.GetACU(aiBrain):GetPosition(), 23, 'Enemy')) == true then --ACU range is 22
-                                        oACUPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftAveragePosition]
-                                        oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
-                                        oACUPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
-                                        oACUPlatoon[M27PlatoonUtilities.refbOverseerAction] = true
-                                    end
-                                end
-                            end
-                        end
-                    end --Available threat vs enemy threat
-                else
-                    --NAVAL THREAT RESPONSE
-                    --Dealing with navy; Torpedo bombers are only made available if they have current targets; therefore in contrast to land appraoch which always updates, torp bomber response to navy threat is 1-off
-                    --However, to make sure we only build torp bombers when we need them, we still need to go through the full process of working out how large a threat we havent dealt with
-                    --Alreayd determiend above:
-                    --iThreatNeeded = tEnemyThreatGroup[refiTotalThreat]
-                    --iThreatWanted = tEnemyThreatGroup[refiHighestThreatRecorded] * iThreatMaxFactor
-                    --tEnemyThreatGroup[reftAveragePosition]
-                    local tTorpBombersByDistance = {}
-                    local iAvailableTorpBombers = 0
-                    local refoTorpUnit = 'M27OTorp'
-                    local refiCurThreat = 'M27OTorThreat'
-                    if bDebugMessages == true then LOG(sFunctionRef..': About to consider if we have any available torp bombers and if so assign them to enemy naval threat') end
-                    --tAvailablePlatoons, refiActualDistanceFromEnemy
-
-
-
-                    if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) == false then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Number of available torp bombers='..table.getn(aiBrain[M27AirOverseer.reftAvailableTorpBombers])) end
-                        --Determine closest available torpedo bombers (unless we should only target ACU)
-                        if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[refoLastNearestACU]) == true then
-                            --Do nothing (logic is in air overseer)
-                        else
-                            for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTorpBombers] do
-                                if not(oUnit.Dead) and not(oUnit[M27AirOverseer.refbOnAssignment]) then
-                                    iAvailableTorpBombers = iAvailableTorpBombers + 1
-                                    tTorpBombersByDistance[iAvailableTorpBombers] = {}
-                                    tTorpBombersByDistance[iAvailableTorpBombers][refoTorpUnit] = oUnit
-                                    tTorpBombersByDistance[iAvailableTorpBombers][refiActualDistanceFromEnemy] = M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], oUnit:GetPosition())
-                                    --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
-                                    tTorpBombersByDistance[iAvailableTorpBombers][refiCurThreat] = M27Logic.GetAirThreatLevel(aiBrain, { oUnit }, false, false, false, false, false, nil, nil, nil, nil, true)
-                                    iAvailableThreat = iAvailableThreat + tTorpBombersByDistance[iAvailableTorpBombers][refiCurThreat]
-                                end
-                            end
-                        end
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': After going through any available torp bombers iAvailableThreat='..iAvailableThreat..'; iThreatNeeded='..iThreatNeeded) end
-                    if (iAvailableThreat >= iThreatNeeded and not(bACUNeedsTorpSupport)) or (bACUNeedsTorpSupport and iAvailableTorpBombers > 1) then--and (not(bACUNeedsTorpSupport) or iAvailableTorpBombers >= 3) then
-                        for iEntry, tTorpSubtable in M27Utilities.SortTableBySubtable(tTorpBombersByDistance, refiActualDistanceFromEnemy, true) do
-                            --Cycle through each enemy unit in the threat group
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering torp bomber '..tTorpSubtable[refoTorpUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..'; tTorpSubtable[refiCurThreat]='..(tTorpSubtable[refiCurThreat] or 0)..'; about to cycle through every enemy unit in threat group to see if should attack one of them') end
-                            local iMaxRangeToSendTorps
-                            local iMaxAngleDifToSendTorps
-                            local iAngleFromBaseToACU
-                            if bACUNeedsTorpSupport then
-                                iMaxRangeToSendTorps = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetACU(aiBrain):GetPosition()) + 90
-                                iAngleFromBaseToACU = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetACU(aiBrain):GetPosition())
-                                iMaxAngleDifToSendTorps = 25
-                            end
-
-
-
-                            for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
-                                if not(bACUNeedsTorpSupport) or (oUnit[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (oUnit[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iAssignedThreat='..(oUnit[iArmyIndex][refiAssignedThreat] or 0)..'; oUnit[iArmyIndex][refiUnitNavalAAThreat]='..(oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0)..'; iNavalThreatMaxFactor='..iNavalThreatMaxFactor) end
-                                    if oUnit[iArmyIndex][refiAssignedThreat] <= iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat] then
-                                        oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
-                                        IssueClearCommands({tTorpSubtable[refoTorpUnit]})
-                                        IssueAttack({tTorpSubtable[refoTorpUnit]}, oUnit)
-                                        M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1)
-                                        for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
-                                            IssueAttack({tTorpSubtable[refoTorpUnit]}, oUnit)
+                                    if (oBasePlatoon[refiTotalThreat] or 0) > 0 and M27Utilities.IsTableEmpty(oBasePlatoon:GetPlatoonUnits()) == false then
+                                        if oBasePlatoon:GetPlan() == nil then
+                                            LOG(sFunctionRef..': ERROR - oBasePlatoons plan is nil, will set to be the defender AI, bIndirectThreatOnly='..tostring(bIndirectThreatOnly))
+                                            if bIndirectThreatOnly then
+                                                oBasePlatoon:SetAIPlan('M27IndirectDefender')
+                                                oBasePlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = true
+                                            else oBasePlatoon:SetAIPlan(sDefenderPlatoonRef) end
                                         end
-                                        IssueAggressiveMove({tTorpSubtable[refoTorpUnit]}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                        tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Clearing torp bomber and then Telling torpedo bomber with ID ref='..tTorpSubtable[refoTorpUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..' to attack '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; GameTime='..GetGameTimeSeconds()) end
-                                        iAvailableTorpBombers = iAvailableTorpBombers - 1
-                                        break
+                                        sPlan = oBasePlatoon:GetPlan()
+                                        iPlatoonNumber = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                        if iPlatoonNumber == nil then iPlatoonNumber = 0 end
+                                        sPlatoonRef = sPlan..iPlatoonNumber
+                                        oBasePlatoon[reftAveragePosition] = oBasePlatoon:GetPlatoonPosition()
+                                        if bDebugMessages == true then LOG(sFunctionRef..': sPlatoonRef='..sPlatoonRef..'; Base platoon av position='..repr(oBasePlatoon[reftAveragePosition])..'; tEnemyThreatGroup[reftAveragePosition]='..repr(tEnemyThreatGroup[reftAveragePosition])) end
+                                        oBasePlatoon[refiActualDistanceFromEnemy] = M27Utilities.GetDistanceBetweenPositions(oBasePlatoon[reftAveragePosition], tEnemyThreatGroup[reftAveragePosition])
+                                        bRefreshPlatoonAction = true
+                                        if bDebugMessages == true then LOG(sFunctionRef..': BasePlatoonRef='..sPlatoonRef..': Considering whether base platoon should have an overseer action override. bAddedUnitsToPlatoon='..tostring(bAddedUnitsToPlatoon)..'; base platoon size='..table.getn(oBasePlatoon:GetPlatoonUnits())) end
+                                        --if not(bAddedUnitsToPlatoon) then
+                                        local iOverseerRefreshCountThreshold = 4
+                                        if oBasePlatoon[M27PlatoonUtilities.refbHoverInPlatoon] then iOverseerRefreshCountThreshold = iOverseerRefreshCountThreshold + 5 end
+                                        if bIndirectThreatOnly == true then iOverseerRefreshCountThreshold = 9 end
+                                        if M27Utilities.IsTableEmpty(oBasePlatoon[M27PlatoonUtilities.reftPrevAction]) == false then
+                                            local iPrevAction = oBasePlatoon[M27PlatoonUtilities.reftPrevAction][1]
+                                            if iPrevAction == M27PlatoonUtilities.refActionRun or iPrevAction == M27PlatoonUtilities.refActionTemporaryRetreat or iPrevAction == M27PlatoonUtilities.refActionAttack then
+                                                bRefreshPlatoonAction = false
+                                            elseif oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] and oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] <= iOverseerRefreshCountThreshold then
+                                                bRefreshPlatoonAction = false
+                                            end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Base platoon has at least 1 previous action, iPrevAction='..iPrevAction..'; bRefreshPlatoonAction='..tostring(bRefreshPlatoonAction)..'; oBasePlatoon[M27PlatoonUtilities.refbOverseerAction]='..tostring(oBasePlatoon[M27PlatoonUtilities.refbOverseerAction])) end
+                                        end
+                                        --end
+
+                                        if bRefreshPlatoonAction == true then
+                                            oBasePlatoon[M27PlatoonUtilities.refbOverseerAction] = true
+                                            if bDebugMessages == true then
+                                                local iPlatoonCount = oBasePlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                                if iPlatoonCount == nil then iPlatoonCount = 'nil' end
+                                                LOG(sFunctionRef..': Given override action to Base platoon sPlatoonRef='..sPlatoonRef..'; About to issue new orders to oBasePlatoon; oBasePlatoon count='..iPlatoonCount..'; oBasePlatoon[refiActualDistanceFromEnemy]='..oBasePlatoon[refiActualDistanceFromEnemy])
+                                            end
+                                            if oBasePlatoon[refiActualDistanceFromEnemy] <= 30 then
+                                                --if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; Telling base platoon to have actionattack') end
+                                                oBasePlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionAttack
+                                                --oBasePlatoon[M27PlatoonUtilities.refiEnemiesInRange] = tEnemyThreatGroup[refiEnemyThreatGroupUnitCount]
+                                                --oBasePlatoon[M27PlatoonUtilities.reftEnemiesInRange] = tEnemyThreatGroup[refoEnemyGroupUnits]
+                                                if bAddedUnitsToPlatoon == true then M27PlatoonUtilities.ForceActionRefresh(oBasePlatoon) end
+                                            else
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; Telling base platoon to refresh its movement path') end
+                                                M27PlatoonUtilities.ForceActionRefresh(oBasePlatoon)
+                                                oBasePlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
+                                            end
+                                        end
+                                        --IssueClearCommands(oBasePlatoon:GetPlatoonUnits())
+                                        oBasePlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                        oBasePlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftAveragePosition]
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Base platoon sPlatoonRef='..sPlatoonRef..'; oBasePlatoon now has movementpath='..repr(oBasePlatoon[M27PlatoonUtilities.reftMovementPath])) end
+                                        oBasePlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
+                                        --oBasePlatoon[M27PlatoonUtilities.refiLastPathTarget] = 1
+                                        oBasePlatoon[refsEnemyThreatGroup] = iEnemyGroup
+                                        --Free up any spare scouts and MAA post-platoon merger:
+                                        RemoveSpareNonCombatUnits(oBasePlatoon)
+                                        --Remove DF units if are attacking a structure
+                                        if sPlan == 'M27IndirectDefender' and oBasePlatoon[M27PlatoonUtilities.refiDFUnits] and oBasePlatoon[M27PlatoonUtilities.refiDFUnits] > 0 then M27PlatoonUtilities.RemoveUnitsFromPlatoon(oBasePlatoon, oBasePlatoon[M27PlatoonUtilities.reftDFUnits], nil, nil) end
+                                        --Set whether should move in formation or rush towards enemy
+                                        local sCurFormation = 'AttackFormation'
+                                        if tEnemyThreatGroup[refiDistanceFromOurBase] <= 60 then sCurFormation = 'GrowthFormation'
+                                        elseif oBasePlatoon[refiActualDistanceFromEnemy] <= 35 then sCurFormation = 'GrowthFormation'
+                                        end
+                                        oBasePlatoon:SetPlatoonFormationOverride(sCurFormation)
+                                    else
+                                        if bGetACUHelp == false then M27Utilities.ErrorHandler('oBasePlatoon is nil but had thought could beat the enemy, and ACU isnt part of attack - likely error') end
+                                    end
+                                end
+                            end
+                            if bGetACUHelp then
+                                --Make sure ACU is moving where we want already; if not then tell it to
+                                local oACUPlatoon = M27Utilities.GetACU(aiBrain).PlatoonHandle
+                                if oACUPlatoon and M27Utilities.IsACU(M27Utilities.GetACU(aiBrain)) then
+                                    if M27Utilities.IsTableEmpty(oACUPlatoon[M27PlatoonUtilities.reftMovementPath][oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget]]) or M27Utilities.GetDistanceBetweenPositions(oACUPlatoon[M27PlatoonUtilities.reftMovementPath][oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget]], tEnemyThreatGroup[reftAveragePosition]) > 10 then
+                                        --ACU isnt moving near where we want it to, update its movement path if it doesnt have nearby enemies
+                                        if oACUPlatoon[M27PlatoonUtilities.refiEnemiesInRange] == 0 or M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE, M27Utilities.GetACU(aiBrain):GetPosition(), 23, 'Enemy')) == true then --ACU range is 22
+                                            oACUPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tEnemyThreatGroup[reftAveragePosition]
+                                            oACUPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
+                                            oACUPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
+                                            oACUPlatoon[M27PlatoonUtilities.refbOverseerAction] = true
+                                        end
+                                    end
+                                end
+                            end
+                        end --Available threat vs enemy threat
+                    else
+                        --NAVAL THREAT RESPONSE
+                        --Dealing with navy; Torpedo bombers are only made available if they have current targets; therefore in contrast to land appraoch which always updates, torp bomber response to navy threat is 1-off
+                        --However, to make sure we only build torp bombers when we need them, we still need to go through the full process of working out how large a threat we havent dealt with
+                        --Alreayd determiend above:
+                        --iThreatNeeded = tEnemyThreatGroup[refiTotalThreat]
+                        --iThreatWanted = tEnemyThreatGroup[refiHighestThreatRecorded] * iThreatMaxFactor
+                        --tEnemyThreatGroup[reftAveragePosition]
+                        local tTorpBombersByDistance = {}
+                        local iAvailableTorpBombers = 0
+                        local refoTorpUnit = 'M27OTorp'
+                        local refiCurThreat = 'M27OTorThreat'
+                        local iAssignedThreatWanted
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to consider if we have any available torp bombers and if so assign them to enemy naval threat. Is table of available torp bombers empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]))) end
+                        --tAvailablePlatoons, refiActualDistanceFromEnemy
+
+
+
+
+                        if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) == false then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Number of available torp bombers='..table.getn(aiBrain[M27AirOverseer.reftAvailableTorpBombers])) end
+                            --Determine closest available torpedo bombers (unless we should only target ACU)
+                            if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[refoLastNearestACU]) == true then
+                                --Do nothing (logic is in air overseer)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is underwater and we are trying to kill it, so wont use normal torp defence logic (as we handle ACU kill elsewhere)') end
+                            else
+                                for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTorpBombers] do
+                                    if not(oUnit.Dead) and not(oUnit[M27AirOverseer.refbOnAssignment]) then
+                                        iAvailableTorpBombers = iAvailableTorpBombers + 1
+                                        tTorpBombersByDistance[iAvailableTorpBombers] = {}
+                                        tTorpBombersByDistance[iAvailableTorpBombers][refoTorpUnit] = oUnit
+                                        tTorpBombersByDistance[iAvailableTorpBombers][refiActualDistanceFromEnemy] = M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftAveragePosition], oUnit:GetPosition())
+                                        --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
+                                        tTorpBombersByDistance[iAvailableTorpBombers][refiCurThreat] = M27Logic.GetAirThreatLevel(aiBrain, { oUnit }, false, false, false, false, false, nil, nil, nil, nil, true)
+                                        iAvailableThreat = iAvailableThreat + tTorpBombersByDistance[iAvailableTorpBombers][refiCurThreat]
                                     end
                                 end
                             end
                         end
-                    else
-                        iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall + iThreatNeeded
-                        if bFirstUnassignedNavyThreat == true then
-                            bFirstUnassignedNavyThreat = false
-                            iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall - iAvailableThreat
-                            --[[if bACUNeedsTorpSupport then
-                                for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTorpBombers] do
-                                    if not(oUnit[M27AirOverseer.refbOnAssignment]) then
-                                        IssueClearCommands({oUnit})
-                                        IssueAggressiveMove({oUnit}, oACU:GetPosition())
-                                        oUnit[M27AirOverseer.refbOnAssignment] = true
-                                        --oUnit[M27AirOverseer.refbTorpBomberProtectingACU] = true
-                                        M27Utilities.DelayChangeVariable(oUnit, M27AirOverseer.refbOnAssignment, false, 45)
+                        if bDebugMessages == true then LOG(sFunctionRef..': After going through any available torp bombers iAvailableThreat='..iAvailableThreat..'; iThreatNeeded='..iThreatNeeded..'; iAvailableTorpBombers='..iAvailableTorpBombers..'; bACUNeedsTorpSupport='..tostring(bACUNeedsTorpSupport)) end
+                        if not(bACUNeedsTorpSupport) and (iAvailableThreat >= iThreatNeeded or iAvailableTorpBombers >= 25) or (bACUNeedsTorpSupport and iAvailableTorpBombers > 1) then--and (not(bACUNeedsTorpSupport) or iAvailableTorpBombers >= 3) then
+                            for iEntry, tTorpSubtable in M27Utilities.SortTableBySubtable(tTorpBombersByDistance, refiActualDistanceFromEnemy, true) do
+                                --Cycle through each enemy unit in the threat group
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering torp bomber '..tTorpSubtable[refoTorpUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..'; tTorpSubtable[refiCurThreat]='..(tTorpSubtable[refiCurThreat] or 0)..'; about to cycle through every enemy unit in threat group to see if should attack one of them') end
+                                local iMaxRangeToSendTorps = 10000
+                                local iMaxAngleDifToSendTorps
+                                local iAngleFromBaseToACU
+                                if bACUNeedsTorpSupport then
+                                    iMaxRangeToSendTorps = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetACU(aiBrain):GetPosition()) + 90
+                                    iAngleFromBaseToACU = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetACU(aiBrain):GetPosition())
+                                    iMaxAngleDifToSendTorps = 25
+                                end
+
+
+
+                                for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' within the curernt threat group. oUnit[refiActualDistanceFromEnemy]='..(oUnit[refiActualDistanceFromEnemy] or 'nil')..'; iMaxRangeToSendTorps='..(iMaxRangeToSendTorps or 'nil')) end
+                                    if not(bACUNeedsTorpSupport) or (oUnit[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (oUnit[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
+                                        iAssignedThreatWanted = iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat]
+                                        if EntityCategoryContains(categories.ANTIAIR, oUnit.UnitId) then iAssignedThreatWanted = iAssignedThreatWanted * 1.34 end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iAssignedThreat='..(oUnit[iArmyIndex][refiAssignedThreat] or 0)..'; oUnit[iArmyIndex][refiUnitNavalAAThreat]='..(oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0)..'; iNavalThreatMaxFactor='..iNavalThreatMaxFactor..'; iAssignedThreatWanted='..iAssignedThreatWanted) end
+
+                                        if oUnit[iArmyIndex][refiAssignedThreat] <= iAssignedThreatWanted then
+                                            oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
+                                            IssueClearCommands({tTorpSubtable[refoTorpUnit]})
+                                            IssueAttack({tTorpSubtable[refoTorpUnit]}, oUnit)
+                                            M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1)
+                                            for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
+                                                IssueAttack({tTorpSubtable[refoTorpUnit]}, oUnit)
+                                            end
+                                            IssueAggressiveMove({tTorpSubtable[refoTorpUnit]}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                            tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Clearing torp bomber and then Telling torpedo bomber with ID ref='..tTorpSubtable[refoTorpUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..' to attack '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; GameTime='..GetGameTimeSeconds()) end
+                                            iAvailableTorpBombers = iAvailableTorpBombers - 1
+                                            break
+                                        end
                                     end
                                 end
-                            end--]]
+                            end
+                        else
+                            iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall + iThreatNeeded
+                            if bFirstUnassignedNavyThreat == true then
+                                bFirstUnassignedNavyThreat = false
+                                iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall - iAvailableThreat
+                                --[[if bACUNeedsTorpSupport then
+                                    for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTorpBombers] do
+                                        if not(oUnit[M27AirOverseer.refbOnAssignment]) then
+                                            IssueClearCommands({oUnit})
+                                            IssueAggressiveMove({oUnit}, oACU:GetPosition())
+                                            oUnit[M27AirOverseer.refbOnAssignment] = true
+                                            --oUnit[M27AirOverseer.refbTorpBomberProtectingACU] = true
+                                            M27Utilities.DelayChangeVariable(oUnit, M27AirOverseer.refbOnAssignment, false, 45)
+                                        end
+                                    end
+                                end--]]
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough torp bombers; iCumulativeTorpBomberThreatShortfall='..iCumulativeTorpBomberThreatShortfall) end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough torp bombers; iCumulativeTorpBomberThreatShortfall='..iCumulativeTorpBomberThreatShortfall) end
-                    end
-                end --Not dealing with navy
-            end
-        end --for each tEnemyThreatGroup
+                    end --Not dealing with navy
+                end
+            end --for each tEnemyThreatGroup
+        end
 
         if bDebugMessages == true then LOG(sFunctionRef..': Finished cycling through all tEnemyThreatGroups; end of overseer cycle') end
         --if bDebugMessages == true then LOG(sFunctionRef..': End of code - ACU state='..M27Logic.GetUnitState(M27Utilities.GetACU(aiBrain))) end
@@ -3653,6 +3662,7 @@ function ACUManager(aiBrain)
 
                 --Are we near the last ACU's known position?
                 aiBrain[refbEnemyACUNearOurs] = false
+                local iACURange = M27Logic.GetUnitMaxGroundRange({ oACU })
                 if iLastDistanceToACU <= iEnemyACUSearchRange and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
                     if bDebugMessages == true then LOG(sFunctionRef..': Are near last ACU known position, iLastDistanceToACU='..iLastDistanceToACU..'; iEnemyACUSearchRange='..iEnemyACUSearchRange) end
                     aiBrain[refbEnemyACUNearOurs] = true
@@ -3660,7 +3670,6 @@ function ACUManager(aiBrain)
                     --Extra health buffer for some of below checks
                     local iExtraHealthCheck = 0
                     if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tACUPos) > M27Utilities.GetDistanceBetweenPositions(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), tACUPos) then iExtraHealthCheck = 1000 end
-                    local iACURange = M27Logic.GetUnitMaxGroundRange({ oACU })
                     --Do we have a big gun, or is the enemy ACU low on health?
                     if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) == true then
                         if bDebugMessages == true then LOG(sFunctionRef..': Our ACU has a big gun') end
@@ -3785,9 +3794,74 @@ function ACUManager(aiBrain)
                         iEnemyThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnitsNearEnemy, false, nil, nil, false, false)
                     end
                     if iAlliedThreat < (iEnemyThreat * iThreatFactor) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': iAlliedThreat='..iAlliedThreat..'; iEnemyThreat='..iEnemyThreat..'; iThreatFactor='..iThreatFactor..'; therefore aborting All in attack') end
-                        bAllInAttack = false
-                        bIncludeACUInAttack = false
+                        --Do we want to abort, or press ahead even if it means a likely draw?
+                        if bDebugMessages == true then LOG(sFunctionRef..': We are outnumbered, will decide whether to abort the attack. Enemy ACU health='..aiBrain[refoLastNearestACU]:GetHealth()..'; Distance between ACUs='..iLastDistanceToACU..'; iACURange='..iACURange) end
+                        if aiBrain[refoLastNearestACU]:GetHealth() <= 2500 and iLastDistanceToACU < (iACURange - 1) then
+                            --Our ACU is in range of theirs, and theirs will die to ACU explosion; if are far ahead on eco then want to play safe though
+                            if aiBrain[refoLastNearestACU]:GetHealth() <= 300 then
+                                --Their ACU is about to die so press attack and just hope we live
+                                if bDebugMessages == true then LOG(sFunctionRef..': THeir ACU is about to die so will proceed with attack') end
+                            else
+                                --Do we have more than our share of mexes?
+                                local iTotalActivePlayers = 1
+                                for iBrain, oBrain in aiBrain[toAllyBrains] do
+                                    iTotalActivePlayers = iTotalActivePlayers + 1
+                                end
+                                for iBrain, oBrain in aiBrain[toEnemyBrains] do
+                                    iTotalActivePlayers = iTotalActivePlayers + 1
+                                end
+                                local iOurShareOfMexesOnMap = aiBrain[refiAllMexesInBasePathingGroup] / iTotalActivePlayers
+                                local bAheadOnEco = false
+                                if bDebugMessages == true then LOG(sFunctionRef..': iOurShareOfMexesOnMap='..iOurShareOfMexesOnMap..'; aiBrain[refiAllMexesInBasePathingGroup] ='..aiBrain[refiAllMexesInBasePathingGroup]..'; aiBrain[refiUnclaimedMexesInBasePathingGroup]='..aiBrain[refiUnclaimedMexesInBasePathingGroup]) end
+                                if (aiBrain[refiAllMexesInBasePathingGroup] - aiBrain[refiUnclaimedMexesInBasePathingGroup]) > iOurShareOfMexesOnMap then
+                                    --Are ahead on eco so play safe
+                                    bAheadOnEco = true
+                                else
+
+                                    local tEnemyMexes = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMex + M27UnitInfo.refCategoryMassStorage, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
+                                    local iEnemyT1Mex = 0
+                                    local iEnemyT2Mex = 0
+                                    local iEnemyT3Mex = 0
+                                    local iEnemyStorage = 0
+                                    if M27Utilities.IsTableEmpty(tEnemyMexes) == false then
+                                        local tEnemyT1Mex = EntityCategoryFilterDown(categories.TECH1 - M27UnitInfo.refCategoryMassStorage, tEnemyMexes)
+                                        if M27Utilities.IsTableEmpty(tEnemyT1Mex) == false then
+                                            iEnemyT1Mex = table.getn(tEnemyT1Mex)
+                                        end
+                                        local tEnemyT2Mex = EntityCategoryFilterDown(categories.TECH2, tEnemyMexes)
+                                        if M27Utilities.IsTableEmpty(tEnemyT2Mex) == false then
+                                            iEnemyT2Mex = table.getn(tEnemyT2Mex)
+                                        end
+
+                                        local tEnemyT3Mex = EntityCategoryFilterDown(categories.TECH3, tEnemyMexes)
+                                        if M27Utilities.IsTableEmpty(tEnemyT3Mex) == false then
+                                            iEnemyT3Mex = table.getn(tEnemyT3Mex)
+                                        end
+                                        local tEnemyStorage = EntityCategoryFilterDown(M27UnitInfo.refCategoryMassStorage, tEnemyMexes)
+                                        if M27Utilities.IsTableEmpty(tEnemyStorage) == false then
+                                            iEnemyStorage = table.getn(tEnemyStorage)
+                                        end
+                                    end
+
+                                    local iEnemyMass = (1 + iEnemyT1Mex * 2 + iEnemyT2Mex * 6 + iEnemyT3Mex * 18 + iEnemyStorage) * 0.1
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iEnemyMass='..iEnemyMass..'; our gross mass income='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; will inflate enemy mass income since we may lack good intel') end
+                                    if iEnemyMass * 1.3 + 0.5 < aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] then
+                                        bAheadOnEco = true
+                                    end
+                                end
+
+                                if bAheadOnEco then
+                                    --We are probably ahead on eco
+                                    bAllInAttack = false
+                                    bIncludeACUInAttack = false
+                                    if bDebugMessages == true then LOG(sFunctionRef..': We are ahead on eco so will abort the all in attack and play safe') end
+                                end
+                            end
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': iAlliedThreat='..iAlliedThreat..'; iEnemyThreat='..iEnemyThreat..'; iThreatFactor='..iThreatFactor..'; Enemy ACU health >=2.5k at '..aiBrain[refoLastNearestACU]:GetHealth()..', so therefore aborting All in attack') end
+                            bAllInAttack = false
+                            bIncludeACUInAttack = false
+                        end
                     end
                 end
                 --Override - dont include ACU in attack if we are massively ahead on eco
@@ -4200,6 +4274,12 @@ function SetMaximumFactoryLevels(aiBrain)
         elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
             iPrimaryFactoryType = refFactoryTypeAir
             aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+        elseif aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[refiDistanceToNearestEnemyBase] >= 400 then
+            iPrimaryFactoryType = refFactoryTypeAir
+            if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+            else
+                aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(4, math.max(1, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] / 10)))
+            end
         end
         --local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
 
@@ -4216,18 +4296,27 @@ function SetMaximumFactoryLevels(aiBrain)
             if bDebugMessages == true then LOG(sFunctionRef..': Are in eco mode so will adjust factory ratios accordingly. M27Conditions.HaveLowMass(aiBrain)='..tostring(M27Conditions.HaveLowMass(aiBrain))..'; iMexesToBaseCalculationOn='..iMexesToBaseCalculationOn) end
             if not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain:GetEconomyStoredRatio('MASS') > 0.2 then
                 iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.25))
-            elseif not(M27Conditions.HaveLowMass(aiBrain)) then iPrimaryFactoriesWanted = math.max(4 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.20))
+                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]/6.5)) end
+            elseif not(M27Conditions.HaveLowMass(aiBrain)) then
+                iPrimaryFactoriesWanted = math.max(4 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.20))
+                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]/8)) end
             else
                 --Have low mass
                 iPrimaryFactoriesWanted = math.max(1, math.floor(iMexesToBaseCalculationOn * 0.15))
+                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 then iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]/10)) end
             end
         else
             if M27Conditions.HaveLowMass(aiBrain) then
                 iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.5))
+                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]/8)) end
             else
                 iPrimaryFactoriesWanted = math.max(6 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.7))
+                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]/6)) end
             end
         end
+        --Overall cap of 15 factories if are land factories
+        if iPrimaryFactoryType == refFactoryTypeLand then iPrimaryFactoriesWanted = math.min(iPrimaryFactoriesWanted, 15) end
+
         if bDebugMessages == true then LOG(sFunctionRef..': iPrimaryFactoriesWanted before considering other factors='..iPrimaryFactoriesWanted) end
 
         aiBrain[reftiMaxFactoryByType][iPrimaryFactoryType] = iPrimaryFactoriesWanted
@@ -4264,7 +4353,7 @@ function SetMaximumFactoryLevels(aiBrain)
             aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
         end
 
-        --Cap the number of land factories if we are building an experimental
+        --Cap the number of land factories if we are building an experimental and have low mass
         local bActiveExperimental = false
         if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) == false then
             for iRef, tSubtable in  aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental] do
@@ -4274,17 +4363,16 @@ function SetMaximumFactoryLevels(aiBrain)
                 end
             end
         end
-        if bActiveExperimental then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 4) end
-        if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
+        if bActiveExperimental and M27Conditions.HaveLowMass(aiBrain) then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 4) end
+        if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.75 then
             aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(2, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
         else
             --Do we need indirect units and can path to enemy by land?
             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[refbNeedIndirect] and not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain[refiOurHighestLandFactoryTech] == 3 then
                 --Increase number of land factories wanted by 1 from what we currently have
-                aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory) + 1
+                aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.max(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory) + 1)
             end
         end
-        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) == false then aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(2, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 
         if aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] > 0 then
             aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(aiBrain[reftiMaxFactoryByType][refFactoryTypeLand], 1)
@@ -4439,8 +4527,10 @@ function UpdateAllNonM27Names()
                         end
                         iCurUpdateCount = iCurUpdateCount + 1
                         if iCurUpdateCount >= iMaxUpdatePerTick then
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             WaitTicks(1)
                             iCurUpdateCount = 0
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                         end
                     end
                 end
@@ -5027,8 +5117,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             tsGameState['05.InitialEngisShortfall'] = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted]
             tsGameState['05.PreReclaimEngisWanted'] = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
             tsGameState['05.refiBOPreSpareEngineersWanted'] = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
-            tsGameState['05.refiBOActiveSpareEngineers'] = aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers]
-            tsGameState['05.SpareEngisByTechLevel'] = aiBrain[M27EngineerOverseer.refiBOActiveSpareEngineers]
+            tsGameState['05.SpareEngisByTechLevel'] = aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel]
 
             --Factories wanted
             tsGameState['05.WantMoreLandFactories'] = tostring(aiBrain[M27EconomyOverseer.refbWantMoreFactories])
@@ -5082,6 +5171,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             end
             if aiBrain[refiModDistFromStartNearestOutstandingThreat] then tsGameState['10.NearestOutstandingThreat'] = aiBrain[refiModDistFromStartNearestOutstandingThreat] end
             if aiBrain[refiPercentageOutstandingThreat] then tsGameState['10.PercentageOutstandingThreat'] = aiBrain[refiPercentageOutstandingThreat] end
+            if aiBrain[refiModDistFromStartNearestThreat] then tsGameState['10.ModDistNearestThreat'] = aiBrain[refiModDistFromStartNearestThreat] end
             tsGameState['10.PercentDistOfOurUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] or 'nil')
             tsGameState['10.NearestEnemyStartPoint'] = aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation]
 

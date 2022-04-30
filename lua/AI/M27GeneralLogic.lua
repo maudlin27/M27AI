@@ -371,12 +371,13 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bForceDebug == true then bDebugMessages = true end --for error control
     local sFunctionRef = 'GetNearestEnemyIndex'
+    --if GetGameTimeSeconds() >= 1343 then bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if aiBrain[refiNearestEnemyIndex] and M27Overseer.tAllAIBrainsByArmyIndex[aiBrain[refiNearestEnemyIndex]] and not(M27Overseer.tAllAIBrainsByArmyIndex[aiBrain[refiNearestEnemyIndex]]:IsDefeated()) and not(aiBrain.M27IsDefeated) and not(M27Overseer.tAllAIBrainsByArmyIndex[aiBrain[refiNearestEnemyIndex]].M27IsDefeated) then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return aiBrain[refiNearestEnemyIndex]
     else
-        if not(aiBrain.M27IsDefeated) then
+        if not(aiBrain.M27IsDefeated) and not(aiBrain:IsDefeated()) then
             local iPlayerArmyIndex = aiBrain:GetArmyIndex()
             local iDistToCurEnemy
             local iMinDistToEnemy = 10000000
@@ -4085,8 +4086,14 @@ end
 
 function RecheckForTMLMissileTarget(aiBrain, oLauncher)
     --Call via fork thread - called if couldnt find any targets for TML
-    WaitSeconds(30)
-    if M27UnitInfo.IsUnitValid(oLauncher) then ConsiderLaunchingMissile(oLauncher) end
+    if not(oLauncher[M27UnitInfo.refbActiveMissileChecker]) then
+        oLauncher[M27UnitInfo.refbActiveMissileChecker] = true
+        WaitSeconds(30)
+        if M27UnitInfo.IsUnitValid(oLauncher) then
+            ConsiderLaunchingMissile(oLauncher)
+            oLauncher[M27UnitInfo.refbActiveMissileChecker] = false
+        end
+    end
 end
 
 function DecideToLaunchNukeSMLOrTMLMissile()  end --Done only to make it easier to find considerlaunchingmissile

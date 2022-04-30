@@ -1096,7 +1096,21 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
             tProfilerEndCount[sFunctionRef] = tProfilerEndCount[sFunctionRef] + 1
             local iCount = tProfilerEndCount[sFunctionRef]
             local iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
-            if tProfilerFunctionStart[sFunctionRef][iCount] == nil then ErrorHandler('sFunctionRef='..sFunctionRef..'; iGameTimeInTicks='..iGameTimeInTicks..'; iCount='..(iCount or 'nil')) end
+            if tProfilerFunctionStart[sFunctionRef][iCount] == nil then
+                ErrorHandler('Didnt record a start for this count.  Will assume the start time was equal to the previous count, and will increase the start count by 1 to try and align.  sFunctionRef='..sFunctionRef..'; iGameTimeInTicks='..iGameTimeInTicks..'; iCount='..(iCount or 'nil'))
+                if iCount > 1 then
+                    for iAdjust = 1, (iCount - 1), 1 do
+                        if tProfilerFunctionStart[sFunctionRef][iCount - iAdjust] then
+                            tProfilerFunctionStart[sFunctionRef][iCount] = tProfilerFunctionStart[sFunctionRef][iCount - iAdjust]
+                            break
+                        end
+                    end
+                end
+                if not(tProfilerFunctionStart[sFunctionRef][iCount]) then
+                    tProfilerFunctionStart[sFunctionRef][iCount] = 0
+                end
+                tProfilerStartCount[sFunctionRef] = iCount
+            end
             local iCurTimeTaken = GetSystemTimeSecondsOnlyForProfileUse() - tProfilerFunctionStart[sFunctionRef][iCount]
 
             if M27Config.M27ProfilingIgnoreFirst2Seconds and iGameTimeInTicks <= 20 then iCurTimeTaken = 0 end

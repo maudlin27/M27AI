@@ -598,7 +598,7 @@ function OnTransportLoad(oUnit, oTransport, bone)
 end
 
 function OnTransportUnload(oUnit, oTransport, bone)
-    if oUnit:GetAIBrain().M27AI then
+    if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain().M27AI then
         IssueClearCommands({oUnit})
         oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
     end

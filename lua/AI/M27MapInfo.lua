@@ -4065,7 +4065,7 @@ function UpdateNewPrimaryBaseLocation(aiBrain)
 
     --local refiTimeOfLastUpdate = 'M27RefTimeOfLastLocationUpdate'
     --LOG('UpdateNewPrimaryBaseLocation: aiBrain='..aiBrain:GetArmyIndex()..'; Start position='..(aiBrain.M27StartPositionNumber or 'nil'))
-    if not(M27Logic.IsCivilianBrain(aiBrain)) then
+    if not(M27Logic.IsCivilianBrain(aiBrain)) and not(aiBrain.M27IsDefeated) and not(aiBrain:IsDefeated()) then
         local tEnemyBase = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
         local tPrevPosition
         if aiBrain[reftPrimaryEnemyBaseLocation] then tPrevPosition = {aiBrain[reftPrimaryEnemyBaseLocation][1], aiBrain[reftPrimaryEnemyBaseLocation][2], aiBrain[reftPrimaryEnemyBaseLocation][3]} end

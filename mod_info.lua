@@ -1,8 +1,8 @@
 name = "M27AI"
-uid = "f27c55b4-v031-55b4-92b6-64398e75e23f"
+uid = "f27c55b4-v032-55b4-92b6-64398e75e23f"
 version = 32 --REMINDER: Update M27Config to flag to remove ConExecute("WLD_GameSpeed 10"); Version reference in uid updated? Tested offline vs AI it should beat to check for any last minute errors introduced?
 copyright = "FreeWare"
-description = "Adaptive AI, particularly effective against turtles and on 5x5 and 10x10 chokepoint maps.  Estimated as a challenge for sub-400 ranked players 1v1.  Report bugs to maudlin27 via discord or the M27AI thread on the forums. See forum for details of changes by version.  Summary of recent focus areas: v29-Optimisation; v30-ExperimentalAir, v31-Bombers, v32-TBC"
+description = "Adaptive AI, particularly effective against turtles and on 5x5 and 10x10 chokepoint maps.  Estimated as a challenge for sub-400 ranked players 1v1.  Report bugs to maudlin27 via discord or the M27AI thread on the forums. See forum for details of changes by version.  Summary of recent focus areas: v29-Optimisation; v30-ExperimentalAir, v31-Bombers, v32-Plateaus"
 author = "maudlin27" --With thanks to Softles/Softlnoob for original Micro AI that was used as a starting point as I learned how to code AI
 url = "https://forum.faforever.com/topic/2373/ai-development-guide-and-m27ai-v1-devlog"
 icon = "/mods/M27AI/M27AI.jpg"
