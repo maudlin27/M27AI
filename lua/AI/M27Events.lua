@@ -514,8 +514,8 @@ function OnConstructed(oEngineer, oJustBuilt)
                 local iPlateauGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oJustBuilt:GetPosition())
                 if not(iPlateauGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
                     oJustBuilt[M27Transport.refiAssignedPlateau] = iPlateauGroup
-                    if not(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) then aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup] = {} end
-                    if not(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) then aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories] = {} end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) then aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup] = {} end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) then aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories] = {} end
                     aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories][oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
                     LOG('Have just recorded factory '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..' in the list of factories for iPlateauGroup='..iPlateauGroup)
             end
@@ -598,8 +598,16 @@ function OnTransportLoad(oUnit, oTransport, bone)
 end
 
 function OnTransportUnload(oUnit, oTransport, bone)
-    if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain().M27AI then
+    local aiBrain = oUnit:GetAIBrain()
+    if M27UnitInfo.IsUnitValid(oUnit) and aiBrain.M27AI then
         IssueClearCommands({oUnit})
         oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+        --Make sure we have correctly recorded the plateau if we have landed engineers
+
+        if not(oUnit[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) then
+            if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit, oUnit:GetPosition()) then
+                oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+            end
+        end
     end
 end

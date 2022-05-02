@@ -3630,7 +3630,7 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
             end
             if iLoopCount > iMaxLoop3 then
 
-                M27Utilities.ErrorHandler('Couldnt find random point in area after looking more than iMaxLoop3='..iMaxLoop3..' times, tMidpoint='..repr({tMidpoint[1], tMidpoint[2], tMidpoint[3]})..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1])..';hopefully the code that called this should recheck pathing')
+                M27Utilities.ErrorHandler('Couldnt find random point in area after looking more than iMaxLoop3='..iMaxLoop3..' times, tMidpoint='..math.floor(tMidpoint[1])..'-'..math.floor(tMidpoint[2])..'-'..math.floor(tMidpoint[3])..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1])..';hopefully the code that called this should recheck pathing')
                 if bDebugMessages == true then
                     --Draw midpoint in white, draw last place checked in gold
                     M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 4, 20)
@@ -3716,8 +3716,8 @@ function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondT
         end
         if not(tPotentialLocation) then
             --Do we have a mex location to go to? If so pick the one closest to our base
-            if M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup]) == false then
-                for iMex, tMex in M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][subrefPlateauMexes] do
+            if M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup]) == false and M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes]) == false then
+                for iMex, tMex in M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes] do
                     iCurDist = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tMex)
                     if iCurDist < iNearestDist then
                         tPotentialLocation = tMex

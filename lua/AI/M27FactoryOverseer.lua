@@ -2223,7 +2223,7 @@ function RemoveTemporaryFactoryPause(aiBrain, oFactory)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary pause to false for factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; GameTIme='..GetGameTimeSeconds()) end
 
-    if (oFactory[M27Transport.refiAssignedPlateau] or aiBrain[refiOurBasePlateauGroup]) == aiBrain[M27MapInfo.refiOurBasePlateauGroup] then
+    if (oFactory[M27Transport.refiAssignedPlateau] and not(oFactory[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup])) then
         aiBrain[refiFactoriesTemporarilyPaused] = aiBrain[refiFactoriesTemporarilyPaused] - 1
     end
     if oFactory then oFactory[refbFactoryTemporaryPauseActive] = false end
@@ -2252,11 +2252,13 @@ function FactoryMainOverseerLoop(aiBrain)
                 if not (oFactory:IsUnitState('BeingBuilt')) and not (oFactory[refbFactoryTemporaryPauseActive] == true) then
                     if not (oFactory[M27Transport.refiAssignedPlateau]) then
                         oFactory[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFactory:GetPosition())
+                        if bDebugMessages == true then LOG(sFunctionRef..': oFactory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' doesnt have an assigned plateau.  Its segment group is '..oFactory[M27Transport.refiAssignedPlateau]..'; base group='..aiBrain[M27MapInfo.refiOurBasePlateauGroup]) end
                         if not (oFactory[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
                             --Make sure we have recorded this in the table of factories for the plateau
                             if not(aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]]) then aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]] = {} end
-                            if not(aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories]) then aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories] = {} end
+                            if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories]) then aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories] = {} end
                             aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories][oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)] = oFactory
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have recorded factory in the plateau information, for plateau group '..oFactory[M27Transport.refiAssignedPlateau]) end
                         end
                     end
                     if not (oFactory:IsUnitState('Building')) and not (oFactory:IsUnitState('Upgrading')) then

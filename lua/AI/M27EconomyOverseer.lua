@@ -707,6 +707,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 then bDebugMessages = true end
 
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
     local oUnitToUpgrade, tCurPosition, iCurDistanceToStart, iCurDistanceToEnemy, iCurCombinedDist
@@ -755,7 +756,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
             end
         end
         --Re-do without the safe to upgrade check and also including plateau units if we are overflowing mass
-        if iPotentialUnits == 0 and M27Utilities.IsTableEmpty(tAllUnits) == false and aiBrain:GetEconomyStoredRatio('MASS') >= 0.9 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not (aiBrain[refbStallingEnergy]) and aiBrain[refiEnergyNetBaseIncome] >= 10 * aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain[refiMassNetBaseIncome] >= 0.5 then
+        if iPotentialUnits == 0 and M27Utilities.IsTableEmpty(tAllUnits) == false and aiBrain:GetEconomyStoredRatio('MASS') >= 0.7 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not (aiBrain[refbStallingEnergy]) and aiBrain[refiEnergyNetBaseIncome] >= 10 * aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain[refiMassNetBaseIncome] >= 0.5 then
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Are overflowing mass so will redo check without checking if its safe to upgrade the mex')
             end
@@ -797,9 +798,9 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
 
             else
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': No safe units based on intel and defence coverage; will only include nearest unit if we are overflowing mass')
+                    LOG(sFunctionRef .. ': No safe units based on intel and defence coverage, so will only include if have at least 15% stored mass and decent economy more generally. Mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; Energy stored ratio='..aiBrain:GetEconomyStoredRatio('ENERGY'))
                 end
-                if aiBrain:GetEconomyStoredRatio('MASS') >= 0.9 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not (aiBrain[refbStallingEnergy]) and aiBrain[refiEnergyNetBaseIncome] >= 10 * aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain[refiMassNetBaseIncome] >= 0.5 then
+                if aiBrain:GetEconomyStoredRatio('MASS') >= 0.15 and aiBrain:GetEconomyStored('MASS') >= 400 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and not (aiBrain[refbStallingEnergy]) and aiBrain[refiEnergyNetBaseIncome] >= 10 * aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain[refiMassNetBaseIncome] >= 0.5 then
                     oUnitToUpgrade = M27Utilities.GetNearestUnit(tPotentialUnits, tOurStartPosition, aiBrain, false)
                 end
             end
@@ -1647,6 +1648,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 then bDebugMessages = true end
 
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
     local bHaveHighMass, bHaveEnoughEnergy
@@ -1916,7 +1918,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                                 end
                             end
                             --Backup for unusual scenarios - are we about to overflow mass and have high energy stored and have positive mass and energy income? then upgrade with no limit
-                            if (iEnergyPercentStorage >= 0.99 or iEnergyNetIncome > 5) and (aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 or iMassStored >= 2000) then
+                            if (iEnergyPercentStorage >= 0.99 or iEnergyNetIncome > 5) and (aiBrain:GetEconomyStoredRatio('MASS') >= 0.7 or iMassStored >= 2000) then
                                 iMaxToUpgrade = 100
                             elseif bHaveLotsOfResources == true and aiBrain:GetEconomyStoredRatio('ENERGY') > 0.9 and aiBrain:GetEconomyStoredRatio('MASS') > 0.7 then
                                 iMaxToUpgrade = 1000
@@ -2366,7 +2368,7 @@ function ManageEnergyStalls(aiBrain)
                                     if iActionRef == oUnit[M27EngineerOverseer.refiEngineerCurrentAction] then
                                         bApplyActionToUnit = true
                                         --Dont pause the last engi building power
-                                        if bPauseNotUnpause and iActionRef == M27EngineerOverseer.refActionBuildPower and (oUnit[M27EngineerOverseer.refbPrimaryBuilder] or aiBrain:GetEconomyStoredRatio('MASS') >= 0.8) then
+                                        if bPauseNotUnpause and iActionRef == M27EngineerOverseer.refActionBuildPower and (oUnit[M27EngineerOverseer.refbPrimaryBuilder] or aiBrain:GetEconomyStoredRatio('MASS') >= 0.7) then
                                             bApplyActionToUnit = false
                                         end
                                         break
@@ -2609,7 +2611,7 @@ function UpgradeManager(aiBrain)
         ForkThread(UpgradeMainLoop, aiBrain)
         if aiBrain[refbWantToUpgradeMoreBuildings] then
             iCurCycleTime = iReducedWaitTime
-            if aiBrain:GetEconomyStoredRatio('MASS') >= 0.9 and aiBrain:GetEconomyStored('MASS') >= 1000 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[refiEnergyNetBaseIncome] >= 5 and aiBrain[refiMassNetBaseIncome] > 0 then
+            if aiBrain:GetEconomyStoredRatio('MASS') >= 0.7 and aiBrain:GetEconomyStored('MASS') >= 1000 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and aiBrain[refiEnergyNetBaseIncome] >= 5 and aiBrain[refiMassNetBaseIncome] > 0 then
                 iCurCycleTime = iShortestWaitTime
             end
         end

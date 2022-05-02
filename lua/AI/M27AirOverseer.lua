@@ -272,9 +272,11 @@ end
 
 function ClearTrackersOnUnitsTargets(oAirUnit, bOnlyRemoveFirstEntry)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'GetReclaimDetourLocation'
+    local sFunctionRef = 'ClearTrackersOnUnitsTargets'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if EntityCategoryContains(categories.TECH3 * categories.BOMBER, oAirUnit.UnitId) and (M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 10 or M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 45) then bDebugMessages = true end
+    --if oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
+
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code. oAirUnit='..oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)..'; Is the air unit target list empty='..tostring(M27Utilities.IsTableEmpty(oAirUnit[reftTargetList]))) end
     if M27Utilities.IsTableEmpty(oAirUnit[reftTargetList]) == false then
@@ -287,7 +289,9 @@ function ClearTrackersOnUnitsTargets(oAirUnit, bOnlyRemoveFirstEntry)
         local oUnit
         for iUnit, tSubtable in oAirUnit[reftTargetList] do
             oUnit = tSubtable[refiShortlistUnit]
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering entry '..iUnit..' in bomber '..oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)..' target list. Is unit dead='..tostring(oUnit.Dead)) end
             if not (oUnit.Dead) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Clearing oUnit as a target, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                 if oUnit[reftoBombersTargetingUnit] then oUnit[reftoBombersTargetingUnit][oUnit:GetAIBrain():GetArmyIndex()..oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)] = nil end
                 if oUnit[refiCurBombersAssigned] == nil then
                     oUnit[refiCurBombersAssigned] = 0
@@ -307,6 +311,15 @@ function ClearTrackersOnUnitsTargets(oAirUnit, bOnlyRemoveFirstEntry)
                 end
             end
             if bOnlyRemoveFirstEntry then
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Only wanted to remove first entry so will abort now.  Will list out if any other units in the target list. Is target list empty='..tostring(M27Utilities.IsTableEmpty(oAirUnit[reftTargetList])))
+                    if not(M27Utilities.IsTableEmpty(oAirUnit[reftTargetList])) then
+                        for iEntry, oEntry in oAirUnit[reftTargetList] do
+                            LOG(sFunctionRef..': iEntry='..iEntry..'; Is unit valid='..tostring(M27UnitInfo.IsUnitValid(tSubtable[refiShortlistUnit])))
+                            if M27UnitInfo.IsUnitValid(tSubtable[refiShortlistUnit]) then LOG(sFunctionRef..': the unit='..tSubtable[refiShortlistUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSubtable[refiShortlistUnit])) end
+                        end
+                    end
+                end
                 break
             end
         end
@@ -335,6 +348,8 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27UnitInfo.GetUnitTechLevel(oAirUnit) == 4 and M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 1 then bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oAirUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 1 then bDebugMessages = true end
+
+    --if oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': oAirUnit=' .. oAirUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAirUnit) .. '; Gametime=' .. GetGameTimeSeconds())
     end
@@ -357,10 +372,11 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
     end
     oAirUnit[refbOnAssignment] = false
     oAirUnit[reftMovementPath] = {}
+    ClearTrackersOnUnitsTargets(oAirUnit) --This MUST come before clearing the target list
     oAirUnit[reftTargetList] = {}
     oAirUnit[refiCurTargetNumber] = 0
     oAirUnit[reftGroundAttackLocation] = nil
-    ClearTrackersOnUnitsTargets(oAirUnit)
+
     if not (bDontIssueCommands) then
         IssueClearCommands({ oAirUnit })
         if EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oAirUnit.UnitId) then
@@ -698,10 +714,12 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
                     if iShortlistCount > 0 then
                         oNewTarget = GetBestBomberTarget(oBomber, tShortlistToPickFrom, 0.5)
                         if oNewTarget then
+                            --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                             ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
                             TrackBomberTarget(oBomber, oNewTarget, iHighestPriority)
                             IssueClearCommands({ oBomber })
                             TellBomberToAttackTarget(oBomber, oNewTarget, false, false)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Told bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' to clear its current target and attack a new target '..oNewTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewTarget)) end
                             break --Need to stop or else risk this function being called numerous times at once for the same unit
                         end
                     end
@@ -858,6 +876,9 @@ function TrackBomberTarget(oBomber, oTarget, iPriority)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if EntityCategoryContains(categories.TECH3, oBomber.UnitId) and (M27UnitInfo.GetUnitLifetimeCount(oBomber) == 10 or M27UnitInfo.GetUnitLifetimeCount(oBomber) == 45) then bDebugMessages = true end
 
+    --[[if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then
+        bDebugMessages = true
+    else bDebugMessages = false end--]]
 
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code, oBomber=' .. oBomber.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBomber) .. '; oTarget=' .. oTarget.UnitId .. '; iPriority=' .. (iPriority or 'nil') .. '; bomber cur target number=' .. (oBomber[refiCurTargetNumber] or 'nil'))
@@ -1087,6 +1108,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 3 and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
+    --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
     local bRemoveCurTarget
     local bHaveMoveCommand = false
     local tTargetPos
@@ -1206,6 +1228,8 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                             if M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tEnemyBase) <= 10 then bAttackMove = true end
                         end
 
+                        --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
+
                         IssueClearCommands({oBomber})
                         if bAttackMove then IssueAggressiveMove({oBomber}, tNewTarget)
                         else IssueMove({oBomber}, tNewTarget)
@@ -1296,6 +1320,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                     end
                                 end
                                 if oNearestGroundAA then
+                                    --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                     ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
                                     IssueClearCommands({ oBomber })
                                     IssueAttack({ oBomber }, oNearestGroundAA)
@@ -1305,6 +1330,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                     TrackBomberTarget(oBomber, oNearestGroundAA, 1)
                                     IssueAggressiveMove({ oBomber }, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                     oBomber[refbOnAssignment] = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Cleared bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' current targets and will attack nearest groundAA '..oNearestGroundAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestGroundAA)) end
                                 end
                             end
                         end
@@ -1442,9 +1468,10 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                             bChangeTarget = false
                                         end
                                         if bChangeTarget then
+                                            --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                             bHaveAssignedNewTarget = true
                                             if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Want to switch target to high priority AA or shield')
+                                                LOG(sFunctionRef .. ': Want to switch target to high priority AA or shield. oBomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; oTargetToSwitchTo='..oTargetToSwitchTo.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTargetToSwitchTo))
                                             end
                                             ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
                                             TrackBomberTarget(oBomber, oTargetToSwitchTo, 1)
@@ -1489,11 +1516,15 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                             end
 
                             if bRemoveCurTarget == true and not (bHaveAssignedNewTarget) then
+                                --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                 if oBomber[refiCurTargetNumber] == nil then
                                     M27Utilities.ErrorHandler('Bomber cur target number is nil; reftTargetList size=' .. table.getn(oBomber[reftTargetList]))
                                 end
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Removing bombers current target as it is nil or dead, iCurTargetNumber=' .. oBomber[refiCurTargetNumber])
+                                    LOG(sFunctionRef .. ': Removing bombers current target as it is nil or dead, iCurTargetNumber=' .. oBomber[refiCurTargetNumber]..'; Bomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber))
+                                    if oBomberCurTarget then LOG(sFunctionRef..': oBomberCurTarget is not nil, UnitId='..oBomberCurTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomberCurTarget))
+                                    else LOG(sFunctionRef..': oBomberCurTarget is nil')
+                                    end
                                 end
                                 --Dont want to use the normal clearairunitassignmenttrackers, as are only clearing the current entry
                                 oBomber[refbOnAssignment] = false
@@ -1529,8 +1560,10 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                         LOG(sFunctionRef .. 'Recently fired bomb, checking if we think we are blocked when attacking target; tPreTargetViaPoint=' .. repr((tPreTargetViaPoint or { 'nil' })))
                                     end
                                     if M27Utilities.IsTableEmpty(tPreTargetViaPoint) == false then
+                                        --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                         --Expect to be blocked so want to reissue
                                         IssueClearCommands({ oBomber })
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Bomber expects to be blocked so will clear commands and then reissue orders to its target list. bomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)) end
                                         if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) == false then
                                             for iTarget, tTarget in oBomber[reftTargetList] do
                                                 if M27UnitInfo.IsUnitValid(tTarget[refiShortlistUnit]) then
@@ -1610,9 +1643,9 @@ function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
             if oTarget[refiMaxStrikeDamageWanted] <= iBomberStrikeDamage then
                 bClearTarget = true
             else
-               if oTarget:GetHealth() * 1.1 <= iBomberStrikeDamage and not(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, false)) then
-                   bClearTarget = true
-               end
+                if oTarget:GetHealth() * 1.1 <= iBomberStrikeDamage and not(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, false)) then
+                    bClearTarget = true
+                end
             end
             if not(bClearTarget) then
                 --Check in case we are targeting the ground and it is too far away from the target
@@ -2017,6 +2050,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                     LOG(sFunctionRef .. ': Unit is on assignment')
                                 end
                                 --Check there's not a rare error where unit is on assignment but is actually idle
+                                --This might also be used for transports (havent bothered debugging to confirm since they work as desired)
                                 if M27Logic.IsUnitIdle(oUnit, true, false, nil) then
                                     local iIdleTime = math.floor(GetGameTimeSeconds())
                                     if not (oUnit[reftIdleChecker]) then
@@ -2290,6 +2324,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                 ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
                                                 bUnitIsUnassigned = true
                                                 if bReturnToRallyPoint == true then
+                                                    --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                                     IssueClearCommands({ oUnit })
                                                     IssueMove({ oUnit }, GetAirRallyPoint(aiBrain))
                                                     if bDebugMessages == true then
@@ -2537,6 +2572,7 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
                                             end
                                         end
                                         if not (bAlreadyTryingToRefuel) and not (oUnit:IsUnitState('Attached')) then
+                                            --if oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                                             ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
                                             IssueClearCommands({ oUnit })
                                             IssueTransportLoad({ oUnit }, oStaging)
@@ -4249,6 +4285,7 @@ function TellBomberToAttackTarget(oBomber, oTarget, bClearCommands, bAreHoverBom
     local bTargetingMobileUnit = false
     if not(bTargetGround) and EntityCategoryContains(categories.MOBILE, oTarget.UnitId) then bTargetingMobileUnit = true end
     if not(bAreHoverBombing) then tPreTargetViaPoint = GetBomberPreTargetViaPoint(oBomber, tGroundTarget, bTargetingMobileUnit) end
+    --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': tPreTargetViaPoint=' .. repr((tPreTargetViaPoint or { 'nil' })))
     end
@@ -4566,7 +4603,7 @@ function AirBomberManager(aiBrain)
             oUnit[refiMaxStrikeDamageWanted] = (iOptionalMaxStrikeDamageWanted or GetMaxStrikeDamageWanted(oUnit))
             if bDebugMessages == true then LOG(sFunctionRef..': Will add oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to shortlist unless we have assigned enough strike damage.  oUnit[refiMaxStrikeDamageWanted]='..(oUnit[refiMaxStrikeDamageWanted] or 0)..'; oUnit[refiStrikeDamageAssigned]='..(oUnit[refiStrikeDamageAssigned] or 0)) end
 
-            if oUnit[refiStrikeDamageAssigned] < oUnit[refiMaxStrikeDamageWanted] or EntityCategoryContains(categories.COMMAND + categories.EXPERIMENTAL, oUnit.UnitId) then
+            if oUnit[refiStrikeDamageAssigned] < oUnit[refiMaxStrikeDamageWanted] or EntityCategoryContains(categories.COMMAND + categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oUnit.UnitId) then
                 iTargetCount = iTargetCount + 1
                 aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount] = {}
                 aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistPriority] = iCurPriority
@@ -5341,6 +5378,8 @@ function AirBomberManager(aiBrain)
 
                     local iStratsNearRallyPoint = 0
                     local tStratsNearRallyPoint = {}
+                    local bTargetsContainHighPriorityWithNoAA = false
+                    local iAANearTarget
                     for iUnit, oUnit in tBombersOfTechLevel do
                         if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint) <= 60 then
                             iStratsNearRallyPoint = iStratsNearRallyPoint + 1
@@ -5395,15 +5434,22 @@ function AirBomberManager(aiBrain)
                             end
 
                             for iUnit, oUnit in tEnemies do
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Strike damage already assigned='..(oUnit[refiStrikeDamageAssigned] or 'nil')..'; Is unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))..'; AA covering target='..IsTargetCoveredByAA(oUnit, tEnemyAA, 3, tStartPoint, true)..'; iStratsNearRallyPoint='..iStratsNearRallyPoint) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Strike damage already assigned='..(oUnit[refiStrikeDamageAssigned] or 'nil')..'; Is unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))..'; AA covering target='..IsTargetCoveredByAA(oUnit, tEnemyAA, 3, tStartPoint, true)..'; iStratsNearRallyPoint='..iStratsNearRallyPoint..'; bTargetsContainHighPriorityWithNoAA='..tostring(bTargetsContainHighPriorityWithNoAA)) end
                                 if (oUnit[refiStrikeDamageAssigned] or 0) <= 1000 then --Dont want to target if already being targeted for some other reason (as risk sending bombers piecemeal); since dealing with t3 strats can ignore low level bomber targeting though
                                     if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
-                                        if not(IsTargetCoveredByAA(oUnit, tEnemyAA, 3, tStartPoint)) or (bAssassination and EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and (iStratsNearRallyPoint >= 26 and IsTargetCoveredByAA(oUnit, tEnemyAA, 3, tStartPoint, true) <= 8) or (iStratsNearRallyPoint < 26 and iStratsNearRallyPoint >= 6 and IsTargetCoveredByAA(oUnit, tEnemyAA, 3, tStartPoint, true) <= 4)) or (iStratsNearRallyPoint >= 15 and EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) and IsTargetCoveredByAA(oUnit, tEnemyAA, 3, tStartPoint, true) <= 2) then
+                                        iAANearTarget = 1000
+                                        if not(IsTargetCoveredByAA(oUnit, tEnemyAA, 3, tStartPoint)) then iAANearTarget = 0
+                                        elseif (bAssassination and EntityCategoryContains(categories.COMMAND, oUnit.UnitId)) or iStratsNearRallyPoint >= 6 then iAANearTarget = IsTargetCoveredByAA(oUnit, tEnemyAA, 3, tStartPoint, true)
+                                        end
+                                        if iAANearTarget == 0 or (not(bTargetsContainHighPriorityWithNoAA) and (bAssassination and EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and (iStratsNearRallyPoint >= 26 and iAANearTarget <= 8) or (iStratsNearRallyPoint < 26 and iStratsNearRallyPoint >= 6 and iAANearTarget <= 4)) or (iStratsNearRallyPoint >= 15 and EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) and iAANearTarget <= 2)) then
                                             iCurStrikeDamage = GetMaxStrikeDamageWanted(oUnit)
                                             iTableIndex = math.min(math.ceil(iCurStrikeDamage / 10000), 5)
                                             table.insert(tTargetsByMaxHealth[iTableIndex], oUnit)
                                             table.insert(tTargetStrikeDamageByMaxHealth[iTableIndex], iCurStrikeDamage)
                                             iPossibleTargets = iPossibleTargets + 1
+                                            if iAANearTarget == 0 and not(bTargetsContainHighPriorityWithNoAA) and (aiBrain[refiAirAAWanted] == 0 or aiBrain[refiHighestEnemyAirThreat] <= 2000) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oUnit.UnitId) then
+                                                bTargetsContainHighPriorityWithNoAA = true
+                                            end
                                         end
                                     end
                                 end
@@ -5590,13 +5636,15 @@ function AirBomberManager(aiBrain)
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': iStratsNearRallyPoint='..iStratsNearRallyPoint..'; coordinated targets to consider='..iPossibleTargets..'; will decide on best target if have any') end
                         if iPossibleTargets > 0 then
-                            --Chose a target for a coordinated attack; start with lowest priority
+                            --Chose a target for a coordinated attack; start with lowest priority. If have high priority vulnerable unit then just include these in shortlist
                             for iHealthIndex = 1, 5 do
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering all units for iHealthIndex='..iHealthIndex..'; iTargetCount='..iTargetCount..'; Is table for this healthindex empty='..tostring(M27Utilities.IsTableEmpty(tTargetsByMaxHealth[iHealthIndex]))) end
                                 if M27Utilities.IsTableEmpty(tTargetsByMaxHealth[iHealthIndex]) == false then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': iTechLevel='..(iTechLevel or 'nil')..'; iHealthIndex='..iHealthIndex..'; Size of table of targets by max health='..table.getn(tTargetsByMaxHealth[iHealthIndex])) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iTechLevel='..(iTechLevel or 'nil')..'; iHealthIndex='..iHealthIndex..'; Size of table of targets by max health='..table.getn(tTargetsByMaxHealth[iHealthIndex])..'; bTargetsContainHighPriorityWithNoAA='..tostring(bTargetsContainHighPriorityWithNoAA)) end
                                     for iUnit, oUnit in tTargetsByMaxHealth[iHealthIndex] do
-                                        AddUnitToShortlist(oUnit, iTechLevel, M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint), tTargetStrikeDamageByMaxHealth[iHealthIndex][iUnit])
+                                        if not(bTargetsContainHighPriorityWithNoAA) or (not(oUnit[refbLastCoveredByAAByTech][iTechLevelOfEnemyAA]) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oUnit.UnitId)) then
+                                            AddUnitToShortlist(oUnit, iTechLevel, M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint), tTargetStrikeDamageByMaxHealth[iHealthIndex][iUnit])
+                                        end
                                     end
                                 end
                                 if iTargetCount > 0 then break end
@@ -5607,7 +5655,7 @@ function AirBomberManager(aiBrain)
                             local oCurTarget, oCurBomber, iTargetMaxHealth
                             local iLoopStartAvailableBombers, iLowestPriority, iClosestDistance, oClosestDistance
                             local iRemainingStrikeDamageAvailable
-                            local iStrikeDamageWanted
+                            local iStrikeDamageWanted, iMinStrikeDamageNeeded
                             if bDebugMessages == true then LOG(sFunctionRef..': About to send strats on coordinated attack. iStratsNearRallyPoint='..iStratsNearRallyPoint..'; iTargetCount='..iTargetCount) end
 
                             local iAverageStrikeDamage = 0
@@ -5648,8 +5696,15 @@ function AirBomberManager(aiBrain)
                                     --Issue co-ordinated attack if we have enough damage to kill it
                                     iRemainingStrikeDamageAvailable = iStratsNearRallyPoint * iAverageStrikeDamage --Approximation - correct if we dont have mixture of different strat bomber techs
                                     iStrikeDamageWanted = GetMaxStrikeDamageWanted(oClosestDistance)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Issuing coordinated attack on oClosestDistance='..oClosestDistance.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestDistance)..' if we have enough strike damage; iStrikeDamageWanted='..iStrikeDamageWanted..'; iRemainingStrikeDamageAvailable='..iRemainingStrikeDamageAvailable) end
-                                    if iRemainingStrikeDamageAvailable >= math.min(75000, iStrikeDamageWanted) or oClosestDistance[refiStrikeDamageAssigned] > 1000 then
+
+                                    if not(oClosestDistance[refbLastCoveredByAAByTech][iTechLevelOfEnemyAA]) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oClosestDistance.UnitId) then
+                                        iMinStrikeDamageNeeded = math.min(35000, iStrikeDamageWanted * 0.5)
+                                    else
+                                        iMinStrikeDamageNeeded = iStrikeDamageWanted
+                                    end
+
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Issuing coordinated attack on oClosestDistance='..oClosestDistance.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestDistance)..' if we have enough strike damage; iStrikeDamageWanted='..iStrikeDamageWanted..'; iRemainingStrikeDamageAvailable='..iRemainingStrikeDamageAvailable..'; iMinStrikeDamageNeeded='..iMinStrikeDamageNeeded) end
+                                    if iRemainingStrikeDamageAvailable >= math.min(75000, iMinStrikeDamageNeeded) or oClosestDistance[refiStrikeDamageAssigned] > 1000 then
                                         --Have enough strats to attack and kill in 1 hit (or dealing with something with so high health that it probably has multiple shields that will fail due to bomber aoe)
                                         while oClosestDistance[refiStrikeDamageAssigned] <= iStrikeDamageWanted do
                                             --Get the first bomber
@@ -5701,6 +5756,7 @@ function AirBomberManager(aiBrain)
                                 LOG(sFunctionRef .. ': Bomber already near or moving to rally point; distance to rally point=' .. repr(tRallyPoint) .. '; tCurTarget=' .. repr(tCurTarget))
                             end
                         else
+                            --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                             --Move to nearest rally point
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Telling ' .. oBomber.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBomber) .. ' to move to nearest rapply point=' .. repr(tRallyPoint))
@@ -5790,6 +5846,7 @@ function AirBomberManagerOld(aiBrain)
                 if oBomber[refiCurTargetNumber] == nil or oBomber[refiCurTargetNumber] == 0 then
                     iBomberRemainingTargetCount = 0
                     tBomberLastTarget = oBomber:GetPosition()
+                    --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                     IssueClearCommands({ oBomber })
                     oBomber[reftTargetList] = {}
                     if M27Config.M27ShowUnitNames == true and oBomber.GetUnitId then
@@ -5971,6 +6028,7 @@ function AirBomberManagerOld(aiBrain)
                         LOG(sFunctionRef .. ': Bomber already near or moving to rally point; distance to rally point=' .. repr(tRallyPoint) .. '; tCurTarget=' .. repr(tCurTarget))
                     end
                 else
+                    --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                     --Move to nearest rally point
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Telling ' .. oBomber.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBomber) .. ' to move to nearest rapply point=' .. repr(tRallyPoint))
@@ -6500,6 +6558,7 @@ function AirAAManager(aiBrain)
                             oClosestAirAA = aiBrain[reftAvailableAirAA][1]
                         end
                         if oClosestAirAA then
+                            --if oClosestAirAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestAirAA) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                             if bDebugMessages == true then
                                 local iLifetimeCount = M27UnitInfo.GetUnitLifetimeCount(oClosestAirAA)
                                 if iLifetimeCount == nil then
@@ -6636,6 +6695,7 @@ function AirAAManager(aiBrain)
                 end
                 for iEntry, tValue in M27Utilities.SortTableBySubtable(tAirUnitsByDistance, 'DistToAlt', true) do
                     oAirAA = tValue['Unit']
+                    --if oAirAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirAA) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                     iCount = iCount + 1
                     if iCount <= iAirUnitsWantAtAltRallyPoint then
                         if bDebugMessages == true then
@@ -6651,6 +6711,7 @@ function AirAAManager(aiBrain)
             else
                 for iAirAA, oAirAA in aiBrain[reftAvailableAirAA] do
                     if M27Utilities.GetDistanceBetweenPositions(oAirAA:GetPosition(), tAirRallyPoint) > 40 then
+                        --if oAirAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirAA) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Clearing commands of airAA unit ' .. oAirAA.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAirAA))
                         end

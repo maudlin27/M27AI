@@ -9,6 +9,8 @@ local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
+local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
+local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 
 
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
@@ -132,8 +134,9 @@ subrefPlateauMidpoint = 'M27PlateauMidpoint' --Location of the midpoint of the p
 subrefPlateauMaxRadius = 'M27PlateauMaxRadius' --Radius to use to ensure the circle coveres the square of the plateau
 subrefPlateauContainsActiveStart = 'M27PlateauContainsActiveStart' --True if the plateau is pathable amphibiously to a start position that was active at the start of the game
 
-    --reftOurPlateauInformation subrefs
+    --reftOurPlateauInformation subrefs (NOTE: If adding more info here need to update in several places, including ReRecordUnitsAndPlatoonsInPlateaus)
 subrefPlateauLandFactories = 'M27PlateauLandFactories'
+
 subrefPlateauLandCombatPlatoons = 'M27PlateauLandCombatPlatoons'
 subrefPlateauIndirectPlatoons = 'M27PlateauIndirectPlatoons'
 subrefPlateauMAAPlatoons = 'M27PlateauMAAPlatoons'
@@ -158,6 +161,7 @@ function DetermineMaxTerrainHeightDif()
     ['Adaptive Flooded Corona'] = 0.15,
     ['Fields of Isis'] = 0.15, --minor for completeness - one of cliffs reclaim looks like its pathable but default settings show it as non-pathable
     ['Selkie Mirror'] = 0.15,
+    ['Adaptive Point of Reason'] = 0.26,
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
@@ -550,10 +554,11 @@ function RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iUn
 end
 
 
-function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOptionalComparisonKnownCorrectPoint)
+function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOptionalComparisonKnownCorrectPoint, bPlateauCheckActive)
     --E.g. set tKnownCorrectPoint to the player start position; will update the pathing
     --return true if pathing has changed, or false if no change
     --tOptionalComparisonKnownCorrectPoint is optional
+    --bPlateauCheckActive - called within this function if doing a check of all plateau mexes as a result - to avoid infinite loop
 
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecheckPathingOfLocation'
@@ -564,7 +569,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
         --[[if M27Utilities.IsTableEmpty(tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]) == false then
             tOptionalComparisonKnownCorrectPoint = tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]
         else--]]
-            tOptionalComparisonKnownCorrectPoint = PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber]
+        tOptionalComparisonKnownCorrectPoint = PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber]
         --end
     end
 
@@ -575,10 +580,12 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
     local iCurManualCheckDist
     local sClosestManualCheckRef
 
+    if bDebugMessages == true then LOG(sFunctionRef..': GameTIMe='..GetGameTimeSeconds()..'; Checking pathing for tTargetLocation='..repr(tTargetLocation)..' using oPathingUnit='..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)) end
+
 
     if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) then
         local iClosestManualCheck = M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tOptionalComparisonKnownCorrectPoint)
-        if bDebugMessages == true then LOG(sFunctionRef..': iClosestManualCheck='..iClosestManualCheck..'; Unit position='..repr(oPathingUnit:GetPosition())) end
+        if bDebugMessages == true then LOG(sFunctionRef..': iClosestManualCheck='..iClosestManualCheck..'; Unit position='..repr(oPathingUnit:GetPosition())..'; targetposition='..repr(tTargetLocation)) end
         if iClosestManualCheck > 50 then
             --Find the closest location where have done a manual check that has the same pathing group as the comparison known correct point
             if M27Utilities.IsTableEmpty(tManualPathingChecks[sPathing]) == false then
@@ -618,8 +625,17 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
 
     --Have we not checked the pathing of either the engineer position or the target?
     if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) or not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tTargetLocation)]) then
+        local iAmphibiousOrigGroupOfTarget
+        local iAmphibiousOrigGroupOfPathingUnit
+        if sPathing == M27UnitInfo.refPathingTypeAmphibious then
+            iAmphibiousOrigGroupOfTarget = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
+            iAmphibiousOrigGroupOfPathingUnit = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
+            if bDebugMessages == true then LOG(sFunctionRef..': sPathing is amphibious so have recorded iAmphibiousOrigGroupOfTarget and iAmphibiousOrigGroupOfPathingUnit as '..iAmphibiousOrigGroupOfTarget..' and '..iAmphibiousOrigGroupOfPathingUnit) end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': Pathing isnt amphibious. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious)
+        end
+
         if bDebugMessages == true then
-            LOG('Will draw the 3 positions in red, with a line')
+            LOG(sFunctionRef..': Will draw the 3 positions in red, with a line. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil'))
             M27Utilities.DrawLocations({tKnownCorrectPoint, oPathingUnit:GetPosition(), tTargetLocation}, nil, 2, 200)
             M27Utilities.ErrorHandler('Temp to see history of function call', true)
         end
@@ -685,6 +701,43 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
                         end
                     end
                 end
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Seeing if we have changed pathing of a plateau. bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil')) end
+        if bHaveChangedPathing and (iAmphibiousOrigGroupOfTarget or iAmphibiousOrigGroupOfPathingUnit) and not(bPlateauCheckActive) then
+            --Have changed amphibious pathing, will see if this was a plateau that had mexes on it
+            if bDebugMessages == true then LOG(sFunctionRef..': M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]))..'; is table empty based on orig amphib group of pathing unit='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit]))..'; Pathing group of the pathing unit after update='..GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())..'; group of target post update='..GetSegmentGroupOfLocation(sPathing, tTargetLocation)) end
+            local bChangedAnyMex = false
+            local iGroupAlreadyChecked
+            --Has the group of the pathing unit changed, and do we have plateau info recorded for the orig pathing group?
+            if iAmphibiousOrigGroupOfPathingUnit and not(GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition()) == iAmphibiousOrigGroupOfPathingUnit) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes])) then
+                --Need to revise plateau logic - first check pathing of every mex on the plateau
+                iGroupAlreadyChecked = iAmphibiousOrigGroupOfPathingUnit
+                for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes] do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking for tMex='..repr(tMex)..'; with mex pathing group='..GetSegmentGroupOfLocation(sPathing, tMex)..'; iAmphibiousOrigGroupOfPathingUnit='..iAmphibiousOrigGroupOfPathingUnit) end
+                    if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfPathingUnit) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repr(tMex)..' or the mex shouldnt be assigned to this plateau') end
+                        bChangedAnyMex = true
+                    end
+                end
+            end
+            --Has the group of the target changed, and do we have plateau info recorded for the orig pathing group?
+            if not(bChangedAnyMex) and iAmphibiousOrigGroupOfTarget and not(iGroupAlreadyChecked == iAmphibiousOrigGroupOfTarget) and not(GetSegmentGroupOfLocation(sPathing, tTargetLocation) == iAmphibiousOrigGroupOfTarget) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes])) then
+                for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes] do
+                    if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfTarget) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repr(tMex)) end
+                        bChangedAnyMex = true
+                    end
+                end
+            end
+            if bChangedAnyMex then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have changed pathing of at least one mex, so will re-record all mexes for all pathing groups') end
+                RecordMexForPathingGroup()
+                RecordAllPlateaus()
+                for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
+                    UpdatePlateausToExpandTo(oBrain, true, true)
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Finished updating details of mexes and plateaus to expand to') end
             end
         end
     elseif bDebugMessages == true then LOG(sFunctionRef..': Have already done a manual check of this location')
@@ -4148,7 +4201,96 @@ function GetMidpointToPrimaryEnemyBase(aiBrain)
     return aiBrain[reftMidpointToPrimaryEnemyBase]
 end
 
-function UpdatePlateausToExpandTo(aiBrain, bForceRefresh)
+function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
+    --Updates aiBrain[reftOurPlateauInformation] manually
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ReRecordUnitsAndPlatoonsInPlateaus'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Brain army index='..aiBrain:GetArmyIndex()..'; GameTime='..GetGameTimeSeconds()) end
+
+    local oFrontUnit
+    local iPlateauGroup
+    local sPlatoonSubref
+    local sPlan
+    aiBrain[reftOurPlateauInformation] = {}
+    if M27Utilities.IsTableEmpty(tAllPlateausWithMexes) == false then
+        --Record platoons
+        for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
+            if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
+                sPlatoonSubref = nil
+                if oPlatoon[M27PlatoonUtilities.refiCurrentUnits] > 0 then
+                    if M27UnitInfo.IsUnitValid(oPlatoon[M27PlatoonUtilities.refoFrontUnit]) then
+                        oFrontUnit = oPlatoon[M27PlatoonUtilities.refoFrontUnit]
+                    else
+                        for iUnit, oUnit in oPlatoon[M27PlatoonUtilities.reftCurrentUnits] do
+                            if M27UnitInfo.IsUnitValid(oUnit) then
+                                oFrontUnit = oUnit
+                                break
+                            end
+                        end
+                    end
+                    iPlateauGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFrontUnit:GetPosition())
+                    oPlatoon[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                    if not(iPlateauGroup == aiBrain[refiOurBasePlateauGroup]) then
+                        sPlan = oPlatoon:GetPlan()
+                        if sPlan == 'M27PlateauLandCombat' then
+                            sPlatoonSubref = subrefPlateauLandCombatPlatoons
+                        elseif sPlan == 'M27PlateauIndirect' then
+                            sPlatoonSubref = subrefPlateauIndirectPlatoons
+                        elseif sPlan == 'M27PlateauMAA' then
+                            sPlatoonSubref = subrefPlateauMAAPlatoons
+                        elseif sPlan == 'M27PlateauScout' then
+                            sPlatoonSubref = subrefPlateauScoutPlatoons
+                        else
+                            M27Utilities.ErrorHandler('Couldnt identify a plateau plan for oPlatoon with plan='..sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]..' for plateau '..iPlateauGroup..' so wont record against this plateau')
+                        end
+                    end
+                    if sPlatoonSubref then
+                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
+                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref] = {} end
+                        aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref][sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]] = oPlatoon
+                    end
+                end
+            end
+        end
+
+        --Record plateau engineers
+        local tEngineers = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer, false, true)
+        local bInSamePlateau
+        if M27Utilities.IsTableEmpty(tEngineers) == false then
+            for iEngineer, oEngineer in tEngineers do
+                bInSamePlateau = false
+                iPlateauGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer:GetPosition())
+                if not(oEngineer:IsUnitState('Attached')) and not(oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionLoadOnTransport) then
+                    oEngineer[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                end
+                if oEngineer[M27Transport.refiAssignedPlateau] and not(oEngineer[M27Transport.refiAssignedPlateau] == aiBrain[refiOurBasePlateauGroup]) then
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers] = {} end
+                    aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers][GetEngineerUniqueCount(oEngineer)] = oEngineer
+                end
+            end
+        end
+
+        --Record factories
+        local tFactories = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandFactory, false, true)
+        if M27Utilities.IsTableEmpty(tFactories) == false then
+            for iUnit, oUnit in tFactories do
+                iPlateauGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+                oUnit[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering land factory '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iPlateauGroup='..iPlateauGroup..'; aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup]) end
+                if not(iPlateauGroup == aiBrain[refiOurBasePlateauGroup]) then
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories] = {} end
+                    aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdatePlateausToExpandTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -4159,14 +4301,15 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh)
     --refiLastPlateausUpdate = 'M27LastTimeUpdatedPlateau' --gametime that we last updated the plateaus
 
     --First time calling - update variables for all plateaus that require aibrain info
-    if not(aiBrain[refiLastPlateausUpdate]) then
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. bForceRefresh='..tostring(bForceRefresh or false)..'; bPathingChange='..tostring(bPathingChange or false)) end
+    if not(aiBrain[refiLastPlateausUpdate]) or bPathingChange then
         local iCurPathingGroup
         local tiBasePathingGroups = {}
         local sPathing = M27UnitInfo.refPathingTypeAmphibious
         for iRefBrain, oBrain in M27Overseer.tAllAIBrainsByArmyIndex do
             if not(M27Logic.IsCivilianBrain(oBrain)) then
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering brain with armyindex='..oBrain:GetArmyIndex()) end
                 iCurPathingGroup = GetSegmentGroupOfLocation(sPathing, PlayerStartPoints[oBrain.M27StartPositionNumber])
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering brain with armyindex='..oBrain:GetArmyIndex()..'; iCurPathingGroup') end
                 if not(tiBasePathingGroups[iCurPathingGroup]) then
                     tiBasePathingGroups[iCurPathingGroup] = true
                 end
@@ -4174,7 +4317,11 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh)
         end
         --Record if active start position in this plateau
         for iPlateauGroup, tSubtable in tAllPlateausWithMexes do
-            if tiBasePathingGroups[iPlateauGroup] then tAllPlateausWithMexes[iPlateauGroup][subrefPlateauContainsActiveStart] = true end
+            if bDebugMessages == true then LOG(sFunctionRef..': if iPlateauGroup'..iPlateauGroup..' contains a base pathing group then will set the flag for this to true. tiBasePathingGroups='..repr(tiBasePathingGroups)..'; tiBasePathingGroups[iPlateauGroup]='..tostring(tiBasePathingGroups[iPlateauGroup] or false)) end
+            if tiBasePathingGroups[iPlateauGroup] then
+                tAllPlateausWithMexes[iPlateauGroup][subrefPlateauContainsActiveStart] = true
+                if bDebugMessages == true then LOG(sFunctionRef..': Have set '..iPlateauGroup..' as having an active start') end
+            end
         end
     end
 
@@ -4213,6 +4360,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh)
                 aiBrain[reftOurPlateauInformation] = {}
             end
 
+            if bPathingChange then ReRecordUnitsAndPlatoonsInPlateaus(aiBrain) end --This will also reset aiBrain[reftOurPlateauInformation
             for iPlateauGroup, tSubtable in tAllPlateausWithMexes do
                 --Ignore plateaus that we already have engies or factories on
                 iExistingEngis = 0
@@ -4269,7 +4417,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh)
                         if bDebugMessages == true then LOG(sFunctionRef..': Will ignore plateaus containing an active start point. tSubtable[subrefPlateauContainsActiveStart]='..tostring(tSubtable[subrefPlateauContainsActiveStart])) end
                         if not(tSubtable[subrefPlateauContainsActiveStart]) then
                             --Is the location safe? First check if the nearest mex is closer than the nearest enemy threat
-                            if not (aiBrain[reftOurPlateauInformation][iPlateauGroup]) then
+                            if M27Utilities.IsTableEmpty (aiBrain[reftOurPlateauInformation][iPlateauGroup]) then
                                 aiBrain[reftOurPlateauInformation][iPlateauGroup] = {}
                             end
 

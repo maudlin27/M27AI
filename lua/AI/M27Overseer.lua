@@ -77,6 +77,7 @@ refiModDistEmergencyRange = 'M27OverseerModDistEmergencyRange'
 reftLocationFromStartNearestThreat = 'M27OverseerLocationNearestLandThreat' --Distance of closest enemy
 refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddistance
 refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
+refiPercentageClosestFriendlyLandFromOurBaseToEnemy = 'M27OverseerClosestLandFromOurBaseToEnemy' --as above, but not limited to combat units, e.g. includes mexes
 refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
 
 local iMaxACUEmergencyThreatRange = 150 --If ACU is more than this distance from our base then won't help even if an emergency threat
@@ -4819,16 +4820,27 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
         local tFriendlyLandCombat = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandCombat, false, true)
         --M27Utilities.GetNearestUnit(tUnits, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
-        local oNearestFriendlyCombatUnitToEnemyBase = M27Utilities.GetNearestUnit(tFriendlyLandCombat, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
+        local oNearestFriendlyUnitToEnemyBase = M27Utilities.GetNearestUnit(tFriendlyLandCombat, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
         local tFurthestFriendlyPosition = {'nil'}
         local iFurthestFriendlyDistToOurBase = 0
         local iFurthestFriendlyDistToEnemyBase = 0
         aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = 0.5
-        if oNearestFriendlyCombatUnitToEnemyBase then
-            tFurthestFriendlyPosition = oNearestFriendlyCombatUnitToEnemyBase:GetPosition()
+        aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy] = 0.5
+        local tFriendlyLand = aiBrain:GetListOfUnits(categories.LAND + M27UnitInfo.refCategoryStructure - categories.BENIGN, false, true)
+        if oNearestFriendlyUnitToEnemyBase then
+            tFurthestFriendlyPosition = oNearestFriendlyUnitToEnemyBase:GetPosition()
             iFurthestFriendlyDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             iFurthestFriendlyDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
             aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
+        end
+        if M27Utilities.IsTableEmpty(tFriendlyLand) == false then
+            oNearestFriendlyUnitToEnemyBase = M27Utilities.GetNearestUnit(tFriendlyLand, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
+            if oNearestFriendlyUnitToEnemyBase then
+                tFurthestFriendlyPosition = oNearestFriendlyUnitToEnemyBase:GetPosition()
+                iFurthestFriendlyDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                iFurthestFriendlyDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
+            end
         end
 
         local iPrevStrategy = aiBrain[refiAIBrainCurrentStrategy]
@@ -4995,7 +5007,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                         if bWantToEco == true then
                             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
                                 bWantToEco = false
-                            --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
+                                --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
                             elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then bWantToEco = false
                                 --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
                             elseif oACU:GetHealthPercent() < 0.45 then
@@ -5172,7 +5184,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             if aiBrain[refiModDistFromStartNearestOutstandingThreat] then tsGameState['10.NearestOutstandingThreat'] = aiBrain[refiModDistFromStartNearestOutstandingThreat] end
             if aiBrain[refiPercentageOutstandingThreat] then tsGameState['10.PercentageOutstandingThreat'] = aiBrain[refiPercentageOutstandingThreat] end
             if aiBrain[refiModDistFromStartNearestThreat] then tsGameState['10.ModDistNearestThreat'] = aiBrain[refiModDistFromStartNearestThreat] end
-            tsGameState['10.PercentDistOfOurUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] or 'nil')
+            tsGameState['10.PercentDistOfOurCombatUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] or 'nil')
+            tsGameState['10.PercentDistOfLandUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy] or 'nil')
             tsGameState['10.NearestEnemyStartPoint'] = aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation]
 
 
@@ -5221,7 +5234,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 else
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
                 end
-                else
+            else
                 if iUpgradeCount < 1 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have any ugprade on ACU yet so want to retreat it') end
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() + 5000)
@@ -5384,8 +5397,8 @@ function RecordAllEnemiesAndAllies(aiBrain)
     --Set mod distance emergency range
     aiBrain[refiModDistEmergencyRange] = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.4, 150), aiBrain[refiDistanceToNearestEnemyBase] * 0.15)
 
-    --Update plateau info since those of interest may have changed
-    ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain)
+    --Force refresh of plateaus to consider expanding to since those of interest may have changed
+    ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain, true, true)
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

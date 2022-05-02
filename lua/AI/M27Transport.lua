@@ -4,7 +4,7 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
-
+local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 
 
 reftTimeOfTransportLastLocationAttempt = 'M27TransportPrevTargetTime' --[x] = Location ref of previous target, returns gametime that we attempted it as a target
@@ -69,6 +69,12 @@ function RecordUnitLoadingOntoTransport(oUnit, oTransport)
 end
 
 function LoadEngineerOnTransport(aiBrain, oEngineer, oTransport)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'LoadEngineerOnTransport'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Engineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; Unit state='..M27Logic.GetUnitState(oEngineer)..'; Transport='..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..'; Unit state='..M27Logic.GetUnitState(oTransport)..'; oTransport[M27UnitInfo.refbSpecialMicroActive]='..tostring(oTransport[M27UnitInfo.refbSpecialMicroActive] or false)) end
+
     if oTransport[M27UnitInfo.refbSpecialMicroActive] then
         aiBrain[reftEngineersWaitingForTransport][M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)] = oEngineer
         oEngineer[refoTransportToLoadOnto] = oTransport
@@ -80,6 +86,7 @@ function LoadEngineerOnTransport(aiBrain, oEngineer, oTransport)
         oTransport[M27UnitInfo.refbSpecialMicroActive] = true
         RecordUnitLoadingOntoTransport(oEngineer, oTransport)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AssignTransportToPlateau(aiBrain, oTransport, iPlateauGroup, iMaxEngisWanted)
@@ -151,6 +158,7 @@ function TransportManager(aiBrain)
 
     local iAvailableTransports = 0
     local iTransportsWaitingForEngis = 0
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, is table of avaialble transports empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]))..'; Is table of plateaus of interest empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]))..'; Plateau group of base='..aiBrain[M27MapInfo.refiOurBasePlateauGroup]) end
     if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTransports]) == false then
         for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTransports] do
             iAvailableTransports = iAvailableTransports + 1
@@ -158,7 +166,7 @@ function TransportManager(aiBrain)
     end
     if M27Utilities.IsTableEmpty(aiBrain[reftTransportsWaitingForEngi]) == false then
         for iUnit, oUnit in aiBrain[reftTransportsWaitingForEngi] do
-            if M27UnitInfo.IsUnitValid(oUnit) then
+            if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false then
                 iTransportsWaitingForEngis = iTransportsWaitingForEngis + 1
             else
                 --Remove from table and abort (will come back to for next cycle)
@@ -225,7 +233,7 @@ function TransportManager(aiBrain)
     end
     --Exception - if we already have a transport waiting
     if iTransportsWaitingForEngis > 0 then aiBrain[refiEngineersWantedForTransports] = math.min(iTransportsWaitingForEngis * 2, 4) end
-    if bDebugMessages == true then LOG(sFunctionRef..': iTransportsWaitingForEngis='..iTransportsWaitingForEngis..'; aiBrain[refiEngineersWantedForTransports]='..aiBrain[refiEngineersWantedForTransports]) end
+    if bDebugMessages == true then LOG(sFunctionRef..': iTransportsWaitingForEngis='..iTransportsWaitingForEngis..'; aiBrain[refiEngineersWantedForTransports]='..aiBrain[refiEngineersWantedForTransports]..'; iAvailableTransports='..iAvailableTransports) end
 
 
     --Send idle transports back to base (dont want to use air rally point since want them close to where engineers are liekly to be built)
@@ -234,21 +242,45 @@ function TransportManager(aiBrain)
         local tCurTarget
         local oNavigator
         local bSendToRallyPoint
+        local bUnloadFirst
         for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTransports] do
-            bSendToRallyPoint = false
-            if oUnit.GetNavigator then
-                oNavigator = oUnit:GetNavigator()
-                if oNavigator and oNavigator.GetCurrentTargetPos then
-                    tCurTarget = oNavigator:GetCurrentTargetPos()
-                    if M27Utilities.GetDistanceBetweenPositions(tCurTarget, tRallyPoint) >= 30 then
-                        bSendToRallyPoint = true
+            --Does the transport have any units loaded? If so then unload them
+            bUnloadFirst = false
+            if oUnit[refiEngisLoaded] > 0 then
+                for iEngi, oEngi in oUnit[reftUnitsToldToLoadOntoTransport] do
+                    if M27UnitInfo.IsUnitValid(oEngi) then
+                        bUnloadFirst = true
+                        break
                     end
                 end
             end
-            if bSendToRallyPoint then
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering available transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit[refiEngisLoaded]='..(oUnit[refiEngisLoaded] or 0)..'; bUnloadFirst='..tostring(bUnloadFirst)) end
+
+            if bUnloadFirst then
                 IssueClearCommands({oUnit})
                 M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
-                IssueMove({oUnit}, tRallyPoint)
+                oUnit[M27AirOverseer.refbOnAssignment] = true
+                IssueTransportUnload({oUnit}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                if bDebugMessages == true then LOG(sFunctionRef..': Told transport to unload at the start position') end
+            else
+
+                bSendToRallyPoint = false
+                if oUnit.GetNavigator then
+                    oNavigator = oUnit:GetNavigator()
+                    if oNavigator and oNavigator.GetCurrentTargetPos then
+                        tCurTarget = oNavigator:GetCurrentTargetPos()
+                        if M27Utilities.GetDistanceBetweenPositions(tCurTarget, tRallyPoint) >= 30 then
+                            bSendToRallyPoint = true
+                        end
+                    end
+                end
+
+                if bSendToRallyPoint then
+                    IssueClearCommands({oUnit})
+                    M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
+                    IssueMove({oUnit}, tRallyPoint)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Telling transport to return to rally point '..repr(tRallyPoint)) end
+                end
             end
         end
     end

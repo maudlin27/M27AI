@@ -6283,35 +6283,68 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                 end
 
                                 --If a big threat, return to first rally point
-                                local tTargetBase
+                                local tTargetBaseAndOtherMovementPaths
                                 if bBigEnemyThreat == true then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy has  big threat so returning to nearest rally point') end
-                                    tTargetBase = {aiBrain[M27MapInfo.reftRallyPoints][1][1], aiBrain[M27MapInfo.reftRallyPoints][1][2], aiBrain[M27MapInfo.reftRallyPoints][1][3]}
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy has  big threat so returning to nearest rally point or shield, subject to if they have a nuke') end
+                                    local bGoToRally = true
+                                    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false then
+                                        local tSMDNearOurBase = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 150, 'Ally')
+                                        if M27Utilities.IsTableEmpty(tSMDNearOurBase) == false then
+                                            local iCurDist
+                                            local iClosestDist = 100000000
+                                            local oClosestSMD
+                                            for iSMD, oSMD in tSMDNearOurBase do
+                                                iCurDist = M27Utilities.GetDistanceBetweenPositions(oSMD:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                                if oSMD:GetFractionComplete() < 1 then iCurDist = iCurDist + 2000
+                                                else
+                                                    if oSMD.GetTacticalSiloAmmoCount == 0 then
+                                                        if oSMD.GetWorkProgress then iCurDist = iCurDist + 1000 * (1 - oSMD:GetWorkProgress())
+                                                        else iCurDist = iCurDist + 1000
+                                                        end
+                                                    end
+                                                end
+                                                if iCurDist < iClosestDist then
+                                                    --Can we path here?
+                                                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oSMD:GetPosition()) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition(oPlatoon)) then
+                                                        iClosestDist = iCurDist
+                                                        oClosestSMD = oSMD
+                                                    end
+                                                end
+                                            end
+                                            if oClosestSMD then
+                                                bGoToRally = false
+                                                tTargetBaseAndOtherMovementPaths = {M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oClosestSMD:GetPosition()), oClosestSMD:GetPosition(), 50, 5)}
+                                            end
+                                        end
+                                    end
+                                    if bGoToRally then
+                                        tTargetBaseAndOtherMovementPaths = {aiBrain[M27MapInfo.reftRallyPoints][1][1], aiBrain[M27MapInfo.reftRallyPoints][1][2], aiBrain[M27MapInfo.reftRallyPoints][1][3]}
+                                    end
                                 else
                                     --Normal behaviour - Go to the enemy base/nearby enemy units or mexes
-                                    tTargetBase = M27Logic.GetPriorityACUDestination(aiBrain, oPlatoon)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Will go to enemy base or priority destination = '..repr(tTargetBase)) end
+                                    tTargetBaseAndOtherMovementPaths = {M27Logic.GetPriorityACUDestination(aiBrain, oPlatoon)}
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will go to enemy base or priority destination = '..repr(tTargetBaseAndOtherMovementPaths)) end
                                     --[[
                                     if M27Logic.GetNearestEnemyStartNumber(aiBrain) == nil then
                                         LOG(sFunctionRef..': ERROR unless enemy dead as M27Logic.GetNearestEnemyStartNumber(aiBrain) is nil')
-                                        tTargetBase = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                                        tTargetBaseAndOtherMovementPaths = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
                                     else
-                                        tTargetBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                                        tTargetBaseAndOtherMovementPaths = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                                     end --]]
                                 end
 
                                 --Are we already near the target position? If so then switch to go to enemy base, or home if close to enemy base
-                                if M27Utilities.GetDistanceBetweenPositions(tTargetBase, M27Utilities.GetACU(aiBrain):GetPosition()) <= 5 then
+                                if M27Utilities.GetDistanceBetweenPositions(tTargetBaseAndOtherMovementPaths[1], M27Utilities.GetACU(aiBrain):GetPosition()) <= 5 then
                                     if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= 5 then
                                         --return to nearest rally point
-                                        tTargetBase = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
+                                        tTargetBaseAndOtherMovementPaths = {M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])}
                                     else
-                                        tTargetBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                                        tTargetBaseAndOtherMovementPaths = {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)}
                                     end
 
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Already near destination so will either go to enemy base or to nearest rally point; revised target='..repr(tTargetBase)) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Already near destination so will either go to enemy base or to nearest rally point; revised target='..repr(tTargetBaseAndOtherMovementPaths)) end
                                 end
-                                oPlatoon[reftMovementPath][1] = tTargetBase
+                                oPlatoon[reftMovementPath] = tTargetBaseAndOtherMovementPaths
                             end
                         end
                         if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath]) == true then M27Utilities.ErrorHandler('Platoon containing ACU has no movement path') end
@@ -9502,7 +9535,7 @@ function PlatoonInitialSetup(oPlatoon)
                     end
                     if sPlatoonSubref then
                         if not(aiBrain[M27MapInfo.reftOurPlateauInformation][oPlatoon[M27Transport.refiAssignedPlateau]][sPlatoonSubref]) then aiBrain[M27MapInfo.reftOurPlateauInformation][oPlatoon[M27Transport.refiAssignedPlateau]][sPlatoonSubref] = {} end
-                        aiBrain[M27MapInfo.reftOurPlateauInformation][oPlatoon[M27Transport.refiAssignedPlateau]][sPlatoonSubref][oPlatoon[refiPlatoonCount]] = oPlatoon
+                        aiBrain[M27MapInfo.reftOurPlateauInformation][oPlatoon[M27Transport.refiAssignedPlateau]][sPlatoonSubref][oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]] = oPlatoon
                         if bDebugMessages == true then LOG(sFunctionRef..': Have recorded platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' in the aiBrain tracker. sPlatoonSubref='..sPlatoonSubref) end
                     else M27Utilities.ErrorHandler('Unrecognised plateau platoon plan '..sPlatoonName..oPlatoon[refiPlatoonCount])
                     end

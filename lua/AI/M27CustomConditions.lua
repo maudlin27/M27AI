@@ -28,6 +28,7 @@ function SafeToUpgradeUnit(oUnit)
     --Can the unit be upgraded?
     local bSafeToGetUpgrade = false
     local aiBrain = oUnit:GetAIBrain()
+    if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 then bDebugMessages = true end
     local oUnitBP = oUnit:GetBlueprint()
     local sUpgradesTo = oUnitBP.General.UpgradesTo
     local iCurRadarRange, oCurBlueprint
@@ -78,12 +79,23 @@ function SafeToUpgradeUnit(oUnit)
             else
                 --No intel coverage - still consider safe if relatively close to our base on a mod distance basis
                 if bDebugMessages == true then LOG(sFunctionRef..': Have no intel coverage, will still consider safe if have full health and are relatively close to our base. Health%='..oUnit:GetHealthPercent()..'; ModDist='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)..'; Emergency range='..aiBrain[M27Overseer.refiModDistEmergencyRange]..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; Dist to our base='..iDistToStart..'; Dist between our base and enemy base='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
-                if oUnit:GetHealthPercent() == 1 and iDistToStart <= aiBrain[M27Overseer.refiModDistEmergencyRange] and M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false) <= aiBrain[M27Overseer.refiModDistEmergencyRange] and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] then
-                    bSafeToGetUpgrade = true
+                if oUnit:GetHealthPercent() == 1 then
+                    local iModDistToStart = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tUnitLocation, false)
+                    if iDistToStart <= aiBrain[M27Overseer.refiModDistEmergencyRange] and iModDistToStart <= aiBrain[M27Overseer.refiModDistEmergencyRange] and M27Utilities.GetDistanceBetweenPositions(tUnitLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Are within emergency range so safe to upgrade') end
+                        bSafeToGetUpgrade = true
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': iModDistToStart='..iModDistToStart..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; iDistToStart='..iDistToStart..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy]..'; aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy]='..aiBrain[M27Overseer.refiPercentageClosestFriendlyLandFromOurBaseToEnemy]..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; Is table of nearby units empty='..tostring(M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - categories.BENIGN, tUnitLocation, iEnemySearchRange + 30, 'Enemy')))) end
+
+                        if iModDistToStart < aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] and iModDistToStart < aiBrain[M27Overseer.refiModDistFromStartNearestThreat] and (iDistToStart < aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] or iDistToStart + 40 < aiBrain[M27Overseer.refiPercentageClosestFriendlyLandFromOurBaseToEnemy] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - categories.BENIGN, tUnitLocation, iEnemySearchRange + 30, 'Enemy')) then
+                            bSafeToGetUpgrade = true
+                        end
+                    end
                 end
             end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, bSafeToGetUpgrade='..tostring(bSafeToGetUpgrade)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bSafeToGetUpgrade
 end
