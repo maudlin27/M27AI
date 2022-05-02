@@ -2498,6 +2498,7 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
             end
         end
     end
+    if M27Utilities.IsTableEmpty(tHighestValueLocation) then M27Utilities.ErrorHandler('Couldnt find a priority destination') end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return tHighestValueLocation
 end

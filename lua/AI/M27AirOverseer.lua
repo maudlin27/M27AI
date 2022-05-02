@@ -79,8 +79,11 @@ refiFailedHitCount = 'M27BomberFailedHitCount' --Whenever a bomber fires a bomb 
 refiTargetFailedHitCount = 'M27BomberTargetFailedHitCount' --Number of failed hits on a target when bomber is assigned it (so dont abort if we knew it woudl be a hard to hit target unless it's proving really hard to hit)
 reftBombersAssignedLowPriorityTargets = 'M27AirBombersWithLowPriorityTargets' --List of bombers (key is unit ID+lifetimecount) whose current target is low priority
 refiShieldIgnoreValue = 'M27BomberShieldIgnoreValue' --Both aibrain and bomber variable; When a bomber is assigned a target, it will record the value of shields that can be ignored.  When the value is calculated, it's set at the aibrain level
+reftEngiHunterBombers = 'M27AirEngiHunterBombers' --[x] = UnitId..LifetimeCount.  Returns the bomber object
 
 refiTimeOfLastT1BomberMexAttack = 'M27BomberTimeOfLastMexAttack' --Against aiBrain when a T1 bomber is told to attack a mex
+reftMexHunterT1Bombers = 'M27AirMexHunterT1Bombers' --[x] = UnitId..LifetimeCount. Returns the bomber object
+refoT1MexTarget = 'M27AirT1MexTarget' --The mex unit being targeted by MexHunterT1Bombers
 
 
 --localised values
@@ -104,6 +107,8 @@ refiLastFiredBomb = 'M27AirLastFiredBomb'
 refoLastBombTarget = 'M27AirLastBombTarget'
 refoAssignedAirScout = 'M27HaveAssignedAirScout' --Assigned to a unit that wants a dedicated air scout (e.g. experimental) - the unit air scout assigned to it; also attached to air scout to indicate the unit it is assisting
 refbEngiHunterMode = 'M27AirBomberEngiHunterLogic' --set to true for t1 bombers with low lifetime count who are in engi hunter mode
+refbHaveDelayedTargeting = 'M27AirBomberHaveDelayedTargeting' --set to true against a bomber if it has already delayed targeting to give another engi a chance - currently used for engihunter bombers
+
 
 refiLastCoveredByAAByTech = 'M27AirLastTimeUnitHadAA' --[x] is the tech level of AA we are concerned about (e.g. 1 = 1+; 2 = 2+ 3 = 3+)
 refbLastCoveredByAAByTech = 'M27AirIsUnitCoveredByAA' --[x] is the tech level of AA we are concerned about
@@ -876,9 +881,7 @@ function TrackBomberTarget(oBomber, oTarget, iPriority)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if EntityCategoryContains(categories.TECH3, oBomber.UnitId) and (M27UnitInfo.GetUnitLifetimeCount(oBomber) == 10 or M27UnitInfo.GetUnitLifetimeCount(oBomber) == 45) then bDebugMessages = true end
 
-    --[[if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then
-        bDebugMessages = true
-    else bDebugMessages = false end--]]
+    --if oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
 
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code, oBomber=' .. oBomber.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBomber) .. '; oTarget=' .. oTarget.UnitId .. '; iPriority=' .. (iPriority or 'nil') .. '; bomber cur target number=' .. (oBomber[refiCurTargetNumber] or 'nil'))
@@ -1023,20 +1026,69 @@ function GetBestBomberTarget(oBomber, tPotentialUnitTargets, iMinFractionComplet
         else iAACategory = M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser
         end
         tEnemyAAToAvoid = aiBrain:GetUnitsAroundPoint(iAACategory, oBomber:GetPosition(), iMaxAARange, 'Enemy')
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': Is table of enemyAAToAvoid empty='..tostring(M27Utilities.IsTableEmpty(tEnemyAAToAvoid))..'; will list out AA if there are any')
+            if M27Utilities.IsTableEmpty(tEnemyAAToAvoid) == false then
+                for iAA, oAA in tEnemyAAToAvoid do
+                    LOG(sFunctionRef..': oAA='..oAA.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAA)..'; Position='..repr(oAA:GetPosition())..'; Dist to us='..M27Utilities.GetDistanceBetweenPositions(oAA:GetPosition(), oBomber:GetPosition())..'; Angle to AA='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oAA:GetPosition()))
+                end
+            end
+        end
     end
+
+    --Engi hunters - want the idle bomber closest to the engi to target it, unless have already given it a chance to target it
+    local tAltEngiHunterBomberPositions
+    local iIdleEngiHunters = 0
+    if oBomber[refbEngiHunterMode] and not(oBomber[refbHaveDelayedTargeting]) then
+        tAltEngiHunterBomberPositions = {}
+        if bDebugMessages == true then LOG(sFunctionRef..': Will see if we have any idle engi hutner bombers. Is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngiHunterBombers]))..'; Bomber curpos='..repr(oBomber:GetPosition())) end
+        if M27Utilities.IsTableEmpty(aiBrain[reftEngiHunterBombers]) == false then
+            for iUnit, oUnit in aiBrain[reftEngiHunterBombers] do
+                if not(oUnit == oBomber) and M27UnitInfo.IsUnitValid(oUnit) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering bomber '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' which is dif to the bomber we are currently considering.  Does it have an empty target list='..tostring(M27Utilities.IsTableEmpty(oUnit[reftTargetList]))..'; Bomber cur target number='..(oUnit[refiCurTargetNumber] or 'nil')..'; Bomber position='..repr(oUnit:GetPosition())) end
+                    if M27Utilities.IsTableEmpty(oUnit[reftTargetList]) then
+                        iIdleEngiHunters = iIdleEngiHunters + 1
+                        tAltEngiHunterBomberPositions[iIdleEngiHunters] = oUnit:GetPosition()
+                    end
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': iIdleEngiHunters='..iIdleEngiHunters..'; table of alt bomber positions='..repr(tAltEngiHunterBomberPositions)) end
+        end
+    end
+    local bLeaveForOtherBomber
+    local iMaxDistFromEnemyBase
+
+
 
 
 
     for iUnit, oUnit in tPotentialUnitTargets do
         --Check its not about to die and is complete enough
-        if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oBomber[refbEngiHunterMode]='..tostring(oBomber[refbEngiHunterMode] or false)..'; Bomber LC='..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Dist from unit to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; aiBrain[refiHighestEnemyAirThreat]='..(aiBrain[refiHighestEnemyAirThreat] or 0)..'; aiBrain[refiEnemyMassInGroundAA]='..(aiBrain[refiEnemyMassInGroundAA] or 0)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oBomber[refbEngiHunterMode]='..tostring(oBomber[refbEngiHunterMode] or false)..'; Bomber LC='..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Dist from unit to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; aiBrain[refiHighestEnemyAirThreat]='..(aiBrain[refiHighestEnemyAirThreat] or 0)..'; aiBrain[refiEnemyMassInGroundAA]='..(aiBrain[refiEnemyMassInGroundAA] or 0)..'; is oUnit the same as oRecentlyTargeted='..tostring(oUnit == oRecentlyTargeted)..'; oUnit fraction complete='..oUnit:GetFractionComplete()..'; GetMaxStrikeDamageWanted(oUnit)='..GetMaxStrikeDamageWanted(oUnit)..'; oUnit[refiStrikeDamageAssigned]='..(oUnit[refiStrikeDamageAssigned] or 'nil')..'; Is unit bombers current target='..tostring(oUnit == oBomberCurTarget)..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; aiBrain[refiHighestEnemyAirThreat]='..aiBrain[refiHighestEnemyAirThreat]..'; iMinFractionComplete wanted='..iMinFractionComplete) end
         if not(oUnit == oRecentlyTargeted) and oUnit:GetFractionComplete() >= (iMinFractionComplete or 0.5) then
             --Check it odesnt already have enough strike damage assigned
             if GetMaxStrikeDamageWanted(oUnit) > (oUnit[refiStrikeDamageAssigned] or 0) or oUnit == oBomberCurTarget then
                 --If in engi hunter mode then ignore engineers close to enemy base unless enemy has no air units
-                if not(oBomber[refbEngiHunterMode]) or (aiBrain[refiHighestEnemyAirThreat] <= 60 and (aiBrain[refiEnemyMassInGroundAA] <= 10 or M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1)) or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) > 80 then
-                    if not(iAATechToCheckFor) or not(IsTargetCoveredByAA(oUnit, tEnemyAAToAvoid, iAATechToCheckFor, oBomber:GetPosition())) then
-                        iDistanceToTarget = M27Utilities.GetDistanceBetweenPositions(tBomberPosition, oUnit:GetPosition())
+                iDistanceToTarget = M27Utilities.GetDistanceBetweenPositions(tBomberPosition, oUnit:GetPosition())
+                iMaxDistFromEnemyBase = 80
+                if iDistanceToTarget <= 60 then iMaxDistFromEnemyBase = 50 end
+                if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToTarget='..iDistanceToTarget..'; iMaxDistFromEnemyBase='..iMaxDistFromEnemyBase..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))) end
+                if not(oBomber[refbEngiHunterMode]) or (aiBrain[refiHighestEnemyAirThreat] <= 60 and (aiBrain[refiEnemyMassInGroundAA] <= 10 or M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1)) or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) > iMaxDistFromEnemyBase then
+                    bLeaveForOtherBomber = false
+                    if not(M27Utilities.IsTableEmpty(tAltEngiHunterBomberPositions)) then
+                        for iAltBomberPos, tAltBomberPos in tAltEngiHunterBomberPositions do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have another idle bomber closer to the target. tAltBomberPos='..repr(tAltBomberPos)..';  Dist to altbomberpos='..M27Utilities.GetDistanceBetweenPositions(tAltBomberPos, oUnit:GetPosition())..'; iDistanceToTarget='..iDistanceToTarget) end
+                            if iDistanceToTarget - 35 > M27Utilities.GetDistanceBetweenPositions(tAltBomberPos, oUnit:GetPosition()) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': We have another idle engi hunter bomber that is closer to the target so will leave it.  Dist to altbomberpos='..M27Utilities.GetDistanceBetweenPositions(tAltBomberPos, oUnit:GetPosition())..'; iDistanceToTarget='..iDistanceToTarget) end
+                                oBomber[refbHaveDelayedTargeting] = true
+                                bLeaveForOTherBomber = true
+                                --Not fully accurate since we might not have picked this target anyway, but should be close enough
+                            end
+                        end
+                    end
+
+                    if bDebugMessages == true then LOG(sFunctionRef..': Either not engi hunter, or Unit is far enough from enemy base, or no AA at enemy base. iAATechToCheckFor='..(iAATechToCheckFor or 'nil')..'  Is it covered by AA+'..tostring(IsTargetCoveredByAA(oUnit, tEnemyAAToAvoid, (iAATechToCheckFor or 1), oBomber:GetPosition(), false, true))..'; Dist to target before adjusting for angle and being too close='..M27Utilities.GetDistanceBetweenPositions(tBomberPosition, oUnit:GetPosition())..'; iClosestDistance='..iClosestDistance..'; Angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oUnit:GetPosition())..'; Dist to unit='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oUnit:GetPosition())) end
+                    if not(iAATechToCheckFor) or not(IsTargetCoveredByAA(oUnit, tEnemyAAToAvoid, iAATechToCheckFor, oBomber:GetPosition(), false, true)) then
                         if iDistanceToTarget <= iTooCloseDistance then
                             iDistanceToTarget = iDistanceToTarget + iExtraDistanceIfDifAngle
                         else
@@ -1124,9 +1176,26 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
             --exception if our current target is near us and within the preferred angle range
             local oBomberCurTarget = oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]
             local bKeepExistingTarget = false
+            local aiBrain = oBomber:GetAIBrain()
 
-            if M27UnitInfo.IsUnitValid(oBomberCurTarget) and M27Utilities.GetDistanceBetweenPositions(oBomberCurTarget:GetPosition(), oBomber:GetPosition()) <= 110 then
-                if math.abs(M27UnitInfo.GetUnitFacingAngle(oBomber) - M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oBomberCurTarget:GetPosition())) <= 20 then
+            local iIdleEngiHunters = 0
+            if bDebugMessages == true then LOG(sFunctionRef..': Will see if we have any idle engi hutner bombers. Is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngiHunterBombers]))) end
+            if M27Utilities.IsTableEmpty(aiBrain[reftEngiHunterBombers]) == false then
+                for iUnit, oUnit in aiBrain[reftEngiHunterBombers] do
+                    if not(oUnit == oBomber) and M27UnitInfo.IsUnitValid(oUnit) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering bomber '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' which is dif to the bomber we are currently considering.  Does it have an empty target list='..tostring(M27Utilities.IsTableEmpty(oUnit[reftTargetList]))..'; Bomber cur target number='..(oUnit[refiCurTargetNumber] or 'nil')) end
+                        if M27Utilities.IsTableEmpty(oUnit[reftTargetList]) then
+                            iIdleEngiHunters = iIdleEngiHunters + 1
+                        end
+                    end
+                end
+            end
+
+
+            if M27UnitInfo.IsUnitValid(oBomberCurTarget) then
+                if iIdleEngiHunters > 0 and not(M27Utilities.CanSeeUnit(aiBrain, oBomberCurTarget, true)) then
+                    bKeepExistingTarget = true
+                elseif M27Utilities.GetDistanceBetweenPositions(oBomberCurTarget:GetPosition(), oBomber:GetPosition()) <= 110 and math.abs(M27UnitInfo.GetUnitFacingAngle(oBomber) - M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oBomberCurTarget:GetPosition())) <= 20 then
                     bKeepExistingTarget = true
                 end
             end
@@ -1135,8 +1204,11 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
 
 
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a t1 bomber that is the first one built, so will hunt for engineers') end
-                local aiBrain = oBomber:GetAIBrain()
                 local tEnemyEngineers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryEngineer * categories.TECH1, oBomber:GetPosition(), aiBrain[refiMaxScoutRadius], 'Enemy')
+                if M27Utilities.IsTableEmpty(tEnemyEngineers) then
+                    tEnemyEngineers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryEngineer, oBomber:GetPosition(), aiBrain[refiMaxScoutRadius], 'Enemy')
+                    if bDebugMessages == true then LOG(sFunctionRef..': No T1 engineers detected, is table of T2+ engineers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyEngineers))) end
+                end
 
                 local oTargetWanted
 
@@ -1197,7 +1269,28 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                         if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through mexes to identify any we havent had sight of recently and will pick one of these') end
                         local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, oBomber:GetPosition(), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], 'Enemy')
                         local iDistToEnemyBase
+                        local bAlreadyCoveredByOtherBomber
+
+                        local iIdleEngiHunters = 0
+                        local tIdleEngiHunterTargets = {}
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will see if we have any idle engi hutner bombers. Is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngiHunterBombers]))) end
+                        if M27Utilities.IsTableEmpty(aiBrain[reftEngiHunterBombers]) == false then
+                            for iUnit, oUnit in aiBrain[reftEngiHunterBombers] do
+                                if not(oUnit == oBomber) and M27UnitInfo.IsUnitValid(oUnit) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering bomber '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' which is dif to the bomber we are currently considering.  Does it have an empty target list='..tostring(M27Utilities.IsTableEmpty(oUnit[reftTargetList]))..'; Bomber cur target number='..(oUnit[refiCurTargetNumber] or 'nil')) end
+                                    if M27Utilities.IsTableEmpty(oUnit[reftTargetList]) then
+                                        if oUnit.GetNavigator and oUnit:GetNavigator() then
+                                            iIdleEngiHunters = iIdleEngiHunters + 1
+                                            tIdleEngiHunterTargets[iIdleEngiHunters] = oUnit:GetNavigator():GetCurrentTargetPos()
+                                        end
+
+                                    end
+                                end
+                            end
+                        end
+
                         for iMex, tMex in tPotentialMexes do
+                            bAlreadyCoveredByOtherBomber = false
                             iCurSegmentX, iCurSegmentZ = GetAirSegmentFromPosition(tMex)
                             iLastVisualSight =  aiBrain[reftAirSegmentTracker][iCurSegmentX][iCurSegmentZ][refiLastScouted]
                             if iCurTime - iLastVisualSight >= 60 then
@@ -1207,8 +1300,18 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                     if iDistToEnemyBase >= 100 or (aiBrain[refiHighestEnemyAirThreat] <= 60 and (aiBrain[refiEnemyMassInGroundAA] <= 10 or M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1)) then
                                         iCurDistance = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tMex)
                                         if iCurDistance >= 30 and iCurDistance < iLowestDistance then
-                                            --Is there any AA covering it?
-                                            if not(IsTargetPositionCoveredByAA(tMex, tEnemyAA, oBomber:GetPosition(), false)) then
+                                            if iIdleEngiHunters > 0 then
+                                                --Do we have another bomber already targeting here?
+                                                for iExistingTarget, tExistingTarget in tIdleEngiHunterTargets do
+                                                    if M27Utilities.GetDistanceBetweenPositions(tExistingTarget, tMex) <= 30 then
+                                                        bAlreadyCoveredByOtherBomber = true
+                                                        break
+                                                    end
+                                                end
+                                            end
+
+                                            --Check dont have a bomber already going here, and that there's no AA covering it?
+                                            if not(bAlreadyCoveredByOtherBomber) and not(IsTargetPositionCoveredByAA(tMex, tEnemyAA, oBomber:GetPosition(), false)) then
                                                 iLowestDistance = iCurDistance
                                                 tNewTarget = {tMex[1], tMex[2], tMex[3]}
                                             end
@@ -2015,6 +2118,15 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
         aiBrain[refiAirStagingWanted] = 1
     end
 
+    --First update the list of engihunter bombers
+    if M27Utilities.IsTableEmpty(aiBrain[reftEngiHunterBombers]) == false then
+        for iUnit, oUnit in aiBrain[reftEngiHunterBombers] do
+            if not(M27UnitInfo.IsUnitValid) or not(oUnit[refbEngiHunterMode]) then
+                aiBrain[reftEngiHunterBombers][iUnit] = nil
+            end
+        end
+    end
+
     for iUnitType, tAllAirOfType in tAllAirUnits do
         sAvailableUnitRef = tAvailableUnitRef[iUnitType]
         aiBrain[sAvailableUnitRef] = {}
@@ -2357,7 +2469,10 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                         if iUnitType == iTypeBomber and M27UnitInfo.GetUnitLifetimeCount(oUnit) <= 2 and iCurTechLevel == 1 then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Dealing with early T1 bomber so want it to hunt for engineers rather tahn being available for normal target logic') end
                                             bUnitIsUnassigned = false
-                                            oUnit[refbEngiHunterMode] = true
+                                            if not(oUnit[refbEngiHunterMode]) then
+                                                oUnit[refbEngiHunterMode] = true
+                                                aiBrain[reftEngiHunterBombers][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+                                            end
                                             UpdateBomberTargets(oUnit)
                                         end
                                     else
@@ -4479,7 +4594,7 @@ function IsTargetPositionCoveredByAA(tTarget, tEnemyAA, tStartPoint, bReturnNumb
         if iAAInRange > 0 then return true else return false end
     end
 end
-function IsTargetCoveredByAA(oTarget, tEnemyAA, iTechLevelOfEnemyAA, tStartPoint, bReturnNumberOfAA)
+function IsTargetCoveredByAA(oTarget, tEnemyAA, iTechLevelOfEnemyAA, tStartPoint, bReturnNumberOfAA, bForceRefresh)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetCoveredByAA'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -4492,7 +4607,7 @@ function IsTargetCoveredByAA(oTarget, tEnemyAA, iTechLevelOfEnemyAA, tStartPoint
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code. oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; iTechLevelOfEnemyAA='..iTechLevelOfEnemyAA..'; tStartPoint='..repr(tStartPoint)) end
 
     --If we have already checked in the last 10 seconds and it was protected, or we checked in the last 2 seconds and it wasn't then just use this value
-    if not(bReturnNumberOfAA) then
+    if not(bReturnNumberOfAA) and not(bForceRefresh) then
         if oTarget[refbLastCoveredByAAByTech][iTechLevelOfEnemyAA] and GetGameTimeSeconds() - oTarget[refiLastCoveredByAAByTech][iTechLevelOfEnemyAA] <= 10 then
             if bDebugMessages == true then LOG(sFunctionRef..': We have checked in the last 10 seconds and the target was protected. Time last checked='..GetGameTimeSeconds() - oTarget[refiLastCoveredByAAByTech][iTechLevelOfEnemyAA]) end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -4504,7 +4619,7 @@ function IsTargetCoveredByAA(oTarget, tEnemyAA, iTechLevelOfEnemyAA, tStartPoint
         end
     end
 
-    --Havent checked recently or want a total number count so recheck
+    --Havent checked recently or want a total number count or bForceRefresh is true so recheck
     local iAAInRange = 0
     oTarget[refiLastCoveredByAAByTech][iTechLevelOfEnemyAA] = GetGameTimeSeconds()
     oTarget[refbLastCoveredByAAByTech][iTechLevelOfEnemyAA] = false
@@ -4647,13 +4762,13 @@ function AirBomberManager(aiBrain)
                     AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, 0)
                 else
                     tbConsideredTargetsByTech[iTechLevel] = true
-                    --Air domination - consider all enemy ground AA
+                    --Air domination - consider all enemy ground AA and shields
                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
                         iCurPriority = 1
                         local iCategoryToSearch = M27UnitInfo.refCategoryGroundAA
                         if iTechLevel == 4 then iCategoryToSearch = iCategoryToSearch * categories.TECH3 end
 
-                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
+                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA + M27UnitInfo.refCategoryFixedShield, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
                         for iUnit, oUnit in tPotentialTargets do
                             if not (oUnit:IsUnitState('Attached')) then
                                 iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)
@@ -4663,6 +4778,9 @@ function AirBomberManager(aiBrain)
                                     --end
                                 end
                             end
+                        end
+                        if iTechLevel >= 3 and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) and not(M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) then
+                            AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel)
                         end
                     end
 
@@ -4720,32 +4838,71 @@ function AirBomberManager(aiBrain)
 
                         --Mex (if not targeted a mex for a while) for T1 bombers
                         iCurPriority = 5
-                        if iTechLevel == 1 and iTargetCount == 0 and iAvailableBombers >= 3 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] < 3 and GetGameTimeSeconds() - (aiBrain[refiTimeOfLastT1BomberMexAttack] or 0) >= 300 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': It has been a while since the last mex attack so will consider targeting a mex.  aiBrain[M27Overseer.refiOurHighestAirFactoryTech]='..aiBrain[M27Overseer.refiOurHighestAirFactoryTech]..'; Time since last targeted mex='..GetGameTimeSeconds() - (aiBrain[refiTimeOfLastT1BomberMexAttack] or 0)) end
-                            local iClosestDistance = 100000
-                            local oClosestDistance
-                            --Find the mex with the lowest special distance to target, ignoring those that have already been targeted
-                            tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Mex, tBasePosition, aiBrain[refiMaxScoutRadius], 'Enemy')
-                            if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
-                                tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
-                                --if not(M27Logic.IsTargetUnderShield(aiBrain, oMex, 0, false, false, true)) then
-                                -- if not(IsTargetCoveredByAA(oMex, tEnemyAA, 1, tStartPoint)) then
-                                for iUnit, oUnit in tPotentialTargets do
-                                    if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
-                                        iCurModDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBasePosition) - M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                                        if iCurModDistance < iClosestDistance and (not(bAvoidCruisers) or iCurModDistance < iNearestCruiserModDistance - 30) then
-                                            if not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)) then
-                                                if not(IsTargetCoveredByAA(oUnit, tEnemyAA, 1, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], false)) then
-                                                    oClosestDistance = oUnit
-                                                    iClosestDistance = iCurModDistance
+                        if iTechLevel == 1 and iTargetCount == 0 and iAvailableBombers >= 3 then
+                            local bTargetMexWithT1Bombers = false
+                            local tLivingT1Bombers = {}
+                            local tMexStartPos
+                            local iLivingBombers = 0
+
+                            if GetGameTimeSeconds() - (aiBrain[refiTimeOfLastT1BomberMexAttack] or -100) >= 300 and (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] < 3 or GetGameTimeSeconds() - (aiBrain[refiTimeOfLastT1BomberMexAttack] or -400) >= 400) then
+                                bTargetMexWithT1Bombers = true
+                            else
+                                --Have we killed the last target with at least 2 of the assigned bombers still being alive?
+                                if not(M27UnitInfo.IsUnitValid(aiBrain[refoT1MexTarget])) then
+                                    bTargetMexWithT1Bombers = true
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftMexHunterT1Bombers]) then
+                                        bTargetMexWithT1Bombers = false
+                                    else
+                                        for iUnit, oUnit in aiBrain[reftMexHunterT1Bombers] do
+                                            if M27UnitInfo.IsUnitValid(oUnit) then
+                                                iLivingBombers = iLivingBombers + 1
+                                                tLivingT1Bombers[iLivingBombers] = oUnit
+                                            end
+                                        end
+                                        if iLivingBombers == 0 then
+                                            aiBrain[reftMexHunterT1Bombers] = {}
+                                        end
+                                        if iLivingBombers < 2 then bTargetMexWithT1Bombers = false end
+
+                                    end
+                                end
+
+                            end
+
+
+                            if bTargetMexWithT1Bombers then
+                                if iLivingBombers >= 2 then
+                                    tMexStartPos = M27Utilities.GetAveragePosition(aiBrain[reftMexHunterT1Bombers])
+                                else
+                                    tMexStartPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': It has been a while since the last mex attack so will consider targeting a mex.  aiBrain[M27Overseer.refiOurHighestAirFactoryTech]='..aiBrain[M27Overseer.refiOurHighestAirFactoryTech]..'; Time since last targeted mex='..GetGameTimeSeconds() - (aiBrain[refiTimeOfLastT1BomberMexAttack] or 0)) end
+                                local iClosestDistance = 100000
+                                local oClosestDistance
+                                --Find the mex with the lowest special distance to target, ignoring those that have already been targeted
+                                tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Mex, tBasePosition, aiBrain[refiMaxScoutRadius], 'Enemy')
+                                if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
+                                    tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiMaxScoutRadius], 'Enemy')
+                                    --if not(M27Logic.IsTargetUnderShield(aiBrain, oMex, 0, false, false, true)) then
+                                    -- if not(IsTargetCoveredByAA(oMex, tEnemyAA, 1, tStartPoint)) then
+                                    for iUnit, oUnit in tPotentialTargets do
+                                        --Ignore mex if it's the last one we tried to target (since that means we failed)
+                                        if not(M27UnitInfo.IsUnitUnderwater(oUnit)) and not(aiBrain[refoT1MexTarget] == oUnit) then
+                                            iCurModDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tMexStartPos) - M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                                            if iCurModDistance < iClosestDistance and (not(bAvoidCruisers) or iCurModDistance < iNearestCruiserModDistance - 30) then
+                                                if not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)) then
+                                                    if not(IsTargetCoveredByAA(oUnit, tEnemyAA, 1, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], false)) then
+                                                        oClosestDistance = oUnit
+                                                        iClosestDistance = iCurModDistance
+                                                    end
                                                 end
                                             end
                                         end
                                     end
                                 end
-                            end
-                            if oClosestDistance then
-                                AddUnitToShortlist(oClosestDistance, iTechLevel, iClosestDistance)
+                                if oClosestDistance then
+                                    AddUnitToShortlist(oClosestDistance, iTechLevel, iClosestDistance)
+                                end
                             end
                         end
                     end
@@ -5292,8 +5449,10 @@ function AirBomberManager(aiBrain)
                                 oCurBomber = tBombersOfTechLevel[iAvailableBombers]
                                 if not(M27UnitInfo.IsUnitValid(oCurBomber)) then M27Utilities.ErrorHandler('Returned a bomber iAvailablerBombers='..iAvailableBombers..' that isnt valid') end
                                 TargetUnit(oCurTarget, oCurBomber, tValue[refiShortlistPriority], tValue[refiShortlistStrikeDamageWanted])
-                                if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oCurTarget.UnitId) then
+                                if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oCurTarget.UnitId) and EntityCategoryContains(categories.TECH1, oCurBomber) then
                                     aiBrain[refiTimeOfLastT1BomberMexAttack] = GetGameTimeSeconds()
+                                    aiBrain[reftMexHunterT1Bombers][oCurBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurBomber)] = oCurBomber
+                                    aiBrain[refoT1MexTarget] = oCurTarget
                                 end
                                 if iLoopStartAvailableBombers <= iAvailableBombers or iAvailableBombers <= 0 then
                                     break
@@ -5319,7 +5478,9 @@ function AirBomberManager(aiBrain)
                             oClosestDistance = nil
                             if bDebugMessages == true then LOG(sFunctionRef..': About to assign target to oCurBomber='..oCurBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurBomber)) end
                             for iEntry, tSubtable in aiBrain[reftBomberShortlistByTech][iTechLevel] do
-                                if M27UnitInfo.IsUnitValid(tSubtable[refiShortlistPriority]) then --Redundancy as once had error that indicated oClosestDistance was a table
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering shortlist for techlevel='..iTechLevel) end
+                                if M27UnitInfo.IsUnitValid(tSubtable[refiShortlistUnit]) then --Redundancy as once had error that indicated oClosestDistance was a table
+                                    if bDebugMessages == true then LOG(sFunctionRef..': tSubtable[refiShortlistUnit][refiStrikeDamageAssigned]='..(tSubtable[refiShortlistUnit][refiStrikeDamageAssigned] or 0)..'; tSubtable[refiShortlistStrikeDamageWanted]='..tSubtable[refiShortlistStrikeDamageWanted]..'; tSubtable[refiShortlistPriority]='..tSubtable[refiShortlistPriority]..'; iLowestPriority='..iLowestPriority..'; Mod distance after adjusting for failed hits='..M27Utilities.GetDistanceBetweenPositions(tBomberPosition, tSubtable[refiShortlistUnit]:GetPosition()) + math.min(100, (tSubtable[refiShortlistUnit][refiFailedHitCount] or 0) * 15)..'; iClosestDistance='..iClosestDistance) end
                                     if (tSubtable[refiShortlistUnit][refiStrikeDamageAssigned] or 0) <= tSubtable[refiShortlistStrikeDamageWanted] then
                                         if tSubtable[refiShortlistPriority] <= iLowestPriority then
                                             iCurModDistance = M27Utilities.GetDistanceBetweenPositions(tBomberPosition, tSubtable[refiShortlistUnit]:GetPosition()) + math.min(100, (tSubtable[refiShortlistUnit][refiFailedHitCount] or 0) * 15)
@@ -5340,14 +5501,17 @@ function AirBomberManager(aiBrain)
                                             end
                                         end
                                     end
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': Unit isnt valid')
                                 end
                             end
+
                             if oClosestDistance then
                                 TargetUnit(oClosestDistance, oCurBomber, iLowestPriority, iTargetMaxHealth)
                                 if iTechLevel == 1 and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oCurTarget.UnitId) then
                                     aiBrain[refiTimeOfLastT1BomberMexAttack] = GetGameTimeSeconds()
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': Telling oCurBomber='..oCurBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurBomber)..' to target unit '..oClosestDistance.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestDistance)..' with strike damage assigned on that unit='..oClosestDistance[refiStrikeDamageAssigned]..' and max strike damage wanted='..oClosestDistance[refiMaxStrikeDamageWanted]..'; bomber on assignment='..tostring(oCurBomber[refbOnAssignment])) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Telling oCurBomber='..oCurBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurBomber)..' to target unit '..oClosestDistance.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestDistance)..' with strike damage assigned on that unit='..oClosestDistance[refiStrikeDamageAssigned]..' and max strike damage wanted='..oClosestDistance[refiMaxStrikeDamageWanted]..'; bomber on assignment='..tostring(oCurBomber[refbOnAssignment])..'; iAvailableBombers='..iAvailableBombers) end
+                            elseif bDebugMessages == true then LOG(sFunctionRef..': oClosestDistance is nil')
                             end
 
                             if iLoopStartAvailableBombers <= iAvailableBombers or iAvailableBombers == 0 then
@@ -5642,7 +5806,7 @@ function AirBomberManager(aiBrain)
                                 if M27Utilities.IsTableEmpty(tTargetsByMaxHealth[iHealthIndex]) == false then
                                     if bDebugMessages == true then LOG(sFunctionRef..': iTechLevel='..(iTechLevel or 'nil')..'; iHealthIndex='..iHealthIndex..'; Size of table of targets by max health='..table.getn(tTargetsByMaxHealth[iHealthIndex])..'; bTargetsContainHighPriorityWithNoAA='..tostring(bTargetsContainHighPriorityWithNoAA)) end
                                     for iUnit, oUnit in tTargetsByMaxHealth[iHealthIndex] do
-                                        if not(bTargetsContainHighPriorityWithNoAA) or (not(oUnit[refbLastCoveredByAAByTech][iTechLevelOfEnemyAA]) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oUnit.UnitId)) then
+                                        if not(bTargetsContainHighPriorityWithNoAA) or (not(oUnit[refbLastCoveredByAAByTech][3]) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oUnit.UnitId)) then
                                             AddUnitToShortlist(oUnit, iTechLevel, M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tRallyPoint), tTargetStrikeDamageByMaxHealth[iHealthIndex][iUnit])
                                         end
                                     end
@@ -5697,7 +5861,7 @@ function AirBomberManager(aiBrain)
                                     iRemainingStrikeDamageAvailable = iStratsNearRallyPoint * iAverageStrikeDamage --Approximation - correct if we dont have mixture of different strat bomber techs
                                     iStrikeDamageWanted = GetMaxStrikeDamageWanted(oClosestDistance)
 
-                                    if not(oClosestDistance[refbLastCoveredByAAByTech][iTechLevelOfEnemyAA]) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oClosestDistance.UnitId) then
+                                    if not(oClosestDistance[refbLastCoveredByAAByTech][3]) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oClosestDistance.UnitId) then
                                         iMinStrikeDamageNeeded = math.min(35000, iStrikeDamageWanted * 0.5)
                                     else
                                         iMinStrikeDamageNeeded = iStrikeDamageWanted
@@ -6868,6 +7032,8 @@ function SetupAirOverseer(aiBrain)
     aiBrain[reftNearestEnemyAirThreat] = {}
     aiBrain[refiEnemyMassInGroundAA] = 0
     aiBrain[refiHighestEnemyAirThreat] = 0
+    aiBrain[reftEngiHunterBombers] = {}
+    aiBrain[reftMexHunterT1Bombers] = {}
 
 
     --Air scouts have visual of 42, so want to divide map into segments of size 20

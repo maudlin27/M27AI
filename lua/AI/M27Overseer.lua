@@ -122,6 +122,7 @@ reftPriorityLandScoutTargets = 'M27ScoutPriorityTargets'
 refiMAAShortfallACUPrecaution = 'M27MAAShortfallACUPrecaution'
 refiMAAShortfallACUCore = 'M27MAAShortfallACUCore'
 refiMAAShortfallLargePlatoons = 'M27MAAShortfallLarge'
+refiMAAShortfallHighMass = 'M27MAAShortfallHighMass' --E.g. if have platoons such as experimentals with high mass value that lack sufficient MAA; note that MAA in here are also included in shortfalllarge
 refiMAAShortfallBase = 'M27MAAShortfallBase'
 
 local iScoutLargePlatoonThreshold = 8 --Platoons >= this size are considered large
@@ -1063,7 +1064,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         --=================Large platoons - ensure they have MAA in them, and if not then add MAA
         local tPlatoonUnits, iPlatoonUnits, tPlatoonCurrentMAAs, oMAAToAdd, oMAAOldPlatoon
 
-        local iThresholdForAMAA
+        local iThresholdForAMAA --MAA wanted will be platoon mass value divided by this
         if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] == nil then aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] = 0 end
         if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 then
             iThresholdForAMAA = 250 + (500 * (aiBrain[refiOurHighestFactoryTechLevel] - 1))
@@ -1074,28 +1075,33 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         local iMAAAlreadyHave
         local iCurLoopCount
         local iMaxLoopCount = 50
+        --If the last cycle we didnt have enough MAA to cover our high mass platoons then want to prioritise these first
+        if aiBrain[refiMAAShortfallHighMass] > 0 then iThresholdForAMAA = 10000 end
+        aiBrain[refiMAAShortfallHighMass] = 0
 
         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
+            local iOurBaseLandPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-                if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) and not(oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow]) and not(oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies]) then
+                if oPlatoon.GetPlan and not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) and not(oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow]) and not(oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies]) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering platoon '..(oPlatoon:GetPlan() or 'nil')..(oPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil')..'; Land pathing segment='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))..'; Our base segment='..iOurBaseLandPathingGroup..'; Mass value='..(oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 'nil')..'; iThresholdForAMAA='..(iThresholdForAMAA or 'nil')) end
                     if (oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 0) >= iThresholdForAMAA then
                         --Can we path here with land from our base?
-                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
-                            iMAAWanted = math.floor(oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] / iThresholdForAMAA)
+                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) == iOurBaseLandPathingGroup then
+                            iMAAWanted = math.min(10, math.floor(oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] / iThresholdForAMAA))
                             tPlatoonCurrentMAAs = EntityCategoryFilterDown(refCategoryMAA, oPlatoon:GetPlatoonUnits())
                             if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == true then iMAAAlreadyHave = 0
                                 --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
-                                else iMAAAlreadyHave = GetAirThreatLevel(aiBrain, tPlatoonCurrentMAAs, false, false, true, false, false, nil, nil, nil, nil, nil) end
+                            else iMAAAlreadyHave = GetAirThreatLevel(aiBrain, tPlatoonCurrentMAAs, false, false, true, false, false, nil, nil, nil, nil, nil) end
                             if oPlatoon[refoUnitsMAAHelper] then
                                 --tPlatoonCurrentMAAs = oPlatoon[refoUnitsMAAHelper]:GetPlatoonUnits()
                                 --if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == false then
-                                    iMAAAlreadyHave = iMAAAlreadyHave + oPlatoon[refoUnitsMAAHelper][M27PlatoonUtilities.refiPlatoonMassValue]
+                                iMAAAlreadyHave = iMAAAlreadyHave + oPlatoon[refoUnitsMAAHelper][M27PlatoonUtilities.refiPlatoonMassValue]
                                 --end
                             end
                             iCurLoopCount = 0
 
                             --Convert to number of units
-                            iMAAWanted = math.floor(iMAAWanted / iSingleMAAMassValue)
+                            --iMAAWanted = math.floor(iMAAWanted / iSingleMAAMassValue) --MAAWanted is divided by the MAA threshold so effectively already is a number of units
                             iMAAAlreadyHave = math.ceil(iMAAAlreadyHave / iSingleMAAMassValue)
 
                             while iMAAWanted > iMAAAlreadyHave do
@@ -1125,9 +1131,16 @@ function AssignMAAToPreferredPlatoons(aiBrain)
 
                                 end
                             end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Can path to platoon with land. iMAAWanted='..iMAAWanted..'; iMAAAlreadyHave='..iMAAAlreadyHave) end
+
                         end
+
                         if iMAAWanted > iMAAAlreadyHave then
                             iTotalMAAWanted = iMAAWanted - iMAAAlreadyHave
+                            if oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 0 >= 10000 then
+                                aiBrain[refiMAAShortfallHighMass] = aiBrain[refiMAAShortfallHighMass] + (iMAAWanted - iMAAAlreadyHave)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have high value platoon '..oPlatoon:GetPlan()..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]..' with mass value '..oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue]..' that lacks sufficient MAA. iTotalMAAWanted='..iTotalMAAWanted..'; iMAAAlreadyHave='..iMAAAlreadyHave..'; aiBrain[refiMAAShortfallHighMass]='..aiBrain[refiMAAShortfallHighMass]) end
+                            end
                             break
                         end
                     end
@@ -1137,14 +1150,18 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         aiBrain[refiMAAShortfallLargePlatoons] = iTotalMAAWanted
         if aiBrain[refiMAAShortfallLargePlatoons] > 0 then aiBrain[refiMAAShortfallBase] = 1
         else aiBrain[refiMAAShortfallBase] = 0 end
+    else
+        --Dont have enough MAA for any platoons
+        aiBrain[refiMAAShortfallLargePlatoons] = 1
+        aiBrain[refiMAAShortfallHighMass] = 1
     end
 
 
     --========Build order related TODO longer term - update the current true/false flag in the factory overseer to differentiate between the MAA wanted
-    if aiBrain[refiMAAShortfallACUPrecaution] + aiBrain[refiMAAShortfallACUCore] + aiBrain[refiMAAShortfallLargePlatoons] > 0 then bNeedMoreMAA = true
+    if aiBrain[refiMAAShortfallACUPrecaution] + aiBrain[refiMAAShortfallACUCore] + aiBrain[refiMAAShortfallLargePlatoons] + aiBrain[refiMAAShortfallHighMass] > 0 then bNeedMoreMAA = true
     else bNeedMoreMAA = false end
     aiBrain[refbNeedMAABuilt] = bNeedMoreMAA
-    if bDebugMessages == true then LOG(sFunctionRef..': End of MAA assignment logic; aiBrain[refiMAAShortfallACUPrecaution]='..aiBrain[refiMAAShortfallACUPrecaution]..'; aiBrain[refiMAAShortfallACUCore]='..aiBrain[refiMAAShortfallACUCore]..'; aiBrain[refiMAAShortfallLargePlatoons]='..aiBrain[refiMAAShortfallLargePlatoons]) end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of MAA assignment logic; aiBrain[refiMAAShortfallACUPrecaution]='..aiBrain[refiMAAShortfallACUPrecaution]..'; aiBrain[refiMAAShortfallACUCore]='..aiBrain[refiMAAShortfallACUCore]..'; aiBrain[refiMAAShortfallLargePlatoons]='..aiBrain[refiMAAShortfallLargePlatoons]..'; aiBrain[refiMAAShortfallHighMass]='..aiBrain[refiMAAShortfallHighMass]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -4851,17 +4868,19 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             --Should we be in air dominance mode?
             local bWantAirDominance = false
             --Have we recently scouted the enemy base?
-            local iBaseScoutingTime = 20
+            local iBaseScoutingTime = 30
             local iEnemyGroundAAFactor = 0.1
             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
-                iBaseScoutingTime = aiBrain[M27AirOverseer.refiIntervalEnemyBase] + 30
+                iBaseScoutingTime = aiBrain[M27AirOverseer.refiIntervalEnemyBase] + 60
                 iEnemyGroundAAFactor = 0.2
             end
             local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
             local bEnemyHasEnoughAA = false
+            if bDebugMessages == true then LOG(sFunctionRef..': iBaseScoutingTime='..iBaseScoutingTime..'; CurTime='..GetGameTimeSeconds()..'; Time last scouted enemy base='..aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted]) end
             if math.max(iBaseScoutingTime + 30, GetGameTimeSeconds()) - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] <= iBaseScoutingTime then
                 if bDebugMessages == true then LOG(sFunctionRef..': Time since last scouted enemy base='..(GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted])..'; Scouting interval='..iBaseScoutingTime..'; therefore considering whether to switch to air dominance') end
                 --Have we either had no bombers die, or the last bomber was effective?
+                if bDebugMessages == true then LOG(sFunctionRef..': Is table of bomber effectiveness empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.refbBombersAreEffective]))..'; Effectiveness of our highest air factory tech='..tostring(aiBrain[M27AirOverseer.refbBombersAreEffective][aiBrain[refiOurHighestAirFactoryTech]] or false)) end
                 if not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.refbBombersAreEffective]) == true or aiBrain[M27AirOverseer.refbBombersAreEffective][aiBrain[refiOurHighestAirFactoryTech]] == false) then
                     if bDebugMessages == true then LOG(sFunctionRef..': Bombers have been ineffective at our current tech level so wont try air dominance') end
                     bEnemyHasEnoughAA = true
@@ -4890,9 +4909,23 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                             if bDebugMessages == true then LOG(sFunctionRef..': We dont have any bombers, so dont switch to air dominance yet') end
                             bEnemyHasEnoughAA = true
                         else
-                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy mass in ground AA='..(aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] or 'nil')..'; table size of bombers='..table.getn(tBombers)) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy mass in ground AA='..(aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] or 'nil')..'; table size of bombers='..table.getn(tBombers)..'; Threat of bombers='..M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false)) end
+                            --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
                             if aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] > 0 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] * 10 > M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false) then
+                                --Further override - if have 3+ strats, and enemy has no cruisers or T3+ AA, then do air dom mode
                                 bEnemyHasEnoughAA = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiPreviousAvailableBombers='..aiBrain[M27AirOverseer.refiPreviousAvailableBombers]..'; M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]))..'; size of tBombers='..table.getn(tBombers)) end
+                                if aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] <= 6000 and aiBrain[M27AirOverseer.refiPreviousAvailableBombers] >= 3 and M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then
+                                    local tT3PlusBombers = EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, tBombers)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of T3PlusBombers empty='..tostring(M27Utilities.IsTableEmpty(tT3PlusBombers))..'; refiPreviousAvailableBombers='..aiBrain[M27AirOverseer.refiPreviousAvailableBombers]..'; Availalbe bombers empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]))) end
+                                    if M27Utilities.IsTableEmpty(tT3PlusBombers) == false and table.getn(tT3PlusBombers) >= 3 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, aiBrain[M27AirOverseer.reftAvailableBombers])) == false then
+                                        local tEnemyT3PlusAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiserCarrier + M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiDistanceToNearestEnemyBase] + 40, 'Enemy')
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Is table of Enemy T3PlusAA empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT3PlusAA))) end
+                                        if M27Utilities.IsTableEmpty(tEnemyT3PlusAA) then
+                                            bEnemyHasEnoughAA = false
+                                        end
+                                    end
+                                end
                             end
                         end
                     end
@@ -4904,18 +4937,20 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
 
             if bEnemyHasEnoughAA == false then
                 --Does enemy have ground AA that is shielded?
-                if bDebugMessages == true then LOG(sFunctionRef..': Enemy doesnt have enough AA, checking if they have any AA that is under fixed shields') end
+                if bDebugMessages == true then LOG(sFunctionRef..': Enemy doesnt have enough AA, checking if they have any AA that is under fixed shields. aiBrain[refiOurHighestAirFactoryTech]='..aiBrain[refiOurHighestAirFactoryTech]) end
                 local tEnemyFixedShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
                 local bHaveAAUnderShield = false
                 local iAACategoryToSearchFor
-                if aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 2 then iAACategoryToSearchFor = M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiserCarrier
+                if aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 2 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have at least 2 T3 bombers so will search only for T3 AA and cruisers') end
+                    iAACategoryToSearchFor = M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiserCarrier
                 else iAACategoryToSearchFor = M27UnitInfo.refCategoryGroundAA + M27UnitInfo.refCategoryCruiserCarrier
                 end
                 if M27Utilities.IsTableEmpty(tEnemyFixedShields) == false then
                     local tNearbyGroundAA, iShieldRadius
                     for iShield, oShield in tEnemyFixedShields do
                         if M27UnitInfo.IsUnitValid(oShield) then
-                            tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, oShield:GetPosition(), oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5 + 1, 'Enemy')
+                            tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(iAACategoryToSearchFor, oShield:GetPosition(), oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5 + 1, 'Enemy')
                             if M27Utilities.IsTableEmpty(tNearbyGroundAA) == false then
                                 for iGroundAA, oGroundAA in tNearbyGroundAA do
                                     if M27UnitInfo.IsUnitValid(oGroundAA) then
@@ -4937,6 +4972,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 if bDebugMessages == true then LOG(sFunctionRef..': Setting strategy as air dominance') end
                 aiBrain[refiAIBrainCurrentStrategy] = refStrategyAirDominance
             else
+                if bDebugMessages == true then LOG(sFunctionRef..': Dont want air dom strategy so will consider alternatives') end
                 --Are we protecting the ACU? If so then stay in this mode unless we think ACU is safe
                 local bKeepProtectingACU = false
                 if aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
@@ -5496,6 +5532,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refiMAAShortfallACUPrecaution] = 1
     aiBrain[refiMAAShortfallACUCore] = 0
     aiBrain[refiMAAShortfallLargePlatoons] = 0
+    aiBrain[refiMAAShortfallHighMass] = 0
     aiBrain[refiMAAShortfallBase] = 0
     aiBrain[reftiMaxFactoryByType] = {1,1,0}
     aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
@@ -5857,8 +5894,8 @@ function CoordinateLandExperimentals(aiBrain)
                 if iM27LandExperimentals >= 2 then
                     local tDistanceByBase = {}
                     local iClosestStartPointDistance = 100000000
-                    local iClosestStartPointNumber
-                    local oClosestBrain
+                    local iClosestStartPointNumber = aiBrain.M27StartPositionNumber
+                    local oClosestBrain = aiBrain
 
                     --Work out the closest base to the experimentals to use
 

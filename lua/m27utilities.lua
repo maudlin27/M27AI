@@ -1002,6 +1002,7 @@ function GetNearestUnit(tUnits, tCurPos, aiBrain, bHostileOnly, bOurAIOnly)
     else return nil end
 end
 
+function IsUnitVisibleSEEBELOW()  end --To help with finding canseeunit
 function CanSeeUnit(aiBrain, oUnit, bTrueIfOnlySeeBlip)
     --returns true if aiBrain can see oUnit
     --bTrueIfOnlySeeBlip - returns true if can see a blip

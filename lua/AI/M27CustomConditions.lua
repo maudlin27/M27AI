@@ -28,7 +28,6 @@ function SafeToUpgradeUnit(oUnit)
     --Can the unit be upgraded?
     local bSafeToGetUpgrade = false
     local aiBrain = oUnit:GetAIBrain()
-    if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 then bDebugMessages = true end
     local oUnitBP = oUnit:GetBlueprint()
     local sUpgradesTo = oUnitBP.General.UpgradesTo
     local iCurRadarRange, oCurBlueprint
@@ -350,47 +349,55 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
         else
             if ACUShouldRunFromBigThreat(aiBrain) then bWantToGetGun = false
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': GrowwEnergyIncome='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; Netincome='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; Net income based on trend='..aiBrain:GetEconomyTrend('ENERGY')..'; EnergyStored='..aiBrain:GetEconomyStored('ENERGY')) end
-                if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 120 * 0.1 then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Net energy income is too low, only get gun if we have lots of energy stored') end
-                    if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 0 and aiBrain:GetEconomyStored('ENERGY') >= 9000 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > 55 then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have small net energy income and 9k stored and 550+ gross income so will ugprade anyway') end
-                        bWantToGetGun = true
-                    else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough gross and stored to ris upgrading') end
-                        bWantToGetGun = false
-                    end
-                else
-                    if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 170 * 0.1 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 500 * 0.1 then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Energy net income < 170 per second and gross < 500 per second so dont want to proceed') end
-                        bWantToGetGun = false
-                    else
-                        iGrossEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]
-                        if iGrossEnergyIncome < 45 then --450 per second
-                            if bDebugMessages == true then LOG(sFunctionRef..': Gross income is <45 so dont want to ugprade unless have alot stored') end
-                            bWantToGetGun = false
-                            if iGrossEnergyIncome > 33 and aiBrain:GetEconomyStored('ENERGY') > 8000 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have alot of energy stored so will proceed with upgrade') end
-                                bWantToGetGun = true
-                            end
-                        else
-                            if iGrossEnergyIncome > 55 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have decent gross income so will proceed') end
-                                bWantToGetGun = true
-                            elseif aiBrain:GetEconomyStored('ENERGY') >= 5000 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have decent stored energy so will proceed') end
-                                bWantToGetGun = true
-                            else
-                                if bDebugMessages == true then LOG(sFunctionRef..': Gross and stored energy not enough to proceed') end
-                            end
-                        end
-                        if bDebugMessages == true then LOG(sFunctionRef..': bWantToGetGun='..tostring(bWantToGetGun)..'; will now check if its safe to get gun') end
-                        if bWantToGetGun == true and bIgnoreEnemies == false and SafeToGetACUUpgrade(aiBrain) == false then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Its not safe to get gun upgrade') end
-                            bWantToGetGun = false
-                        end
-                    end
+                local iResourceThresholdAdjustFactor = 1
+                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 700 or not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) or (not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 450) then
+                    iResourceThresholdAdjustFactor = 2.5
+                elseif M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false or (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 75) then
+                    iResourceThresholdAdjustFactor = 1.5
+                elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
+                    iResourceThresholdAdjustFactor = 1.3
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': GrowwEnergyIncome='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; Netincome='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; Net income based on trend='..aiBrain:GetEconomyTrend('ENERGY')..'; EnergyStored='..aiBrain:GetEconomyStored('ENERGY')) end
+                if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 120 * 0.1 * iResourceThresholdAdjustFactor then
+                if bDebugMessages == true then LOG(sFunctionRef..': Net energy income is too low, only get gun if we have lots of energy stored') end
+                if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 0 and aiBrain:GetEconomyStored('ENERGY') >= 9000 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > 55 * iResourceThresholdAdjustFactor then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have small net energy income and 9k stored and 550+ gross income so will ugprade anyway') end
+                bWantToGetGun = true
+                else
+                if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough gross and stored to ris upgrading') end
+                bWantToGetGun = false
+                end
+                else
+                if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 170 * 0.1 * iResourceThresholdAdjustFactor and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 500 * 0.1 * iResourceThresholdAdjustFactor then
+                if bDebugMessages == true then LOG(sFunctionRef..': Energy net income < 170 per second and gross < 500 per second so dont want to proceed') end
+                bWantToGetGun = false
+                else
+                iGrossEnergyIncome = aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]
+                if iGrossEnergyIncome < 45 * iResourceThresholdAdjustFactor then --450 per second
+                if bDebugMessages == true then LOG(sFunctionRef..': Gross income is <45 so dont want to ugprade unless have alot stored') end
+                bWantToGetGun = false
+                if iGrossEnergyIncome > 33 * iResourceThresholdAdjustFactor and aiBrain:GetEconomyStored('ENERGY') > 8000 then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have alot of energy stored so will proceed with upgrade') end
+                bWantToGetGun = true
+                end
+                else
+                if iGrossEnergyIncome > 55 * iResourceThresholdAdjustFactor then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have decent gross income so will proceed') end
+                bWantToGetGun = true
+                elseif aiBrain:GetEconomyStored('ENERGY') >= 5000 * iResourceThresholdAdjustFactor then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have decent stored energy so will proceed') end
+                bWantToGetGun = true
+                else
+                if bDebugMessages == true then LOG(sFunctionRef..': Gross and stored energy not enough to proceed') end
+                end
+                end
+                    if bDebugMessages == true then LOG(sFunctionRef..': bWantToGetGun='..tostring(bWantToGetGun)..'; will now check if its safe to get gun') end
+                if bWantToGetGun == true and bIgnoreEnemies == false and SafeToGetACUUpgrade(aiBrain) == false then
+                if bDebugMessages == true then LOG(sFunctionRef..': Its not safe to get gun upgrade') end
+                bWantToGetGun = false
+                    end
+                    end
+                    end
             end
             if bDebugMessages == true then LOG(sFunctionRef..'; bWantToGetGun='..tostring(bWantToGetGun)) end
         end

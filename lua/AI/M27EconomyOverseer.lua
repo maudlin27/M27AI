@@ -707,7 +707,6 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 then bDebugMessages = true end
 
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
     local oUnitToUpgrade, tCurPosition, iCurDistanceToStart, iCurDistanceToEnemy, iCurCombinedDist
@@ -1648,7 +1647,6 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 then bDebugMessages = true end
 
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
     local bHaveHighMass, bHaveEnoughEnergy
@@ -1832,6 +1830,14 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                 tMassThresholds[iThresholdRef][2] = tMassThresholds[iThresholdRef][2] + 1
             end
         end
+        --Increase thresholds if we have high eco, as want to keep upgrading with some of our mass if we can
+        if aiBrain[refiMassGrossBaseIncome] >= 20 then
+            for iThresholdRef, tThreshold in tMassThresholds do
+                if tMassThresholds[iThresholdRef][2] < 0 then tMassThresholds[iThresholdRef][2] = tMassThresholds[iThresholdRef][2] * 2
+                elseif tMassThresholds[iThresholdRef][2] > 0 then tMassThresholds[iThresholdRef][2] = tMassThresholds[iThresholdRef][2] * 0.5 end
+            end
+        end
+
 
         --Increase thresholds if we are trying to ctrl-K a mex
         if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == false then
