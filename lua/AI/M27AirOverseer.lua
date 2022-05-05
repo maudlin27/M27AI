@@ -4920,8 +4920,8 @@ function AirBomberManager(aiBrain)
                                 if iT1AreasToAvoidCount > 0 then
                                     for iCount, tSubtable in tT1AreasToAvoidSubtables do
                                         --Are we within 30 degrees?
-                                        if math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - tSubtable[refiSubtableAngle]) <= 30 then
-                                            if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - 30 >= tSubtable[refiSubtableDistanceFromBase] then
+                                        if math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) - tSubtable[refiSubtableAngle]) <= 30 then
+                                            if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) - 30 >= tSubtable[refiSubtableDistanceFromBase] then
                                                 bTargetNearAreaToAvoid = true
                                                 break
                                             end
