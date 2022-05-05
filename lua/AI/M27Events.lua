@@ -17,6 +17,7 @@ local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
+local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -202,9 +203,14 @@ end
 
 function OnWorkEnd(self, work)
     if M27Utilities.bM27AIInGame then
+        local sFunctionRef = 'OnWorkEnd'
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'OnWorkEnd'
         if bDebugMessages == true then LOG(sFunctionRef..': Hook successful') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end
 
@@ -316,6 +322,8 @@ function OnBombFired(oWeapon, projectile)
     if M27Utilities.bM27AIInGame then
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'OnBombFired'
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
         local oUnit = oWeapon.unit
         if oUnit and oUnit.GetUnitId then
@@ -340,6 +348,7 @@ function OnBombFired(oWeapon, projectile)
                 end
             end
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end
 
@@ -350,6 +359,7 @@ function OnWeaponFired(oWeapon)
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'OnWeaponFired'
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         --NOTE: Have used hook on calcballisticacceleration instead of below now
         --if oWeapon.GetBlueprint then LOG('OnWeaponFired hook for blueprint='..repr(oWeapon:GetBlueprint())) end
         local oUnit = oWeapon.unit
@@ -361,13 +371,33 @@ function OnWeaponFired(oWeapon)
                 oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] = GetGameTimeSeconds()
             end
 
-            --T3 arti
             if oUnit:GetAIBrain().M27AI then
+                --T3 arti
                 if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit.UnitId) then
                     ForkThread(M27Logic.GetT3ArtiTarget, oUnit)
+                    --DF units whose shot is blocked
+                elseif EntityCategoryContains(M27UnitInfo.refCategoryDFTank, oUnit.UnitId) then
+                    --Get weapon target
+                    local oTarget = oWeapon:GetCurrentTarget()
+                    if M27UnitInfo.IsUnitValid(oTarget) then
+                        oUnit[M27UnitInfo.refiTimeOfLastCheck] = GetGameTimeSeconds()
+                        oUnit[M27UnitInfo.refbLastShotBlocked] = M27Logic.IsShotBlocked(oUnit, oTarget)
+                        if oUnit[M27UnitInfo.refbLastShotBlocked] then
+                            --Reset after 20s if we havent fired any more shots at the target
+                            --function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerConditionRef, iMustBeLessThanThisTimeValue, iMustBeMoreThanThisTimeValue, vMustNotEqualThisValue)
+                            M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbLastShotBlocked, false, 20, M27UnitInfo.refiTimeOfLastCheck, GetGameTimeSeconds() + 0.01)
+                        end
+                    end
+                    --SMD, TML and SML backup to ensure missile is built
+                elseif EntityCategoryContains(categories.SILO * categories.STRUCTURE, oUnit.UnitId) and oUnit.SetAutoMode then
+                    oUnit:SetAutoMode(true)
+                    oUnit:SetPaused(false)
+                    oUnit[M27EconomyOverseer.refbWillReclaimUnit] = false
+                    if EntityCategoryContains(M27UnitInfo.refCategorySML, oUnit.UnitId) then oUnit:GetAIBrain()[M27EconomyOverseer.refbReclaimNukes] = false end
                 end
             end
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end
 
@@ -504,7 +534,7 @@ function OnConstructed(oEngineer, oJustBuilt)
                     local sLocationRef = M27Utilities.ConvertLocationToStringRef(oJustBuilt:GetPosition())
                     if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex]) == false then
                         for iEngi, oEngi in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionBuildMex] do
-                            IssueClearCommands({oEngi})
+                            IssueClearCommands({ oEngi })
                             M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
                         end
                     end
@@ -512,13 +542,17 @@ function OnConstructed(oEngineer, oJustBuilt)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oJustBuilt.UnitId) then
                 --Is this a land factory on a plateau?
                 local iPlateauGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oJustBuilt:GetPosition())
-                if not(iPlateauGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+                if not (iPlateauGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
                     oJustBuilt[M27Transport.refiAssignedPlateau] = iPlateauGroup
-                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) then aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup] = {} end
-                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) then aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories] = {} end
-                    aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories][oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
-                    LOG('Have just recorded factory '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..' in the list of factories for iPlateauGroup='..iPlateauGroup)
-            end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) then
+                        aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup] = {}
+                    end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) then
+                        aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories] = {}
+                    end
+                    aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories][oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
+                    LOG('Have just recorded factory ' .. oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt) .. ' in the list of factories for iPlateauGroup=' .. iPlateauGroup)
+                end
             else
                 --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
                 if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then
@@ -526,27 +560,30 @@ function OnConstructed(oEngineer, oJustBuilt)
                 end
                 if aiBrain[M27Overseer.refbEnemyTMLSightedBefore] and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
                     if EntityCategoryContains(M27UnitInfo.refCategoryProtectFromTML, oJustBuilt.UnitId) then
-                        M27Logic.DetermineTMDWantedForUnits(aiBrain, {oJustBuilt})
+                        M27Logic.DetermineTMDWantedForUnits(aiBrain, { oJustBuilt })
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryTMD, oJustBuilt.UnitId) then
                         --Update list of units wanting TMD to factor in if they have TMD coverage from all threats now that we have just built a TMD
                         M27Logic.DetermineTMDWantedForUnits(aiBrain, aiBrain[M27EngineerOverseer.reftUnitsWantingTMD])
                     end
                 end
-                if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oJustBuilt.UnitId) and not(oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
+                if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oJustBuilt.UnitId) and not (oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
                     aiBrain[M27Overseer.refbAreBigThreats] = true
                     --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
                     oJustBuilt[M27UnitInfo.refbActiveTargetChecker] = true
                     ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
                 end
             end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    elseif M27Config.M27ShowEnemyUnitNames then
-        oJustBuilt:SetCustomName(oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
-    end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        elseif M27Config.M27ShowEnemyUnitNames then
+            oJustBuilt:SetCustomName(oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
+        end
         --Engineer callbacks
-        if oEngineer:GetAIBrain().M27AI and not(oEngineer.Dead) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
+        if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
             local sFunctionRef = 'OnConstructed'
-            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+            local bDebugMessages = false
+            if M27Utilities.bGlobalDebugOverride == true then
+                bDebugMessages = true
+            end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -593,13 +630,20 @@ end
 
 function OnTransportLoad(oUnit, oTransport, bone)
     if oUnit:GetAIBrain().M27AI and oTransport:GetAIBrain().M27AI then
+        local sFunctionRef = 'OnTransportUnload'
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         M27Transport.UpdateTransportForLoadedUnit(oUnit, oTransport)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end
 
 function OnTransportUnload(oUnit, oTransport, bone)
     local aiBrain = oUnit:GetAIBrain()
     if M27UnitInfo.IsUnitValid(oUnit) and aiBrain.M27AI then
+        local sFunctionRef = 'OnTransportUnload'
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         IssueClearCommands({oUnit})
         oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
         --Make sure we have correctly recorded the plateau if we have landed engineers
@@ -609,5 +653,6 @@ function OnTransportUnload(oUnit, oTransport, bone)
                 oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
             end
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end

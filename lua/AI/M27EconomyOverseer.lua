@@ -576,6 +576,7 @@ function GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, iUnitCat
     return iUpgradingCount, iAvailableToUpgradeCount, bAreAlreadyUpgradingToHQ
 end
 
+
 function TrackHQUpgrade(oUnitUpgradingToHQ)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'TrackHQUpgrade'
@@ -863,7 +864,11 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
     local iT1AirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH1)
     local iT2AirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH2)
     local iT3AirFactories = aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH3)
+    local iT2PlusHQs = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllHQFactories - categories.TECH1)
+
     local iCategoryToUpgrade
+
+    local iEngisOfHighestTechLevel = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]))
 
     local bAlreadyUpgradingEnough = false
     if iMaxToBeUpgrading <= (iLandFactoryUpgrading + aiBrain[refiMexesUpgrading] + iAirFactoryUpgrading) then
@@ -872,14 +877,14 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
 
     --Special logic for upgrading HQs that takes priority
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Is table of active HQ upgrades empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])) .. '; Highest land fac=' .. aiBrain[M27Overseer.refiOurHighestLandFactoryTech] .. '; highest air fac=' .. aiBrain[M27Overseer.refiOurHighestAirFactoryTech] .. '; T1,2,3 land fac=' .. iT1LandFactories .. '-' .. iT2LandFactories .. '-' .. iT3LandFactories .. '; T1-2-3 air facs=' .. iT1AirFactories .. '-' .. iT2AirFactories .. '-' .. iT3AirFactories)
+        LOG(sFunctionRef .. ': Is table of active HQ upgrades empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades])) .. '; Highest land fac=' .. aiBrain[M27Overseer.refiOurHighestLandFactoryTech] .. '; highest air fac=' .. aiBrain[M27Overseer.refiOurHighestAirFactoryTech] .. '; T1,2,3 land fac=' .. iT1LandFactories .. '-' .. iT2LandFactories .. '-' .. iT3LandFactories .. '; T1-2-3 air facs=' .. iT1AirFactories .. '-' .. iT2AirFactories .. '-' .. iT3AirFactories..'; iEngisOfHighestTechLevel='..iEngisOfHighestTechLevel..'; iT2PlusHQs='..iT2PlusHQs)
     end
-    if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) then
+    if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) and (iEngisOfHighestTechLevel >= 2 or (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] < 3 and iT3AirFactories + iT3LandFactories > 0)) then
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': No active HQ upgrades so will see if we have lost our HQ and need a new one first. aiBrain[M27Overseer.refiOurHighestLandFactoryTech]=' .. aiBrain[M27Overseer.refiOurHighestLandFactoryTech] .. '; aiBrain[M27Overseer.refiOurHighestLandFactoryTech]=' .. aiBrain[M27Overseer.refiOurHighestLandFactoryTech] .. '; iT2LandFactories=' .. iT2LandFactories .. '; iT3LandFactories=' .. iT3LandFactories)
         end
         if aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and (iT2LandFactories + iT3LandFactories) > 0 then
-            --Have lower tech level than we have in factories
+--Have lower tech level than we have in factories (e.g. our HQ was destroyed)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Only have T1 land factory tech available, but have T2 and T3 factories so assuming we lost our HQ')
             end
@@ -961,7 +966,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                         break
                     end
                 end
-                if not (bAirFacUpgrading) and aiBrain[refiEnergyGrossBaseIncome] >= 500 and aiBrain[refiEnergyNetBaseIncome] >= 100 and aiBrain[refiMassGrossBaseIncome] >= 15 and aiBrain[refiMassNetBaseIncome] >= 1 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 150 then
+                if not (bAirFacUpgrading) and aiBrain[refiEnergyGrossBaseIncome] >= 500 and aiBrain[refiEnergyNetBaseIncome] >= 100 and aiBrain[refiMassGrossBaseIncome] >= 15 and aiBrain[refiMassNetBaseIncome] >= 1 and ((aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 1 and (iT1AirFactories >= 2 or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 75)) or (aiBrain:GetEconomyStored('MASS') >= 2000 and (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 150 or (iT1AirFactories + iT2AirFactories >= 4 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 75)))) then
                     if iT2AirFactories > 0 then
                         iCategoryToUpgrade = refCategoryAirFactory * categories.TECH2
                     else
@@ -974,7 +979,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
         end
     else
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': Already have active HQ upgrades, will list out the units and their work progress')
+            LOG(sFunctionRef .. ': Already have active HQ upgrades or not enough engineers of the tech level. iEngisOfHighestTechLevel='..iEngisOfHighestTechLevel..'; will list out the units and their work progress')
             for iUnit, oUnit in aiBrain[reftActiveHQUpgrades] do
                 if M27UnitInfo.IsUnitValid(oUnit) then
                     LOG(sFunctionRef .. ': HQ unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; Workpgoress=' .. oUnit:GetWorkProgress())
@@ -1195,7 +1200,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                         end
                         iCategoryToUpgrade = DecideOnFirstHQ()
                         --Get T3 HQ with similar scenario
-                    elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == true and iT3LandFactories + iT3AirFactories == 0 and iT2LandFactories + iT2AirFactories > 0 and (aiBrain[refiMassGrossBaseIncome] >= 11 or iT3Mexes >= 4) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power) > 0 then
+                    elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) == true and iT3LandFactories + iT3AirFactories == 0 and iT2LandFactories + iT2AirFactories > 0 and (aiBrain[refiMassGrossBaseIncome] >= 11 or iT3Mexes >= 4) and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power) > 0 and iEngisOfHighestTechLevel >= 2 then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Want to get T3 factory upgrade, will decide if want ot get land or air factory')
                         end
@@ -1258,9 +1263,9 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
                                             end
                                             --Want to upgrade build power; do we want an HQ?
 
-                                            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] < 2 and aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]), false, true) >= 3 and aiBrain[refiEnergyGrossBaseIncome] >= 50 then
+                                            if iEngisOfHighestTechLevel >= 2 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] < 2 and aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]), false, true) >= 3 and aiBrain[refiEnergyGrossBaseIncome] >= 50 then
                                                 iCategoryToUpgrade = DecideOnFirstHQ()
-                                            elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and (iT2Mexes + iT3Mexes) >= math.min(8, table.getn(M27MapInfo.GetResourcesNearTargetLocation(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 30, true))) and aiBrain[refiEnergyGrossBaseIncome] >= 100 then
+                                            elseif iEngisOfHighestTechLevel >= 2 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 and (iT2Mexes + iT3Mexes) >= math.min(8, table.getn(M27MapInfo.GetResourcesNearTargetLocation(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 30, true))) and aiBrain[refiEnergyGrossBaseIncome] >= 100 then
                                                 iCategoryToUpgrade = DecideOnFirstHQ()
                                             elseif aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 2 then
                                                 --Dont want to upgrade an HQ, consider upgrading a support factory as well providing it wont be upgraded to an HQ
@@ -2138,15 +2143,17 @@ function UpgradeMainLoop(aiBrain)
                                     end
                                     oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryAirFactory * categories.TECH1, tStartPosition)
                                     if oUnitToUpgrade == nil then
+                                        local iT2PlusEngis = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer - categories.TECH1)
                                         if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Will look for T2 land factory')
+                                            LOG(sFunctionRef .. ': Will look for T2 land factory unless our highest tech level is T2 and we lack 2 T2 engineers. iT2PlusEngis='..iT2PlusEngis..'; Highest tech level='..aiBrain[M27Overseer.refiOurHighestFactoryTechLevel])
                                         end
-                                        oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory * categories.TECH2, tStartPosition)
+                                        if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 or iT2PlusEngis >= 2 then oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryLandFactory * categories.TECH2, tStartPosition) end
+
                                         if oUnitToUpgrade == nil then
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Will look for T2 air factory')
                                             end
-                                            oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryAirFactory * categories.TECH2, tStartPosition)
+                                            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 or iT2PlusEngis >= 2 then oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryAirFactory * categories.TECH2, tStartPosition) end
                                             if oUnitToUpgrade == nil then
                                                 --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
                                                 if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 100 then

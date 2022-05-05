@@ -266,7 +266,7 @@ function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tTarget, bUseEn
         --If only 1 enemy group then treat anywhere behind us as the emergency range
         if bUseEnemyStartInstead then
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            if bDebugMessages == true then LOG(sFunctionRef..': will ignore multiple enemies since have flagged to use enemy start instead, will return '..math.cos(ConvertAngleToRadians(math.abs(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Utilities.GetAngleFromAToB(tStartPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])))) * iDistStartToTarget) end
+            if bDebugMessages == true then LOG(sFunctionRef..': will ignore multiple enemies since have flagged to use enemy start instead, will return '..math.cos(M27Utilities.ConvertAngleToRadians(math.abs(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Utilities.GetAngleFromAToB(tStartPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])))) * iDistStartToTarget) end
             return aiBrain[refiModDistEmergencyRange], math.cos(math.abs(M27Utilities.ConvertAngleToRadians(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Utilities.GetAngleFromAToB(tStartPos, tEnemyBase)))) * iDistStartToTarget
         else
             local bIsBehindUs = true
@@ -980,6 +980,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                 if bDebugMessages == true then LOG(sFunctionRef..': sMAAHelperName='..sMAAHelperName) end
                 if M27Utilities.IsTableEmpty(oExistingMAAPlatoon[M27PlatoonUtilities.reftCurrentUnits]) == false then
                     local iCurMAAHelperThreat = GetMAAThreat(oExistingMAAPlatoon[M27PlatoonUtilities.reftCurrentUnits])
+                    if oExistingMAAPlatoon[M27PlatoonUtilities.refiCurrentUnits] >= 10 then iMAAThreatWanted = math.min(iMAAThreatWanted, iCurMAAHelperThreat) end
                     iMAAThreatWanted = iMAAThreatWanted - iCurMAAHelperThreat
                     iMinACUMAAThreatWanted = iMinACUMAAThreatWanted - iCurMAAHelperThreat
                     if bDebugMessages == true then LOG(sFunctionRef..': iCurMAAHelperThreat='..iCurMAAHelperThreat..'; iMAAThreatWanted after factorign in this='..iMAAThreatWanted) end
@@ -1088,6 +1089,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                         --Can we path here with land from our base?
                         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) == iOurBaseLandPathingGroup then
                             iMAAWanted = math.min(10, math.floor(oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] / iThresholdForAMAA))
+                            if oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 0 <= 10000 then iMAAWanted = math.min(iMAAWanted, 8) end
                             tPlatoonCurrentMAAs = EntityCategoryFilterDown(refCategoryMAA, oPlatoon:GetPlatoonUnits())
                             if M27Utilities.IsTableEmpty(tPlatoonCurrentMAAs) == true then iMAAAlreadyHave = 0
                                 --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
@@ -3165,7 +3167,7 @@ function ThreatAssessAndRespond(aiBrain)
                             end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': After going through any available torp bombers iAvailableThreat='..iAvailableThreat..'; iThreatNeeded='..iThreatNeeded..'; iAvailableTorpBombers='..iAvailableTorpBombers..'; bACUNeedsTorpSupport='..tostring(bACUNeedsTorpSupport)) end
-                        if not(bACUNeedsTorpSupport) and (iAvailableThreat >= iThreatNeeded or iAvailableTorpBombers >= 25) or (bACUNeedsTorpSupport and iAvailableTorpBombers > 1) then--and (not(bACUNeedsTorpSupport) or iAvailableTorpBombers >= 3) then
+                        if not(bACUNeedsTorpSupport) and (iAvailableThreat >= iThreatNeeded or iAvailableTorpBombers >= 15) or (bACUNeedsTorpSupport and iAvailableTorpBombers > 1) then--and (not(bACUNeedsTorpSupport) or iAvailableTorpBombers >= 3) then
                             for iEntry, tTorpSubtable in M27Utilities.SortTableBySubtable(tTorpBombersByDistance, refiActualDistanceFromEnemy, true) do
                                 --Cycle through each enemy unit in the threat group
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering torp bomber '..tTorpSubtable[refoTorpUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit])..'; tTorpSubtable[refiCurThreat]='..(tTorpSubtable[refiCurThreat] or 0)..'; about to cycle through every enemy unit in threat group to see if should attack one of them') end
@@ -5279,6 +5281,26 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 end
             end
         end
+
+        --Increase health to run on if enemy has air nearby and we lack AA
+        if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
+            local bHaveNearbyMAA = false
+            if oACU[refoUnitsMAAHelper] and M27Utilities.IsTableEmpty(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits]) == false then
+                local oNearestMAA = M27Utilities.GetNearestUnit(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits], oACU:GetPosition(), aiBrain)
+                if M27UnitInfo.IsUnitValid(oNearestMAA) then
+                    if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oNearestMAA:GetPosition()) <= 30 then
+                        bHaveNearbyMAA = true
+                    end
+                end
+            end
+            if not(bHaveNearbyMAA) then
+                local tEnemyAirThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGunship + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, oACU:GetPosition(), 40, 'Enemy')
+                if M27Utilities.IsTableEmpty(tEnemyAirThreats) == false then
+                    --Do we have nearby MAA or have no AirAA needed?
+                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
+                end
+            end
+        end
         if bDebugMessages == true then LOG(sFunctionRef..': Finished setting ACU health to run on. ACU max health='..oACU:GetMaxHealth()..'; ACU health to run on='..aiBrain[refiACUHealthToRunOn]) end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -6154,6 +6176,8 @@ function OverseerManager(aiBrain)
 
 
 
+
+
     --[[ForkThread(RunLotsOfLoopsPreStart)
     WaitTicks(10)
     LOG('TEMPTEST REPR after 10 ticks='..repr(tTEMPTEST))--]]
@@ -6216,16 +6240,24 @@ function OverseerManager(aiBrain)
 
 
 
-
+    local bSetHook = false
     while(not(aiBrain:IsDefeated())) do
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
         if aiBrain.M27IsDefeated then break end
+        --if GetGameTimeSeconds() >= 1459 then M27Utilities.bGlobalDebugOverride = true end
+        --[[if not(bSetHook) and GetGameTimeSeconds() >= 1459 then
+            bDebugMessages = true
+            bSetHook = true
+            M27Utilities.bGlobalDebugOverride = true
+            --debug.sethook(M27Utilities.AllFunctionHook, "c", 200)
+            debug.sethook(M27Utilities.OutputRecentFunctionCalls, "c", 1)
+        end--]]
 
 
         --ForkThread(TestNewMovementCommands, aiBrain)
 
         if bDebugMessages == true then
-            LOG(sFunctionRef..': Start of cycle')
+            LOG(sFunctionRef..': Start of cycle, GameTIme='..GetGameTimeSeconds())
             --ForkThread(TEMPUNITPOSITIONLOG, aiBrain)
 
             --ArmyPoolContainsLandFacTest(aiBrain)
@@ -6250,7 +6282,7 @@ function OverseerManager(aiBrain)
         if not(WaitTicksSpecial(aiBrain, 1)) then break end
         ForkThread(AssignMAAToPreferredPlatoons, aiBrain) --No point running logic for MAA helpers if havent created any scouts
         if bDebugMessages == true then
-            LOG(sFunctionRef..': pre threat assessment')
+            LOG(sFunctionRef..': pre threat assessment. GameTime='..GetGameTimeSeconds())
             --ArmyPoolContainsLandFacTest(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
             DebugPrintACUPlatoon(aiBrain)
@@ -6261,7 +6293,7 @@ function OverseerManager(aiBrain)
         --if bDebugMessages == true then ArmyPoolContainsLandFacTest(aiBrain) end
 
         if bDebugMessages == true then
-            LOG(sFunctionRef..': post threat assessment pre ACU manager')
+            LOG(sFunctionRef..': post threat assessment pre ACU manager. GameTime='..GetGameTimeSeconds())
             --ArmyPoolContainsLandFacTest(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
         end
@@ -6269,7 +6301,7 @@ function OverseerManager(aiBrain)
         if not(WaitTicksSpecial(aiBrain, 1)) then break end
         ForkThread(ACUManager, aiBrain)
         if bDebugMessages == true then
-            LOG(sFunctionRef..': post ACU manager, pre wait 10 ticks')
+            LOG(sFunctionRef..': post ACU manager, pre wait 10 ticks. GameTime='..GetGameTimeSeconds())
             DebugPrintACUPlatoon(aiBrain)
             --ArmyPoolContainsLandFacTest(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
@@ -6284,6 +6316,7 @@ function OverseerManager(aiBrain)
         if not(WaitTicksSpecial(aiBrain, 1)) then break end
         iSlowerCycleCount = iSlowerCycleCount - 1
         ForkThread(StrategicOverseer, aiBrain, iSlowerCycleCount)
+        if bDebugMessages == true then LOG(sFunctionRef..': Just called strategic overseer. GetGameTimeSeconds()='..GetGameTimeSeconds()) end
         if iSlowerCycleCount <= 0 then
             iSlowerCycleCount = iSlowerCycleThreshold
             ForkThread(EnemyThreatRangeUpdater, aiBrain)
@@ -6295,7 +6328,9 @@ function OverseerManager(aiBrain)
         end
 
         if not(WaitTicksSpecial(aiBrain, 1)) then break end
+        if bDebugMessages == true then LOG(sFunctionRef..': Just waited 1 tick, about to call refresheconomydata.  GetGameTimeSeconds()='..GetGameTimeSeconds()) end
         ForkThread(M27EconomyOverseer.RefreshEconomyData, aiBrain)
+        if bDebugMessages == true then LOG(sFunctionRef..': Just sent forked request to refresh economy data. GetGameTimeSeconds()='..GetGameTimeSeconds()) end
 
         --Update enemy unit names (only does if the config setting is set, and caps the number of units that will be updated; also ignores if are already in the process of updating)
         ForkThread(UpdateAllNonM27Names)
@@ -6303,6 +6338,7 @@ function OverseerManager(aiBrain)
         --NOTE: We dont have the number of ticks below as 'available' for use, since on initialisation we're waiting ticks as well when initialising things such as the engineer and upgrade overseers which work off their own loops
         --therefore the actual available tick count will be the below number less the number of ticks we're already waiting
         if not(WaitTicksSpecial(aiBrain, 4)) then break end
+        if bDebugMessages == true then LOG(sFunctionRef..': Just waited 4 ticks. GetGameTimeSeconds()='..GetGameTimeSeconds()) end
 
 
         if bDebugMessages == true then

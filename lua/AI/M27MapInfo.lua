@@ -563,6 +563,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecheckPathingOfLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
 
     if not(tOptionalComparisonKnownCorrectPoint) then
@@ -710,10 +711,11 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
             local bChangedAnyMex = false
             local iGroupAlreadyChecked
             --Has the group of the pathing unit changed, and do we have plateau info recorded for the orig pathing group?
-            if iAmphibiousOrigGroupOfPathingUnit and not(GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition()) == iAmphibiousOrigGroupOfPathingUnit) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes])) then
+            if iAmphibiousOrigGroupOfPathingUnit and not(GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition()) == iAmphibiousOrigGroupOfPathingUnit) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes])) then
                 --Need to revise plateau logic - first check pathing of every mex on the plateau
+                if bDebugMessages == true then LOG(sFunctionRef..': The group of the pathing unit has changed, and there were mexes in the original pathing group, so will check all mexes in the orig pathing group') end
                 iGroupAlreadyChecked = iAmphibiousOrigGroupOfPathingUnit
-                for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes] do
+                for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes] do
                     if bDebugMessages == true then LOG(sFunctionRef..': Checking for tMex='..repr(tMex)..'; with mex pathing group='..GetSegmentGroupOfLocation(sPathing, tMex)..'; iAmphibiousOrigGroupOfPathingUnit='..iAmphibiousOrigGroupOfPathingUnit) end
                     if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfPathingUnit) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repr(tMex)..' or the mex shouldnt be assigned to this plateau') end
@@ -723,6 +725,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
             end
             --Has the group of the target changed, and do we have plateau info recorded for the orig pathing group?
             if not(bChangedAnyMex) and iAmphibiousOrigGroupOfTarget and not(iGroupAlreadyChecked == iAmphibiousOrigGroupOfTarget) and not(GetSegmentGroupOfLocation(sPathing, tTargetLocation) == iAmphibiousOrigGroupOfTarget) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes])) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Amphibious group of the target is different to what we originally thought, and the original grouping had mexes in, so will recheck all mexes in the group') end
                 for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes] do
                     if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfTarget) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repr(tMex)) end
@@ -742,7 +745,9 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
         end
     elseif bDebugMessages == true then LOG(sFunctionRef..': Have already done a manual check of this location')
     end
+
     if bDebugMessages == true then LOG(sFunctionRef..': bHaveChangedPathing='..tostring(bHaveChangedPathing)) end
+    if bDebugMessages == true and bHaveChangedPathing then M27Utilities.ErrorHandler('Have changed pathing', true) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bHaveChangedPathing
 end
@@ -878,9 +883,10 @@ function GetNearestReclaimSegmentLocation(tLocation, iSearchRadius, iMinReclaimV
     local iCurAbsSegmentDif
     local tClosestReclaimSegmentXZ
 
-    for iReclaimSegmentX = iBaseReclaimSegmentX - iSegmentSearchRange, iBaseReclaimSegmentX + iSegmentSearchRange do
-        for iReclaimSegmentZ = iBaseReclaimSegmentZ - iSegmentSearchRange, iBaseReclaimSegmentZ + iSegmentSearchRange do
-            if (tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][refReclaimHighestIndividualReclaim] or 0) >= iMinReclaimValue then
+    for iReclaimSegmentX = math.max(0, iBaseReclaimSegmentX - iSegmentSearchRange), iBaseReclaimSegmentX + iSegmentSearchRange do
+        for iReclaimSegmentZ = math.max(0, iBaseReclaimSegmentZ - iSegmentSearchRange), iBaseReclaimSegmentZ + iSegmentSearchRange do
+            if bDebugMessages == true then LOG(sFunctionRef..': Segment '..iReclaimSegmentX..'-'..iReclaimSegmentZ..'; tLocation='..repr(tLocation)..'; highest individual reclaim='..(tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][refReclaimHighestIndividualReclaim] or 'nil')..'; Total mass='..(tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][refReclaimTotalMass] or 'nil')..'; iMinReclaimValue='..iMinReclaimValue) end
+            if math.min((tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][refReclaimHighestIndividualReclaim] or 0), (tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][refReclaimTotalMass] or 0)) >= iMinReclaimValue then
                 iCurAbsSegmentDif = math.abs(iBaseReclaimSegmentX - iReclaimSegmentX) + math.abs(iBaseReclaimSegmentZ - iReclaimSegmentZ)
                 if iCurAbsSegmentDif < iClosestAbsSegmentDif then
                     tClosestReclaimSegmentXZ = {iReclaimSegmentX, iReclaimSegmentZ}
@@ -1185,10 +1191,14 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
 end
 
 function RecordThatWeWantToUpdateReclaimSegment(iReclaimSegmentX, iReclaimSegmentZ)
-    table.insert(tReclaimSegmentsToUpdate, {iReclaimSegmentX, iReclaimSegmentZ})
+    if iReclaimSegmentX >= 0 and iReclaimSegmentZ >= 0 then table.insert(tReclaimSegmentsToUpdate, {iReclaimSegmentX, iReclaimSegmentZ}) end
 end
 
 function RecordThatWeWantToUpdateReclaimAtLocation(tLocation, iNearbySegmentsToUpdate)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local sFunctionRef = 'RecordThatWeWantToUpdateReclaimAtLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local iReclaimSegmentX, iReclaimSegmentZ = GetReclaimSegmentsFromLocation(tLocation)
     if iNearbySegmentsToUpdate then
         for iSegmentX = iReclaimSegmentX - iNearbySegmentsToUpdate, iReclaimSegmentX + iNearbySegmentsToUpdate do
@@ -1199,6 +1209,7 @@ function RecordThatWeWantToUpdateReclaimAtLocation(tLocation, iNearbySegmentsToU
     else
         RecordThatWeWantToUpdateReclaimSegment(iReclaimSegmentX, iReclaimSegmentZ)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DelayedReclaimRecordAtLocation(tPosition, iNearbySegmentsToUpdate, iWaitInSeconds)
@@ -1607,13 +1618,18 @@ function UpdateReclaimMarkersOld()
                             end
                         end
                         local bNeedToUpdateChangedBrains = not(M27Utilities.IsTableEmpty(tBrainsWithChangedThreat))
+                        local iLoopCount = 0
                         while bNeedToUpdateChangedBrains == true do
                             bNeedToUpdateChangedBrains = false
-                            for iArmyIndex, oBrain in tBrainsWithChangedThreat do
-                                if oBrain:IsDefeated() or oBrain.M27IsDefeated then
-                                    bNeedToUpdateChangedBrains = true
-                                    tBrainsWithChangedThreat[iArmyIndex] = nil
-                                    break
+                            iLoopCount = iLoopCount + 1
+                            if iLoopCount >= 20 then M27Utilities.ErrorHandler('Infinite loop') break end
+                            if M27Utilities.IsTableEmpty(tBrainsWithChangedThreat) == false then
+                                for iArmyIndex, oBrain in tBrainsWithChangedThreat do
+                                    if oBrain:IsDefeated() or oBrain.M27IsDefeated then
+                                        bNeedToUpdateChangedBrains = true
+                                        tBrainsWithChangedThreat[iArmyIndex] = nil
+                                        break
+                                    end
                                 end
                             end
                         end
@@ -3535,6 +3551,10 @@ function DrawAllMapPathing(aiBrain)
 end
 
 function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local sFunctionRef = 'DrawMapPathing'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if M27Utilities.IsTableEmpty(bMapDrawingAlreadyCommenced[sPathing]) == true then
         bMapDrawingAlreadyCommenced[sPathing] = true
         if bDontDrawWaterIfPathingLand == nil then
@@ -3634,9 +3654,14 @@ function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
         end
     end
     bMapDrawingAlreadyCommenced[sPathing] = false
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DrawWater()
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local sFunctionRef = 'DrawWater'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local rPlayableArea = rMapPlayableArea
     local iMaxX = rPlayableArea[3] - rPlayableArea[1]
     local iMaxZ = rPlayableArea[4] - rPlayableArea[2]
@@ -3650,6 +3675,8 @@ function DrawWater()
             if iCurTerrainHeight < iCurSurfaceHeight then M27Utilities.DrawLocation({iCurX, iCurSurfaceHeight, iCurZ}, nil, 4, 1000) end
         end
     end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function TempCanPathToEveryMex(oUnit)
@@ -4186,6 +4213,7 @@ function UpdateNewPrimaryBaseLocation(aiBrain)
         end
     elseif bDebugMessages == true then LOG(sFunctionRef..': Dealing with a civilian brain')
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetPrimaryEnemyBaseLocation(aiBrain)
@@ -4242,7 +4270,8 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
                         elseif sPlan == 'M27PlateauScout' then
                             sPlatoonSubref = subrefPlateauScoutPlatoons
                         else
-                            M27Utilities.ErrorHandler('Couldnt identify a plateau plan for oPlatoon with plan='..sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]..' for plateau '..iPlateauGroup..' so wont record against this plateau')
+                            --Not sure want to add a pathing check due to the risk of an infinite loop/massive slowdown
+                            M27Utilities.ErrorHandler('Couldnt identify a plateau plan for oPlatoon with plan='..sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]..' for plateau '..iPlateauGroup..' so wont record against this plateau. aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup])
                         end
                     end
                     if sPlatoonSubref then
@@ -4267,7 +4296,7 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
                 if oEngineer[M27Transport.refiAssignedPlateau] and not(oEngineer[M27Transport.refiAssignedPlateau] == aiBrain[refiOurBasePlateauGroup]) then
                     if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
                     if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers] = {} end
-                    aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers][GetEngineerUniqueCount(oEngineer)] = oEngineer
+                    aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers][M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)] = oEngineer
                 end
             end
         end
@@ -4480,6 +4509,10 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
 end
 
 function RefreshPlateauPlatoons(aiBrain, iPlateauGroup)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local sFunctionRef = 'RefreshPlateauPlatoons'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local tsPlatoonRefs = { subrefPlateauLandCombatPlatoons, subrefPlateauIndirectPlatoons, subrefPlateauMAAPlatoons, subrefPlateauScoutPlatoons }
     for iRef, sRef in tsPlatoonRefs do
         if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][sRef]) == false then
@@ -4490,5 +4523,7 @@ function RefreshPlateauPlatoons(aiBrain, iPlateauGroup)
             end
         end
     end
-
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local sFunctionRef = 'RecordThatWeWantToUpdateReclaimAtLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

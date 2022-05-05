@@ -1676,12 +1676,14 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 end
                             elseif iCurrentConditionToTry == 15 then
                                 if bHavePowerForAir and aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] > 0 then
-                                    if aiBrain:GetCurrentUnits(refCategoryAirScout) == 0 then
+                                    local iMinScoutsWanted = 2
+                                    if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12 and M27MapInfo.rMapPlayableArea[3] - M27MapInfo.rMapPlayableArea[1] >= 500 then iMinScoutsWanted = 4 end
+                                    if aiBrain:GetCurrentUnits(refCategoryAirScout) < iMinScoutsWanted then
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Dont have any alive air scouts so will get air scout')
                                         end
                                         iCategoryToBuild = refCategoryAirScout
-                                        iTotalWanted = 1
+                                        iTotalWanted = math.min(2, aiBrain[M27AirOverseer.refiExtraAirScoutsWanted])
                                     end
                                 end
                             elseif iCurrentConditionToTry == 16 then

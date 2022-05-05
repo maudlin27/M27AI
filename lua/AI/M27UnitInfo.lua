@@ -39,7 +39,8 @@ refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will upd
 reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
 refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
 refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
-refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adjacency and when first detected enemy SMD, but could be used for other things if want
+refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adjacency and when first detected enemy SMD, and for when last checked if shot was blocked, but could be used for other things if want
+refbLastShotBlocked = 'M27UnitLastShotBlocked' --Used for DF units to indicate if last shot was blocked
 
 --TMD:
 refbTMDChecked = 'M27TMDChecked' --Used against enemy TML to flag if we've already checked for TMD we want when it was first detected
@@ -156,6 +157,7 @@ refCategoryFrigate = categories.NAVAL * categories.FRIGATE
 refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE
 refCategoryAllNavy = categories.NAVAL
 refCategoryCruiser = categories.NAVAL * categories.CRUISER
+refCategorySalem = categories.NAVAL * categories.AMPHIBIOUS * categories.DIRECTFIRE
 refCategoryCruiserCarrier = refCategoryCruiser + categories.NAVAL * categories.NAVALCARRIER
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted

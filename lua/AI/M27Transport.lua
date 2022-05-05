@@ -24,6 +24,9 @@ refiMaxEngisWanted = 'M27TransportEngisWanted' --max number of engineers a trans
 function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     --Called when the event for a unit being loaded onto a transport is triggered
     --Updates tracking variables, and if the transport is full then sends it to the target
+    local sFunctionRef = 'UpdateTransportForLoadedUnit'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     oUnitJustLoaded[refoTransportToLoadOnto] = nil
     oUnitJustLoaded[M27UnitInfo.refbSpecialMicroActive] = false
@@ -60,12 +63,17 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     if bSendTransportToTarget then
         ForkThread(SendTransportToPlateau, aiBrain, oTransport)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordUnitLoadingOntoTransport(oUnit, oTransport)
+    local sFunctionRef = 'RecordUnitLoadingOntoTransport'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     oUnit[refoTransportToLoadOnto] = oTransport
     if not(oTransport[reftUnitsToldToLoadOntoTransport]) then oTransport[reftUnitsToldToLoadOntoTransport] = {} end
     oTransport[reftUnitsToldToLoadOntoTransport][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function LoadEngineerOnTransport(aiBrain, oEngineer, oTransport)
@@ -90,6 +98,10 @@ function LoadEngineerOnTransport(aiBrain, oEngineer, oTransport)
 end
 
 function AssignTransportToPlateau(aiBrain, oTransport, iPlateauGroup, iMaxEngisWanted)
+    local sFunctionRef = 'AssignTransportToPlateau'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if iMaxEngisWanted > 0 then
         aiBrain[reftTransportsWaitingForEngi][oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)] = oTransport
     end
@@ -98,15 +110,24 @@ function AssignTransportToPlateau(aiBrain, oTransport, iPlateauGroup, iMaxEngisW
     if not(aiBrain[reftTransportsAssignedByPlateauGroup][iPlateauGroup]) then aiBrain[reftTransportsAssignedByPlateauGroup][iPlateauGroup] = {} end
     aiBrain[reftTransportsAssignedByPlateauGroup][iPlateauGroup][oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)] = oTransport
     oTransport[refiMaxEngisWanted] = iMaxEngisWanted
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ClearTransportTrackers(aiBrain, oTransport)
+    local sFunctionRef = 'ClearTransportTrackers'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if aiBrain[reftTransportsAssignedByPlateauGroup][oTransport[refiAssignedPlateau]] then
         aiBrain[reftTransportsAssignedByPlateauGroup][oTransport[refiAssignedPlateau]][oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)] = nil
     end
     aiBrain[reftTransportsWaitingForEngi][oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)] = nil
     oTransport[refiAssignedPlateau] = nil
     oTransport[refiMaxEngisWanted] = 0
+
+    local sFunctionRef = 'AssignTransportToPlateau'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function SendTransportToPlateau(aiBrain, oTransport)

@@ -39,6 +39,9 @@ tProfilerCountByTickByFunction = {}
 tbProfilerOutputGivenForTick = {} --true if already given output for [iTick]
 IssueCount = 0 --Used to track no. of times issuemove has been sent in game
 
+tFunctionCallByName = {}
+iFunctionCurCount = 0
+
 tiProfilerStartCountByFunction = {} --[functionref] - Used if want to temporarily check how many times a function is called - have this update in the function itself, along with the end count
 --example of usage of the above: --M27Utilities.tiProfilerStartCountByFunction[sFunctionRef] = (M27Utilities.tiProfilerStartCountByFunction[sFunctionRef] or 0) + 1 LOG(sFunctionRef..': M27Utilities.tiProfilerStartCountByFunction[sFunctionRef]='..M27Utilities.tiProfilerStartCountByFunction[sFunctionRef])
 tiProfilerEndCountByFunction = {} --[functionref] - Used if want to temporarily check how many times a function is called - have this update in the function itself, along with the end count
@@ -1053,6 +1056,48 @@ function CalculateDistanceDeviationOfPositions(tPositions, iOptionalCentreSize)
     end
     FunctionProfiler(sFunctionRef, refProfilerEnd)
     return math.sqrt(iSquaredDifTotal / iCount)
+end
+
+function EveryFunctionHook()
+    --local tInfo = debug.getinfo(2,"n")
+    --local sName = tInfo[name]
+    local sName = tostring(debug.getinfo(2, "n").name)
+    if sName then tFunctionCallByName[sName] = (tFunctionCallByName[sName] or 0) + 1 end
+    iFunctionCurCount = iFunctionCurCount + 1
+    if iFunctionCurCount >= 250 then
+        iFunctionCurCount = 0
+        LOG('Every function hook: tFunctionCallByName='..repr(tFunctionCallByName)..'; sName='..(sName or 'nil')..'; Name='..tostring(debug.getinfo(2, "n").name))
+    end
+end
+
+function OutputRecentFunctionCalls()
+--NOTE: Insert below commented out code into e.g. the overseer for the second that want it.  Also can adjust the threshold for iFunctionCurCount from 10000, but if setting to 1 then only do for an individual tick or likely will crash the game
+    --[[if not(bSetHook) and GetGameTimeSeconds() >= 1459 then
+        bDebugMessages = true
+        bSetHook = true
+        M27Utilities.bGlobalDebugOverride = true
+        --debug.sethook(M27Utilities.AllFunctionHook, "c", 200)
+        debug.sethook(M27Utilities.OutputRecentFunctionCalls, "c", 1)
+    end--]]
+
+    local sName = tostring(debug.getinfo(2, "n").name)
+    if sName then tFunctionCallByName[sName] = (tFunctionCallByName[sName] or 0) + 1 end
+    iFunctionCurCount = iFunctionCurCount + 1
+    if iFunctionCurCount >= 10000 then
+        iFunctionCurCount = 0
+        LOG('Every function hook: tFunctionCallByName='..repr(tFunctionCallByName))
+        tFunctionCallByName = {}
+    end
+end
+
+function AllFunctionHook()
+    --local tInfo = debug.getinfo(1,"n")
+    --if tInfo.name or tInfo['name'] then LOG('AllFunctionHook: '..repr(tInfo)) end
+    --if debug.getinfo(1,"n").name then LOG('AllFunctionHook: Name='.. debug.getinfo(1,"n").name) end
+    --LOG('AllFunctionHook: '..repr(debug.getinfo(2,"n")))
+    LOG('Table of functions by count='..repr(tFunctionCallByName)..' cur function='..repr(debug.getinfo(2, "n"))..'; name='..tostring(debug.getinfo(2, "n").name))
+    tFunctionCallByName[tostring(debug.getinfo(2, "n").name)] = (tFunctionCallByName[tostring(debug.getinfo(2, "n").name)] or 0) + 1
+    LOG('tFunctionCallByName='..repr(tFunctionCallByName))
 end
 
 function FunctionProfiler(sFunctionRef, sStartOrEndRef)

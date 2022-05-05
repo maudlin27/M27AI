@@ -346,6 +346,7 @@ function IsCivilianBrain(aiBrain)
     --Is this an AI brain?
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsCivilianBrain'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local bIsCivilian = false
     if bDebugMessages == true then
@@ -363,6 +364,7 @@ function IsCivilianBrain(aiBrain)
             end
         end
     --end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bIsCivilian
 end
 
@@ -2452,20 +2454,32 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
             local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit])
             if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
             local iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
+            if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup]) then
+                if M27MapInfo.RecheckPathingOfLocation(sPathing, oPlatoon[M27PlatoonUtilities.refoFrontUnit], M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) then
+                    iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
+                end
+            end
+            if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup]) then
+                --Something has likely gone wrong - will use segment group of our base
+                M27Utilities.ErrorHandler('Have no mexes in iSegmentGroup='..iSegmentGroup..'; sPathing='..sPathing..'; will use segemtn group of our base instead which is '..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+                iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            end
             local iHighestValueLocation = GetLocationValue(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
             local iCurValueLocation
 
             if bDebugMessages == true then LOG(sFunctionRef..': Value of enemy start location='..iHighestValueLocation..'; will consider if any mexes have a better value') end
             --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
-            for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))] do
-                if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 then
-                    --Check not tried going here here lots before
-                    if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
-                        iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
-                        if iCurValueLocation > iHighestValueLocation then
-                            if bDebugMessages == true then LOG(sFunctionRef..': tMex='..repr(tMex)..'; value of location='..iCurValueLocation) end
-                            iHighestValueLocation = iCurValueLocation
-                            tHighestValueLocation = tMex
+            if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup]) == false then
+                for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
+                    if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 then
+                        --Check not tried going here here lots before
+                        if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
+                            iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
+                            if iCurValueLocation > iHighestValueLocation then
+                                if bDebugMessages == true then LOG(sFunctionRef..': tMex='..repr(tMex)..'; value of location='..iCurValueLocation) end
+                                iHighestValueLocation = iCurValueLocation
+                                tHighestValueLocation = tMex
+                            end
                         end
                     end
                 end
@@ -3733,16 +3747,19 @@ function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondT
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         return GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, true)
                     else
-                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..' so will just return the current position '..repr(tPosition), true)
-                        tPotentialLocation = tPosition
+                        tPotentialLocation = {tPosition[1] + math.random(-10, 10), tPosition[2], tPosition[3] + math.random(-10, 10)}
+                        tPotentialLocation[2] = GetTerrainHeight(tPotentialLocation[1], tPotentialLocation[3])
+                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..' so will just return a random position nearby='..math.floor(tPotentialLocation[1])..'-'..math.floor(tPotentialLocation[2])..'-'..math.floor(tPotentialLocation[3]), true)
                     end
                 else
                     if M27UnitInfo.IsUnitValid(oOptionalPathingUnit) then
-                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..'; already done a check of pathing, and we also have a valid pathing unit='..oOptionalPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOptionalPathingUnit)..'; will just return the current position '..repr(tPosition), true)
+                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..'; already done a check of pathing, and we also have a valid pathing unit='..oOptionalPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOptionalPathingUnit)..'; will just return a random location near the current position', true)
                     else
                         --No pathing unit so could be expected - e.g. one cause is a platoon being disbanded will call the nearest rally point - if there is no front unit then it may return an error
                     end
-                    tPotentialLocation = tPosition
+                    tPotentialLocation = {tPosition[1] + math.random(-10, 10), tPosition[2], tPosition[3] + math.random(-10, 10)}
+                    tPotentialLocation[2] = GetTerrainHeight(tPotentialLocation[1], tPotentialLocation[3])
+
                 end
             end
         end
@@ -4187,11 +4204,11 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                                 --First time we have no target
                                 oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] = GetGameTimeSeconds()
                             end
-                            if GetGameTimeSeconds() - oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] >= 150 and not(M27Utilities.IsTableEmpty(tEnemyTMD)) then
+                            --[[if GetGameTimeSeconds() - oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] >= 150 and not(M27Utilities.IsTableEmpty(tEnemyTMD)) then
                                 --Reclaim the unit
                                 oLauncher[M27EconomyOverseer.refbWillReclaimUnit] = true
                                 table.insert(aiBrain[M27EconomyOverseer.reftoTMLToReclaim], oLauncher)
-                            end
+                            end--]]
                         else
                             --Already set to be reclaimed so just need to check for targets
                         end
@@ -4317,7 +4334,10 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                 if tTarget then
                     --Launch missile
                     if bDebugMessages == true then LOG(sFunctionRef..': Will launch missile at tTarget='..repr(tTarget)) end
-                    if bTML then IssueTactical({oLauncher}, tTarget)
+                    if bTML then
+                        IssueTactical({oLauncher}, tTarget)
+                        oLauncher:SetAutoMode(true)
+                        oLauncher:SetPaused(false)
                     else
                         IssueNuke({oLauncher}, tTarget)
                         --Restart SMD monitor after giving time for missile to fire
