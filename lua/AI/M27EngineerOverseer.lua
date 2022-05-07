@@ -246,7 +246,7 @@ function CanBuildAtLocation(aiBrain, sBlueprintToBuild, tTargetLocation, iEngiAc
                                 --Do we want to cancel any blocking units?
                                 if bClearActionsIfNotStartedBuilding then
                                     for iUniqueEngiRef, oEngineer in tSubtable do
-                                        if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+                                        --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
                                         if bDebugMessages == true then LOG(sFunctionRef..': About to clear oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' which was recorded as having iActionRef='..iActionRef) end
                                         IssueClearCommands({oEngineer})
                                         ClearEngineerActionTrackers(aiBrain, oEngineer, true)
@@ -1005,7 +1005,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
 
     local sFunctionRef = 'ProcessingEngineerActionForNearbyEnemies'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
     local bAreNearbyEnemies = false
     --if oEngineer and not(oEngineer.Dead) then --We already check this in the engineer reassignment before calling this action
 
@@ -1437,7 +1437,7 @@ function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
     local sFunctionRef = 'DelayedSpareEngineerClearAction'
     local iOrigAction = oEngineer[refiEngineerCurrentAction]
     WaitSeconds(iDelaySeconds)
-    if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
     if oEngineer[refiEngineerCurrentAction] == iOrigAction or oEngineer[refiEngineerCurrentAction] == refActionSpare or oEngineer[refiEngineerCurrentAction] == refActionPlateauSpareAction then
         if bDebugMessages == true then LOG(sFunctionRef..': About to clear engineer '..GetEngineerUniqueCount(oEngineer)..' actions as it still has a spare action') end
         IssueClearCommands({oEngineer})
@@ -1450,7 +1450,7 @@ function IssuePlateauSpareEngineerAction(aiBrain, oEngineer)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IssuePlateauSpareEngineerAction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
 
     local oLandFactory
     local iPlateauGroup = oEngineer[M27Transport.refiAssignedPlateau]
@@ -1892,7 +1892,6 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FindRandomPlaceToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if sBlueprintToBuild == 'ueb4301' then bDebugMessages = true end
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -2204,8 +2203,9 @@ if bDebugMessages == true then LOG(sFunctionRef..': No mexes identified around t
 return false--]]
 end
 
-function GetBuildLocationForShield(aiBrain, sShieldBP,  tPositionToCoverWithShield)
+function GetBuildLocationForShield(aiBrain, sShieldBP,  tPositionToCoverWithShield, bBuildAwayFromEnemy)
     --find the first location near tPositionToCoverWithShield that can build on that doesnt have anything queued for either it or nearby locations
+    --if bBuildAwayFromEnemy is true then instead will try looking away from enemy in preference
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBuildLocationForShield'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -2215,7 +2215,15 @@ function GetBuildLocationForShield(aiBrain, sShieldBP,  tPositionToCoverWithShie
     local iBuildingSizeRadius = math.ceil(math.max(__blueprints[sShieldBP].Physics.SkirtSizeX, __blueprints[sShieldBP].Physics.SkirtSizeZ) * 0.5)
     local tPossibleLocation, sLocationRef
     local bValidLocation
-    if bDebugMessages == true then LOG(sFunctionRef..': About to search through every point around target to check we can build the shield '..sShieldBP..' there.  iBuildingSizeRadius='..iBuildingSizeRadius..'; iShieldRadius='..iShieldRadius..'; base position is '..repr(tPositionToCoverWithShield)..' which will draw in blue') end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to search through every point around target to check we can build the shield '..sShieldBP..' there.  iBuildingSizeRadius='..iBuildingSizeRadius..'; iShieldRadius='..iShieldRadius..'; base position is '..repr(tPositionToCoverWithShield)..' which will draw in blue.  bBuildAwayFromEnemy='..tostring(bBuildAwayFromEnemy or false)) end
+
+    local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(tPositionToCoverWithShield, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+    local ttValidLocationPositions = {}
+    local iValidLocations = 0
+    local tiValidLocationAngles = {}
+    local iHighestAngleDifValue = 0
+    local iHighestAngleDifLocationRef
+    local iCurAngleDif
 
     for iAbsAdjX = 0, iShieldRadius, 1 do
         for iXFactor = -1, 1, 2 do
@@ -2225,33 +2233,33 @@ function GetBuildLocationForShield(aiBrain, sShieldBP,  tPositionToCoverWithShie
                         tPossibleLocation = {tPositionToCoverWithShield[1] + iAbsAdjX * iXFactor, nil, tPositionToCoverWithShield[3] + iAbsAdjZ * iZFactor}
                         tPossibleLocation[2] = GetTerrainHeight(tPossibleLocation[1], tPossibleLocation[3])
                         if CanBuildAtLocation(aiBrain, sShieldBP, tPossibleLocation, nil, false) then
-                            --if aiBrain:CanBuildStructureAt(sShieldBP, tPossibleLocation) then
                             bValidLocation = true
-                            --Incorporated below into canbuildatlocation check
-                            --[[if bDebugMessages == true then LOG(sFunctionRef..': Have a location that we can build at, tPossibleLocation='..repr(tPossibleLocation)..'; will check have nothing queued up near here') end
-                --Do we have anything queued up for here or nearby?
-                for iQueueAdjustX = -iBuildingSizeRadius, iBuildingSizeRadius, 1 do
-                    for iQueueAdjustZ = -iBuildingSizeRadius, iBuildingSizeRadius, 1 do
-                        --reftEngineerAssignmentsByLocation --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location; returns the engineer object
-                        sLocationRef = M27Utilities.ConvertLocationToReference({tPossibleLocation[1] + iQueueAdjustX, GetTerrainHeight(tPossibleLocation[1] + iQueueAdjustX, tPossibleLocation[3] + iQueueAdjustZ), tPossibleLocation[3] + iQueueAdjustZ})
-                        if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByLocation][sLocationRef]) == false then
-                            bValidLocation = false
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef..': Cant build here as engineer has queued something up, will draw in black')
-                                M27Utilities.DrawLocation(tPossibleLocation, nil, 3, 100)
-                            end
-                            break
-                        end
-                    end
-                    if not(bValidLocation) then break end
-                end--]]
                             if bValidLocation then
-                                --Can build here, so return
+                                --Can build here, so record
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef..': No engineer assignments around here so can build here, will draw in white')
+                                    LOG(sFunctionRef..': No engineer assignments around here so can build here, will draw in white. iAbsAdjX='..iAbsAdjX * iXFactor..'; iAbsAdjZ='..iAbsAdjZ * iZFactor)
                                     M27Utilities.DrawLocation(tPossibleLocation, nil, 7, 100)
                                 end
-                                return tPossibleLocation
+
+                                iValidLocations = iValidLocations + 1
+                                if bBuildAwayFromEnemy then
+                                    ttValidLocationPositions[iValidLocations] = tPossibleLocation
+                                    tiValidLocationAngles[iValidLocations] = M27Utilities.GetAngleFromAToB(tPositionToCoverWithShield, tPossibleLocation)
+                                    iCurAngleDif = math.abs(tiValidLocationAngles[iValidLocations] - iAngleToEnemyBase)
+                                    if iCurAngleDif > 180 then iCurAngleDif = math.abs(iCurAngleDif - 360) end
+                                    if iCurAngleDif > iHighestAngleDifValue then
+                                        iHighestAngleDifValue = iCurAngleDif
+                                        iHighestAngleDifLocationRef = iValidLocations
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have a valid location '..iValidLocations..' with position '..repr(tPossibleLocation)..'; angle from target to possible position='..tiValidLocationAngles[iValidLocations]..'; Angle from target to base='..iAngleToEnemyBase..'; iCurAngleDif='..iCurAngleDif..'; iHighestAngleDifValue='..iHighestAngleDifValue) end
+                                end
+
+                                if not(bBuildAwayFromEnemy) or iCurAngleDif >= 150 then
+                                    --Good enough match so abort
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurAngleDif >= 150 or arent worried about building away from enemy so will abort') end
+                                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                                    return tPossibleLocation
+                                end
                             end
                         elseif bDebugMessages == true then
                             LOG(sFunctionRef..': Cant build here as existing building is blocking, will draw in red')
@@ -2262,6 +2270,15 @@ function GetBuildLocationForShield(aiBrain, sShieldBP,  tPositionToCoverWithShie
             end
         end
     end
+    if iValidLocations > 0 then
+        if bBuildAwayFromEnemy then
+            --Get best location
+            tPossibleLocation = ttValidLocationPositions[iHighestAngleDifLocationRef]
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return tPossibleLocation
+    end
+
     if bDebugMessages == true then LOG(sFunctionRef..': Finished searching, unable to find any valid locations') end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -2646,7 +2663,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
     local sFunctionRef = 'BuildStructureAtLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if iCategoryToBuild == M27UnitInfo.refCategoryTML then bDebugMessages = true end
-    if GetEngineerUniqueCount(oEngineer) == 39 and tAlternativePositionToLookFrom and math.floor(tAlternativePositionToLookFrom[1]) == 152 then bDebugMessages = true end
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, Engineer UC='..GetEngineerUniqueCount(oEngineer)..'; Engineer LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; Techlevel='..M27UnitInfo.GetUnitTechLevel(oEngineer)..'; tAlternativePositionToLookFrom='..repr(tAlternativePositionToLookFrom or {'nil'})..'; bBuildCheapestStructure='..tostring((bBuildCheapestStructure or false))..'; bNeverBuildRandom='..tostring((bNeverBuildRandom or false))..'; All blueprints that meet the category='..repr(EntityCategoryGetUnitList(iCategoryToBuild))..'; iMaxAreaToSearch='..(iMaxAreaToSearch or 'nil')) end
@@ -2783,8 +2800,10 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                     if iBuildingCount > 0 then
                         --GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNewBuildingBPID, bCheckValid, aiBrain, bReturnOnlyBestMatch, pBuilderPos, iMaxAreaToSearch, iBuilderRange, bIgnoreOutsideBuildArea, bBetterIfNoReclaim, bPreferCloseToEnemy, bPreferFarFromEnemy, bLookForQueuedBuildings)
                         if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, sBlueprintToBuild) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Will try and build the shield anywhere near the target') end
-                            tTargetLocation = GetBuildLocationForShield(aiBrain, sBlueprintToBuild, tAlternativePositionToLookFrom)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will try and build the shield anywhere near the target. iOptionalEngiActionRef='..(iOptionalEngiActionRef or 'nil')) end
+                            local bBuildAwayFromEnemy = false
+                            if iOptionalEngiActionRef == refActionFortifyFirebase then bBuildAwayFromEnemy = true end
+                            tTargetLocation = GetBuildLocationForShield(aiBrain, sBlueprintToBuild, tAlternativePositionToLookFrom, bBuildAwayFromEnemy)
                             if not(tTargetLocation) then bAbortConstruction = true end
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': About to call GetBestBuildLocation; iBuildingCount='..iBuildingCount..'; sBlueprintBuildBy='..sBlueprintBuildBy) end
@@ -2817,8 +2836,15 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                         if bDebugMessages == true then LOG(sFunctionRef..': Cant find any valid buildings for adjacency') end
                     end
                 else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have a category to build by, will look for random location unless current target is valid') end
-                    bFindRandomLocation = not(bNeverBuildRandom)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have a category to build by, will look for random location unless current target is valid or we are a shield') end
+                    if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, sBlueprintToBuild) then
+                        local bBuildAwayFromEnemy = false
+                        if iOptionalEngiActionRef == refActionFortifyFirebase then bBuildAwayFromEnemy = true end
+                        tTargetLocation = GetBuildLocationForShield(aiBrain, sBlueprintToBuild, tAlternativePositionToLookFrom, bBuildAwayFromEnemy)
+                        if tTargetLocation then bFindRandomLocation = false else bFindRandomLocation = not(bNeverBuildRandom) end
+                    else
+                        bFindRandomLocation = not(bNeverBuildRandom)
+                    end
                 end
             else
                 --Dealing with mex or hydro or storage
@@ -3575,7 +3601,7 @@ function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpg
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'UpgradeBuildingActionCompleteChecker'
-    if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
 
     local bContinue = true
     while bContinue == true do
@@ -3601,7 +3627,7 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReissueEngineerOldOrders'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
 
     if bClearActionsFirst then IssueClearCommands({oEngineer}) end
     --reftEngineerActionsByEngineerRef Records actions by engineer reference; aiBrain[reftEngineerActionsByEngineerRef][iUniqueRef][BuildingQueue]: returns {LocRef, EngRef, AssistingRef, ActionRef, refbPrimaryBuilder, refEngineerAssignmentActualLocation} but not in that order - i.e. use subtable keys to reference these; buildingqueue will be 1 for the first queueud building by the unit, 2 for the second etc. (e.g. t1 power)
@@ -3670,7 +3696,7 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateActionForNearbyReclaim'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
 
     local bReclaimWillMoveOutOfRangeSoon = false
     --First check we have space to accept any reclaim - want higher of 1% storage and 50 mass
@@ -3928,7 +3954,7 @@ function ReplaceT2WithT3Monitor(aiBrain, oEngineer, oActionTargetObject)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReplaceT2WithT3Monitor'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
 
     local tTargetMex = oActionTargetObject:GetPosition()
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code for Engineer UC='..GetEngineerUniqueCount(oEngineer)..'; LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..', tTargetMex='..repr(tTargetMex)..'; Target object='..oActionTargetObject.UnitId..M27UnitInfo.GetUnitLifetimeCount(oActionTargetObject)) end
@@ -4362,7 +4388,7 @@ function CheckForEnemySMD(aiBrain, oSML)
                             if bDebugMessages == true then LOG(sFunctionRef..'Have engineers building experimental that is SML so will go through and clear them') end
                             for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental] do
                                 oEngineer = tSubtable[refEngineerAssignmentEngineerRef]
-                                if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+                                --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
                                 IssueClearCommands({oEngineer})
                                 ClearEngineerActionTrackers(aiBrain, oEngineer, true)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oEngineer)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
@@ -4374,7 +4400,7 @@ function CheckForEnemySMD(aiBrain, oSML)
                         if bDebugMessages == true then LOG(sFunctionRef..': Have engineers with assist nuke action - will clear') end
                         for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistNuke] do
                             oEngineer = tSubtable[refEngineerAssignmentEngineerRef]
-                            if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+                            --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
                             IssueClearCommands({oEngineer})
                             ClearEngineerActionTrackers(aiBrain, oEngineer, true)
                             if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oEngineer)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
@@ -4419,8 +4445,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
 
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
-    if iActionToAssign == refActionFortifyFirebase then bDebugMessages = true end
-    if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+    --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
 
 
     if oEngineer then
@@ -5246,7 +5271,6 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local sFunctionRef = 'GetActionTargetAndObject'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if iActionRefToAssign == refActionBuildTML then bDebugMessages = true end
-    if iActionRefToAssign == refActionFortifyFirebase and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
 
 
 
@@ -6002,7 +6026,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     local sFunctionRef = 'ReassignEngineers'
     M27Utilities.FunctionProfiler(sFunctionRef..': Overall', M27Utilities.refProfilerStart)
     --if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 and aiBrain:GetEconomyStored('MASS') >= 5000 then bDebugMessages = true end
-    --if GetGameTimeSeconds() >= 1740 then bDebugMessages = true end
 
 
     if M27Logic.iTimeOfLastBrainAllDefeated < 10 then
@@ -6048,7 +6071,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         if M27Utilities.IsTableEmpty(tEngineers) == false then
             for iEngineer, oEngineer in tEngineers do
                 --if oEngineer.UnitId == 'xsl0105' and M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 4 and aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 1326 and GetGameTimeSeconds() <= 1327 then bDebugMessages = true else bDebugMessages = false end
-                if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
+                --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true else bDebugMessages = false end
                 if M27UnitInfo.IsUnitValid(oEngineer) and oEngineer:GetFractionComplete() >= 1 and not(oEngineer:IsUnitState('Attached')) then
 
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering if oEngineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' with UC='..GetEngineerUniqueCount(oEngineer)..' is idle. TIme of last assignment='..iCurGameTime - (oEngineer[refiTimeOfLastAssignment] or -100)..'; Engineer is valid='..tostring(M27UnitInfo.IsUnitValid(oEngineer))) end
@@ -6341,8 +6364,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             bThresholdInitialEngineerCondition = false --Dont want inside while loop or else it gets reset to false while the line setting it to true only gets called once (when on that specific condition)
             bThresholdPreReclaimEngineerCondition = false
 
-            if iEngineersToConsider >= 5 then bDebugMessages = true end
-
 
             while iEngineersToConsider >= 0 do --want >= rather than > so get correct calculation of engineers needed
                 --if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 and aiBrain:GetEconomyStored('MASS') >= 10000 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true else bDebugMessages = false end
@@ -6352,7 +6373,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 if M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
                 if iCount > 100 then
                     if iEngineersToConsider < 40 then
-                        M27Utilities.ErrorHandler('Infinite loop - have done more than 100 cycles but only have '..(iEngineersToConsider or 'nil')..' engineers to consider')
+                        M27Utilities.ErrorHandler('Possible infinite loop - have done more than 100 cycles.  Remaining engineers to consider='..(iEngineersToConsider or 'nil')..'.  If we have large number of engineers being reassigned at once then this could cause this message to trigger')
                         break
                     elseif iCount > 110 then
                         --abort for performance reasons anyway
@@ -6600,7 +6621,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                                         iNearestEngineer = iCurDistance
                                                     end
                                                 end
-                                                if GetEngineerUniqueCount(oNearestEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
+                                                --if GetEngineerUniqueCount(oNearestEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
                                                 if bDebugMessages == true then LOG(sFunctionRef..': About to clear nearest engineer='..oNearestEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestEngineer)..'; UC='..GetEngineerUniqueCount(oNearestEngineer)) end
                                                 IssueClearCommands({oNearestEngineer})
                                                 ClearEngineerActionTrackers(aiBrain, oNearestEngineer, true)
@@ -7069,7 +7090,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                             LOG(sFunctionRef..': oEngineer UC='..GetEngineerUniqueCount(aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistSMD][iUniqueRef][refEngineerAssignmentEngineerRef])..'; About to check if valid unit')
                                         end
                                         if M27UnitInfo.IsUnitValid(tSubtable[refEngineerAssignmentEngineerRef]) then
-                                            if GetEngineerUniqueCount(tSubtable[refEngineerAssignmentEngineerRef]) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
+                                            --if GetEngineerUniqueCount(tSubtable[refEngineerAssignmentEngineerRef]) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
                                             if bDebugMessages == true then LOG(sFunctionRef..': Engineer is assigned the action so will clear it') end
                                             IssueClearCommands({tSubtable[refEngineerAssignmentEngineerRef]})
                                             ClearEngineerActionTrackers(aiBrain, tSubtable[refEngineerAssignmentEngineerRef], true)
@@ -7529,7 +7550,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
                     elseif iCurrentConditionToTry == 31 then --Fortify firebase
                         if not(bHaveLowPower) and (not(bHaveLowMass) or aiBrain:GetEconomyStored('MASS') > 0 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12) then
-                            bDebugMessages = true
                             if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionFortifyFirebase]) == false then
                                 iActionToAssign = refActionFortifyFirebase
                                 iMinEngiTechLevelWanted = 2
