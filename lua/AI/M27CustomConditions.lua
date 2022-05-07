@@ -70,15 +70,15 @@ function SafeToUpgradeUnit(oUnit)
                     --Exception - Unit is ACU with gun with low enemy threat and have shield coverage and high health
                     if oUnit.PlatoonHandle and M27Utilities.IsACU(oUnit) then
                         local oPlatoon = oUnit.PlatoonHandle
-                        if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] and oUnit:GetHealthPercent() > 0.8 and DoesACUHaveGun(aiBrain, false, oUnit) and DoesPlatoonWantAnotherMobileShield(oPlatoon, 200, false) == false then
+                        if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] and M27UnitInfo.GetUnitHealthPercent(oUnit) > 0.8 and DoesACUHaveGun(aiBrain, false, oUnit) and DoesPlatoonWantAnotherMobileShield(oPlatoon, 200, false) == false then
                             bSafeToGetUpgrade = true
                         end
                     end
                 end
             else
                 --No intel coverage - still consider safe if relatively close to our base on a mod distance basis
-                if bDebugMessages == true then LOG(sFunctionRef..': Have no intel coverage, will still consider safe if have full health and are relatively close to our base. Health%='..oUnit:GetHealthPercent()..'; ModDist='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)..'; Emergency range='..aiBrain[M27Overseer.refiModDistEmergencyRange]..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; Dist to our base='..iDistToStart..'; Dist between our base and enemy base='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
-                if oUnit:GetHealthPercent() == 1 then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have no intel coverage, will still consider safe if have full health and are relatively close to our base. Health%='..M27UnitInfo.GetUnitHealthPercent(oUnit)..'; ModDist='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)..'; Emergency range='..aiBrain[M27Overseer.refiModDistEmergencyRange]..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; Dist to our base='..iDistToStart..'; Dist between our base and enemy base='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
+                if M27UnitInfo.GetUnitHealthPercent(oUnit) == 1 then
                     local iModDistToStart = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tUnitLocation, false)
                     if iDistToStart <= aiBrain[M27Overseer.refiModDistEmergencyRange] and iModDistToStart <= aiBrain[M27Overseer.refiModDistEmergencyRange] and M27Utilities.GetDistanceBetweenPositions(tUnitLocation, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] then
                         if bDebugMessages == true then LOG(sFunctionRef..': Are within emergency range so safe to upgrade') end
@@ -174,10 +174,10 @@ function SafeToGetACUUpgrade(aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies, will now check ACUs health and if its trying to heal') end
                             local iCurrentHealth = oACU:GetHealth()
                             local bACUNearBase = false
-                            if bDebugMessages == true then LOG(sFunctionRef..': M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]='..repr(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; M27Overseer.iDistanceFromBaseToBeSafe='..M27Overseer.iDistanceFromBaseToBeSafe..'; tACUPos='..repr(tACUPos)..'; ACU health %='..oACU:GetHealthPercent()..'; dist wanted from base='..math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25))) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]='..repr(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; M27Overseer.iDistanceFromBaseToBeSafe='..M27Overseer.iDistanceFromBaseToBeSafe..'; tACUPos='..repr(tACUPos)..'; ACU health %='..M27UnitInfo.GetUnitHealthPercent(oACU)..'; dist wanted from base='..math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25))) end
 
                             local iACUDistToBase = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                            if iACUDistToBase <= M27Overseer.iDistanceFromBaseToBeSafe or (oACU:GetHealthPercent() >= 0.75 and iACUDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25))) then bACUNearBase = true
+                            if iACUDistToBase <= M27Overseer.iDistanceFromBaseToBeSafe or (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 and iACUDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25))) then bACUNearBase = true
                             elseif M27Utilities.GetDistanceBetweenPositions(tACUPos, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos, oACU)) <= math.min(10, M27Overseer.iDistanceFromBaseToBeSafe * 0.5) then
                                 --Treat ACU as though it's near our base if its close to a rally point
                                 bACUNearBase = true
@@ -188,14 +188,14 @@ function SafeToGetACUUpgrade(aiBrain)
                             elseif oACU.PlatoonHandle and oACU.PlatoonHandle[M27PlatoonUtilities.refbNeedToHeal] and bACUNearBase == false then
                                 if bDebugMessages == true then LOG(sFunctionRef..': ACU platoon is flagged that it needs to heal so not safe to get gun') end
                                 bIsSafe = false
-                            elseif oACU:GetHealthPercent() <= M27Overseer.iACUEmergencyHealthPercentThreshold then
+                            elseif M27UnitInfo.GetUnitHealthPercent(oACU) <= M27Overseer.iACUEmergencyHealthPercentThreshold then
                                 if bACUNearBase then
                                     if iACUDistToBase > M27Overseer.iDistanceFromBaseWhenVeryLowHealthToBeSafe then bIsSafe = false end
                                 else bIsSafe = false
                                 end
                             end
                             if bIsSafe == false then --Check if we have mobile shields nearby and are on our side of the map
-                                if oACU.PlatoonHandle and HaveNearbyMobileShield(oACU.PlatoonHandle) and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) and oACU:GetHealthPercent() <= M27Overseer.iACUEmergencyHealthPercentThreshold * 0.8 then
+                                if oACU.PlatoonHandle and HaveNearbyMobileShield(oACU.PlatoonHandle) and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) and M27UnitInfo.GetUnitHealthPercent(oACU) <= M27Overseer.iACUEmergencyHealthPercentThreshold * 0.8 then
                                     bIsSafe = true
                                 end
                             end
@@ -297,9 +297,9 @@ function CanWeStopProtectingACU(aiBrain, oACU)
     local bStopProtecting = false
     local iCurTime = math.floor(GetGameTimeSeconds())
     if not(aiBrain[M27Overseer.refbEnemyACUNearOurs]) then
-        if DoesACUHaveGun(aiBrain, false, oACU) and oACU:GetHealthPercent() >= 0.5 then
+        if DoesACUHaveGun(aiBrain, false, oACU) and M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.5 then
             bStopProtecting = true
-        elseif oACU:GetHealthPercent() >= 0.8 and not(oACU:IsUnitState('Upgrading')) and not(oACU.GetWorkProgress and oACU:GetWorkProgress() > 0 and oACU:GetWorkProgress() < 1) and not(oACU.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionUpgrade) then
+        elseif M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 and not(oACU:IsUnitState('Upgrading')) and not(oACU.GetWorkProgress and oACU:GetWorkProgress() > 0 and oACU:GetWorkProgress() < 1) and not(oACU.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionUpgrade) then
             bStopProtecting = true
         elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= M27Overseer.iDistanceFromBaseToBeSafe then
             bStopProtecting = true
@@ -308,7 +308,7 @@ function CanWeStopProtectingACU(aiBrain, oACU)
         end
     end
 
-    if bDebugMessages == true then LOG(sFunctionRef..': bStopProtecting='..tostring(bStopProtecting)..'; iCurTime='..iCurTime..'; Does ACU have gun='..tostring(DoesACUHaveGun(aiBrain, false, oACU))..'; ACU health%='..oACU:GetHealthPercent()..'; ACU unit state='..M27Logic.GetUnitState(oACU)..'; Dist to base='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Dist to base to be safe='..M27Overseer.iDistanceFromBaseToBeSafe..'; ACU health 30s ago='..(oACU[M27Overseer.reftACURecentHealth][iCurTime - 30] or 'nil')..'; ACU cur health='..(oACU[M27Overseer.reftACURecentHealth][iCurTime] or oACU[M27Overseer.reftACURecentHealth][iCurTime-1] or 'nil')..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; Is table of enemy nearby units empty='..tostring(M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, oACU:GetPosition(), 50, 'Enemy')))..'; aiBrain[M27Overseer.refbEnemyACUNearOurs]='..tostring((aiBrain[M27Overseer.refbEnemyACUNearOurs] or false))) end
+    if bDebugMessages == true then LOG(sFunctionRef..': bStopProtecting='..tostring(bStopProtecting)..'; iCurTime='..iCurTime..'; Does ACU have gun='..tostring(DoesACUHaveGun(aiBrain, false, oACU))..'; ACU health%='..M27UnitInfo.GetUnitHealthPercent(oACU)..'; ACU unit state='..M27Logic.GetUnitState(oACU)..'; Dist to base='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Dist to base to be safe='..M27Overseer.iDistanceFromBaseToBeSafe..'; ACU health 30s ago='..(oACU[M27Overseer.reftACURecentHealth][iCurTime - 30] or 'nil')..'; ACU cur health='..(oACU[M27Overseer.reftACURecentHealth][iCurTime] or oACU[M27Overseer.reftACURecentHealth][iCurTime-1] or 'nil')..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))..'; Is table of enemy nearby units empty='..tostring(M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, oACU:GetPosition(), 50, 'Enemy')))..'; aiBrain[M27Overseer.refbEnemyACUNearOurs]='..tostring((aiBrain[M27Overseer.refbEnemyACUNearOurs] or false))) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bStopProtecting
 end
@@ -483,8 +483,8 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering if enough mass income to get upgrade; iMassIncomePerTickWanted='..iMassIncomePerTickWanted..'; iUpgradeMassCost='..iUpgradeMassCost..'; iUpgradeBuildTime='..iUpgradeBuildTime..'; iACUBuildRate='..iACUBuildRate..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; aiBrain:GetEconomyStored(MASS)='..aiBrain:GetEconomyStored('MASS')) end
                         if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= iMassIncomePerTickWanted and aiBrain:GetEconomyStored('MASS') >= 5 then --check we're not massively mass stalling
                             --Do we have good health, and dont have map control?  If so then want to use ACU to attack
-                            if bDebugMessages == true then LOG(sFunctionRef..': If have low health or nearby threats wont upgrade; oACU:GetHealthPercent()='..oACU:GetHealthPercent()..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
-                            if oACU:GetHealthPercent() < 0.8 or (aiBrain[M27Overseer.refiPercentageOutstandingThreat] > 0.5 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > 0.3) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': If have low health or nearby threats wont upgrade; M27UnitInfo.GetUnitHealthPercent(oACU)='..M27UnitInfo.GetUnitHealthPercent(oACU)..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
+                            if M27UnitInfo.GetUnitHealthPercent(oACU) < 0.8 or (aiBrain[M27Overseer.refiPercentageOutstandingThreat] > 0.5 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > 0.3) then
                                 --Have enough energy, check if safe to get upgrade
                                 local bAbort = false
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have enough energy and mass, check its safe to get upgrade') end

@@ -4,5 +4,6 @@ function OnFirstUpdate()
     M27OnFirstUpdate()
     if M27Config.M27RunVeryFast == true then
         ConExecute("WLD_GameSpeed 10")
+        ConExecute("WLD_GameSpeed 50")
     end
 end

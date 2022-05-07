@@ -522,7 +522,7 @@ function IsLineFromAToBInRangeOfCircleAtC(iDistFromAToB, iDistFromAToC, iDistFro
     else
         --Unclear so need more precise calculation
         --LOG('Unclear so doing more precise calculation.  iAngleFromAToB - iAngleFromAToC='..(iAngleFromAToB - iAngleFromAToC)..'; ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC)='..ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC)..'; math.tan(math.abs(ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC)))='..math.tan(math.abs(ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC)))..'; iDistFromAToC='..iDistFromAToC..'; iCircleRadius='..iCircleRadius..'; Calculation result='..math.tan(math.abs(ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC))) * iDistFromAToC)
-        if math.tan(math.abs(ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC))) * iDistFromAToC <= iCircleRadius then
+        if math.abs(math.tan(ConvertAngleToRadians(iAngleFromAToB - iAngleFromAToC))) * iDistFromAToC <= iCircleRadius then
             --LOG('Are in range so returning true')
             return true
         else

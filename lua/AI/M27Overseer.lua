@@ -3646,7 +3646,7 @@ function ACUManager(aiBrain)
                 if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iHealthThresholdAdjIfAlreadyAllIn = 0.05 end
                 iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
                 bWantEscort = oACU:IsUnitState('Upgrading')
-                if bWantEscort and oACU:GetHealthPercent() >= 0.95 and iACUCurShield >= iACUMaxShield * 0.95 and M27Conditions.DoesACUHaveGun(aiBrain, false, oACU) then
+                if bWantEscort and M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.95 and iACUCurShield >= iACUMaxShield * 0.95 and M27Conditions.DoesACUHaveGun(aiBrain, false, oACU) then
                     bWantEscort = false
                 end
 
@@ -3697,7 +3697,7 @@ function ACUManager(aiBrain)
                         bIncludeACUInAttack = true
                     else
                         --Attack if we're close to ACU and have a notable health advantage, and are on our side of the map or are already in attack mode
-                        if iLastDistanceToACU <= (iACURange + 15) and aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.5 + iHealthThresholdAdjIfAlreadyAllIn) and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck + 2500 < (oACU:GetHealth() + iHealthAbsoluteThresholdIfAlreadyAllIn) and (M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) or aiBrain[refbIncludeACUInAllOutAttack] == true) then
+                        if iLastDistanceToACU <= (iACURange + 15) and M27UnitInfo.GetUnitHealthPercent(aiBrain[refoLastNearestACU]) < (0.5 + iHealthThresholdAdjIfAlreadyAllIn) and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck + 2500 < (oACU:GetHealth() + iHealthAbsoluteThresholdIfAlreadyAllIn) and (M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) or aiBrain[refbIncludeACUInAllOutAttack] == true) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is almost in range of us and is on low health so will do all out attack') end
                             bAllInAttack = true
                             bIncludeACUInAttack = true
@@ -3754,7 +3754,7 @@ function ACUManager(aiBrain)
                             end
                         end
 
-                        if aiBrain[refoLastNearestACU]:GetHealth() > (oACU:GetHealth() + iHealthModForGun) and aiBrain[refoLastNearestACU]:GetHealth() > 2500 and oACU:GetHealthPercent() < (0.75 + iHealthPercentModForGun) then
+                        if aiBrain[refoLastNearestACU]:GetHealth() > (oACU:GetHealth() + iHealthModForGun) and aiBrain[refoLastNearestACU]:GetHealth() > 2500 and M27UnitInfo.GetUnitHealthPercent(oACU) < (0.75 + iHealthPercentModForGun) then
                             bWantEscort = true
                             bEmergencyRequisition = true
 
@@ -3772,17 +3772,17 @@ function ACUManager(aiBrain)
                 end
                 if bAllInAttack == false and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
                     if bDebugMessages == true then LOG(sFunctionRef..': Will consider if want all out attack even if our ACU isnt in much stronger position') end
-                    if aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.1 + iHealthThresholdAdjIfAlreadyAllIn) then
+                    if M27UnitInfo.GetUnitHealthPercent(aiBrain[refoLastNearestACU]) < (0.1 + iHealthThresholdAdjIfAlreadyAllIn) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is almost dead') end
                         bAllInAttack = true
-                    elseif aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.75 + iHealthThresholdAdjIfAlreadyAllIn) then
+                    elseif M27UnitInfo.GetUnitHealthPercent(aiBrain[refoLastNearestACU]) < (0.75 + iHealthThresholdAdjIfAlreadyAllIn) then
                         --Do we have more threat near the ACU than the ACU has?
                         tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Ally')
 
                         if M27Utilities.IsTableEmpty(tAlliedUnitsNearEnemy) == false then
                             tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Enemy')
                             iThreatFactor = 2.5
-                            if aiBrain[refoLastNearestACU]:GetHealthPercent() < (0.4 + iHealthThresholdAdjIfAlreadyAllIn) then iThreatFactor = 1.25 end
+                            if M27UnitInfo.GetUnitHealthPercent(aiBrain[refoLastNearestACU]) < (0.4 + iHealthThresholdAdjIfAlreadyAllIn) then iThreatFactor = 1.25 end
                             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iThreatFactor = 1 end
                             iAlliedThreat = M27Logic.GetCombatThreatRating(aiBrain, tAlliedUnitsNearEnemy, false, nil, nil, false, false)
                             iEnemyThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnitsNearEnemy, false, nil, nil, false, false)
@@ -3794,7 +3794,7 @@ function ACUManager(aiBrain)
                     end
 
 
-                    if bAllInAttack and not(oACU:IsUnitState('Upgrading')) and oACU:GetHealthPercent() > 0.5 then
+                    if bAllInAttack and not(oACU:IsUnitState('Upgrading')) and M27UnitInfo.GetUnitHealthPercent(oACU) > 0.5 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Include ACU in all out attack as it has more than 50% health') end
                         bIncludeACUInAttack = true
                     end
@@ -3908,7 +3908,7 @@ function ACUManager(aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': ACU has lost a lot of health recently, oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]) end
                             bCancelUpgradeAndRun = true
                             --Is the reason for the health loss because we removed T2 upgrade (e.g. sera)? Note - if changing the time frame from 10s above, need to change the delay variable reset on the upgrade in platoonutilities (currently 11s)
-                            if oACU[M27UnitInfo.refbRecentlyRemovedHealthUpgrade] and (oACU:GetHealthPercent() >= 0.99 or oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] < 3000) then
+                            if oACU[M27UnitInfo.refbRecentlyRemovedHealthUpgrade] and (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.99 or oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] < 3000) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': We recently removed an upgrade that increased our health and have good health or health loss less than 3k') end
                                 bCancelUpgradeAndRun = false
                             end
@@ -3992,7 +3992,7 @@ function ACUManager(aiBrain)
             --ACU run logic regardless of whether have an ACU or have replaced it with an engineer/structure
 
 
-            local iHealthPercentage = oACU:GetHealthPercent()
+            local iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oACU)
             --[[local bRunAway = false
             local bNewPlatoon = true
             local oNewPlatoon--]]
@@ -4130,7 +4130,7 @@ function ACUManager(aiBrain)
                     end
                 end
                 --Reset flag for ACU having run (normally platoons reset when they reach their destination, but for ACU it will revert to going to enemy start if we have gun upgrade)
-                if oACU:GetHealthPercent() >= 0.95 and oACU.PlatoonHandle[M27PlatoonUtilities.refbHavePreviouslyRun] and M27Conditions.DoesACUHaveUpgrade(aiBrain) then
+                if M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.95 and oACU.PlatoonHandle[M27PlatoonUtilities.refbHavePreviouslyRun] and M27Conditions.DoesACUHaveUpgrade(aiBrain) then
                     if iACUMaxShield == 0 or iACUCurShield >= iACUMaxShield * 0.7 then
                         --Large threat near ACU?
                         local iNearbyThreat = 0
@@ -5048,7 +5048,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                                 --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
                             elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then bWantToEco = false
                                 --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
-                            elseif oACU:GetHealthPercent() < 0.45 then
+                            elseif M27UnitInfo.GetUnitHealthPercent(oACU) < 0.45 then
                                 bWantToEco = false
                                 --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
                             elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
@@ -5668,7 +5668,7 @@ function SendWarningIfNoM27(aiBrain)
     --Whenever an aiBrain is initialised this should be called as a fork thread
     WaitSeconds(5)
     if not(M27Utilities.bM27AIInGame) then
-        M27Chat.SendGameCompatibilityWarning(aiBrain, 'No M27AI have been detected, the game may run faster if the mod is disabled when not in use.  If you have rehosted a game note that this can prevent most AI from loading properly', 0, 1)
+        M27Chat.SendGameCompatibilityWarning(aiBrain, 'No Active M27 AI detected, disable M27AI mod to make the game run faster', 0, 1)
     end
 end
 

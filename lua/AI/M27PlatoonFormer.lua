@@ -350,7 +350,7 @@ function CombatPlatoonFormer(aiBrain)
                             --Does the ACU need help? If not, then can form a large platoon
                             local bACUNeedsHelp = false
                             local oACU = M27Utilities.GetACU(aiBrain)
-                            if oACU:GetHealthPercent() <= 0.75 then
+                            if M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75 then
                                 local oComPlatoon = oACU.GetPlatoonHandle
                                 if oComPlatoon and oComPlatoon[M27PlatoonUtilities.refiEnemiesInRange] and oComPlatoon[M27PlatoonUtilities.refiEnemiesInRange] > 0 then
                                     bACUNeedsHelp = true

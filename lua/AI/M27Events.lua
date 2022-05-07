@@ -24,7 +24,7 @@ local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
 local refCategoryAirScout = M27UnitInfo.refCategoryAirScout
 
 
-function OnKilled(self, instigator, type, overkillRatio)
+function OnKilled(oUnitKilled, instigator, type, overkillRatio)
     --NOTE: Called by any unit of any player being killed; also note that OnUnitDeath triggers as well as this
     --i.e. this shoudl be used for where only want to get an event where the unit was killed by something
     --Is the unit owned by M27AI?
@@ -33,9 +33,9 @@ function OnKilled(self, instigator, type, overkillRatio)
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-        if self.GetAIBrain then
-            local aiBrain = self:GetAIBrain()
-            if aiBrain.M27AI then
+        if oUnitKilled.GetAIBrain then
+            local oKilledBrain = oUnitKilled:GetAIBrain()
+            if oKilledBrain.M27AI then
                 --were we killed by something?
                 local oKillerUnit
                 if instigator then
@@ -45,23 +45,24 @@ function OnKilled(self, instigator, type, overkillRatio)
                         oKillerUnit = instigator.unit
                     end
                     if oKillerUnit and oKillerUnit.GetAIBrain then
-                        M27AirOverseer.CheckForUnseenKiller(aiBrain, self, oKillerUnit)
+                        M27AirOverseer.CheckForUnseenKiller(oKilledBrain, oUnitKilled, oKillerUnit)
                     end
                 end
+                --If a PD that didnt compelte construction then track mass value so we adjust PD effectiveness
+                if EntityCategoryContains(M27UnitInfo.refCategoryPD, oUnitKilled.UnitId) and not(oUnitKilled.M27OnConstructedCalled) then
+                    oKilledBrain[M27EngineerOverseer.refiMassSpentOnPD] = oKilledBrain[M27EngineerOverseer.refiMassSpentOnPD] + oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.5
+                    oKilledBrain[M27EngineerOverseer.refbPDHaveChangedSinceLastFirebaseCheck] = true
+                end
             else
-                --Decided to remove the below and instead just work off a lower threshold that only increases when we run
-                --[[if instigator and IsUnit(instigator) and EntityCategoryContains(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, instigator.UnitId) then
+                --Did a PD we own kill something?
+                if instigator and IsUnit(instigator) then
                     local oKillerBrain = instigator:GetAIBrain()
                     if oKillerBrain.M27AI then
-                        local iSegmentX, iSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(instigator:GetPosition())
-                        for iXAdj = -1, 1 do
-                            for iZAdj = -1, 1 do
-                                if not(oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX + iXAdj]) then oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX + iXAdj] = {} end
-                                oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX+iXAdj][iSegmentZ+iZAdj] = math.max(0,(oKillerBrain[M27AirOverseer.reftPreviousTargetByLocationCount][iSegmentX + iXAdj][iSegmentZ+iZAdj] or 0) - 1)
-                            end
+                        if EntityCategoryContains(M27UnitInfo.refCategoryPD, instigator.UnitId) then
+                            oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] = oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] + instigator.Sync.totalMassKilled or 0
                         end
                     end
-                end--]]
+                end
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -465,7 +466,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
             --Decide if we want to shield the construction
             local oBP = oConstruction:GetBlueprint()
             if oBP.Economy.BuildCostMass >= 2000 then
-                if oBP.Defense.Health / oBP.Economy.BuildCostMass < 1 or (aiBrain[M27Overseer.refbDefendAgainstArti] and oBP.Economy.BuildCostMass >= 3000 and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oConstruction.UnitId)) then
+                if oBP.Defense.Health / oBP.Economy.BuildCostMass < 1 or EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oConstruction.UnitId) or (aiBrain[M27Overseer.refbDefendAgainstArti] and oBP.Economy.BuildCostMass >= 3000 and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oConstruction.UnitId)) then
                     oConstruction[M27EngineerOverseer.refiShieldsWanted] = 1
                     table.insert(aiBrain[M27EngineerOverseer.reftUnitsWantingFixedShield], oConstruction)
                     --Flag if we want it to have a heavy shield
@@ -553,6 +554,10 @@ function OnConstructed(oEngineer, oJustBuilt)
                     aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories][oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
                     LOG('Have just recorded factory ' .. oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt) .. ' in the list of factories for iPlateauGroup=' .. iPlateauGroup)
                 end
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryPD, oJustBuilt.UnitId) then
+                --Update PD tracking
+                aiBrain[M27EngineerOverseer.refiMassSpentOnPD] = aiBrain[M27EngineerOverseer.refiMassSpentOnPD] + oJustBuilt:GetBlueprint().Economy.BuildCostMass
+                aiBrain[M27EngineerOverseer.refbPDHaveChangedSinceLastFirebaseCheck] = true
             else
                 --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
                 if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then
@@ -573,6 +578,28 @@ function OnConstructed(oEngineer, oJustBuilt)
                     ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
                 end
             end
+
+            --Firebase tracking
+            if oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionFortifyFirebase then
+                --Get the closest firebase, if its within 50 of here then assign the unit to it
+
+                if not(oJustBuilt[M27EngineerOverseer.refiAssignedFirebase]) and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasePosition]) == false then
+                    local iCurDist
+                    local iClosestDist = 10000
+                    local iClosestFirebaseRef
+                    for iFirebase, tFirebase in aiBrain[M27EngineerOverseer.reftFirebasePosition] do
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(tFirebase, oJustBuilt:GetPosition())
+                        if iCurDist < iClosestDist then
+                            iClosestDist = iCurDist
+                            iClosestFirebaseRef = iFirebase
+                        end
+                    end
+                    if iClosestDist <= 50 then
+                        oJustBuilt[M27EngineerOverseer.refiAssignedFirebase] = iClosestFirebaseRef
+                        aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef][iClosestFirebaseRef][oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
+                    end
+                end
+            end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         elseif M27Config.M27ShowEnemyUnitNames then
             oJustBuilt:SetCustomName(oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
@@ -580,10 +607,7 @@ function OnConstructed(oEngineer, oJustBuilt)
         --Engineer callbacks
         if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
             local sFunctionRef = 'OnConstructed'
-            local bDebugMessages = false
-            if M27Utilities.bGlobalDebugOverride == true then
-                bDebugMessages = true
-            end
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

@@ -393,7 +393,7 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
 
             if not(oAirUnit[M27UnitInfo.refbSpecialMicroActive]) and EntityCategoryContains(refCategoryBomber - categories.TECH1, oAirUnit.UnitId) and not(oAirUnit[refbSentRefuelCommand]) and not(oAirUnit[refoAirStagingAssigned]) then
                 --Do we have low health or fuel? Then will want to return to base
-                if oAirUnit:GetHealthPercent() < iLowHealthPercent or oAirUnit:GetFuelRatio() < iLowFuelPercent then
+                if M27UnitInfo.GetUnitHealthPercent(oAirUnit) < iLowHealthPercent or oAirUnit:GetFuelRatio() < iLowFuelPercent then
                     --Do we have any air staging units?
                     if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirStaging) > 0 or EntityCategoryContains(categories.EXPERIMENTAL, oAirUnit.UnitId) then
                         bMicroTurn = true
@@ -1136,7 +1136,7 @@ function IssueNewAttackToBomber(oBomber, oTarget, iPriority, bAreHoverBombing)
     local iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oTarget)
     --IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
     local iNearbyShieldCurHealth, iNearbyShieldMaxHealth = M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, true, false, true)
-    local iHealthPercent = oTarget:GetHealthPercent()
+    local iHealthPercent = M27UnitInfo.GetUnitHealthPercent(oTarget)
     if iHealthPercent == 0 then
         iHealthPercent = 1
     end
@@ -2478,7 +2478,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                     else
                                         --Error check in case unit somehow gained full health and fuel
                                         if iFuelPercent >= 0.99 then
-                                            if oUnit:GetHealthPercent() >= 0.99 then
+                                            if M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.99 then
                                                 if bDebugMessages == true then
                                                     LOG('Warning - Unit has its status as refueling, but its health and fuel percent are >=99%.  Will remove its status as refueling')
                                                 end
@@ -2490,10 +2490,10 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                             end
                             if bUnitIsUnassigned == true then
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Unit is unassigned, will treat as available unless it is a low health bomber or t3 air and we have air staging. iAirStaging=' .. iAirStaging .. '; oUnit:GetHealthPercent()=' .. oUnit:GetHealthPercent() .. '; Tech level=' .. M27UnitInfo.GetUnitTechLevel(oUnit) .. '; iUnitType=' .. iUnitType .. '; ')
+                                    LOG(sFunctionRef .. ': Unit is unassigned, will treat as available unless it is a low health bomber or t3 air and we have air staging. iAirStaging=' .. iAirStaging .. '; M27UnitInfo.GetUnitHealthPercent(oUnit)=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Tech level=' .. M27UnitInfo.GetUnitTechLevel(oUnit) .. '; iUnitType=' .. iUnitType .. '; ')
                                 end
                                 --Send low health bombers and T3 air to heal up provided no T2+ airAA units nearby
-                                if iCurTechLevel < 4 and iAirStaging > 0 and oUnit:GetHealthPercent() <= iLowHealthPercent and (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber or iCurTechLevel == 3) and
+                                if iCurTechLevel < 4 and iAirStaging > 0 and M27UnitInfo.GetUnitHealthPercent(oUnit) <= iLowHealthPercent and (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber or iCurTechLevel == 3) and
                                         ((M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA - categories.TECH1, oUnit:GetPosition(), 100, 'Enemy'))) or (M27UnitInfo.GetUnitTechLevel(oUnit) <= 2 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA, oUnit:GetPosition(), 100, 'Enemy')))) and
                                         (oUnit[refiBombsDropped] >= 2 or not (iUnitType == iTypeBomber or iUnitType == iTypeTorpBomber)) then
                                     iCurUnitsWithLowFuel = iCurUnitsWithLowFuel + 1
@@ -2520,7 +2520,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Unit is trying to refuel so wont mark it as available or as a unit with low fuel unless it has high fuel and health')
                         end
-                        if (oUnit:GetHealthPercent() >= 0.98 and oUnit:GetFuelRatio() >= 0.98) or EntityCategoryContains(categories.CANNOTUSEAIRSTAGING, oUnit.UnitId) then
+                        if (M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.98 and oUnit:GetFuelRatio() >= 0.98) or EntityCategoryContains(categories.CANNOTUSEAIRSTAGING, oUnit.UnitId) then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Unit has high health and fuel so clearing order so it is seen as being available next cycle')
                             end
@@ -2639,7 +2639,7 @@ function OrderUnitsToRefuel(aiBrain, tUnitsToRefuel)
                                     oStaging[reftAssignedRefuelingUnits][iRefuelingUnit] = nil
                                 else
                                     --Is the unit already refueled and isnt flagged as being in air staging?
-                                    if oRefuelingUnit:GetFuelRatio() >= 0.95 and oRefuelingUnit:GetHealthPercent() >= 0.98 and not (oRefuelingUnit:IsUnitState('Attached')) then
+                                    if oRefuelingUnit:GetFuelRatio() >= 0.95 and M27UnitInfo.GetUnitHealthPercent(oRefuelingUnit) >= 0.98 and not (oRefuelingUnit:IsUnitState('Attached')) then
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': oRefuelingUnit=' .. oRefuelingUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oRefuelingUnit) .. '; appears to have refueld and isnt attached, unit state=' .. M27Logic.GetUnitState(oRefuelingUnit) .. ' so will clear refueling trakcers')
                                         end
@@ -2775,11 +2775,11 @@ function RefuelIdleAirUnits(aiBrain)
             end
             if M27UnitInfo.IsUnitValid(oUnit) and not (oUnit[refbOnAssignment]) and not (oUnit[refbSentRefuelCommand]) and M27Utilities.IsTableEmpty(oUnit[reftTargetList]) == true and M27Utilities.IsTableEmpty(oUnit[refiCurMovementPath]) == true and oUnit.GetFuelRatio and not (oUnit:IsUnitState('Attached')) and not(EntityCategoryContains(categories.CANNOTUSEAIRSTAGING, oUnit.UnitId)) then
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Unit is available, will check its fuel and health; Fuel=' .. oUnit:GetFuelRatio() .. '; Health=' .. oUnit:GetHealthPercent())
+                    LOG(sFunctionRef .. ': Unit is available, will check its fuel and health; Fuel=' .. oUnit:GetFuelRatio() .. '; Health=' .. M27UnitInfo.GetUnitHealthPercent(oUnit))
                 end
                 if oUnit:GetFuelRatio() <= iFuelThreshold then
                     bRefuelUnit = true
-                elseif oUnit:GetHealthPercent() <= iHealthThreshold then
+                elseif M27UnitInfo.GetUnitHealthPercent(oUnit) <= iHealthThreshold then
                     bRefuelUnit = true
                 end
                 if bDebugMessages == true then
@@ -2865,7 +2865,7 @@ function ReleaseRefueledUnits(aiBrain)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Have a unit refueling, checking its health and fuel')
                             end
-                            if oRefuelingUnit:GetFuelRatio() < 0.9 or oRefuelingUnit:GetHealthPercent() < 0.9 then
+                            if oRefuelingUnit:GetFuelRatio() < 0.9 or M27UnitInfo.GetUnitHealthPercent(oRefuelingUnit) < 0.9 then
                                 bReadyToLeave = false
                             end
                             if bReadyToLeave then
@@ -4827,7 +4827,7 @@ function AirBomberManager(aiBrain)
                                     local iNearbyLandCombatMass
                                     local tNearbyAA, iNearbyAAMass, iDistFromBase
                                     for iUnit, oUnit in tT2AA do
-                                        if oUnit:GetHealthPercent() >= 0.5 then
+                                        if M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.5 then
                                             iDistFromBase = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition())
                                             if iDistFromBase > 100 then
                                                 iNearbyLandCombatMass = 0
@@ -5440,10 +5440,10 @@ function AirBomberManager(aiBrain)
                                         iCurPriority = 5
                                         local iMaxShieldedSAM = 6
                                         local iMaxUnshieldedSAM = 12
-                                        if tBombersOfTechLevel[iAvailableBombers]:GetHealthPercent() <= 0.4 then
+                                        if M27UnitInfo.GetUnitHealthPercent(tBombersOfTechLevel[iAvailableBombers]) <= 0.4 then
                                             iMaxShieldedSAM = 0
                                             iMaxUnshieldedSAM = 6
-                                        elseif tBombersOfTechLevel[iAvailableBombers]:GetHealthPercent() <= 0.8 then
+                                        elseif M27UnitInfo.GetUnitHealthPercent(tBombersOfTechLevel[iAvailableBombers]) <= 0.8 then
                                             iMaxShieldedSAM = 3
                                             iMaxUnshieldedSAM = 6
                                         end
@@ -5473,10 +5473,10 @@ function AirBomberManager(aiBrain)
                                 if M27Utilities.IsTableEmpty(tEnemies) == false then
                                     local iMaxShieldedSAM = 2
                                     local iMaxUnshieldedSAM = 4
-                                    if tBombersOfTechLevel[iAvailableBombers]:GetHealthPercent() <= 0.4 then
+                                    if M27UnitInfo.GetUnitHealthPercent(tBombersOfTechLevel[iAvailableBombers]) <= 0.4 then
                                         iMaxShieldedSAM = 0
                                         iMaxUnshieldedSAM = 2
-                                    elseif tBombersOfTechLevel[iAvailableBombers]:GetHealthPercent() <= 0.8 then
+                                    elseif M27UnitInfo.GetUnitHealthPercent(tBombersOfTechLevel[iAvailableBombers]) <= 0.8 then
                                         iMaxShieldedSAM = 1
                                         iMaxUnshieldedSAM = 3
                                     end
@@ -7549,7 +7549,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                                 iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                                 iTimeToKillTarget = (oUnit:GetHealth() + iCurShield + math.min(iMaxShield - iCurShield, iTimeToTarget * iCurDPSMod)) / math.max(0.001, iDPS - iCurDPSMod)
                                 if iMaxShield == 0 and not (EntityCategoryContains(categories.COMMAND, oUnit.UnitId)) then
-                                    iCurValue = iCurValue * math.max(oUnit:GetHealthPercent(), 0.25)
+                                    iCurValue = iCurValue * math.max(M27UnitInfo.GetUnitHealthPercent(oUnit), 0.25)
                                 end
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ' Unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' iCurValue=' .. iCurValue .. '; iTimeToTarget=' .. iTimeToTarget .. '; iTimeToKillTarget=' .. iTimeToKillTarget .. '; iCurShield=' .. iCurShield .. '; iMaxShield=' .. iMaxShield .. '; iCurDPSMod=' .. iCurDPSMod)
@@ -7950,7 +7950,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 end
             end
 
-            if oUnit:GetHealthPercent() <= (0.25 + iPercentMod) or (bIsCzar and iCurShield <= iMaxShield * (0.1 + iPercentMod)) then
+            if M27UnitInfo.GetUnitHealthPercent(oUnit) <= (0.25 + iPercentMod) or (bIsCzar and iCurShield <= iMaxShield * (0.1 + iPercentMod)) then
                 bWantToRun = true
             else
                 oUnit[refbPreviouslyRun] = false
@@ -8003,12 +8003,12 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
 
             local bStillRun = true
             if not (bWantToRun) then
-                if oUnit:GetHealthPercent() >= 0.99 and iCurShield >= iMaxShield * 0.95 then
+                if M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.99 and iCurShield >= iMaxShield * 0.95 then
                     bStillRun = false
                 end
             end
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': We either want to run, or have recently want to run; bWantToRun=' .. tostring(bWantToRun) .. '; Health %=' .. oUnit:GetHealthPercent() .. '; Cur shield=' .. iCurShield .. '; MaxShield=' .. iMaxShield .. '; bStillRun=' .. tostring(bStillRun))
+                LOG(sFunctionRef .. ': We either want to run, or have recently want to run; bWantToRun=' .. tostring(bWantToRun) .. '; Health %=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Cur shield=' .. iCurShield .. '; MaxShield=' .. iMaxShield .. '; bStillRun=' .. tostring(bStillRun))
             end
             if bStillRun then
                 if bWantToRun then
@@ -8037,9 +8037,9 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             if iNearbyFriendlyAirExperimental > 0 then
                 iSAMThreshold = iSAMThreshold * (1 + iNearbyFriendlyAirExperimental)
             end
-            if oUnit:GetHealthPercent() <= 0.9 then
+            if M27UnitInfo.GetUnitHealthPercent(oUnit) <= 0.9 then
 
-                if oUnit:GetHealthPercent() <= 0.7 then
+                if M27UnitInfo.GetUnitHealthPercent(oUnit) <= 0.7 then
                     iSAMThreshold = iSAMThreshold - 2
                 else
                     iSAMThreshold = iSAMThreshold - 1

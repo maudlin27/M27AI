@@ -1319,6 +1319,9 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
     if tUnits[1]==nil then tAllUnits[1] = tUnits else tAllUnits = tUnits end
     local tUnitBPs = {}
     local iBPCount = 0
+
+    --Override for fatboy (since its an indirect fire unit but can work as an ok direct fire unit)
+    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, tUnits)) then iMaxRange = 100 end
     for i, oUnit in tAllUnits do
         if not(oUnit.Dead) then
             if M27Utilities.IsACU(oUnit) == false then
@@ -1549,7 +1552,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
     --IsTableEmpty(tTable, bNotEmptyIfSingleValueNotTable)
     if bDebugMessages == true then LOG(sFunctionRef..': About to check if table is empty') end
     if M27Utilities.IsTableEmpty(tUnits, true) == true then
-    --if tUnits == nil then
+        --if tUnits == nil then
         if bDebugMessages == true then LOG(sFunctionRef..': Warning: tUnits is empty, returning 0') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return 0
@@ -1655,9 +1658,9 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
 
 
                     iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
-                    iHealthPercentage = oUnit:GetHealthPercent()
+                    iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
                     if iMaxShield > 0 and iHealthPercentage > 0 then
-                        iHealthPercentage = (oUnit:GetHealth() + iCurShield) / (oUnit:GetHealth() / oUnit:GetHealthPercent() + iMaxShield)
+                        iHealthPercentage = (oUnit:GetHealth() + iCurShield) / (oUnit:GetHealth() / M27UnitInfo.GetUnitHealthPercent(oUnit) + iMaxShield)
                     end
                     --Reduce threat by health, with the amount depending on if its an ACU and if its an enemy
                     if iMassMod > 0 then
@@ -1912,7 +1915,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                     if iMassMod > 0 then
                         --Onlyantiair - use to weight results when calculating AA threat
                         if iHealthFactor > 0 then
-                            iHealthPercentage = oUnit:GetHealthPercent()
+                            iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
                             iMassMod = (1 - (1-iHealthPercentage) * iHealthFactor) * iMassMod
                         end
                         --Only GroundToAir: Increase structure value by 100%

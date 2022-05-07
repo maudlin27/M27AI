@@ -356,7 +356,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                             --ACU specific
                             if M27Utilities.IsACU(oUnit) then
                                 local aiBrain = oCurBrain
-                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) > (M27Logic.GetUnitMaxGroundRange({oUnit}) - 10) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) < 32 and (M27UnitInfo.GetUnitTechLevel(oBomber) == 1 or oUnit:GetHealthPercent() > 0.3) then
+                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) > (M27Logic.GetUnitMaxGroundRange({oUnit}) - 10) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) < 32 and (M27UnitInfo.GetUnitTechLevel(oBomber) == 1 or M27UnitInfo.GetUnitHealthPercent(oUnit) > 0.3) then
                                     --Dont dodge in case we can no longer attack ACU
                                 else
                                     --If ACU is upgrading might not want to cancel
@@ -503,7 +503,7 @@ end
     if not(oUnitWithOvercharge[M27UnitInfo.refbOverchargeOrderGiven]) then
         if M27Conditions.HaveExcessEnergy(aiBrain, 10) then bResourcesToOvercharge = true
         else
-            if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true and M27Utilities.GetACU(aiBrain):GetHealthPercent() < 0.4 then bResourcesToOvercharge = true end
+            if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true and M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) < 0.4 then bResourcesToOvercharge = true end
         end
         if bResourcesToOvercharge == true then
             local tUnitPosition = oUnitWithOvercharge:GetPosition()
@@ -518,7 +518,7 @@ end
                 --Target enemy ACU if its low health as a top priority unless it's about to move out of our range
                 if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) then
                     oEnemyACU = aiBrain[M27Overseer.refoLastNearestACU]
-                    if aiBrain[M27Overseer.refoLastNearestACU]:GetHealthPercent() < 0.2 then
+                    if M27UnitInfo.GetUnitHealthPercent(aiBrain[M27Overseer.refoLastNearestACU]) < 0.2 then
                         iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition)
                         if iDistanceToEnemyACU + 2 < iACURange then
                             oOverchargeTarget = aiBrain[M27Overseer.refoLastNearestACU]
@@ -647,7 +647,7 @@ end
                             local tEnemyACU = aiBrain:GetUnitsAroundPoint(categories.COMMAND, tUnitPosition, iACURange, 'Enemy')
                             if M27Utilities.IsTableEmpty(tEnemyACU) == false then
                                 for iUnit, oEnemyACUUnit in tEnemyACU do
-                                    if oEnemyACUUnit:GetHealthPercent() <= 0.1 then
+                                    if M27UnitInfo.GetHealthPercent(oEnemyACUUnit) <= 0.1 then
                                         if M27Logic.IsShotBlocked(oUnitWithOvercharge, oEnemyACUUnit) == false then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Setting target to enemy ACU') end
                                             oOverchargeTarget = oEnemyACUUnit
@@ -734,7 +734,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     if not(oUnitWithOvercharge[M27UnitInfo.refbOverchargeOrderGiven]) then
         if M27Conditions.HaveExcessEnergy(aiBrain, 10) then bResourcesToOvercharge = true
         else
-            if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true and M27Utilities.GetACU(aiBrain):GetHealthPercent() < 0.4 then bResourcesToOvercharge = true end
+            if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] == true and M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) < 0.4 then bResourcesToOvercharge = true end
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Do we have resources to overcharge='..tostring((bResourcesToOvercharge or false))) end
         if bResourcesToOvercharge == true then
@@ -776,7 +776,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                 if bAbort == false then
                     if iDistanceToEnemyACU == nil then iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition) end
                     --Is ACU about to fall out of our vision or weapon range?
-                    if iDistanceToEnemyACU + 4 > math.min(iACURange, 26) and oUnitWithOvercharge:GetHealthPercent() >= 0.8 and oUnitWithOvercharge.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] <= 4 then
+                    if iDistanceToEnemyACU + 4 > math.min(iACURange, 26) and M27UnitInfo.GetUnitHealthPercent(oUnitWithOvercharge) >= 0.8 and oUnitWithOvercharge.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] <= 4 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU about to fall out of our vision or range so will abort as want to keep moving') end
                         bAbort = true
                     end

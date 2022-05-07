@@ -4391,103 +4391,107 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
 
             if bPathingChange then ReRecordUnitsAndPlatoonsInPlateaus(aiBrain) end --This will also reset aiBrain[reftOurPlateauInformation
             for iPlateauGroup, tSubtable in tAllPlateausWithMexes do
-                --Ignore plateaus that we already have engies or factories on
-                iExistingEngis = 0
-                iExistingFactories = 0
-                iAlliedMexes = 0
-                bAlreadyOwnPlateau = false
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; considering if we have friendly units in the plateau already. IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup])='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]))) end
-                if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of engineers assigned to plateau empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]))) end
-                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]) == false then
-                        for iEngi, oEngi in aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers] do
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering engineer '..oEngi.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngi)..'; is unit valid='..tostring(M27UnitInfo.IsUnitValid(oEngi))) end
-                            if M27UnitInfo.IsUnitValid(oEngi) then iExistingEngis = iExistingEngis + 1 end
+                if M27Utilities.IsTableEmpty(tSubtable[subrefPlateauMexes]) == false then
+                    --Ignore plateaus that we already have engies or factories on
+                    iExistingEngis = 0
+                    iExistingFactories = 0
+                    iAlliedMexes = 0
+                    bAlreadyOwnPlateau = false
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; considering if we have friendly units in the plateau already. IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup])='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]))) end
+                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Is table of engineers assigned to plateau empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]))) end
+                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]) == false then
+                            for iEngi, oEngi in aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers] do
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering engineer '..oEngi.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngi)..'; is unit valid='..tostring(M27UnitInfo.IsUnitValid(oEngi))) end
+                                if M27UnitInfo.IsUnitValid(oEngi) then iExistingEngis = iExistingEngis + 1 end
+                            end
+                        end
+                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories]) == false then
+                            for iFactory, oFactory in aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories] do
+                                if M27UnitInfo.IsUnitValid(oFactory) and oFactory:GetFractionComplete() == 1 then iExistingFactories = iExistingFactories + 1 end
+                            end
                         end
                     end
-                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories]) == false then
-                        for iFactory, oFactory in aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories] do
-                            if M27UnitInfo.IsUnitValid(oFactory) and oFactory:GetFractionComplete() == 1 then iExistingFactories = iExistingFactories + 1 end
-                        end
+
+                    if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) then
+                        bAlreadyOwnPlateau = true
                     end
-                end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngis='..iExistingEngis..'; iExistingFactories='..iExistingFactories..'; Mexes on plateau='..tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount]..'; bAlreadyOwnPlateau='..tostring(bAlreadyOwnPlateau)) end
+                    if not(bAlreadyOwnPlateau) then
+                        --Look for allied units on the plateau
 
-                if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) then
-                    bAlreadyOwnPlateau = true
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngis='..iExistingEngis..'; iExistingFactories='..iExistingFactories..'; Mexes on plateau='..tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount]..'; bAlreadyOwnPlateau='..tostring(bAlreadyOwnPlateau)) end
-                if not(bAlreadyOwnPlateau) then
-                    --Look for allied units on the plateau
-
-                    if bCheckForAlliedUnits then
-                        tAlliedUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandFactory + M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryMex, tSubtable[subrefPlateauMidpoint], tSubtable[subrefPlateauMaxRadius], 'Ally')
-                        if M27Utilities.IsTableEmpty(tAlliedUnits) == false then
-                            for iUnit, oUnit in tAlliedUnits do
-                                --Is it an allied unit not our own?
-                                if oUnit:GetFractionComplete() == 1 and not(oUnit:GetAIBrain() == aiBrain) and GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == iPlateauGroup then
-                                    if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
-                                        iAlliedMexes = iAlliedMexes + 1
-                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oUnit.UnitId) then
-                                        iExistingFactories = iExistingFactories + 1
-                                    else iExistingEngis = iExistingEngis + 1
+                        if bCheckForAlliedUnits then
+                            tAlliedUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandFactory + M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryMex, tSubtable[subrefPlateauMidpoint], tSubtable[subrefPlateauMaxRadius], 'Ally')
+                            if M27Utilities.IsTableEmpty(tAlliedUnits) == false then
+                                for iUnit, oUnit in tAlliedUnits do
+                                    --Is it an allied unit not our own?
+                                    if oUnit:GetFractionComplete() == 1 and not(oUnit:GetAIBrain() == aiBrain) and GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == iPlateauGroup then
+                                        if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
+                                            iAlliedMexes = iAlliedMexes + 1
+                                        elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oUnit.UnitId) then
+                                            iExistingFactories = iExistingFactories + 1
+                                        else iExistingEngis = iExistingEngis + 1
+                                        end
                                     end
                                 end
-                            end
-                            if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) or iAlliedMexes >= tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] * 0.75 then
-                                bAlreadyOwnPlateau = true
-                            end
-                        end
-                    end
-
-                    if bDebugMessages == true then LOG(sFunctionRef..': Finished checking for allied units on the plateau, bAlreadyOwnPlateau='..tostring(bAlreadyOwnPlateau)) end
-
-                    if not(bAlreadyOwnPlateau) then
-                        --Ignore plateaus that contain an enemy base
-                        if bDebugMessages == true then LOG(sFunctionRef..': Will ignore plateaus containing an active start point. tSubtable[subrefPlateauContainsActiveStart]='..tostring(tSubtable[subrefPlateauContainsActiveStart])) end
-                        if not(tSubtable[subrefPlateauContainsActiveStart]) then
-                            --Is the location safe? First check if the nearest mex is closer than the nearest enemy threat
-                            if M27Utilities.IsTableEmpty (aiBrain[reftOurPlateauInformation][iPlateauGroup]) then
-                                aiBrain[reftOurPlateauInformation][iPlateauGroup] = {}
-                            end
-
-                            iClosestMexDist = 10000
-                            for iMex, tMex in tSubtable[subrefPlateauMexes] do
-                                iCurDist = M27Utilities.GetDistanceBetweenPositions(tMex, tStartPos)
-                                if iCurDist < iClosestMexDist then
-                                    iClosestMexDist = iCurDist
-                                    iClosestMexRef = iMex
+                                if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) or iAlliedMexes >= tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] * 0.75 then
+                                    bAlreadyOwnPlateau = true
                                 end
                             end
-                            tClosestMex = tSubtable[subrefPlateauMexes][iClosestMexRef]
+                        end
 
-                            iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tClosestMex, false)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if nearest threat is too close to risk sending transport. aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; iCurModDistance='..iCurModDistance..'; will allow a threshold above this.  Will also allow if have radar coverage of the plateau.  Have radar coverage='..tostring(M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true))) end
-                            if iCurModDistance <= (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] + 60) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true) then
-                                --Are we outside norush range?
-                                if not(bNoRushActive) or M27Utilities.GetDistanceBetweenPositions(tClosestMex, aiBrain[reftNoRushCentre]) <= iNoRushRange then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished checking for allied units on the plateau, bAlreadyOwnPlateau='..tostring(bAlreadyOwnPlateau)) end
 
-                                    --Is there any enemy AA in range of this mex?
-                                    if not (M27AirOverseer.IsTargetPositionCoveredByAA(tClosestMex, tEnemyAA, tStartPos, false)) then
-                                        bNearbyEnemyLand = false
-                                        tEnemyGround = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tClosestMex, 100, 'Enemy')
-                                        if M27Utilities.IsTableEmpty(tEnemyGround) == false then
-                                            for iEnemy, oEnemy in tEnemyGround do
-                                                if GetSegmentGroupOfLocation(sPathing, tClosestMex) == iPlateauGroup then
-                                                    bNearbyEnemyLand = true
-                                                    break
+                        if not(bAlreadyOwnPlateau) then
+                            --Ignore plateaus that contain an enemy base
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will ignore plateaus containing an active start point. tSubtable[subrefPlateauContainsActiveStart]='..tostring(tSubtable[subrefPlateauContainsActiveStart])) end
+                            if not(tSubtable[subrefPlateauContainsActiveStart]) then
+                                --Is the location safe? First check if the nearest mex is closer than the nearest enemy threat
+                                if M27Utilities.IsTableEmpty (aiBrain[reftOurPlateauInformation][iPlateauGroup]) then
+                                    aiBrain[reftOurPlateauInformation][iPlateauGroup] = {}
+                                end
+
+                                iClosestMexDist = 10000
+                                for iMex, tMex in tSubtable[subrefPlateauMexes] do
+                                    iCurDist = M27Utilities.GetDistanceBetweenPositions(tMex, tStartPos)
+                                    if iCurDist < iClosestMexDist then
+                                        iClosestMexDist = iCurDist
+                                        iClosestMexRef = iMex
+                                    end
+                                end
+
+
+                                tClosestMex = tSubtable[subrefPlateauMexes][iClosestMexRef]
+
+                                iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tClosestMex, false)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering if nearest threat is too close to risk sending transport. aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; iCurModDistance='..(iCurModDistance or 'nil')..'; will allow a threshold above this.  Will also allow if have radar coverage of the plateau.  Have radar coverage='..tostring(M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true))) end
+                                if iCurModDistance <= (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] + 60) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true) then
+                                    --Are we outside norush range?
+                                    if not(bNoRushActive) or M27Utilities.GetDistanceBetweenPositions(tClosestMex, aiBrain[reftNoRushCentre]) <= iNoRushRange then
+
+                                        --Is there any enemy AA in range of this mex?
+                                        if not (M27AirOverseer.IsTargetPositionCoveredByAA(tClosestMex, tEnemyAA, tStartPos, false)) then
+                                            bNearbyEnemyLand = false
+                                            tEnemyGround = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, tClosestMex, 100, 'Enemy')
+                                            if M27Utilities.IsTableEmpty(tEnemyGround) == false then
+                                                for iEnemy, oEnemy in tEnemyGround do
+                                                    if GetSegmentGroupOfLocation(sPathing, tClosestMex) == iPlateauGroup then
+                                                        bNearbyEnemyLand = true
+                                                        break
+                                                    end
                                                 end
                                             end
-                                        end
 
-                                        if not (bNearbyEnemyLand) then
-                                            --Have we tried targeting this mex recently?
-                                            sLocationRef = M27Utilities.ConvertLocationToStringRef(tClosestMex)
-                                            if GetGameTimeSeconds() - (aiBrain[M27Transport.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300) >= 300 then
-                                                --Add to shortlist of locations to try and expand to
-                                                aiBrain[reftPlateausOfInterest][iPlateauGroup] = tClosestMex
+                                            if not (bNearbyEnemyLand) then
+                                                --Have we tried targeting this mex recently?
+                                                sLocationRef = M27Utilities.ConvertLocationToStringRef(tClosestMex)
+                                                if GetGameTimeSeconds() - (aiBrain[M27Transport.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300) >= 300 then
+                                                    --Add to shortlist of locations to try and expand to
+                                                    aiBrain[reftPlateausOfInterest][iPlateauGroup] = tClosestMex
+                                                end
                                             end
+                                        elseif bDebugMessages == true then LOG(sFunctionRef..': Enemy AA is covering the closest mex, at position '..repr(tClosestMex)..'; size of tEnemyAA='..table.getn(tEnemyAA))
                                         end
-                                    elseif bDebugMessages == true then LOG(sFunctionRef..': Enemy AA is covering this point')
                                     end
                                 end
                             end

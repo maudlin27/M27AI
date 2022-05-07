@@ -20,6 +20,7 @@ refoTransportToLoadOnto = 'M27TransportWanted' --local variable assigned to an e
 reftUnitsToldToLoadOntoTransport = 'M27TransportUnitsToldToLoad' --Recorded on a transport to keep track of units told to load onto it
 refiEngisLoaded = 'M27TransportEngisLoaded' --Number of engineers successfully loaded onto transport
 refiMaxEngisWanted = 'M27TransportEngisWanted' --max number of engineers a transport wants
+refiWaitingForEngiCount = 'M27TransportWaitingForEngiCount' --Will increase by 1 for each cycle that transport is near base and engi and waiting to be loaded
 
 function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     --Called when the event for a unit being loaded onto a transport is triggered
@@ -160,6 +161,7 @@ function SendTransportToPlateau(aiBrain, oTransport)
     oTransport[refiMaxEngisWanted] = 0
 
     --Tell transport to unload engineers at the target
+    if bDebugMessages == true then LOG(sFunctionRef..': Setting transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' to have no activem icro') end
     oTransport[M27UnitInfo.refbSpecialMicroActive] = false
     oTransport[M27AirOverseer.refbOnAssignment] = true
 
@@ -187,7 +189,12 @@ function TransportManager(aiBrain)
     end
     if M27Utilities.IsTableEmpty(aiBrain[reftTransportsWaitingForEngi]) == false then
         for iUnit, oUnit in aiBrain[reftTransportsWaitingForEngi] do
+            if M27Utilities.IsTableEmpty(oUnit[reftUnitsToldToLoadOntoTransport]) then
+                oUnit[M27UnitInfo.refbSpecialMicroActive] = false
+                if bDebugMessages == true then LOG(sFunctionRef..': No units told to load onto transport so setting transport '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to have no activem icro') end
+            end
             if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false then
+
                 iTransportsWaitingForEngis = iTransportsWaitingForEngis + 1
             else
                 --Remove from table and abort (will come back to for next cycle)
@@ -308,16 +315,16 @@ function TransportManager(aiBrain)
 
     --Load engineers in a group onto transport
     if bDebugMessages == true then LOG(sFunctionRef..': Is the table of engineers waiting for transport empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineersWaitingForTransport]))) end
-    if M27Utilities.IsTableEmpty(aiBrain[reftEngineersWaitingForTransport]) then
+    if M27Utilities.IsTableEmpty(aiBrain[reftEngineersWaitingForTransport]) == false then
         local tEngisByTransportRef = {}
         local oTransportWanted
         for iEngi, oEngi in aiBrain[reftEngineersWaitingForTransport] do
-            if not(M27UnitInfo.IsUnitValid(oEngi)) then
-                aiBrain[reftEngineersWaitingForTransport] = nil
+            if not(M27UnitInfo.IsUnitValid(oEngi)) or not(oEngi[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionLoadOnTransport) then
+                aiBrain[reftEngineersWaitingForTransport][iEngi] = nil
             else
                 if not(M27UnitInfo.IsUnitValid(oEngi[refoTransportToLoadOnto])) then
                     IssueClearCommands({oEngi})
-                    aiBrain[reftEngineersWaitingForTransport] = nil
+                    aiBrain[reftEngineersWaitingForTransport][iEngi] = nil
                     M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
                 else
                     if not(tEngisByTransportRef[oEngi[refoTransportToLoadOnto].UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngi[refoTransportToLoadOnto])]) then tEngisByTransportRef[oEngi[refoTransportToLoadOnto].UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngi[refoTransportToLoadOnto])] = {} end
@@ -328,18 +335,55 @@ function TransportManager(aiBrain)
 
         for iTransportRef, tEngiGroup in tEngisByTransportRef do
             oTransportWanted = tEngiGroup[1][refoTransportToLoadOnto]
-            if not(oTransportWanted.refbSpecialMicroActive) then
+            if bDebugMessages == true then LOG(sFunctionRef..': iTransportRef='..iTransportRef..'; Is special micro active='..tostring(oTransportWanted[M27UnitInfo.refbSpecialMicroActive])) end
+            if not(oTransportWanted[M27UnitInfo.refbSpecialMicroActive]) then
                 IssueClearCommands(tEngiGroup)
                 IssueClearCommands({oTransportWanted})
                 IssueTransportLoad(tEngiGroup, oTransportWanted)
                 oTransportWanted[M27UnitInfo.refbSpecialMicroActive] = true
-                if bDebugMessages == true then LOG(sFunctionRef..': Getting engineers to load onto transport '..oTransportWanted.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransportWanted)) end
+
+                if bDebugMessages == true then LOG(sFunctionRef..': Getting engineers to load onto transport '..oTransportWanted.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransportWanted)..'; Transport Special micro active='..tostring(oTransportWanted[M27UnitInfo.refbSpecialMicroActive] or false)) end
                 for iEngi, oEngi in tEngiGroup do
                     oEngi[M27UnitInfo.refbSpecialMicroActive] = true
                     RecordUnitLoadingOntoTransport(oEngi, oTransportWanted)
                 end
+            else
+                --Engineers have been told to load onto transport, however if we have been waiting for them to load for some time and the transport is near base, then want to retry
+                if M27Utilities.GetDistanceBetweenPositions(oTransportWanted:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 50 then
+                    local bWaitingForEngi = true
+                    for iEngi, oEngi in tEngiGroup do
+                        if not(M27UnitInfo.IsUnitValid(oEngi)) or not(oEngi[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionLoadOnTransport) then
+                            tEngiGroup[iEngi] = nil
+                        else
+                            if M27Utilities.GetDistanceBetweenPositions(oTransportWanted:GetPosition(), oEngi:GetPosition()) >= 50 then
+                                bWaitingForEngi = false
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': bWaitingForEngi='..tostring(bWaitingForEngi)..'; WaitingCount='..(oTransportWanted[refiWaitingForEngiCount] or 0)..'; is table of engis empty='..tostring(M27Utilities.IsTableEmpty(tEngiGroup))) end
+                    if bWaitingForEngi then
+                        oTransportWanted[refiWaitingForEngiCount] = (oTransportWanted[refiWaitingForEngiCount] or 0) + 1
+                        if oTransportWanted[refiWaitingForEngiCount] >= 30 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will reset special micro flag, or if we have engis in engi group will reissue order to load') end
+                            oTransportWanted[refiWaitingForEngiCount] = 0
+                            if M27Utilities.IsTableEmpty(tEngiGroup) == false then
+                                IssueClearCommands(tEngiGroup)
+                                IssueClearCommands({oTransportWanted})
+                                IssueTransportLoad(tEngiGroup, oTransportWanted)
+                                oTransportWanted[M27UnitInfo.refbSpecialMicroActive] = true
+                                for iEngi, oEngi in tEngiGroup do
+                                    RecordUnitLoadingOntoTransport(oEngi, oTransportWanted)
+                                end
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': No engi group so setting transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' to have no activem icro') end
+                                oTransportWanted[M27UnitInfo.refbSpecialMicroActive] = false
+                            end
+                        end
+                    end
+                end
             end
         end
+    elseif bDebugMessages == true then LOG(sFunctionRef..': No engineers to load onto transport')
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
