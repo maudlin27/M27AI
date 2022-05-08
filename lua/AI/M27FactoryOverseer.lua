@@ -1948,6 +1948,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             aiBrain[refiEngineerCap] = 70
                         end
                         if iFactoryTechLevel >= 3 then aiBrain[refiEngineerCap] = aiBrain[refiEngineerCap] * 2 end
+                        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftPriorityShieldsToAssist]) == false then aiBrain[refiEngineerCap] = aiBrain[refiEngineerCap] + math.min(60, table.getn(aiBrain[M27EngineerOverseer.reftPriorityShieldsToAssist]) * 14) end
 
                         if iExistingEngis > aiBrain[refiEngineerCap] and (aiBrain:GetEconomyStoredRatio('MASS') <= 0.5 or aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel][iFactoryTechLevel] >= math.max(30, aiBrain[refiEngineerCap] * 0.5) or iFactoryTechLevel < 3) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Are over the engi cap so will set to nil') end

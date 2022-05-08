@@ -215,10 +215,35 @@ function OnWorkEnd(self, work)
     end
 end
 
-function OnDamaged(self, instigator)
+function OnShieldBubbleDamaged(self, instigator)
+    if M27Utilities.bM27AIInGame then
+        local sFunctionRef = 'OnShieldBubbleDamaged'
+        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+        --Self is the shield object.  Doing a log of this, it has an Owner value, which is the unit object
+        local oShield = self.Owner
+        if M27UnitInfo.IsUnitValid(oShield) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Shield '..oShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oShield)..' has just taken damage') end
+            local aiBrain = oShield:GetAIBrain()
+            if aiBrain.M27AI then
+                if aiBrain[M27EngineerOverseer.reftPriorityShieldsToAssist][oShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oShield)] then
+                    --Dealing with a priority shield, so start a monitor if dont already have one
+                    ForkThread(M27EngineerOverseer.MonitorShieldHealth, aiBrain, oShield)
+                else
+                    --Not a priority shield, so do nothing
+                end
+            end
+        end
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    end
+end
+
+function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble is damaged - see OnShieldBubbleDamaged for this
     if M27Utilities.bM27AIInGame then
         local sFunctionRef = 'OnDamaged'
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if self.IsWreckage then
             --Decided to comment out the below and only update when props and wrecks are destroyed

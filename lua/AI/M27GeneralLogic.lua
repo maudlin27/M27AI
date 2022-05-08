@@ -3487,6 +3487,46 @@ function GetNearestActiveFixedEnemyShield(aiBrain, tLocation)
     return oNearestShield
 end
 
+function IsLocationUnderFriendlyFixedShield(aiBrain, tTargetPos)
+--Based on IsTargetUnderShield, but simplified slightly
+
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IsLocationUnderFriendlyFixedShield'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iShieldSearchRange = 46
+    local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, tTargetPos, iShieldSearchRange, sSearchType)
+    if M27Utilities.IsTableEmpty(tNearbyShields) == false then
+        local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
+        for iUnit, oUnit in tNearbyShields do
+            if not(oUnit.Dead) and oUnit:GetFractionComplete() >= 0.8 then
+                oCurUnitBP = oUnit:GetBlueprint()
+                iCurShieldRadius = 0
+                if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
+                    iCurShieldRadius = oCurUnitBP.Defense.Shield.ShieldSize * 0.5
+                    if iCurShieldRadius > 0 then
+                        iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
+                        if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius..'; shield position='..repr(oUnit:GetPosition())..'; target position='..repr(tTargetPos)) end
+                        if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
+                            if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target') end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return true
+                        end
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
+                    end
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit.UnitId) end
+                end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is dead')
+            end
+        end
+    else
+        if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return false
+end
+
 function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHealth, bReturnShieldHealthInstead, bIgnoreMobileShields, bTreatPartCompleteAsComplete)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetUnderShield'
