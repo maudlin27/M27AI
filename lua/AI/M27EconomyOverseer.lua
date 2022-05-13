@@ -674,6 +674,12 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
     if sUpgradeID then
         --Issue upgrade
         IssueUpgrade({ oUnitToUpgrade }, sUpgradeID)
+
+        --Clear any pausing of the unit
+        if M27UnitInfo.IsUnitValid(oUnitToUpgrade) then
+            oUnitToUpgrade:SetPaused(false)
+            oUnitToUpgrade[M27UnitInfo.refbPaused] = false
+        end
         if bUpdateUpgradeTracker then
             local aiBrain = oUnitToUpgrade:GetAIBrain()
             table.insert(aiBrain[reftUpgrading], oUnitToUpgrade)
@@ -708,6 +714,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
 
     local tAllUnits = aiBrain:GetListOfUnits(iUnitCategory, false, true)
     local oUnitToUpgrade, tCurPosition, iCurDistanceToStart, iCurDistanceToEnemy, iCurCombinedDist
@@ -822,6 +829,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideWhatToUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
 
 
     --iMexesUpgrading, iMexesAvailableForUpgrade = GetTotalUnitsCurrentlyUpgradingAndAvailableForUpgrade(aiBrain, refCategoryT1Mex + refCategoryT2Mex, true)
@@ -1653,6 +1661,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     local sFunctionRef = 'DecideMaxAmountToBeUpgrading'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
     local bHaveHighMass, bHaveEnoughEnergy
     local iMaxToUpgrade = 0
@@ -2087,6 +2096,7 @@ function UpgradeMainLoop(aiBrain)
     local sFunctionRef = 'UpgradeManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+
     if (M27Logic.iTimeOfLastBrainAllDefeated or 0) < 10 then
 
         local iCategoryToUpgrade, oUnitToUpgrade
@@ -2155,16 +2165,25 @@ function UpgradeMainLoop(aiBrain)
                                             end
                                             if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 or iT2PlusEngis >= 2 then oUnitToUpgrade = GetUnitToUpgrade(aiBrain, refCategoryAirFactory * categories.TECH2, tStartPosition) end
                                             if oUnitToUpgrade == nil then
-                                                --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
-                                                if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 100 then
-                                                    --Do we have any T1 or T2 factories or mexes within 100 of our base? If not, then we have presumably run out of units to upgrade
-                                                    local tNearbyUpgradables = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryMex - categories.TECH3 - categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 100, 'Ally')
-                                                    if M27Utilities.IsTableEmpty(tNearbyUpgradables) == false then
-                                                        --Do we own any of these
-                                                        for iUpgradable, oUpgradable in tNearbyUpgradables do
-                                                            if oUpgradable:GetAIBrain() == aiBrain and not (oUpgradable:IsUnitState('Upgrading')) then
-                                                                M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; nearest enemy to base=' .. math.floor(aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) .. '; Have a T2 or below mex or factory within 100 of our base, which includes ' .. oUpgradable.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUpgradable), nil, true)
-                                                                break
+                                                --Upgrade T2 shields if we have any and have very high resources
+                                                if bDebugMessages == true then LOG(sFunctionRef..': If about to overflow mass then will upgrade T2 shields if have any. aiBrain:GetEconomyStoredRatio(MASS)='..aiBrain:GetEconomyStoredRatio('MASS')..'; Energy net income='..aiBrain[refiEnergyNetBaseIncome]..'; Total number of T2 shields='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedShield * categories.TECH2)) end
+                                                if aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 and aiBrain[refiEnergyNetBaseIncome] >= 50 then
+                                                    oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryFixedShield * categories.TECH2, tStartPosition)
+                                                end
+                                                if oUnitToUpgrade == nil then
+                                                    --Consider whether to show an error message or not:
+
+                                                    --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
+                                                    if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 100 then
+                                                        --Do we have any T1 or T2 factories or mexes within 100 of our base? If not, then we have presumably run out of units to upgrade
+                                                        local tNearbyUpgradables = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryMex - categories.TECH3 - categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 100, 'Ally')
+                                                        if M27Utilities.IsTableEmpty(tNearbyUpgradables) == false then
+                                                            --Do we own any of these
+                                                            for iUpgradable, oUpgradable in tNearbyUpgradables do
+                                                                if oUpgradable:GetAIBrain() == aiBrain and not (oUpgradable:IsUnitState('Upgrading')) then
+                                                                    M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; nearest enemy to base=' .. math.floor(aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) .. '; Have a T2 or below mex or factory within 100 of our base, which includes ' .. oUpgradable.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUpgradable), nil, true)
+                                                                    break
+                                                                end
                                                             end
                                                         end
                                                     end
@@ -2227,7 +2246,16 @@ function ManageEnergyStalls(aiBrain)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': If we have flagged that we are stalling energy then will check if we have enough to start unpausing things')
         end
-        if aiBrain[refbStallingEnergy] and (aiBrain:GetEconomyStoredRatio('ENERGY') > 0.8 or (aiBrain:GetEconomyStoredRatio('ENERGY') > 0.7 and aiBrain[refiEnergyNetBaseIncome] > 1) or (aiBrain:GetEconomyStoredRatio('ENERGY') > 0.5 and aiBrain[refiEnergyNetBaseIncome] > 4) or (GetGameTimeSeconds() <= 180 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.3)) then
+        local iT3Arti = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT3Arti)
+        local iPercentMod = 0
+        local iNetMod = 0
+        if iT3Arti > 0 then
+            iPercentMod = 0.1
+            --Sometimes we may calculate this just as a shot is fired (meaning we already are factoring the shot in), othertimse we wont
+            iNetMod = 25 + (iT3Arti - 1) * 200
+            if aiBrain[refiEnergyNetBaseIncome] > 0 then iNetMod = iT3Arti * 250 end
+        end
+        if aiBrain[refbStallingEnergy] and (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.8 + iPercentMod) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.7 + iPercentMod) and aiBrain[refiEnergyNetBaseIncome] > (1 + iNetMod)) or (aiBrain:GetEconomyStoredRatio('ENERGY') > (0.5 + iPercentMod) and aiBrain[refiEnergyNetBaseIncome] > (4 + iNetMod)) or (GetGameTimeSeconds() <= 180 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.3)) then
             --aiBrain[refbStallingEnergy] = false
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Have enough energy stored or income to start unpausing things')
@@ -2239,7 +2267,7 @@ function ManageEnergyStalls(aiBrain)
             LOG(sFunctionRef .. ': Checking if we shoudl flag that we are energy stalling')
         end
         --Check if should manage energy stall
-        if bChangeRequired == false and (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.08 or (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.6 and aiBrain[refiEnergyNetBaseIncome] < 2) or (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.4 and aiBrain[refiEnergyNetBaseIncome] < 0.5)) then
+        if bChangeRequired == false and (aiBrain:GetEconomyStoredRatio('ENERGY') <= (0.08 + iPercentMod) or (aiBrain:GetEconomyStoredRatio('ENERGY') <= (0.6 + iPercentMod) and aiBrain[refiEnergyNetBaseIncome] < (2 + iNetMod)) or (aiBrain:GetEconomyStoredRatio('ENERGY') <= (0.4 + iPercentMod) and aiBrain[refiEnergyNetBaseIncome] < (0.5 + iNetMod))) then
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': We are stalling energy, will look for units to pause')
             end
@@ -2291,7 +2319,7 @@ function ManageEnergyStalls(aiBrain)
 
             local iEnergyPerTickSavingNeeded
             if aiBrain[refbStallingEnergy] then
-                iEnergyPerTickSavingNeeded = math.max(1, -aiBrain[refiEnergyNetBaseIncome])
+                iEnergyPerTickSavingNeeded = math.max(1, -aiBrain[refiEnergyNetBaseIncome] + iNetMod * 0.5)
             else
                 iEnergyPerTickSavingNeeded = math.min(-1, -aiBrain[refiEnergyNetBaseIncome])
             end

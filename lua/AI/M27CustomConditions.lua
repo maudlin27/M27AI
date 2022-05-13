@@ -70,7 +70,7 @@ function SafeToUpgradeUnit(oUnit)
                     --Exception - Unit is ACU with gun with low enemy threat and have shield coverage and high health
                     if oUnit.PlatoonHandle and M27Utilities.IsACU(oUnit) then
                         local oPlatoon = oUnit.PlatoonHandle
-                        if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] and M27UnitInfo.GetUnitHealthPercent(oUnit) > 0.8 and DoesACUHaveGun(aiBrain, false, oUnit) and DoesPlatoonWantAnotherMobileShield(oPlatoon, 200, false) == false then
+                        if oPlatoon[M27PlatoonUtilities.refbACUInPlatoon] and M27UnitInfo.GetUnitHealthPercent(oUnit) > 0.8 and DoesACUHaveGun(aiBrain, false, oUnit) and DoesPlatoonOrUnitWantAnotherMobileShield(oPlatoon, 200, false) == false then
                             bSafeToGetUpgrade = true
                         end
                     end

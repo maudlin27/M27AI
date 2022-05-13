@@ -4423,6 +4423,15 @@ function DetermineInitialBuildOrder(aiBrain)
     local sFunctionRef = 'DetermineInitialBuildOrder'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --Distance to enemy base examples:
+        --Theta passage: 321
+        --Open palms: 361
+        --Astro craters: 362
+        --Eye of the storm: 598
+        --Burial mounds: 832
+
+    --Redundancy as not sure order this is called - should already have been determined but will do this to be safe
+    aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
     --First check if we can path to enemy with amphibious, and if not flag for rest of the game that our ACU will be helping out at base
     local bCantPathOutsideBase = false
 
@@ -4443,7 +4452,6 @@ function DetermineInitialBuildOrder(aiBrain)
     M27Utilities.GetACU(aiBrain)[refbACUCantPathAwayFromBase] = bCantPathOutsideBase
     if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true then
         aiBrain[refiInitialRaiderPlatoonsWanted] = 2
-        aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
         if M27MapInfo.bNoRushActive then aiBrain[refiInitialRaiderPlatoonsWanted] = 0 end
 
 
@@ -4461,7 +4469,7 @@ function DetermineInitialBuildOrder(aiBrain)
         end
         if iNearbyMexCount >= 12 then
             aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 7
-        elseif iNearbyMexCount >= 8 or aiBrain[refiDistanceToNearestEnemyBase] >= 300 then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 5 --e.g. Theta passage is less than 300 I think
+        elseif iNearbyMexCount >= 8 or aiBrain[refiDistanceToNearestEnemyBase] >= 375 then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 5
         else
             aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 4
         end
@@ -4475,13 +4483,19 @@ function DetermineInitialBuildOrder(aiBrain)
         end
 
 
-        --Calc dist to enemy base - dont manually here rather than referencing the variable as not sure on timing whether the variable will be calcualted yet - ideally want to go 2nd air on larger maps
-        if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= 350 then
+
+        if aiBrain[refiDistanceToNearestEnemyBase] >= 380 then
             aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
+            aiBrain[M27AirOverseer.refiEngiHuntersToGet] = 2
+        else
+            aiBrain[M27AirOverseer.refiEngiHuntersToGet] = 1
+            aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
         end
     else
+        --Cant path to enemy base with land
         aiBrain[refiInitialRaiderPlatoonsWanted] = 0
         aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
+        aiBrain[M27AirOverseer.refiEngiHuntersToGet] = 2
         aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 10
         if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 12 end
     end
@@ -5219,6 +5233,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 tsGameState['10.iIntelPathPosition'] = iIntelPathPosition
                 tsGameState['10.iIntelDistancePercent'] = iIntelDistanceToStart / (iIntelDistanceToStart + iIntelDistanceToEnemy)
             end
+            tsGameState['10.DistanceToNearestEnemyBase'] = aiBrain[refiDistanceToNearestEnemyBase]
             if aiBrain[refiModDistFromStartNearestOutstandingThreat] then tsGameState['10.NearestOutstandingThreat'] = aiBrain[refiModDistFromStartNearestOutstandingThreat] end
             if aiBrain[refiPercentageOutstandingThreat] then tsGameState['10.PercentageOutstandingThreat'] = aiBrain[refiPercentageOutstandingThreat] end
             if aiBrain[refiModDistFromStartNearestThreat] then tsGameState['10.ModDistNearestThreat'] = aiBrain[refiModDistFromStartNearestThreat] end
@@ -5259,6 +5274,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                 end
             end
         end
+        --Do we have a firebase? if so increase health to run on
+        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then aiBrain[refiACUHealthToRunOn] = math.min(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn] + 2000) end
+
         --Also set health to run as a high value if we have high mass and energy income
         if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
             if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
@@ -5574,6 +5592,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[M27FactoryOverseer.refiAirScoutCap] = 35
 
     aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
+    aiBrain[M27PlatoonFormer.reftPriorityUnitsForShielding] = {}
     aiBrain[refiCyclesThatACUHasNoPlatoon] = 0
     aiBrain[refiCyclesThatACUInArmyPool] = 0
     aiBrain[reftUnitGroupPreviousReferences] = {}
@@ -6020,13 +6039,35 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+    --GetCategoryConditionFromUnitID(sUnitId) test
+
+    local oACU = M27Utilities.GetACU(aiBrain)
+    local iACUCategory = M27UnitInfo.GetCategoryConditionFromUnitID(oACU.UnitId)
+    local tACUs = aiBrain:GetUnitsAroundPoint(iACUCategory, oACU:GetPosition(), 1000, 'Ally')
+    LOG('TESTCUSTOM - is table of tACUs empty='..tostring(M27Utilities.IsTableEmpty(tACUs)))
+
+    --[[
+    --EntityCategoryFilterDown test
+    local tACU = aiBrain:GetListOfUnits(categories.COMMAND, false, false)
+    local tFilteredList = EntityCategoryFilterDown(categories.COMMAND * categories.DIRECTFIRE, tACU)
+    local tSpecialKey = {}
+    tSpecialKey['abc'] = tFilteredList[1]
+    local tOtherSpecialKey = {}
+    tOtherSpecialKey[1] = tFilteredList[1]
+    LOG('Is tACU empty='..tostring(M27Utilities.IsTableEmpty(tACU))..'; Is filtered list empty='..tostring(M27Utilities.IsTableEmpty(tFilteredList))..'; is filtered list without variable empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.COMMAND, tACU)))..'; Is filtered down of custom key empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.COMMAND, tSpecialKey)))..'; is tOtherSpecialKey[1] empty='..tostring(M27Utilities.IsTableEmpty(tOtherSpecialKey[1])))
+    for iEntry, oEntry in EntityCategoryFilterDown(categories.COMMAND, tSpecialKey) do
+        LOG('oEntry='..oEntry.UnitId)
+    end--]]
+
+
+    --[[
     --Cos testing as giving strange results
     local iDistStartToTarget = 708
     local iAngleStartToTarget = 88.045585632324
     local iAngleStartToEnemy = 90
     local iAbsAngleDif = math.abs(iAngleStartToTarget - iAngleStartToEnemy)
     LOG('iAbsAngleDif='..iAbsAngleDif..'; cos this='..math.cos(M27Utilities.ConvertAngleToRadians(iAbsAngleDif))..'; math.cos * dist='..math.cos(M27Utilities.ConvertAngleToRadians(iAbsAngleDif)) * iDistStartToTarget)
-
+    --]]
 
     --List out all experimental unit BPs
     --[[
@@ -6244,6 +6285,7 @@ function OverseerManager(aiBrain)
     while(not(aiBrain:IsDefeated())) do
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
         if aiBrain.M27IsDefeated then break end
+
         --if GetGameTimeSeconds() >= 1459 then M27Utilities.bGlobalDebugOverride = true end
         --[[if not(bSetHook) and GetGameTimeSeconds() >= 1459 then
             bDebugMessages = true

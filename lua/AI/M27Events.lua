@@ -48,10 +48,18 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         M27AirOverseer.CheckForUnseenKiller(oKilledBrain, oUnitKilled, oKillerUnit)
                     end
                 end
-                --If a PD that didnt compelte construction then track mass value so we adjust PD effectiveness
-                if EntityCategoryContains(M27UnitInfo.refCategoryPD, oUnitKilled.UnitId) and not(oUnitKilled.M27OnConstructedCalled) then
-                    oKilledBrain[M27EngineerOverseer.refiMassSpentOnPD] = oKilledBrain[M27EngineerOverseer.refiMassSpentOnPD] + oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.5
-                    oKilledBrain[M27EngineerOverseer.refbPDHaveChangedSinceLastFirebaseCheck] = true
+
+                if EntityCategoryContains(M27UnitInfo.refCategoryPD, oUnitKilled.UnitId) then
+                    --If a PD that didnt compelte construction then track mass value so we adjust PD effectiveness
+                    if not(oUnitKilled.M27OnConstructedCalled) then
+                        oKilledBrain[M27EngineerOverseer.refiMassSpentOnPD] = oKilledBrain[M27EngineerOverseer.refiMassSpentOnPD] + oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.5
+                        oKilledBrain[M27EngineerOverseer.refbPDHaveChangedSinceLastFirebaseCheck] = true
+                    end
+                    --Adjust firebase overall PD mass values
+                    if oUnitKilled[M27EngineerOverseer.refiAssignedFirebase] then
+                        oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassCost][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] = (oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassCost][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] or 0) + oUnitKilled:GetBlueprint().Economy.BuildCostMass * oUnitKilled:GetFractionComplete()
+                        oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] = (oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] or 0) + oUnitKilled.Sync.totalMassKilled
+                    end
                 end
             else
                 --Did a PD we own kill something?
@@ -218,7 +226,7 @@ end
 function OnShieldBubbleDamaged(self, instigator)
     if M27Utilities.bM27AIInGame then
         local sFunctionRef = 'OnShieldBubbleDamaged'
-        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
         --Self is the shield object.  Doing a log of this, it has an Owner value, which is the unit object
@@ -243,7 +251,7 @@ end
 function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble is damaged - see OnShieldBubbleDamaged for this
     if M27Utilities.bM27AIInGame then
         local sFunctionRef = 'OnDamaged'
-        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if self.IsWreckage then
             --Decided to comment out the below and only update when props and wrecks are destroyed
@@ -431,6 +439,11 @@ function OnMissileBuilt(self, weapon)
     if M27Utilities.bM27AIInGame then
 
         if self.GetAIBrain and self:GetAIBrain().M27AI then
+            --Flag we've recently built a missile (so e.g. have a backup in case there's a delay in registering the missile being built, so we dont assist SMD that has just built a missile)
+            self[M27EngineerOverseer.refbMissileRecentlyBuilt] = true
+            M27Utilities.DelayChangeVariable(self, M27EngineerOverseer.refbMissileRecentlyBuilt, false, 5)
+
+
             --Pause if we already have 2 missiles
             local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             local sFunctionRef = 'OnMissileBuilt'
@@ -458,6 +471,22 @@ function OnMissileBuilt(self, weapon)
             if not(self[M27UnitInfo.refbActiveMissileChecker]) and not(EntityCategoryContains(M27UnitInfo.refCategorySMD, self.UnitId)) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Calling logic to consider launching a missile') end
                 ForkThread(M27Logic.ConsiderLaunchingMissile, self, weapon)
+            end
+
+            --SMD - clear any assisting engineers (dont both with missile count check, since it's off slightly and we want to stop at 1 missile anyway and this event means it has 1 missile
+            if EntityCategoryContains(M27UnitInfo.refCategorySMD, self.UnitId) then
+                local aiBrain = self:GetAIBrain()
+                if bDebugMessages == true then LOG(sFunctionRef..': SMD '..self.UnitId..M27UnitInfo.GetUnitLifetimeCount(self)..' has just loaded a missile, is table of assist SMD actions empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionAssistSMD]))) end
+                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionAssistSMD]) == false then
+                    for iSubtable, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionAssistSMD] do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Cycling through each assigned subtable. Engineer='..tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef])..' with UC='..M27EngineerOverseer.GetEngineerUniqueCount(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef])..'; Unit being assisted='..tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][M27EngineerOverseer.refoUnitBeingAssisted].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][M27EngineerOverseer.refoUnitBeingAssisted])) end
+                        if tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][M27EngineerOverseer.refoUnitBeingAssisted] == self then
+                            if M27UnitInfo.IsUnitValid(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]) then IssueClearCommands({tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]}) end
+                            M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef], true)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have sent a clear commands action to the engineer') end
+                        end
+                    end
+                end
             end
 
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -523,18 +552,21 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
 
             --Check for construction of nuke
             --if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] then
-                local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-                local sFunctionRef = 'OnConstructionStarted'
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have just started construction on a nuke; if so then will start a monitor; UnitID='..oConstruction.UnitId..'; oConstruction[M27UnitInfo.refbActiveSMDChecker]='..(tostring(oConstruction[M27UnitInfo.refbActiveSMDChecker] or false))) end
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+            local sFunctionRef = 'OnConstructionStarted'
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have just started construction on a nuke; if so then will start a monitor; UnitID='..oConstruction.UnitId..'; oConstruction[M27UnitInfo.refbActiveSMDChecker]='..(tostring(oConstruction[M27UnitInfo.refbActiveSMDChecker] or false))) end
 
-                if EntityCategoryContains(M27UnitInfo.refCategorySML, oConstruction.UnitId) then
-                    --Are building a nuke, check if already monitoring SMD somehow
-                    if not(oConstruction[M27UnitInfo.refbActiveSMDChecker]) and oConstruction:GetFractionComplete() < 1 then
+            if EntityCategoryContains(M27UnitInfo.refCategorySML, oConstruction.UnitId) then
+                --Are building a nuke, check if already monitoring SMD somehow
+                if not(oConstruction[M27UnitInfo.refbActiveSMDChecker]) and oConstruction:GetFractionComplete() < 1 then
                     --if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27UnitInfo.refCategorySML and not(aiBrain[M27UnitInfo.refbActiveSMDChecker]) then
-                        ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oConstruction)
-                    end
+                    ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oConstruction)
                 end
+            end
             --end
+
+            --Firebase tracking
+            if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oConstruction.UnitId) then ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oConstruction) end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         end
     end
@@ -605,26 +637,8 @@ function OnConstructed(oEngineer, oJustBuilt)
             end
 
             --Firebase tracking
-            if oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionFortifyFirebase then
-                --Get the closest firebase, if its within 50 of here then assign the unit to it
+            if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oJustBuilt.UnitId) then ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oJustBuilt) end
 
-                if not(oJustBuilt[M27EngineerOverseer.refiAssignedFirebase]) and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasePosition]) == false then
-                    local iCurDist
-                    local iClosestDist = 10000
-                    local iClosestFirebaseRef
-                    for iFirebase, tFirebase in aiBrain[M27EngineerOverseer.reftFirebasePosition] do
-                        iCurDist = M27Utilities.GetDistanceBetweenPositions(tFirebase, oJustBuilt:GetPosition())
-                        if iCurDist < iClosestDist then
-                            iClosestDist = iCurDist
-                            iClosestFirebaseRef = iFirebase
-                        end
-                    end
-                    if iClosestDist <= 50 then
-                        oJustBuilt[M27EngineerOverseer.refiAssignedFirebase] = iClosestFirebaseRef
-                        aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef][iClosestFirebaseRef][oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)] = oJustBuilt
-                    end
-                end
-            end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         elseif M27Config.M27ShowEnemyUnitNames then
             oJustBuilt:SetCustomName(oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))

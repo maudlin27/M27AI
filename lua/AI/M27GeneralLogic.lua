@@ -3236,16 +3236,18 @@ function GetDirectFireWeaponPosition(oFiringUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDirectFireWeaponPosition'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oFiringUnit.UnitId) then bDebugMessages = true end
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local tShotStartPosition
-    if EntityCategoryContains(categories.DIRECTFIRE, oBPFiringUnit.BlueprintId) == true then
+    if EntityCategoryContains(categories.DIRECTFIRE + M27UnitInfo.refCategoryFatboy, oBPFiringUnit.BlueprintId) == true then
         local bIsACU = EntityCategoryContains(categories.COMMAND, oBPFiringUnit.BlueprintId)
 
         local sFiringBone
         if bDebugMessages == true then LOG(sFunctionRef..': Have a DF unit, working out where shot coming from') end
         --Work out where the shot is coming from:
+        local bIsFatboy = EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oFiringUnit)
         for iCurWeapon, oWeapon in oBPFiringUnit.Weapon do
-            if oWeapon.RangeCategory and oWeapon.RangeCategory == 'UWRC_DirectFire' then
+            if oWeapon.RangeCategory and (oWeapon.RangeCategory == 'UWRC_DirectFire' or (bIsFatboy and oWeapon.RangeCategory == 'UWRC_IndirectFire')) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a weapon with range category') end
                 if oWeapon.RackBones then
                     if bDebugMessages == true then LOG(sFunctionRef..': Have a weapon with RackBones') end
@@ -3316,9 +3318,10 @@ function IsLineBlockedAborted(aiBrain, tShotStartPosition, tShotEndPosition, iAO
     return bShotIsBlocked
 end
 
-function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
+function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE, bReturnDistanceThatBlocked)
     --If iAOE is specified then will end once reach the iAOE range
     --(aiBrain included as argument as want to retry CheckBlockingTerrain in the future)
+    --bReturnDistanceThatBlocked - if true then returns either distance at which shot is blocked, or the distance+1 between the start and end position
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLineBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -3343,6 +3346,10 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
                         M27Utilities.DrawLocation(tTerrainPositionAtPoint, nil, 5, 10)
                     end
                     bShotIsBlocked = true
+                    if bReturnDistanceThatBlocked then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return iPointToTarget
+                    end
 
                     break
                 elseif bDebugMessages == true then LOG(sFunctionRef..': Are at end point and terrain height is identical, so will assume we will actually reach the target')
@@ -3354,7 +3361,10 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
     else bShotIsBlocked = false
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return bShotIsBlocked
+    if bReturnDistanceThatBlocked and not(bShotIsBlocked) then return M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition) + 1
+    else
+        return bShotIsBlocked
+    end
 end
 
 --NOTE: Use IsLineBlocked if have positions instead of units
@@ -3495,7 +3505,7 @@ function IsLocationUnderFriendlyFixedShield(aiBrain, tTargetPos)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iShieldSearchRange = 46
-    local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, tTargetPos, iShieldSearchRange, sSearchType)
+    local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, tTargetPos, iShieldSearchRange, 'Ally')
     if M27Utilities.IsTableEmpty(tNearbyShields) == false then
         local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
         for iUnit, oUnit in tNearbyShields do
@@ -3748,6 +3758,41 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
     return tEndDestination
 end
 
+function GetNearestFirebase(aiBrain, tPosition, bMustHaveShield)
+    local sFunctionRef = 'GetNearestFirebase'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --Returns nil if no nearby firebase
+    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
+        local bHasShield = bMustHaveShield
+        local iCurDist
+        local iClosestDist = 10000
+        local iClosestFirebaseRef
+        for iFirebaseRef, tFirebaseUnits in aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef] do
+            if not(bMustHaveShield) then
+                for iUnit, oUnit in tFirebaseUnits do
+                    if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oUnit.UnitId) then
+                        bHasShield = true
+                        break
+                    end
+                end
+            end
+            if bHasShield then --Eitherh as shield, or not bothered if it ahs a shield
+                iCurDist = M27Utilities.GetDistanceBetweenPositions(tPosition, aiBrain[M27EngineerOverseer.reftFirebasePosition][iFirebaseRef])
+                if iCurDist < iClosestDist then
+                    iClosestFirebaseRef = iFirebaseRef
+                    iClosestDist = iCurDist
+                end
+            end
+        end
+        if iClosestFirebaseRef then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return aiBrain[M27EngineerOverseer.reftFirebasePosition][iClosestFirebaseRef]
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return nil
+end
+
 function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondTimeRun)
     --Todo - longer term want to integrate this with forward base logic
     --NOTE: Air overseer uses custom copy of this with some variations to get air rally point
@@ -3830,8 +3875,16 @@ function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondT
                     iNearestRallyPoint = iRallyPoint
                 end
             end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
+
+            --Do we have a firebase near here?
+            local tNearbyFirebase = GetNearestFirebase(aiBrain, aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint], false)
+            if M27Utilities.IsTableEmpty(tNearbyFirebase) == false and (M27Utilities.GetDistanceBetweenPositions(tNearbyFirebase, aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint]) <= 40 or M27Utilities.GetDistanceBetweenPositions(tPosition, tNearbyFirebase) <= (iNearestToStart + 40)) then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return M27Utilities.MoveInDirection(tNearbyFirebase, M27Utilities.GetAngleFromAToB(tNearbyFirebase, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), 12, true)
+            else
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
+            end
         end
         --[[ Previous code based on mex patrol locations:
         local tMexPatrolLocations = M27MapInfo.GetMexPatrolLocations(aiBrain)

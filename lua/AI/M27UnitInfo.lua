@@ -839,3 +839,12 @@ function GetTransportMaxCapacity(oTransport, iTechLevelToLoad)
 
     return tiCapacityByTechAndFaction[GetUnitTechLevel(oTransport)][iFaction][iTechLevelToLoad]
 end
+
+function GetCategoryConditionFromUnitID(sUnitId)
+    --Returns a category condition that has all the categories that the blueprint of sUnitId has
+    local iFullCategoryCondition = categories.ALLUNITS
+    for iCategory, sCategory in __blueprints[sUnitId].Categories do
+        iFullCategoryCondition = iFullCategoryCondition * ParseEntityCategory(sCategory)
+    end
+    return iFullCategoryCondition
+end
