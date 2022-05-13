@@ -1233,6 +1233,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                         --=======AIR FACTORY------------------
                     elseif bIsAirFactory then
+                        bDebugMessages = true
                         --if aiBrain:GetCurrentUnits(refCategoryBomber) >= 200 then bDebugMessages = true end
 
                         local iCurT1Bombers = aiBrain:GetCurrentUnits(refCategoryBomber * categories.TECH1) --used in so many places might as well always calculate

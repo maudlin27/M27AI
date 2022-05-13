@@ -3238,6 +3238,7 @@ function GetDirectFireWeaponPosition(oFiringUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDirectFireWeaponPosition'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oFiringUnit.UnitId) then bDebugMessages = true end
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local tShotStartPosition
     if EntityCategoryContains(categories.DIRECTFIRE + M27UnitInfo.refCategoryFatboy, oBPFiringUnit.BlueprintId) == true then
