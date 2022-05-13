@@ -18,6 +18,7 @@ refiAssignedPlateau = 'M27TransportAssignedPlateau' --Used by transports to reco
 reftPlateauNearestMex = 'M27TransportNearestMexTarget' --Assigned to transport
 refoTransportToLoadOnto = 'M27TransportWanted' --local variable assigned to an engineer object
 reftUnitsToldToLoadOntoTransport = 'M27TransportUnitsToldToLoad' --Recorded on a transport to keep track of units told to load onto it
+reftUnitsLoadedOntoTransport = 'M27TransportUnitsLoadedOntoTransport' --Engineers successfully loaded onto a transport
 refiEngisLoaded = 'M27TransportEngisLoaded' --Number of engineers successfully loaded onto transport
 refiMaxEngisWanted = 'M27TransportEngisWanted' --max number of engineers a transport wants
 refiWaitingForEngiCount = 'M27TransportWaitingForEngiCount' --Will increase by 1 for each cycle that transport is near base and engi and waiting to be loaded
@@ -28,6 +29,7 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     local sFunctionRef = 'UpdateTransportForLoadedUnit'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': oUnitJustLoaded='..oUnitJustLoaded.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitJustLoaded)..'; Is unit valid='..tostring(M27UnitInfo.IsUnitValid(oUnitJustLoaded))) end
 
     oUnitJustLoaded[refoTransportToLoadOnto] = nil
     oUnitJustLoaded[M27UnitInfo.refbSpecialMicroActive] = false
@@ -36,27 +38,49 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     if M27Utilities.IsTableEmpty(oTransport[reftUnitsToldToLoadOntoTransport]) then
         oTransport[M27UnitInfo.refbSpecialMicroActive] = false
     end
+    if not(oTransport[reftUnitsLoadedOntoTransport]) then oTransport[reftUnitsLoadedOntoTransport] = {} end
+
+
 
     --Is the transport full?
     local bSendTransportToTarget = false
     local iMaxTechLevel = 1
+    if M27UnitInfo.IsUnitValid(oUnitJustLoaded) then iMaxTechLevel = math.max(iMaxTechLevel, M27UnitInfo.GetUnitTechLevel(oUnitJustLoaded)) end
     local iCurTechLevel
     local iEngisToBeLoaded = 0
     local aiBrain = oTransport:GetAIBrain()
+    if bDebugMessages == true then LOG(sFunctionRef..': Is table of units told to load onto transport empty='..tostring(M27Utilities.IsTableEmpty(oTransport[reftUnitsToldToLoadOntoTransport]))) end
     if M27Utilities.IsTableEmpty(oTransport[reftUnitsToldToLoadOntoTransport]) == false then
         for iEngi, oEngi in oTransport[reftUnitsToldToLoadOntoTransport] do
+            if bDebugMessages == true then LOG(sFunctionRef..': iEngi='..iEngi..'; oEngi is valid='..tostring(M27UnitInfo.IsUnitValid(oEngi))) end
             if M27UnitInfo.IsUnitValid(oEngi) then
                 iEngisToBeLoaded = iEngisToBeLoaded + 1
                 iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oEngi)
                 if iCurTechLevel > iMaxTechLevel then iMaxTechLevel = iCurTechLevel end
+                if bDebugMessages == true then LOG(sFunctionRef..': oEngi='..oEngi.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTechLevel='..iCurTechLevel..'; iMaxTechLevel='..iMaxTechLevel) end
             else
                 oTransport[reftUnitsToldToLoadOntoTransport][iEngi] = nil
             end
         end
     end
-    if iEngisToBeLoaded == 0 then iMaxTechLevel = aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] end
+    if iMaxTechLevel < 3 and M27Utilities.IsTableEmpty(oTransport[reftUnitsLoadedOntoTransport]) == false then
+        for iEngi, oEngi in oTransport[reftUnitsToldToLoadOntoTransport] do
+            if bDebugMessages == true then LOG(sFunctionRef..': iEngi='..iEngi..'; oEngi is valid='..tostring(M27UnitInfo.IsUnitValid(oEngi))) end
+            if M27UnitInfo.IsUnitValid(oEngi) then
+                iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oEngi)
+                if iCurTechLevel > iMaxTechLevel then iMaxTechLevel = iCurTechLevel end
+                if bDebugMessages == true then LOG(sFunctionRef..': oEngi='..oEngi.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTechLevel='..iCurTechLevel..'; iMaxTechLevel='..iMaxTechLevel) end
+            else
+                oTransport[reftUnitsToldToLoadOntoTransport][iEngi] = nil
+            end
+        end
+    end
+    if iEngisToBeLoaded == 0 then iMaxTechLevel = math.max(iMaxTechLevel, aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]) end
+
+    oTransport[reftUnitsLoadedOntoTransport][oUnitJustLoaded.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitJustLoaded)] = oUnitJustLoaded
 
     local iTransportCapacity = M27UnitInfo.GetTransportMaxCapacity(oTransport, iMaxTechLevel)
+    if bDebugMessages == true then LOG(sFunctionRef..': iMaxTechLevel='..iMaxTechLevel..'; iTransportCapacity='..iTransportCapacity..'; oTransport[refiEngisLoaded]='..(oTransport[refiEngisLoaded] or 'nil')..'; oTransport[refiMaxEngisWanted]='..(oTransport[refiMaxEngisWanted] or 'nil')) end
     if iTransportCapacity <= oTransport[refiEngisLoaded] or oTransport[refiEngisLoaded] >= oTransport[refiMaxEngisWanted] or (oTransport[refiEngisLoaded] >= oTransport[refiMaxEngisWanted] * 0.7 and iEngisToBeLoaded == 0) then
         bSendTransportToTarget = true
     end
@@ -72,8 +96,9 @@ function RecordUnitLoadingOntoTransport(oUnit, oTransport)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     oUnit[refoTransportToLoadOnto] = oTransport
-    if not(oTransport[reftUnitsToldToLoadOntoTransport]) then oTransport[reftUnitsToldToLoadOntoTransport] = {} end
+    if M27Utilities.IsTableEmpty(oTransport[reftUnitsToldToLoadOntoTransport]) then oTransport[reftUnitsToldToLoadOntoTransport] = {} end
     oTransport[reftUnitsToldToLoadOntoTransport][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
+    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oTransport='..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 

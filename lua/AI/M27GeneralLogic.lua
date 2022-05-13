@@ -1304,11 +1304,11 @@ end
 
 
 
-function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
+function GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, iReturnRangeType)
     --Works if either sent a table of units or a single unit
     --iReturnRangeType: nil or 0: Return min+Max; 1: Return min only; 2: Return max only
     --Cycles through each unit and then each weapon to determine the minimum range
-    local sFunctionRef = 'GetDirectFireUnitMinOrMaxRange'
+    local sFunctionRef = 'GetDFAndT1ArtiUnitMinOrMaxRange'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
@@ -1322,6 +1322,7 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
 
     --Override for fatboy (since its an indirect fire unit but can work as an ok direct fire unit)
     if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, tUnits)) then iMaxRange = 100 end
+    local bIncludeT1Arti = false
     for i, oUnit in tAllUnits do
         if not(oUnit.Dead) then
             if M27Utilities.IsACU(oUnit) == false then
@@ -1329,6 +1330,7 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
                     if bDebugMessages == true then LOG(sFunctionRef..': Have a non-ACU blueprint, adding to the list') end
                     iBPCount = iBPCount + 1
                     tUnitBPs[iBPCount] = oUnit:GetBlueprint()
+                    if EntityCategoryContains(categories.TECH1 * categories.ARTILLERY, oUnit.UnitId) then bIncludeT1Arti = true end
                 end
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Have an ACU blueprint, using custom logic to work out DF range') end
@@ -1347,7 +1349,7 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
                 if not(oCurWeapon.CannotAttackGround == true) then
                     if not(oCurWeapon.ManualFire == true) then
                         --Exclude indirect fire weapons
-                        if not(oCurWeapon.WeaponCategory == 'Artillery') and not(oCurWeapon.WeaponCategory == 'Missile') and not(oCurWeapon.WeaponCategory == 'Indirect Fire') then
+                        if not(oCurWeapon.WeaponCategory == 'Artillery' and (not(bIncludeT1Arti) or not(EntityCategoryContains(categories.TECH1 * categories.ARTILLERY, oBP.BlueprintId)))) and not(oCurWeapon.WeaponCategory == 'Missile') and not(oCurWeapon.WeaponCategory == 'Indirect Fire') then
                             iCurRange = oCurWeapon.MaxRadius
                             if iCurRange > iMaxRange then iMaxRange = iCurRange end
                             if iCurRange < iMinRange then iMinRange = iCurRange end
@@ -1371,13 +1373,13 @@ function GetDirectFireUnitMinOrMaxRange(tUnits, iReturnRangeType)
 end
 
 function GetUnitMinGroundRange(tUnits)
-    return GetDirectFireUnitMinOrMaxRange(tUnits, 1)
+    return GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, 1)
 end
 function GetUnitMaxGroundRange(tUnits)
-    return GetDirectFireUnitMinOrMaxRange(tUnits, 2)
+    return GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, 2)
 end
 function GetUnitMinAndMaxGroundRange(tUnits)
-    return GetDirectFireUnitMinOrMaxRange(tUnits, 0)
+    return GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, 0)
 end
 
 function GetUnitSpeedData(tUnits, aiBrain, bNeedToHaveBlipOrVisual, iReturnType, iOptionalSpeedThreshold)
@@ -3238,14 +3240,15 @@ function GetDirectFireWeaponPosition(oFiringUnit)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local tShotStartPosition
-    if EntityCategoryContains(categories.DIRECTFIRE, oBPFiringUnit.BlueprintId) == true then
+    if EntityCategoryContains(categories.DIRECTFIRE + M27UnitInfo.refCategoryFatboy, oBPFiringUnit.BlueprintId) == true then
         local bIsACU = EntityCategoryContains(categories.COMMAND, oBPFiringUnit.BlueprintId)
 
         local sFiringBone
         if bDebugMessages == true then LOG(sFunctionRef..': Have a DF unit, working out where shot coming from') end
         --Work out where the shot is coming from:
+        local bIsFatboy = EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oFiringUnit)
         for iCurWeapon, oWeapon in oBPFiringUnit.Weapon do
-            if oWeapon.RangeCategory and oWeapon.RangeCategory == 'UWRC_DirectFire' then
+            if oWeapon.RangeCategory and (oWeapon.RangeCategory == 'UWRC_DirectFire' or (bIsFatboy and oWeapon.RangeCategory == 'UWRC_IndirectFire')) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have a weapon with range category') end
                 if oWeapon.RackBones then
                     if bDebugMessages == true then LOG(sFunctionRef..': Have a weapon with RackBones') end
@@ -3316,9 +3319,10 @@ function IsLineBlockedAborted(aiBrain, tShotStartPosition, tShotEndPosition, iAO
     return bShotIsBlocked
 end
 
-function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
+function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE, bReturnDistanceThatBlocked)
     --If iAOE is specified then will end once reach the iAOE range
     --(aiBrain included as argument as want to retry CheckBlockingTerrain in the future)
+    --bReturnDistanceThatBlocked - if true then returns either distance at which shot is blocked, or the distance+1 between the start and end position
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLineBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -3343,6 +3347,10 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
                         M27Utilities.DrawLocation(tTerrainPositionAtPoint, nil, 5, 10)
                     end
                     bShotIsBlocked = true
+                    if bReturnDistanceThatBlocked then
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        return iPointToTarget
+                    end
 
                     break
                 elseif bDebugMessages == true then LOG(sFunctionRef..': Are at end point and terrain height is identical, so will assume we will actually reach the target')
@@ -3354,7 +3362,10 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE)
     else bShotIsBlocked = false
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return bShotIsBlocked
+    if bReturnDistanceThatBlocked and not(bShotIsBlocked) then return M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition) + 1
+    else
+        return bShotIsBlocked
+    end
 end
 
 --NOTE: Use IsLineBlocked if have positions instead of units
@@ -3495,7 +3506,7 @@ function IsLocationUnderFriendlyFixedShield(aiBrain, tTargetPos)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iShieldSearchRange = 46
-    local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, tTargetPos, iShieldSearchRange, sSearchType)
+    local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, tTargetPos, iShieldSearchRange, 'Ally')
     if M27Utilities.IsTableEmpty(tNearbyShields) == false then
         local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
         for iUnit, oUnit in tNearbyShields do
@@ -3748,6 +3759,41 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
     return tEndDestination
 end
 
+function GetNearestFirebase(aiBrain, tPosition, bMustHaveShield)
+    local sFunctionRef = 'GetNearestFirebase'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --Returns nil if no nearby firebase
+    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
+        local bHasShield = bMustHaveShield
+        local iCurDist
+        local iClosestDist = 10000
+        local iClosestFirebaseRef
+        for iFirebaseRef, tFirebaseUnits in aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef] do
+            if not(bMustHaveShield) then
+                for iUnit, oUnit in tFirebaseUnits do
+                    if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oUnit.UnitId) then
+                        bHasShield = true
+                        break
+                    end
+                end
+            end
+            if bHasShield then --Eitherh as shield, or not bothered if it ahs a shield
+                iCurDist = M27Utilities.GetDistanceBetweenPositions(tPosition, aiBrain[M27EngineerOverseer.reftFirebasePosition][iFirebaseRef])
+                if iCurDist < iClosestDist then
+                    iClosestFirebaseRef = iFirebaseRef
+                    iClosestDist = iCurDist
+                end
+            end
+        end
+        if iClosestFirebaseRef then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return aiBrain[M27EngineerOverseer.reftFirebasePosition][iClosestFirebaseRef]
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return nil
+end
+
 function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondTimeRun)
     --Todo - longer term want to integrate this with forward base logic
     --NOTE: Air overseer uses custom copy of this with some variations to get air rally point
@@ -3830,8 +3876,16 @@ function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondT
                     iNearestRallyPoint = iRallyPoint
                 end
             end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
+
+            --Do we have a firebase near here?
+            local tNearbyFirebase = GetNearestFirebase(aiBrain, aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint], false)
+            if M27Utilities.IsTableEmpty(tNearbyFirebase) == false and (M27Utilities.GetDistanceBetweenPositions(tNearbyFirebase, aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint]) <= 40 or M27Utilities.GetDistanceBetweenPositions(tPosition, tNearbyFirebase) <= (iNearestToStart + 40)) then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return M27Utilities.MoveInDirection(tNearbyFirebase, M27Utilities.GetAngleFromAToB(tNearbyFirebase, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), 12, true)
+            else
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
+            end
         end
         --[[ Previous code based on mex patrol locations:
         local tMexPatrolLocations = M27MapInfo.GetMexPatrolLocations(aiBrain)
