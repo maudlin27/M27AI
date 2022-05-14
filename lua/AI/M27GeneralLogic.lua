@@ -1891,8 +1891,8 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                             --Manual adjustments for units with good AA that also have direct fire
                                             if sCurUnitBP == 'XAA0305' then iMassMod = 0.7 --Restorer
                                             elseif sCurUnitBP == 'XEA0306' then iMassMod = 0.7 --Continental
-                                            elseif sCurUnitBP == 'UAA0310' then iMassMod = 0.4 --Czar
-                                            elseif sCurUnitBP == 'XSA0402' then iMassMod = 0.2 --Sera experi bomber
+                                            elseif sCurUnitBP == 'UAA0310' then iMassMod = 0.55 --Czar
+                                            elseif sCurUnitBP == 'XSA0402' then iMassMod = 0.3 --Sera experi bomber
                                             end
                                         end
                                     end
@@ -1918,6 +1918,8 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                         --Onlyantiair - use to weight results when calculating AA threat
                         if iHealthFactor > 0 then
                             iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
+                            --Assume low health experimental is has more health than it does - e.g. might heal, or might be under construction
+                            if iHealthPercentage < 1 and EntityCategoryContains(categories.EXPERIMENTAL, oUnit) then iHealthPercentage = math.min(1, math.max(0.4, iHealthPercentage * 1.5)) end
                             iMassMod = (1 - (1-iHealthPercentage) * iHealthFactor) * iMassMod
                         end
                         --Only GroundToAir: Increase structure value by 100%
@@ -1975,8 +1977,8 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
 
     local bIsIdle
     local iIdleCountThreshold = 1 --Number of times the unit must have been idle to trigger (its increased by 1 this cycle, so 1 effectively means no previous times)
-        --Note this is increased for engineers with an action to build a T3 mex
-    --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit) and (M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 59) then bDebugMessages = true end
+    --Note this is increased for engineers with an action to build a T3 mex
+    --if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) and (M27EngineerOverseer.GetEngineerUniqueCount(oUnit) == 59) then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': Checking if unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is idle; unit state='..(GetUnitState(oUnit) or 'nil')) end
     if oUnit[M27UnitInfo.refbSpecialMicroActive] then bIsIdle = false
@@ -3238,7 +3240,6 @@ function GetDirectFireWeaponPosition(oFiringUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDirectFireWeaponPosition'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oFiringUnit.UnitId) then bDebugMessages = true end
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local tShotStartPosition
     if EntityCategoryContains(categories.DIRECTFIRE + M27UnitInfo.refCategoryFatboy, oBPFiringUnit.BlueprintId) == true then

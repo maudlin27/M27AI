@@ -97,6 +97,7 @@ refiCurTargetNumber = 'M27AirCurTargetNumber' --e.g. for a bomber which is assig
 local refoAirAATarget = 'M27AirAirAATarget' --Interceptor target
 local reftTargetedByList = 'M27AirTargetedByList' --for interceptor target so can track mass value assigned to it, each entry is an air AA object assigned to target the unit
 local refbPartOfSpecialAttack = 'M27AirPartOfLargeAttack' --True if part of special attack logic
+refoTorpBomberPrimaryTarget = 'M27TorpPrimaryTarget' --Primary target of a torp bomber, so can reduce its threat damage assigned when torp bomber dies or becomes available
 reftoBombersTargetingUnit = 'M27AirBombersTargetingUnit' --[x] key is the aiBrain armyindex..BomberID+UniqueCount.  Table of bombers told to target a unit (e.g. as part of a coordinated attack)
 refiStrikeDamageAssigned = 'M27AirStrikeDamageAssigned'
 refiCoordinatedStrikeDamageAssigned = 'M27AirCoordinatedStrikeDamage' --Used to work out how much strike damage was assigned at the start of the attack
@@ -282,10 +283,17 @@ function ClearTrackersOnUnitsTargets(oAirUnit, bOnlyRemoveFirstEntry)
     local sFunctionRef = 'ClearTrackersOnUnitsTargets'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if EntityCategoryContains(categories.TECH3 * categories.BOMBER, oAirUnit.UnitId) and (M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 10 or M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 45) then bDebugMessages = true end
+
     --if oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit) == 'uea03042' then bDebugMessages = true else bDebugMessages = false end
 
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. oAirUnit='..oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)..'; Is the air unit target list empty='..tostring(M27Utilities.IsTableEmpty(oAirUnit[reftTargetList]))..'; Does it have a torpedo target='..tostring(M27UnitInfo.IsUnitValid(oAirUnit[refoTorpBomberPrimaryTarget]))) end
+    --Further torp bomber tracking (as was having issues with current approach)
+    if M27UnitInfo.IsUnitValid(oAirUnit[refoTorpBomberPrimaryTarget]) then
+        local iArmyIndex = oAirUnit:GetAIBrain():GetArmyIndex()
+        oAirUnit[refoTorpBomberPrimaryTarget][iArmyIndex][M27Overseer.refiAssignedThreat] = (oAirUnit[refoTorpBomberPrimaryTarget][iArmyIndex][M27Overseer.refiAssignedThreat] or 0) - oAirUnit:GetBlueprint().Economy.BuildCostMass
+        if bDebugMessages == true then LOG(sFunctionRef..': Air unit '..oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)..'; Reduced assigned threat on '..oAirUnit[refoTorpBomberPrimaryTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit[refoTorpBomberPrimaryTarget])..'; assigned threat is now '..oAirUnit[refoTorpBomberPrimaryTarget][iArmyIndex][M27Overseer.refiAssignedThreat]) end
+    end
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. oAirUnit='..oAirUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oAirUnit)..'; Is the air unit target list empty='..tostring(M27Utilities.IsTableEmpty(oAirUnit[reftTargetList]))) end
     if M27Utilities.IsTableEmpty(oAirUnit[reftTargetList]) == false then
         --local iTotalTargets = table.getn(oAirUnit[reftTargetList])
         --local oCurTarget
@@ -393,7 +401,7 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
             local tRallyPoint = GetAirRallyPoint(aiBrain)
             local bMicroTurn = false
 
-            if not(oAirUnit[M27UnitInfo.refbSpecialMicroActive]) and EntityCategoryContains(refCategoryBomber - categories.TECH1, oAirUnit.UnitId) and not(oAirUnit[refbSentRefuelCommand]) and not(oAirUnit[refoAirStagingAssigned]) then
+            if not(oAirUnit[M27UnitInfo.refbSpecialMicroActive]) and EntityCategoryContains(refCategoryBomber - categories.TECH1 - refCategoryTorpBomber, oAirUnit.UnitId) and not(oAirUnit[refbSentRefuelCommand]) and not(oAirUnit[refoAirStagingAssigned]) then
                 --Do we have low health or fuel? Then will want to return to base
                 if M27UnitInfo.GetUnitHealthPercent(oAirUnit) < iLowHealthPercent or oAirUnit:GetFuelRatio() < iLowFuelPercent then
                     --Do we have any air staging units?
@@ -891,6 +899,9 @@ function TrackBomberTarget(oBomber, oTarget, iPriority)
 
     if oBomber[reftTargetList] == nil then
         oBomber[reftTargetList] = {}
+    end
+    if EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oBomber.UnitId) then
+        oBomber[refoTorpBomberPrimaryTarget] = oTarget
     end
 
     --oBomber[refbTorpBomberProtectingACU] = false --Will set for all units rather than adding an eneitry category check fotorp bombers for performance reasons
@@ -1784,37 +1795,39 @@ function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
                 --Dont hover-bomb for Torp bombers, T1 bombers, or Non-Notha t2 bombers
                 if not(EntityCategoryContains(refCategoryTorpBomber + refCategoryBomber * categories.TECH1 + refCategoryBomber * categories.TECH2 - refCategoryBomber * categories.TECH2 * categories.SERAPHIM, oBomber.UnitId)) then
                     local bHoverBomb = false
-                    if EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalLevel, oTarget.UnitId) then
-                        bHoverBomb = true
-                    elseif oTarget[refiCoordinatedStrikeDamageAssigned] < GetMaxStrikeDamageWanted(oTarget) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': oTarget[refiCoordinatedStrikeDamageAssigned]='..oTarget[refiCoordinatedStrikeDamageAssigned]..'; GetMaxStrikeDamageWanted(oUnit)='..GetMaxStrikeDamageWanted(oTarget)..' so will hoverbomb') end
-                        bHoverBomb = true
-                    else
-                        --Do we have close to the expected strike damage?
-                        local iCurStrikeDamage = 0
-                        local iBomberAOE, iBomberStrikeDamage
-                        if oTarget[reftoBombersTargetingUnit] then
-                            for iAltBomber, oAltBomber in oTarget[reftoBombersTargetingUnit] do
-                                if M27UnitInfo.IsUnitValid(oAltBomber) and not(EntityCategoryContains(refCategoryTorpBomber, oAltBomber.UnitId)) then
-                                    iBomberAOE, iBomberStrikeDamage = M27UnitInfo.GetBomberAOEAndStrikeDamage(oAltBomber)
-                                    iCurStrikeDamage = iCurStrikeDamage + iBomberStrikeDamage
+                    if not(EntityCategoryContains(refCategoryTorpBomber, oBomber.UnitId)) then
+                        if EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalLevel, oTarget.UnitId) then
+                            bHoverBomb = true
+                        elseif oTarget[refiCoordinatedStrikeDamageAssigned] < GetMaxStrikeDamageWanted(oTarget) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': oTarget[refiCoordinatedStrikeDamageAssigned]='..oTarget[refiCoordinatedStrikeDamageAssigned]..'; GetMaxStrikeDamageWanted(oUnit)='..GetMaxStrikeDamageWanted(oTarget)..' so will hoverbomb') end
+                            bHoverBomb = true
+                        else
+                            --Do we have close to the expected strike damage?
+                            local iCurStrikeDamage = 0
+                            local iBomberAOE, iBomberStrikeDamage
+                            if oTarget[reftoBombersTargetingUnit] then
+                                for iAltBomber, oAltBomber in oTarget[reftoBombersTargetingUnit] do
+                                    if M27UnitInfo.IsUnitValid(oAltBomber) and not(EntityCategoryContains(refCategoryTorpBomber, oAltBomber.UnitId)) then
+                                        iBomberAOE, iBomberStrikeDamage = M27UnitInfo.GetBomberAOEAndStrikeDamage(oAltBomber)
+                                        iCurStrikeDamage = iCurStrikeDamage + iBomberStrikeDamage
+                                    end
                                 end
                             end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iCurStrikeDamage='..iCurStrikeDamage..'; oTarget[refiCoordinatedStrikeDamageAssigned]='..oTarget[refiCoordinatedStrikeDamageAssigned]) end
+                            if iCurStrikeDamage < oTarget[refiCoordinatedStrikeDamageAssigned] then
+                                bHoverBomb = true
+                            end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': iCurStrikeDamage='..iCurStrikeDamage..'; oTarget[refiCoordinatedStrikeDamageAssigned]='..oTarget[refiCoordinatedStrikeDamageAssigned]) end
-                        if iCurStrikeDamage < oTarget[refiCoordinatedStrikeDamageAssigned] then
-                            bHoverBomb = true
-                        end
-                    end
-                    --Dont hover-bomb if enemy flak detected (as hover-bombing means our bombersa re likely to die) unless are targeting enemy ACU or very high priority structure threat
-                    if bHoverBomb and not(EntityCategoryContains(categories.COMMAND + categories.STRUCTURE * M27UnitInfo.refCategoryExperimentalLevel, oTarget.UnitId)) then
-                        local tNearbyFlak = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH2 + M27UnitInfo.refCategoryStructureAA * categories.TECH2, oBomber:GetPosition(), 70, 'Enemy')
+                        --Dont hover-bomb if enemy flak detected (as hover-bombing means our bombersa re likely to die) unless are targeting enemy ACU or very high priority structure threat
+                        if bHoverBomb and not(EntityCategoryContains(categories.COMMAND + categories.STRUCTURE * M27UnitInfo.refCategoryExperimentalLevel, oTarget.UnitId)) then
+                            local tNearbyFlak = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH2 + M27UnitInfo.refCategoryStructureAA * categories.TECH2, oBomber:GetPosition(), 70, 'Enemy')
 
-                        if M27Utilities.IsTableEmpty(tNearbyFlak) == false then
-                            local iNearbyFlak = table.getn(tNearbyFlak)
-                            --Ignore if only 1 T2 mobile flak, otherwise dont hover-bomb
-                            if iNearbyFlak > 1 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.STRUCTURE, tNearbyFlak)) == false then
-                                bHoverBomb = false
+                            if M27Utilities.IsTableEmpty(tNearbyFlak) == false then
+                                local iNearbyFlak = table.getn(tNearbyFlak)
+                                --Ignore if only 1 T2 mobile flak, otherwise dont hover-bomb
+                                if iNearbyFlak > 1 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.STRUCTURE, tNearbyFlak)) == false then
+                                    bHoverBomb = false
+                                end
                             end
                         end
                     end
@@ -2151,6 +2164,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                     LOG(sFunctionRef .. '; iUnitType=' .. iUnitType .. '; iUnit=' .. iUnit .. '; ID and LC=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; checking if unit is dead and has fuel and whether its on assignment; oUnit[refbSentRefuelCommand]=' .. tostring(oUnit[refbSentRefuelCommand] or false))
                 end
                 if not (oUnit.Dead) and oUnit.GetFractionComplete and oUnit:GetFractionComplete() == 1 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': oUnit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; Health percent='..oUnit:GetHealthPercent()..'; Fuel ratio='..oUnit:GetFuelRatio()..'; Unit[refbOnAssignment]='..tostring(oUnit[refbOnAssignment] or false)..'; special micro active='..tostring(oUnit[M27UnitInfo.refbSpecialMicroActive] or false)) end
                     if not (oUnit[refbSentRefuelCommand]) then
                         iFuelPercent = 0
                         if oUnit.GetFuelRatio then
@@ -4534,8 +4548,8 @@ function DetermineBomberDefenceRange(aiBrain)
         aiBrain[refiBomberDefenceModDistance] = aiBrain[refiBomberDefenceModDistance] + math.min(70, (aiBrain[refiPreviousAvailableBombers] - 10))
     end
 
-    --Reduce range if nearest enemy unit is much closer and we had no available bombers last cycle
-    if aiBrain[refiPreviousAvailableBombers] == 0 then aiBrain[refiBomberDefenceModDistance] = math.min(aiBrain[M27Overseer.refiModDistFromStartNearestThreat] + 110, aiBrain[refiBomberDefenceModDistance]) end
+    --Reduce range if nearest enemy unit is much closer and we had few available bombers last cycle
+    if aiBrain[refiPreviousAvailableBombers] <= 5 then aiBrain[refiBomberDefenceModDistance] = math.min(aiBrain[M27Overseer.refiModDistFromStartNearestThreat] + 90, aiBrain[refiBomberDefenceModDistance]) end
 
     --Increase defence range based on air rally point to make sure our bombers cant be attacked by land units
     local tRallyPoint = GetAirRallyPoint(aiBrain)
@@ -4802,7 +4816,9 @@ function AirBomberManager(aiBrain)
 
         for iTechLevel = 1, 4 do
             if iTechLevel >= 3 then
-                bAvoidCruisers = false
+                if iTechLevel >= 4 or (iTechLevel == 3 and (M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers]) or table.getsize(aiBrain[reftAvailableTorpBombers]) <= 4)) then
+                    bAvoidCruisers = false
+                end
             end
 
             iHighestPriorityFound = 1000
@@ -4861,10 +4877,10 @@ function AirBomberManager(aiBrain)
 
                     --Tech 1 and 2: Consider nearby targets
                     if iTechLevel == 1 or (iTechLevel == 2 and not (tbConsideredTargetsByTech[1])) then
-                        --Shortlist for T1 bombers - nearby enemies
+                        --Shortlist for T1 bombers - nearby enemies - start with AA and vulnerable indirect fire units
                         --T2 bombers will use the exact same logic
                         iCurPriority = 1
-                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
+                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA + M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategorySniperBot, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
                         if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
                             if iTechLevel == 1 and iAvailableBombers > 0 then
                                 --Generate list of locations to avoid for T1 bombers (will have already reduced emergency def range for shielded T2 flak and T3 AA)
@@ -4939,7 +4955,7 @@ function AirBomberManager(aiBrain)
                             for iFirebaseRef, tFirebaseUnits in aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef] do
                                 if iFirebaseRef and M27Utilities.IsTableEmpty(tFirebaseUnits) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasePosition][iFirebaseRef]) == false then
                                     iCurPriority = 1
-                                    tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryIndirect + M27UnitInfo.refCategorySniperBot - categories.TECH1, aiBrain[M27EngineerOverseer.reftFirebasePosition][iFirebaseRef], 90, 'Enemy')
+                                    tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryIndirect + M27UnitInfo.refCategorySniperBot - categories.TECH1, aiBrain[M27EngineerOverseer.reftFirebasePosition][iFirebaseRef], 110, 'Enemy')
                                     for iUnit, oUnit in tPotentialTargets do
                                         if not (oUnit:IsUnitState('Attached')) then
                                             if not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, nil, nil, false, true)) then
@@ -5290,8 +5306,8 @@ function AirBomberManager(aiBrain)
                             end
                         end
 
-                        --If enemy cruiser within emergency defence range then also consider this (but not carriers)
-                        if iNearestCruiserModDistance <= aiBrain[refiBomberDefenceModDistance] + 30 then
+                        --If enemy cruiser within emergency defence range, and aren't avoiding cruisers, then also consider this (but not carriers)
+                        if not(bAvoidCruisers) and iNearestCruiserModDistance <= aiBrain[refiBomberDefenceModDistance] + 30 then
                             iCurPriority = iHighestPriorityFound
                             tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiser, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiBomberDefenceModDistance] * 2, 'Enemy')
                             if M27Utilities.IsTableEmpty(tPotentialTargets) == false then

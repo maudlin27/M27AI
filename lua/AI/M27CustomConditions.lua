@@ -132,7 +132,18 @@ function SafeToGetACUUpgrade(aiBrain)
         else
             --Have we been losing health quickly?
             local oACU = M27Utilities.GetACU(aiBrain)
-            if M27Utilities.IsACU(oACU) then
+            --Do we have at least 2 T2 PD nearby?
+            local tNearbyPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, oACU:GetPosition(), 20, 'Ally')
+            if M27Utilities.IsTableEmpty(tNearbyPD) == false and table.getn(tNearbyPD) >= 2 then
+                local iNearbyPD = 0
+                for iPD, oPD in tNearbyPD do
+                    if oPD:GetFractionComplete() >= 1 then
+                        iNearbyPD = iNearbyPD + 1
+                        if iNearbyPD >= 2 then bIsSafe = true break end
+                    end
+                end
+            end
+            if not(bIsSafe) and M27Utilities.IsACU(oACU) then
                 if not(ACUShouldRunFromBigThreat(aiBrain)) then
 
                     local iCurTime = math.floor(GetGameTimeSeconds())
@@ -460,12 +471,18 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                     local iUpgradeBuildTime = oBP.Enhancements[sUpgradeRef].BuildTime
                     local iUpgradeEnergyCost = oBP.Enhancements[sUpgradeRef].BuildCostEnergy
                     --Double the energy cost if its really high (so we are less likely to get it)
-                    if iUpgradeEnergyCost >= 250000 then iUpgradeEnergyCost = iUpgradeEnergyCost * 2 end
+
                     local iEnergyWanted = (iUpgradeEnergyCost / (iUpgradeBuildTime / iACUBuildRate)) * 0.1 * 1.2 --Want slight margin for error in case we're just inbetween building power
+                    if iUpgradeEnergyCost >= 250000 then iEnergyWanted = iEnergyWanted * 2 end
+
                     --Increase threshold if we want to eco
                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iEnergyWanted = iEnergyWanted * 2 end
                     --Aif our ACU isnt going gun due to not pathign to enemy base then wait until we have enough energy to indicate we have T2 power as well
                     if oACU[M27Overseer.refbACUCantPathAwayFromBase] and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then iEnergyWanted = math.max(iEnergyWanted, aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] + 10) end
+
+                    --Be more likely to get an upgrade if we are low health
+                    iEnergyWanted = iEnergyWanted * math.max(0.4, oACU:GetHealth() / oACU:GetMaxHealth())
+
 
                     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; iEnergyWanted='..iEnergyWanted) end
                     if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > iEnergyWanted then
@@ -477,8 +494,12 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                         --Increase threshold if we want to eco
                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
                             if M27Utilities.GetACU(aiBrain)[M27Overseer.refbACUCantPathAwayFromBase] then iMassIncomePerTickWanted = iMassIncomePerTickWanted * 4 end
-                            else iMassIncomePerTickWanted = iMassIncomePerTickWanted * 1.5
+                        else iMassIncomePerTickWanted = iMassIncomePerTickWanted * 1.5
                         end
+
+                        --Be more likely to upgrade if low health
+                        iMassIncomePerTickWanted = iMassIncomePerTickWanted * math.max(0.4, oACU:GetHealth() / oACU:GetMaxHealth())
+
 
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering if enough mass income to get upgrade; iMassIncomePerTickWanted='..iMassIncomePerTickWanted..'; iUpgradeMassCost='..iUpgradeMassCost..'; iUpgradeBuildTime='..iUpgradeBuildTime..'; iACUBuildRate='..iACUBuildRate..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; aiBrain:GetEconomyStored(MASS)='..aiBrain:GetEconomyStored('MASS')) end
                         if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= iMassIncomePerTickWanted and aiBrain:GetEconomyStored('MASS') >= 5 then --check we're not massively mass stalling

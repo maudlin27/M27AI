@@ -2258,7 +2258,8 @@ function RemoveSpareUnits(oPlatoon, iThreatNeeded, iMinScouts, iMinMAA, oPlatoon
                             oUnit[refiActualDistanceFromEnemy] = M27Utilities.GetDistanceBetweenPositions(tTargetMergePoint, oUnit:GetPosition())
                             else
                             M27Utilities.ErrorHandler('tUnitPos is nil; iCurUnit='..iCurUnit..'; oPlatoon plan+count='..oPlatoon:GetPlan()..oPlatoon[M27PlatoonUtilities.refiPlatoonCount])
-                            oUnit[refiActualDistanceFromEnemy] = 10000 end
+                            oUnit[refiActualDistanceFromEnemy] = 10000
+                        end
                     end
                     for iCurUnit, oUnit in M27Utilities.SortTableBySubtable(tUnits, refiActualDistanceFromEnemy, true) do
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurUnit='..iCurUnit..'; checking if unit is valid') end
@@ -3147,6 +3148,7 @@ function ThreatAssessAndRespond(aiBrain)
 
 
                         if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) == false then
+                            local tAirRallyPoint = M27AirOverseer.GetAirRallyPoint(aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': Number of available torp bombers='..table.getn(aiBrain[M27AirOverseer.reftAvailableTorpBombers])) end
                             --Determine closest available torpedo bombers (unless we should only target ACU)
                             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[refoLastNearestACU]) == true then
@@ -3183,8 +3185,8 @@ function ThreatAssessAndRespond(aiBrain)
 
 
                                 for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' within the curernt threat group. oUnit[refiActualDistanceFromEnemy]='..(oUnit[refiActualDistanceFromEnemy] or 'nil')..'; iMaxRangeToSendTorps='..(iMaxRangeToSendTorps or 'nil')) end
-                                    if not(bACUNeedsTorpSupport) or (oUnit[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (oUnit[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' within the curernt threat group. tTorpSubtable[refiActualDistanceFromEnemy]='..(tTorpSubtable[refiActualDistanceFromEnemy] or 'nil')..'; iMaxRangeToSendTorps='..(iMaxRangeToSendTorps or 'nil')) end
+                                    if not(bACUNeedsTorpSupport) or (tTorpSubtable[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (tTorpSubtable[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
                                         iAssignedThreatWanted = iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat]
                                         if EntityCategoryContains(categories.ANTIAIR, oUnit.UnitId) then iAssignedThreatWanted = iAssignedThreatWanted * 1.34 end
                                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iAssignedThreat='..(oUnit[iArmyIndex][refiAssignedThreat] or 0)..'; oUnit[iArmyIndex][refiUnitNavalAAThreat]='..(oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0)..'; iNavalThreatMaxFactor='..iNavalThreatMaxFactor..'; iAssignedThreatWanted='..iAssignedThreatWanted) end
@@ -3229,7 +3231,6 @@ function ThreatAssessAndRespond(aiBrain)
                 end
             end --for each tEnemyThreatGroup
         end
-
         if bDebugMessages == true then LOG(sFunctionRef..': Finished cycling through all tEnemyThreatGroups; end of overseer cycle') end
         --if bDebugMessages == true then LOG(sFunctionRef..': End of code - ACU state='..M27Logic.GetUnitState(M27Utilities.GetACU(aiBrain))) end
     else
@@ -3346,11 +3347,11 @@ function ThreatAssessAndRespond(aiBrain)
                         tCurDestination = oNavigator:GetCurrentTargetPos()
                     end
                 end
-            end
-            if bDebugMessages == true then LOG(sFunctionRef..': TorpBomber='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tCurDestination='..repr((tCurDestination or {'nil'}))..'; will attackmove to rally point if destination is too far from rally point. Rallypoint='..repr(tRallyPoint)..'; dist to rallypoint='..M27Utilities.GetDistanceBetweenPositions((tCurDestination or {0, 0, 0}), tRallyPoint)) end
-            if not(tCurDestination) or M27Utilities.GetDistanceBetweenPositions(tCurDestination, tRallyPoint) >= 10 then
-                IssueClearCommands({oUnit})
-                IssueAggressiveMove({oUnit}, tRallyPoint)
+                if bDebugMessages == true then LOG(sFunctionRef..': TorpBomber='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tCurDestination='..repr((tCurDestination or {'nil'}))..'; will attackmove to rally point if destination is too far from rally point. Rallypoint='..repr(tRallyPoint)..'; dist to rallypoint='..M27Utilities.GetDistanceBetweenPositions((tCurDestination or {0, 0, 0}), tRallyPoint)..'; oUnit[M27AirOverseer.refbOnAssignment]='..tostring(oUnit[M27AirOverseer.refbOnAssignment])) end
+                if not(tCurDestination) or M27Utilities.GetDistanceBetweenPositions(tCurDestination, tRallyPoint) >= 10 then
+                    IssueClearCommands({oUnit})
+                    IssueAggressiveMove({oUnit}, tRallyPoint)
+                end
             end
         end
     end
@@ -3918,7 +3919,7 @@ function ACUManager(aiBrain)
                             --Based on how our health has changed over the last 10s vs the upgrade progress, are we likely to die?
                             local iHealthLossPerSec = (oACU[reftACURecentHealth][iCurTime-10] - oACU[reftACURecentHealth][iCurTime])/10
                             if iHealthLossPerSec > 50 then --If changing these values, consider updating the SafeToGetACUUpgrade thresholds
-                                local iTimeToComplete = (1 - oACU[reftACURecentUpgradeProgress][iCurTime]) / ((oACU[reftACURecentUpgradeProgress][iCurTime] - oACU[reftACURecentUpgradeProgress][iCurTime - 10]) / 10)
+                                local iTimeToComplete = (1 - (oACU[reftACURecentUpgradeProgress][iCurTime] or 0.01)) / (math.max(((oACU[reftACURecentUpgradeProgress][iCurTime] or 0.01) - (oACU[reftACURecentUpgradeProgress][iCurTime - 10] or 0)), 0.01) / 10)
                                 local iHealthReduction = 0
                                 if not(M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) then iHealthReduction = 1000 end --If we are getting gun upgrade then we need some health post-upgrade to have any chance of surviving
                                 if aiBrain[refbEnemyACUNearOurs] then iHealthReduction = iHealthReduction + 1000 end
@@ -4363,14 +4364,13 @@ function SetMaximumFactoryLevels(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': iAirUnitsWanted='..iAirUnitsWanted..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
 
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill or aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
-            --Just build air factories if we have mass (assuming we have enough energy)
-            aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
+            --aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
             if aiBrain:GetEconomyStoredRatio('MASS') > 0.1 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 1 then
                 aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = iAirFactoriesOwned + 1
             else
                 aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, iAirFactoriesOwned)
             end
-            aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = 1
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = aiBrain[refiMinLandFactoryBeforeOtherTypes]
         end
 
         --Cap the number of land factories if we are building an experimental and have low mass
@@ -4485,11 +4485,15 @@ function DetermineInitialBuildOrder(aiBrain)
 
 
         if aiBrain[refiDistanceToNearestEnemyBase] >= 380 then
-            aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
+            if aiBrain[refiDistanceToNearestEnemyBase] <= 425 then
+                aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
+            else
+                aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
+            end
             aiBrain[M27AirOverseer.refiEngiHuntersToGet] = 2
         else
             aiBrain[M27AirOverseer.refiEngiHuntersToGet] = 1
-            aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
+            aiBrain[refiMinLandFactoryBeforeOtherTypes] = 3
         end
     else
         --Cant path to enemy base with land

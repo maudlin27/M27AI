@@ -1542,7 +1542,18 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                                         LOG(sFunctionRef..': About to send engineer units to be reassigned')
                                         --M27Utilities.ErrorHandler('Full audit trail of reassignengineer call', nil, true)
                                     end
-                                    M27EngineerOverseer.ReassignEngineers(aiBrain, false, tEngineerUnits)
+                                    local tEngisToReassign = {}
+                                    for iEngi, oEngi in tEngineerUnits do
+                                        if oEngi[M27EngineerOverseer.refiEngineerCurrentAction] then
+                                            M27EngineerOverseer.ReissueEngineerOldOrders(aiBrain, oEngi)
+                                        else
+                                            table.insert(tEngisToReassign, oEngi)
+                                        end
+                                    end
+                                    if M27Utilities.IsTableEmpty(tEngisToReassign) == false then
+                                        M27EngineerOverseer.ReassignEngineers(aiBrain, false, tEngisToReassign)
+                                    end
+
                                 end
                             end
                             if M27Utilities.IsTableEmpty(tCombatUnits) == false then
