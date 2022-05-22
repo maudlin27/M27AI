@@ -486,7 +486,9 @@ function CheckForUnseenKiller(aiBrain, oKilled, oKiller)
         --If unit dies, check if have intel on a nearby enemy, and if not then make it a high priority area for scouting
         --CanSeeUnit(aiBrain, oUnit, bTrueIfOnlySeeBlip)
         if oKiller.GetAIBrain then
-            if not (M27Utilities.CanSeeUnit(aiBrain, oKiller, true)) then
+            local bJustNeedBlip = true
+            if EntityCategoryContains(categories.INDIRECTFIRE * categories.LAND + categories.STRUCTURE, oKiller.UnitId) then bJustNeedBlip = false end
+            if not (M27Utilities.CanSeeUnit(aiBrain, oKiller, bJustNeedBlip)) then
                 MakeSegmentsAroundPositionHighPriority(aiBrain, oKilled:GetPosition(), 3)
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Unit died from unseen killer, so will flag to scout it sooner. Killed position='..repru(oKilled:GetPosition()))
@@ -2946,8 +2948,9 @@ function UpdateScoutingSegmentRequirements(aiBrain)
     else
 
         --Change scouting interval for enemy base once we have access to T3 air and decent mass income
-        if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 then
-            aiBrain[refiIntervalEnemyBase] = 80 - 40
+        if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12 then
+            aiBrain[refiIntervalEnemyBase] = math.max(40, 80 - (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - 10) * 4)
+            aiBrain[refiIntervalHighestPriority] = math.max(15, 30 - (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - 10) * 2)
         end
 
         --Update enemy base to lower of its current value and the value for an enemy base (as the primary enemy base location may be different to the start position)
@@ -7481,7 +7484,7 @@ function SetupAirOverseer(aiBrain)
     iSegmentVisualThresholdBoxSize2 = iAirSegmentSize * 3
 
     aiBrain[refiIntervalLowestPriority] = 300
-    aiBrain[refiIntervalHighestPriority] = 30
+    aiBrain[refiIntervalHighestPriority] = 30 --Note this is changed late game on high incomes
     aiBrain[refiIntervalMexNotBuiltOn] = 100
     aiBrain[refiIntervaPriorityMex] = 60
     aiBrain[refiIntervalEnemyMex] = 120

@@ -1603,7 +1603,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             elseif iCurrentConditionToTry == 8 then --No living air scouts - get more if have certain level of mass
                                 if bHavePowerForAir and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 5 or not(M27Conditions.HaveLowMass(aiBrain))) and aiBrain[M27AirOverseer.refiOurMassInAirAA] > 75 then
                                     local iCurAirScouts = aiBrain:GetCurrentUnits(refCategoryAirScout)
-                                    if iCurAirScouts == 0 or (iCurAirScouts <= 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and (iCurAirScouts <= 1 or iCurAirScouts < aiBrain:GetCurrentUnits(categories.EXPERIMENTAL) + 1)) then
+                                    if iCurAirScouts == 0 or (iCurAirScouts <= 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and (iCurAirScouts <= 1 or aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] >= 5 or iCurAirScouts < aiBrain:GetCurrentUnits(categories.EXPERIMENTAL) + 1)) then
                                         iCategoryToBuild = refCategoryAirScout
                                         iTotalWanted = 1
                                     end

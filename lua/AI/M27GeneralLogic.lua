@@ -4370,6 +4370,8 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         if oBestTarget then
                             tTarget = oBestTarget:GetPosition()
                             oBestTarget[M27EngineerOverseer.refiTMLShotsFired] = (oBestTarget[M27EngineerOverseer.refiTMLShotsFired] or 0) + 1
+                            oLauncher[M27EngineerOverseer.refoLastTMLTarget] = oBestTarget
+                            oLauncher[M27EngineerOverseer.refiLastTMLMassKills] = (oLauncher.Sync.totalMassKilled or 0)
                         end
                     end
                     if bDebugMessages == true then LOG(sFunctionRef..': iValidTargets='..iValidTargets..'; tTarget='..repru((tTarget or {'nil'}))) end

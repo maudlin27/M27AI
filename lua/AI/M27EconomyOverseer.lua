@@ -2123,7 +2123,8 @@ function RefreshEconomyData(aiBrain)
         iCheatMod = tonumber(ScenarioInfo.Options.CheatMult) or 2
     end
     aiBrain[refiEnergyGrossBaseIncome] = (iACUEnergy + iT3PowerCount * iEnergyT3Power + iT2PowerCount * iEnergyT2Power + iT1PowerCount * iEnergyT1Power + iHydroCount * iEnergyHydro) * iPerTickFactor * iCheatMod
-    aiBrain[refiEnergyNetBaseIncome] = aiBrain[refiEnergyGrossBaseIncome] - iEnergyUsage
+    --Net energy in theory is meant to ignore benefit of tree reclaim, however there are some flaws as sometimes especially late game it can show with a positive value despite trend being negative.  Will therefore use the lower of the two
+    aiBrain[refiEnergyNetBaseIncome] = math.min(aiBrain[refiEnergyGrossBaseIncome] - iEnergyUsage, aiBrain:GetEconomyTrend('ENERGY'))
     aiBrain[refiMassGrossBaseIncome] = (iACUMass + iT3MexMass * iT3MexCount + iT2MexMass * iT2MexCount + iT1MexMass * iT1MexCount + iStorageIncomeBoost) * iPerTickFactor * iCheatMod
     aiBrain[refiMassNetBaseIncome] = aiBrain[refiMassGrossBaseIncome] - iMassUsage
 
@@ -2213,10 +2214,12 @@ function UpgradeMainLoop(aiBrain)
                                                     oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryFixedShield * categories.TECH2, tStartPosition)
                                                 end
                                                 if oUnitToUpgrade == nil then
-                                                    --Consider whether to show an error message or not:
+                                                    --Consider whether to show an error message or not
+
+                                                --FOR DEBUG ONLY:
 
                                                     --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
-                                                    if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 100 then
+                                                    if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 150 then
                                                         --Do we have any T1 or T2 factories or mexes within 100 of our base? If not, then we have presumably run out of units to upgrade
                                                         local tNearbyUpgradables = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryMex - categories.TECH3 - categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 100, 'Ally')
                                                         if M27Utilities.IsTableEmpty(tNearbyUpgradables) == false then
@@ -2275,6 +2278,8 @@ function ManageEnergyStalls(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageEnergyStalls'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --if GetGameTimeSeconds() >= 1200 and aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.5 then bDebugMessages = true end
 
     local bPauseNotUnpause = true
     local bChangeRequired = false

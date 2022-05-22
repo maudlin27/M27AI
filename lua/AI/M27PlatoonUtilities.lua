@@ -347,7 +347,7 @@ function PlatoonMove(oPlatoon, tLocation)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonMove'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if oPlatoon:GetPlan() == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    --if oPlatoon:GetPlan() == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] and GetGameTimeSeconds() >= 400 then bDebugMessages = true end
 
     --Attackmove with indirect if theyre part of a platoon with DF units and arent running; for simplicity indirect fire units will be given both an attackorder, and then the default move order given to all platoon units, if the indirect+direct fire units is < the current units
@@ -401,10 +401,21 @@ function PlatoonMove(oPlatoon, tLocation)
         if ((oPlatoon[refiIndirectUnits] > 0 and oPlatoon[refiCurrentUnits] == oPlatoon[refiIndirectUnits]) or (oPlatoon[M27PlatoonTemplates.refbAttackMove]) and not(oPlatoon[refbHavePreviouslyRun])) then
             if oPlatoon[refiCurrentAction] == refActionTemporaryRetreat or oPlatoon[refiCurrentAction] == refActionKitingRetreat or oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionReturnToBase then
                 if bDebugMessages == true then LOG(sFunctionRef..': Platoon is retreating so in most cases will want to move instead of attack-move') end
-                --If we have T3 mobile arti then just attack-move due to deployment time, otherwise normal move if we have a run type action
+                --If we have T3 mobile arti then just attack-move due to deployment time unless are close to a firebase, otherwise normal move if we have a run type action
                 if oPlatoon[refiIndirectUnits] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryT3MobileArtillery, oPlatoon[reftIndirectUnits])) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': We have T3 mobile arti in platoon so will force an attackmove') end
+                    if bDebugMessages == true then LOG(sFunctionRef..': We have T3 mobile arti in platoon so will force an attackmove unless close to a firebase') end
                     bAttackMove = true
+                    local aiBrain = oPlatoon:GetBrain()
+                    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasePosition]) == false then
+                        local iDistToFirebase
+                        for iFirebaseRef, tFirebaseLocation in aiBrain[M27EngineerOverseer.reftFirebasePosition] do
+                            iDistToFirebase = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tFirebaseLocation)
+                            if iDistToFirebase <= 50 and iDistToFirebase >= 5 then
+                                bAttackMove = false
+                                break
+                            end
+                        end
+                    end
                 else
                     bAttackMove = false
                 end
@@ -2133,13 +2144,13 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local bProceed = true
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 1560 then bDebugMessages = true end
-    if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 1560 then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
-    --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 26 then bDebugMessages = true end
+    --if sPlatoonName == 'M27IndirectSpareAttacker' then bDebugMessages = true end
     --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = false end
@@ -3379,14 +3390,26 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                 --Do we have an escort that still has units in it (if not then there may be nearby enemies even if we cant see them)
                                                 if (oPlatoon[refiCurrentEscortThreat] or 0) <= (oPlatoon[refiEscortThreatWanted] or 0) * 0.3 then
                                                     --Do we have intel coverage?
+                                                    local bRetreatNotAttack = false
                                                     if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), math.min(40, iFrontUnitRange), false)) and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Below, oPlatoon[reftIndirectUnits])) == false then
                                                         if bDebugMessages == true then LOG(sFunctionRef..': Have some T2 or lower units so will retreat from enemies as either dont have sufficient escort, or dont have intel coverage') end
-                                                        oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
+                                                        bRetreatNotAttack = true
                                                     else
-                                                        --Likely have T3 mobile arti in platoon so just attack
-                                                        if bDebugMessages == true then LOG(sFunctionRef..': To get here we probably have T3 mobile arty in platoon although not always, so will just attack') end
-                                                        oPlatoon[refiCurrentAction] = refActionAttack
+                                                        --Likely have T3 mobile arti in platoon so just attack unless near a chokepoint/firebase
+                                                        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasePosition]) == false then
+                                                            local iDistToFirebase
+                                                            for iFirebaseRef, tFirebaseLocation in aiBrain[M27EngineerOverseer.reftFirebasePosition] do
+                                                                iDistToFirebase = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tFirebaseLocation)
+                                                                if iDistToFirebase <= 50 and iDistToFirebase >= 5 and (iDistToFirebase <= 25 or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))) then
+                                                                    if bDebugMessages == true then LOG(sFunctionRef..': Are near a firebase so will stay here') end
+                                                                    bRetreatNotAttack = true
+                                                                    break
+                                                                end
+                                                            end
+                                                        end
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': To get here we probably have T3 mobile arty in platoon although not always, so will just attack unless near a firebase. bRetreatNotAttack='..tostring(bRetreatNotAttack)) end
                                                     end
+                                                    if bRetreatNotAttack then oPlatoon[refiCurrentAction] = refActionTemporaryRetreat else oPlatoon[refiCurrentAction] = refActionAttack end
                                                 end
                                             end
                                         end
@@ -4889,7 +4912,7 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
-    if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 1560 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 1560 then bDebugMessages = true end
 
     if oACU:HasEnhancement('AdvancedEngineering') or oACU:HasEnhancement('T3Engineering') then
         if bDebugMessages == true then LOG(sFunctionRef..': ACU has access to T2 tech, if strategy is turtle will consider what to build. aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; M27Logic.IsTargetUnderShield(aiBrain, oACU, 8000, nil, false, false)='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oACU, 8000, nil, false, false))) end
@@ -5581,8 +5604,8 @@ function DeterminePlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 1560 then bDebugMessages = true end
-            if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 1560 then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
@@ -6592,7 +6615,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
 
         --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
         --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 then bDebugMessages = true end
-        if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+        --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
         --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
         --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
         --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -6914,9 +6937,6 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                             if M27UnitInfo.IsUnitValid(oUnit) then
                                                 bBigEnemyThreat = true
                                                 break
-                                            elseif oUnit.GetFractionComplete and oUnit:GetFractionComplete() >= 0.8 then
-                                                bBigEnemyThreat = true
-                                                break
                                             end
                                         end
                                     end
@@ -7136,7 +7156,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions, bCalledFromNewMovement
 
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 then bDebugMessages = true end
-    if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -8580,7 +8600,7 @@ function ProcessPlatoonAction(oPlatoon)
 
             --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
-            if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end

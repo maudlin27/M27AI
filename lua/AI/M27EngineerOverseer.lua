@@ -172,6 +172,8 @@ reftUnitsWantingTMD = 'M27EngineerUnitsWantingTMD' --[key] is the UnitId..Lifeti
 reftoTMLTargetsOfInterest = 'M27EngineerTMLTargetsOfInterest' --General targets based on our base rather than a specific TML we have (used to decide if want to build a TML)
 refiTimeOfLastTMLTargetRefresh = 'M27EngineerTimeOfLastTMLTargetRefresh' --Time we last refreshed the targetsofinterest
 refiTMLShotsFired = 'M27EngineerTMLShotsFired' --times we have fired TML at a unit
+refoLastTMLTarget = 'M27EngineerLastTMLTarget' --Against TML launcher, records the unit we last fired a missile at
+refiLastTMLMassKills = 'M27EngineerLastTMLMassKills' --Against TML Launcher, records mass kills when last fired a missile
 iTMLMissileRange = 256 --e.g. use if dont have access to a unit blueprint
 iTMLMinMissileRange = 15
 refiFirstTimeNoTargetsAvailable = 'M27EngineerFirstTimeNoTargetsAvailable' --For TML - Gametimeseconds so if its been a while of having no targets we can reclaim
@@ -2211,7 +2213,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     else
         tTargetLocation = nil
         if iGroupCycleCount >= math.max(5, iMaxCycles) then
-            M27Utilities.ErrorHandler('Failed to find a random place to build that engineer can path to after iGroupCycleCount='..iCycleAbortCount..' with iMaxCycles='..iMaxCycles..';, will check pathing and re-run this function if this is the first time')
+            M27Utilities.ErrorHandler('Failed to find a random place to build that engineer can path to after iGroupCycleCount='..iCycleAbortCount..' with iMaxCycles='..iMaxCycles..';, will check pathing and re-run this function if this is the first time', true)
             bDebugMessages = true --To help with errors
         end
 
@@ -3378,7 +3380,7 @@ function ConvertExperimentalRefToCategory(iExperimentalRef)
 end
 
 function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DecideOnExperimentalToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -5149,7 +5151,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                             aiBrain[reftUnitsWantingTMD][oTempUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTempUnit)] = nil
                                         end
 
-                                        M27Utilities.ErrorHandler('Failed to find a location to build at for oEngineer UC=' .. GetEngineerUniqueCount(oEngineer) .. '; Action=' .. iActionToAssign .. '; , switching to backup engineer logic')
+                                        M27Utilities.ErrorHandler('Failed to find a location to build at for oEngineer UC=' .. GetEngineerUniqueCount(oEngineer) .. '; Action=' .. iActionToAssign .. '; , switching to backup engineer logic.  This message is expected if there are lots of buildings near the target', true)
                                         aiBrain[refiTimeOfLastFailure][iActionToAssign] = GetGameTimeSeconds()
                                         tTargetLocation = oEngineer:GetPosition()
                                         iActionToAssign = refActionSpare
@@ -6329,7 +6331,7 @@ end
 
 function RefreshListOfFirebases(aiBrain, bForceRefresh)
     --Have there been any PD changes since we last checked or has it been a while since we last checked (e.g. in case things have changed like enemy indirect fire units or SML)?
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshListOfFirebases'
 
     local iRefreshInterval = 20
@@ -9560,7 +9562,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                                 --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore)
                                 if M27Utilities.IsTableEmpty(tActionTargetLocation) == true and oActionTargetObject == nil then
-                                    if bHaveEngisOfCurrentOrHigherTech and not(iActionToAssign == refActionReclaimUnit) then M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review if this happens repeatedly as normally shoudlnt have this happen - current examples are if want to assist a building but all of them have nearby enemies (or are factories that are idle), or if try to reclaim a unit that no longer has a position (this warning is hidden if the action was to reclaim a unit as a result though). iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry) end
+                                    if bHaveEngisOfCurrentOrHigherTech and not(iActionToAssign == refActionReclaimUnit) then M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review if this happens repeatedly for unexpected actions (examples where this triggers in line with expectations are if want to assist a building but all of them have nearby enemies (or are factories that are idle), or if try to reclaim a unit that no longer has a position (this warning is hidden if the action was to reclaim a unit as a result though). iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry, true) end
                                     iCurConditionEngiShortfall = iMaxEngisWanted - iExistingEngineersAssigned
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have no action target or object target, so unless anErrormessage has appeared we are just calculating how many engis we want to build; Total available T3 engis='..tiAvailableEngineersByTech[3]..'; repr of table of available engis by tech level='..repru(tiAvailableEngineersByTech)) end
                                 else

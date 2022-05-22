@@ -184,7 +184,7 @@ refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, 
 refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
 refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
 refWeaponPriorityTorpBomber = {refCategoryCruiser, refCategoryCruiserCarrier, refCategoryFrigate, refCategoryNavyThatCanBeTorpedoed}
-refWeaponPriorityT2Arti = {refCategoryFatboy, refCategoryIndirectT2Plus + M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryFixedShield + refCategoryNavalSurface, refCategoryStructure - categories.TECH1, refCategoryStructure + refCategoryLandCombat - categories.TECH1, categories.LAND - categories.BENIGN}
+refWeaponPriorityT2Arti = {refCategoryFatboy, refCategoryIndirectT2Plus + refCategoryFixedT2Arti, refCategoryFixedShield + refCategoryNavalSurface, refCategoryStructure - categories.TECH1, refCategoryStructure + refCategoryLandCombat - categories.TECH1, categories.LAND - categories.BENIGN}
 
 
 function GetUnitLifetimeCount(oUnit)

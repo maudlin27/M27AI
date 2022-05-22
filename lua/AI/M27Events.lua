@@ -64,11 +64,17 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
             if oKilledBrain.M27AI then
                 --were we killed by something?
                 local oKillerUnit
-                if instigator then
-                    if IsUnit(instigator) then
-                        oKillerUnit = instigator
+                if instigator and not(instigator.Dead) then
+                    if instigator.Launcher then
+                        oKillerUnit = instigator.Launcher
+                    elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
+                        --Can get errors for artillery shells when running IsProjectile
                     elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
-                        oKillerUnit = instigator.unit
+                        if instigator.unit then
+                            oKillerUnit = instigator.unit
+                        end
+                    elseif IsUnit(instigator) then
+                        oKillerUnit = instigator
                     end
                     if oKillerUnit and oKillerUnit.GetAIBrain then
                         M27AirOverseer.CheckForUnseenKiller(oKilledBrain, oUnitKilled, oKillerUnit)
@@ -93,11 +99,22 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                 end
             else
                 --Did a PD we own kill something?
-                if instigator and IsUnit(instigator) then
+                if instigator and not(instigator.Launcher) and instigator.UnitId and IsUnit(instigator) then
                     local oKillerBrain = instigator:GetAIBrain()
                     if oKillerBrain.M27AI then
                         if EntityCategoryContains(M27UnitInfo.refCategoryPD, instigator.UnitId) then
                             oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] = oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] + instigator.Sync.totalMassKilled or 0
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, instigator.UnitId) then
+                            --Did we kill something with a TML that wasnt our last target (so e.g. a unit might have managed to block the TML missile meaning we can try again)?
+                            if M27UnitInfo.IsUnitValid(instigator[M27EngineerOverseer.refoLastTMLTarget]) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': TML last target='..instigator[M27EngineerOverseer.refoLastTMLTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator[M27EngineerOverseer.refoLastTMLTarget])..'; shots fired at last target='..(instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0)..'; Mass killed currently='..instigator.Sync.totalMassKilled..'; mass killed when fired missile='..instigator[M27EngineerOverseer.refiLastTMLMassKills]) end
+                                --if instigator[M27EngineerOverseer.refiLastTMLMassKills] < (instigator.Sync.totalMassKilled or 0) and (instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0) > 0 then
+                                    --if bDebugMessages == true then LOG(sFunctionRef..': TML killed a unit that wasnt its last target so missile may have been blocked') end
+
+                                    --Allow to go to -1 to give a small margin for error incase e.g. the next time it is blocked by a higher health unit
+                                    instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] = math.max((instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 1) - 1, -1)
+                                --end
+                            end
                         end
                     end
                 end
@@ -280,6 +297,25 @@ function OnShieldBubbleDamaged(self, instigator)
                 else
                     --Not a priority shield, so do nothing
                 end
+
+                --Have we just taken damage from an unseen indirect unit?
+                local oKillerUnit
+                if instigator then
+                    if instigator.Launcher then
+                        oKillerUnit = instigator.Launcher
+                    elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
+                        --Can get errors for artillery shells when running IsProjectile
+                    elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
+                        if instigator.unit then
+                            oKillerUnit = instigator.unit
+                        end
+                    elseif IsUnit(instigator) then
+                        oKillerUnit = instigator
+                    end
+                        if M27UnitInfo.IsUnitValid(oKillerUnit) then
+                        M27AirOverseer.CheckForUnseenKiller(aiBrain, oShield, oKillerUnit)
+                    end
+                end
             end
         end
 
@@ -312,10 +348,16 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                             --Do we have a unit that damaged us?
                             local oUnitCausingDamage
                             if instigator then
-                                if IsUnit(instigator) then
-                                    oUnitCausingDamage = instigator
+                                if instigator.Launcher then
+                                    oUnitCausingDamage = instigator.Launcher
+                                elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
+                                    --Can get errors for artillery shells when running IsProjectile
                                 elseif IsProjectile(instigator) or IsCollisionBeam(instigator) then
-                                    oUnitCausingDamage = instigator.unit
+                                    if instigator.unit then
+                                        oUnitCausingDamage = instigator.unit
+                                    end
+                                elseif IsUnit(instigator) then
+                                    oUnitCausingDamage = instigator
                                 end
                                 if not(oUnitCausingDamage) and bDebugMessages == true then LOG(sFunctionRef..': Dont ahve a valid unit as instigator') end
 
@@ -381,7 +423,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                     end
                 end
             end
-            if instigator and IsUnit(instigator) and instigator.GetAIBrain and instigator:GetAIBrain().M27AI then
+            if instigator and not(instigator.Launcher) and IsUnit(instigator) and instigator.GetAIBrain and instigator:GetAIBrain().M27AI then
                 instigator[M27UnitInfo.refbRecentlyDealtDamage] = true
                 instigator[M27UnitInfo.refiGameTimeDamageLastDealt] = math.floor(GetGameTimeSeconds())
                 M27Utilities.DelayChangeVariable(instigator, M27UnitInfo.refbRecentlyDealtDamage, false, 5, M27UnitInfo.refiGameTimeDamageLastDealt, instigator[M27UnitInfo.refiGameTimeDamageLastDealt] + 1, nil, nil)
