@@ -41,7 +41,7 @@ function GetBombTarget(weapon, projectile)
 
 
 
-        LOG('Forked GetBombTarget target.tpos='..repr(target.tpos))
+        LOG('Forked GetBombTarget target.tpos='..repru(target.tpos))
     end--]]
 end
 
@@ -141,7 +141,7 @@ function CalculateBallisticAcceleration(weapon, projectile)
         -- store last acceleration in case target dies in the middle of carpet bomb run
         bomb_data[id].acc = acc
     end
-    LOG(sFunctionRef..': bomb_data='..repr(bomb_data)..'; proj.pos='..repr(proj.pos)..'; target.tpos='..repr(target.tpos)..'; target.pos='..repr(target.pos)..'; acc='..repr(acc))
+    LOG(sFunctionRef..': bomb_data='..repru(bomb_data)..'; proj.pos='..repru(proj.pos)..'; target.tpos='..repru(target.tpos)..'; target.pos='..repru(target.pos)..'; acc='..repru(acc))
     M27Utilities.DrawLocation(target.tpos, nil, 7, 20)
 
     return acc--]]

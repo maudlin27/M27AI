@@ -332,7 +332,7 @@ function TransportManager(aiBrain)
                     IssueClearCommands({oUnit})
                     M27AirOverseer.ClearAirUnitAssignmentTrackers(aiBrain, oUnit, true)
                     IssueMove({oUnit}, tRallyPoint)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Telling transport to return to rally point '..repr(tRallyPoint)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Telling transport to return to rally point '..repru(tRallyPoint)) end
                 end
             end
         end

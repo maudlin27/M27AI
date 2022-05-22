@@ -22,19 +22,19 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     if tUnitPosition[1] == tPositionToRunFrom[1] and tUnitPosition[3] == tPositionToRunFrom[3] then
         local aiBrain = oUnit:GetAIBrain()
         tRevisedPositionToRunFrom = M27Utilities.MoveTowardsTarget(tUnitPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 1, 0)
-        if bDebugMessages == true then LOG(sFunctionRef..': Unit position was the same as position to run from, so will run from enemy ase instead, tRevisedPositionToRunFrom='..repr(tRevisedPositionToRunFrom)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Unit position was the same as position to run from, so will run from enemy ase instead, tRevisedPositionToRunFrom='..repru(tRevisedPositionToRunFrom)) end
     else
-        if bDebugMessages == true then LOG(sFunctionRef..': Will try to run from '..repr(tPositionToRunFrom)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Will try to run from '..repru(tPositionToRunFrom)) end
         tRevisedPositionToRunFrom = tPositionToRunFrom
     end
 
 
     local tNewTargetIgnoringGrouping = M27Utilities.MoveTowardsTarget(tUnitPosition, tRevisedPositionToRunFrom, iDistanceToMove, 180)
-    if bDebugMessages == true then LOG(sFunctionRef..': tNewTargetIgnoringGrouping='..repr(tNewTargetIgnoringGrouping)..'; tUnitPosition='..repr(tUnitPosition)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': tNewTargetIgnoringGrouping='..repru(tNewTargetIgnoringGrouping)..'; tUnitPosition='..repru(tUnitPosition)) end
     --local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
     local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, true, false)
     if tNewTargetInSameGroup then
-        if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tNewTargetInSameGroup='..repr(tNewTargetInSameGroup)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tNewTargetInSameGroup='..repru(tNewTargetInSameGroup)) end
         IssueClearCommands({oUnit})
         IssueMove({oUnit}, tNewTargetInSameGroup)
         oUnit[M27UnitInfo.refbSpecialMicroActive] = true
@@ -87,7 +87,7 @@ function ForkedMoveInHalfCircle(oUnit, iTimeToRun, tPositionToRunFrom)
     end
     M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
 
-    if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; iAngleToTargetToEscape='..iAngleToTargetToEscape..'; iFacingAngleWanted='..iFacingAngleWanted..'; tUnitStartPosition='..repr(tUnitStartPosition)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; iAngleToTargetToEscape='..iAngleToTargetToEscape..'; iFacingAngleWanted='..iFacingAngleWanted..'; tUnitStartPosition='..repru(tUnitStartPosition)) end
     IssueClearCommands({oUnit})
     local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
     while not(iTempAngleDirectionToMove == iFacingAngleWanted) do
@@ -103,7 +103,7 @@ function ForkedMoveInHalfCircle(oUnit, iTimeToRun, tPositionToRunFrom)
         iTempDistanceAwayToMove = iTempDistanceAwayToMove + iDistanceIncreasePerCycle * iDistanceIncreasePerCycle * (iDistanceIncreaseCompoundFactor ^ iLoopCount - 1)
         tTempLocationToMove = M27Utilities.MoveInDirection(tUnitStartPosition, iTempAngleDirectionToMove, iTempDistanceAwayToMove)
         IssueMove({oUnit}, tTempLocationToMove)
-        if bDebugMessages == true then LOG(sFunctionRef..': tTempLocationToMove='..repr(tTempLocationToMove)..'; iTempAngleDirectionToMove='..iTempAngleDirectionToMove) end
+        if bDebugMessages == true then LOG(sFunctionRef..': tTempLocationToMove='..repru(tTempLocationToMove)..'; iTempAngleDirectionToMove='..iTempAngleDirectionToMove) end
     end
 
     --[[while (oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun) do
@@ -123,7 +123,7 @@ function ForkedMoveInHalfCircle(oUnit, iTimeToRun, tPositionToRunFrom)
 
         tTempLocationToMove = M27Utilities.MoveInDirection(oUnit:GetPosition(), iTempAngleDirectionToMove, iTempDistanceAwayToMove)
         IssueMove({oUnit}, tTempLocationToMove)
-        if bDebugMessages == true then LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; Just issued move order to '..repr(tTempLocationToMove)..'; iCurFacingDirection='..iCurFacingDirection..'; iTempAngleDirectionToMove='..iTempAngleDirectionToMove) end
+        if bDebugMessages == true then LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; Just issued move order to '..repru(tTempLocationToMove)..'; iCurFacingDirection='..iCurFacingDirection..'; iTempAngleDirectionToMove='..iTempAngleDirectionToMove) end
 
         WaitTicks(iTicksBetweenOrders)
     end--]]
@@ -188,7 +188,7 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
     if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
 
     if bRecentMicro == false and not(bDontClearCommandsFirst) then IssueClearCommands({oUnit}) end
-    if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; tUnitStartPosition='..repr(tUnitStartPosition)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; tUnitStartPosition='..repru(tUnitStartPosition)) end
     local iTempAngleDirectionToMove = iCurFacingDirection + iInitialAngleAdj * iAngleAdjFactor
     local iTempDistanceAwayToMove
     local bTimeToStop = false
@@ -224,7 +224,7 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
         tTempLocationToMove = M27Utilities.MoveInDirection(oUnit:GetPosition(), iTempAngleDirectionToMove, iTempDistanceAwayToMove)
 
         IssueMove({oUnit}, tTempLocationToMove)
-        if bDebugMessages == true then LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; Just issued move order to '..repr(tTempLocationToMove)..'; iCurFacingDirection='..iCurFacingDirection..'; iTempAngleDirectionToMove='..iTempAngleDirectionToMove) end
+        if bDebugMessages == true then LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; Just issued move order to '..repru(tTempLocationToMove)..'; iCurFacingDirection='..iCurFacingDirection..'; iTempAngleDirectionToMove='..iTempAngleDirectionToMove) end
 
         WaitTicks(iTicksBetweenOrders)
     end --]]
@@ -339,7 +339,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
         local iBomberArmyIndex = oBomber:GetAIBrain():GetArmyIndex()
 
         if bDebugMessages == true then
-            LOG(sFunctionRef..': oBomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Bomber position='..repr(oBomber:GetPosition())..'; tBombTarget='..repr(tBombTarget)..'; Dist between position and target='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tBombTarget)..'; Angle='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), tBombTarget)..'; Bomber facing direction='..M27UnitInfo.GetUnitFacingAngle(oBomber))
+            LOG(sFunctionRef..': oBomber='..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Bomber position='..repru(oBomber:GetPosition())..'; tBombTarget='..repru(tBombTarget)..'; Dist between position and target='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), tBombTarget)..'; Angle='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), tBombTarget)..'; Bomber facing direction='..M27UnitInfo.GetUnitFacingAngle(oBomber))
             M27Utilities.DrawLocation(tBombTarget, nil, 3, 20)
         end --black ring around target
 
@@ -453,7 +453,7 @@ function DodgeBombsFiredByUnit(oWeapon, oBomber)
     local iBomberArmyIndex = oBomber:GetAIBrain():GetArmyIndex()
 
     if bDebugMessages == true then
-        LOG(sFunctionRef..': tBombTarget='..repr(tBombTarget))
+        LOG(sFunctionRef..': tBombTarget='..repru(tBombTarget))
         M27Utilities.DrawLocation(tBombTarget, nil, 3, 20)
     end --black ring around target
 
@@ -754,7 +754,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                     end
                     oUnit[reftiAngleFromACUToUnit][aiBrain:GetArmyIndex()] = M27Utilities.GetAngleFromAToB(tUnitPosition, oUnit:GetPosition())
                     oUnit[reftiDistFromACUToUnit][aiBrain:GetArmyIndex()] = M27Utilities.GetDistanceBetweenPositions(tUnitPosition, oUnit:GetPosition())
-                    if bDebugMessages == true then LOG(sFunctionRef..': Angle from oUnit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to our ACU='..repr(oUnit[reftiAngleFromACUToUnit])..'; distance='..repr(oUnit[reftiDistFromACUToUnit])) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Angle from oUnit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to our ACU='..repru(oUnit[reftiAngleFromACUToUnit])..'; distance='..repru(oUnit[reftiDistFromACUToUnit])) end
                 end
             end
 
@@ -1214,10 +1214,10 @@ function HoverBombTarget(aiBrain, oBomber, oTarget)
                 --Below function should clear commands and then issue an attack
                 if bDebugMessages == true then
                     LOG(sFunctionRef..': Bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Target '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Time to wait between orders='..iTicksBetweenOrders..'; Distance away to move to='..iDistanceAwayToMove..'; iAngleAdjust='..iAngleAdjust..'; Bomber facing direction='..M27UnitInfo.GetUnitFacingAngle(oBomber)..'; Angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())..'; Distance from bomber to target='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition())..'; GameTime='..GetGameTimeSeconds())
-                    LOG(sFunctionRef..': Have valid bomber and target so will issue an attack order for the bomber to attack the target, unless we have a ground target. tGroundTarget='..repr((tGroundTarget or {'nil'})))
+                    LOG(sFunctionRef..': Have valid bomber and target so will issue an attack order for the bomber to attack the target, unless we have a ground target. tGroundTarget='..repru((tGroundTarget or {'nil'})))
                 end
                 if tGroundTarget then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Issuing attack order on ground='..repr(tGroundTarget)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Issuing attack order on ground='..repru(tGroundTarget)) end
                     oBomber[M27AirOverseer.reftGroundAttackLocation] = tGroundTarget
                     IssueClearCommands({oBomber})
                     IssueAttack({oBomber}, tGroundTarget)
@@ -1329,7 +1329,7 @@ function TurnAirUnitAndMoveToTarget(aiBrain, oBomber, tDirectionToMoveTo, iMaxAc
         oBomber[M27UnitInfo.refbSpecialMicroActive] = false
         IssueClearCommands({oBomber})
         IssueMove({oBomber}, tDirectionToMoveTo)
-        if bDebugMessages == true then LOG(sFunctionRef..': Just cleared bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' commands and told it to move to '..repr(tDirectionToMoveTo)..'; GameTime='..GetGameTimeSeconds()) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Just cleared bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' commands and told it to move to '..repru(tDirectionToMoveTo)..'; GameTime='..GetGameTimeSeconds()) end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -1396,7 +1396,7 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
         local iMaxDistanceAwayWanted = M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition()) * 3
         local iAngleAwayWanted = M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition()) + 180
         if iAngleAwayWanted > 360 then iAngleAwayWanted = iAngleAwayWanted - 360 end
-        iCurAngleDif = math.abs(iFacingDirection - iAngleAwayWanted)
+        iCurAngleDif = M27Utilities.GetAngleDifference(iFacingDirection, iAngleAwayWanted)
         local iMaxAcceptableAngleDif = 30
 
 
@@ -1549,10 +1549,10 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
                         --Below function should clear commands and then issue an attack
                         if bDebugMessages == true then
                             LOG(sFunctionRef..': Bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Target '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Time to wait between orders='..iTicksBetweenOrders..'; Distance away to move to='..iDistanceAwayToMove..'; iAngleAdjust='..iAngleAdjust..'; Bomber facing direction='..M27UnitInfo.GetUnitFacingAngle(oBomber)..'; Angle from bomber to target='..M27Utilities.GetAngleFromAToB(oBomber:GetPosition(), oTarget:GetPosition())..'; Distance from bomber to target='..M27Utilities.GetDistanceBetweenPositions(oBomber:GetPosition(), oTarget:GetPosition())..'; GameTime='..GetGameTimeSeconds())
-                            LOG(sFunctionRef..': Have valid bomber and target so will issue an attack order for the bomber to attack the target, unless we have a ground target. tGroundTarget='..repr((tGroundTarget or {'nil'})))
+                            LOG(sFunctionRef..': Have valid bomber and target so will issue an attack order for the bomber to attack the target, unless we have a ground target. tGroundTarget='..repru((tGroundTarget or {'nil'})))
                         end
                         if tGroundTarget then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Issuing attack order on ground='..repr(tGroundTarget)) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Issuing attack order on ground='..repru(tGroundTarget)) end
                             oBomber[M27AirOverseer.reftGroundAttackLocation] = tGroundTarget
                             IssueClearCommands({oBomber})
                             IssueAttack({oBomber}, tGroundTarget)

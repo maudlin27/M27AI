@@ -10,6 +10,7 @@ local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
+local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 
 
 local reftoCombatUnitsWaitingForAssignment = 'M27CombatUnitsWaitingForAssignment'
@@ -295,331 +296,340 @@ function CombatPlatoonFormer(aiBrain)
         --local tDFUnitsWaiting, tIndirectT1UnitsWaiting, tIndirectT2PlusUnitsWaiting, iDFUnitsWaiting, iIndirectT1UnitsWaiting, iIndirectT2PlusUnitsWaiting
 
         --if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then
-            if bDebugMessages == true then
-                LOG(sFunctionRef..': iUnitsWaiting='..iUnitsWaiting..'; About to list out every unit in tUnitsWaiting')
-                if M27Utilities.IsTableEmpty(tUnitsWaiting) == true then LOG('Table is empty')
-                else
-                    for iUnit, oUnit in tUnitsWaiting do
-                        local iUniqueID = M27UnitInfo.GetUnitLifetimeCount(oUnit)
-                        if iUniqueID == nil then iUniqueID = 0 end
-                        LOG('iUnit='..iUnit..'; Blueprint+UniqueCount='..oUnit.UnitId..iUniqueID)
-                    end
-                end
-            end
-
-
-            local iStrategy = aiBrain[M27Overseer.refiAIBrainCurrentStrategy]
-            local iCurrentConditionToTry = 1
-            local sPlatoonToForm, iRaiders, iDefenceCoverage, oPlatoonOrUnitToEscort
-            iDefenceCoverage = aiBrain[M27Overseer.refiPercentageOutstandingThreat]
-            if bDebugMessages == true then LOG(sFunctionRef..': iDefenceCoverage='..iDefenceCoverage..'; iStrategy='..iStrategy) end
-            local iCount = 0
-            while sPlatoonToForm == nil do
-                oPlatoonOrUnitToEscort = nil
-                iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
-                aiBrain[refbUsingTanksForPlatoons] = true
-                if iStrategy == M27Overseer.refStrategyLandEarly then
-                    if bDebugMessages == true then LOG(sFunctionRef..'We are using early land strategy, decide what platoon to form') end
-                    if iCurrentConditionToTry == 1 then --Initial land raiders
-                        if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] < aiBrain[M27Overseer.refiInitialRaiderPlatoonsWanted] then
-                            sPlatoonToForm = 'M27MexRaiderAI' end
-                    elseif iCurrentConditionToTry == 2 then --Emergency defence
-                        --iDefenceCoverage = aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]
-                        if iDefenceCoverage < 0.3 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
-                    elseif iCurrentConditionToTry == 3 then
-                        --Platoon escorts
-                        if bDebugMessages == true then LOG(sFunctionRef..': Checking if need escorts, IsTableEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftPlatoonsOrUnitsNeedingEscorts]))) end
-                        if M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftPlatoonsOrUnitsNeedingEscorts]) == false then
-                            oPlatoonOrUnitToEscort = GetPlatoonOrUnitToEscort(aiBrain)
-                            if oPlatoonOrUnitToEscort then sPlatoonToForm = 'M27EscortAI' end
-                        end
-                    elseif iCurrentConditionToTry == 4 then --1 active raider if can path to enemy base with amphibious
-                        aiBrain[M27PlatoonUtilities.refbNeedEscortUnits] = false --Have just gone through the escort conditions - if not allocated to it, then suggests we dont need any more units
-                        iRaiders = M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexLargerRaiderAI')
-                        if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders) end
-                        if iRaiders < 1 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
-                    elseif iCurrentConditionToTry == 5 then
-                        if iDefenceCoverage < 0.4 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])  then sPlatoonToForm = 'M27DefenderAI' end
-                    elseif iCurrentConditionToTry == 6 then
-                        if iRaiders < 2 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
-
-                    elseif iCurrentConditionToTry == 7 then
-                        if iRaiders < 3 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
-                    elseif iCurrentConditionToTry == 8 then
-                        if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
-                    elseif iCurrentConditionToTry == 9 then
-                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) and M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27LargeAttackForce') < 1 and (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3 or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= M27Overseer.iDistanceToEnemyEcoThreshold) then
-                            --Does the ACU need help? If not, then can form a large platoon
-                            local bACUNeedsHelp = false
-                            local oACU = M27Utilities.GetACU(aiBrain)
-                            if M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75 then
-                                local oComPlatoon = oACU.GetPlatoonHandle
-                                if oComPlatoon and oComPlatoon[M27PlatoonUtilities.refiEnemiesInRange] and oComPlatoon[M27PlatoonUtilities.refiEnemiesInRange] > 0 then
-                                    bACUNeedsHelp = true
-                                end
-                            end
-                            if bACUNeedsHelp == false then
-                                sPlatoonToForm = 'M27LargeAttackForce'
-                                if bDebugMessages == true then LOG(sFunctionRef..': Seeting platoon to form to be large attack force') end
-                            end
-                        end
-                    elseif iCurrentConditionToTry == 10 then
-                        if iRaiders < 5 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
-                    else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Dont meet any other conditions so will form attackenarestunit platoon') end
-                        sPlatoonToForm = 'M27AttackNearestUnits'
-                        aiBrain[refbUsingTanksForPlatoons] = false
-                        break
-                    end
-                elseif iStrategy == M27Overseer.refStrategyEcoAndTech or iStrategy == M27Overseer.refStrategyAirDominance then
-                    --Defend with coverage up to the max % value specified, and have 1 active raider
-                    if bDebugMessages == true then LOG(sFunctionRef..': Start of loop for eco strategy, iCurrentConditionToTry='..iCurrentConditionToTry) end
-                    aiBrain[refbUsingTanksForPlatoons] = true
-                    if iCurrentConditionToTry == 1 then --Emergency defence
-                        --iDefenceCoverage = aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]
-                        if iDefenceCoverage < 0.3 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
-                    elseif iCurrentConditionToTry == 2 then
-                        --Platoon escorts
-                        if bDebugMessages == true then LOG(sFunctionRef..': Checking if need escorts, IsTableEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftPlatoonsOrUnitsNeedingEscorts]))) end
-                        if M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftPlatoonsOrUnitsNeedingEscorts]) == false then
-                            oPlatoonOrUnitToEscort = GetPlatoonOrUnitToEscort(aiBrain)
-                            if oPlatoonOrUnitToEscort then sPlatoonToForm = 'M27EscortAI' end
-                        end
-                    elseif iCurrentConditionToTry == 3 then
-                        aiBrain[M27PlatoonUtilities.refbNeedEscortUnits] = false --Have just gone through the escort conditions - if not allocated to it, then suggests we dont need any more units
-                        if iDefenceCoverage < 0.5 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
-                    elseif iCurrentConditionToTry == 4 then --1 active raider
-                        iRaiders = M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexLargerRaiderAI')
-                        if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders) end
-                        if iRaiders < 1 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
-                    elseif iCurrentConditionToTry == 5 then
-                        if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
-                    else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Dont meet any other conditions so will form attackenarestunit platoon') end
-                        sPlatoonToForm = 'M27CombatPatrolAI'
-                        aiBrain[refbUsingTanksForPlatoons] = false
-                        break
-                    end
-                elseif iStrategy == M27Overseer.refStrategyACUKill then
-                    sPlatoonToForm = 'M27AttackNearestUnits'
-                elseif iStrategy == M27Overseer.refStrategyProtectACU then
-                    sPlatoonToForm = 'M27EscortAI'
-                    oPlatoonOrUnitToEscort = M27Utilities.GetACU(aiBrain).PlatoonHandle
-                else
-                    M27Utilities.ErrorHandler('Dont have a recognised strategy')
-                end
-                iCurrentConditionToTry = iCurrentConditionToTry + 1
-            end
-
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished looping throug hplatoon former conditions to work out what platoon to form. aiBrain[refbUsingTanksForPlatoons]='..tostring(aiBrain[refbUsingTanksForPlatoons])..'; sPlatoonToForm='..(sPlatoonToForm or 'nil')) end
-
-            if sPlatoonToForm == nil then
-                M27Utilities.ErrorHandler('Werent able to figure out a platoon for a combat unit to go into')
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': iUnitsWaiting='..iUnitsWaiting..'; About to list out every unit in tUnitsWaiting')
+            if M27Utilities.IsTableEmpty(tUnitsWaiting) == true then LOG('Table is empty')
             else
-                --Do we have enough units for this platoon?
-                local iMinSize = M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize]
-                if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry after increasing by 1='..iCurrentConditionToTry..'; sPlatoonWanted='..sPlatoonToForm..'; iMinSize='..iMinSize..'; iUnitsWaiting='..iUnitsWaiting) end
-                --Add combat patrol platoon to units that are waiting if we dont want to form a combat patrol platoon
-                if not(sPlatoonToForm == 'M27CombatPatrolAI') then
-                    if aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) and aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] > 0 and (aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiEnemiesInRange] or 0) <= 0 then
-                        --if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then iUnitsWaiting = table.getn(tUnitsWaiting) end
-                        for iUnit, oUnit in aiBrain[refoCombatPatrolPlatoon]:GetPlatoonUnits() do
-                            if M27UnitInfo.IsUnitValid(oUnit) then
-                                iUnitsWaiting = iUnitsWaiting + 1
-                                tUnitsWaiting[iUnitsWaiting] = oUnit
-                            end
-                        end
-                        bAreUsingCombatPatrolUnits = true
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have combat patrol units so setting units waiting to be the units in the combat patrol platoon. IsTableEmpty='..tostring(M27Utilities.IsTableEmpty(tUnitsWaiting))..'; iUnitsWaiting='..iUnitsWaiting) end
-                    end
+                for iUnit, oUnit in tUnitsWaiting do
+                    local iUniqueID = M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                    if iUniqueID == nil then iUniqueID = 0 end
+                    LOG('iUnit='..iUnit..'; Blueprint+UniqueCount='..oUnit.UnitId..iUniqueID)
                 end
+            end
+        end
 
 
+        local iStrategy = aiBrain[M27Overseer.refiAIBrainCurrentStrategy]
+        local iCurrentConditionToTry = 1
+        local sPlatoonToForm, iRaiders, iDefenceCoverage, oPlatoonOrUnitToEscort
+        iDefenceCoverage = aiBrain[M27Overseer.refiPercentageOutstandingThreat]
+        local iFirebasePercent = 1
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and aiBrain[M27MapInfo.reftChokepointBuildLocation] then
+            iFirebasePercent = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27MapInfo.reftChokepointBuildLocation]) / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': iDefenceCoverage='..iDefenceCoverage..'; iStrategy='..iStrategy) end
+        local iCount = 0
+        while sPlatoonToForm == nil do
+            oPlatoonOrUnitToEscort = nil
+            iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
+            aiBrain[refbUsingTanksForPlatoons] = true
+            if iStrategy == M27Overseer.refStrategyLandMain then
+                if bDebugMessages == true then LOG(sFunctionRef..'We are using early land strategy, decide what platoon to form') end
+                if iCurrentConditionToTry == 1 then --Initial land raiders
+                    if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] < aiBrain[M27Overseer.refiInitialRaiderPlatoonsWanted] then
+                        sPlatoonToForm = 'M27MexRaiderAI' end
+                elseif iCurrentConditionToTry == 2 then --Emergency defence
+                    --iDefenceCoverage = aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]
+                    if iDefenceCoverage < 0.3 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
+                elseif iCurrentConditionToTry == 3 then
+                    --Platoon escorts
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if need escorts, IsTableEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftPlatoonsOrUnitsNeedingEscorts]))) end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftPlatoonsOrUnitsNeedingEscorts]) == false then
+                        oPlatoonOrUnitToEscort = GetPlatoonOrUnitToEscort(aiBrain)
+                        if oPlatoonOrUnitToEscort then sPlatoonToForm = 'M27EscortAI' end
+                    end
+                elseif iCurrentConditionToTry == 4 then --1 active raider if can path to enemy base with amphibious
+                    aiBrain[M27PlatoonUtilities.refbNeedEscortUnits] = false --Have just gone through the escort conditions - if not allocated to it, then suggests we dont need any more units
+                    iRaiders = M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexLargerRaiderAI')
+                    if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders) end
+                    if iRaiders < 1 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                elseif iCurrentConditionToTry == 5 then
+                    if iDefenceCoverage < 0.4 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])  then sPlatoonToForm = 'M27DefenderAI' end
+                elseif iCurrentConditionToTry == 6 then
+                    if iRaiders < 2 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
 
-                if iUnitsWaiting >= iMinSize then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Checking whether we have a platoon/unit to escort or not. bAreUsingCombatPatrolUnits='..tostring(bAreUsingCombatPatrolUnits)) end
-                    --Are we an escort platoon?
-                    local tTemporaryUnitsWaitingForAssignment = {}
-                    local iTemporaryUnitsWaitingForAssignment = 0
-                    if oPlatoonOrUnitToEscort then
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef..': Have a platoon or unit to escort, will note its ID in a moment')
-                            if oPlatoonOrUnitToEscort.PlatoonHandle then LOG(oPlatoonOrUnitToEscort.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoonOrUnitToEscort))
-                            else LOG(oPlatoonOrUnitToEscort:GetPlan()..oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiPlatoonCount])
+                elseif iCurrentConditionToTry == 7 then
+                    if iRaiders < 3 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                elseif iCurrentConditionToTry == 8 then
+                    if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
+                elseif iCurrentConditionToTry == 9 then
+                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) and M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27LargeAttackForce') < 1 and (aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 3 or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= M27Overseer.iDistanceToEnemyEcoThreshold) then
+                        --Does the ACU need help? If not, then can form a large platoon
+                        local bACUNeedsHelp = false
+                        local oACU = M27Utilities.GetACU(aiBrain)
+                        if M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75 then
+                            local oComPlatoon = oACU.GetPlatoonHandle
+                            if oComPlatoon and oComPlatoon[M27PlatoonUtilities.refiEnemiesInRange] and oComPlatoon[M27PlatoonUtilities.refiEnemiesInRange] > 0 then
+                                bACUNeedsHelp = true
                             end
                         end
-                        --Determine if we want all of the units that are waiting for assignment
-                        --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride)
-                        if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU) then --If protecting ACU then want to assign every unit to ACU's escort
-                            local iThreatOfUnitsWaitingForAssignment = M27Logic.GetCombatThreatRating(aiBrain, tUnitsWaiting, false, nil, nil)
-                            local iExcessThreat = math.max(0, iThreatOfUnitsWaitingForAssignment + oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiCurrentEscortThreat] - oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiEscortThreatWanted])
-                            if bDebugMessages == true then LOG(sFunctionRef..': Will remove excess threat before forming the escort from waiting units. iExcessThreat='..iExcessThreat..'; iThreatOfUnitsWaitingForAssignment='..iThreatOfUnitsWaitingForAssignment..'; oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiCurrentEscortThreat]='..oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiCurrentEscortThreat]..'; oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiEscortThreatWanted]='..oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiEscortThreatWanted]) end
-                            if iExcessThreat > 100 then
-                                --Temporarily move spare units waiting for assignment into a different platoon until we've removing all spare units/threat
-                                local iCurLoopCount = 0
-                                local iCurUnitRef
-                                for iCurUnitRef = iUnitsWaiting, 1, -1 do
-                                --while iExcessThreat > 100 do
-                                    iCurLoopCount = iCurLoopCount + 1
-                                    if iCurLoopCount > 100 then M27Utilities.ErrorHandler('Likely infinite loop as have been through 100 units waiting for assignment') break
-                                    else
-                                        --iCurUnitRef = table.getn(tUnitsWaiting)
-                                        if iCurUnitRef <= 1 then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Only have 1 unit left in the table so will just assign a bit more threat unless its massively over; will list out every unit if we are stopping here; iUnitsWaiting='..iUnitsWaiting) end
-                                            if iExcessThreat < 5000 then
-                                                if bDebugMessages == true then
-                                                    for iUnit, oUnit in tUnitsWaiting do
-                                                        LOG(oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
-                                                    end
-                                                end
-                                                break
-                                            end
-                                        end
+                        if bACUNeedsHelp == false then
+                            sPlatoonToForm = 'M27LargeAttackForce'
+                            if bDebugMessages == true then LOG(sFunctionRef..': Seeting platoon to form to be large attack force') end
+                        end
+                    end
+                elseif iCurrentConditionToTry == 10 then
+                    if iRaiders < 5 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont meet any other conditions so will form attackenarestunit platoon') end
+                    sPlatoonToForm = 'M27AttackNearestUnits'
+                    aiBrain[refbUsingTanksForPlatoons] = false
+                    break
+                end
+            elseif iStrategy == M27Overseer.refStrategyEcoAndTech or iStrategy == M27Overseer.refStrategyAirDominance or iStrategy == M27Overseer.refStrategyTurtle then
+                --Defend with coverage up to the max % value specified, and have 1 active raider
+                if bDebugMessages == true then LOG(sFunctionRef..': Start of loop for eco strategy, iCurrentConditionToTry='..iCurrentConditionToTry) end
+                aiBrain[refbUsingTanksForPlatoons] = true
+                if iCurrentConditionToTry == 1 and iStrategy == M27Overseer.refStrategyTurtle then --Initial land raiders
+                    if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] < aiBrain[M27Overseer.refiInitialRaiderPlatoonsWanted] then
+                        sPlatoonToForm = 'M27MexRaiderAI' end
+                elseif iCurrentConditionToTry == 2 then --Emergency defence
+                    --iDefenceCoverage = aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]
+                    if iDefenceCoverage < math.min(0.3, iFirebasePercent) and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
+                elseif iCurrentConditionToTry == 3 then
+                    --Platoon escorts
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if need escorts, IsTableEmpty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftPlatoonsOrUnitsNeedingEscorts]))) end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftPlatoonsOrUnitsNeedingEscorts]) == false then
+                        oPlatoonOrUnitToEscort = GetPlatoonOrUnitToEscort(aiBrain)
+                        if oPlatoonOrUnitToEscort then sPlatoonToForm = 'M27EscortAI' end
+                    end
+                elseif iCurrentConditionToTry == 4 then
+                    aiBrain[M27PlatoonUtilities.refbNeedEscortUnits] = false --Have just gone through the escort conditions - if not allocated to it, then suggests we dont need any more units
+                    if iDefenceCoverage < math.min(0.5, iFirebasePercent) and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
+                elseif iCurrentConditionToTry == 5 then --1 active raider (unless relatively late game and are turtling)
+                    if not(iStrategy == M27Overseer.refStrategyTurtle) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] < 4 then
+                        iRaiders = M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexLargerRaiderAI')
+                        if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders) end
+                        if iRaiders < 1 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                    end
+                elseif iCurrentConditionToTry == 6 then
+                    if iDefenceCoverage < aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then sPlatoonToForm = 'M27DefenderAI' end
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont meet any other conditions so will form attackenarestunit platoon') end
+                    sPlatoonToForm = 'M27CombatPatrolAI'
+                    aiBrain[refbUsingTanksForPlatoons] = false
+                    break
+                end
+            elseif iStrategy == M27Overseer.refStrategyACUKill then
+                sPlatoonToForm = 'M27AttackNearestUnits'
+            elseif iStrategy == M27Overseer.refStrategyProtectACU then
+                sPlatoonToForm = 'M27EscortAI'
+                oPlatoonOrUnitToEscort = M27Utilities.GetACU(aiBrain).PlatoonHandle
+            else
+                M27Utilities.ErrorHandler('Dont have a recognised strategy')
+            end
+            iCurrentConditionToTry = iCurrentConditionToTry + 1
+        end
 
-                                        if bDebugMessages == true then LOG(sFunctionRef..': iCurLoopCount='..iCurLoopCount..'; iCurUnitRef='..iCurUnitRef) end
-                                        if tUnitsWaiting[iCurUnitRef] then
-                                            local iLastTableUnitThreat = M27Logic.GetCombatThreatRating(aiBrain, {tUnitsWaiting[iCurUnitRef]}, false, nil, nil)
-                                            if bDebugMessages == true then LOG(sFunctionRef..': iLastTableUnitThreat='..iLastTableUnitThreat..'; iExcessThreat='..iExcessThreat) end
-                                            if iLastTableUnitThreat > iExcessThreat then
-                                                break
-                                            else
-                                                iTemporaryUnitsWaitingForAssignment = iTemporaryUnitsWaitingForAssignment + 1
-                                                tTemporaryUnitsWaitingForAssignment[iTemporaryUnitsWaitingForAssignment] = tUnitsWaiting[iCurUnitRef]
-                                                table.remove(tUnitsWaiting, iCurUnitRef)
-                                                iExcessThreat = iExcessThreat - iLastTableUnitThreat
-                                                iUnitsWaiting = iUnitsWaiting - 1
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Removed unit from tUnitsWaiting, iExcessThreat after reducing for this='..iExcessThreat..'; size of tUnitsWaiting='..table.getn(tUnitsWaiting)) end
-                                                if M27Utilities.IsTableEmpty(tUnitsWaiting) == true then
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': No units left to assign as escort') end
-                                                    break
-                                                elseif iExcessThreat <= 0 then
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': Excess threat is below 0 now so wont remove anything further') end
-                                                    break
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished looping throug hplatoon former conditions to work out what platoon to form. aiBrain[refbUsingTanksForPlatoons]='..tostring(aiBrain[refbUsingTanksForPlatoons])..'; sPlatoonToForm='..(sPlatoonToForm or 'nil')) end
+
+        if sPlatoonToForm == nil then
+            M27Utilities.ErrorHandler('Werent able to figure out a platoon for a combat unit to go into')
+        else
+            --Do we have enough units for this platoon?
+            local iMinSize = M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize]
+            if bDebugMessages == true then LOG(sFunctionRef..': iCurrentConditionToTry after increasing by 1='..iCurrentConditionToTry..'; sPlatoonWanted='..sPlatoonToForm..'; iMinSize='..iMinSize..'; iUnitsWaiting='..iUnitsWaiting) end
+            --Add combat patrol platoon to units that are waiting if we dont want to form a combat patrol platoon
+            if not(sPlatoonToForm == 'M27CombatPatrolAI') then
+                if aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) and aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] > 0 and (aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiEnemiesInRange] or 0) <= 0 then
+                    --if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then iUnitsWaiting = table.getn(tUnitsWaiting) end
+                    for iUnit, oUnit in aiBrain[refoCombatPatrolPlatoon]:GetPlatoonUnits() do
+                        if M27UnitInfo.IsUnitValid(oUnit) then
+                            iUnitsWaiting = iUnitsWaiting + 1
+                            tUnitsWaiting[iUnitsWaiting] = oUnit
+                        end
+                    end
+                    bAreUsingCombatPatrolUnits = true
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have combat patrol units so setting units waiting to be the units in the combat patrol platoon. IsTableEmpty='..tostring(M27Utilities.IsTableEmpty(tUnitsWaiting))..'; iUnitsWaiting='..iUnitsWaiting) end
+                end
+            end
+
+
+
+            if iUnitsWaiting >= iMinSize then
+                if bDebugMessages == true then LOG(sFunctionRef..': Checking whether we have a platoon/unit to escort or not. bAreUsingCombatPatrolUnits='..tostring(bAreUsingCombatPatrolUnits)) end
+                --Are we an escort platoon?
+                local tTemporaryUnitsWaitingForAssignment = {}
+                local iTemporaryUnitsWaitingForAssignment = 0
+                if oPlatoonOrUnitToEscort then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Have a platoon or unit to escort, will note its ID in a moment')
+                        if oPlatoonOrUnitToEscort.PlatoonHandle then LOG(oPlatoonOrUnitToEscort.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoonOrUnitToEscort))
+                        else LOG(oPlatoonOrUnitToEscort:GetPlan()..oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiPlatoonCount])
+                        end
+                    end
+                    --Determine if we want all of the units that are waiting for assignment
+                    --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride)
+                    if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU) then --If protecting ACU then want to assign every unit to ACU's escort
+                        local iThreatOfUnitsWaitingForAssignment = M27Logic.GetCombatThreatRating(aiBrain, tUnitsWaiting, false, nil, nil)
+                        local iExcessThreat = math.max(0, iThreatOfUnitsWaitingForAssignment + oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiCurrentEscortThreat] - oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiEscortThreatWanted])
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will remove excess threat before forming the escort from waiting units. iExcessThreat='..iExcessThreat..'; iThreatOfUnitsWaitingForAssignment='..iThreatOfUnitsWaitingForAssignment..'; oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiCurrentEscortThreat]='..oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiCurrentEscortThreat]..'; oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiEscortThreatWanted]='..oPlatoonOrUnitToEscort[M27PlatoonUtilities.refiEscortThreatWanted]) end
+                        if iExcessThreat > 100 then
+                            --Temporarily move spare units waiting for assignment into a different platoon until we've removing all spare units/threat
+                            local iCurLoopCount = 0
+                            local iCurUnitRef
+                            for iCurUnitRef = iUnitsWaiting, 1, -1 do
+                                --while iExcessThreat > 100 do
+                                iCurLoopCount = iCurLoopCount + 1
+                                if iCurLoopCount > 100 then M27Utilities.ErrorHandler('Likely infinite loop as have been through 100 units waiting for assignment') break
+                                else
+                                    --iCurUnitRef = table.getn(tUnitsWaiting)
+                                    if iCurUnitRef <= 1 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Only have 1 unit left in the table so will just assign a bit more threat unless its massively over; will list out every unit if we are stopping here; iUnitsWaiting='..iUnitsWaiting) end
+                                        if iExcessThreat < 5000 then
+                                            if bDebugMessages == true then
+                                                for iUnit, oUnit in tUnitsWaiting do
+                                                    LOG(oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
                                                 end
                                             end
-                                        else break
+                                            break
                                         end
+                                    end
+
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurLoopCount='..iCurLoopCount..'; iCurUnitRef='..iCurUnitRef) end
+                                    if tUnitsWaiting[iCurUnitRef] then
+                                        local iLastTableUnitThreat = M27Logic.GetCombatThreatRating(aiBrain, {tUnitsWaiting[iCurUnitRef]}, false, nil, nil)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iLastTableUnitThreat='..iLastTableUnitThreat..'; iExcessThreat='..iExcessThreat) end
+                                        if iLastTableUnitThreat > iExcessThreat then
+                                            break
+                                        else
+                                            iTemporaryUnitsWaitingForAssignment = iTemporaryUnitsWaitingForAssignment + 1
+                                            tTemporaryUnitsWaitingForAssignment[iTemporaryUnitsWaitingForAssignment] = tUnitsWaiting[iCurUnitRef]
+                                            table.remove(tUnitsWaiting, iCurUnitRef)
+                                            iExcessThreat = iExcessThreat - iLastTableUnitThreat
+                                            iUnitsWaiting = iUnitsWaiting - 1
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Removed unit from tUnitsWaiting, iExcessThreat after reducing for this='..iExcessThreat..'; size of tUnitsWaiting='..table.getn(tUnitsWaiting)) end
+                                            if M27Utilities.IsTableEmpty(tUnitsWaiting) == true then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': No units left to assign as escort') end
+                                                break
+                                            elseif iExcessThreat <= 0 then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Excess threat is below 0 now so wont remove anything further') end
+                                                break
+                                            end
+                                        end
+                                    else break
                                     end
                                 end
                             end
-                        elseif bDebugMessages == true then LOG(sFunctionRef..': Strategy is to protect ACU so dont want to reduce number of units assigned to the escort')
                         end
-                    elseif bDebugMessages == true then LOG(sFunctionRef..': Dont have a platoon or unit to escort')
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': Strategy is to protect ACU so dont want to reduce number of units assigned to the escort')
                     end
-                    --if not(bAreUsingCombatPatrolUnits) or not(sPlatoonToForm == 'M27CombatPatrolAI') then
-                        --if bDebugMessages == true then LOG(sFunctionRef..': Arent using combat patrol units or platoon to form isnt the combat patrol AI') end
-                        if oPlatoonOrUnitToEscort and oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon] and aiBrain:PlatoonExists(oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon]) then
-                            --Add to existing platoon
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have a platoon or unit to escort that already has an assigned escort so will assign units to existing escort') end
-                            aiBrain:AssignUnitsToPlatoon(oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon], tUnitsWaiting, 'Attack', 'GrowthFormation')
-                        elseif sPlatoonToForm == 'M27CombatPatrolAI' then
-                            if bDebugMessages == true then LOG(sFunctionRef..': want to use a combat patrol platoon; will see if we already have one and if so add units to that') end
-                            if aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) then
-                                aiBrain:AssignUnitsToPlatoon(aiBrain[refoCombatPatrolPlatoon], tUnitsWaiting, 'Attack', 'GrowthFormation')
-                                if bDebugMessages == true then LOG(sFunctionRef..': Platoon already exists so have just assigned tUnitsWaiting to the combat patrol platoon, plan='..aiBrain[refoCombatPatrolPlatoon]:GetPlan()..(aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiPlatoonCount] or 'nil')) end
-                            else
-                                aiBrain[refoCombatPatrolPlatoon] = CreatePlatoon(aiBrain, sPlatoonToForm, tUnitsWaiting)
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have created a new platoon for the waiting units to join') end
-                            end
-                        else
-                            if M27Utilities.IsTableEmpty(tUnitsWaiting) == true then
-                                M27Utilities.ErrorHandler('tUnitsWaiting is nil, wont form a platoon afterall')
-                            else
-                                if bDebugMessages == true then LOG(sFunctionRef..': Creating new platoon and assigning units to it') end
-                                local oNewPlatoon = CreatePlatoon(aiBrain, sPlatoonToForm, tUnitsWaiting)
-                                if oPlatoonOrUnitToEscort then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': oPlatoonOrUnitToEscort doesnt have an escorting platoon assigned to it') end
-                                    oNewPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oPlatoonOrUnitToEscort
-                                    oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon] = oNewPlatoon
-                                end
-                            end
-                        end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Will update units that were flagged as waiting for assignment to say they are no longer waiting for assignment, and then clear the table of units waiting for assignment') end
-                        for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
-                            oUnit[refbWaitingForAssignment] = false
-                        end
-                        aiBrain[reftoCombatUnitsWaitingForAssignment] = {}
-                        --Did we have too many units for assignment? If so then move spare ones back to be waiting for assignment
-                        if iTemporaryUnitsWaitingForAssignment > 0 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': We had too many units for assignment, so will now add any spare units back to be waiting for assignment. iTemporaryUnitsWaitingForAssignment='..iTemporaryUnitsWaitingForAssignment) end
-                            if not(bAreUsingCombatPatrolUnits) then
-                                for iUnit, oUnit in tTemporaryUnitsWaitingForAssignment do
-                                    aiBrain[reftoCombatUnitsWaitingForAssignment][iUnit] = oUnit
-                                end
-                            end
-                        end
-                    --end
-                else
-                    --Get the units that are waiting to move to the rally point nearest the enemy
-                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough units for min size, iUnitsWaiting='..iUnitsWaiting..'; iMinSize='..iMinSize..' so will send them to intel path temporarily') end
-                    if aiBrain[M27Overseer.refbIntelPathsGenerated] == true then
-                        --[[local iIntelPathPoint = aiBrain[M27Overseer.refiCurIntelLineTarget]
-                        if iIntelPathPoint == nil then iIntelPathPoint = 1
-                        else
-                            iIntelPathPoint = iIntelPathPoint - 2
-                            if iIntelPathPoint <= 0 then iIntelPathPoint = 1 end
-                        end
-                        local tTargetPosition = aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint][1]
-                        --]]
-                        local tTargetPosition = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                        --Modify position if its close to a factory
-                        --[[local iCurLoop = 0
-                        local iMaxLoop = 10
-                        local tBasePosition = {tTargetPosition[1], tTargetPosition[2], tTargetPosition[3]}
-                        if M27Utilities.IsTableEmpty(tBasePosition) == true then
-                            M27Utilities.ErrorHandler('tBasePosition is empty, will give logs to help figure out why and set the rally point to our start position')
-                            if aiBrain[M27Overseer.refiCurIntelLineTarget] then
-                                LOG('aiBrain[M27Overseer.refiCurIntelLineTarget]='..aiBrain[M27Overseer.refiCurIntelLineTarget])
-                            else LOG('aiBrain[M27Overseer.refiCurIntelLineTarget] is nil')
-                            end
-                            if iIntelPathPoint == nil then LOG('iIntelPathPoint is nil') else LOG('iIntelPathPoint='..iIntelPathPoint) end
-                            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint]) == true then
-                                LOG('reftIntelLinePositions is empty for iIntelPathPoint '..iIntelPathPoint)
-                            else
-                                LOG('aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathCurTarget] isnt empty, will now check the first point in it')
-                                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint][1]) == true then
-                                    LOG('intel path point 1 is empty')
-                                else LOG('Intel path point 1='..repr(aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint][1]))
-                                end
-                            end
-                            local tStartPoint = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-                            tBasePosition = {tStartPoint[1], tStartPoint[2], tStartPoint[3]}
-                        end
-
-                        local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
-                        local bHaveValidLocation = false
-                        local oPathingUnitExample = aiBrain[reftoCombatUnitsWaitingForAssignment][1]
-                        local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnitExample)
-                        local iStartSegmentX, iStartSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tBasePosition)
-                        local iBaseGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iStartSegmentX, iStartSegmentZ)
-                        local iNewPositionGroup = iBaseGroup
-                        local iNewPositionSegmentX, iNewPositionSegmentZ
-                        while bHaveValidLocation == false do
-                            if iNewPositionGroup == iBaseGroup and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandFactory, tTargetPosition, 8, 'Ally'))==true then
-                                bHaveValidLocation = true
-                                break
-                            else
-                                iCurLoop = iCurLoop + 1
-                                if iCurLoop > iMaxLoop then M27Utilities.ErrorHandler('Infinite loop') break end
-                                --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
-                                tTargetPosition = M27Utilities.MoveTowardsTarget(tBasePosition, tEnemyStartPosition, 5 * iCurLoop, 0)
-                                iNewPositionSegmentX, iNewPositionSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tTargetPosition)
-                                iNewPositionGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iNewPositionSegmentX, iNewPositionSegmentZ)
-                            end
-                        end --]]
-                        if M27Utilities.IsTableEmpty(tTargetPosition) == false then
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to clear commands for all units waiting for assignment to a platoon and tell them to move to '..repr(tTargetPosition)) end
-                            IssueClearCommands(aiBrain[reftoCombatUnitsWaitingForAssignment])
-                            IssueMove(aiBrain[reftoCombatUnitsWaitingForAssignment], tTargetPosition)
-                            if M27Config.M27ShowUnitNames == true then M27PlatoonUtilities.UpdateUnitNames(aiBrain[reftoCombatUnitsWaitingForAssignment], 'WaitingToForm '..sPlatoonToForm) end
-                        else M27Utilities.ErrorHandler('target position doesnt exist')
-                        end
-
+                elseif bDebugMessages == true then LOG(sFunctionRef..': Dont have a platoon or unit to escort')
+                end
+                --if not(bAreUsingCombatPatrolUnits) or not(sPlatoonToForm == 'M27CombatPatrolAI') then
+                --if bDebugMessages == true then LOG(sFunctionRef..': Arent using combat patrol units or platoon to form isnt the combat patrol AI') end
+                if oPlatoonOrUnitToEscort and oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon] and aiBrain:PlatoonExists(oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon]) then
+                    --Add to existing platoon
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a platoon or unit to escort that already has an assigned escort so will assign units to existing escort') end
+                    aiBrain:AssignUnitsToPlatoon(oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon], tUnitsWaiting, 'Attack', 'GrowthFormation')
+                elseif sPlatoonToForm == 'M27CombatPatrolAI' then
+                    if bDebugMessages == true then LOG(sFunctionRef..': want to use a combat patrol platoon; will see if we already have one and if so add units to that') end
+                    if aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) then
+                        aiBrain:AssignUnitsToPlatoon(aiBrain[refoCombatPatrolPlatoon], tUnitsWaiting, 'Attack', 'GrowthFormation')
+                        if bDebugMessages == true then LOG(sFunctionRef..': Platoon already exists so have just assigned tUnitsWaiting to the combat patrol platoon, plan='..aiBrain[refoCombatPatrolPlatoon]:GetPlan()..(aiBrain[refoCombatPatrolPlatoon][M27PlatoonUtilities.refiPlatoonCount] or 'nil')) end
                     else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Dont have intel path generated yet so wont try to move to a new rally point') end
+                        aiBrain[refoCombatPatrolPlatoon] = CreatePlatoon(aiBrain, sPlatoonToForm, tUnitsWaiting)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have created a new platoon for the waiting units to join') end
+                    end
+                else
+                    if M27Utilities.IsTableEmpty(tUnitsWaiting) == true then
+                        M27Utilities.ErrorHandler('tUnitsWaiting is nil, wont form a platoon afterall')
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Creating new platoon and assigning units to it') end
+                        local oNewPlatoon = CreatePlatoon(aiBrain, sPlatoonToForm, tUnitsWaiting)
+                        if oPlatoonOrUnitToEscort then
+                            if bDebugMessages == true then LOG(sFunctionRef..': oPlatoonOrUnitToEscort doesnt have an escorting platoon assigned to it') end
+                            oNewPlatoon[M27PlatoonUtilities.refoPlatoonOrUnitToEscort] = oPlatoonOrUnitToEscort
+                            oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon] = oNewPlatoon
+                        end
                     end
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': Will update units that were flagged as waiting for assignment to say they are no longer waiting for assignment, and then clear the table of units waiting for assignment') end
+                for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
+                    oUnit[refbWaitingForAssignment] = false
+                end
+                aiBrain[reftoCombatUnitsWaitingForAssignment] = {}
+                --Did we have too many units for assignment? If so then move spare ones back to be waiting for assignment
+                if iTemporaryUnitsWaitingForAssignment > 0 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': We had too many units for assignment, so will now add any spare units back to be waiting for assignment. iTemporaryUnitsWaitingForAssignment='..iTemporaryUnitsWaitingForAssignment) end
+                    if not(bAreUsingCombatPatrolUnits) then
+                        for iUnit, oUnit in tTemporaryUnitsWaitingForAssignment do
+                            aiBrain[reftoCombatUnitsWaitingForAssignment][iUnit] = oUnit
+                        end
+                    end
+                end
+                --end
+            else
+                --Get the units that are waiting to move to the rally point nearest the enemy
+                if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough units for min size, iUnitsWaiting='..iUnitsWaiting..'; iMinSize='..iMinSize..' so will send them to intel path temporarily') end
+                if aiBrain[M27Overseer.refbIntelPathsGenerated] == true then
+                    --[[local iIntelPathPoint = aiBrain[M27Overseer.refiCurIntelLineTarget]
+                    if iIntelPathPoint == nil then iIntelPathPoint = 1
+                    else
+                        iIntelPathPoint = iIntelPathPoint - 2
+                        if iIntelPathPoint <= 0 then iIntelPathPoint = 1 end
+                    end
+                    local tTargetPosition = aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint][1]
+                    --]]
+                    local tTargetPosition = M27Logic.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                    --Modify position if its close to a factory
+                    --[[local iCurLoop = 0
+                    local iMaxLoop = 10
+                    local tBasePosition = {tTargetPosition[1], tTargetPosition[2], tTargetPosition[3]}
+                    if M27Utilities.IsTableEmpty(tBasePosition) == true then
+                        M27Utilities.ErrorHandler('tBasePosition is empty, will give logs to help figure out why and set the rally point to our start position')
+                        if aiBrain[M27Overseer.refiCurIntelLineTarget] then
+                            LOG('aiBrain[M27Overseer.refiCurIntelLineTarget]='..aiBrain[M27Overseer.refiCurIntelLineTarget])
+                        else LOG('aiBrain[M27Overseer.refiCurIntelLineTarget] is nil')
+                        end
+                        if iIntelPathPoint == nil then LOG('iIntelPathPoint is nil') else LOG('iIntelPathPoint='..iIntelPathPoint) end
+                        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint]) == true then
+                            LOG('reftIntelLinePositions is empty for iIntelPathPoint '..iIntelPathPoint)
+                        else
+                            LOG('aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathCurTarget] isnt empty, will now check the first point in it')
+                            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint][1]) == true then
+                                LOG('intel path point 1 is empty')
+                            else LOG('Intel path point 1='..repru(aiBrain[M27Overseer.reftIntelLinePositions][iIntelPathPoint][1]))
+                            end
+                        end
+                        local tStartPoint = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                        tBasePosition = {tStartPoint[1], tStartPoint[2], tStartPoint[3]}
+                    end
+
+                    local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                    local bHaveValidLocation = false
+                    local oPathingUnitExample = aiBrain[reftoCombatUnitsWaitingForAssignment][1]
+                    local sPathing = M27UnitInfo.GetUnitPathingType(oPathingUnitExample)
+                    local iStartSegmentX, iStartSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tBasePosition)
+                    local iBaseGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iStartSegmentX, iStartSegmentZ)
+                    local iNewPositionGroup = iBaseGroup
+                    local iNewPositionSegmentX, iNewPositionSegmentZ
+                    while bHaveValidLocation == false do
+                        if iNewPositionGroup == iBaseGroup and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandFactory, tTargetPosition, 8, 'Ally'))==true then
+                            bHaveValidLocation = true
+                            break
+                        else
+                            iCurLoop = iCurLoop + 1
+                            if iCurLoop > iMaxLoop then M27Utilities.ErrorHandler('Infinite loop') break end
+                            --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
+                            tTargetPosition = M27Utilities.MoveTowardsTarget(tBasePosition, tEnemyStartPosition, 5 * iCurLoop, 0)
+                            iNewPositionSegmentX, iNewPositionSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tTargetPosition)
+                            iNewPositionGroup = M27MapInfo.GetSegmentGroupOfTarget(sPathing, iNewPositionSegmentX, iNewPositionSegmentZ)
+                        end
+                    end --]]
+                    if M27Utilities.IsTableEmpty(tTargetPosition) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to clear commands for all units waiting for assignment to a platoon and tell them to move to '..repru(tTargetPosition)) end
+                        IssueClearCommands(aiBrain[reftoCombatUnitsWaitingForAssignment])
+                        IssueMove(aiBrain[reftoCombatUnitsWaitingForAssignment], tTargetPosition)
+                        if M27Config.M27ShowUnitNames == true then M27PlatoonUtilities.UpdateUnitNames(aiBrain[reftoCombatUnitsWaitingForAssignment], 'WaitingToForm '..sPlatoonToForm) end
+                    else M27Utilities.ErrorHandler('target position doesnt exist')
+                    end
+
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have intel path generated yet so wont try to move to a new rally point') end
+                end
             end
+        end
         --end
         --Are we still using units, but are using them from the combat patrol platoon and still ahve units left in this platoon?
         if bAreUsingCombatPatrolUnits and aiBrain[refbUsingTanksForPlatoons] == true and aiBrain[refoCombatPatrolPlatoon] and aiBrain:PlatoonExists(aiBrain[refoCombatPatrolPlatoon]) and M27Utilities.IsTableEmpty(aiBrain[refoCombatPatrolPlatoon]:GetPlatoonUnits()) == false then
@@ -977,11 +987,11 @@ function MAAPlatoonFormer(aiBrain, tMAA)
     if aiBrain[refoMAABasePatrolPlatoon] == nil or (aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] or 0) == 0 then
         oPlatoonToAddTo = CreatePlatoon(aiBrain, 'M27MAAPatrol', tMAA)
         oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard] = aiBrain[M27MapInfo.reftRallyPoints][1]
-        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the base MAA platoon and set location to guard='..repr(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the base MAA platoon and set location to guard='..repru(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
     elseif aiBrain[refoMAARallyPatrolPlatoon] == nil or (aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] or 0) == 0 then
         oPlatoonToAddTo = CreatePlatoon(aiBrain, 'M27MAAPatrol', tMAA)
         oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard] = M27MapInfo.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the rally point MAA platoon and set location to guard='..repr(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the rally point MAA platoon and set location to guard='..repru(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
     else
         --Which platoon needs more MAA if we want 60:40 ratio for base:rally point?
         if aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiPlatoonThreatValue] * 0.6 < aiBrain[refoMAARallyPatrolPlatoon][M27PlatoonUtilities.refiPlatoonThreatValue] * 0.4 then
@@ -1363,7 +1373,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                                 elseif iCurDistanceFromStartPosition > iDistToLookAtRect then
                                     --See if the unit is one of those in a rect of the land factory
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef..': Checking all units in a rect of the land factory='..repr(rRect))
+                                        LOG(sFunctionRef..': Checking all units in a rect of the land factory='..repru(rRect))
                                         --M27Utilities.DrawRectangle(rRect, 2, 10)
                                     end
                                     tUnitsInRect = GetUnitsInRect(rRect)
@@ -1397,7 +1407,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                                 local oNavigator = oNewUnit:GetNavigator()
                                 if oNavigator.GetCurrentTargetPos then
                                     local tCurTarget = oNavigator:GetCurrentTargetPos()
-                                    if bDebugMessages == true then LOG(sFunctionRef..': tCurTarget='..repr(tCurTarget)..'; Unitposition='..repr(tOrigPosition)) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': tCurTarget='..repru(tCurTarget)..'; Unitposition='..repru(tOrigPosition)) end
 
                                     if math.abs(tOrigPosition[1] - tCurTarget[1]) > 10 or math.abs(tOrigPosition[3] - tCurTarget[3]) > 10 then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Unit is already moving far away from the factory so dont try to reissue it any commands') end
@@ -1405,7 +1415,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                                     else
                                         if oNavigator.GetGoalPos then
                                             local tGoalTarget = oNavigator:GetGoalPos()
-                                            if bDebugMessages == true then LOG(sFunctionRef..': tGoalTarget='..repr(tGoalTarget)..'; Unitposition='..repr(tOrigPosition)) end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': tGoalTarget='..repru(tGoalTarget)..'; Unitposition='..repru(tOrigPosition)) end
                                             if math.abs(tOrigPosition[1] - tGoalTarget[1]) > 10 or math.abs(tOrigPosition[3] - tGoalTarget[3]) > 10 then
                                                 bReissueExistingMoveToPlatoon = false
                                             end
@@ -1494,7 +1504,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                                 LOG(sFunctionRef..': About to reissue movement path')
                                 LOG('Platoon name='..oNewUnit.PlatoonHandle:GetPlan())
                                 LOG('UnitId='..oNewUnit.UnitId)
-                                LOG('movement path='..repr(oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath]))
+                                LOG('movement path='..repru(oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath]))
                             end
                             for iMovementPath, tMovementTarget in oNewUnit.PlatoonHandle[M27PlatoonUtilities.reftMovementPath] do
                                 IssueMove(tPlatoonUnits, tMovementTarget)
@@ -1534,7 +1544,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                                 --Is this an engineer that has been assigned to build a T3 mex on a delay? If so then reissue its command instead of reassigning it
 
                                 if table.getn(tEngineerUnits) == 1 and M27UnitInfo.IsUnitValid(tEngineerUnits[1]) and tEngineerUnits[1][M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildT3MexOverT2 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])]) == false and aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.refbPrimaryBuilder] == true then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have just cleared actions and were going to call reassignengineers for engineer '..M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])..'; however its action is to build a T3 mex over T2, given the time delay on this will tell it to move to its old target and also to build a mex there so should work either way. refEngineerAssignmentActualLocation='..repr(aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.refEngineerAssignmentActualLocation])) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have just cleared actions and were going to call reassignengineers for engineer '..M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])..'; however its action is to build a T3 mex over T2, given the time delay on this will tell it to move to its old target and also to build a mex there so should work either way. refEngineerAssignmentActualLocation='..repru(aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.refEngineerAssignmentActualLocation])) end
                                     IssueMove({tEngineerUnits[1]}, aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.refEngineerAssignmentActualLocation])
                                     M27EngineerOverseer.BuildStructureAtLocation(aiBrain, tEngineerUnits[1], M27UnitInfo.refCategoryT3Mex, 1, nil, aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(tEngineerUnits[1])][1][M27EngineerOverseer.refEngineerAssignmentActualLocation], true, false)
                                 else

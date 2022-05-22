@@ -90,7 +90,7 @@ function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder,
             if bDebugMessages == true then
                 for Key, Data in buildingTemplate do
                     if Data[1] == buildingType and Data[2] then
-                        LOG('*AIExecuteBuildStructure: Found template: '..repr(Data[1])..' - Using UnitID: '..repr(Data[2]))
+                        LOG('*AIExecuteBuildStructure: Found template: '..repru(Data[1])..' - Using UnitID: '..repru(Data[2]))
                     end
                 end
             end
@@ -222,7 +222,7 @@ function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder,
             end
 
             if bSpecialBehaviour == true then
-                if bDebugMessages == true then LOG('aiBuildStructures: About to add to build queue; whatToBuild='..whatToBuild..'; relativeLoc='..repr(relativeLoc)) end
+                if bDebugMessages == true then LOG('aiBuildStructures: About to add to build queue; whatToBuild='..whatToBuild..'; relativeLoc='..repru(relativeLoc)) end
                 AddToBuildQueue(aiBrain, builder, whatToBuild, NormalToBuildLocation(relativeLoc), false)
                 return
             else

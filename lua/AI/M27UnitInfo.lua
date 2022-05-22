@@ -175,6 +175,8 @@ refCategoryStealthGenerator = categories.STEALTHFIELD
 refCategoryStealthAndCloakPersonal = categories.STEALTH
 refCategoryProtectFromTML = refCategoryT2Mex + refCategoryT3Mex + refCategoryT2Power + refCategoryT3Power + refCategoryFixedT2Arti
 refCategoryExperimentalLevel = categories.EXPERIMENTAL + refCategoryFixedT3Arti + refCategorySML
+refCategoryFirebaseSuitable = refCategoryPD + refCategoryT1Radar + refCategoryT2Radar + refCategorySMD + refCategoryTMD + refCategoryFixedShield + refCategoryFixedT2Arti + refCategoryStructureAA
+refCategoryLongRangeMobile = refCategoryFatboy + refCategorySniperBot + (refCategoryCruiser - categories.AEON) + refCategoryIndirectT2Plus
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
@@ -182,6 +184,7 @@ refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, 
 refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
 refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
 refWeaponPriorityTorpBomber = {refCategoryCruiser, refCategoryCruiserCarrier, refCategoryFrigate, refCategoryNavyThatCanBeTorpedoed}
+refWeaponPriorityT2Arti = {refCategoryFatboy, refCategoryIndirectT2Plus + M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryFixedShield + refCategoryNavalSurface, refCategoryStructure - categories.TECH1, refCategoryStructure + refCategoryLandCombat - categories.TECH1, categories.LAND - categories.BENIGN}
 
 
 function GetUnitLifetimeCount(oUnit)
@@ -219,7 +222,7 @@ function GetBlueprintIDFromBuildingTypeAndFaction(buildingType, iFactionNumber)
     --1: UEF, 2: Aeon, 3: Cybran, 4: Seraphim, 5: Nomads
     --Alternatively could get faction of a unit, using the FactionName = 'Aeon' property
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if bDebugMessages == true then LOG('About to print out entire building template:'..repr(BuildingTemplates)) end
+    if bDebugMessages == true then LOG('About to print out entire building template:'..repru(BuildingTemplates)) end
     local tBuildingTemplateForFaction = BuildingTemplates[iFactionNumber]
     return GetBlueprintIDFromBuildingType(buildingType, tBuildingTemplateForFaction)
 end

@@ -23,8 +23,33 @@ local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
 local refCategoryAirScout = M27UnitInfo.refCategoryAirScout
 
+function OnPlayerDefeated(aiBrain)
+    aiBrain.M27IsDefeated = true
+
+    --Was it an M27AI assigned to a chokepoint? If so then have any teammates no longer adopt a turtle strategy
+    if aiBrain.M27AI and aiBrain[M27MapInfo.refiAssignedChokepointCount] then
+        for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+            if not(oBrain == aiBrain) then
+                oBrain[aiBrain[M27MapInfo.refiAssignedChokepointCount]] = nil
+                oBrain[M27Overseer.refiDefaultStrategy] = oBrain[M27Overseer.refStrategyLandMain]
+                oBrain[M27Overseer.refiAIBrainCurrentStrategy] = oBrain[M27Overseer.refiDefaultStrategy]
+            end
+        end
+    end
+
+    for iArmyIndex, oBrain in M27Overseer.tAllAIBrainsByArmyIndex do
+        if aiBrain == oBrain then
+            M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
+            M27Overseer.tAllActiveM27Brains[iArmyIndex] = nil
+        elseif oBrain.M27AI then
+            ForkThread(M27Overseer.RecordAllEnemiesAndAllies, oBrain)
+        end
+    end
+end
 
 function OnKilled(oUnitKilled, instigator, type, overkillRatio)
+    --WARNING: Doesnt trigger when an ACU is killed
+
     --NOTE: Called by any unit of any player being killed; also note that OnUnitDeath triggers as well as this
     --i.e. this shoudl be used for where only want to get an event where the unit was killed by something
     --Is the unit owned by M27AI?
@@ -32,6 +57,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
         local sFunctionRef = 'OnKilled'
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+        if bDebugMessages == true then LOG(sFunctionRef..': oUnitKilled='..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)..'; Is unit killed an ACU='..tostring(M27Utilities.IsACU(oUnitKilled))) end
 
         if oUnitKilled.GetAIBrain then
             local oKilledBrain = oUnitKilled:GetAIBrain()
@@ -49,16 +75,20 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     end
                 end
 
+                --Firebase tracking
+                if EntityCategoryContains(M27UnitInfo.refCategoryFirebaseSuitable, oUnitKilled.UnitId) then
+                    oKilledBrain[M27EngineerOverseer.refbPotentialFirebaseBuildingChangedSinceLastFirebaseCheck] = true
+                end
+
                 if EntityCategoryContains(M27UnitInfo.refCategoryPD, oUnitKilled.UnitId) then
                     --If a PD that didnt compelte construction then track mass value so we adjust PD effectiveness
                     if not(oUnitKilled.M27OnConstructedCalled) then
                         oKilledBrain[M27EngineerOverseer.refiMassSpentOnPD] = oKilledBrain[M27EngineerOverseer.refiMassSpentOnPD] + oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.5
-                        oKilledBrain[M27EngineerOverseer.refbPDHaveChangedSinceLastFirebaseCheck] = true
                     end
                     --Adjust firebase overall PD mass values
                     if oUnitKilled[M27EngineerOverseer.refiAssignedFirebase] then
                         oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassCost][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] = (oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassCost][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] or 0) + oUnitKilled:GetBlueprint().Economy.BuildCostMass * oUnitKilled:GetFractionComplete()
-                        oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] = (oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] or 0) + oUnitKilled.Sync.totalMassKilled
+                        oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] = (oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] or 0) + (oUnitKilled.Sync.totalMassKilled or 0)
                     end
                 end
             else
@@ -101,7 +131,7 @@ function OnPropDestroyed(oProp)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if oProp.CachePosition then
             if bDebugMessages == true then
-                LOG(sFunctionRef..': Prop destroyed hook successful; will debug array and then update reclaim at the location '..repr(oProp.CachePosition)..' drawing red rectangle around cahce position')
+                LOG(sFunctionRef..': Prop destroyed hook successful; will debug array and then update reclaim at the location '..repru(oProp.CachePosition)..' drawing red rectangle around cahce position')
                 M27Utilities.DrawLocation(oProp.CachePosition, nil, 2, 100, nil)
                 M27Utilities.DebugArray(oProp)
             end
@@ -115,24 +145,25 @@ end
 
 
 function OnUnitDeath(oUnit)
+    --WARNING: Doesnt trigger when an ACU is killed
+
     --NOTE: This is called by the death of any unit of any player, so careful with what commands are given
     if M27Utilities.bM27AIInGame then
         local sFunctionRef = 'OnUnitDeath'
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-        if bDebugMessages == true then LOG(sFunctionRef..'Hook successful') end
+        if bDebugMessages == true then LOG(sFunctionRef..'Hook successful. oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; IsACU='..tostring(M27Utilities.IsACU(oUnit))) end
         --Is it an ACU?
-        if M27Utilities.IsACU(oUnit) then
+        if M27Utilities.IsACU(oUnit) then --NOTE: THis doesnt always trigger for ACU (not sure if it triggers some of the time, or none of the time)
             M27Overseer.iACUDeathCount = M27Overseer.iACUDeathCount + 1
-            LOG(sFunctionRef..' ACU kill detected; total kills='..M27Overseer.iACUDeathCount)
+            LOG(sFunctionRef..' ACU kill detected; total kills='..M27Overseer.iACUDeathCount..'; ACU position at time of death='..repru(oUnit:GetPosition()))
             --Update list of brains
             local oACUBrain = oUnit:GetAIBrain()
             if ScenarioInfo.Options.Victory == "demoralization" then
                 M27Utilities.ErrorHandler('ACU has died for brain='..oACUBrain:GetArmyIndex()..'; are in assassination so will flag the brain is defeated', true)
-                M27Utilities.OnPlayerDefeated(oACUBrain)
+                OnPlayerDefeated(oACUBrain)
             end
-
             for iArmyIndex, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
                 if aiBrain == oACUBrain and ScenarioInfo.Options.Victory == "demoralization" then
                     M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
@@ -140,7 +171,15 @@ function OnUnitDeath(oUnit)
                 elseif aiBrain.M27AI then
                     ForkThread(M27Overseer.RecordAllEnemiesAndAllies, aiBrain)
                 end
+                --Clear ACU Kill strategy and last ACU position from any M27AI brain enemies
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering aiBrain with army index='..aiBrain:GetArmyIndex()..'; oACUBrain index='..oACUBrain:GetArmyIndex()..'; Are tehse enemies='..tostring(IsEnemy(aiBrain:GetArmyIndex(), oACUBrain:GetArmyIndex()))..'; aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; Default strategy='..aiBrain[M27Overseer.refiDefaultStrategy]) end
+                if aiBrain.M27AI and IsEnemy(aiBrain:GetArmyIndex(), oACUBrain:GetArmyIndex()) and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                    aiBrain[M27Overseer.refiAIBrainCurrentStrategy] = aiBrain[M27Overseer.refiDefaultStrategy]
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering aiBrain with army index='..aiBrain:GetArmyIndex()..': Updated strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]) end
+                end
             end
+
+
         else
             if bDebugMessages == true then
                 LOG('Will debug array of the unit')
@@ -362,14 +401,14 @@ function OnBombFired(oWeapon, projectile)
         local oUnit = oWeapon.unit
         if oUnit and oUnit.GetUnitId then
             local sUnitID = oUnit.UnitId
-            if bDebugMessages == true then LOG(sFunctionRef..': bomber position when firing bomb='..repr(oUnit:GetPosition())) end
+            if bDebugMessages == true then LOG(sFunctionRef..': bomber position when firing bomb='..repru(oUnit:GetPosition())) end
             if EntityCategoryContains(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, sUnitID) then
                 --Dont bother trying to dodge an experimental bomb
                 if not(EntityCategoryContains(categories.EXPERIMENTAL, sUnitID)) then
                     M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
                 end
                 if oUnit.GetAIBrain and oUnit:GetAIBrain().M27AI then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repr(projectile:GetPosition())) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repru(projectile:GetPosition())) end
                     local iDelay = 0
                     if M27UnitInfo.DoesBomberFireSalvo(oUnit) then iDelay = 3 end
 
@@ -395,7 +434,7 @@ function OnWeaponFired(oWeapon)
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         --NOTE: Have used hook on calcballisticacceleration instead of below now
-        --if oWeapon.GetBlueprint then LOG('OnWeaponFired hook for blueprint='..repr(oWeapon:GetBlueprint())) end
+        --if oWeapon.GetBlueprint then LOG('OnWeaponFired hook for blueprint='..repru(oWeapon:GetBlueprint())) end
         local oUnit = oWeapon.unit
         if oUnit and oUnit.GetUnitId then
             --Overcharge
@@ -500,10 +539,10 @@ function OnProjectileFired(oWeapon, oMuzzle)
     local sFunctionRef = 'OnProjectileFired'
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if oWeapon.GetBlueprint then
-        LOG('OnWeaponFired hook for blueprint='..repr(oWeapon:GetBlueprint()))
+        LOG('OnWeaponFired hook for blueprint='..repru(oWeapon:GetBlueprint()))
     end
     if oWeapon.unit then
-        LOG('Have a unit; unit position='..repr(oWeapon.unit:GetPosition()))
+        LOG('Have a unit; unit position='..repru(oWeapon.unit:GetPosition()))
     end
 end--]]
 
@@ -566,12 +605,56 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
             --end
 
             --Firebase tracking
-            if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oConstruction.UnitId) then ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oConstruction) end
+            if EntityCategoryContains(M27UnitInfo.refCategoryFirebaseSuitable, oConstruction.UnitId) then
+                --First check in case ACU is already building something
+                local oUnitToSwitchTo
+                if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU building firebase unit near us in which case will switch to assisting it instead.  Cur strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; oEngineer[M27EngineerOverseer.refiEngineerCurrentAction]='..(oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
+                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionFortifyFirebase then
+                    local oACU = M27Utilities.GetACU(aiBrain)
+                    local iFirebaseCategoryWanted = aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]
+                    if bDebugMessages == true then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(oACU)) end
+                    if oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
+                        local oACUTarget = oACU:GetFocusUnit()
+                        if M27UnitInfo.IsUnitValid(oACUTarget) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': oACUTarget='..oACUTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oACUTarget)..'; Fraction complete='..oACUTarget:GetFractionComplete()..'; Dist to oConstruction='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition())) end
+                            if oACUTarget:GetFractionComplete() < 1 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 then
+                                --Is the ACU building a firebase category, and is that our action?
+                                if EntityCategoryContains(aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]], oACUTarget.UnitId) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will switch so we assist this unit instead') end
+                                    oUnitToSwitchTo = oACUTarget
+                                end
+                            end
+                        end
+                    end
+                    if not(oUnitToSwitchTo) and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 then
+                        local tNearbyUnitsOfType = aiBrain:GetUnitsAroundPoint(iFirebaseCategoryWanted, oConstruction:GetPosition(), 35, 'Ally')
+                        if M27Utilities.IsTableEmpty(tNearbyUnitsOfType) == false then
+                            for iUnit, oUnit in tNearbyUnitsOfType do
+                                if oUnit:GetFractionComplete() < 1 then
+                                    oUnitToSwitchTo = oUnit
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+                if oUnitToSwitchTo and not(oUnitToSwitchTo == oConstruction) then
+                    IssueClearCommands({oEngineer})
+                    IssueReclaim({oEngineer}, oConstruction)
+                    IssueGuard({oEngineer}, oUnitToSwitchTo)
+                    ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oUnitToSwitchTo)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have told engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to switch to assist what the ACU is building') end
+                else
+                    ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oConstruction)
+                end
+            end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         end
     end
 end
 function OnConstructed(oEngineer, oJustBuilt)
+    --WARNING: This doesnt seem to trigger for the ACU
+
     --NOTE: This is called every time an engineer stops building a unit whose fractioncomplete is 100%, so can be called multiple times
     if M27Utilities.bM27AIInGame then
 
@@ -579,11 +662,23 @@ function OnConstructed(oEngineer, oJustBuilt)
             local sFunctionRef = 'OnConstructed'
             local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            if bDebugMessages == true then LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; oJustBuilt='..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)) end
 
             oJustBuilt.M27OnConstructedCalled = true
 
             --LOG('OnConstructed hook test; oJustBuilt='..oJustBuilt.UnitId..'; oEngineer='..oEngineer.UnitId)
             local aiBrain = oJustBuilt:GetAIBrain()
+            if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oJustBuilt.UnitId) then
+                ForkThread(M27UnitInfo.SetUnitTargetPriorities, oJustBuilt, M27UnitInfo.refWeaponPriorityT2Arti)
+            end
+
+            --Firebase tracking
+            if EntityCategoryContains(M27UnitInfo.refCategoryFirebaseSuitable, oJustBuilt.UnitId) then
+                aiBrain[M27EngineerOverseer.refbPotentialFirebaseBuildingChangedSinceLastFirebaseCheck] = true
+                ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oJustBuilt)
+                --If just built by ACU than refresh firebase so ACU doesnt risk building loads more T2 PD to try and get a firebase to register
+                if EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then ForkThread(M27EngineerOverseer.RefreshListOfFirebases, aiBrain) end
+            end
 
             --Mexes built by spare engineers - want to clear already assigned engineers
             if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oJustBuilt.UnitId) then
@@ -614,7 +709,6 @@ function OnConstructed(oEngineer, oJustBuilt)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryPD, oJustBuilt.UnitId) then
                 --Update PD tracking
                 aiBrain[M27EngineerOverseer.refiMassSpentOnPD] = aiBrain[M27EngineerOverseer.refiMassSpentOnPD] + oJustBuilt:GetBlueprint().Economy.BuildCostMass
-                aiBrain[M27EngineerOverseer.refbPDHaveChangedSinceLastFirebaseCheck] = true
             else
                 --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
                 if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then
@@ -635,9 +729,6 @@ function OnConstructed(oEngineer, oJustBuilt)
                     ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
                 end
             end
-
-            --Firebase tracking
-            if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oJustBuilt.UnitId) then ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oJustBuilt) end
 
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         elseif M27Config.M27ShowEnemyUnitNames then
@@ -662,7 +753,7 @@ function OnReclaimFinished(oEngineer, oReclaim)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
         if oReclaim and oReclaim.CachePosition then
-            --LOG('OnReclaimFinished temp log - remove once confirmed this works - about to update reclaim data near location='..repr(oReclaim.CachePosition))
+            --LOG('OnReclaimFinished temp log - remove once confirmed this works - about to update reclaim data near location='..repru(oReclaim.CachePosition))
             ForkThread(M27MapInfo.RecordThatWeWantToUpdateReclaimAtLocation, oReclaim.CachePosition, 0)
             --M27MapInfo.UpdateReclaimDataNearLocation(oReclaim.CachePosition, 0, nil)
         else
@@ -677,7 +768,7 @@ end
 function OnCreateWreck(tPosition, iMass, iEnergy)
     --Dont check if M27brains are in game yet as can be called at start of game before we have recorded any aiBrain; instead will have check in the delayedreclaim
     if M27Utilities.bM27AIInGame  or GetGameTimeSeconds() <= 5 then
-        --LOG('OnCreateWreck temp log - remove once confirmed this works; wreck position='..repr(tPosition)..'; iMass='..(iMass or 'nil')..'; iEnergy='..(iEnergy or 'nil'))
+        --LOG('OnCreateWreck temp log - remove once confirmed this works; wreck position='..repru(tPosition)..'; iMass='..(iMass or 'nil')..'; iEnergy='..(iEnergy or 'nil'))
         local sFunctionRef = 'OnCreateWreck'
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)

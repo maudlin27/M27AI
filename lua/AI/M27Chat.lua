@@ -87,6 +87,6 @@ function SendGameCompatibilityWarning(aiBrain, sMessage, iOptionalDelay, iOption
         SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
         tiM27VoiceTauntByType[sFunctionRef] = GetGameTimeSeconds()
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repr(tiM27VoiceTauntByType)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

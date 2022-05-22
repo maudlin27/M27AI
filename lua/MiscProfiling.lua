@@ -20,7 +20,7 @@ TestProfilerIsActive = false
 --            end
 --        end
 --    end
---    _ALERT(repr(allCategories))
+--    _ALERT(repru(allCategories))
 --end--]]
 
 --Alterantive - originally used with __blueprints - it gave numbers that looked to be double what they should be; therefore tried using Balthazaar's approach above, gave same result, so must just be blueprints file that list things multiple times
@@ -76,7 +76,7 @@ function ListCategoriesUsedByCount(tAllBlueprints)
             end
         end
     end
-    LOG(repr(tUnitsWithLowUsageCategories))
+    LOG(repru(tUnitsWithLowUsageCategories))
 end
 
 

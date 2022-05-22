@@ -3,6 +3,7 @@ local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
+local M27Events = import('/mods/M27AI/lua/AI/M27Events.lua')
 
 refProfilerStart = 0
 refProfilerEnd = 1
@@ -235,7 +236,7 @@ function DrawCircleAroundPoint(tLocation, iColour, iDisplayCount, iCircleSize)
 
     local iMaxDrawCount = iDisplayCount
     local iCurDrawCount = 0
-    if bDebugMessages == true then LOG('About to draw circle at table location ='..repr(tLocation)) end
+    if bDebugMessages == true then LOG('About to draw circle at table location ='..repru(tLocation)) end
     while true do
         bFirstLocation = true
         DrawCircle(tLocation, iCircleSize, sColour)
@@ -279,7 +280,7 @@ function OldDrawTableOfLocations(tableLocations, relativeStart, iColour, iDispla
     if relativeStart == nil then relativeStart = {0,0,0} end
     local iMaxDrawCount = iDisplayCount
     local iCurDrawCount = 0
-    if bDebugMessages == true then LOG('About to draw circle at table locations ='..repr(tableLocations)) end
+    if bDebugMessages == true then LOG('About to draw circle at table locations ='..repru(tableLocations)) end
     local bFirstLocation = true
     local tPrevLocation = {}
     local iCount = 0
@@ -315,7 +316,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
     --Draws lines around rRect; rRect should be a rect table, with keys x0, x1, y0, y1
     local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DrawRectBase'
-    if bDebugMessages == true then LOG(sFunctionRef..': rRect='..repr(rRect)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': rRect='..repru(rRect)) end
     local sColour
     if iColour == nil then sColour = 'c00000FF' --dark blue
     elseif iColour == 1 then sColour = 'c00000FF' --dark blue
@@ -345,7 +346,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
         else tAllZ[iRectKey - 2] = iRectVal end
     end--]]
 
-    if bDebugMessages == true then LOG(sFunctionRef..'tAllX='..repr(tAllX)..'; tAllZ='..repr(tAllZ)..'; Rectx0='..rRect['x0']) end
+    if bDebugMessages == true then LOG(sFunctionRef..'tAllX='..repru(tAllX)..'; tAllZ='..repru(tAllZ)..'; Rectx0='..rRect['x0']) end
     local iCurDrawCount = 0
 
     local iCount = 0
@@ -364,7 +365,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
                 tLastPos = tCurPos
                 tCurPos = {iCurX, GetTerrainHeight(iCurX, iCurZ), iCurZ}
                 if tLastPos then
-                    if bDebugMessages == true then LOG(sFunctionRef..': tLastPos='..repr(tLastPos)..'; tCurPos='..repr(tCurPos)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': tLastPos='..repru(tLastPos)..'; tCurPos='..repru(tCurPos)) end
                     DrawLine(tLastPos, tCurPos, sColour)
                 end
             end
@@ -416,6 +417,18 @@ function DrawRectangle(rRect, iColour, iDisplayCount)
     ForkThread(SteppingStoneForDrawRect, rRect, iColour, iDisplayCount)
 end
 
+function GetAverageOfLocations(tAllLocations)
+    local tTotalPos = {0,0,0}
+    local iLocationCount = 0
+    for iLocation, tLocation in tAllLocations do
+        tTotalPos[1] = tTotalPos[1] + tLocation[1]
+        tTotalPos[3] = tTotalPos[3] + tLocation[3]
+        iLocationCount = iLocationCount + 1
+    end
+    local tAveragePos = {tTotalPos[1] / iLocationCount, 0, tTotalPos[3] / iLocationCount}
+    tAveragePos[2] = GetSurfaceHeight(tAveragePos[1], tAveragePos[3])
+    return tAveragePos
+end
 
 function GetAveragePosition(tUnits)
     --returns a table with the average position of tUnits
@@ -531,7 +544,10 @@ function IsLineFromAToBInRangeOfCircleAtC(iDistFromAToB, iDistFromAToC, iDistFro
         end
     end
 end
-
+function GetAngleDifference(iAngle1, iAngle2)
+    --returns the absolute difference between two angles.  Assumes angles are 0-360
+    return 180 - math.abs(math.abs(iAngle1 - iAngle2) - 180)
+end
 function ConvertAngleToRadians(iAngle)
     return iAngle * math.pi / 180
 end
@@ -581,7 +597,7 @@ function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
 
 
     if not(bKeepInMapBounds) then
-        --if bDebugMessages == true then LOG(sFunctionRef..': Are within map bounds, iXAdj='..iXAdj..'; iZAdj='..iZAdj..'; iTheta='..iTheta..'; position='..repr({tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj})) end
+        --if bDebugMessages == true then LOG(sFunctionRef..': Are within map bounds, iXAdj='..iXAdj..'; iZAdj='..iZAdj..'; iTheta='..iTheta..'; position='..repru({tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj})) end
         return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
     else
         local tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
@@ -691,12 +707,47 @@ function MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
 
 
     if bDebugMessages == true then
-        LOG(sFunctionRef..': tTargetPos='..repr(tTargetPos)..'; tStartPos='..repr(tStartPos)..'; iAngle='..iAngle..'; iDistanceToTravel='..iDistanceToTravel..'; NewPos=XZ='..iXPos..','..iZPos)
+        LOG(sFunctionRef..': tTargetPos='..repru(tTargetPos)..'; tStartPos='..repru(tStartPos)..'; iAngle='..iAngle..'; iDistanceToTravel='..iDistanceToTravel..'; NewPos=XZ='..iXPos..','..iZPos)
         DrawLocations({{ iXPos, GetTerrainHeight(iXPos, iZPos), iZPos }, tStartPos, tTargetPos})
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, about to return value') end
     return { iXPos, GetTerrainHeight(iXPos, iZPos), iZPos }
     --]]
+end
+
+function GetEdgeOfMapInDirection(tStart, iAngle)
+    --Moves from tStart in iAngle, until reaches the edge of the playable area (or within 2 of the edge), and returns this position
+    local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetEdgeOfMapInDirection'
+    FunctionProfiler(sFunctionRef, refProfilerStart)
+
+    local iCurInterval = math.max(M27MapInfo.rMapPlayableArea[3] - M27MapInfo.rMapPlayableArea[1], M27MapInfo.rMapPlayableArea[4] - M27MapInfo.rMapPlayableArea[2])
+    local tInBounds = {tStart[1], tStart[2], tStart[3]}
+    local tOutBounds = MoveInDirection(tStart, iAngle, iCurInterval, false)
+    local iDifInDist = GetDistanceBetweenPositions(tInBounds, tOutBounds)
+    local tMidpoint
+    local bIsInBounds
+    if bDebugMessages == true then LOG(sFunctionRef..': Pre start of loop, tStart='..repru(tStart)..'; tInBounds='..repru(tInBounds)..'; tOutBounds='..repru(tOutBounds)..'; iCurInterval='..iCurInterval..'; iAngle='..iAngle..'; iDifInDist='..iDifInDist..'; Playablearea='..repru(M27MapInfo.rMapPlayableArea)) end
+    local iCycleCount = 0
+    while iDifInDist > 2 do
+        iCycleCount = iCycleCount + 1
+        if iCycleCount > 1000 then ErrorHandler('Infinite loop') break end
+
+        tMidpoint = MoveInDirection(tInBounds, iAngle, iDifInDist * 0.5, false)
+        --Is this in or out of bounds?
+        bIsInBounds = true
+        if tMidpoint[1] < M27MapInfo.rMapPlayableArea[1] or tMidpoint[1] > M27MapInfo.rMapPlayableArea[3] or tMidpoint[3] < M27MapInfo.rMapPlayableArea[2] or tMidpoint[3] > M27MapInfo.rMapPlayableArea[4] then
+            bIsInBounds = false
+        end
+        if bIsInBounds then tInBounds = tMidpoint
+        else tOutBounds = tMidpoint
+        end
+        iDifInDist = GetDistanceBetweenPositions(tInBounds, tOutBounds)
+        if bDebugMessages == true then LOG(sFunctionRef..': iCycleCount='..iCycleCount..'; tInBounds='..repru(tInBounds)..'; tOutBounds='..repru(tOutBounds)..'; iDifInDist='..iDifInDist..'; tMidpoint='..repru(tMidpoint)..'; bIsInBounds='..tostring(bIsInBounds)) end
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, returning tInBounds='..repru(tInBounds)) end
+    FunctionProfiler(sFunctionRef, refProfilerEnd)
+    return tInBounds
 end
 
 function GetAIBrainArmyNumber(aiBrain)
@@ -729,18 +780,6 @@ function IsACU(oUnit)
 --        return true
 end
 
-function OnPlayerDefeated(aiBrain)
-    aiBrain.M27IsDefeated = true
-    for iArmyIndex, oBrain in M27Overseer.tAllAIBrainsByArmyIndex do
-        if aiBrain == oBrain then
-            M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
-            M27Overseer.tAllActiveM27Brains[iArmyIndex] = nil
-        elseif oBrain.M27AI then
-            ForkThread(M27Overseer.RecordAllEnemiesAndAllies, oBrain)
-        end
-    end
-end
-
 
 function GetACU(aiBrain)
     function GetSubstituteACU(aiBrain)
@@ -758,7 +797,7 @@ function GetACU(aiBrain)
         end
         if IsTableEmpty(tSubstitutes) then
             ErrorHandler('Dont have a valid substitute ACU so will treat aiBrain '..aiBrain:GetArmyIndex()..' as being defeated')
-            OnPlayerDefeated(aiBrain)
+            M27Events.OnPlayerDefeated(aiBrain)
         else
             aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(tSubstitutes, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
             if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
@@ -766,7 +805,7 @@ function GetACU(aiBrain)
                 aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(aiBrain:GetListOfUnits(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand, false, true), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
                 if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
                     ErrorHandler('Dont have a valid substitute ACU, will treat aiBrain '..aiBrain:GetArmyIndex()..' as being defeated')
-                    OnPlayerDefeated(aiBrain)
+                    M27Events.OnPlayerDefeated(aiBrain)
                 end
             else
                 aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] = true
@@ -787,7 +826,7 @@ function GetACU(aiBrain)
             else
                 if ScenarioInfo.Options.Victory == "demoralization" then
                     ErrorHandler('Cant find any ACUs that we own for brain'..aiBrain:GetArmyIndex()..', and in assassination game mode, so will treat us as being defeated')
-                    OnPlayerDefeated(aiBrain)
+                    M27Events.OnPlayerDefeated(aiBrain)
                 else
                     GetSubstituteACU(aiBrain)
                     --WaitSeconds(30)
@@ -810,10 +849,10 @@ function GetACU(aiBrain)
                 M27Overseer.iACUAlternativeFailureCount = M27Overseer.iACUAlternativeFailureCount + 1
                 if ScenarioInfo.Options.Victory == "demoralization" then
                     ErrorHandler('ACU is dead for brain'..aiBrain:GetArmyIndex()..', will return nil as are in assassination; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
-                    OnPlayerDefeated(aiBrain)
+                    M27Events.OnPlayerDefeated(aiBrain)
                 elseif aiBrain:IsDefeated() then
                     ErrorHandler('AI brain '..aiBrain:GetArmyIndex()..' is showing as defeated; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
-                    OnPlayerDefeated(aiBrain)
+                    M27Events.OnPlayerDefeated(aiBrain)
                 else
                     ErrorHandler('ACU is dead for brain'..aiBrain:GetArmyIndex()..', so will try and get a substitute as arent in assassination; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount, true)
                     GetSubstituteACU(aiBrain)
@@ -821,7 +860,7 @@ function GetACU(aiBrain)
             end
         elseif aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] and aiBrain:IsDefeated() then
             ErrorHandler('aiBrain '..aiBrain:GetArmyIndex()..' is showing as having been defeated')
-            OnPlayerDefeated(aiBrain)
+            M27Events.OnPlayerDefeated(aiBrain)
         end
     end
     if aiBrain.M27IsDefeated then aiBrain[M27Overseer.refoStartingACU] = nil end
@@ -1066,7 +1105,7 @@ function EveryFunctionHook()
     iFunctionCurCount = iFunctionCurCount + 1
     if iFunctionCurCount >= 250 then
         iFunctionCurCount = 0
-        LOG('Every function hook: tFunctionCallByName='..repr(tFunctionCallByName)..'; sName='..(sName or 'nil')..'; Name='..tostring(debug.getinfo(2, "n").name))
+        LOG('Every function hook: tFunctionCallByName='..repru(tFunctionCallByName)..'; sName='..(sName or 'nil')..'; Name='..tostring(debug.getinfo(2, "n").name))
     end
 end
 
@@ -1085,19 +1124,19 @@ function OutputRecentFunctionCalls()
     iFunctionCurCount = iFunctionCurCount + 1
     if iFunctionCurCount >= 10000 then
         iFunctionCurCount = 0
-        LOG('Every function hook: tFunctionCallByName='..repr(tFunctionCallByName))
+        LOG('Every function hook: tFunctionCallByName='..repru(tFunctionCallByName))
         tFunctionCallByName = {}
     end
 end
 
 function AllFunctionHook()
     --local tInfo = debug.getinfo(1,"n")
-    --if tInfo.name or tInfo['name'] then LOG('AllFunctionHook: '..repr(tInfo)) end
+    --if tInfo.name or tInfo['name'] then LOG('AllFunctionHook: '..repru(tInfo)) end
     --if debug.getinfo(1,"n").name then LOG('AllFunctionHook: Name='.. debug.getinfo(1,"n").name) end
-    --LOG('AllFunctionHook: '..repr(debug.getinfo(2,"n")))
-    LOG('Table of functions by count='..repr(tFunctionCallByName)..' cur function='..repr(debug.getinfo(2, "n"))..'; name='..tostring(debug.getinfo(2, "n").name))
+    --LOG('AllFunctionHook: '..repru(debug.getinfo(2,"n")))
+    LOG('Table of functions by count='..repru(tFunctionCallByName)..' cur function='..repru(debug.getinfo(2, "n"))..'; name='..tostring(debug.getinfo(2, "n").name))
     tFunctionCallByName[tostring(debug.getinfo(2, "n").name)] = (tFunctionCallByName[tostring(debug.getinfo(2, "n").name)] or 0) + 1
-    LOG('tFunctionCallByName='..repr(tFunctionCallByName))
+    LOG('tFunctionCallByName='..repru(tFunctionCallByName))
 end
 
 function FunctionProfiler(sFunctionRef, sStartOrEndRef)
@@ -1598,7 +1637,7 @@ function DebugArray(Table)
         elseif type(Array) == 'table' then
             LOG('Index['..Index..'] is type('..type(Array)..'). I wont print that!')
         else
-            LOG('Index['..Index..'] is type('..type(Array)..'). "', repr(Array),'".')
+            LOG('Index['..Index..'] is type('..type(Array)..'). "', repru(Array),'".')
         end
     end
 end
