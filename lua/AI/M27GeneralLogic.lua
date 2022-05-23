@@ -3735,7 +3735,7 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
             end
             if iLoopCount > iMaxLoop3 then
 
-                M27Utilities.ErrorHandler('Couldnt find random point in area after looking more than iMaxLoop3='..iMaxLoop3..' times, tMidpoint='..math.floor(tMidpoint[1])..'-'..math.floor(tMidpoint[2])..'-'..math.floor(tMidpoint[3])..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1])..';hopefully the code that called this should recheck pathing')
+                M27Utilities.ErrorHandler('Couldnt find random point in area after looking more than iMaxLoop3='..iMaxLoop3..' times, tMidpoint='..math.floor(tMidpoint[1])..'-'..math.floor(tMidpoint[2])..'-'..math.floor(tMidpoint[3])..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1])..';hopefully the code that called this should recheck pathing', true)
                 if bDebugMessages == true then
                     --Draw midpoint in white, draw last place checked in gold
                     M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 4, 20)
@@ -4542,20 +4542,23 @@ function GetT3ArtiTarget(oT3Arti)
         local tTargetShortlist = {}
         local iTargetShortlist = 0
         local iFriendlyT3ArtiInRange = 0
+        if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through every enemy artillery and experimental structure, size of table='..table.getsize(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure])) end
         for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
             if M27UnitInfo.IsUnitValid(oUnit) then
                 iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                 --Use 15 above normal range due to inaccuracy of shots
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistance='..iCurDistance) end
                 if iCurDistance <= 840 then
 
                     tT3ArtiInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, oUnit:GetPosition(), 840, 'Ally')
                     if M27Utilities.IsTableEmpty(tT3ArtiInRange) == false then
                         iFriendlyT3ArtiInRange = 0
-                        for iUnit, oUnit in tT3ArtiInRange do
+                        for iFriendlyArti, oFriendlyArti in tT3ArtiInRange do
                             if oUnit:GetFractionComplete() == 1 then
                                 iFriendlyT3ArtiInRange = iFriendlyT3ArtiInRange + 1
                             end
                         end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iFriendlyT3ArtiInRange='..iFriendlyT3ArtiInRange..'; iMostT3ArtiInRange='..iMostT3ArtiInRange) end
 
                         if iFriendlyT3ArtiInRange >= iMostT3ArtiInRange then
                             if iFriendlyT3ArtiInRange > iMostT3ArtiInRange then
@@ -4570,35 +4573,41 @@ function GetT3ArtiTarget(oT3Arti)
                 end
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished going through all enemy experimental structures. Targetshortlist='..iTargetShortlist) end
         if iTargetShortlist > 0 then
             --Pick the closest target
             if iTargetShortlist == 1 then
                 tTarget = tTargetShortlist[1]:GetPosition()
+                if bDebugMessages == true then LOG(sFunctionRef..': Only one target so will pick this, position='..repru(tTarget)) end
             else
                 local iClosestTarget = 100000
-               for iUnit, oUnit in tTargetShortlist do
-                  iCurDistance =  M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
-                   if iCurDistance < iClosestTarget then
-                       tTarget = oUnit:GetPosition()
-                       iClosestTarget = iCurDistance
-                   end
-               end
+                for iUnit, oUnit in tTargetShortlist do
+                    iCurDistance =  M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
+                    if iCurDistance < iClosestTarget then
+                        tTarget = oUnit:GetPosition()
+                        iClosestTarget = iCurDistance
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Unit in shortlist='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistance='..iCurDistance..'; iClosestTarget='..iClosestTarget..'; tTarget='..repru(tTarget)) end
+                end
             end
         end
         if tTarget and M27Utilities.GetDistanceBetweenPositions(tTarget, oT3Arti:GetPosition()) > 824.99 then
             tTarget = M27Utilities.MoveInDirection(oT3Arti:GetPosition(), M27Utilities.GetAngleFromAToB(oT3Arti:GetPosition(), tTarget), 824.99, false)
+            if bDebugMessages == true then LOG(sFunctionRef..': Unit is more than 824.99 away, so will adjust target to '..repru(tTarget)) end
         end
     end
     if not(tTarget) then
+        if bDebugMessages == true then LOG(sFunctionRef..': Have no target so will try and get an alternative one') end
         local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategoryStructure * categories.TECH2, categories.COMMAND}
 
         --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
         tTarget = {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[2], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[3]}
-        iBestValueTarget = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage)
+        iBestTargetValue = GetDamageFromBomb(aiBrain, tTarget, iAOE, iDamage)
 
         --Check we dont have key friendly units close to here
         if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
             iBestTargetValue = 0
+            if bDebugMessages == true then LOG(sFunctionRef..': Have a friendly ACU or experimental near here so wont attack') end
         end
 
         --iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage)
@@ -4610,7 +4619,7 @@ function GetT3ArtiTarget(oT3Arti)
                 if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                     for iUnit, oUnit in tEnemyUnitsOfInterest do
                         iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
-                        if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repru(oUnit:GetPosition())) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': CategoryRef='..iRef..'; target oUnit='..oUnit.UnitId..'; iCurTargetValue='..iCurTargetValue..'; location='..repru(oUnit:GetPosition())) end
                         --Stop looking if tried >=10 targets and have one that is at least 20k of value
                         if iCurTargetValue > iBestTargetValue then
                             if M27Utilities.IsTableEmpty(categories.COMMAND + categories.EXPERIMENTAL - M27UnitInfo.refCategorySatellite, tTarget, iAOE * 2, 'Ally') == false then
@@ -4632,11 +4641,13 @@ function GetT3ArtiTarget(oT3Arti)
 
         if tTarget then --Dont want to adjust the aoe target if are targeting a high priority unit such as a t3 arti
             tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage)
+            if bDebugMessages == true then LOG(sFunctionRef..': Adjusted target for aoe, changed tTarget to '..repru(tTarget)..'; iBestTargetValue='..iBestTargetValue) end
         end
     end
     if tTarget then
         IssueClearCommands({oT3Arti})
         IssueAttack({oT3Arti}, tTarget)
+        if bDebugMessages == true then LOG(sFunctionRef..': Told oT3Arti '..oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..' to attack tTarget '..repru(tTarget)) end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

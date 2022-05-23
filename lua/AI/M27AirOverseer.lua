@@ -7752,8 +7752,8 @@ function GetNovaxTarget(aiBrain, oNovax)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Want to kill enemy ACU so will target the ACU if we can see it')
             end
-            if M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[refoLastNearestACU], true) and not (M27MapInfo.IsUnderwater(aiBrain[M27Overseer.reftLastNearestACU])) then
-                oTarget = aiBrain[refoLastNearestACU]
+            if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) and not (M27MapInfo.IsUnderwater(aiBrain[M27Overseer.reftLastNearestACU])) then
+                oTarget = aiBrain[M27Overseer.refoLastNearestACU]
             else
                 tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand, aiBrain[M27Overseer.reftLastNearestACU], iMaxRange * 0.5, 'Enemy')
                 if M27Utilities.IsTableEmpty(tEnemyUnits) == false then

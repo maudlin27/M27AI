@@ -386,6 +386,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
             local bHavePowerForAir --only used if have air fac
             local iUnitCapCategory
             local iUnitToBuildTechLevel
+
+            local iEngineers
+
             if M27Utilities.IsTableEmpty(tNearbyEnemies) == false then iNearbyEnemies = table.getn(tNearbyEnemies) end
             if bDebugMessages == true then
                 if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then LOG(sFunctionRef..': No nearby enemies')
@@ -644,9 +647,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiInitialEngineersWanted]='..aiBrain[refiInitialEngineersWanted]..'; M27Conditions.LifetimeBuildCountLessThan(aiBrain, refCategoryEngineer,  aiBrain[refiInitialEngineersWanted] + 1)='..tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, refCategoryEngineer,  aiBrain[refiInitialEngineersWanted] + 1))) end
                                 if M27Conditions.LifetimeBuildCountLessThan(aiBrain, refCategoryEngineer,  aiBrain[refiInitialEngineersWanted] + 1) == true then
                                     --local tEngineers = aiBrain:GetListOfUnits(refCategoryEngineer, false, true)
-                                    local iEngineers = aiBrain:GetCurrentUnits(refCategoryEngineer)
                                     --if M27Utilities.IsTableEmpty(tEngineers) == true then iEngineers = 0
                                     --else iEngineers = table.getn(tEngineers) end
+                                    if not(iEngineers) then iEngineers = aiBrain:GetCurrentUnits(refCategoryEngineer) end
                                     if iEngineers < aiBrain[refiInitialEngineersWanted] then
                                         iCategoryToBuild = refCategoryEngineer
                                         iTotalWanted = aiBrain[refiInitialEngineersWanted] - iEngineers
@@ -1332,9 +1335,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 end
                             elseif iCurrentConditionToTry == 2 then
                                 if iFactoryTechLevel < 3 and aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to build engineers for initial build order') end
-                                    iCategoryToBuild = refCategoryEngineer
-                                    iTotalWanted = 1
+                                    if not(iEngineers) then iEngineers = aiBrain:GetCurrentUnits(refCategoryEngineer) end
+                                    if iEngineers < aiBrain[refiInitialEngineersWanted] and (iEngineers <= 2 or M27Conditions.GetLifetimeBuildCount(aiBrain, categories.ENGINEER) < aiBrain[refiInitialEngineersWanted]) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to build engineers for initial build order') end
+                                        iCategoryToBuild = refCategoryEngineer
+                                        iTotalWanted = 1
+                                    end
                                 end
                             elseif iCurrentConditionToTry == 3 then  --Emergency defence bombers (get T1 bombers even if can get higher tech unless enemy flak detected), to max of 20% of base and s.t. overall cap on numbers
                                 local iEmergencyRange = math.min(math.max(125, aiBrain[M27AirOverseer.refiBomberDefenceModDistance] - 20), (math.max(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.225, math.min(225,aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.33))))
@@ -1508,13 +1514,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                 end
                             elseif iCurrentConditionToTry == 4 then
-                                --Emergency AA needed
-                                if aiBrain[M27Overseer.refbEmergencyMAANeeded] and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
+                                --Emergency AA needed, or 1-off intie if enemy has air and we dont
+                                if (aiBrain[M27Overseer.refbEmergencyMAANeeded] and aiBrain[M27AirOverseer.refiAirAANeeded] > 0) or (iFactoryTechLevel == 1 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 and M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryAirAA)) <= 1 then
                                     iCategoryToBuild = refCategoryAirAA
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Need emergency AA so will build some')
                                     end
-                                    iTotalWanted = aiBrain[M27AirOverseer.refiAirAANeeded]
+                                    iTotalWanted = math.max(1, aiBrain[M27AirOverseer.refiAirAANeeded])
                                     if not (bHavePowerForAir) then
                                         iTotalWanted = 1
                                     end
@@ -2183,7 +2189,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 LOG(sFunctionRef .. ': sBPIDToBuild pre unit cap override=' .. sBPIDToBuild .. '; iCurrentConditionToTry=' .. iCurrentConditionToTry .. '; bIsLandFactory=' .. tostring(bIsLandFactory))
                             end
                             if iCategoryToBuild == refCategoryEngineer then
-                                LOG('Are building an engineer; current number of engineers that we already have=' .. aiBrain:GetCurrentUnits(refCategoryEngineer))
+                                LOG('Are building an engineer; current number of engineers that we already have=' .. iEngineers)
                             else
                                 LOG('Not building an engineer. number of units with the same category we already have=' .. aiBrain:GetCurrentUnits(iCategoryToBuild))
                             end
@@ -2354,6 +2360,7 @@ function FactoryMainOverseerLoop(aiBrain)
                         if bDebugMessages == true then LOG(sFunctionRef..': oFactory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' doesnt have an assigned plateau.  Its segment group is '..oFactory[M27Transport.refiAssignedPlateau]..'; base group='..aiBrain[M27MapInfo.refiOurBasePlateauGroup]) end
                         if not (oFactory[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
                             --Make sure we have recorded this in the table of factories for the plateau
+                            if not(aiBrain[M27MapInfo.reftOurPlateauInformation]) then aiBrain[M27MapInfo.reftOurPlateauInformation] = {} end
                             if not(aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]]) then aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]] = {} end
                             if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories]) then aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories] = {} end
                             aiBrain[M27MapInfo.reftOurPlateauInformation][oFactory[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories][oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)] = oFactory

@@ -4427,11 +4427,12 @@ function SetMaximumFactoryLevels(aiBrain)
         end
         aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(1, math.min((aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] or 1), math.floor(aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] / (13 * aiBrain[refiOurHighestAirFactoryTech] * aiBrain[refiOurHighestAirFactoryTech]))))
 
-
-
         if bDebugMessages == true then LOG(sFunctionRef..': bActiveExperimental='..tostring(bActiveExperimental)..'; Idle factories='..aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused]) end
 
         aiBrain[refiMinLandFactoryBeforeOtherTypes] = math.min(aiBrain[refiMinLandFactoryBeforeOtherTypes], aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
+
+        --Early game - if enemy air detected and we dont ahve an air fac, then buidl air fac as high priority
+        if iAirFactoriesOwned == 0 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
     end
 
 
@@ -4531,6 +4532,14 @@ function DetermineInitialBuildOrder(aiBrain)
             aiBrain[M27AirOverseer.refiEngiHuntersToGet] = 2
             aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 10
             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 12 end
+        end
+
+        --Reduce raiders if map is very small (e.g. winter dual small)
+        if aiBrain[refiInitialRaiderPlatoonsWanted] > 1 or aiBrain[M27AirOverseer.refiEngiHuntersToGet] > 1 then
+            if math.min(M27MapInfo.rMapPlayableArea[3] - M27MapInfo.rMapPlayableArea[1],  M27MapInfo.rMapPlayableArea[4] - M27MapInfo.rMapPlayableArea[2]) <= 150 then
+                aiBrain[refiInitialRaiderPlatoonsWanted] = math.min(1, aiBrain[refiInitialRaiderPlatoonsWanted])
+                aiBrain[M27AirOverseer.refiEngiHuntersToGet] = math.min(aiBrain[M27AirOverseer.refiEngiHuntersToGet], 1)
+            end
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]='..aiBrain[M27FactoryOverseer.refiInitialEngineersWanted]..'; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]='..aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]) end
@@ -5158,7 +5167,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         end
 
         --Record highest threat values of certain types of units
-        local tiCategoriesWanted = {[refiTotalEnemyLongRangeThreat] = M27UnitInfo.refCategoryLongRangeMobile, [refiTotalEnemyShortRangeThreat] = categories.DIRECTFIRE + categories.INDIRECTFIRE - M27UnitInfo.refCategoryLongRangeMobile}
+        local tiCategoriesWanted = {[refiTotalEnemyLongRangeThreat] = M27UnitInfo.refCategoryLongRangeMobile, [refiTotalEnemyShortRangeThreat] = M27UnitInfo.refCategoryShortRangeMobile}
         --local tsThreatVariableRef = {refiTotalEnemyLongRangeThreat, refiTotalEnemyShortRangeThreat}
         local tAllThreatUnits
         local iCurMassTotal
@@ -5318,7 +5327,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
         --Play safe with ACU if we have almost half or more of mexes
         local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
-        local iUpgradesWanted = 2
+        local iKeyUpgradesWanted = 1
         if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 0.9 then
             if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.1 then
                 --We have 55% of mexes on map so shoudl be ahead on eco
@@ -5327,12 +5336,12 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                     --Set equal to max health (so run) if we dont have a supporting upgrade
 
                     if EntityCategoryContains(categories.AEON, oACU) then
-                        iUpgradesWanted = 3
+                        iKeyUpgradesWanted = 2
                     end
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': iUpgradeCount=' .. iUpgradeCount .. '; iUpgradesWanted=' .. iUpgradesWanted)
+                        LOG(sFunctionRef .. ': iUpgradeCount=' .. iUpgradeCount .. '; iKeyUpgradesWanted=' .. iKeyUpgradesWanted)
                     end
-                    if iUpgradeCount < iUpgradesWanted and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 3.5 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 45 then
+                    if iUpgradeCount < iKeyUpgradesWanted and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 3.5 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 45 then
                         aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
                     end
                 end
@@ -5352,8 +5361,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             aiBrain[refiACUHealthToRunOn] = math.min(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn] + 2000)
         end
 
-        --Also set health to run as a high value if we have high mass and energy income
-        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
+        --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
+        if aiBrain[refiEnemyHighestTechLevel] >= 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
             if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
                 if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                     --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
@@ -5371,7 +5380,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
                         LOG(sFunctionRef .. ': Dont have any ugprade on ACU yet so want to retreat it')
                     end
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() + 5000)
-                elseif iUpgradeCount < iUpgradesWanted then
+                elseif iUpgradeCount < iKeyUpgradesWanted then
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
                 end
             end

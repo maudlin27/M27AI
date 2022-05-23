@@ -2320,6 +2320,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         end
                     end
                 end
+                local tEnemyT2PlusPD
                 if bACUNeedsToRun == false then
                     local bHaveMostMexes = false
                     if table.getn(M27EngineerOverseer.GetUnclaimedMexes(aiBrain, M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), true, false, true)) < table.getn(M27MapInfo.tMexByPathingAndGrouping[M27UnitInfo.refPathingTypeAmphibious][M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])]) * 0.4 then
@@ -2329,7 +2330,6 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU significantly outnumbered or lots of T2 PD nearby') end
                     local iEnemyThreatRating = 0
                     if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
-                        local tEnemyT2PlusPD
                         local iCurShield, iMaxShield, iMaxHealth
                         if oPlatoon[refiEnemyStructuresInRange] > 0 then
                             tEnemyT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])
@@ -2396,9 +2396,9 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                 for iUnit, oUnit in tPotentialOmniUnits do
                                                     iEnemyDistToUs = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oUnit:GetPosition())
                                                     iEnemyOmniRange = oUnit:GetBlueprint().Intel.OmniRadius
-                                                    if EntityCategoryContains(categories.AIR) then iEnemyOmniRange = iEnemyOmniRange + 100
-                                                    elseif EntityCategoryContains(categories.MOBILE) then
-                                                        if EntityCategoryContains(categories.COMMAND) and oUnit:HasEnhancement('EnhancedSensors') then iEnemyOmniRange = math.max(iEnemyOmniRange, 80)
+                                                    if EntityCategoryContains(categories.AIR, oUnit.UnitId) then iEnemyOmniRange = iEnemyOmniRange + 100
+                                                    elseif EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then
+                                                        if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and oUnit:HasEnhancement('EnhancedSensors') then iEnemyOmniRange = math.max(iEnemyOmniRange, 80)
                                                         else
                                                             iEnemyOmniRange = iEnemyOmniRange + 20
                                                         end
@@ -3215,17 +3215,21 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     bDontChangeCurrentAction = true
                 end--]]
 
-                if oPlatoon[refiCurrentAction] == nil then bDontConsiderFurtherOrders = false
+                --Fatboy and megalith - just want to attack if nearby enemies
+                if sPlatoonName == 'M27GroundExperimental' and EntityCategoryContains(M27UnitInfo.refCategoryFatboy + M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) then
+                    bDontConsiderFurtherOrders = true
+                    bProceed = false
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have fatboy or megalith so will ignore normal threat based logic since megalith cant kite and fatboy is best if firing at enemy rather than running before it meets the threat') end
                 else
-                    if bAlreadyHaveAttackActionFromOverseer == true and oPlatoon[refiCurrentAction] == iExistingAction then bDontConsiderFurtherOrders = false
-                    else bDontConsiderFurtherOrders = true
+                    if oPlatoon[refiCurrentAction] == nil then bDontConsiderFurtherOrders = false
+                    else
+                        if bAlreadyHaveAttackActionFromOverseer == true and oPlatoon[refiCurrentAction] == iExistingAction then bDontConsiderFurtherOrders = false
+                        else bDontConsiderFurtherOrders = true
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have an action now, refiCurrentAction='..oPlatoon[refiCurrentAction]) end
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have an action now, refiCurrentAction='..oPlatoon[refiCurrentAction]) end
                 end
                 --Note - reason why might still want to consider action is if overseer has given an override action saying to attack as a general order; the below should then hopefully get more optimal commands for how to attack
-
-
-
 
 
                 --=======normal determining action for enemies
@@ -4067,7 +4071,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                 if oPlatoon[refiPrevCurrentUnits] < oPlatoon[refiCurrentUnits] then
                     if bDebugMessages == true then LOG(sFunctionRef..': Units in platoon has increased so refreshing platoon action') end
                     oPlatoon[refbForceActionRefresh] = true end
-                oPlatoon[reftDFUnits] = EntityCategoryFilterDown(categories.DIRECTFIRE + M27UnitInfo.refCategoryFatboy - categories.SCOUT + M27UnitInfo.refCategoryCombatScout, oPlatoon[reftCurrentUnits])
+                oPlatoon[reftDFUnits] = EntityCategoryFilterDown(categories.DIRECTFIRE + M27UnitInfo.refCategoryFatboy - categories.SCOUT - categories.ANTIAIR + M27UnitInfo.refCategoryCombatScout, oPlatoon[reftCurrentUnits])
                 oPlatoon[reftScoutUnits] = EntityCategoryFilterDown(categories.SCOUT, oPlatoon[reftCurrentUnits])
                 oPlatoon[reftIndirectUnits] = EntityCategoryFilterDown(categories.INDIRECTFIRE, oPlatoon[reftCurrentUnits])
                 oPlatoon[reftBuilders] = EntityCategoryFilterDown(categories.CONSTRUCTION, oPlatoon[reftCurrentUnits])
@@ -4986,8 +4990,8 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
                             oPlatoon[refoConstructionToAssist] = oShieldBeingBuilt
                         else
 
-                            if bDebugMessages == true then LOG(sFunctionRef..': Are near the firebase. iNearbyT2PlusPD='..iNearbyT2PlusPD) end
-                            if oUnderConstructionPD or (iNearbyT2PlusPD <= 15 and (iNearbyT2PlusPD < 2 or (iNearestEnemy <= 45 and iDistToFirebase <= 30) or (iNearbyT2PlusPD <= 7 and iNearestEnemy <=55) or (iNearbyT2PlusPD < 6 and iT2PDNearToEnemy <= 0) or (iT2PDNearToEnemy <= 1 and M27Conditions.HaveLowMass(aiBrain) == false) or (iNearestEnemy <= 60 or not(iNearbyFirebaseRef)))) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Are near the firebase. iNearbyT2PlusPD='..iNearbyT2PlusPD..'; iNearestEnemy='..iNearestEnemy..'; iDistToFirebase='..iDistToFirebase..'; iNearbyFirebaseRef='..(iNearbyFirebaseRef or 'nil')) end
+                            if oUnderConstructionPD or (iNearbyT2PlusPD <= 15 and (iNearbyT2PlusPD < 4 or iNearestEnemy <= 150) and (iNearbyT2PlusPD < 2 or (iNearestEnemy <= 45 and iDistToFirebase <= 30) or (iNearbyT2PlusPD <= 7 and iNearestEnemy <=55) or (iNearbyT2PlusPD < 6 and iT2PDNearToEnemy <= 0 and iNearestEnemy <= 80 and aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 3500) or (iT2PDNearToEnemy <= 1 and M27Conditions.HaveLowMass(aiBrain) == false and iNearestEnemy <= 80 and aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 3500) or not(iNearbyFirebaseRef))) then
                                 --Do we have a PD under construction? (although have 'should assist construction' action before, that only triggers if have sufficient resources)
                                 if oUnderConstructionPD then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have under construction PD so will assist this, PD='..oUnderConstructionPD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnderConstructionPD)..' at position '..repru(oUnderConstructionPD:GetPosition())) end
@@ -5090,7 +5094,7 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
                                                     --Have enough resources to help with construction
                                                     M27EngineerOverseer.RefreshListOfFirebases(aiBrain, true)
                                                     --Do we want to fortify the chokepoint firebase?
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': Have just refreshed firebases.  Is list of firebases wanting fortification empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasesWantingFortification]))..'; Does the chokepoint firebase want fortification='..tostring(aiBrain[M27EngineerOverseer.reftFirebasesWantingFortification][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]] or false)..'; firebase chokepoint ref='..aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] or 'nil') end
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Have just refreshed firebases.  Is list of firebases wanting fortification empty='..tostring((M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasesWantingFortification]) or false))..'; Does the chokepoint firebase want fortification='..tostring(aiBrain[M27EngineerOverseer.reftFirebasesWantingFortification][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]] or false)..'; firebase chokepoint ref='..(aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] or 'nil')) end
                                                     if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasesWantingFortification]) == false and aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] and aiBrain[M27EngineerOverseer.reftFirebasesWantingFortification][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]] then
                                                         --First double-check we arent building this nearby (as above checks might only be checking some categories if we had nearby enemies)
                                                         local tUnitsWanted = aiBrain:GetUnitsAroundPoint(aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]], tFirebasePosition, 50, 'Ally')

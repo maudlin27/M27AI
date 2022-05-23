@@ -177,6 +177,7 @@ refCategoryProtectFromTML = refCategoryT2Mex + refCategoryT3Mex + refCategoryT2P
 refCategoryExperimentalLevel = categories.EXPERIMENTAL + refCategoryFixedT3Arti + refCategorySML
 refCategoryFirebaseSuitable = refCategoryPD + refCategoryT1Radar + refCategoryT2Radar + refCategorySMD + refCategoryTMD + refCategoryFixedShield + refCategoryFixedT2Arti + refCategoryStructureAA
 refCategoryLongRangeMobile = refCategoryFatboy + refCategorySniperBot + (refCategoryCruiser - categories.AEON) + refCategoryIndirectT2Plus
+refCategoryShortRangeMobile = refCategoryLandCombat + refCategoryNavalSurface - refCategoryLongRangeMobile
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
@@ -585,6 +586,7 @@ end
 
 function SetUnitTargetPriorities(oUnit, tPriorityTable)
     if IsUnitValid(oUnit) then
+        if EntityCategoryContains(categories.ANTIAIR * categories.LAND, oUnit) then M27Utilities.ErrorHandler('Changing weapon priority for MAA') end
         for i =1, oUnit:GetWeaponCount() do
             local wep = oUnit:GetWeapon(i)
             wep:SetWeaponPriorities(tPriorityTable)

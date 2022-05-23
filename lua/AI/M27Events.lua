@@ -64,7 +64,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
             if oKilledBrain.M27AI then
                 --were we killed by something?
                 local oKillerUnit
-                if instigator and not(instigator.Dead) then
+                if instigator and not(instigator:BeenDestroyed()) and not(instigator.Dead) then
                     if instigator.Launcher then
                         oKillerUnit = instigator.Launcher
                     elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
@@ -219,6 +219,8 @@ function OnUnitDeath(oUnit)
                         --Run unit type specific on death logic
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                         local sUnitBP = oUnit.UnitId
+
+
                         if EntityCategoryContains(refCategoryEngineer, sUnitBP) then
                             --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Pre clear action')
                             M27EngineerOverseer.OnEngineerDeath(aiBrain, oUnit)
@@ -255,6 +257,19 @@ function OnUnitDeath(oUnit)
                                 if aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories] then aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil end
                             end
                         end
+
+                        --All non-mex/hydro structures - if have shield locations that cant build on, then check if this was near any of them
+                        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFailedShieldLocations]) == false and EntityCategoryContains(categories.STRUCTURE - M27UnitInfo.refCategoryMex - M27UnitInfo.refCategoryHydro, sUnitBP) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have failed shield locations so will check if any buildings need adjusting') end
+                            local iBuildingSize = math.max(1, math.ceil(oUnit:GetBlueprint().Physics.SkirtSizeX))
+                            local tLocation = oUnit:GetPosition()
+                            for iXAdj = -iBuildingSize, iBuildingSize, 1 do
+                                for iZAdj = -iBuildingSize, iBuildingSize, 1 do
+                                    aiBrain[M27EngineerOverseer.reftFailedShieldLocations][M27Utilities.ConvertLocationToReference({tLocation[1] + iXAdj, tLocation[2], tLocation[3] + iZAdj})] = nil
+                                end
+                            end
+                        end
+
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
                         OnMexDeath(oUnit)
@@ -300,7 +315,7 @@ function OnShieldBubbleDamaged(self, instigator)
 
                 --Have we just taken damage from an unseen indirect unit?
                 local oKillerUnit
-                if instigator then
+                if instigator and not(instigator:BeenDestroyed()) then
                     if instigator.Launcher then
                         oKillerUnit = instigator.Launcher
                     elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
@@ -347,7 +362,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                             if bDebugMessages == true then LOG(sFunctionRef..': ACU has just taken damage, checking if can see the unit that damaged it') end
                             --Do we have a unit that damaged us?
                             local oUnitCausingDamage
-                            if instigator then
+                            if instigator and not(instigator:BeenDestroyed()) then
                                 if instigator.Launcher then
                                     oUnitCausingDamage = instigator.Launcher
                                 elseif instigator.DamageData and not(instigator.unit) and not(instigator.UnitId) then
