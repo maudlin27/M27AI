@@ -665,12 +665,13 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
             if EntityCategoryContains(M27UnitInfo.refCategoryFirebaseSuitable, oConstruction.UnitId) then
                 --First check in case ACU is already building something
                 local oUnitToSwitchTo
+                local bReclaimAnyway = false
                 if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU building firebase unit near us in which case will switch to assisting it instead.  Cur strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; oEngineer[M27EngineerOverseer.refiEngineerCurrentAction]='..(oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionFortifyFirebase then
                     local oACU = M27Utilities.GetACU(aiBrain)
                     local iFirebaseCategoryWanted = aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(oACU)) end
-                    if oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
+                    if iFirebaseCategoryWanted and oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
                         local oACUTarget = oACU:GetFocusUnit()
                         if M27UnitInfo.IsUnitValid(oACUTarget) then
                             if bDebugMessages == true then LOG(sFunctionRef..': oACUTarget='..oACUTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oACUTarget)..'; Fraction complete='..oACUTarget:GetFractionComplete()..'; Dist to oConstruction='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition())) end
@@ -683,7 +684,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                             end
                         end
                     end
-                    if not(oUnitToSwitchTo) and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 then
+                    if iFirebaseCategoryWanted and not(oUnitToSwitchTo) and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 then
                         local tNearbyUnitsOfType = aiBrain:GetUnitsAroundPoint(iFirebaseCategoryWanted, oConstruction:GetPosition(), 35, 'Ally')
                         if M27Utilities.IsTableEmpty(tNearbyUnitsOfType) == false then
                             for iUnit, oUnit in tNearbyUnitsOfType do
@@ -694,13 +695,29 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                             end
                         end
                     end
+                    --Did we just start on a radar at a firebase that already has one complete nearby?
+                    if not(oUnitToSwitchTo) and EntityCategoryContains(M27UnitInfo.refCategoryRadar, oConstruction.UnitId) then
+                        local iTechCategory = M27UnitInfo.ConvertTechLevelToCategory(M27UnitInfo.GetUnitTechLevel(oConstruction))
+                        local tNearbyRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryRadar * iTechCategory, oConstruction:GetPosition(), 35, 'Ally')
+                        if M27Utilities.IsTableEmpty(tNearbyRadar) == false then
+                            for iUnit, oUnit in tNearbyRadar do
+                                if oUnit:GetFractionComplete() == 1 then
+                                    bReclaimAnyway = true
+                                    break
+                                end
+                            end
+                        end
+                    end
                 end
-                if oUnitToSwitchTo and not(oUnitToSwitchTo == oConstruction) then
+                if bReclaimAnyway or (oUnitToSwitchTo and not(oUnitToSwitchTo == oConstruction)) then
                     IssueClearCommands({oEngineer})
                     IssueReclaim({oEngineer}, oConstruction)
-                    IssueGuard({oEngineer}, oUnitToSwitchTo)
-                    ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oUnitToSwitchTo)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have told engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to switch to assist what the ACU is building') end
+                    if oUnitToSwitchTo then
+                        IssueRepair({oEngineer}, oUnitToSwitchTo)
+                        ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oUnitToSwitchTo)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have told engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to switch to assist what the ACU is building') end
+                    elseif bDebugMessages == true then LOG(sFunctionRef..': Engineer was building radar but we have one nearby now, will reclaim the radar')
+                    end
                 else
                     ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oConstruction)
                 end

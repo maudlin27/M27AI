@@ -4052,6 +4052,7 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateActionForNearbyReclaim'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if GetEngineerUniqueCount(oEngineer) == 1 and GetGameTimeSeconds() >= 840 and GetGameTimeSeconds() <= 1020 then bDebugMessages = true else bDebugMessages = false end
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
 
     local bReclaimWillMoveOutOfRangeSoon = false
@@ -4076,9 +4077,9 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
 
         local tCurPos = oEngineer:GetPosition()
         --Has the engineer moved from its location when it was last told to reclaim?
-        if bDebugMessages == true then LOG(sFunctionRef..': Checking if engineer has moved, oEngineer[M27UnitInfo.refbSpecialMicroActive]='..tostring((oEngineer[M27UnitInfo.refbSpecialMicroActive] or false))..'; oEngineer[reftEngineerLastPositionOfReclaimOrder]='..repru(oEngineer[reftEngineerLastPositionOfReclaimOrder])..'; oEngineer[reftEngineerCurrentTarget]='..repru(oEngineer[reftEngineerCurrentTarget])) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Checking if engineer has moved, oEngineer[M27UnitInfo.refbSpecialMicroActive]='..tostring((oEngineer[M27UnitInfo.refbSpecialMicroActive] or false))..'; oEngineer[reftEngineerLastPositionOfReclaimOrder]='..repru(oEngineer[reftEngineerLastPositionOfReclaimOrder])..'; oEngineer[reftEngineerCurrentTarget]='..repru(oEngineer[reftEngineerCurrentTarget])..'; dist to cur target='..M27Utilities.GetDistanceBetweenPositions(tCurPos, oEngineer[reftEngineerCurrentTarget])) end
         if not(oEngineer[M27UnitInfo.refbSpecialMicroActive]) then
-            if not(oEngineer[reftEngineerLastPositionOfReclaimOrder]) or (M27Utilities.GetDistanceBetweenPositions(tCurPos, oEngineer[reftEngineerLastPositionOfReclaimOrder]) > 1 or M27Utilities.GetDistanceBetweenPositions(tCurPos, oEngineer[reftEngineerCurrentTarget]) <= 1) then
+            if not(oEngineer[reftEngineerLastPositionOfReclaimOrder]) or (M27Utilities.GetDistanceBetweenPositions(tCurPos, oEngineer[reftEngineerLastPositionOfReclaimOrder]) > 1 or M27Utilities.GetDistanceBetweenPositions(tCurPos, oEngineer[reftEngineerCurrentTarget]) <= 1.5) then
                 --Is the engineer part of a segment with iMinReclaimIndividualValue reclaim, or near a segment with this minimum)?
                 if bDebugMessages == true then
                     LOG(sFunctionRef..': Engineer isnt close to recent reclaim order; will check if any reclaim in range of engi')
@@ -4128,11 +4129,20 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
                         if bDebugMessages == true then LOG(sFunctionRef..': bGetEnergy='..tostring(bGetEnergy)..'; bGetMass='..tostring(bGetMass)) end
 
                         if bGetEnergy or bGetMass then
+                            if M27Utilities.IsTableEmpty(oEngineer[reftEngineerCurrentTarget]) then
+                                if oEngineer.GetNavigator then
+                                    local oNavigator = oUnit:GetNavigator()
+                                    if oNavigator and oNavigator.GetCurrentTargetPos then
+                                        oEngineer[reftEngineerCurrentTarget] = oNavigator:GetCurrentTargetPos()
+                                    end
+                                end
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': oEngineer[reftEngineerCurrentTarget]='..repru(oEngineer[reftEngineerCurrentTarget])..'; tCurPos='..repru(tCurPos)..'; iCompletionDistToFinalDestination='..iCompletionDistToFinalDestination..'; Dist to destination='..M27Utilities.GetDistanceBetweenPositions(oEngineer[reftEngineerCurrentTarget], tCurPos)) end
                             if M27Utilities.GetDistanceBetweenPositions(oEngineer[reftEngineerCurrentTarget], tCurPos) <= iCompletionDistToFinalDestination then
                                 bReclaimWillMoveOutOfRangeSoon = true
                                 iMinDistanceToEngineer = 0
                             end
-                            if bDebugMessages == true then LOG(sFunctionRef..'Have nearby reclaim, will check if any will move out of range soon') end
+                            if bDebugMessages == true then LOG(sFunctionRef..'Have nearby reclaim, will check if any will move out of range soon. iMinDistanceToEngineer='..iMinDistanceToEngineer) end
                             local tReclaimInRange = {}
                             local iValidReclaimInRange = 0
                             for iReclaim, oReclaim in tNearbyReclaim do
@@ -4806,7 +4816,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
 
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
-    --if iActionToAssign == refActionFortifyFirebase then bDebugMessages = true end
+
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
 
 
@@ -6398,6 +6408,8 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshListOfFirebases'
 
+    --if aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 20000 then bDebugMessages = true end
+
     local iRefreshInterval = 20
     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then iRefreshInterval = 5 end
 
@@ -6708,9 +6720,13 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                     if not(bWantFortification) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 5 then
                         --More T2 Arti (if are effective)
                         tExistingT2Arti = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedT2Arti, tFirebaseUnits)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want more T2 arti based on how effective they are.  Is table of firebase units filtered to T2 arti empty='..tostring(M27Utilities.IsTableEmpty(tExistingT2Arti))..'; Size of T2 Arti='..table.getsize(tExistingT2Arti)..'; Size of T2 PD='..table.getsize(tT2PlusPD)) end
-                        if M27Utilities.IsTableEmpty(tExistingT2Arti) == false or (M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[M27Overseer.reftEnemyLandExperimentals])) == false and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[reftFirebasePosition][iFirebaseRef]) <= math.max(75, math.min(200, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]))) then
-                            if (M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[M27Overseer.reftEnemyLandExperimentals])) == false) or (table.getsize(tExistingT2Arti) <= 14 and table.getsize(tT2PlusPD) >= table.getsize(tExistingT2Arti)) then
+                        local iExistingT2Arti = 0
+                        local iPDToArtiRatioWanted = 1
+                        if aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 20000 then iPDToArtiRatioWanted = 4 end
+                        if M27Utilities.IsTableEmpty(tExistingT2Arti) == false then iExistingT2Arti = table.getsize(tExistingT2Arti) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want more T2 arti based on how effective they are.  Is table of firebase units filtered to T2 arti empty='..tostring(M27Utilities.IsTableEmpty(tExistingT2Arti))..'; Size of T2 Arti='..table.getsize(tExistingT2Arti)..'; Size of T2 PD='..table.getsize(tT2PlusPD)..'; iPDToArtiRatioWanted='..iPDToArtiRatioWanted) end
+                        if iExistingT2Arti > 0 or (M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[M27Overseer.reftEnemyLandExperimentals])) == false and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[reftFirebasePosition][iFirebaseRef]) <= math.max(75, math.min(200, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]))) then
+                            if (M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[M27Overseer.reftEnemyLandExperimentals])) == false) or (iExistingT2Arti <= 14 and table.getsize(tT2PlusPD) >= table.getsize(tExistingT2Arti) * iPDToArtiRatioWanted) then
                                 local iTotalMassKilled = 0
                                 local iTotalMassCost = 0
                                 local iArtiWithNoKills = 0
@@ -6718,7 +6734,7 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                     for iUnit, oUnit in tExistingT2Arti do
                                         if M27UnitInfo.IsUnitValid(oUnit) then
                                             iTotalMassKilled = iTotalMassKilled + (oUnit.Sync.totalMassKilled or 0)
-                                            iTotalMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
+                                            iTotalMassCost = iTotalMassCost + oUnit:GetBlueprint().Economy.BuildCostMass
                                             if (oUnit.Sync.totalMassKilled or 0) <= 150 then
                                                 iArtiWithNoKills = iArtiWithNoKills + 1
                                             end
@@ -6728,13 +6744,14 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                 local iPercentFactor = 1
                                 --Increase the amount of mass we want to have killed to build more if we have low mass
                                 if M27Conditions.HaveLowMass(aiBrain) then
-                                    if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] <= 10 then iPercentFactor = 2
-                                    else iPercentFactor = 1.5
+                                    if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] <= 10 then iPercentFactor = 2.5
+                                    else iPercentFactor = 1.75
                                     end
                                 end
+                                if iTotalMassCost > aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] * 2 then iPercentFactor = iPercentFactor * 1.75 end
 
                                 if bDebugMessages == true then LOG(sFunctionRef..': iArtiWithNoKills='..iArtiWithNoKills..'; iTotalMassKilled='..iTotalMassKilled..'; iTotalMassCost='..iTotalMassCost..'; iPercentFactor='..iPercentFactor) end
-                                if (iTotalMassKilled >= iTotalMassCost * 0.6 * iPercentFactor and iArtiWithNoKills == 0) or (iTotalMassKilled >= iTotalMassCost * 0.8 * iPercentFactor and iArtiWithNoKills <= 1) or (iTotalMassKilled >= iTotalMassCost * iPercentFactor and iArtiWithNoKills <= 2) or (iTotalMassCost <= 22000 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[M27Overseer.reftEnemyLandExperimentals])) == false) or (iTotalMassKilled >= iTotalMassCost * 2.5 * iPercentFactor and iArtiWithNoKills <= 5) then
+                                if (iTotalMassKilled >= iTotalMassCost * 0.65 * iPercentFactor and iArtiWithNoKills == 0) or (iTotalMassKilled >= iTotalMassCost * 0.85 * iPercentFactor and iArtiWithNoKills <= 1) or (iTotalMassKilled >= iTotalMassCost * iPercentFactor and iArtiWithNoKills <= 2) or (iTotalMassCost <= 22000 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[M27Overseer.reftEnemyLandExperimentals])) == false) or (iTotalMassKilled >= iTotalMassCost * 2.5 * iPercentFactor and iArtiWithNoKills <= 5) then
                                     bWantFortification = true
                                     aiBrain[refiFirebaseCategoryWanted][iFirebaseRef] = M27UnitInfo.refCategoryFixedT2Arti
                                     if bDebugMessages == true then LOG(sFunctionRef..': Want to build more T2 arti at firebase') end
@@ -6742,175 +6759,189 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                             end
                         end
                     end
-                    --TML if lifetime nubmer built is <=1 and dont already have action to build TML at base (so avoid keep tyring to build tml at firebase if they keep dying, and allow both 1 tml at main base and 1 at firebase)
-                    if not(bWantFortification) and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryTML) <= 1 and GetGameTimeSeconds() - (aiBrain[refiTimeOfLastFailedTML] or -300) >= 300 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryTML, tFirebaseUnits)) then
-                        local tPotentialTargets = aiBrain:GetUnitsAroundPoint(iTMLHighPriorityCategories, aiBrain[reftFirebasePosition][iFirebaseRef], 241, 'Enemy') --Range is 256, so this gives a buffer for if we are built a bit further from the firebase
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if want TML. Table of potential targets is empty='..tostring(M27Utilities.IsTableEmpty(tPotentialTargets))) end
-                        if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
-                            local iValidTargets = 0
-                            local tEnemyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, aiBrain[reftFirebasePosition][iFirebaseRef], 241 + 31, 'Enemy')
-                            for iUnit, oUnit in tPotentialTargets do
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering whether oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is a valid TML target.  Is table of TMD empty='..tostring(M27Utilities.IsTableEmpty(tEnemyTMD))) end
-                                if IsValidTMLTarget(aiBrain, aiBrain[reftFirebasePosition][iFirebaseRef], oUnit, tEnemyTMD) then
-                                    iValidTargets = iValidTargets + 1
-                                    aiBrain[reftoTMLTargetsOfInterest][iValidTargets] = oUnit
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have a valid target, iValidTargets='..iValidTargets..'; recording for oUnit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                        --TML if lifetime nubmer built is <=1 and dont already have action to build TML at base (so avoid keep tyring to build tml at firebase if they keep dying, and allow both 1 tml at main base and 1 at firebase)
+                        if not(bWantFortification) and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryTML) <= 1 and GetGameTimeSeconds() - (aiBrain[refiTimeOfLastFailedTML] or -300) >= 300 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryTML, tFirebaseUnits)) then
+                            local tPotentialTargets = aiBrain:GetUnitsAroundPoint(iTMLHighPriorityCategories, aiBrain[reftFirebasePosition][iFirebaseRef], 241, 'Enemy') --Range is 256, so this gives a buffer for if we are built a bit further from the firebase
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if want TML. Table of potential targets is empty='..tostring(M27Utilities.IsTableEmpty(tPotentialTargets))) end
+                            if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
+                                local iValidTargets = 0
+                                local tEnemyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, aiBrain[reftFirebasePosition][iFirebaseRef], 241 + 31, 'Enemy')
+                                for iUnit, oUnit in tPotentialTargets do
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering whether oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is a valid TML target.  Is table of TMD empty='..tostring(M27Utilities.IsTableEmpty(tEnemyTMD))) end
+                                    if IsValidTMLTarget(aiBrain, aiBrain[reftFirebasePosition][iFirebaseRef], oUnit, tEnemyTMD) then
+                                        iValidTargets = iValidTargets + 1
+                                        aiBrain[reftoTMLTargetsOfInterest][iValidTargets] = oUnit
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a valid target, iValidTargets='..iValidTargets..'; recording for oUnit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                                    end
+                                end
+                                if iValidTargets >= 2 then
+                                    CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategoryTML, 50, 1)
                                 end
                             end
-                            if iValidTargets >= 2 then
-                                CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategoryTML, 50, 1)
-                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': bWantFortification after checking if want TML='..tostring(bWantFortification)) end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': bWantFortification after checking if want TML='..tostring(bWantFortification)) end
-                    end
 
-                    --Second shield
-                    if iMassInvested >= 4000 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 50 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and (not(M27Conditions.HaveLowMass(aiBrain)) or M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLocationFromStartNearestThreat], aiBrain[reftFirebasePosition][iFirebaseRef]) <= 100) and table.getn(EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield, tFirebaseUnits)) <= 1 then
-                        CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategoryFixedShield * categories.TECH2, 35, 2)
-                    end
-
-
-                    --T2 arti - other conditions - enemy T2 structure in likely arti range?
-                    if not(bWantFortification) then
-                        local tNearbyEnemyStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH2 + M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL, aiBrain[reftFirebasePosition][iFirebaseRef], 128, 'Enemy')
-                        if M27Utilities.IsTableEmpty(tNearbyEnemyStructures) == false then
-                            local tNearbyEnemyShieldsAndArti = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryFixedT2Arti, tNearbyEnemyStructures)
-                            local iNearbyEnemyShields = 0
-                            if M27Utilities.IsTableEmpty(tNearbyEnemyShieldsAndArti) == false then iNearbyEnemyShields = table.getn(tNearbyEnemyShieldsAndArti) end
-                            local iMinT2ArtiWanted = 1
-                            if iNearbyEnemyShields >= 2 then
-                                iMinT2ArtiWanted = 6
-                            elseif iNearbyEnemyShields == 1 then
-                                iMinT2ArtiWanted = 3
-                            end
-                            CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategoryFixedT2Arti, 50, iMinT2ArtiWanted)
+                        --Second shield
+                        if iMassInvested >= 4000 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 50 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and (not(M27Conditions.HaveLowMass(aiBrain)) or M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLocationFromStartNearestThreat], aiBrain[reftFirebasePosition][iFirebaseRef]) <= 100) and table.getn(EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield, tFirebaseUnits)) <= 1 then
+                            CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategoryFixedShield * categories.TECH2, 35, 2)
                         end
-                    end
 
-                    if not(bWantFortification) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 3 then
-                        --Do we want more T1/T2/T3 PD at this specific firebase? (up to 10 T2+ PD)
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef..': Checking if want T1+ PD at the firebase.  Is the table of filtered PD empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tFirebaseUnits))))
 
-                            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tFirebaseUnits)) then
-                                LOG(sFunctionRef..': Something has gone wrong as we shoudl ahve PD.  Will list out every unti in iFirebaseRef='..iFirebaseRef..' again:')
-                                for iUnit, oUnit in tFirebaseUnits do
-                                    LOG(sFunctionRef..': '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Does this contain PD category='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryPD, oUnit.UnitId))..'; Is a table containing just this unit filtered for PD empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, { oUnit }))))
+                        --T2 arti - other conditions - enemy T2 structure in likely arti range?
+                        if not(bWantFortification) then
+                            local tNearbyEnemyStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.TECH2 + M27UnitInfo.refCategoryStructure * categories.TECH3 + M27UnitInfo.refCategoryStructure * categories.EXPERIMENTAL, aiBrain[reftFirebasePosition][iFirebaseRef], 128, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tNearbyEnemyStructures) == false then
+                                local tNearbyEnemyShieldsAndArti = EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryFixedT2Arti, tNearbyEnemyStructures)
+                                local iNearbyEnemyShields = 0
+                                if M27Utilities.IsTableEmpty(tNearbyEnemyShieldsAndArti) == false then iNearbyEnemyShields = table.getn(tNearbyEnemyShieldsAndArti) end
+                                local iMinT2ArtiWanted = 1
+                                if iNearbyEnemyShields >= 2 then
+                                    iMinT2ArtiWanted = 6
+                                elseif iNearbyEnemyShields == 1 then
+                                    iMinT2ArtiWanted = 3
                                 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iNearbyEnemyShieldsAndArti='..iNearbyEnemyShields..'; iMinT2ArtiWanted='..iMinT2ArtiWanted) end
+                                CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], M27UnitInfo.refCategoryFixedT2Arti, 50, iMinT2ArtiWanted)
                             end
                         end
 
-                        if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tFirebaseUnits)) == false then
-                            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH1, tFirebaseUnits)) then
-                                CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH1, 25, 1)
-                            end
+                        if not(bWantFortification) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 3 then
+                            --Do we want more T1/T2/T3 PD at this specific firebase? (up to 10 T2+ PD, or 25 if enemy has at least 20k threat)
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': First checking for T1 PD, is table empty=' .. tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH1, tFirebaseUnits))) .. '; bWantFortification after checking for t1 PD=' .. tostring(bWantFortification))
-                            end
-                            if not (bWantFortification) then
-                                local tT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, tFirebaseUnits)
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Size of T2PlusPD table=' .. table.getn(tT2PlusPD))
+                                LOG(sFunctionRef..': Checking if want T1+ PD at the firebase.  Is the table of filtered PD empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tFirebaseUnits))))
+
+                                if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tFirebaseUnits)) then
+                                    LOG(sFunctionRef..': Something has gone wrong as we shoudl ahve PD.  Will list out every unti in iFirebaseRef='..iFirebaseRef..' again:')
+                                    for iUnit, oUnit in tFirebaseUnits do
+                                        LOG(sFunctionRef..': '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Does this contain PD category='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryPD, oUnit.UnitId))..'; Is a table containing just this unit filtered for PD empty='..tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, { oUnit }))))
+                                    end
                                 end
-                                if M27Utilities.IsTableEmpty(tT2PlusPD) or table.getn(tT2PlusPD) < 3 then
-                                    CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH2, 35, 3)
+                            end
+
+                            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tFirebaseUnits)) == false then
+                                if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH1, tFirebaseUnits)) then
+                                    CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH1, 25, 1)
+                                end
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': First checking for T1 PD, is table empty=' .. tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH1, tFirebaseUnits))) .. '; bWantFortification after checking for t1 PD=' .. tostring(bWantFortification))
+                                end
+                                if not (bWantFortification) then
+                                    local tT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, tFirebaseUnits)
+                                    local iT2PlusPD = 0
+                                    if M27Utilities.IsTableEmpty(tT2PlusPD) == false then iT2PlusPD = table.getn(tT2PlusPD) end
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': bWantFortification after checking for at least 3 TdPlusPD=' .. tostring(bWantFortification))
+                                        LOG(sFunctionRef .. ': Size of T2PlusPD table=' .. iT2PlusPD)
+                                    end
+                                    if M27Utilities.IsTableEmpty(tT2PlusPD) or iT2PlusPD < 3 then
+                                        CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH2, 35, 3)
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': bWantFortification after checking for at least 3 TdPlusPD=' .. tostring(bWantFortification))
+                                        end
+                                    else
+                                        local iTotalMassKilled = (aiBrain[reftiFirebaseDeadPDMassKills][iFirebaseRef] or 0)
+                                        local iTotalMassCost = (aiBrain[reftiFirebaseDeadPDMassCost][iFirebaseRef] or 0)
+                                        local iPDWithNoKills = 0
+                                        if bDebugMessages == true then LOG(sFunctionRef..': About to calculate mass killed and cost of all PD in the firebase.  Initial values based on dead PD are a cost of '..iTotalMassCost..' and total mass kills of '..iTotalMassKilled) end
+                                        for iUnit, oUnit in tT2PlusPD do
+                                            if M27UnitInfo.IsUnitValid(oUnit) then
+                                                iTotalMassKilled = iTotalMassKilled + (oUnit.Sync.totalMassKilled or 0)
+                                                iTotalMassCost = iTotalMassCost + oUnit:GetBlueprint().Economy.BuildCostMass
+                                                if (oUnit.Sync.totalMassKilled or 0) <= 25 then
+                                                    iPDWithNoKills = iPDWithNoKills + 1
+                                                end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit mass killed='..(oUnit.Sync.totalMassKilled or 0)..'; iTotalMassKilled='..iTotalMassKilled..'; iTotalMassCost='..iTotalMassCost..'; iPDWithNoKills='..iPDWithNoKills) end
+                                            end
+                                        end
+                                        local iPercentFactor = 1
+                                        if iTotalMassCost > aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] then iPercentFactor = iPercentFactor * 1.5 end
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Finished considering if we want more PD for the firebase. iTotalMassKilled=' .. iTotalMassKilled .. '; iTotalMassCost=' .. iTotalMassCost .. '; iPDWithNoKills=' .. iPDWithNoKills)
+                                        end
+                                        if iTotalMassKilled > iTotalMassCost * iPercentFactor and (iPDWithNoKills <= 1 or (iPDWithNoKills <= 4 and iTotalMassKilled > iTotalMassCost * 2 * iPercentFactor) or (iPDWithNoKills <= 8 and iTotalMassKilled > iTotalMassCost * 4 * iPercentFactor)) then
+                                            local iMaxT2PD = 10
+                                            if aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 20000 then iMaxT2PD = 25 end
+                                            CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryT2PlusPD, 35, iMaxT2PD)
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef ..': bWantFortification after checking if we have < iMaxT2PD='..iMaxT2PD..'; WantFortification='..tostring(bWantFortification))
+                                            end
+                                        end
                                     end
                                 else
-                                    local iTotalMassKilled = (aiBrain[reftiFirebaseDeadPDMassKills][iFirebaseRef] or 0)
-                                    local iTotalMassCost = (aiBrain[reftiFirebaseDeadPDMassCost][iFirebaseRef] or 0)
-                                    local iPDWithNoKills = 0
-                                    if bDebugMessages == true then LOG(sFunctionRef..': About to calculate mass killed and cost of all PD in the firebase.  Initial values based on dead PD are a cost of '..iTotalMassCost..' and total mass kills of '..iTotalMassKilled) end
-                                    for iUnit, oUnit in tT2PlusPD do
-                                        if M27UnitInfo.IsUnitValid(oUnit) then
-                                            iTotalMassKilled = iTotalMassKilled + (oUnit.Sync.totalMassKilled or 0)
-                                            iTotalMassCost = iTotalMassCost + oUnit:GetBlueprint().Economy.BuildCostMass
-                                            if (oUnit.Sync.totalMassKilled or 0) <= 25 then
-                                                iPDWithNoKills = iPDWithNoKills + 1
-                                            end
-                                            if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit mass killed='..(oUnit.Sync.totalMassKilled or 0)..'; iTotalMassKilled='..iTotalMassKilled..'; iTotalMassCost='..iTotalMassCost..'; iPDWithNoKills='..iPDWithNoKills) end
-                                        end
-                                    end
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Finished considering if we want more PD for the firebase. iTotalMassKilled=' .. iTotalMassKilled .. '; iTotalMassCost=' .. iTotalMassCost .. '; iPDWithNoKills=' .. iPDWithNoKills)
+                                        LOG(sFunctionRef .. ': Want to get T1 PD for firebase')
                                     end
-                                    if iTotalMassKilled > iTotalMassCost and (iPDWithNoKills <= 1 or (iPDWithNoKills <= 4 and iTotalMassKilled > iTotalMassCost * 2) or (iPDWithNoKills <= 8 and iTotalMassKilled > iTotalMassCost * 4)) then
-                                        CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryT2PlusPD, 35, 10)
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef ..': bWantFortification after checking if we have <10 T2PlusPD='..tostring(bWantFortification))
-                                        end
-                                    end
-                                end
-                            else
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Want to get T1 PD for firebase')
                                 end
                             end
                         end
-                    end
-                    --More AA defences
-                    if not(bWantFortification) and (iMassInvested >= 3000 or (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 800 and aiBrain[M27AirOverseer.refiAirAANeeded] > 0)) then
-                        local iAAWanted = 1
-                        local iAACategory = M27UnitInfo.refCategoryStructureAA - categories.TECH1
-                        if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then
-                            iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3
-                            if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 6000 and iMassInvested >= 4000 then
-                                iAAWanted = math.max(1, math.min(math.floor(iMassInvested / 6000), math.floor(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] / 2500)))
-                            else
-                                iAAWanted = math.max(1, math.min(math.floor(iMassInvested / 8000), math.floor(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] / 2750)))
-                            end
-                        end
-                        CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], iAACategory, 40, iAAWanted)
-                    end
+                        --More AA defences
+                        if not(bWantFortification) and (iMassInvested >= 3000 or (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 800 and aiBrain[M27AirOverseer.refiAirAANeeded] > 0)) then
+                            local iAAWanted = 1
+                            local iAACategory = M27UnitInfo.refCategoryStructureAA - categories.TECH1
+                            if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 then
+                                iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3
+                                local iMassPerAA = 3000
+                                if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 6000 and iMassInvested >= 4000 then
+                                    iMassPerAA = 2500
+                                    --Have we lost air control?
+                                    if aiBrain[M27AirOverseer.refiAirAAWanted] > 5 and (aiBrain[M27AirOverseer.refiAirAANeeded] >= 3 or aiBrain[M27AirOverseer.refiOurMassInAirAA] < aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * 0.75) then
+                                        iMassPerAA = 1500
+                                    end
+                                end
 
-                    if not(bWantFortification) and iFirebaseRef == aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
-                        --Do we want more based on our threat?
-                        if bDebugMessages == true then LOG(sFunctionRef..': Dealing with chokepoint, will see if we have enough threat in the chokepoint to handle the enemy. aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat]='..aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat]..'; aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat]='..aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat]) end
-                        if aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] >= 50 or aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] > 1250 then
-                            local tiCategoriesWanted = {[M27Overseer.refiTotalEnemyShortRangeThreat] = M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryFixedShield, [M27Overseer.refiTotalEnemyLongRangeThreat] = M27UnitInfo.refCategoryFixedT2Arti}
-                            local tiUnitCap = {[M27Overseer.refiTotalEnemyShortRangeThreat] = 35, [M27Overseer.refiTotalEnemyLongRangeThreat] = 14}
-                            local tOurUnitsOfRelevance
-                            local iCurMassTotal
-                            local tiOurThreatVsEnemyThreat = {}
-                            local iLowestRatio = 10000
-                            local sRefWanted
-                            local iRatioWanted = 0.8
-                            if M27Conditions.HaveLowMass(aiBrain) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryIndirect, aiBrain[reftFirebasePosition][iFirebaseRef], 120)) then iRatioWanted = 0.55 end
-                            for sThreatVariableRef, iCategory in tiCategoriesWanted do
-                                tOurUnitsOfRelevance = EntityCategoryFilterDown(iCategory, tFirebaseUnits)
-                                --For performance reasons will just get mass cost total
-                                iCurMassTotal = 0.01
-                                if M27Utilities.IsTableEmpty(tOurUnitsOfRelevance) == false then
-                                    --Hard caps on the number of units that will build
-                                    if table.getn(tOurUnitsOfRelevance) >= tiUnitCap[sThreatVariableRef] then
-                                        iCurMassTotal = 1000000
-                                    else
-                                        for iUnit, oUnit in tOurUnitsOfRelevance do
-                                            iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
+                                iAAWanted = math.min(16, math.max(aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] / iMassPerAA, iMassInvested / 8000))
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have access to T3, iMassPerAA wanted='..iMassPerAA..'; iAAWanted='..iAAWanted..'; Highest enemy air threat='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; iMassInvested='..iMassInvested..'; AirAA Needed='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; AirAA Wanted='..aiBrain[M27AirOverseer.refiAirAAWanted]) end
+                            end
+                            CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebasePosition][iFirebaseRef], iAACategory, 40, iAAWanted)
+                        end
+
+                        if not(bWantFortification) and iFirebaseRef == aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
+                            --Do we want more based on our threat?
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dealing with chokepoint, will see if we have enough threat in the chokepoint to handle the enemy. aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat]='..aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat]..'; aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat]='..aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat]) end
+                            if aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] >= 50 or aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] > 1250 then
+                                local tiCategoriesWanted = {[M27Overseer.refiTotalEnemyShortRangeThreat] = M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryFixedShield, [M27Overseer.refiTotalEnemyLongRangeThreat] = M27UnitInfo.refCategoryFixedT2Arti}
+                                local tiUnitCap = {[M27Overseer.refiTotalEnemyShortRangeThreat] = 35, [M27Overseer.refiTotalEnemyLongRangeThreat] = 14}
+                                if aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 20000 then tiUnitCap[M27Overseer.refiTotalEnemyShortRangeThreat] = math.max(tiUnitCap[M27Overseer.refiTotalEnemyShortRangeThreat], 55) end
+                                local tOurUnitsOfRelevance
+                                local iCurMassTotal
+                                local tiOurThreatVsEnemyThreat = {}
+                                local iLowestRatio = 10000
+                                local sRefWanted
+                                local iRatioWanted = 0.8
+                                if M27Conditions.HaveLowMass(aiBrain) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryIndirect, aiBrain[reftFirebasePosition][iFirebaseRef], 120)) then iRatioWanted = 0.55 end
+                                for sThreatVariableRef, iCategory in tiCategoriesWanted do
+                                    tOurUnitsOfRelevance = EntityCategoryFilterDown(iCategory, tFirebaseUnits)
+                                    --For performance reasons will just get mass cost total
+                                    iCurMassTotal = 0.01
+                                    if M27Utilities.IsTableEmpty(tOurUnitsOfRelevance) == false then
+                                        --Hard caps on the number of units that will build
+                                        if table.getn(tOurUnitsOfRelevance) >= tiUnitCap[sThreatVariableRef] then
+                                            iCurMassTotal = 1000000
+                                        else
+                                            for iUnit, oUnit in tOurUnitsOfRelevance do
+                                                iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
+                                            end
                                         end
                                     end
+                                    tiOurThreatVsEnemyThreat[sThreatVariableRef] = iCurMassTotal / math.max(aiBrain[sThreatVariableRef], 0.001)
+                                    if tiOurThreatVsEnemyThreat[sThreatVariableRef] < iLowestRatio then
+                                        iLowestRatio = tiOurThreatVsEnemyThreat[sThreatVariableRef]
+                                        sRefWanted = sThreatVariableRef
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering sThreatVariableRef='..sThreatVariableRef..'; iCurMassTotal='..iCurMassTotal..'; aiBrain[sThreatVariableRef]='..aiBrain[sThreatVariableRef]..'; tiOurThreatVsEnemyThreat[sThreatVariableRef]='..tiOurThreatVsEnemyThreat[sThreatVariableRef]..'; iLowestRatio='..iLowestRatio..'; tiUnitCap[sRefWanted]='..tiUnitCap[sRefWanted]) end
                                 end
-                                tiOurThreatVsEnemyThreat[sThreatVariableRef] = iCurMassTotal / math.max(aiBrain[sThreatVariableRef], 0.001)
-                                if tiOurThreatVsEnemyThreat[sThreatVariableRef] < iLowestRatio then
-                                    iLowestRatio = tiOurThreatVsEnemyThreat[sThreatVariableRef]
-                                    sRefWanted = sThreatVariableRef
+                                if iLowestRatio < 0.7 and sRefWanted then
+                                    CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], tiCategoriesWanted[sRefWanted] - M27UnitInfo.refCategoryFixedShield, 50, tiUnitCap[sRefWanted])
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will try and build something to satisfy sRefWanted='..sRefWanted..'; bWantFortification after checking='..tostring(bWantFortification)) end
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering sThreatVariableRef='..sThreatVariableRef..'; iCurMassTotal='..iCurMassTotal..'; aiBrain[sThreatVariableRef]='..aiBrain[sThreatVariableRef]..'; tiOurThreatVsEnemyThreat[sThreatVariableRef]='..tiOurThreatVsEnemyThreat[sThreatVariableRef]..'; iLowestRatio='..iLowestRatio) end
                             end
-                            if iLowestRatio < 0.7 and sRefWanted then
-                                CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], tiCategoriesWanted[sRefWanted] - M27UnitInfo.refCategoryFixedShield, 50, tiUnitCap[sRefWanted])
-                                if bDebugMessages == true then LOG(sFunctionRef..': Will try and build something to satisfy sRefWanted='..sRefWanted..'; bWantFortification after checking='..tostring(bWantFortification)) end
-                            end
-                        end
-                        --Force the building of ravagers if are UEF and have lots of T2 PD but not many ravagers
-                        if not(bWantFortification) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 14 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 150 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 500 and EntityCategoryContains(categories.UEF, M27Utilities.GetACU(aiBrain).UnitId) then
-                            if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPD * categories.TECH3) <= 5 then
-                                CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH3, 40, 3)
+                            --Force the building of ravagers if are UEF and have lots of T2 PD but not many ravagers
+                            if not(bWantFortification) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 14 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 150 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 500 and EntityCategoryContains(categories.UEF, M27Utilities.GetACU(aiBrain).UnitId) then
+                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPD * categories.TECH3) <= 5 then
+                                    CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH3, 40, 3)
+                                end
                             end
                         end
                     end
-                end
                 if bWantFortification then
                     aiBrain[reftFirebasesWantingFortification][iFirebaseRef] = true
                 end
@@ -7943,7 +7974,11 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 if aiBrain[reftFirebasesWantingFortification] and aiBrain[reftFirebasesWantingFortification][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]] then
                                     iActionToAssign = refActionFortifyFirebase
                                     aiBrain[refiFirebaseBeingFortified] = aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]
-                                    if bHaveLowMass then iMaxEngisWanted = 1 else iMaxEngisWanted = 3 end
+                                    if aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 20000 then
+                                        iMaxEngisWanted = 7
+                                        if bHaveLowMass then iMaxEngisWanted = 5 end
+                                    elseif bHaveLowMass then iMaxEngisWanted = 1 else iMaxEngisWanted = 3
+                                    end
                                     iMinEngiTechLevelWanted = 2
                                     if not(M27Utilities.DoesCategoryContainCategory(categories.TECH1 + categories.TECH2, aiBrain[refiFirebaseCategoryWanted][aiBrain[refiFirebaseBeingFortified]], false)) then iMinEngiTechLevelWanted = 3
                                         --Are we building T2Plus PD and have an available UEF engineer?
@@ -10155,6 +10190,7 @@ function EngineerManager(aiBrain)
     aiBrain[refiTimeOfLastAction] = {}
     aiBrain[reftUnclaimedMexOrHydroByCondition] = {}
     aiBrain[reftUnitsWantingTMD] = {}
+    aiBrain[reftoTMLTargetsOfInterest] = {}
     --reftUnclaimedMexOrHydroByCondition = 'M27EngUnclaimedMexOrHydroByCondition' --[ConvertUnclaimedConditionsToKey()] - returns a table {reftResourceLocations, refiTimeOfLastUpdate}
 
     aiBrain[reftiResourceClaimedStatus] = {}

@@ -1098,8 +1098,6 @@ function CalculateDistanceDeviationOfPositions(tPositions, iOptionalCentreSize)
 end
 
 function EveryFunctionHook()
-    --local tInfo = debug.getinfo(2,"n")
-    --local sName = tInfo[name]
     local sName = tostring(debug.getinfo(2, "n").name)
     if sName then tFunctionCallByName[sName] = (tFunctionCallByName[sName] or 0) + 1 end
     iFunctionCurCount = iFunctionCurCount + 1

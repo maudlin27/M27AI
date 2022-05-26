@@ -363,8 +363,8 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
             else
                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 1.4 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 26 and (M27Utilities.GetACU(aiBrain):GetHealth() >= 7500 or M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= M27Overseer.iDistanceFromBaseToBeSafe) and
                     (aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 40 or
-                    (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 30) or
-                    (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 30 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 26)) then
+                    (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 34) or
+                    (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 20 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 28)) then
                     return true
                 else
                     local iResourceThresholdAdjustFactor = 1

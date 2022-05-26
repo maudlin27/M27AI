@@ -2474,11 +2474,22 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
     else
         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then
             local tFirebasePosition = aiBrain[M27MapInfo.reftChokepointBuildLocation]
-            if bDebugMessages == true then LOG(sFunctionRef..': ChokepointCount='..aiBrain[M27MapInfo.refiAssignedChokepointCount]..'; tFirebasePosition='..repru(tFirebasePosition)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': ChokepointCount='..aiBrain[M27MapInfo.refiAssignedChokepointCount]..'; tFirebasePosition='..repru(tFirebasePosition)..'; Distance between them='..M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tFirebasePosition)) end
             if M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tFirebasePosition) <= 10 then
-                tHighestValueLocation = GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit]), M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit]), tFirebasePosition), tFirebasePosition, 20, 5)
+                --Are we in the same pathing group? If not then get a random point around the firebase
+                local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit])
+                if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+                local iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon))
+                if not(iSegmentGroup == M27MapInfo.GetSegmentGroupOfLocation(sPathing, tFirebasePosition)) then
+                    tHighestValueLocation = {math.random(-20, 20) + tFirebasePosition[1], 0, math.random(-20, 20) + tFirebasePosition[3]}
+                    tHighestValueLocation[2] = GetTerrainHeight(tHighestValueLocation[1], tHighestValueLocation[3])
+                else
+                    tHighestValueLocation = GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit]), M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit]), tFirebasePosition), tFirebasePosition, 20, 5)
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Got random point in area that can path to as are already near the chokepoint. tHighestValueLocation='..repru(tHighestValueLocation)..'; pathing group of firebase='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27MapInfo.reftChokepointBuildLocation])..'; Segment group of ACU='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition())) end
             else
                 tHighestValueLocation = {tFirebasePosition[1], tFirebasePosition[2], tFirebasePosition[3]}
+                if bDebugMessages == true then LOG(sFunctionRef..': Will try and go to the chokepoint. tHighestValueLocation='..repru(tHighestValueLocation)) end
             end
             if bDebugMessages == true then LOG(sFunctionRef..': Want to turtle so will go to the firebase. tHighestValueLocation='..repru(tHighestValueLocation)) end
         else

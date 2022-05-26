@@ -839,6 +839,8 @@ function GetAirRallyPoint(aiBrain)
     local iFurthestFromStart = 0
     local iNearestRallyPoint, iCurDistanceToStart
     local iMaxDistance = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4
+    --If are turtling then have the air rally point 30 behind our chokepoint
+    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then iMaxDistance = math.min(iMaxDistance, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27MapInfo.reftChokepointBuildLocation])-30) end
 
     --Override for all of this - rally at ACU if it is in water and taking damage from torps
     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and GetGameTimeSeconds() - (M27Utilities.GetACU(aiBrain)[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] or -100) <= 30 and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain)) and M27UnitInfo.IsUnitValid(M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitDealingUnseenDamage]) and EntityCategoryContains(categories.ANTINAVY + categories.OVERLAYANTINAVY, M27Utilities.GetACU(aiBrain)[M27Overseer.refoUnitDealingUnseenDamage].UnitId) then
@@ -846,6 +848,7 @@ function GetAirRallyPoint(aiBrain)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return M27Utilities.GetACU(aiBrain):GetPosition()
     else
+
         if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == false then iMaxDistance = math.min(iMaxDistance, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) - 30) end
 
         local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(refCategoryAirAA, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxDistance + 60, 'Enemy')
@@ -2059,7 +2062,8 @@ function AirThreatChecker(aiBrain)
                         LOG(sFunctionRef .. ': Have nearby enemy air threat with ' .. table.getn(tNearbyEnemyAirThreat) .. ' units but no nearby MAA so building emergency MAA')
                     end
                     bEmergencyAA = true
-                else
+                elseif aiBrain[refiAirAANeeded] > 0 or aiBrain[refiAirAAWanted] > 0 then
+
                     local iOurNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyGroundAA, false, false, true, false, false)
                     local iNearbyEnemyAirThreat = M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, true, true)
                     if bDebugMessages == true then
@@ -2151,6 +2155,8 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
         end
     end
 
+    local bCheckForMobileAirStaging = false
+
     for iUnitType, tAllAirOfType in tAllAirUnits do
         sAvailableUnitRef = tAvailableUnitRef[iUnitType]
         aiBrain[sAvailableUnitRef] = {}
@@ -2174,11 +2180,16 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                 end
                 if not (oUnit.Dead) and oUnit.GetFractionComplete and oUnit:GetFractionComplete() == 1 then
                     if bDebugMessages == true then LOG(sFunctionRef..': oUnit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; Health percent='..oUnit:GetHealthPercent()..'; Fuel ratio='..oUnit:GetFuelRatio()..'; Unit[refbOnAssignment]='..tostring(oUnit[refbOnAssignment] or false)..'; special micro active='..tostring(oUnit[M27UnitInfo.refbSpecialMicroActive] or false)) end
+                    --Backup logic for units attached to a non-air staging structure (that wont get sent an order to issue the units)
+                    iFuelPercent = 0
+                    if oUnit.GetFuelRatio then
+                        iFuelPercent = oUnit:GetFuelRatio()
+                    end
+                    if iFuelPercent == 1 and not(bCheckForMobileAirStaging) and oUnit:IsUnitState('Attached') then
+                        bCheckForMobileAirStaging = true
+                    end
                     if not (oUnit[refbSentRefuelCommand]) then
-                        iFuelPercent = 0
-                        if oUnit.GetFuelRatio then
-                            iFuelPercent = oUnit:GetFuelRatio()
-                        end
+
                         iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oUnit)
 
                         if iAirStaging == 0 or iFuelPercent >= iLowFuelPercent or iCurTechLevel >= 4 or EntityCategoryContains(categories.CANNOTUSEAIRSTAGING, oUnit.UnitId) then
@@ -2573,6 +2584,9 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             if sAvailableUnitRef == reftAvailableBombers then
                 aiBrain[refiPreviousAvailableBombers] = table.getn(aiBrain[sAvailableUnitRef])
             end
+
+
+
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Finished getting all units with type ref=' .. sAvailableUnitRef .. '; size of available unit ref table=' .. table.getn(aiBrain[sAvailableUnitRef])..'; will list out all available units')
                 if table.getn(aiBrain[sAvailableUnitRef]) > 0 then
@@ -2584,6 +2598,19 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             end
         end
     end
+
+    --If have flagged that have full fuel air units attached to something, then do a check of all non-structure units with air staging platforms
+    if bCheckForMobileAirStaging then
+        local tMobileAirStaging = aiBrain:GetListOfUnits(categories.AIRSTAGINGPLATFORM - categories.STRUCTURE, false, true)
+        if M27Utilities.IsTableEmpty(tMobileAirStaging) == false then
+            for iUnit, oUnit in tMobileAirStaging do
+                if oUnit:GetFractionComplete() == 1 then
+                    ReleaseRefueledUnitsFromAirStaging(aiBrain, oUnit)
+                end
+            end
+        end
+    end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -2863,51 +2890,58 @@ function UnloadUnit(oTransport)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function ReleaseRefueledUnitsFromAirStaging(aiBrain, oAirStaging)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ReleaseRefueledUnitsFromAirStaging'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local tRefuelingUnits = oAirStaging:GetCargo()
+    local bReadyToLeave = false
+    if bDebugMessages == true then
+        LOG(sFunctionRef .. ': Checking if air staging has any refueling units')
+    end
+    if M27Utilities.IsTableEmpty(tRefuelingUnits) == false then
+        for iRefuelingUnit, oRefuelingUnit in tRefuelingUnits do
+            if not (oRefuelingUnit.Dead) then
+                oRefuelingUnit[refbSentRefuelCommand] = false
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Have a unit refueling, checking tracker')
+                end
+                bReadyToLeave = true
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Have a unit refueling, checking its health and fuel')
+                end
+                if oRefuelingUnit:GetFuelRatio() < 0.99 or M27UnitInfo.GetUnitHealthPercent(oRefuelingUnit) < 0.99 then
+                    bReadyToLeave = false
+                end
+                if bReadyToLeave then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Telling unit to leave air staging')
+                    end
+                    ForkThread(UnloadUnit, oAirStaging)
+                    M27Utilities.DelayChangeVariable(oRefuelingUnit, refbSentRefuelCommand, false, 5)
+                    break
+                end
+            end
+        end
+    else
+        if bDebugMessages == true then
+            LOG(sFunctionRef .. ': .Refueling is nil so not proceeding')
+        end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function ReleaseRefueledUnits(aiBrain)
     --Only want to call this periodically as doesnt seem an easy way of telling it to only release some of the units, instead it releases all
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReleaseRefueledUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local tStagingPosition = {}
-    local bReadyToLeave
     local tAirStaging = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirStaging, false, true)
-    local tRefuelingUnits
     if M27Utilities.IsTableEmpty(tAirStaging) == false then
         for iStaging, oStaging in tAirStaging do
             if not (oStaging.Dead) then
-                tRefuelingUnits = oStaging:GetCargo()
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Checking if air staging has any refueling units')
-                end
-                if M27Utilities.IsTableEmpty(tRefuelingUnits) == false then
-                    for iRefuelingUnit, oRefuelingUnit in tRefuelingUnits do
-                        if not (oRefuelingUnit.Dead) then
-                            oRefuelingUnit[refbSentRefuelCommand] = false
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Have a unit refueling, checking tracker')
-                            end
-                            bReadyToLeave = true
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Have a unit refueling, checking its health and fuel')
-                            end
-                            if oRefuelingUnit:GetFuelRatio() < 0.9 or M27UnitInfo.GetUnitHealthPercent(oRefuelingUnit) < 0.9 then
-                                bReadyToLeave = false
-                            end
-                            if bReadyToLeave then
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Telling unit to leave air staging')
-                                end
-                                ForkThread(UnloadUnit, oStaging)
-                                M27Utilities.DelayChangeVariable(oRefuelingUnit, refbSentRefuelCommand, false, 5)
-                                break
-                            end
-                        end
-                    end
-                else
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': .Refueling is nil so not proceeding')
-                    end
-                end
+                ReleaseRefueledUnitsFromAirStaging(aiBrain, oStaging)
             end
         end
     end
@@ -4480,9 +4514,34 @@ function DetermineBomberDefenceRange(aiBrain)
     local iMaxRange = math.min(350, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5)
 
     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then
-        aiBrain[refiBomberDefenceModDistance] = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27MapInfo.reftChokepointBuildLocation], false) + 40
-        local tNearbyIndirect = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategorySniperBot + M27UnitInfo.refCategoryFatboy, aiBrain[M27MapInfo.reftChokepointBuildLocation], 100, 'Enemy')
-        if M27Utilities.IsTableEmpty(tNearbyIndirect) == false then aiBrain[refiBomberDefenceModDistance] = aiBrain[refiBomberDefenceModDistance] + 80 end
+        aiBrain[refiBomberDefenceModDistance] = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27MapInfo.reftChokepointBuildLocation], false) + 45
+        local iClosestExperimentalModDist = 10000
+        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
+            local iCurModDist
+            if bDebugMessages == true then LOG(sFunctionRef..': Enemy has land experimentals, will get the closest one and consider increasing mod distance') end
+            for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
+                if M27UnitInfo.IsUnitValid(oUnit) then
+                    iCurModDist = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)
+                    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurModDist='..iCurModDist..'; Actual dist to start='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; iClosestExperimentalModDist before update='..iClosestExperimentalModDist) end
+                    if iCurModDist < iClosestExperimentalModDist then
+                        iClosestExperimentalModDist = iCurModDist
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have set iClosestExperimentalModDist to '..iClosestExperimentalModDist) end
+                    end
+                end
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Before updating bomber defence for experimental, it is '..aiBrain[refiBomberDefenceModDistance]..'; higher of this and 15+closest experimental mod dist='..math.max(aiBrain[refiBomberDefenceModDistance], iClosestExperimentalModDist + 15)..'; this plus 90='..aiBrain[refiBomberDefenceModDistance] + 90) end
+        if iClosestExperimentalModDist <= aiBrain[refiBomberDefenceModDistance] + 170 then
+            aiBrain[refiBomberDefenceModDistance] = math.max(aiBrain[refiBomberDefenceModDistance], iClosestExperimentalModDist + 30) --Factory only builds bombers as emergency if more than 20 inside emergency defence range
+            if bDebugMessages == true then LOG(sFunctionRef..': Bomber defence dist after increasing for experimental='..aiBrain[refiBomberDefenceModDistance]..'; iClosestExperimentalModDist='..iClosestExperimentalModDist) end
+        else
+            local tNearbyIndirect = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategorySniperBot + M27UnitInfo.refCategoryFatboy, aiBrain[M27MapInfo.reftChokepointBuildLocation], 100, 'Enemy')
+            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiBomberDefenceModDistance] based on firebase='..aiBrain[refiBomberDefenceModDistance]..'; Is tNearbyIndirect empty='..tostring(M27Utilities.IsTableEmpty(tNearbyIndirect))) end
+            if M27Utilities.IsTableEmpty(tNearbyIndirect) == false then
+                aiBrain[refiBomberDefenceModDistance] = aiBrain[refiBomberDefenceModDistance] + 80
+                if bDebugMessages == true then LOG(sFunctionRef..': Increased bomber defence distance due to enemy indirect units, defence mod dist='..aiBrain[refiBomberDefenceModDistance]) end
+            end
+        end
     else
 
         --aiBrain[refiBomberDefencePercentRange] = 0.25 --(Will decrease if in air domination mode)
@@ -4621,7 +4680,6 @@ function DetermineBomberDefenceRange(aiBrain)
 end
 
 function IsTargetPositionCoveredByAA(tTarget, tEnemyAA, tStartPoint, bReturnNumberOfAA)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetPositionCoveredByAA'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -4673,7 +4731,6 @@ function IsTargetPositionCoveredByAA(tTarget, tEnemyAA, tStartPoint, bReturnNumb
     end
 end
 function IsTargetCoveredByAA(oTarget, tEnemyAA, iTechLevelOfEnemyAA, tStartPoint, bReturnNumberOfAA, bForceRefresh)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsTargetCoveredByAA'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -4752,10 +4809,11 @@ end
 
 function AirBomberManager(aiBrain)
     --v30 - replaced old approach which would determine a shortlist for use by all bombers; new approach will break things up by bomber tech level
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirBomberManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --if GetGameTimeSeconds() >= 1560 then bDebugMessages = true end
 
     DetermineBomberDefenceRange(aiBrain) --Updates aiBrain[refiBomberDefenceModDistance]
     if bDebugMessages == true then
@@ -6350,7 +6408,6 @@ function AirBomberManager(aiBrain)
 end
 
 function AirBomberManagerOld(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirBomberManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -6705,7 +6762,6 @@ end--]]
 end
 
 function AirAAManager(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirAAManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -6777,6 +6833,8 @@ function AirAAManager(aiBrain)
         --Hold back AirAA units from most air threats if we need to build up our force
         local bIgnoreUnlessEmergencyThreat = false
         local iIgnoredThreats = 0
+        --if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false and table.getsize(aiBrain[reftAvailableAirAA]) >= 20 then bDebugMessages = true end
+        if bDebugMessages == true then LOG(sFunctionRef..': Will hold back AirAA if need to build up our force.  aiBrain[refbMercySightedRecently]='..tostring(aiBrain[refbMercySightedRecently])..'; aiBrain[refiHighestEnemyAirThreat]='..aiBrain[refiHighestEnemyAirThreat]..'; aiBrain[refiOurMassInAirAA]='..aiBrain[refiOurMassInAirAA]) end
         if not (aiBrain[refbMercySightedRecently]) and aiBrain[refiHighestEnemyAirThreat] >= 2000 and not ((aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill)) then
             local iTeamAirAAMass = aiBrain[refiOurMassInAirAA]
             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) then
@@ -6799,7 +6857,7 @@ function AirAAManager(aiBrain)
         if M27Utilities.IsTableEmpty(tEnemyAirUnits) == false then
             if bDebugMessages == true then
 
-    --Below is all for debug!
+                --Below is all for debug!
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Will list out any friendly bombers and the distance of the nearest enemy airAA unit to them')
                 end
@@ -6891,14 +6949,16 @@ function AirAAManager(aiBrain)
                     end
                 end
                 if iFurthestChokepointDistance >= iClosestChokepointDistance then
-                    iCloseToBaseRange = math.min(iFurthestChokepointDistance, math.max(iCloseToBaseRange, iClosestChokepointDistance + 20))
+                    iCloseToBaseRange = math.max(iFurthestChokepointDistance, iClosestChokepointDistance + 40)
+                    if aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and aiBrain[refiHighestEnemyAirThreat] >= 20000 then
+                        if aiBrain[refiOurMassInAirAA] > aiBrain[refiHighestEnemyAirThreat] * 0.75 then
+                            iCloseToBaseRange = math.max(iCloseToBaseRange, iClosestChokepointDistance + 120)
+                        else
+                            iCloseToBaseRange = math.max(iCloseToBaseRange, iClosestChokepointDistance + 80)
+                        end
+                    end
                 end
             end
-
-
-
-
-
 
             --Create a table with all air threats and their distance
             for iUnit, oUnit in tEnemyAirUnits do
@@ -7325,6 +7385,7 @@ function AirAAManager(aiBrain)
         end
 
         --Calculate how much airAA we want to build
+        --if M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false and table.getsize(aiBrain[reftAvailableAirAA]) >= 20 then bDebugMessages = true end
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': About to calculate how much airAA we want')
         end
@@ -7342,10 +7403,16 @@ function AirAAManager(aiBrain)
             end
             iEnemyAirUnits = iEnemyAirUnits + iIgnoredThreats
             aiBrain[refiAirAANeeded] = iEnemyAirUnits * 1.3 + 2
+            if bDebugMessages == true then LOG(sFunctionRef..': No AirAA so need a minimum of 2 plus 1.3*iEnemyAirUnits, ='..aiBrain[refiAirAANeeded]) end
         else
             iAirThreatShortfall = iAirThreatShortfall + iIgnoredThreats
             if iAirThreatShortfall > 0 then
-                aiBrain[refiAirAANeeded] = math.max(5, math.ceil(iAirThreatShortfall / iExpectedThreatPerCount))
+                --Dont flag as needing as many airAA units if we already have a decent number available
+                if aiBrain[refiOurMassInAirAA] >= math.max(8 * iExpectedThreatPerCount, 350 * aiBrain[M27Overseer.refiEnemyHighestTechLevel]) and M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false and table.getsize(aiBrain[reftAvailableAirAA]) >= 10 then
+                    aiBrain[refiAirAANeeded] = math.ceil(iAirThreatShortfall / iExpectedThreatPerCount)*0.5
+                else
+                    aiBrain[refiAirAANeeded] = math.max(5, math.ceil(iAirThreatShortfall / iExpectedThreatPerCount))
+                end
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': End of calculating threat required; iAirThreatShortfall=' .. iAirThreatShortfall .. '; iExpectedThreatPerCount=' .. iExpectedThreatPerCount .. '; aiBrain[refiAirAANeeded]=' .. aiBrain[refiAirAANeeded])
                 end
@@ -7365,7 +7432,6 @@ function AirAAManager(aiBrain)
 end
 
 function AirLogicMainLoop(aiBrain, iCycleCount)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirLogicMainLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -7410,7 +7476,6 @@ function AirLogicMainLoop(aiBrain, iCycleCount)
 end
 
 function AirLogicOverseer(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirLogicOverseer'
     local bProfiling = false
@@ -7446,7 +7511,6 @@ end
 function Initialise()
 end --Done so can find air overseer setup more easily
 function SetupAirOverseer(aiBrain)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetupAirOverseer'
     if bDebugMessages == true then
@@ -7579,7 +7643,6 @@ end
 --Decide on mex targets and update air scouting for these
 function UpdateMexScoutingPriorities(aiBrain)
     --called from strategic overseer
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpdateMexScoutingPriorities'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -7693,7 +7756,6 @@ function UpdateMexScoutingPriorities(aiBrain)
 end
 
 function GetNovaxTarget(aiBrain, oNovax)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNovaxTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -7701,12 +7763,15 @@ function GetNovaxTarget(aiBrain, oNovax)
     local tEnemyUnits
     local iMaxRange = 600
     local oTarget
+    if bDebugMessages == true then LOG(sFunctionRef..': Is there a valid target override set='..tostring(oNovax[refoPriorityTargetOverride])..'; Time since last override='..GetGameTimeSeconds() - (oNovax[refiTimeOfLastOverride] or -100)) end
     if M27UnitInfo.IsUnitValid(oNovax[refoPriorityTargetOverride]) and (GetGameTimeSeconds() - oNovax[refiTimeOfLastOverride]) <= 11 then
         --Ignore override if are in ACU kill mode and its assassination
+        if bDebugMessages == true then LOG(sFunctionRef..': Will ignore override if in ACU kill mode. Strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; Victory setting='..ScenarioInfo.Options.Victory) end
         if not (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and ScenarioInfo.Options.Victory == "demoralization") then
             oTarget = oNovax[refoPriorityTargetOverride]
             --Are there any near-exposed shields nearby? Then target them instead
             local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oTarget:GetPosition(), 23, 'Enemy')
+            if bDebugMessages == true then LOG(sFunctionRef..': is table of nearby shields empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields)..'; target subject to this='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget))) end
             if M27Utilities.IsTableEmpty(tNearbyEnemyShields) == false then
                 local iCurShield, iMaxShield
                 local iLowestShield = 5000
@@ -7716,6 +7781,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                         if not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, iLowestShield + 1, false, false, false)) then
                             oTarget = oUnit
                             iLowestShield = iCurShield
+                            if bDebugMessages == true then LOG(sFunctionRef..': Nearby shield with low health, setting oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)) end
                         end
                     end
                 end
@@ -7799,6 +7865,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                     tPositionToSearchFrom = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
                     iSearchRange = 300
                     iCategoriesToSearch = M27UnitInfo.refCategoryCruiser
+                    if bDebugMessages == true then LOG(sFunctionRef..': Are searching for enemy cruisers, iSearchRange='..iSearchRange) end
                 elseif iCurTargetType == 3 then
                     iCategoriesToSearch = M27UnitInfo.refCategoryT1Mex
                     iMassFactor = 5
@@ -7835,6 +7902,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                     end
                     for iUnit, oUnit in tEnemyUnits do
                         --Is the unit mobile and attached to another and is <=T3?
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; Does it contain mobile category='..tostring(EntityCategoryContains(categories.MOBILE, oUnit.UnitId))..'; is it underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))..'; Is it under shield='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 2000, false, false, false))) end
                         if not (oUnit:IsUnitState('Attached') and EntityCategoryContains(categories.MOBILE, oUnit.UnitId)) then
                             --Is the unit underwater or shielded?
                             if not (M27UnitInfo.IsUnitUnderwater(oUnit)) and not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, 2000, false, false, false)) then
@@ -7949,6 +8017,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                 --Get low priority target
                 --Nearest surface naval unit
                 tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, tPositionToSearchFrom, 1000, 'Enemy')
+                if bDebugMessages == true then LOG(sFunctionRef..': No high priority targets, will search for lower priority, first with surface naval units. Is table empty='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
                 if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
                     oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, tPositionToSearchFrom, aiBrain)
                 else
@@ -7976,11 +8045,11 @@ function GetNovaxTarget(aiBrain, oNovax)
 end
 
 function NovaxCoreTargetLoop(aiBrain, oNovax)
-    --Used so can do forkthread of this in case come across errors
-    local bDebugMessages = false
+    --Used so can do forkthread of this in case come across errors    
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'NovaxCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if GetGameTimeSeconds() >= 1980 then bDebugMessages = true end
 
     local iEffectiveRange = math.max(20, oNovax:GetBlueprint().Weapon[1].MaxRadius) + 10
     local oTarget
@@ -8005,12 +8074,13 @@ function NovaxCoreTargetLoop(aiBrain, oNovax)
 
         if iOrderType == refOrderMove then
             --Has the order changed from before?
+            if bDebugMessages == true then LOG(sFunctionRef..': Target out of range so want to move to it.  Position of target='..repru(oTarget:GetPosition())..'; Position of last order location='..repru(oNovax[reftLastIssuedOrderLocation])..' Dist between them='..M27Utilities.GetDistanceBetweenPositions(oNovax[reftLastIssuedOrderLocation], oTarget:GetPosition())) end
             if not (iOrderType == oNovax[refiLastIssuedOrderType] and oNovax[reftLastIssuedOrderLocation] and M27Utilities.GetDistanceBetweenPositions(oNovax[reftLastIssuedOrderLocation], oTarget:GetPosition()) <= 8) then
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Issuing new order to novax, telling it to move to ' .. repru(oNovax[reftLastIssuedOrderLocation]))
                 end
                 IssueClearCommands({ oNovax })
-                oNovax[reftLastIssuedOrderLocation] = oTarget:GetPosition()
+                oNovax[reftLastIssuedOrderLocation] = {oTarget:GetPosition()[1], oTarget:GetPosition()[2], oTarget:GetPosition()[3]}
                 IssueMove({ oNovax }, oNovax[reftLastIssuedOrderLocation])
                 oNovax[refiLastIssuedOrderType] = iOrderType
                 oNovax[refoLastIssuedOrderUnit] = nil
@@ -8051,9 +8121,9 @@ function NovaxCoreTargetLoop(aiBrain, oNovax)
 end
 
 function NovaxManager(oNovax)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'NovaxManager'
+    --if GetGameTimeSeconds() >= 1980 then bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code for oNovax=' .. oNovax.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oNovax))
@@ -8080,7 +8150,6 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     --Broad idea (at time of first draft) - target locations that expect to be lightly defended, but try to dominate enemy groundAA when come across threats
     --bIsCzar - will affect some of the logic
 
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ExperimentalGunshipCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -8833,7 +8902,6 @@ function ExperimentalBomberCoreTargetLoop(aiBrain, oUnit)
 end
 
 function ExperimentalAirManager(oUnit)
-    local bDebugMessages = false
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ExperimentalAirManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)

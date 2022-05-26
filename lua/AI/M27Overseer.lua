@@ -4460,8 +4460,10 @@ function DetermineInitialBuildOrder(aiBrain)
     if aiBrain[refiDefaultStrategy] == refStrategyTurtle then
         aiBrain[refiInitialRaiderPlatoonsWanted] = 1
         aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 8
+        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[refiDistanceToNearestEnemyBase] <= 400 then aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
+        else aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1 end
         if aiBrain[refiDistanceToNearestEnemyBase] >= 400 then aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 12 end
-        aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
+
         aiBrain[M27AirOverseer.refiEngiHuntersToGet] = 1
     else
 
@@ -6178,13 +6180,39 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+    --Get the blueprint for a projectile of an SMD
+    local oBP = __blueprints['ueb4302']
+    local sProjectileBP = oBP.Weapon[1].ProjectileId
+    LOG('TestCustom: ProjectileBP='..sProjectileBP)
+    local oProjectileBP = __blueprints[sProjectileBP]
+    LOG('ProjectileBP mass cost='..oProjectileBP.Economy.BuildCostMass)
+    local iCurUnitEnergyUsage = 0
+    if EntityCategoryContains(categories.SILO, 'ueb4302') and oBP.Economy.BuildRate then
+        --Dealing with a silo so need to calculate energy usage differently
+        iCurUnitEnergyUsage = 0
+        for iWeapon, tWeapon in oBP.Weapon do
+            LOG('Considering iWeapon='..iWeapon)
+            if tWeapon.MaxProjectileStorage and tWeapon.ProjectileId then
+                LOG('Weapon has max projectile storage and a projectileID')
+                local oProjectileBP = __blueprints[tWeapon.ProjectileId]
+                if oProjectileBP.Economy and oProjectileBP.Economy.BuildCostEnergy and oProjectileBP.Economy.BuildTime > 0 and oBP.Economy.BuildRate > 0 then
+                    iCurUnitEnergyUsage = oProjectileBP.Economy.BuildCostEnergy * oBP.Economy.BuildRate / oProjectileBP.Economy.BuildTime
+                    break
+                else
+                    LOG('Weapon doesnt have economy or build cost energy or time or unit BP isnt >0')
+                end
+            end
+        end
+    end
+    LOG('TestCustom: iCurUnitEnergyUsage='..iCurUnitEnergyUsage)
+
     --Check GetEdgeOfMapInDirection(tStart, iAngle) works:
-    local tEndPoint
+    --[[local tEndPoint
     for iAngleRef = 1, 7 do
         tEndPoint = M27Utilities.GetEdgeOfMapInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleRef * 45)
         LOG('TEST: iAngleRef='..iAngleRef..'; tEndPoint='..repru(tEndPoint)..'; Playable bounds='..repru(M27MapInfo.rMapPlayableArea)..'; will draw in coloru basedi n angle ref '..iAngleRef)
         M27Utilities.DrawLocation(tEndPoint, nil, iAngleRef, 100, nil)
-    end
+    end--]]
 
     --[[
     --GetCategoryConditionFromUnitID(sUnitId) test
@@ -6425,7 +6453,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    --TestCustom(aiBrain)
+    TestCustom(aiBrain)
 
 
 

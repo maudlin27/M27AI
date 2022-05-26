@@ -176,8 +176,8 @@ refCategoryStealthAndCloakPersonal = categories.STEALTH
 refCategoryProtectFromTML = refCategoryT2Mex + refCategoryT3Mex + refCategoryT2Power + refCategoryT3Power + refCategoryFixedT2Arti
 refCategoryExperimentalLevel = categories.EXPERIMENTAL + refCategoryFixedT3Arti + refCategorySML
 refCategoryFirebaseSuitable = refCategoryPD + refCategoryT1Radar + refCategoryT2Radar + refCategorySMD + refCategoryTMD + refCategoryFixedShield + refCategoryFixedT2Arti + refCategoryStructureAA
-refCategoryLongRangeMobile = refCategoryFatboy + refCategorySniperBot + (refCategoryCruiser - categories.AEON) + refCategoryIndirectT2Plus
-refCategoryShortRangeMobile = refCategoryLandCombat + refCategoryNavalSurface - refCategoryLongRangeMobile
+refCategoryLongRangeMobile = refCategoryFatboy + refCategorySniperBot + refCategoryNavalSurface * categories.DIRECTFIRE + refCategoryNavalSurface * categories.INDIRECTFIRE - refCategoryNavalSurface * categories.TECH1 + refCategoryIndirectT2Plus
+refCategoryShortRangeMobile = refCategoryLandCombat + refCategoryFrigate - refCategoryLongRangeMobile
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
@@ -610,9 +610,12 @@ function GetUnitIndirectRange(oUnit)
 
     local iMaxRange = 0
     if oUnit.GetBlueprint then
-        for iCurWeapon, oCurWeapon in oUnit:GetBlueprint().Weapon do
-            if oCurWeapon.WeaponCategory == 'Missile' or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
-                if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
+        local oBP = oUnit:GetBlueprint()
+        if oBP.Weapon then
+            for iCurWeapon, oCurWeapon in oBP.Weapon do
+                if oCurWeapon.WeaponCategory == 'Missile' or oCurWeapon.WeaponCategory == 'Artillery' or oCurWeapon.WeaponCategory == 'Indirect Fire' then
+                    if oCurWeapon.MaxRadius > iMaxRange then iMaxRange = oCurWeapon.MaxRadius end
+                end
             end
         end
     end

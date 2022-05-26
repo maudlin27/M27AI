@@ -2343,7 +2343,7 @@ function ManageEnergyStalls(aiBrain)
             local tEngineerActionsByPriority
             local iSpecialHQCategory
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
-                if aiBrain[M27AirOverseer.refiAirAANeeded] <= 0 then
+                if aiBrain[M27AirOverseer.refiAirAANeeded] <= 0 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > aiBrain[M27AirOverseer.refiBomberDefenceModDistance] then
                     tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, iSpecialHQCategory, M27UnitInfo.refCategoryEngineer }
                 else
                     tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, iSpecialHQCategory, M27UnitInfo.refCategoryEngineer }
@@ -2352,10 +2352,10 @@ function ManageEnergyStalls(aiBrain)
                 tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildSecondAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionFortifyFirebase },
                                                { M27EngineerOverseer.refActionBuildEmergencyPD, M27EngineerOverseer.refActionAssistShield, M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro } }
             elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then
-                if aiBrain[M27AirOverseer.refiAirAANeeded] <= 0 then
+                if aiBrain[M27AirOverseer.refiAirAANeeded] <= 0 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > aiBrain[M27AirOverseer.refiBomberDefenceModDistance] then
                     tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryT3Radar, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryLandFactory, categories.COMMAND, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, iSpecialHQCategory, M27UnitInfo.refCategoryEngineer }
                 else
-                    tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryT3Radar, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryEngineer, categories.COMMAND, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, iSpecialHQCategory, M27UnitInfo.refCategoryEngineer }
+                    tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryT3Radar, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryAirFactory, categories.COMMAND, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, iSpecialHQCategory, M27UnitInfo.refCategoryEngineer }
                 end
 
                 tEngineerActionsByPriority = { { M27EngineerOverseer.refActionBuildT3Radar, M27EngineerOverseer.refActionBuildSecondExperimental, M27EngineerOverseer.refActionBuildT2Sonar, M27EngineerOverseer.refActionBuildT1Sonar, M27EngineerOverseer.refActionBuildT2Radar, M27EngineerOverseer.refActionBuildT1Radar, M27EngineerOverseer.refActionBuildTML, M27EngineerOverseer.refActionBuildEnergyStorage, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionBuildShield, M27EngineerOverseer.refActionBuildThirdPower, M27EngineerOverseer.refActionBuildExperimental, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildSecondAirFactory, M27EngineerOverseer.refActionBuildAirFactory, M27EngineerOverseer.refActionBuildSecondLandFactory, M27EngineerOverseer.refActionBuildLandFactory, M27EngineerOverseer.refActionBuildMassStorage, M27EngineerOverseer.refActionUpgradeBuilding, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionBuildTMD, M27EngineerOverseer.refActionBuildSMD, M27EngineerOverseer.refActionFortifyFirebase, M27EngineerOverseer.refActionBuildEmergencyPD, M27EngineerOverseer.refActionBuildMex },
@@ -2372,7 +2372,7 @@ function ManageEnergyStalls(aiBrain)
                                                { M27EngineerOverseer.refActionBuildEmergencyPD, M27EngineerOverseer.refActionAssistShield, M27EngineerOverseer.refActionBuildAirStaging, M27EngineerOverseer.refActionSpare, M27EngineerOverseer.refActionBuildMex, M27EngineerOverseer.refActionBuildSecondPower, M27EngineerOverseer.refActionAssistAirFactory, M27EngineerOverseer.refActionBuildPower, M27EngineerOverseer.refActionBuildHydro } }
             else
                 --Land attack mode/normal logic
-                if aiBrain[M27AirOverseer.refiAirAANeeded] <= 0 then
+                if aiBrain[M27AirOverseer.refiAirAANeeded] <= 0 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > aiBrain[M27AirOverseer.refiBomberDefenceModDistance] then
                     tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryAirFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, iSpecialHQCategory, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, M27UnitInfo.refCategoryEngineer }
                 else
                     tCategoriesByPriority = { M27UnitInfo.refCategorySMD, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryT3Radar, categories.COMMAND, M27UnitInfo.refCategoryLandFactory, M27UnitInfo.refCategoryEngineer, M27UnitInfo.refCategoryAirFactory, iSpecialHQCategory, M27UnitInfo.refCategoryStealthGenerator, M27UnitInfo.refCategoryStealthAndCloakPersonal, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryPersonalShield, M27UnitInfo.refCategoryFixedShield, M27UnitInfo.refCategoryMobileLandShield, M27UnitInfo.refCategoryEngineer }
@@ -2436,6 +2436,7 @@ function ManageEnergyStalls(aiBrain)
 
                 local iCurUnitEnergyUsage
                 local bApplyActionToUnit
+                local oBP
                 if M27Utilities.IsTableEmpty(tRelevantUnits) == false then
                     bNoRelevantUnits = false
                     iTotalUnits = table.getn(tRelevantUnits)
@@ -2451,7 +2452,7 @@ function ManageEnergyStalls(aiBrain)
                         --for iUnit, oUnit in tRelevantUnits do
                         bApplyActionToUnit = false
                         iCurUnitEnergyUsage = 0
-                        if M27UnitInfo.IsUnitValid(oUnit) then
+                        if M27UnitInfo.IsUnitValid(oUnit, true) then --Only consider unit if it has been constructed
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': About to consider pausing/unpausingunit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; will first check category specific logic for if we want to go ahead with pausing4')
                             end
@@ -2537,18 +2538,35 @@ function ManageEnergyStalls(aiBrain)
 
                             if bApplyActionToUnit then
                                 bWasUnitPaused = oUnit[M27UnitInfo.refbPaused] --Means we will ignore the energy usage when calculating how much we have saved
-                                iCurUnitEnergyUsage = oUnit:GetBlueprint().Economy.MaintenanceConsumptionPerSecondEnergy
+                                oBP = oUnit:GetBlueprint()
+                                iCurUnitEnergyUsage = oBP.Economy.MaintenanceConsumptionPerSecondEnergy
 
                                 if (iCurUnitEnergyUsage or 0) == 0 or iCategoryRef == M27UnitInfo.refCategoryEngineer or iCategoryRef == M27UnitInfo.refCategoryMex or iCategoryRef == categories.COMMAND then
                                     --Approximate energy usage based on build rate as a very rough guide
                                     --examples: Upgrading mex to T3 costs 11E per BP; T3 power is 8.4; T1 power is 6; Guncom is 30; Laser is 178; Strat bomber is 15
                                     local iEnergyPerBP = 9
-                                    if iCategoryRef == categories.COMMAND and oUnit[M27UnitInfo.refsUpgradeRef] then
-                                        --Determine energy cost per BP
-                                        iEnergyPerBP = M27UnitInfo.GetUpgradeEnergyCost(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) / (M27UnitInfo.GetUpgradeBuildTime(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) or 1)
-                                    end
-                                    if oUnit:GetBlueprint().Economy.BuildRate then
-                                        iCurUnitEnergyUsage = oUnit:GetBlueprint().Economy.BuildRate * iEnergyPerBP
+                                    if EntityCategoryContains(categories.SILO, oUnit.UnitId) and oBP.Economy.BuildRate then
+                                        --Dealing with a silo so need to calculate energy usage differently
+                                        iCurUnitEnergyUsage = 0
+                                        for iWeapon, tWeapon in oBP.Weapon do
+                                            if tWeapon.MaxProjectileStorage and tWeapon.ProjectileId then
+                                                local oProjectileBP = __blueprints[tWeapon.ProjectileId]
+                                                if oProjectileBP.Economy and oProjectileBP.Economy.BuildCostEnergy and oProjectileBP.Economy.BuildTime > 0 and oBP.Economy.BuildRate > 0 then
+                                                    iCurUnitEnergyUsage = 0.1 * oProjectileBP.Economy.BuildCostEnergy * oBP.Economy.BuildRate / oProjectileBP.Economy.BuildTime
+                                                    --If are power stalling then assume we only save 80% of this, as might have adjacency
+                                                    if bPauseNotUnpause then iCurUnitEnergyUsage = iCurUnitEnergyUsage * 0.8 end
+                                                    break
+                                                end
+                                            end
+                                        end
+                                    else
+                                        if iCategoryRef == categories.COMMAND and oUnit[M27UnitInfo.refsUpgradeRef] then
+                                            --Determine energy cost per BP
+                                            iEnergyPerBP = M27UnitInfo.GetUpgradeEnergyCost(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) / (M27UnitInfo.GetUpgradeBuildTime(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) or 1)
+                                        end
+                                        if oBP.Economy.BuildRate then
+                                            iCurUnitEnergyUsage = oBP.Economy.BuildRate * iEnergyPerBP
+                                        end
                                     end
                                 end
                                 --We're working in ticks so adjust energy usage accordingly
