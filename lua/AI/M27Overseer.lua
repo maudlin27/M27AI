@@ -39,7 +39,7 @@ toAllyBrains = 'M27OverseerAllyBrains'
 iACUDeathCount = 0
 iACUAlternativeFailureCount = 0
 iDistanceFromBaseToBeSafe = 55 --If ACU wants to run (<50% health) then will think its safe once its this close to our base
-iDistanceFromBaseWhenVeryLowHealthToBeSafe = 25 --As above but when ACU on lower health
+iDistanceFromBaseWhenVeryLowHealthToBeSafe = 20 --As above but when ACU on lower health
 iDistanceToEnemyEcoThreshold = 450 --Point to nearest enemy base after which will be more likely to favour eco based actions
 
 refiACUHealthToRunOn = 'M27ACUHealthToRunOn'
@@ -95,6 +95,7 @@ reftEnemyTML = 'M27OverseerEnemyTML'
 refbEnemyTMLSightedBefore = 'M27OverseerEnemyTMLSightedBefore'
 refiEnemyHighestTechLevel = 'M27OverseerEnemyHighestTech'
 refbAreBigThreats = 'M27OverseerAreBigThreats'
+refbEnemyFiredNuke = 'M27OverseerEnemyFiredNuke' --against aiBrain, true if an enemy has fired a nuke
 refbDefendAgainstArti = 'M27OverseerDefendAgainstArti' --set to true if have activated logic to defend against enemy arti or novax
 refbCloakedEnemyACU = 'M27OverseerCloakedACU'
 --Total threat values e.g. used for firebase chokepoints
@@ -117,7 +118,7 @@ refbNeedMAABuilt = 'M27NeedMAABuilt'
 refbEmergencyMAANeeded = 'M27OverseerNeedEmergencyMAA'
 refbUnclaimedMexNearACU = 'M27UnclaimedMexNearACU'
 refoReclaimNearACU = 'M27ReclaimObjectNearACU'
-refiScoutShortfallInitialRaider = 'M27ScoutShortfallRaider'
+refiScoutShortfallInitialRaiderOrSkirmisher = 'M27ScoutShortfallRaider'
 refiScoutShortfallACU = 'M27ScoutShortfallACU'
 refiScoutShortfallPriority = 'M27ScoutShortfallPriority'
 refiScoutShortfallIntelLine = 'M27ScoutShortfallIntelLine'
@@ -181,6 +182,11 @@ refiOurHighestLandFactoryTech = 'M27OverseerOurHighestLandFactoryTech'
 refoScoutHelper = 'M27UnitsScoutHelper'
 refoUnitsMAAHelper = 'M27UnitsMAAHelper' --MAA platoon assigned to help a unit (e.g. the ACU)
 
+--Skirmisher
+refiSkirmisherMassDeathsFromLand = 'M27OverseerSkirmisherDeathsFromDF'
+refiSkirmisherMassDeathsAll = 'M27OverseerSkirmisherAllDeaths'
+refiSkirmisherMassKills = 'M27OverseerSkirmisherAllKills'
+refiSkirmisherMassBuilt = 'M27OverseerSkirmisherMassBuilt'
 
 
 --Grand strategy related
@@ -721,7 +727,7 @@ function RecordIntelPaths(aiBrain)
             end
         else
             if bDebugMessages == true then LOG(sFunctionRef..': Pathing not complete yet, so will assume we need a scout for every category') end
-            aiBrain[refiScoutShortfallInitialRaider] = 1
+            aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 1
             aiBrain[refiScoutShortfallACU] = 1
             aiBrain[refiScoutShortfallPriority] = 1
             aiBrain[refiScoutShortfallIntelLine] = 1
@@ -1271,7 +1277,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
             LOG('Have 80 scouts, seems higher than would expect')
             if iScouts > 120 and iScouts > iNonScouts then
                 M27Utilities.ErrorHandler('Warning possible error unless large map or lots of small platoons - more than 25 scouts, but only '..iNonScouts..' non-scouts; iScouts='..iScouts..'; turning on debug messages.  Still stop producing scouts if get to 100')
-                aiBrain[refiScoutShortfallInitialRaider] = 0
+                aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 0
                 aiBrain[refiScoutShortfallACU] = 0
                 aiBrain[refiScoutShortfallPriority] = 0
                 aiBrain[refiScoutShortfallIntelLine] = 0
@@ -1286,7 +1292,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
         local oArmyPoolPlatoon, tArmyPoolScouts
         if iScouts > 0 then
             local oScoutToGive
-            --============Initial mex raider scouts-----------------------
+            --============Initial mex raider scouts and skirmishers-----------------------
             --Check initial raiders have scouts (1-off at start of game)
             if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] == nil then aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] = {} end
             local iRaiderCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI']
@@ -1344,8 +1350,8 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                         --Available scouts will include those under construction; if are already constructing the scouts we need then update flag so we dont produce more:
                         if iRaiderScoutsMissing == 0 and iRaiderCount >= aiBrain[refiInitialRaiderPlatoonsWanted] then
                             aiBrain[refbConfirmedInitialRaidersHaveScouts] = true
-                            aiBrain[refiScoutShortfallInitialRaider] = 0
-                        else aiBrain[refiScoutShortfallInitialRaider] = math.max(aiBrain[refiInitialRaiderPlatoonsWanted] - iRaiderCount, 0) + iRaiderScoutsMissing
+                            aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 0
+                        else aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = math.max(aiBrain[refiInitialRaiderPlatoonsWanted] - iRaiderCount, 0) + iRaiderScoutsMissing
                         end
                     end
                 end
@@ -1353,14 +1359,39 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
             iAvailableScouts = iAvailableScouts - iRaiderScoutsMissing
             if iAvailableScouts < 0 then
                 if bDebugMessages == true then LOG(sFunctionRef..': iAvailableScouts='..iAvailableScouts..'; not enough for intiial raider so will flag as having shortfall') end
-                if aiBrain[refiScoutShortfallInitialRaider] < 1 then aiBrain[refiScoutShortfallInitialRaider] = -iAvailableScouts end --redundancy/backup - shouldnt need due to above
+                if aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] < 1 then aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = -iAvailableScouts end --redundancy/backup - shouldnt need due to above
                 aiBrain[refiScoutShortfallACU] = 1
                 aiBrain[refiScoutShortfallPriority] = 1
                 aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': Have enough scouts for initial raiders so will set shortfall to 0; if available scouts is 0 then will flag acu has shortfall. iAvailableScouts='..iAvailableScouts) end
-                aiBrain[refiScoutShortfallInitialRaider] = 0
-                if iAvailableScouts == 0 then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have enough scouts for initial raiders, will now consider skirmishers. iAvailableScouts='..iAvailableScouts) end
+                if M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel]) == false then
+                    local iSkirmishersNeedingScouts = 0
+                    for iPlatoon, oPlatoon in aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel] do
+                        if aiBrain:PlatoonExists(oPlatoon) then
+                            if not(oPlatoon[refoScoutHelper]) or oPlatoon[refoScoutHelper][M27PlatoonUtilities.refiCurrentUnits] <= 0 then
+                                iSkirmishersNeedingScouts = iSkirmishersNeedingScouts + 1
+                                if iAvailableScouts > 0 then
+                                    oScoutToGive = GetNearestMAAOrScout(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), true, true, true)
+                                    if oScoutToGive then
+                                        iAvailableScouts = iAvailableScouts - 1
+                                        iSkirmishersNeedingScouts = iSkirmishersNeedingScouts - 1
+                                        AssignHelperToPlatoonOrUnit(oScoutToGive, oPlatoon, true)
+                                    end
+                                end
+                            end
+                        else
+                            aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel][iPlatoon] = nil
+                        end
+                    end
+                    aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] + iSkirmishersNeedingScouts
+                else
+                    aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 0
+                end
+
+
+
+                if iAvailableScouts <= 0 then
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont ahve any more available scouts so setting shortfall to 1 for ACU') end
                     aiBrain[refiScoutShortfallACU] = 1
                     aiBrain[refiScoutShortfallPriority] = 1
@@ -1706,7 +1737,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                     M27Utilities.ErrorHandler('tCurPathPos is empty for iCurSubpath='..iCurSubpath..'; iIntelLineTarget='..aiBrain[refiCurIntelLineTarget]..'; iSubpathMod='..iSubpathMod)
                                 else
                                     if bDebugMessages == true then
-                                       LOG(sFunctionRef..': iCurSubpath='..iCurSubpath..'; iSubpathMod = '..iSubpathMod..': tCurPathPos='..repru(tCurPathPos))
+                                        LOG(sFunctionRef..': iCurSubpath='..iCurSubpath..'; iSubpathMod = '..iSubpathMod..': tCurPathPos='..repru(tCurPathPos))
                                         M27Utilities.DrawLocation(tCurPathPos)
                                     end
                                     for iPlatoon, oPlatoon in tIntelPlatoons do
@@ -1934,13 +1965,13 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
             end
         else
             if bDebugMessages == true then LOG(sFunctionRef..': No scouts so will set as needing more scouts for ACU and initial raider') end
-            aiBrain[refiScoutShortfallInitialRaider] = aiBrain[refiInitialRaiderPlatoonsWanted]
+            aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = aiBrain[refiInitialRaiderPlatoonsWanted]
             aiBrain[refiScoutShortfallACU] = 1
             aiBrain[refiScoutShortfallPriority] = 1
             aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
         end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..':End of code, gametime='..GetGameTimeSeconds()..'; aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; aiBrain[refiScoutShortfallInitialRaider]='..aiBrain[refiScoutShortfallInitialRaider]..'; aiBrain[refiScoutShortfallIntelLine]='..aiBrain[refiScoutShortfallIntelLine]) end
+    if bDebugMessages == true then LOG(sFunctionRef..':End of code, gametime='..GetGameTimeSeconds()..'; aiBrain[refiScoutShortfallACU]='..aiBrain[refiScoutShortfallACU]..'; aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher]='..aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher]..'; aiBrain[refiScoutShortfallIntelLine]='..aiBrain[refiScoutShortfallIntelLine]) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -3914,7 +3945,9 @@ function ACUManager(aiBrain)
 
                 --Is the ACU upgrading?
                 if oACU:IsUnitState('Upgrading') then
+                    bDebugMessages = true
                     local bCancelUpgradeAndRun = false
+                    local bNeedProtecting = false
                     if M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then
                         if bDebugMessages == true then LOG(sFunctionRef..': ACU should run from a big threat so will cancel upgrade') end
                         bCancelUpgradeAndRun = true
@@ -3941,12 +3974,22 @@ function ACUManager(aiBrain)
                                 local iHealthReduction = 0
                                 if not(M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) then iHealthReduction = 1000 end --If we are getting gun upgrade then we need some health post-upgrade to have any chance of surviving
                                 if aiBrain[refbEnemyACUNearOurs] then iHealthReduction = iHealthReduction + 1000 end
+                                if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 125 then iHealthReduction = math.max(0, iHealthReduction * 0.5) end
                                 if iTimeToComplete * iHealthLossPerSec > math.min(oACU[reftACURecentHealth][iCurTime] * 0.9 - iHealthReduction, oACU:GetMaxHealth() * 0.7 - iHealthReduction) then
                                     --ACU will be really low health or die if it keeps upgrading
                                     bCancelUpgradeAndRun = true
+                                    bNeedProtecting = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': We will be really low health if we finish the upgrade; consider if we are near base/if expect we might be able to reduce the damage taken where the upgrade is at least 50% done. % done='..oACU[reftACURecentUpgradeProgress][iCurTime]..'; Dist to base='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; oACU[reftACURecentHealth][iCurTime] * 1.1='..oACU[reftACURecentHealth][iCurTime] * 1.1..'; iTimeToComplete * iHealthLossPerSec='..iTimeToComplete * iHealthLossPerSec..'; iHealthReduction='..iHealthReduction..'; ACU Max health='..oACU:GetMaxHealth()) end
+                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.5 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 125 then
+                                        if iTimeToComplete * iHealthLossPerSec < oACU[reftACURecentHealth][iCurTime] * 1.1 - iHealthReduction then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Will try and finish upgrade and hope units can save us') end
+                                            bCancelUpgradeAndRun = false
+                                        end
+                                    end
+
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec..'; iTimeToComplete='..iTimeToComplete..'; iTimeToComplete * iHealthLossPerSec='..iTimeToComplete * iHealthLossPerSec..'; oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]) end
-                            elseif bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec)
+                                if bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec..'; iTimeToComplete='..iTimeToComplete..'; iTimeToComplete * iHealthLossPerSec='..iTimeToComplete * iHealthLossPerSec..'; oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]..'; bCancelUpgradeAndRun='..tostring(bCancelUpgradeAndRun)) end
+                            elseif bDebugMessages == true then LOG(sFunctionRef..': Health loss less than 50 so wont cancel for this. iHealthLossPerSec='..iHealthLossPerSec)
                             end
 
                         end
@@ -4003,8 +4046,9 @@ function ACUManager(aiBrain)
                         end
                     else
                         --We are upgrading, but dont want to cancel - still switch to protect ACU mode if enemy ACU is near since it can survive long enough once the upgrade is complete to kill us if we are low on health
-                        if aiBrain[refbEnemyACUNearOurs] and not(M27UnitInfo.IsUnitUnderwater(oACU)) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is near ours and we arent underwater so will switch strategy to protect ACU while we are upgrading') end
+                        if aiBrain[refbEnemyACUNearOurs] and not(M27UnitInfo.IsUnitUnderwater(oACU)) then bNeedProtecting = true end
+                        if bNeedProtecting then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is near ours and we arent underwater, or we have taken lots of damage and are likely to die, so will switch strategy to protect ACU while we are upgrading') end
                             aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
                         end
                     end
@@ -4733,7 +4777,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
             end
         end
     end
-    if aiBrain[refbCloakedEnemyACU] then aiBrain[refbAreBigThreats] = true end
+    if aiBrain[refbCloakedEnemyACU] then aiBrain[refbAreBigThreats] = true
+    elseif aiBrain[refbEnemyFiredNuke] then aiBrain[refbAreBigThreats] = true end
 
     --Coordinate friendly experimentals if enemy has land experimentals
     if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false then
@@ -5274,7 +5319,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount) --also features 'state of ga
         tsGameState['06.EmergencyMAANeeded'] = aiBrain[refbEmergencyMAANeeded]
 
         --Scouts wanted:
-        tsGameState['07.ScoutShortfallInitialRaider'] = aiBrain[refiScoutShortfallInitialRaider]
+        tsGameState['07.ScoutShortfallInitialRaider'] = aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher]
         tsGameState['07.ScoutShortfallACU'] = aiBrain[refiScoutShortfallACU]
         tsGameState['07.ScoutShortfallIntelLine'] = aiBrain[refiScoutShortfallIntelLine]
         tsGameState['07.ScoutShortfallLargePlatoons'] = aiBrain[refiScoutShortfallLargePlatoons]
@@ -5687,7 +5732,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refbConfirmedInitialRaidersHaveScouts] = false
 
     --Intel BO related:
-    aiBrain[refiScoutShortfallInitialRaider] = 1
+    aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 1
     aiBrain[refiScoutShortfallACU] = 1
     aiBrain[refiScoutShortfallPriority] = 1
     aiBrain[refiScoutShortfallIntelLine] = 1
@@ -5704,6 +5749,12 @@ function OverseerInitialisation(aiBrain)
     --Scout related - other
     aiBrain[tScoutAssignedToMexLocation] = {}
 
+    --Skirmisher
+    aiBrain[refiSkirmisherMassDeathsFromLand] = 0
+    aiBrain[refiSkirmisherMassDeathsAll] = 0
+    aiBrain[refiSkirmisherMassKills] = 0
+    aiBrain[refiSkirmisherMassBuilt] = 0
+
 
     aiBrain[M27FactoryOverseer.refiInitialEngineersWanted] = 4
     aiBrain[M27FactoryOverseer.refiEngineerCap] = 70 --Max engis of any 1 tech level even if have spare mass (note will manually increase for tech3)
@@ -5717,6 +5768,7 @@ function OverseerInitialisation(aiBrain)
 
     aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
     aiBrain[M27PlatoonFormer.reftPriorityUnitsForShielding] = {}
+    aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel] = {}
     aiBrain[refiCyclesThatACUHasNoPlatoon] = 0
     aiBrain[refiCyclesThatACUInArmyPool] = 0
     aiBrain[reftUnitGroupPreviousReferences] = {}

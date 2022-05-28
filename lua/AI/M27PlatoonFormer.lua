@@ -193,6 +193,8 @@ function CombatPlatoonFormer(aiBrain)
 
     RefreshUnitsWaitingForAssignment(aiBrain)
 
+    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySkirmisher, aiBrain[reftoCombatUnitsWaitingForAssignment])) == false then bDebugMessages = true end
+
 
     --Remove any duplicate units from reftoCombatUnitsWaitingForAssignment
     if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
@@ -229,7 +231,7 @@ function CombatPlatoonFormer(aiBrain)
     if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
         if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH2 + M27UnitInfo.refCategoryEngineer * categories.TECH3) >= 3  then
             for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
-                if EntityCategoryContains(categories.ALLUNITS - categories.COMMAND -M27UnitInfo.refCategoryLandExperimental, oUnit.UnitId) then
+                if EntityCategoryContains(categories.ALLUNITS - categories.COMMAND -M27UnitInfo.refCategoryLandExperimental - M27UnitInfo.refCategorySkirmisher, oUnit.UnitId) then
                     --Consider if should assign to suicide squad instead
                     if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true and EntityCategoryContains(categories.TECH1 * M27UnitInfo.refCategoryDFTank, oUnit.UnitId) and M27UnitInfo.GetUnitPathingType(oUnit) == M27UnitInfo.refPathingTypeLand then
                         table.insert(tSuicideUnits, oUnit)
@@ -682,6 +684,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
         local tACU = {}
         local tCombat = {}
         local tLandExperimentals = {}
+        local tSkirmishers = {}
         local tIndirect = {}
         local tEngi = {}
         local tStructures = {}
@@ -717,6 +720,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                         elseif EntityCategoryContains(refCategoryEngineer, sUnitID) then table.insert(tEngi, oUnit)
                         elseif EntityCategoryContains(categories.STRUCTURE, sUnitID) then table.insert(tStructures, oUnit)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, sUnitID) then table.insert(tLandExperimentals, oUnit)
+                        elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, sUnitID) then table.insert(tSkirmishers, oUnit)
                         elseif EntityCategoryContains(refCategoryLandCombat, sUnitID) then table.insert(tCombat, oUnit)
                         elseif EntityCategoryContains(refCategoryIndirectT2Plus, sUnitID) then table.insert(tIndirect, oUnit)
                         elseif EntityCategoryContains(refCategoryAllAir, sUnitID) then
@@ -748,6 +752,11 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
             end
             if M27Utilities.IsTableEmpty(tEngi) == false then AddIdleUnitsToPlatoon(aiBrain, tEngi, aiBrain[M27PlatoonTemplates.refoAllEngineers]) end
             if M27Utilities.IsTableEmpty(tLandExperimentals) == false then local oNewPlatoon = CreatePlatoon(aiBrain, 'M27GroundExperimental', tLandExperimentals) end
+            if M27Utilities.IsTableEmpty(tSkirmishers) == false then
+                bDebugMessages = true
+                if bDebugMessages == true then LOG(sFunctionRef..': Will create a new skrimisher platoon which includes unit '..tSkirmishers[1].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSkirmishers[1])) end
+                local oNewPlatoon = CreatePlatoon(aiBrain, 'M27Skirmisher', tSkirmishers)
+            end
             if M27Utilities.IsTableEmpty(tCombat) == false then
                 AddIdleUnitsToPlatoon(aiBrain, tCombat, aiBrain[M27PlatoonTemplates.refoIdleCombat])
                 AllocateNewUnitsToPlatoonNotFromFactory(tCombat)
@@ -1272,6 +1281,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     --if bNoDelay is true then wont do normal waiting for the unit to move away from the factory (nb: should only set this to true if we're not talking about a newly produced unit from a factory as it will bypass the workaround for factory error where factories stop building)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AllocateNewUnitToPlatoonBase'
+    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySkirmisher, tNewUnits)) == false then bDebugMessages = true end
     --DONT USE PROFILER HERE as need solution to the waitticks
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
@@ -1529,7 +1539,8 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                             --local refCategoryAttackBot = M27UnitInfo.refCategoryDFTank
                             --local refCategoryIndirect = M27UnitInfo.refCategoryIndirect
                             local tMobileShieldUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
-                            local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
+                            local tSpecialCombat = EntityCategoryFilterDown(M27UnitInfo.refCategorySkirmisher + M27UnitInfo.refCategoryLandExperimental, tNewUnits)
+                            local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategorySkirmisher - M27UnitInfo.refCategoryLandExperimental, tNewUnits)
                             local tEngineerUnits = EntityCategoryFilterDown(refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
                             local tAirUnits = EntityCategoryFilterDown(categories.AIR - refCategoryEngineer, tNewUnits)
                             local tNavalUnits = EntityCategoryFilterDown(categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat, tNewUnits)
@@ -1626,6 +1637,10 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                             end
                             if M27Utilities.IsTableEmpty(tMAA) == false then
                                 MAAPlatoonFormer(aiBrain, tMAA)
+                            end
+                            if M27Utilities.IsTableEmpty(tSpecialCombat) == false then
+                                AllocateUnitsToIdlePlatoons(aiBrain, tSpecialCombat)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have special combat units, so will send to idle platoon former instead of combat platoon former') end
                             end
                             if M27Utilities.IsTableEmpty(tAirUnits) == false then
                                 AllocateUnitsToIdlePlatoons(aiBrain, tAirUnits)

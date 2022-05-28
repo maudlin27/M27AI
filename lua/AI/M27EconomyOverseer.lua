@@ -749,7 +749,7 @@ function GetUnitToUpgrade(aiBrain, iUnitCategory, tStartPoint)
                     LOG('Unit is valid, ID=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; Unit status=' .. M27Logic.GetUnitState(oUnit) .. '; GameTime=' .. GetGameTimeSeconds())
                 end
             end
-            if M27UnitInfo.IsUnitValid(oUnit) and not (M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, true) == nil) and not (oUnit:IsUnitState('Upgrading')) then
+            if M27UnitInfo.IsUnitValid(oUnit) and M27UnitInfo.GetUnitUpgradeBlueprint(oUnit, true) and not (oUnit:IsUnitState('Upgrading')) then
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Have a unit that is available for upgrading; iUnit=' .. iUnit .. '; Unit ref=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
                 end

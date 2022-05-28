@@ -140,6 +140,7 @@ refCategoryObsidian = categories.AEON * categories.TECH2 * categories.SHIELD * c
 refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD - refCategoryObsidian --Miscategorised obsidian tank
 refCategoryPersonalShield = categories.PERSONALSHIELD + refCategoryObsidian
 refCategorySniperBot = categories.MOBILE * categories.SNIPER * categories.LAND
+refCategorySkirmisher = refCategorySniperBot * categories.TECH3 + refCategoryDFTank * categories.UEF * categories.TECH2 * categories.BOT + refCategoryDFTank * categories.CYBRAN * categories.TECH2 * categories.BOT - categories.BOMB --Mongoose, Hoplite, sniperbot
 
 --Air units
 refCategoryAirScout = categories.AIR * categories.SCOUT
@@ -180,12 +181,12 @@ refCategoryLongRangeMobile = refCategoryFatboy + refCategorySniperBot + refCateg
 refCategoryShortRangeMobile = refCategoryLandCombat + refCategoryFrigate - refCategoryLongRangeMobile
 
 --Weapon target priorities
-refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
-refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN}
-refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
-refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN}
-refWeaponPriorityTorpBomber = {refCategoryCruiser, refCategoryCruiserCarrier, refCategoryFrigate, refCategoryNavyThatCanBeTorpedoed}
-refWeaponPriorityT2Arti = {refCategoryFatboy, refCategoryIndirectT2Plus + refCategoryFixedT2Arti, refCategoryFixedShield + refCategoryNavalSurface, refCategoryStructure - categories.TECH1, refCategoryStructure + refCategoryLandCombat - categories.TECH1, categories.LAND - categories.BENIGN}
+refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityTorpBomber = {refCategoryCruiser, refCategoryCruiserCarrier, refCategoryFrigate, refCategoryNavyThatCanBeTorpedoed, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityT2Arti = {refCategoryFatboy, refCategoryIndirectT2Plus + refCategoryFixedT2Arti, refCategoryFixedShield + refCategoryCruiser, refCategoryNavalSurface + refCategoryStructure - categories.TECH1 + refCategoryMobileLandShield, refCategoryStructure + refCategoryLandCombat - categories.TECH1, categories.LAND - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
 
 
 function GetUnitLifetimeCount(oUnit)
@@ -282,7 +283,7 @@ end
 
 function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     --Returns support factory ID if it can be built, otherwise returns normal upgrade unit (works for any unit, not just factory)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitUpgradeBlueprint'
     --if EntityCategoryContains(refCategoryAirFactory, oUnitToUpgrade.UnitId) then bDebugMessages = true end
 
@@ -342,7 +343,7 @@ function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
             local oFactoryBP = oUnitToUpgrade:GetBlueprint()
             sUpgradeBP = oFactoryBP.General.UpgradesTo
             if bDebugMessages == true then LOG(sFunctionRef..': sUpgradeBP='..(sUpgradeBP or 'nil')) end
-            if not(sUpgradeBP) or not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then sUpgradeBP = nil end
+            if not(sUpgradeBP) or sUpgradeBP == '' or not(oUnitToUpgrade:CanBuild(sUpgradeBP)) then sUpgradeBP = nil end
             if bDebugMessages == true then LOG(sFunctionRef..': Didnt have valid support factory to upgrade to; blueprint UpgradesTo='..(sUpgradeBP or 'nil')) end
         end
         if sUpgradeBP == '' then

@@ -693,6 +693,9 @@ Platoon = Class(M27PlatoonClass) {
     M27IndirectSpareAttacker = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27Skirmisher = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
     M27EscortAI = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,

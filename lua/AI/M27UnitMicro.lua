@@ -680,7 +680,7 @@ end--]]
 
 function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     --should have already confirmed overcharge action is available using CanUnitUseOvercharge
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetOverchargeExtraAction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -784,7 +784,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
             end
             if bAbort == false and not(oOverchargeTarget) then
                 --Cycle through every land combat non-ACU unit within firing range to see if can find one that reduces the damage the most, or failing that does the most mass damage; will include all navy on the assumption isshotblocked will trigger if shot will go underwater (as otherwise we might ignore sera T2 destroyers)
-                local tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - categories.COMMAND + M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryAllNavy, tUnitPosition, iACURange - 2, 'Enemy')
+                local tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - categories.COMMAND + M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryAllNavy, tUnitPosition, iACURange - 1, 'Enemy')
                 --local iMostMobileCombatMassDamage = 0
                 --local oMostCombatMassDamage
                 local iMostMassDamage = 0

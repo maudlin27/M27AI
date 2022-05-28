@@ -1316,6 +1316,7 @@ function GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, iReturnRangeType)
     local sFunctionRef = 'GetDFAndT1ArtiUnitMinOrMaxRange'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    if M27Utilities.IsTableEmpty(M27UnitInfo.refCategorySkirmisher, tUnits) == false then bDebugMessages = true end
 
     local iCurRange = 0
     local iMinRange = 1000000000
@@ -1326,7 +1327,10 @@ function GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, iReturnRangeType)
     local iBPCount = 0
 
     --Override for fatboy (since its an indirect fire unit but can work as an ok direct fire unit)
-    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, tUnits)) then iMaxRange = 100 end
+    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, tUnits)) == false then
+        if bDebugMessages == true then LOG(sFunctionRef..': Have a fatboy, so setting range to 100') end
+        iMaxRange = 100
+    end
     local bIncludeT1Arti = false
     for i, oUnit in tAllUnits do
         if not(oUnit.Dead) then
@@ -3219,8 +3223,10 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
         end
     end
 
+
     local iMaxIntelCoverage = 0
     if iMinCoverageWanted == nil and bHaveRecentVisual then iMaxIntelCoverage = M27AirOverseer.iAirSegmentSize end
+    if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverageWanted='..(iMinCoverageWanted or 'nil')..'; bHaveRecentVisual='..tostring(bHaveRecentVisual)..'; iMaxIntelCoverage='..(iMaxIntelCoverage or 'nil')) end
     if bHaveRecentVisual == false or iMinCoverageWanted == nil then
         --Dont have recent visual, so see if have nearby radar or scout
         local tCategoryList = {M27UnitInfo.refCategoryRadar, categories.SCOUT}
@@ -3239,7 +3245,7 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
                 if iCurIntelCoverage > iMaxIntelCoverage then
 
                     --if iMinCoverageWanted == nil then
-                        iMaxIntelCoverage = iCurIntelCoverage
+                    iMaxIntelCoverage = iCurIntelCoverage
                     --else
                     if not(iMinCoverageWanted==nil) then
                         if iCurIntelCoverage > iMinCoverageWanted then
@@ -3268,13 +3274,17 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
                 end
             end
         end--]]
+    elseif bHaveRecentVisual and iMinCoverageWanted then
+        if bDebugMessages == true then LOG(sFunctionRef..': Have recent visual of all nearby segments so returning true') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return true
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if iMinCoverageWanted == nil then
         if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage is nil; returning iMaxIntelCoverage='..iMaxIntelCoverage) end
         return iMaxIntelCoverage
     else
-        if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage) end
+        if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage..'; returning false') end
         return false end
 
 end

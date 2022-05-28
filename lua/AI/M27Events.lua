@@ -97,24 +97,36 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] = (oKilledBrain[M27EngineerOverseer.reftiFirebaseDeadPDMassKills][oUnitKilled[M27EngineerOverseer.refiAssignedFirebase]] or 0) + (oUnitKilled.Sync.totalMassKilled or 0)
                     end
                 end
+
+                --Skirmisher tracking
+                if EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, oUnitKilled.UnitId) then
+                    --We already track the mass killed generally from the unitdeath event; this is only for tracking if it died to DF unit
+                    if oKillerUnit and EntityCategoryContains(categories.LAND * categories.MOBILE, oKillerUnit.UnitId) then
+                        local aiBrain = oUnitKilled:GetAIBrain()
+                        aiBrain[M27Overseer.refiSkirmisherMassDeathsFromLand] = aiBrain[M27Overseer.refiSkirmisherMassDeathsFromLand] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
+                    end
+                end
             else
-                --Did a PD we own kill something?
+                --Did a PD or skirmisher we own kill something?
                 if instigator and not(instigator.Launcher) and instigator.UnitId and IsUnit(instigator) then
                     local oKillerBrain = instigator:GetAIBrain()
                     if oKillerBrain.M27AI then
                         if EntityCategoryContains(M27UnitInfo.refCategoryPD, instigator.UnitId) then
-                            oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] = oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] + instigator.Sync.totalMassKilled or 0
+                            oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] = oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, instigator.UnitId) then
                             --Did we kill something with a TML that wasnt our last target (so e.g. a unit might have managed to block the TML missile meaning we can try again)?
                             if M27UnitInfo.IsUnitValid(instigator[M27EngineerOverseer.refoLastTMLTarget]) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': TML last target='..instigator[M27EngineerOverseer.refoLastTMLTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator[M27EngineerOverseer.refoLastTMLTarget])..'; shots fired at last target='..(instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0)..'; Mass killed currently='..instigator.Sync.totalMassKilled..'; mass killed when fired missile='..instigator[M27EngineerOverseer.refiLastTMLMassKills]) end
                                 --if instigator[M27EngineerOverseer.refiLastTMLMassKills] < (instigator.Sync.totalMassKilled or 0) and (instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0) > 0 then
-                                    --if bDebugMessages == true then LOG(sFunctionRef..': TML killed a unit that wasnt its last target so missile may have been blocked') end
+                                --if bDebugMessages == true then LOG(sFunctionRef..': TML killed a unit that wasnt its last target so missile may have been blocked') end
 
-                                    --Allow to go to -1 to give a small margin for error incase e.g. the next time it is blocked by a higher health unit
-                                    instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] = math.max((instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 1) - 1, -1)
+                                --Allow to go to -1 to give a small margin for error incase e.g. the next time it is blocked by a higher health unit
+                                instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] = math.max((instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 1) - 1, -1)
                                 --end
                             end
+                        elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, instigator.UnitId) then
+                            local aiBrain = instigator:GetAIBrain()
+                            aiBrain[M27Overseer.refiSkirmisherMassKills] = aiBrain[M27Overseer.refiSkirmisherMassKills] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
                         end
                     end
                 end
@@ -202,7 +214,7 @@ function OnUnitDeath(oUnit)
                 LOG('Will debug array of the unit')
                 M27Utilities.DebugArray(oUnit)
             end
-            if oUnit.CachePosition then --Redundancy, not sure this will actually trigger as looks like wreck deaths are picked up by the prop logic above
+            if oUnit.CachePosition then --Redundancy to check not dealing with a unit, not sure this will actually trigger as looks like wreck deaths are picked up by the prop logic above
                 if bDebugMessages == true then
                     LOG(sFunctionRef..': Unit killed has a cache position, will draw in blue around it')
                     M27Utilities.DrawLocation(oUnit.CachePosition, nil, 1, 100, nil)
@@ -211,7 +223,35 @@ function OnUnitDeath(oUnit)
             else
                 --Is the unit owned by M27AI?
                 if oUnit.GetAIBrain then
+                    --Ythotha deathball avoidance - all M27 units run away regardless of whether it was an M27 or enemy Ythotha
+                        --Note -seraphimunits.lua contains SEnergyBallUnit which looks like it is for when the death ball is spawned; ID is XSL0402; SpawnElectroStorm is in the ythotha script
+                        --Sandbox test - have c.36s from ythotha dying to energy ball dying, so want to run away for half of this (18s) plus extra time based on how far away we already were
+                    if EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental * categories.SERAPHIM, oUnit.UnitId) then
+                        bDebugMessages = true
+                        local tNearbyUnits
+                        if bDebugMessages == true then LOG(sFunctionRef..': Ythotha has just died, will look for nearby units and tell them to run away') end
+                        local iTimeToRun
+                        local iSearchRange = 70
+                        for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
+                            tNearbyUnits = oBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand, oUnit:GetPosition(), 50, 'Ally')
+                            if M27Utilities.IsTableEmpty(tNearbyUnits) == false then
+                                for iFriendlyUnit, oFriendlyUnit in tNearbyUnits do
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oFriendlyUnit='..oFriendlyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFriendlyUnit)..'; if we own it then will make it run away') end
+                                    if oFriendlyUnit:GetAIBrain() == oBrain then --Only do this for M27 units
+                                        if M27UnitInfo.IsUnitValid(oFriendlyUnit, true) then
+                                            iTimeToRun = math.min(32, math.max(10, 18 + (50 - M27Utilities.GetDistanceBetweenPositions(oFriendlyUnit:GetPosition(), oUnit:GetPosition()) / (oFriendlyUnit:GetBlueprint().Physics.MaxSpeed or 1))))
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Telling friendly unit '..oFriendlyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFriendlyUnit)..' to move away for 18s via moveawayfromtarget order') end
+                                            ForkThread(M27UnitMicro.MoveAwayFromTargetTemporarily, oFriendlyUnit, iTimeToRun, oUnit:GetPosition())
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+
                     local aiBrain = oUnit:GetAIBrain()
+
                     if aiBrain.M27AI then
                         --Flag for the platoon count of units to be updated:
                         if oUnit.PlatoonHandle then oUnit.PlatoonHandle[M27PlatoonUtilities.refbUnitHasDiedRecently] = true end
@@ -256,6 +296,8 @@ function OnUnitDeath(oUnit)
                             if not(oUnit[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
                                 if aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories] then aiBrain[M27MapInfo.reftOurPlateauInformation][oUnit[M27Transport.refiAssignedPlateau]][M27MapInfo.subrefPlateauLandFactories][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = nil end
                             end
+                        elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, sUnitBP) then
+                            aiBrain[M27Overseer.refiSkirmisherMassDeathsAll] = aiBrain[M27Overseer.refiSkirmisherMassDeathsAll] + oUnit:GetBlueprint().Economy.BuildCostMass
                         end
 
                         --All non-mex/hydro structures - if have shield locations that cant build on, then check if this was near any of them
@@ -499,6 +541,16 @@ function OnWeaponFired(oWeapon)
                 oUnit[M27UnitInfo.refbOverchargeOrderGiven] = false
                 if bDebugMessages == true then LOG('Overcharge weapon was just fired') end
                 oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] = GetGameTimeSeconds()
+            end
+
+            --SML fired - have all M27 brains build SMD if they havent already (better late than never...)
+            if EntityCategoryContains(M27UnitInfo.refCategorySML, oUnit.UnitId) then
+                local iEnemyIndex = oUnit:GetAIBrain():GetArmyIndex()
+                for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
+                    if IsEnemy(oBrain:GetArmyIndex(), iEnemyIndex) then
+                        oBrain[M27Overseer.refbEnemyFiredNuke] = true
+                    end
+                end
             end
 
             if oUnit:GetAIBrain().M27AI then

@@ -215,6 +215,27 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = true,
         [refbWantsShieldEscort] = true,
     },
+    ['M27Skirmisher'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = 20, --By default wont amalgamate, but have code to start amalgamation when number gets really high
+        [refiPlatoonAmalgamationMaxSize] = 6,
+        [refbUsedByThreatDefender] = false,
+        [refbWantsShieldEscort] = true,
+    },
     ['M27EscortAI'] =
     {
         [refbIdlePlatoon] = false,
