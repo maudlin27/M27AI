@@ -227,7 +227,6 @@ function OnUnitDeath(oUnit)
                         --Note -seraphimunits.lua contains SEnergyBallUnit which looks like it is for when the death ball is spawned; ID is XSL0402; SpawnElectroStorm is in the ythotha script
                         --Sandbox test - have c.36s from ythotha dying to energy ball dying, so want to run away for half of this (18s) plus extra time based on how far away we already were
                     if EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental * categories.SERAPHIM, oUnit.UnitId) then
-                        bDebugMessages = true
                         local tNearbyUnits
                         if bDebugMessages == true then LOG(sFunctionRef..': Ythotha has just died, will look for nearby units and tell them to run away') end
                         local iTimeToRun
@@ -543,7 +542,7 @@ function OnWeaponFired(oWeapon)
                 oUnit[M27UnitInfo.refiTimeOfLastOverchargeShot] = GetGameTimeSeconds()
             end
 
-            --SML fired - have all M27 brains build SMD if they havent already (better late than never...)
+            --SML fired - have all enemy M27 brains build SMD if they havent already (better late than never...)
             if EntityCategoryContains(M27UnitInfo.refCategorySML, oUnit.UnitId) then
                 local iEnemyIndex = oUnit:GetAIBrain():GetArmyIndex()
                 for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
@@ -554,8 +553,8 @@ function OnWeaponFired(oWeapon)
             end
 
             if oUnit:GetAIBrain().M27AI then
-                --T3 arti
-                if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oUnit.UnitId) then
+                --T3 and experimental arti
+                if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oUnit.UnitId) then
                     ForkThread(M27Logic.GetT3ArtiTarget, oUnit)
                     --DF units whose shot is blocked
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryDFTank, oUnit.UnitId) then
@@ -609,11 +608,35 @@ function OnMissileBuilt(self, weapon)
             if bDebugMessages == true then LOG(sFunctionRef..': iMissiles based on tactical silo ammo='..iMissiles) end
             if self.GetNukeSiloAmmoCount then iMissiles = iMissiles + self:GetNukeSiloAmmoCount() end
             if bDebugMessages == true then LOG(sFunctionRef..': iMissiles after Nuke silo ammo='..iMissiles) end
-            if iMissiles >= 2 then
+            if iMissiles >= 2 and not(EntityCategoryContains(categories.EXPERIMENTAL, self.UnitId)) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have at least 2 missiles so will set paused to true') end
+                if self.UnitId..M27UnitInfo.GetUnitLifetimeCount(self) == 'xsb23051' then M27Utilities.ErrorHandler('Pausing Yolona') end
                 self:SetPaused(true)
                 --Recheck every minute
                 ForkThread(M27Logic.CheckIfWantToBuildAnotherMissile, self)
+                --Clear any engineers that were assisting
+                local aiBrain = self:GetAIBrain()
+                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionAssistNuke]) == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have engineers with assist nuke action - will clear') end
+                    local oEngineer
+                    local sActionRef
+                    if EntityCategoryContains(M27UnitInfo.refCategorySML, self.UnitId) then sActionRef = M27EngineerOverseer.refActionAssistNuke
+                    elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, self.UnitId) then sActionRef = M27EngineerOverseer.refActionAssistTML
+                    elseif EntityCategoryContains(M27UnitInfo.refCategorySMD, self.UnitId) then sActionRef = M27EngineerOverseer.refActionAssistSMD
+                    end
+                    if sActionRef then
+                        for iRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sActionRef] do
+                            oEngineer = tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]
+                            --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end
+                            --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
+                            if oEngineer.GetFocusUnit and oEngineer:GetFocusUnit() == self then
+                                IssueClearCommands({oEngineer})
+                                M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
+                            end
+                        end
+                    end
+                end
             end
             --Start logic to periodically check for targets to fire the missile at (in case there are no targets initially)
             if not(self[M27UnitInfo.refbActiveMissileChecker]) and not(EntityCategoryContains(M27UnitInfo.refCategorySMD, self.UnitId)) then
@@ -665,115 +688,147 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
 
             oConstruction['M27FirstConstructionStart'] = true
             local aiBrain = oEngineer:GetAIBrain()
-            --Decide if we want to shield the construction
-            local oBP = oConstruction:GetBlueprint()
-            if oBP.Economy.BuildCostMass >= 2000 then
-                if oBP.Defense.Health / oBP.Economy.BuildCostMass < 1 or EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oConstruction.UnitId) or (aiBrain[M27Overseer.refbDefendAgainstArti] and oBP.Economy.BuildCostMass >= 3000 and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oConstruction.UnitId)) then
-                    oConstruction[M27EngineerOverseer.refiShieldsWanted] = 1
-                    table.insert(aiBrain[M27EngineerOverseer.reftUnitsWantingFixedShield], oConstruction)
-                    --Flag if we want it to have a heavy shield
-                    if aiBrain[M27Overseer.refbDefendAgainstArti] then
-                        oConstruction[M27EngineerOverseer.refbNeedsLargeShield] = true
-                        aiBrain[M27EngineerOverseer.refbHaveUnitsWantingHeavyShield] = true --Redundancy (should already check for the defendagainstarti flag)
-                        if oBP.Economy.BuildCostMass >= 12000 then
-                            oConstruction[M27EngineerOverseer.refiShieldsWanted] = 2
-                        end
-                    else
-                        if oBP.Economy.BuildCostMass >= 12000 then
 
-                            if oBP.Economy.BuildCostMass >= 20000 then
-                                oConstruction[M27EngineerOverseer.refbNeedsLargeShield] = true
-                                aiBrain[M27EngineerOverseer.refbHaveUnitsWantingHeavyShield] = true
-                            else
-                                --Cybran - shield nukes with T3 shields.  Other factions can use t2
-                                if EntityCategoryContains(categories.CYBRAN, oConstruction.UnitId) then
+            --Game enders - check if we have already started a gameender nearby, and if so clear current building and reclaim it
+            local bCancelAndReclaim = false
+            local oUnitToSwitchTo
+            if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalStructure, oConstruction.UnitId) then
+                local tNearbyGameEnders = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalStructure, oConstruction:GetPosition(), 150, 'Ally')
+
+                if M27Utilities.IsTableEmpty(tNearbyGameEnders) == false then
+                    local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oConstruction:GetPosition())
+                    for iUnit, oUnit in tNearbyGameEnders do
+                        if not(oUnit == oConstruction) and oUnit:GetFractionComplete() < 1 and iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) then
+                            bCancelAndReclaim = true
+                            oUnitToSwitchTo = oUnit
+                            break
+                        end
+                    end
+                end
+            end
+            if bCancelAndReclaim then
+                IssueClearCommands({oEngineer})
+                IssueReclaim({oEngineer}, oConstruction)
+                if oUnitToSwitchTo then
+                    IssueRepair({oEngineer}, oUnitToSwitchTo)
+                end
+            else
+                --Decide if we want to shield the construction
+                local oBP = oConstruction:GetBlueprint()
+                if oBP.Economy.BuildCostMass >= 2000 then
+                    if oBP.Defense.Health / oBP.Economy.BuildCostMass < 1 or EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oConstruction.UnitId) or (aiBrain[M27Overseer.refbDefendAgainstArti] and oBP.Economy.BuildCostMass >= 3000 and EntityCategoryContains(M27UnitInfo.refCategoryStructure, oConstruction.UnitId)) then
+                        oConstruction[M27EngineerOverseer.refiShieldsWanted] = 1
+                        table.insert(aiBrain[M27EngineerOverseer.reftUnitsWantingFixedShield], oConstruction)
+                        --Flag if we want it to have a heavy shield
+                        if aiBrain[M27Overseer.refbDefendAgainstArti] then
+                            oConstruction[M27EngineerOverseer.refbNeedsLargeShield] = true
+                            aiBrain[M27EngineerOverseer.refbHaveUnitsWantingHeavyShield] = true --Redundancy (should already check for the defendagainstarti flag)
+                            if oBP.Economy.BuildCostMass >= 12000 then
+                                oConstruction[M27EngineerOverseer.refiShieldsWanted] = 2
+                            end
+                        else
+                            if oBP.Economy.BuildCostMass >= 12000 then
+
+                                if oBP.Economy.BuildCostMass >= 20000 then
                                     oConstruction[M27EngineerOverseer.refbNeedsLargeShield] = true
                                     aiBrain[M27EngineerOverseer.refbHaveUnitsWantingHeavyShield] = true
+                                else
+                                    --Cybran - shield nukes with T3 shields.  Other factions can use t2
+                                    if EntityCategoryContains(categories.CYBRAN, oConstruction.UnitId) then
+                                        oConstruction[M27EngineerOverseer.refbNeedsLargeShield] = true
+                                        aiBrain[M27EngineerOverseer.refbHaveUnitsWantingHeavyShield] = true
+                                    end
                                 end
-                            end
 
+                            end
                         end
                     end
+                end
+
+
+                --Check for construction of nuke
+                --if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] then
+                local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+                local sFunctionRef = 'OnConstructionStarted'
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have just started construction on a nuke; if so then will start a monitor; UnitID='..oConstruction.UnitId..'; oConstruction[M27UnitInfo.refbActiveSMDChecker]='..(tostring(oConstruction[M27UnitInfo.refbActiveSMDChecker] or false))) end
+
+                if EntityCategoryContains(M27UnitInfo.refCategorySML - categories.EXPERIMENTAL, oConstruction.UnitId) then
+                    --Are building a nuke, check if already monitoring SMD somehow
+                    if not(oConstruction[M27UnitInfo.refbActiveSMDChecker]) and oConstruction:GetFractionComplete() < 1 then
+                        --if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27UnitInfo.refCategorySML and not(aiBrain[M27UnitInfo.refbActiveSMDChecker]) then
+                        ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oConstruction)
+                    end
+                end
+                --end
+
+                --Firebase tracking
+                if EntityCategoryContains(M27UnitInfo.refCategoryFirebaseSuitable, oConstruction.UnitId) then
+                    --First check in case ACU is already building something
+                    local oUnitToSwitchTo
+                    local bReclaimAnyway = false
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU building firebase unit near us in which case will switch to assisting it instead.  Cur strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; oEngineer[M27EngineerOverseer.refiEngineerCurrentAction]='..(oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
+                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionFortifyFirebase then
+                        local oACU = M27Utilities.GetACU(aiBrain)
+                        local iFirebaseCategoryWanted = aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(oACU)) end
+                        if iFirebaseCategoryWanted and oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
+                            local oACUTarget = oACU:GetFocusUnit()
+                            if M27UnitInfo.IsUnitValid(oACUTarget) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': oACUTarget='..oACUTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oACUTarget)..'; Fraction complete='..oACUTarget:GetFractionComplete()..'; Dist to oConstruction='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition())) end
+                                if oACUTarget:GetFractionComplete() < 1 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 then
+                                    --Is the ACU building a firebase category, and is that our action?
+                                    if EntityCategoryContains(aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]], oACUTarget.UnitId) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will switch so we assist this unit instead') end
+                                        oUnitToSwitchTo = oACUTarget
+                                    end
+                                end
+                            end
+                        end
+                        if iFirebaseCategoryWanted and not(oUnitToSwitchTo) and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 then
+                            local tNearbyUnitsOfType = aiBrain:GetUnitsAroundPoint(iFirebaseCategoryWanted, oConstruction:GetPosition(), 35, 'Ally')
+                            if M27Utilities.IsTableEmpty(tNearbyUnitsOfType) == false then
+                                for iUnit, oUnit in tNearbyUnitsOfType do
+                                    if oUnit:GetFractionComplete() < 1 then
+                                        oUnitToSwitchTo = oUnit
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                        --Did we just start on a radar at a firebase that already has one complete nearby?
+                        if not(oUnitToSwitchTo) and EntityCategoryContains(M27UnitInfo.refCategoryRadar, oConstruction.UnitId) then
+                            local iTechCategory = M27UnitInfo.ConvertTechLevelToCategory(M27UnitInfo.GetUnitTechLevel(oConstruction))
+                            local tNearbyRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryRadar * iTechCategory, oConstruction:GetPosition(), 35, 'Ally')
+                            if M27Utilities.IsTableEmpty(tNearbyRadar) == false then
+                                for iUnit, oUnit in tNearbyRadar do
+                                    if oUnit:GetFractionComplete() == 1 then
+                                        bReclaimAnyway = true
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    if bReclaimAnyway or (oUnitToSwitchTo and not(oUnitToSwitchTo == oConstruction)) then
+                        IssueClearCommands({oEngineer})
+                        IssueReclaim({oEngineer}, oConstruction)
+                        if oUnitToSwitchTo then
+                            IssueRepair({oEngineer}, oUnitToSwitchTo)
+                            ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oUnitToSwitchTo)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have told engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to switch to assist what the ACU is building') end
+                        elseif bDebugMessages == true then LOG(sFunctionRef..': Engineer was building radar but we have one nearby now, will reclaim the radar')
+                        end
+                    else
+                        ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oConstruction)
+                    end
+                end
+
+                --Scathis tracking (since impacts where we can build)
+                if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalArti * categories.MOBILE, oConstruction.UnitId) then
+                    aiBrain[M27EngineerOverseer.reftFriendlyScathis][oConstruction.UnitId..M27UnitInfo.GetUnitLifetimeCount(oConstruction)] = oConstruction
                 end
             end
 
-
-            --Check for construction of nuke
-            --if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] then
-            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-            local sFunctionRef = 'OnConstructionStarted'
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have just started construction on a nuke; if so then will start a monitor; UnitID='..oConstruction.UnitId..'; oConstruction[M27UnitInfo.refbActiveSMDChecker]='..(tostring(oConstruction[M27UnitInfo.refbActiveSMDChecker] or false))) end
-
-            if EntityCategoryContains(M27UnitInfo.refCategorySML, oConstruction.UnitId) then
-                --Are building a nuke, check if already monitoring SMD somehow
-                if not(oConstruction[M27UnitInfo.refbActiveSMDChecker]) and oConstruction:GetFractionComplete() < 1 then
-                    --if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27UnitInfo.refCategorySML and not(aiBrain[M27UnitInfo.refbActiveSMDChecker]) then
-                    ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oConstruction)
-                end
-            end
-            --end
-
-            --Firebase tracking
-            if EntityCategoryContains(M27UnitInfo.refCategoryFirebaseSuitable, oConstruction.UnitId) then
-                --First check in case ACU is already building something
-                local oUnitToSwitchTo
-                local bReclaimAnyway = false
-                if bDebugMessages == true then LOG(sFunctionRef..': Checking if ACU building firebase unit near us in which case will switch to assisting it instead.  Cur strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; oEngineer[M27EngineerOverseer.refiEngineerCurrentAction]='..(oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
-                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionFortifyFirebase then
-                    local oACU = M27Utilities.GetACU(aiBrain)
-                    local iFirebaseCategoryWanted = aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(oACU)) end
-                    if iFirebaseCategoryWanted and oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
-                        local oACUTarget = oACU:GetFocusUnit()
-                        if M27UnitInfo.IsUnitValid(oACUTarget) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': oACUTarget='..oACUTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oACUTarget)..'; Fraction complete='..oACUTarget:GetFractionComplete()..'; Dist to oConstruction='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition())) end
-                            if oACUTarget:GetFractionComplete() < 1 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 then
-                                --Is the ACU building a firebase category, and is that our action?
-                                if EntityCategoryContains(aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]], oACUTarget.UnitId) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Will switch so we assist this unit instead') end
-                                    oUnitToSwitchTo = oACUTarget
-                                end
-                            end
-                        end
-                    end
-                    if iFirebaseCategoryWanted and not(oUnitToSwitchTo) and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oConstruction:GetPosition()) <= 35 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 then
-                        local tNearbyUnitsOfType = aiBrain:GetUnitsAroundPoint(iFirebaseCategoryWanted, oConstruction:GetPosition(), 35, 'Ally')
-                        if M27Utilities.IsTableEmpty(tNearbyUnitsOfType) == false then
-                            for iUnit, oUnit in tNearbyUnitsOfType do
-                                if oUnit:GetFractionComplete() < 1 then
-                                    oUnitToSwitchTo = oUnit
-                                    break
-                                end
-                            end
-                        end
-                    end
-                    --Did we just start on a radar at a firebase that already has one complete nearby?
-                    if not(oUnitToSwitchTo) and EntityCategoryContains(M27UnitInfo.refCategoryRadar, oConstruction.UnitId) then
-                        local iTechCategory = M27UnitInfo.ConvertTechLevelToCategory(M27UnitInfo.GetUnitTechLevel(oConstruction))
-                        local tNearbyRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryRadar * iTechCategory, oConstruction:GetPosition(), 35, 'Ally')
-                        if M27Utilities.IsTableEmpty(tNearbyRadar) == false then
-                            for iUnit, oUnit in tNearbyRadar do
-                                if oUnit:GetFractionComplete() == 1 then
-                                    bReclaimAnyway = true
-                                    break
-                                end
-                            end
-                        end
-                    end
-                end
-                if bReclaimAnyway or (oUnitToSwitchTo and not(oUnitToSwitchTo == oConstruction)) then
-                    IssueClearCommands({oEngineer})
-                    IssueReclaim({oEngineer}, oConstruction)
-                    if oUnitToSwitchTo then
-                        IssueRepair({oEngineer}, oUnitToSwitchTo)
-                        ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oUnitToSwitchTo)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have told engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to switch to assist what the ACU is building') end
-                    elseif bDebugMessages == true then LOG(sFunctionRef..': Engineer was building radar but we have one nearby now, will reclaim the radar')
-                    end
-                else
-                    ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oConstruction)
-                end
-            end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         end
     end
@@ -848,11 +903,12 @@ function OnConstructed(oEngineer, oJustBuilt)
                         M27Logic.DetermineTMDWantedForUnits(aiBrain, aiBrain[M27EngineerOverseer.reftUnitsWantingTMD])
                     end
                 end
-                if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti, oJustBuilt.UnitId) and not (oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
+                if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oJustBuilt.UnitId) and not (oJustBuilt[M27UnitInfo.refbActiveTargetChecker]) then
                     aiBrain[M27Overseer.refbAreBigThreats] = true
                     --T3 arti - first time its constructed want to start thread checking for power, and also tell it what to fire
                     oJustBuilt[M27UnitInfo.refbActiveTargetChecker] = true
                     ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Just built t3 arti or equivalent so have called the logic to get t3 arti target') end
                 end
             end
 
@@ -919,20 +975,23 @@ function OnTransportLoad(oUnit, oTransport, bone)
 end
 
 function OnTransportUnload(oUnit, oTransport, bone)
-    local aiBrain = oUnit:GetAIBrain()
-    if M27UnitInfo.IsUnitValid(oUnit) and aiBrain.M27AI then
-        local sFunctionRef = 'OnTransportUnload'
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-        IssueClearCommands({oUnit})
-        oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
-        --Make sure we have correctly recorded the plateau if we have landed engineers
 
-        if not(oUnit[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) then
-            if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit, oUnit:GetPosition()) then
-                oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+    if M27UnitInfo.IsUnitValid(oUnit) then
+        local aiBrain = oUnit:GetAIBrain()
+        if aiBrain.M27AI then
+            local sFunctionRef = 'OnTransportUnload'
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            IssueClearCommands({oUnit})
+            oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+            --Make sure we have correctly recorded the plateau if we have landed engineers
+
+            if not(oUnit[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) then
+                if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit, oUnit:GetPosition()) then
+                    oUnit[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())
+                end
             end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
 end

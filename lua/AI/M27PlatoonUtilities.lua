@@ -2146,8 +2146,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local bProceed = true
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
-    if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 840 and GetGameTimeSeconds() <= 1020 then bDebugMessages = true end
+    --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
@@ -3213,13 +3213,13 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                     bDontChangeCurrentAction = false
                                 end
                             end
-                            if bDontChangeCurrentAction == false then
+                            if bDontChangeCurrentAction then
                                 --Check if have reached the target:
                                 local tDFUnits = EntityCategoryFilterDown(categories.DIRECTFIRE, oPlatoon[reftCurrentUnits])
                                 if tDFUnits == nil then bDontChangeCurrentAction = false
                                 else
                                     if table.getn(tDFUnits) == 0 then bDontChangeCurrentAction = false
-                                    else
+                                    elseif M27Utilities.IsTableEmpty(oPlatoon[reftTemporaryMoveTarget]) == false then
                                         if M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetAveragePosition(tDFUnits), oPlatoon[reftTemporaryMoveTarget]) <= 10 then bDontChangeCurrentAction = false end
                                     end
                                 end
@@ -3731,11 +3731,11 @@ end
 
 function MergeNearbyPlatoons(oBasePlatoon)
     --Merges nearby platoons, and updates current platoons current units. Returns true if have merged platoons
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MergeNearbyPlatoons'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oBasePlatoon:GetPlan() == 'M27AttackNearestUnits' and oBasePlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
-    if oBasePlatoon:GetPlan() == 'M27Skirmisher' then bDebugMessages = true end
+    --if oBasePlatoon:GetPlan() == 'M27Skirmisher' then bDebugMessages = true end
     local oPlatoonToMergeInto
     if oBasePlatoon[M27PlatoonTemplates.refbAmalgamateIntoEscort] then oPlatoonToMergeInto = oBasePlatoon[refoEscortingPlatoon]
     else oPlatoonToMergeInto = oBasePlatoon end
@@ -3829,7 +3829,6 @@ function CombineNearbySkirmishers(aiBrain)
         end
     end
     if iSkirmisherCount >= 20 then
-        bDebugMessages = true
         local iUnitsBeforeMerge
         local iMergesWanted = 5
         if bDebugMessages == true then LOG(sFunctionRef..': iSkirmisherCount='..iSkirmisherCount..'; will cycle through every platoon and see if can merge any of them') end
@@ -4023,7 +4022,7 @@ function SetIfPlatoonCanKite(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetIfPlatoonCanKite'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if oPlatoon.GetPlan and oPlatoon:GetPlan() == 'M27Skirmisher' then bDebugMessages = true end
+    --if oPlatoon.GetPlan and oPlatoon:GetPlan() == 'M27Skirmisher' then bDebugMessages = true end
     oPlatoon[refbKiteEnemies] = false
     if oPlatoon[refbACUInPlatoon] then oPlatoon[refbKiteEnemies] = true
     elseif oPlatoon[refiCurrentUnits] > 0 and (oPlatoon[refiDFUnits] > 0 or oPlatoon[refiIndirectUnits] > 0) then
@@ -4383,6 +4382,7 @@ function DetermineActionForNearbyMex(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineActionForNearbyMex'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': About to check have builders in platoon and get first builder') end
     if oPlatoon[refiBuilders] > 0 then
         local oFirstBuilder
@@ -4413,115 +4413,126 @@ function DetermineActionForNearbyMex(oPlatoon)
             local bHaveEnoughPower = false
 
 
-            if not(M27Utilities.IsACU(oFirstBuilder)) or not(M27Conditions.DoesACUHaveBigGun(aiBrain)) then
-                --Early game: Only build max 1 mex if no nearby hydro (until have 4 pgens), max 3 mex if nearby Hydro, until have got hydro/power in place
-                if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 11 then bHaveEnoughPower = true
-                elseif M27Conditions.HydroNearACUAndBase(aiBrain, true, false) then
-                    local iCurMexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex)
-                    if iCurMexes < 3 then bHaveEnoughPower = true
-                    elseif iCurMexes < 4 then
-                        --Sometimes want to get 4 mexes before hydro
-                        if M27Utilities.IsTableEmpty(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber]) == false and table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1]) <= 5 then
-                            bHaveEnoughPower = true
-                        end
-
-                    end
-                elseif aiBrain:GetEconomyIncome('MASS') <= 0.2 or (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Power) >= 4 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex) < 2) then bHaveEnoughPower = true
-                elseif (aiBrain:GetEconomyStored('MASS') <= 30 and aiBrain:GetEconomyStored('ENERGY') >= 1400) or (aiBrain:GetEconomyStored('MASS') <= 15 and aiBrain:GetEconomyStored('ENERGY') >= 500 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower)) >= math.max(4, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex)+1) then bHaveEnoughPower = true
-
-                end
-                if bHaveEnoughPower == true then
-
-                    --Do we have a part-built mex within range or near range?
-                    local tNearbyMex = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMex, GetPlatoonFrontPosition(oPlatoon), iMexSearchRange, 'Ally')
-                    if M27Utilities.IsTableEmpty(tNearbyMex) == false then
-                        local oNearestPartBuiltMex
-                        local iNearestPartBuiltMex = 100000
-                        local iCurDistance
-                        for iMex, oMex in tNearbyMex do
-                            if oMex:GetFractionComplete() < 1 then
-                                iCurDistance = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oMex:GetPosition())
-                                if iCurDistance < iNearestPartBuiltMex then
-                                    iNearestPartBuiltMex = iCurDistance
-                                    oNearestPartBuiltMex = oMex
-                                end
-
+                if not(M27Utilities.IsACU(oFirstBuilder)) or not(M27Conditions.DoesACUHaveBigGun(aiBrain)) then
+                    --Early game: Only build max 1 mex if no nearby hydro (until have 4 pgens), max 3 mex if nearby Hydro, until have got hydro/power in place
+                    if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 11 then bHaveEnoughPower = true
+                    elseif M27Conditions.HydroNearACUAndBase(aiBrain, true, false) then
+                        local iCurMexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex)
+                        if iCurMexes < 3 then bHaveEnoughPower = true
+                        elseif iCurMexes < 4 then
+                            --Sometimes want to get 4 mexes before hydro
+                            if M27Utilities.IsTableEmpty(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber]) == false and table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1]) <= 5 then
+                                bHaveEnoughPower = true
                             end
+
                         end
-                        if oNearestPartBuiltMex then
-                            oPlatoon[refiCurrentAction] = refActionAssistConstruction
-                            oPlatoon[refoConstructionToAssist] = oNearestPartBuiltMex
+                    elseif aiBrain:GetEconomyIncome('MASS') <= 0.2 or (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Power) >= 4 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex) < 2) then bHaveEnoughPower = true
+                    elseif (aiBrain:GetEconomyStored('MASS') <= 30 and aiBrain:GetEconomyStored('ENERGY') >= 1400) or (aiBrain:GetEconomyStored('MASS') <= 15 and aiBrain:GetEconomyStored('ENERGY') >= 500 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPower)) >= math.max(4, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT1Mex)+1) then bHaveEnoughPower = true
+
+                    end
+
+                    --If have less tahn 20 power and are more likely to stall power than mass then call logic to build power first
+                    if bHaveEnoughPower and not(oFirstBuilder:IsUnitState('Building')) and not(oFirstBuilder:IsUnitState('Repairing')) and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 20 and aiBrain:GetEconomyStored('ENERGY') <= 2000 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 0 and (aiBrain:GetEconomyStored('MASS') >= 50 or (aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 and aiBrain:GetEconomyStored('MASS') >= 15)) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Still have lowish power, will see if want to build power first rather than mass') end
+                        DetermineIfACUShouldBuildPower(oPlatoon)
+                        if oPlatoon[refiCurrentAction] then
+                            bHaveEnoughPower = false
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want to build power in priority to mex') end
                         end
                     end
-                    if not(oPlatoon[refiCurrentAction]) then
 
-                        --Are there any unclaimed mexes nearby:
-                        --GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy, bCanBeQueuedToBeBuilt, iMaxSearchRangeMod, tStartPositionOverride, tMexesToIgnore)
-                        local tNearbyMex = M27MapInfo.GetNearestMexToUnit(oFirstBuilder, false, false, true, M27Overseer.iACUMaxTravelToNearbyMex, nil, nil) --allows a slight detour from current position
-                        if bDebugMessages == true then
-                            if M27Utilities.IsTableEmpty(tNearbyMex) then LOG(sFunctionRef..': tNearbyMex is empty')
-                            else LOG(sFunctionRef..': tNearbyMex='..repru(tNearbyMex)) end
-                        end
+                    if bHaveEnoughPower == true then
+
+                        --Do we have a part-built mex within range or near range?
+                        local tNearbyMex = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMex, GetPlatoonFrontPosition(oPlatoon), iMexSearchRange, 'Ally')
                         if M27Utilities.IsTableEmpty(tNearbyMex) == false then
-                            --Do we already have an action to reclaim? If so then only build mex if are in range
-                            local iDistToMex = math.floor(M27Utilities.GetDistanceBetweenPositions(tNearbyMex, oFirstBuilder:GetPosition()))
-                            if iDistToMex <= iMexSearchRange and (not(oPlatoon[refiCurrentAction]) or (aiBrain:GetEconomyStored('MASS') >= 20 and iDistToMex <= oPlatoon[reftBuilders][1]:GetBlueprint().MaxBuildDistance)) then
-                                --Is the mex location in range of enemy T2+ PD?
-                                local tEnemyT2PlusPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, tNearbyMex, 53, 'Enemy')
-                                if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) then
-                                    tEnemyT2PlusPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3PD, tNearbyMex, 72, 'Enemy')
-                                    if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) then
-                                        --If we walk in a straight line to a mex can we path there? (ignore check if mex is within build range), and does anything block a shot there?
-                                        local bNoObstructions = true
-                                        local iBuildRange = oFirstBuilder:GetBlueprint().Economy.MaxBuildDistance - 2
-
-                                        if iDistToMex <= iBuildRange then
-                                            bNoObstructions = true --redundancy
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Mex is within build range so can build on it. iDistToMex='..iDistToMex..'; iBuildRange='..iBuildRange) end
-                                        else
-                                            local iOurBasePathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFirstBuilder:GetPosition())
-                                            local tPositionToCheck
-                                            local iAngleToMove = M27Utilities.GetAngleFromAToB(oFirstBuilder:GetPosition(), tNearbyMex)
-                                            for iDistance = 1, (iDistToMex - iBuildRange) do
-                                                tPositionToCheck = M27Utilities.MoveInDirection(oFirstBuilder:GetPosition(), iAngleToMove, iDistance, false)
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Comparing pathing group of builder position='..repru(oFirstBuilder:GetPosition())..' with group '..iOurBasePathingGroup..' to positiontocheck='..repru(tPositionToCheck)..' with group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPositionToCheck)) end
-                                                if not(iOurBasePathingGroup == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPositionToCheck)) then
-                                                    if bDebugMessages == true then LOG(sFunctionRef..': The position to check is in a different pathing group so have obstructions') end
-                                                    bNoObstructions = false
-                                                    break
-                                                end
-                                            end
-                                            if bNoObstructions and iDistToMex > (iBuildRange + 1) then
-                                                --Check if we fire a shot if anything blocks it
-                                                local tStartPosition = GetPlatoonFrontPosition(oPlatoon)
-                                                if M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit]) then tStartPosition[2] = GetSurfaceHeight(tStartPosition[1], tStartPosition[3]) end
-                                                tStartPosition[2] = tStartPosition[2] + 0.1
-                                                if bDebugMessages == true then LOG(sFunctionRef..': About to check if line is blocked from tStartPosition='..repru(tStartPosition)..' to tNearbyMex='..repru({tNearbyMex[1], tNearbyMex[2] + 0.1, tNearbyMex[3]})..'; result='..tostring(M27Logic.IsLineBlocked(aiBrain, tStartPosition, {tNearbyMex[1], tNearbyMex[2] + 0.1, tNearbyMex[3]}, 1))) end
-                                                if M27Logic.IsLineBlocked(aiBrain, tStartPosition, {tNearbyMex[1], tNearbyMex[2] + 0.1, tNearbyMex[3]}, 1) then
-                                                    bNoObstructions = false
-                                                end
-                                            end
-
-                                            if bDebugMessages == true then LOG(sFunctionRef..': CHecking if can path in a straight line to the nearest mex; iOurBasePathingGroup='..iOurBasePathingGroup..'; bNoObstructions='..tostring(bNoObstructions)) end
-                                        end
-
-                                        if bNoObstructions then
-                                            oPlatoon[refiCurrentAction] = refActionBuildMex
-                                            if oPlatoon[reftNearbyMexToBuildOn] == nil then oPlatoon[reftNearbyMexToBuildOn] = {} end
-                                            oPlatoon[reftNearbyMexToBuildOn] = tNearbyMex
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Have updated for nearby mex='..repru(oPlatoon[reftNearbyMexToBuildOn])) end
-                                        elseif bDebugMessages == true then LOG(sFunctionRef..': Cant path easily to the mex so wont try and build on it')
-                                        end
-                                    elseif bDebugMessages == true then LOG(sFunctionRef..': Mex has T3 PD near it so wont proceed')
+                            local oNearestPartBuiltMex
+                            local iNearestPartBuiltMex = 100000
+                            local iCurDistance
+                            for iMex, oMex in tNearbyMex do
+                                if oMex:GetFractionComplete() < 1 then
+                                    iCurDistance = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oMex:GetPosition())
+                                    if iCurDistance < iNearestPartBuiltMex then
+                                        iNearestPartBuiltMex = iCurDistance
+                                        oNearestPartBuiltMex = oMex
                                     end
-                                elseif bDebugMessages == true then LOG(sFunctionRef..': Mex has T2 PD near it so wont proceed')
+
                                 end
-                            elseif bDebugMessages == true then LOG(sFunctionRef..': Already have an action assigned, and not in range of mex, so will proceed with existing action')
+                            end
+                            if oNearestPartBuiltMex then
+                                oPlatoon[refiCurrentAction] = refActionAssistConstruction
+                                oPlatoon[refoConstructionToAssist] = oNearestPartBuiltMex
+                            end
+                        end
+                        if not(oPlatoon[refiCurrentAction]) then
+
+                            --Are there any unclaimed mexes nearby:
+                            --GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy, bCanBeQueuedToBeBuilt, iMaxSearchRangeMod, tStartPositionOverride, tMexesToIgnore)
+                            local tNearbyMex = M27MapInfo.GetNearestMexToUnit(oFirstBuilder, false, false, true, M27Overseer.iACUMaxTravelToNearbyMex, nil, nil) --allows a slight detour from current position
+                            if bDebugMessages == true then
+                                if M27Utilities.IsTableEmpty(tNearbyMex) then LOG(sFunctionRef..': tNearbyMex is empty')
+                                else LOG(sFunctionRef..': tNearbyMex='..repru(tNearbyMex)) end
+                            end
+                            if M27Utilities.IsTableEmpty(tNearbyMex) == false then
+                                --Do we already have an action to reclaim? If so then only build mex if are in range
+                                local iDistToMex = math.floor(M27Utilities.GetDistanceBetweenPositions(tNearbyMex, oFirstBuilder:GetPosition()))
+                                if iDistToMex <= iMexSearchRange and (not(oPlatoon[refiCurrentAction]) or (aiBrain:GetEconomyStored('MASS') >= 20 and iDistToMex <= oPlatoon[reftBuilders][1]:GetBlueprint().MaxBuildDistance)) then
+                                    --Is the mex location in range of enemy T2+ PD?
+                                    local tEnemyT2PlusPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, tNearbyMex, 53, 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) then
+                                        tEnemyT2PlusPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3PD, tNearbyMex, 72, 'Enemy')
+                                        if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) then
+                                            --If we walk in a straight line to a mex can we path there? (ignore check if mex is within build range), and does anything block a shot there?
+                                            local bNoObstructions = true
+                                            local iBuildRange = oFirstBuilder:GetBlueprint().Economy.MaxBuildDistance - 2
+
+                                            if iDistToMex <= iBuildRange then
+                                                bNoObstructions = true --redundancy
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Mex is within build range so can build on it. iDistToMex='..iDistToMex..'; iBuildRange='..iBuildRange) end
+                                            else
+                                                local iOurBasePathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFirstBuilder:GetPosition())
+                                                local tPositionToCheck
+                                                local iAngleToMove = M27Utilities.GetAngleFromAToB(oFirstBuilder:GetPosition(), tNearbyMex)
+                                                for iDistance = 1, (iDistToMex - iBuildRange) do
+                                                    tPositionToCheck = M27Utilities.MoveInDirection(oFirstBuilder:GetPosition(), iAngleToMove, iDistance, false)
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Comparing pathing group of builder position='..repru(oFirstBuilder:GetPosition())..' with group '..iOurBasePathingGroup..' to positiontocheck='..repru(tPositionToCheck)..' with group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPositionToCheck)) end
+                                                    if not(iOurBasePathingGroup == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPositionToCheck)) then
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': The position to check is in a different pathing group so have obstructions') end
+                                                        bNoObstructions = false
+                                                        break
+                                                    end
+                                                end
+                                                if bNoObstructions and iDistToMex > (iBuildRange + 1) then
+                                                    --Check if we fire a shot if anything blocks it
+                                                    local tStartPosition = GetPlatoonFrontPosition(oPlatoon)
+                                                    if M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit]) then tStartPosition[2] = GetSurfaceHeight(tStartPosition[1], tStartPosition[3]) end
+                                                    tStartPosition[2] = tStartPosition[2] + 0.1
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': About to check if line is blocked from tStartPosition='..repru(tStartPosition)..' to tNearbyMex='..repru({tNearbyMex[1], tNearbyMex[2] + 0.1, tNearbyMex[3]})..'; result='..tostring(M27Logic.IsLineBlocked(aiBrain, tStartPosition, {tNearbyMex[1], tNearbyMex[2] + 0.1, tNearbyMex[3]}, 1))) end
+                                                    if M27Logic.IsLineBlocked(aiBrain, tStartPosition, {tNearbyMex[1], tNearbyMex[2] + 0.1, tNearbyMex[3]}, 1) then
+                                                        bNoObstructions = false
+                                                    end
+                                                end
+
+                                                if bDebugMessages == true then LOG(sFunctionRef..': CHecking if can path in a straight line to the nearest mex; iOurBasePathingGroup='..iOurBasePathingGroup..'; bNoObstructions='..tostring(bNoObstructions)) end
+                                            end
+
+                                            if bNoObstructions then
+                                                oPlatoon[refiCurrentAction] = refActionBuildMex
+                                                if oPlatoon[reftNearbyMexToBuildOn] == nil then oPlatoon[reftNearbyMexToBuildOn] = {} end
+                                                oPlatoon[reftNearbyMexToBuildOn] = tNearbyMex
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Have updated for nearby mex='..repru(oPlatoon[reftNearbyMexToBuildOn])) end
+                                            elseif bDebugMessages == true then LOG(sFunctionRef..': Cant path easily to the mex so wont try and build on it')
+                                            end
+                                        elseif bDebugMessages == true then LOG(sFunctionRef..': Mex has T3 PD near it so wont proceed')
+                                        end
+                                    elseif bDebugMessages == true then LOG(sFunctionRef..': Mex has T2 PD near it so wont proceed')
+                                    end
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': Already have an action assigned, and not in range of mex, so will proceed with existing action')
+                                end
                             end
                         end
                     end
                 end
-            end
         end
         else
             oPlatoon[refiBuilders] = 0
@@ -4539,6 +4550,7 @@ function DetermineIfACUShouldBuildPower(oPlatoon)
     --Only call if ACU in platoon
     if oPlatoon:GetPlan() == 'M27ACUMain' then
         local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
+        --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
         if oPlatoon[reftPrevAction] and oPlatoon[reftPrevAction][1] == refActionBuildInitialPower then
             local oACU = M27Utilities.GetACU(aiBrain)
             if oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
@@ -4593,13 +4605,19 @@ function DetermineIfACUShouldBuildPower(oPlatoon)
                 if bDebugMessages == true then LOG(sFunctionRef..': iGrossEnergyIncome='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; iGrossEnergyWanted='..iGrossEnergyWanted) end
                 if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= iGrossEnergyWanted then
                     --Only get power if we have <90% energy stored or 3 factories
-                    if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 11 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories) < 3 and aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] > 1 then
+                    if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 11 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.9 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllFactories) < math.min(3, aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand]) then
                         --Do nothing as want to build factory in next step
                     else
-                        if bDebugMessages == true then LOG(sFunctionRef..': Want more energy, will build unless not the start of the game, game time='..GetGameTimeSeconds()) end
-                        if GetGameTimeSeconds() <= 200 + math.max(0, (iGrossEnergyWanted - 30) * 15) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Near start of game so will build power unless we are near a hydro; NearHydro='..tostring(M27Conditions.HydroNearACUAndBase(aiBrain, true, false))) end
-                            if not(M27Conditions.HydroNearACUAndBase(aiBrain, true, false)) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want more energy, will build unless are far from base') end
+                        if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.4) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Near start of game so will build power unless we are near a hydro; NearHydro='..tostring(M27Conditions.HydroNearACUAndBase(aiBrain, true, false))..'; WOuld expect platoon to have already been given action to build hydro though by this point, unless construction hasnt started') end
+                            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 1 or not(M27Conditions.HydroNearACUAndBase(aiBrain, true, false)) then
+                                oPlatoon[refiCurrentAction] = refActionBuildInitialPower
+                            else
+                                --Have nearby hydro not yet built so dont send action to build power as want to help with the hydro
+                            end
+
+                            --[[if not(M27Conditions.HydroNearACUAndBase(aiBrain, true, false)) then
                                 oPlatoon[refiCurrentAction] = refActionBuildInitialPower
                             else
                                 --If we already have 1 hydro then build t1 power anyway unless unbuilt hydro is really close to ACU
@@ -4610,7 +4628,7 @@ function DetermineIfACUShouldBuildPower(oPlatoon)
                                         oPlatoon[refiCurrentAction] = refActionBuildInitialPower
                                     end
                                 end
-                            end
+                            end--]]
                         end
                     end
                 end
@@ -4748,6 +4766,7 @@ function DetermineActionForNearbyHydro(oPlatoon)
         end
         if not(oFirstBuilder==nil) then
             --Are there any Hydro buildings nearby:
+            --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
 
             --GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy, bCanBeQueuedToBeBuilt, iMaxSearchRangeMod, tStartPositionOverride, tMexesToIgnore)
             local aiBrain = (oPlatoon[refoBrain] or oFirstBuilder:GetAIBrain())
@@ -4837,7 +4856,7 @@ function DetermineActionForNearbyReclaim(oPlatoon)
                         oFirstReclaimer = oReclaimer break
                     end
                 end
-                if oFirstReclaimer and (not(oFirstReclaimer:IsUnitState('Building') or oFirstReclaimer:IsUnitState('Repairing')) or (aiBrain:GetEconomyStored('MASS') == 0 and oFirstReclaimer:GetFocusUnit():GetFractionComplete() >= 0.75 and oFirstReclaimer:GetFocusUnit() and oFirstReclaimer:GetFocusUnit().GetFractionComplete and oFirstReclaimer:GetFocusUnit():GetFractionComplete() < 1)) then
+                if oFirstReclaimer and (not(oFirstReclaimer:IsUnitState('Building') or oFirstReclaimer:IsUnitState('Repairing')) or (aiBrain:GetEconomyStored('MASS') == 0 and oFirstReclaimer:GetFocusUnit() and oFirstReclaimer:GetFocusUnit().GetFractionComplete and oFirstReclaimer:GetFocusUnit():GetFractionComplete() >= 0.75 and oFirstReclaimer:GetFocusUnit():GetFractionComplete() < 1)) then
                     --If ACU then will ahve called this before checking for nearby enemies, so check if any within 30
                     local bHaveNearbyEnemies = false
                     if oPlatoon[refiEnemyStructuresInRange] > 0 then bHaveNearbyEnemies = true
@@ -5009,7 +5028,7 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
-    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 840 and GetGameTimeSeconds() <= 1020 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
 
     if oACU:HasEnhancement('AdvancedEngineering') or oACU:HasEnhancement('T3Engineering') then
         if bDebugMessages == true then LOG(sFunctionRef..': ACU has access to T2 tech, if strategy is turtle will consider what to build. aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; M27Logic.IsTargetUnderShield(aiBrain, oACU, 8000, nil, false, false)='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oACU, 8000, nil, false, false))) end
@@ -5734,8 +5753,8 @@ function DeterminePlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
-            if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 840 and GetGameTimeSeconds() <= 1020 then bDebugMessages = true end
+            --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -6744,7 +6763,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
         --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
 
         --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-        --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 840 and GetGameTimeSeconds() <= 1020 then bDebugMessages = true end
+        --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
         --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
         --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
         --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -8731,8 +8750,8 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 840 and GetGameTimeSeconds() <= 1020 then bDebugMessages = true end
-            if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
+            --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -9992,7 +10011,7 @@ function ProcessPlatoonAction(oPlatoon)
                         --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, tAlternativePositionToLookFrom)
                         --M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil)
 
-                        local oNearbyUnderConstruction = M27EngineerOverseer.GetPartCompleteBuilding(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, 30)
+                        local oNearbyUnderConstruction = M27EngineerOverseer.GetPartCompleteBuilding(aiBrain, oACU, iCategoryToBuild + M27UnitInfo.refCategoryHydro, iMaxAreaToSearch, 30)
                         if oNearbyUnderConstruction == nil then
                             --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, tAlternativePositionToLookFrom)
                             if bDebugMessages == true then LOG(sFunctionRef..': About to tell ACU to build power') end

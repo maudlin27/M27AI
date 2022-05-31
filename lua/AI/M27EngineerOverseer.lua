@@ -69,7 +69,8 @@ refActionFortifyFirebase = 39
 refActionAssistShield = 40
 refActionBuildSecondShield = 41
 refActionBuildEmergencyArti = 42
-tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees, refActionUpgradeBuilding, refActionAssistSMD, refActionAssistAirFactory, refActionUpgradeHQ, refActionAssistNuke, refActionLoadOnTransport, refActionAssistShield}
+refActionAssistTML = 43
+tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees, refActionUpgradeBuilding, refActionAssistSMD, refActionAssistTML, refActionAssistAirFactory, refActionUpgradeHQ, refActionAssistNuke, refActionLoadOnTransport, refActionAssistShield}
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 --ALSO update the actions noted in RefreshT3ArtiAdjacencyLocations as being ones that can ignore when deciding whether to clear existing engineer commands
 
@@ -115,7 +116,11 @@ refiExperimentalAir = 2
 refiExperimentalNuke = 3
 refiExperimentalT3Arti = 4
 refiExperimentalNovax = 5
-refiAllExperimentals = 6
+refiExperimentalArti = 6
+refiExperimentalYolona = 7
+refiExperimentalParagon = 8
+refiAllExperimentals = 9
+
 
 refiLastSecondExperimentalRef = 'M27EngineerLastSecondExperimentalCategory' --As above
 refiSMLConstructionStart = 'M27EngineerSMLConstructionStart' --Game time that started construction of nuke
@@ -152,6 +157,7 @@ refiTimeOfLastEngiSelfDestruct = 'M27TimeOfLastSelfDestruct' --floor(gametimesec
 refbLastSpareEngineerHadNoAction = 'M27EngLastSpareEngineerHadNoAction' --True if the last spare engineer had nothing to do - used to increase search range
 refiTimeOfLastFailure = 'M27EngLastFailure' --Game time that failed to build an action, [x] = actionref
 refiTimeOfLastAction = 'M27EngLastAction'
+reftFriendlyScathis = 'M27EngFriendlyScathis' --Against aiBrain, [x] is UnitId..LifetimeCount; returns the unit.  Scathis when firing prevents units being built, so want to track it and not try and build on it
 
 reftUnclaimedMexOrHydroByCondition = 'M27EngUnclaimedMexOrHydroByCondition' --[ConvertUnclaimedConditionsToKey()] - returns a table {reftResourceLocations, refiTimeOfLastUpdate}
 reftResourceLocations = 'M27EngResourceLocations'
@@ -261,8 +267,7 @@ function CanBuildAtLocation(aiBrain, sBlueprintToBuild, tTargetLocation, iEngiAc
                                 end
                             end
                             if iEngiActionToIgnore and iActionRef == iEngiActionToIgnore then bIgnoreAction = true end
-                            if bDebugMessages == true then LOG(sFunctionRef..': iActionRef='..iActionRef..'; bIgnoreAction='..tostring(bIgnoreAction)) end
-                            if not(bIgnoreAction) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': iActionRef='..iActionRef..'; bIgnoreAction='..tostring(bIgnoreAction)) end                            if not(bIgnoreAction) then
                                 bCanBuildStructure = false
                                 --Do we want to cancel any blocking units?
                                 if bClearActionsIfNotStartedBuilding then
@@ -286,24 +291,44 @@ function CanBuildAtLocation(aiBrain, sBlueprintToBuild, tTargetLocation, iEngiAc
             end
         end
         if bCanBuildStructure then
-            --Thanks to jip for flagging there's an engine bug where in rare situations units can be built slightly overlapping even if aiBrain:CanBuildStructureAt returns true - comments in the code Jip linked to suggested this is only where a building has upgraded
-            -- compute build locations and issue the capping
             local iSkirtSizeRadius = __blueprints[sBlueprintToBuild].Physics.SkirtSizeX * 0.5
 
-            -- find all units that may prevent us from building
-            local tNearbyStructures = GetUnitsInRect(tTargetLocation[1] - (iSkirtSizeRadius + 4), tTargetLocation[3] - (iSkirtSizeRadius + 4), tTargetLocation[1] + (iSkirtSizeRadius + 4), tTargetLocation[3] + (iSkirtSizeRadius + 4))
-            if M27Utilities.IsTableEmpty(tNearbyStructures) == false then
-                tNearbyStructures = EntityCategoryFilterDown(M27UnitInfo.refCategoryUpgraded, tNearbyStructures)
-                local iClosestDistance
+            --Check in case scathis is blocking us
+            if M27Utilities.IsTableEmpty(aiBrain[reftFriendlyScathis]) == false then
+                for iUnit, oUnit in aiBrain[reftFriendlyScathis] do
+                    if not(M27UnitInfo.IsUnitValid(oUnit)) then
+                        aiBrain[reftFriendlyScathis][iUnit] = nil
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering building at location '..repru(tTargetLocation)..'; Scathis unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Scathis position='..repru(oUnit:GetPosition())..'; distance to position='..M27Utilities.GetDistanceBetweenPositions(tTargetLocation, oUnit:GetPosition())..'; iSkirtSizeRadius='..iSkirtSizeRadius..'; sBlueprintToBuild='..sBlueprintToBuild..'; scathis skirt size*0.5='..oUnit:GetBlueprint().Physics.SkirtSizeX * 0.5) end
+                        if M27Utilities.GetDistanceBetweenPositions(tTargetLocation, oUnit:GetPosition()) < (iSkirtSizeRadius + oUnit:GetBlueprint().Physics.SkirtSizeX * 0.5) then
+                            bCanBuildStructure = false
+                            if bDebugMessages == true then LOG(sFunctionRef..': Are too close to a scathis so wont build here') end
+                            break
+                        end
+                    end
+                end
+            end
+
+            if bCanBuildStructure then
+
+                --Thanks to jip for flagging there's an engine bug where in rare situations units can be built slightly overlapping even if aiBrain:CanBuildStructureAt returns true - comments in the code Jip linked to suggested this is only where a building has upgraded
+                -- compute build locations and issue the capping
+
+                -- find all units that may prevent us from building
+                local tNearbyStructures = GetUnitsInRect(tTargetLocation[1] - (iSkirtSizeRadius + 4), tTargetLocation[3] - (iSkirtSizeRadius + 4), tTargetLocation[1] + (iSkirtSizeRadius + 4), tTargetLocation[3] + (iSkirtSizeRadius + 4))
                 if M27Utilities.IsTableEmpty(tNearbyStructures) == false then
-                    for iStructure, oStructure in tNearbyStructures do
-                        if not(oStructure.Dead) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': oStructure='..oStructure.UnitId..M27UnitInfo.GetUnitLifetimeCount(oStructure)..'; position='..repru(oStructure:GetPosition())..'; target location='..repru(tTargetLocation)..'; target building ID='..sBlueprintToBuild..'; 50% of target building skirt size='..iSkirtSizeRadius..'; 50% of oStructure skrit size='..oStructure:GetBlueprint().Physics.SkirtSizeX * 0.5) end
-                            iClosestDistance = math.max(math.abs(oStructure:GetPosition()[1] - tTargetLocation[1]), math.abs(oStructure:GetPosition()[3] - tTargetLocation[3]))
-                            if iClosestDistance < (iSkirtSizeRadius + oStructure:GetBlueprint().Physics.SkirtSizeX * 0.5) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Cant build as iClosestDistance='..iClosestDistance..'which is less than the two skirt sizes') end
-                                bCanBuildStructure = false
-                                break
+                    tNearbyStructures = EntityCategoryFilterDown(M27UnitInfo.refCategoryUpgraded, tNearbyStructures)
+                    local iClosestDistance
+                    if M27Utilities.IsTableEmpty(tNearbyStructures) == false then
+                        for iStructure, oStructure in tNearbyStructures do
+                            if not(oStructure.Dead) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': oStructure='..oStructure.UnitId..M27UnitInfo.GetUnitLifetimeCount(oStructure)..'; position='..repru(oStructure:GetPosition())..'; target location='..repru(tTargetLocation)..'; target building ID='..sBlueprintToBuild..'; 50% of target building skirt size='..iSkirtSizeRadius..'; 50% of oStructure skrit size='..oStructure:GetBlueprint().Physics.SkirtSizeX * 0.5) end
+                                iClosestDistance = math.max(math.abs(oStructure:GetPosition()[1] - tTargetLocation[1]), math.abs(oStructure:GetPosition()[3] - tTargetLocation[3]))
+                                if iClosestDistance < (iSkirtSizeRadius + oStructure:GetBlueprint().Physics.SkirtSizeX * 0.5) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Cant build as iClosestDistance='..iClosestDistance..'which is less than the two skirt sizes') end
+                                    bCanBuildStructure = false
+                                    break
+                                end
                             end
                         end
                     end
@@ -480,6 +505,7 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
             if bDebugMessages == true then LOG(sFunctionRef..': About to unpause engineer with UC='..GetEngineerUniqueCount(oEngineer)..' if it is still alive') end
             if oEngineer.SetPaused and M27UnitInfo.IsUnitValid(oEngineer) then
                 oEngineer:SetPaused(false)
+                if bDebugMessages == true then LOG(sFunctionRef..': Just stopped engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UC='..GetEngineerUniqueCount(oEngineer)..' from being paused') end
                 --Also update engineer's name to show it has no action
                 if M27Config.M27ShowUnitNames == true or M27Config.M27ShowUnitNames == true then
                     local sName = 'E'..iUniqueRef..':UID='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..': No action'
@@ -1636,6 +1662,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
             end
         end
     end
+    if bHaveLowPower and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50000 then bHaveLowPower = false end
 
     local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
     local bACUIsUpgrading = false
@@ -3414,11 +3441,17 @@ function ConvertExperimentalRefToCategory(iExperimentalRef)
         iCategory = M27UnitInfo.refCategoryNovaxCentre
     elseif iExperimentalRef == refiAllExperimentals then
         iCategory = M27UnitInfo.refCategoryExperimentalLevel
+    elseif iExperimentalRef == refiExperimentalArti then
+        iCategory = M27UnitInfo.refCategoryExperimentalStructure * categories.ARTILLERY
+    elseif iExperimentalRef == refiExperimentalYolona then
+        iCategory = M27UnitInfo.refCategorySML * categories.EXPERIMENTAL * categories.STRUCTURE
+    elseif iExperimentalRef == refiExperimentalParagon then
+        iCategory = M27UnitInfo.refCategoryParagon
     else
         M27Utilities.ErrorHandler('No recognised experimental category for iExperimentalRef='..(iExperimentalRef or 'nil')..'; will return land experimental')
         iCategory = M27UnitInfo.refCategoryLandExperimental
     end
-        return iCategory
+    return iCategory
 end
 
 function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
@@ -3442,9 +3475,9 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
 
     else
         --Do we have nearby experimental type units being built by us or an ally? If so pick this category (in the hope we will then assist construction of the existing unit) unless we are trying to buidl a second experimental
-        if not(iActionToAssign == refActionBuildSecondExperimental) then
+        if not(iActionToAssign == refActionBuildSecondExperimental) or aiBrain[refiLastExperimentalReference] == refiExperimentalArti or aiBrain[refiLastExperimentalReference] == refiExperimentalYolona or aiBrain[refiLastExperimentalReference] == refiExperimentalParagon then
             local iBasePathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-            local tNearbyExperimentals = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalLevel, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 150, 'Ally')
+            local tNearbyExperimentals = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalLevel, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 250, 'Ally')
             local tNearbyExperimentalSubset
             if M27Utilities.IsTableEmpty(tNearbyExperimentals) == false then
 
@@ -3454,20 +3487,29 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                         if oUnit:GetFractionComplete() >= 0.03 and oUnit:GetFractionComplete() < 1 then
                             --Can we path here?
                             if iBasePathingGroup == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) then
-                                iCategoryRef = aiBrain[refiLastExperimentalReference]
-                                break
+                                --Is it iether within 150, or has a mass build cost of at least 70k?
+                                if oUnit:GetAIBrain():GetArmyIndex() == aiBrain:GetArmyIndex() or (oUnit:GetFractionComplete() < 0.8 and (oUnit:GetBlueprint().Economy.BuildCostMass >= 65000 or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 120)) then
+                                    iCategoryRef = aiBrain[refiLastExperimentalReference]
+                                    break
+                                end
                             end
                         end
                     end
                 else
                     --Dont know the category so will cycle through main categories and if still cant figure it out will choose every category
-                    for iCatRef, iCategory in {refiExperimentalLand, refiExperimentalAir, refiExperimentalNuke, refiExperimentalT3Arti, refiExperimentalNovax, refiAllExperimentals} do
+                    for iCatRef, iCategory in {refiExperimentalLand, refiExperimentalAir, refiExperimentalNuke, refiExperimentalT3Arti, refiExperimentalNovax, refiExperimentalArti, refiExperimentalYolona, refiExperimentalParagon, refiAllExperimentals} do
                         tNearbyExperimentalSubset = EntityCategoryFilterDown(ConvertExperimentalRefToCategory(iCategory), tNearbyExperimentals)
                         if M27Utilities.IsTableEmpty(tNearbyExperimentalSubset) == false then
                             for iUnit, oUnit in tNearbyExperimentalSubset do
                                 if oUnit:GetFractionComplete() >= 0.03 and oUnit:GetFractionComplete() < 1 then
-                                    iCategoryRef = iCategory
-                                    break
+                                    --Can we path here?
+                                    if iBasePathingGroup == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) then
+                                        --Is it iether within 150, or has a mass build cost of at least 70k?
+                                        if oUnit:GetAIBrain():GetArmyIndex() == aiBrain:GetArmyIndex() or (oUnit:GetFractionComplete() < 0.8 and (oUnit:GetBlueprint().Economy.BuildCostMass >= 65000 or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 120)) then
+                                            iCategoryRef = iCategory
+                                            break
+                                        end
+                                    end
                                 end
                             end
                             if iCategoryRef then break end
@@ -3547,7 +3589,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
         if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 0.4 and ((aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 175 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 0.35) or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat])) then
             bNearbyLandPathableThreat = true
         end
-        local iT3ArtiWeOwn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT3Arti)
+        local iT3ArtiWeOwn = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti)
         local iLifetimeLandExperimentalCount = M27Conditions.GetLifetimeBuildCount(aiBrain, ConvertExperimentalRefToCategory(refiExperimentalLand))
         if bDebugMessages == true then LOG(sFunctionRef..': Deciding if want land experimental due to nearby enemy threat; iT3ArtiWeOwn='..iT3ArtiWeOwn..'; iLifetimeLandExperimentalCount='..iLifetimeLandExperimentalCount..'; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; Enemy PD threat='..iEnemyPDThreat..'; iExistingLandExperimentals='..iExistingLandExperimentals..'; iEnemyT2ArtiCount='..iEnemyT2ArtiCount) end
 
@@ -3698,7 +3740,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                 if not(iCategoryRef) then
                     --Do we want a fatboy?
                     if bDebugMessages == true then LOG(sFunctionRef..': Deciding if we want a fatboy or a T3 arti; aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; iExistingLandExperimentals='..iExistingLandExperimentals..'; Enemy T2 arti='..table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy'))..'; M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3)='..tostring(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3))) end
-                    if iExistingLandExperimentals <= 2 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 600 and iExistingLandExperimentals <= 1 and (iEnemyT2ArtiCount <= (iExistingLandExperimentals + 1) * 2 or table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy')) <= (iExistingLandExperimentals + 1) * 2) and (M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3) or not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryFixedT3Arti, 1))) then
+                    if iExistingLandExperimentals <= 2 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 600 and iExistingLandExperimentals <= 1 and (iEnemyT2ArtiCount <= (iExistingLandExperimentals + 1) * 2 or table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 725, 'Enemy')) <= (iExistingLandExperimentals + 1) * 2) and (M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3) or not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, 1))) then
                         iCategoryRef = refiExperimentalLand
                     else
                         --T3 arti if we have the eco to support it
@@ -3803,6 +3845,23 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                     local iCurrentT3Arti = iT3ArtiWeOwn
                     if bTargetsForT3Arti and not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandExperimental, 3 + iCurrentT3Arti)) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 12 then
                         iCategoryRef = refiExperimentalT3Arti
+                    end
+                end
+            end
+
+            --Game-enders (override for T3 arti, and for if ahve no category ref)
+            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 90 or (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 55 and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 750) then
+                --Do we already ahve a game-ender and its not a paragon?
+                local iExistingGameEnders = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryExperimentalStructure - M27UnitInfo.refCategoryParagon)
+
+                if iExistingGameEnders == 0 or iExistingGameEnders < (iExistingLandExperimentals + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL)) / 3 then
+
+                    if iCategoryRef == refiExperimentalT3Arti or not(iCategoryRef) then
+                        --Build a game-ender - experimental arti or experimental nuke
+                        if iFactionIndex == M27UnitInfo.refFactionSeraphim then
+                            iCategoryRef = refiExperimentalYolona
+                        else iCategoryRef = refiExperimentalArti
+                        end
                     end
                 end
             end
@@ -3917,7 +3976,7 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
         iCategoryToBuild = M27UnitInfo.refCategoryT2Radar
     elseif iActionToAssign == refActionBuildT3Radar then
         iCategoryToBuild = M27UnitInfo.refCategoryT3Radar
-    elseif iActionToAssign == refActionAssistSMD or iActionToAssign == refActionAssistNuke then
+    elseif iActionToAssign == refActionAssistSMD or iActionToAssign == refActionAssistNuke or iActionToAssign == refActionAssistTML then
         iCategoryToBuild = nil
     elseif iActionToAssign == refActionAssistAirFactory then
         iCategoryToBuild = nil
@@ -4790,6 +4849,7 @@ function CheckForEnemySMD(aiBrain, oSML)
                     --Disable missile autobuild
                     oSML:SetAutoMode(false)
                     --Pause the SML
+                    if oSML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oSML) == 'xsb23051' then M27Utilities.ErrorHandler('Pausing Yolona') end
                     oSML:SetPaused(true)
                     --Note - is a graphical bug where a paused SML will appear to still use resources - the below commented out code was used to confirm that it doesnt; a manual calculation was also done of energy usage which was consistent with the SML not using energy based on the total displayed energy usage
                     --[[if bDebugMessages == true then
@@ -4821,7 +4881,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
 
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
-
+    --if iActionToAssign == refActionBuildExperimental then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
 
 
@@ -4992,7 +5052,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                         iMaxAreaToSearch = 30
                                     end
                                 else
-                                    iCatToBuildBy = refCategoryAirFactory + M27UnitInfo.refCategoryT3Radar + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategoryFixedT3Arti
+                                    iCatToBuildBy = refCategoryAirFactory + M27UnitInfo.refCategoryT3Radar + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti * categories.STRUCTURE
                                     iMaxAreaToSearch = 50
                                     if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 300 then
                                         iMaxAreaToSearch = 40
@@ -5123,14 +5183,14 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                             elseif iActionToAssign == refActionBuildT3Radar then
                                 iCatToBuildBy = M27UnitInfo.refCategoryT3Power
                                 iMaxAreaToSearch = 70
-                            elseif iActionToAssign == refActionAssistSMD or iActionToAssign == refActionAssistNuke then
+                            elseif iActionToAssign == refActionAssistSMD or iActionToAssign == refActionAssistNuke or iActionToAssign == refActionAssistTML then
                                 bConstructBuilding = false
                             elseif iActionToAssign == refActionAssistAirFactory then
                                 bConstructBuilding = false
                             elseif iActionToAssign == refActionAssistShield then
                                 bConstructBuilding = false
                             elseif iActionToAssign == refActionBuildExperimental or iActionToAssign == refActionBuildSecondExperimental then
-                                if iCategoryToBuild == M27UnitInfo.refCategorySML or iCategoryToBuild == M27UnitInfo.refCategoryFixedT3Arti then
+                                if iCategoryToBuild == M27UnitInfo.refCategorySML or iCategoryToBuild == M27UnitInfo.refCategoryFixedT3Arti or iCategoryToBuild == M27UnitInfo.refCategoryExperimentalArti then
                                     iCatToBuildBy = M27UnitInfo.refCategoryT3Power
                                     if aiBrain[M27Overseer.refbDefendAgainstArti] then iCatToBuildBy = iCatToBuildBy + M27UnitInfo.refCategoryFixedShield end
                                 end
@@ -5365,7 +5425,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                         end
                                         IssueClearCommands({ oEngineer })
                                         ClearEngineerActionTrackers(aiBrain, oEngineer, true)
-                                        for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryFixedT3Arti, false, false) do
+                                        for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti * categories.STRUCTURE, false, false) do
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Considering adjacency locations for T3 Arti=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
                                             end
@@ -5729,6 +5789,7 @@ function GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSea
     local sFunctionRef = 'GetNearestPartBuiltUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oNearestPartBuilt
+    local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tStartPosition)
     --Check if any nearby part-built units (that have abandoned) near tStartPosition
     if iCategoryToBuild then
         local tNearbyUnitsOfType = aiBrain:GetUnitsAroundPoint(iCategoryToBuild, tStartPosition, iSearchRange, 'Ally')
@@ -5742,8 +5803,16 @@ function GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSea
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is part complete, checking if its location is already assigned to an engineer') end
                     --reftEngineerAssignmentsByLocation = 'M27EngineerAssignmentsByLoc'     --[x][y][z];  x is the unique location ref (need to use ConvertLocationToReference in utilities to use), [y] is the actionref, z is the engineer unique ref assigned to this location; returns the engineer object
                     if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByLocation][sPartBuiltLocationRef]) == true then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Location not assigned to an engineer, so will assist this') end
-                        oNearestPartBuilt = oUnit
+                        if bDebugMessages == true then LOG(sFunctionRef..': Location not assigned to an engineer, so will assist this unless it belongs to a teammate and isnt T3 Plus non-power') end
+                        if not(EntityCategoryContains(M27UnitInfo.refCategoryPower + categories.TECH1 + categories.TECH2 - M27UnitInfo.refCategoryT2PlusPD - M27UnitInfo.refCategoryFixedShield - M27UnitInfo.refCategoryFixedT2Arti, oUnit.UnitId)) or oUnit:GetAIBrain():GetArmyIndex() == aiBrain:GetArmyIndex() then
+                            --Can we path here?
+                            if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) then
+                                --If distance is >150 and contains experimental level category then only consider if mass cost is >=65k
+                                if (oUnit:GetAIBrain():GetArmyIndex() == aiBrain:GetArmyIndex()) or not(EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oUnit.UnitId)) or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 150 or oUnit:GetBlueprint().Economy.BuildCostMass >= 65000 then
+                                    oNearestPartBuilt = oUnit
+                                end
+                            end
+                        end
                     end
                 end
             end
@@ -5760,7 +5829,8 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetActionTargetAndObject'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if iActionRefToAssign == refActionFortifyFirebase then bDebugMessages = true end
+
+    --if iActionRefToAssign == refActionBuildExperimental then bDebugMessages = true end
 
 
 
@@ -5786,7 +5856,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code. iActionRefToAssign='..iActionRefToAssign) end
 
     --Are we assisting a building?
-    if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistNuke or iActionRefToAssign == refActionAssistAirFactory or iActionRefToAssign == refActionUpgradeHQ or iActionRefToAssign == refActionAssistShield then
+    if iActionRefToAssign == refActionUpgradeBuilding or iActionRefToAssign == refActionAssistSMD or iActionRefToAssign == refActionAssistTML or iActionRefToAssign == refActionAssistNuke or iActionRefToAssign == refActionAssistAirFactory or iActionRefToAssign == refActionUpgradeHQ or iActionRefToAssign == refActionAssistShield then
         --Find the nearest building that is upgrading and assist it, but set a timer to reconsider engineer action after a while
         if bDebugMessages == true then LOG(sFunctionRef..': About to search for buildings to assist in upgrading') end
         local iCategoryToAssist = M27UnitInfo.refCategoryStructure
@@ -5800,6 +5870,10 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
             iCategoryToAssist = M27UnitInfo.refCategorySMD
             sUnitStateWanted = 'SiloBuildingAmmo'
             iEnemySearchRange = 0
+        elseif iActionRefToAssign == refActionAssistTML then
+            iCategoryToAssist = M27UnitInfo.refCategoryTML
+            sUnitStateWanted = 'SiloBuildingAmmo'
+            iEnemySearchRange = 30
         elseif iActionRefToAssign == refActionAssistNuke then
             iCategoryToAssist = M27UnitInfo.refCategorySML
             sUnitStateWanted = 'SiloBuildingAmmo'
@@ -5844,8 +5918,8 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
 
 
         if M27Utilities.IsTableEmpty(tAllBuildings) then
-            tAllBuildings = aiBrain:GetListOfUnits(iCategoryToAssist, false, false)
-            if iActionRefToAssign == refActionAssistShield then M27Utilities.ErrorHandler('Couldnt find a priority shield to assist with the normal logic so will just assist the nearest T3 shield') end
+        tAllBuildings = aiBrain:GetListOfUnits(iCategoryToAssist, false, false)
+        if iActionRefToAssign == refActionAssistShield then M27Utilities.ErrorHandler('Couldnt find a priority shield to assist with the normal logic so will just assist the nearest T3 shield') end
         end
         local iNearestUpgradingBuilding = 10000
         local iCurDistanceToStart, tCurPosition
@@ -5854,36 +5928,36 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
 
         if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through all buildings meeting the category in question to see if we can assist them') end
         if M27Utilities.IsTableEmpty(tAllBuildings) == false then
-            for iBuilding, oBuilding in tAllBuildings do
-                if M27UnitInfo.IsUnitValid(oBuilding) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': iBuilding='..iBuilding..'; oBuilding Id='..oBuilding.UnitId..'; Unit state='..M27Logic.GetUnitState(oBuilding)) end
-                    if not(oBuilding[M27EconomyOverseer.refbWillReclaimUnit]) and (oBuilding:GetFractionComplete() < 1 or bIgnoreUnitState or (oBuilding.IsUnitState and (oBuilding:IsUnitState(sUnitStateWanted) or (sAltUnitStateWanted and oBuilding:IsUnitState(sAltUnitStateWanted))))) then
-                        tCurPosition = oBuilding:GetPosition()
-                        iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tStartPosition)
-                        if bDebugMessages == true then LOG(sFunctionRef..': iBuilding is '..sUnitStateWanted..';  its distance to start='..iCurDistanceToStart) end
-                        if iCurDistanceToStart < iNearestUpgradingBuilding then
-                            --Check no nearby enemies
-                            if iEnemySearchRange > 0 then tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.DIRECTFIRE + categories.LAND * categories.INDIRECTFIRE, tCurPosition, iEnemySearchRange, 'Enemy')
-                            else tNearbyEnemies = nil end
-                            if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then
-                                if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will assign this building as target unless we subsequently find ones that are even closer') end
-                                iNearestUpgradingBuilding = iCurDistanceToStart
-                                oActionObject = oBuilding
-                                tActionLocation = oBuilding:GetPosition()
-                            else
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemies so not picking this building') end
-                            end
-                        end
-                    else
-                        if bDebugMessages == true then LOG(sFunctionRef..': oBuilding='..oBuilding.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBuilding)..'; Unit state='..M27Logic.GetUnitState(oBuilding)) end
-                    end
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': iBuilding count in tAllBuildings='..iBuilding..'; unit isnt valid. Size of tAllBuildings='..table.getsize(tAllBuildings)) end
-                end
-            end
+        for iBuilding, oBuilding in tAllBuildings do
+        if M27UnitInfo.IsUnitValid(oBuilding) then
+        if bDebugMessages == true then LOG(sFunctionRef..': iBuilding='..iBuilding..'; oBuilding Id='..oBuilding.UnitId..'; Unit state='..M27Logic.GetUnitState(oBuilding)) end
+        if not(oBuilding[M27EconomyOverseer.refbWillReclaimUnit]) and (oBuilding:GetFractionComplete() < 1 or bIgnoreUnitState or (oBuilding.IsUnitState and (oBuilding:IsUnitState(sUnitStateWanted) or (sAltUnitStateWanted and oBuilding:IsUnitState(sAltUnitStateWanted))))) then
+        tCurPosition = oBuilding:GetPosition()
+        iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tStartPosition)
+        if bDebugMessages == true then LOG(sFunctionRef..': iBuilding is '..sUnitStateWanted..';  its distance to start='..iCurDistanceToStart) end
+        if iCurDistanceToStart < iNearestUpgradingBuilding then
+        --Check no nearby enemies
+        if iEnemySearchRange > 0 then tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.DIRECTFIRE + categories.LAND * categories.INDIRECTFIRE, tCurPosition, iEnemySearchRange, 'Enemy')
+        else tNearbyEnemies = nil end
+        if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then
+        if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will assign this building as target unless we subsequently find ones that are even closer') end
+        iNearestUpgradingBuilding = iCurDistanceToStart
+        oActionObject = oBuilding
+        tActionLocation = oBuilding:GetPosition()
         else
-            M27Utilities.ErrorHandler('Couldnt find any buildings for Action '..(iActionRefToAssign or 'nil'))
+        if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemies so not picking this building') end
         end
+        end
+        else
+        if bDebugMessages == true then LOG(sFunctionRef..': oBuilding='..oBuilding.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBuilding)..'; Unit state='..M27Logic.GetUnitState(oBuilding)) end
+        end
+        else
+        if bDebugMessages == true then LOG(sFunctionRef..': iBuilding count in tAllBuildings='..iBuilding..'; unit isnt valid. Size of tAllBuildings='..table.getsize(tAllBuildings)) end
+        end
+        end
+        else
+        M27Utilities.ErrorHandler('Couldnt find any buildings for Action '..(iActionRefToAssign or 'nil'))
+            end
     elseif iActionRefToAssign == refActionLoadOnTransport then
         for iUnit, oUnit in aiBrain[M27Transport.reftTransportsWaitingForEngi] do
             if M27UnitInfo.IsUnitValid(oUnit) then
@@ -6069,7 +6143,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                         local iCategoryToBuild = GetCategoryToBuildFromAction(iActionRefToAssign, iMinTechLevelWanted, aiBrain)
                         --Use massive range for experimentals
                         local iSearchRangeForPartBuilt = math.max(iSearchRangeForNearestEngi, 30)
-                        if iActionRefToAssign == refActionBuildExperimental then iSearchRangeForPartBuilt = math.max(iSearchRangeForPartBuilt, 150) end
+                        if iActionRefToAssign == refActionBuildExperimental then iSearchRangeForPartBuilt = math.max(iSearchRangeForPartBuilt, 250) end
                         local oNearestPartBuilt = GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSearchRangeForPartBuilt)
                         if oNearestPartBuilt then
                             if bDebugMessages == true then LOG(sFunctionRef..': Are assisting part built building') end
@@ -7614,6 +7688,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > iPowerWantedPerTick and not(GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100)) <= 20 then bWantMorePower = false end
             end
 
+            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50000 then bHaveLowPower = false bWantMorePower = false bHaveVeryLowPower = false end
+
             if bDebugMessages == true then LOG(sFunctionRef..': Power calcs: bHaveLowPower='..tostring(bHaveLowPower)..'; bWantMorePower='..tostring(bWantMorePower)..'; iPowerWantedPerTick='..iPowerWantedPerTick..'; iNetCurEnergyIncome='..iNetCurEnergyIncome..'; % energy stored='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; iEnergyBufferMassFactorWanted='..iEnergyBufferMassFactorWanted..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; iAbsolutePowerBufferWanted='..iAbsolutePowerBufferWanted..'; Time since last power stall='..(GetGameTimeSeconds() - (aiBrain[M27EconomyOverseer.refiLastEnergyStall] or -100))) end
 
 
@@ -8245,7 +8321,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
                         end
                     elseif iCurrentConditionToTry == 11 then --Low power action part 1; also T3 power adjacency logic (as want this built as high priority  ahead of normal power)
-                        local tT3Arti = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryFixedT3Arti, false, false)
+                        local tT3Arti = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti - categories.MOBILE, false, false)
                         if M27Utilities.IsTableEmpty(tT3Arti) == false then
                             if bDebugMessages == true then LOG(sFunctionRef..': Have T3 arti so will look to build power by it') end
                             --Do we already have an engineer with this action? If so will want to assist it so no need to refresh pgen adjacency locations
@@ -8556,9 +8632,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     elseif iCurrentConditionToTry == 18 then --Shield if needed for SML/SMD/T3 Arti as high priority
                         if not(bHaveVeryLowPower) and aiBrain[M27Overseer.refbDefendAgainstArti] then
                             RefreshUnitsWantingFixedShields(aiBrain)
-                            if tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true end
                             if bDebugMessages == true then LOG(sFunctionRef..': Is table of units wanting fixed shield empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingFixedShield])))
-                                if M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingFixedShield]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySMD + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryFixedT3Arti, aiBrain[reftUnitsWantingFixedShield])) == false then
+                                if M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingFixedShield]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySMD + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti * categories.STRUCTURE, aiBrain[reftUnitsWantingFixedShield])) == false then
                                     --Have SML or SMD that needs a shield, and enemy has novax or T3 arti, so need to shield as high priority
                                     --Do we already have 5 engineers assigned to build a shield? Then build a second shield
 
@@ -8578,7 +8653,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
-                        bDebugMessages = false
                     elseif iCurrentConditionToTry == 19 then --Assist shields to defend against arti
                         if not(bHaveLowPower) and aiBrain[M27Overseer.refbDefendAgainstArti] then
                             RecordPriorityShields(aiBrain)
@@ -8628,7 +8702,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                     elseif iCurrentConditionToTry == 23 then --Nuke assist
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if have a nuke that want to assist; aiBrain[M27EconomyOverseer.refbStallingEnergy]='..tostring(aiBrain[M27EconomyOverseer.refbStallingEnergy])..'; Number of SMLs='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML)..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; aiBrain[M27EconomyOverseer.refbReclaimNukes]='..tostring((aiBrain[M27EconomyOverseer.refbReclaimNukes] or false))) end
-                        if iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML) > 0 and not(aiBrain[M27EconomyOverseer.refbReclaimNukes]) and not(aiBrain[M27EconomyOverseer.refbStallingEnergy]) then
+                        if iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML - categories.EXPERIMENTAL) > 0 and not(aiBrain[M27EconomyOverseer.refbReclaimNukes]) and not(aiBrain[M27EconomyOverseer.refbStallingEnergy]) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Want to assist nuke') end
                             aiBrain[refbNeedResourcesForMissile] = true
                             iMinEngiTechLevelWanted = 3
@@ -8835,34 +8909,52 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     elseif iCurrentConditionToTry == 30 then --TML if think enough targets
                         --if iHighestFactoryOrEngineerTechAvailable >= 2 and tiAvailableEngineersByTech[2] > 0 then bDebugMessages = true end
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering if we want to build a TML. iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; aiBrain[refiTimeOfLastFailedTML]='..(aiBrain[refiTimeOfLastFailedTML] or 'nil')..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; refbNeedIndirect='..tostring(aiBrain[M27Overseer.refbNeedIndirect])..'; aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML)..'; M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]))..'; bHaveLowMass='..tostring(bHaveLowMass)..'; Is list of firebase units empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftFirebaseUnitsByFirebaseRef]) == false)) end
-                        if iHighestFactoryOrEngineerTechAvailable >= 2 and not(aiBrain[refiTimeOfLastFailedTML]) and (aiBrain[M27Overseer.refbNeedIndirect] or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= math.min(aiBrain[M27AirOverseer.refiBomberDefenceModDistance], 150) or (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 70 and M27Utilities.IsTableEmpty(aiBrain[reftFirebaseUnitsByFirebaseRef]) == false)) and (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML) == 0 or M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) == false) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to build TML. Is table of existing TML action empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]))) end
-                            if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) == false then
-                                iActionToAssign = refActionBuildTML
-                                iMinEngiTechLevelWanted = 2
-                                iMaxEngisWanted = 3
-                                if bHaveLowMass then iMaxEngisWanted = 2 end
-                                for iEntry, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML] do
-                                    tExistingLocationsToPickFrom = {}
-                                    tExistingLocationsToPickFrom[1] = tSubtable[refEngineerAssignmentActualLocation]
-                                    break
+                        if iHighestFactoryOrEngineerTechAvailable >= 2 and not(aiBrain[refiTimeOfLastFailedTML]) and (aiBrain[M27Overseer.refbNeedIndirect] or aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= math.min(aiBrain[M27AirOverseer.refiBomberDefenceModDistance], 150) or (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] >= 70 and M27Utilities.IsTableEmpty(aiBrain[reftFirebaseUnitsByFirebaseRef]) == false)) then
+                            if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTML) == 0 or M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to build TML. Is table of existing TML action empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]))) end
+                                if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) == false then
+                                    iActionToAssign = refActionBuildTML
+                                    iMinEngiTechLevelWanted = 2
+                                    iMaxEngisWanted = 3
+                                    if bHaveLowMass then iMaxEngisWanted = 2 end
+                                    for iEntry, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML] do
+                                        tExistingLocationsToPickFrom = {}
+                                        tExistingLocationsToPickFrom[1] = tSubtable[refEngineerAssignmentActualLocation]
+                                        break
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Already have an action to build TML, will make sure we have enough engis assigned. iMaxEngisWanted='..iMaxEngisWanted) end
+                                else
+                                    RecordPossibleTMLTargets(aiBrain, false)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have recorded possible TML targets.  Is the table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]))..'; size of targets='..table.getn(aiBrain[reftoTMLTargetsOfInterest])) end
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]) == false and table.getn(aiBrain[reftoTMLTargetsOfInterest]) >= 2 then
+                                        tExistingLocationsToPickFrom = {}
+                                        tExistingLocationsToPickFrom[1] = GetTMLBuildLocation(aiBrain)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': TML build location in tExistingLocationsToPickFrom='..repru(tExistingLocationsToPickFrom)) end
+                                        if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom[1]) == false then
+                                            iActionToAssign = refActionBuildTML
+                                            iMinEngiTechLevelWanted = 2
+                                            iMaxEngisWanted = 3
+                                            if bHaveLowMass then iMaxEngisWanted = 2 end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Will try to build TML.  Available engineers='..repru(tiAvailableEngineersByTech)) end
+                                        else
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a TML build location') end
+                                        end
+                                    end
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': Already have an action to build TML, will make sure we have enough engis assigned. iMaxEngisWanted='..iMaxEngisWanted) end
                             else
-                                RecordPossibleTMLTargets(aiBrain, false)
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have recorded possible TML targets.  Is the table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]))..'; size of targets='..table.getn(aiBrain[reftoTMLTargetsOfInterest])) end
-                                if M27Utilities.IsTableEmpty(aiBrain[reftoTMLTargetsOfInterest]) == false and table.getn(aiBrain[reftoTMLTargetsOfInterest]) >= 2 then
-                                    tExistingLocationsToPickFrom = {}
-                                    tExistingLocationsToPickFrom[1] = GetTMLBuildLocation(aiBrain)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': TML build location in tExistingLocationsToPickFrom='..repru(tExistingLocationsToPickFrom)) end
-                                    if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom[1]) == false then
-                                        iActionToAssign = refActionBuildTML
-                                        iMinEngiTechLevelWanted = 2
-                                        iMaxEngisWanted = 3
-                                        if bHaveLowMass then iMaxEngisWanted = 2 end
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Will try to build TML.  Available engineers='..repru(tiAvailableEngineersByTech)) end
-                                    else
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find a TML build location') end
+                                --Will happen if either no TML owend, or we arent constructing any; so if we arent constructing any it means we own some
+                                if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTML]) then
+                                    --Is the TML effective?
+                                    local tFriendlyTML = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryTML, false, true)
+                                    for iTML, oTML in tFriendlyTML do
+                                        if oTML.GetTacticalSiloAmmoCount and oTML:GetTacticalSiloAmmoCount() == 0 and not(oTML:IsPaused()) then
+                                            iActionToAssign = refActionAssistTML
+                                            iMaxEngisWanted = 3
+                                            if bHaveLowMass then iMaxEngisWanted = 1
+                                            elseif oTML.Sync.totalMassKilled >= 1000 then iMaxEngisWanted = 5
+                                            end
+                                            break
+                                        end
                                     end
                                 end
                             end
@@ -9350,6 +9442,19 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                                 iMaxEngisWanted = math.min(iMaxEngisWanted, math.ceil(aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] / (15 * iHighestFactoryOrEngineerTechAvailable) + iExistingEngineersAssigned))
                                 iSearchRangeForNearestEngi = 75
+                            end
+                        end
+                        --If dont want to assist air factory any more but have engineers already assisting, and dont need airaa or torps, and have availablebombers, then clear them, unless are in protect ACU mode (as that also has an assist air fac builder)
+                        if not(iActionToAssign == refActionAssistAirFactory) and aiBrain[M27AirOverseer.refiAirAAWanted] <= 0 and aiBrain[M27AirOverseer.refiTorpBombersWanted] <= 0 and M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then
+                            if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistAirFactory]) == false then
+                                for iUniqueRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistAirFactory] do
+                                    local oEngi = tSubtable[refEngineerAssignmentEngineerRef]
+                                    if M27UnitInfo.IsUnitValid(oEngi) then
+                                        IssueClearCommands({oEngi})
+                                        ClearEngineerActionTrackers(aiBrain, oEngi, true)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oEngi)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngi)) end
+                                    end
+                                end
                             end
                         end
                     elseif iCurrentConditionToTry == 47 then --Sonar
@@ -9996,6 +10101,7 @@ function ReassignPlateauEngineer(aiBrain, oEngineer)
                 bHaveLowPower = true
             end
         end
+        if bHaveLowPower and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50000 then bHaveLowPower = false end
 
         if bDebugMessages == true then LOG(sFunctionRef..': Is table of plateau land factories for plateau group '..iPlateauGroup..' empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]))) end
         if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup][M27MapInfo.subrefPlateauLandFactories]) == false then
@@ -10271,6 +10377,7 @@ function EngineerManager(aiBrain)
     aiBrain[reftiFirebaseDeadPDMassKills] = {}
     aiBrain[reftFirebaseFrontPDPosition] = {}
     aiBrain[reftPriorityShieldsToAssist] = {}
+    aiBrain[reftFriendlyScathis] = {}
 
 
 

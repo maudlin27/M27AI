@@ -3945,7 +3945,6 @@ function ACUManager(aiBrain)
 
                 --Is the ACU upgrading?
                 if oACU:IsUnitState('Upgrading') then
-                    bDebugMessages = true
                     local bCancelUpgradeAndRun = false
                     local bNeedProtecting = false
                     if M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then
@@ -5979,7 +5978,7 @@ function CoordinateNovax(aiBrain)
             bWantToCoordinate = false
             local tFriendlyNovax = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySatellite, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
             if M27Utilities.IsTableEmpty(tFriendlyNovax) == false then
-                local tFriendlyT3Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
+                local tFriendlyT3Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
                 --What is the shield power of M27 controlled units?
                 local iAvailableNovax = 0
                 local tAvailableNovax = {}
@@ -6442,6 +6441,9 @@ end
 function OverseerManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OverseerManager'
+
+    --With thanks to Balthazar for suggesting the below for where e.g. FAF develop has a function that isnt yet in FAF main
+    _G.repru = rawget(_G, 'repru') or repr
 
 
 

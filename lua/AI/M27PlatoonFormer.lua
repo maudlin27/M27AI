@@ -193,7 +193,6 @@ function CombatPlatoonFormer(aiBrain)
 
     RefreshUnitsWaitingForAssignment(aiBrain)
 
-    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySkirmisher, aiBrain[reftoCombatUnitsWaitingForAssignment])) == false then bDebugMessages = true end
 
 
     --Remove any duplicate units from reftoCombatUnitsWaitingForAssignment
@@ -718,7 +717,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                         elseif EntityCategoryContains(refCategoryMAA, sUnitID) then table.insert(tMAA, oUnit)
                         elseif EntityCategoryContains(categories.COMMAND, sUnitID) then table.insert(tACU, oUnit)
                         elseif EntityCategoryContains(refCategoryEngineer, sUnitID) then table.insert(tEngi, oUnit)
-                        elseif EntityCategoryContains(categories.STRUCTURE, sUnitID) then table.insert(tStructures, oUnit)
+                        elseif EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalArti, sUnitID) then table.insert(tStructures, oUnit)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, sUnitID) then table.insert(tLandExperimentals, oUnit)
                         elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, sUnitID) then table.insert(tSkirmishers, oUnit)
                         elseif EntityCategoryContains(refCategoryLandCombat, sUnitID) then table.insert(tCombat, oUnit)
@@ -753,7 +752,6 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
             if M27Utilities.IsTableEmpty(tEngi) == false then AddIdleUnitsToPlatoon(aiBrain, tEngi, aiBrain[M27PlatoonTemplates.refoAllEngineers]) end
             if M27Utilities.IsTableEmpty(tLandExperimentals) == false then local oNewPlatoon = CreatePlatoon(aiBrain, 'M27GroundExperimental', tLandExperimentals) end
             if M27Utilities.IsTableEmpty(tSkirmishers) == false then
-                bDebugMessages = true
                 if bDebugMessages == true then LOG(sFunctionRef..': Will create a new skrimisher platoon which includes unit '..tSkirmishers[1].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSkirmishers[1])) end
                 local oNewPlatoon = CreatePlatoon(aiBrain, 'M27Skirmisher', tSkirmishers)
             end
@@ -1281,7 +1279,6 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     --if bNoDelay is true then wont do normal waiting for the unit to move away from the factory (nb: should only set this to true if we're not talking about a newly produced unit from a factory as it will bypass the workaround for factory error where factories stop building)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AllocateNewUnitToPlatoonBase'
-    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySkirmisher, tNewUnits)) == false then bDebugMessages = true end
     --DONT USE PROFILER HERE as need solution to the waitticks
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
@@ -1318,7 +1315,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
             LOG('Warning - no valid units in tNewUnits')
         end
     else
-        if EntityCategoryContains(categories.STRUCTURE, oNewUnit.UnitId) then
+        if EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalArti, oNewUnit.UnitId) then
             bValidUnit = false
             if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a structure e.g. a factory, so will ignore normal check that unit has moved away from factory build area') end
         else
@@ -1454,7 +1451,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                         if iLifetimeCount == nil then iLifetimeCount = 0 end
                         LOG(sFunctionRef..': About to clear commands to unit with lifetime count='..iLifetimeCount..' and ID='..sUnitID)
                     end
-                    local tUnitsToClear = EntityCategoryFilterDown(categories.ALLUNITS - categories.AIR - categories.COMMAND - categories.STRUCTURE, tNewUnits)
+                    local tUnitsToClear = EntityCategoryFilterDown(categories.ALLUNITS - categories.AIR - categories.COMMAND - categories.STRUCTURE - M27UnitInfo.refCategoryExperimentalArti, tNewUnits)
                     --Is the factory unit state building or upgrading? If so then dont need to worry about clearing
                     local bFactoryNotBuilding = false
                     if M27Utilities.IsTableEmpty(tUnitsToClear) == false then

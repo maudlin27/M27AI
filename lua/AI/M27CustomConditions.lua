@@ -362,9 +362,9 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
                 bWantToGetGun = false
             else
                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 1.4 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 26 and (M27Utilities.GetACU(aiBrain):GetHealth() >= 7500 or M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= M27Overseer.iDistanceFromBaseToBeSafe) and
-                    (aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 40 or
-                    (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 34) or
-                    (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 20 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 28)) then
+                        (aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 40 or
+                                (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 50 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 34) or
+                                (M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]) <= 20 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 28)) then
                     return true
                 else
                     local iResourceThresholdAdjustFactor = 1
@@ -624,10 +624,12 @@ end
 
 function HaveLowMass(aiBrain)
     local bHaveLowMass = false
-    local iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
-    if iMassStoredRatio < 0.05 or ((aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and aiBrain:GetEconomyStored('MASS') <= 350) then bHaveLowMass = true
-    elseif (iMassStoredRatio < 0.15 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.2 then bHaveLowMass = true
-    elseif (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and (iMassStoredRatio < 0.1 or ((iMassStoredRatio < 0.2 or (aiBrain:GetEconomyStored('MASS') < 1000 and iMassStoredRatio < 0.25)) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.3)) then bHaveLowMass = true
+    if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] <= 200 then --i.e. we dont ahve a paragon or crazy amount of SACUs
+        local iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
+        if iMassStoredRatio < 0.05 or ((aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and aiBrain:GetEconomyStored('MASS') <= 350) then bHaveLowMass = true
+        elseif (iMassStoredRatio < 0.15 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.2 then bHaveLowMass = true
+        elseif (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and (iMassStoredRatio < 0.1 or ((iMassStoredRatio < 0.2 or (aiBrain:GetEconomyStored('MASS') < 1000 and iMassStoredRatio < 0.25)) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.3)) then bHaveLowMass = true
+        end
     end
     return bHaveLowMass
 end
@@ -1237,7 +1239,7 @@ function IsBuildingWantedForAdjacency(oUnit)
         else
             local tAdjacent8x8Buildings = GetUnitsInRect(Rect(oUnit:GetPosition()[1]-iBuildingRadius - 4.1, oUnit:GetPosition()[3]-iBuildingRadius - 4.1, oUnit:GetPosition()[1]+iBuildingRadius + 4.1, oUnit:GetPosition()[3]+iBuildingRadius + 4.1))
             if bDebugMessages == true then LOG(sFunctionRef..': Checking if any units in a rectangle around '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iBuildingRadius='..iBuildingRadius..'; Unitposition='..repru(oUnit:GetPosition())..'; is tAdjacent8x8Buildings empty='..tostring(M27Utilities.IsTableEmpty(tAdjacent8x8Buildings))) end
-            if M27Utilities.IsTableEmpty(tAdjacent8x8Buildings) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedT3Arti, tAdjacent8x8Buildings)) == false then
+            if M27Utilities.IsTableEmpty(tAdjacent8x8Buildings) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti * categories.STRUCTURE, tAdjacent8x8Buildings)) == false then
                 bWantForAdjacency = true
             elseif bDebugMessages == true then LOG(sFunctionRef..': No T3 arti in tAdjacent8x8Buildings')
             end

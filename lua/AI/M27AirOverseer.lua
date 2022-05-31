@@ -3828,14 +3828,14 @@ function GetBomberTargetShortlist(aiBrain)
                 if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] == 2 then
                     if iEnemyT3Power == 0 then
                         --Enemies dont have any T3 power constructed, so if we target T2 power we might power stall them
-                        reftPriorityTargetCategories = { M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure }
+                        reftPriorityTargetCategories = { M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalArti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure }
                         aiBrain[refiLowPriorityStart] = 11 --if changing this also change the poitn at which to insert
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Enemy has no T3 power so will focus down any T2 power first')
                         end
                     else
                         --Enemy has T3 power so focus on mexes rather than power
-                        reftPriorityTargetCategories = { M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure }
+                        reftPriorityTargetCategories = { M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalArti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure }
                         aiBrain[refiLowPriorityStart] = 7 --if changing this also change the poitn at which to insert
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Enemy has T3 power so will focus on mexes')
@@ -3845,14 +3845,14 @@ function GetBomberTargetShortlist(aiBrain)
                     --T3+ air - same as T2 for targeting except will include ACU in high priority options
                     if iEnemyT3Power == 0 then
                         --Enemies dont have any T3 power constructed, so if we target T2 power we might power stall them
-                        reftPriorityTargetCategories = { M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure }
+                        reftPriorityTargetCategories = { M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalArti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryGroundAA, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure }
                         aiBrain[refiLowPriorityStart] = 12 --if changing this also change the poitn at which to insert
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Enemy has no T3 power so will focus down any T2 power first')
                         end
                     else
                         --Enemy has T3 power so focus on mexes rather than power
-                        reftPriorityTargetCategories = { M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure }
+                        reftPriorityTargetCategories = { M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalArti, M27UnitInfo.refCategorySniperBot, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryFixedT2Arti, categories.COMMAND, M27UnitInfo.refCategoryT3Power, M27UnitInfo.refCategoryT2Power, M27UnitInfo.refCategoryHydro, M27UnitInfo.refCategoryMex, M27UnitInfo.refCategoryEnergyStorage, M27UnitInfo.refCategoryPower, M27UnitInfo.refCategoryRadar, M27UnitInfo.refCategoryMobileLand, M27UnitInfo.refCategoryStructure }
                         aiBrain[refiLowPriorityStart] = 8 --if changing this also change the poitn at which to insert
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Enemy has T3 power so will focus on mexes')
@@ -4572,7 +4572,7 @@ function DetermineBomberDefenceRange(aiBrain)
             if M27Utilities.IsTableEmpty(tOurHighValueBuildings) == false then
                 local iCurDistance
                 for iUnit, oUnit in tOurHighValueBuildings do
-                    if oUnit:GetFractionComplete() < 1 or EntityCategoryContains(categories.STRUCTURE, oUnit.UnitId) then
+                    if oUnit:GetFractionComplete() < 1 or EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalArti, oUnit.UnitId) then
                         iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' which is distance '..iCurDistance..' from our base, and mod distance='..M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)..'; aiBrain[refiBomberDefenceModDistance]='..aiBrain[refiBomberDefenceModDistance]) end
                         if iCurDistance > aiBrain[refiBomberDefenceModDistance] then
@@ -5580,7 +5580,7 @@ function AirBomberManager(aiBrain)
                         local tEnemies
                         if iTargetCount == 0 then
                             --Enemy high value structure threats
-                            tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryExperimentalStructure, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.5, 'Enemy')
+                            tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryExperimentalStructure, tStartPoint, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.5, 'Enemy')
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Checking high value structure threats; is table empty=' .. tostring(M27Utilities.IsTableEmpty(tEnemies)))
                             end
@@ -6037,7 +6037,7 @@ function AirBomberManager(aiBrain)
                                             table.insert(tTargetsByMaxHealth[iTableIndex], oUnit)
                                             table.insert(tTargetStrikeDamageByMaxHealth[iTableIndex], iCurStrikeDamage)
                                             iPossibleTargets = iPossibleTargets + 1
-                                            if iAANearTarget == 0 and not (bTargetsContainHighPriorityWithNoAA) and (aiBrain[refiAirAAWanted] == 0 or aiBrain[refiHighestEnemyAirThreat] <= 2000) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oUnit.UnitId) then
+                                            if iAANearTarget == 0 and not (bTargetsContainHighPriorityWithNoAA) and (aiBrain[refiAirAAWanted] == 0 or aiBrain[refiHighestEnemyAirThreat] <= 2000) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryExperimentalArti + M27UnitInfo.refCategorySML, oUnit.UnitId) then
                                                 bTargetsContainHighPriorityWithNoAA = true
                                             end
                                         end

@@ -74,6 +74,7 @@ refCategoryT3Power = categories.STRUCTURE * categories.ENERGYPRODUCTION * catego
 refCategoryMassStorage = categories.STRUCTURE * categories.MASSSTORAGE * categories.TECH1
 
 refCategoryEnergyStorage = categories.STRUCTURE * categories.ENERGYSTORAGE
+refCategoryParagon = categories.MASSPRODUCTION * categories.MASSFABRICATION * categories.EXPERIMENTAL
 
 --Building - intel and misc
 refCategoryAirStaging = categories.STRUCTURE * categories.AIRSTAGINGPLATFORM
@@ -105,6 +106,7 @@ refCategoryTMD = categories.STRUCTURE * categories.ANTIMISSILE - categories.SILO
 refCategoryFixedShield = categories.SHIELD * categories.STRUCTURE
 refCategoryFixedT2Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH2
 refCategoryFixedT3Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH3
+refCategoryExperimentalArti = categories.EXPERIMENTAL * categories.ARTILLERY
 refCategorySML = categories.NUKE * categories.SILO
 refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * categories.STRUCTURE
 refCategoryTML = categories.SILO * categories.STRUCTURE * categories.TECH2 - categories.ANTIMISSILE
@@ -283,7 +285,7 @@ end
 
 function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
     --Returns support factory ID if it can be built, otherwise returns normal upgrade unit (works for any unit, not just factory)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnitUpgradeBlueprint'
     --if EntityCategoryContains(refCategoryAirFactory, oUnitToUpgrade.UnitId) then bDebugMessages = true end
 
@@ -638,6 +640,19 @@ function GetUpgradeBuildTime(oUnit, sUpgradeRef)
     return iUpgradeTime
 end
 
+function GetUpgradeMassCost(oUnit, sUpgradeRef)
+    local oBP = oUnit:GetBlueprint()
+    local iUpgradeMass
+    for sUpgradeID, tUpgrade in oBP.Enhancements do
+        if sUpgradeID == sUpgradeRef then
+            iUpgradeMass = tUpgrade.BuildCostMass
+        end
+
+    end
+    if not(iUpgradeMass) then M27Utilities.ErrorHandler('oUnit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
+    return iUpgradeMass
+end
+
 function GetUpgradeEnergyCost(oUnit, sUpgradeRef)
     local oBP = oUnit:GetBlueprint()
     local iUpgradeEnergy
@@ -736,6 +751,34 @@ function DoesBomberFireSalvo(oUnit)
     end
 end
 
+function PauseOrUnpauseMassUsage(aiBrain, oUnit, bPauseNotUnpause)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'PauseOrUnpauseMassUsage'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if EntityCategoryContains(categories.COMMAND + refCategoryAirFactory, oUnit.UnitId) then bDebugMessages = true end
+
+    if bDebugMessages == true then
+        local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
+        LOG(sFunctionRef..': Start of code, oUnit='..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..'; bPauseNotUnpause='..tostring(bPauseNotUnpause)..'; Unit state='..M27Logic.GetUnitState(oUnit))
+        if oUnit.GetWorkProgress then LOG(sFunctionRef..': Unit work progress='..oUnit:GetWorkProgress()) end
+    end
+    if IsUnitValid(oUnit, true) and oUnit.SetPaused then
+
+        --Want to pause unit, check for any special logic for pausing
+        local bWasUnitPaused = (oUnit[refbPaused] or false)
+        --Normal logic - just pause unit - exception if are dealing with a factory whose workcomplete is 100% and want to pause it
+        if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
+            if oUnit.UnitId..GetUnitLifetimeCount(oUnit) == 'xsb23051' and bPauseNotUnpause then M27Utilities.ErrorHandler('Pausing Yolona') end
+            oUnit:SetPaused(bPauseNotUnpause)if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)..' for unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)) end
+        elseif bDebugMessages == true then
+            LOG(sFunctionRef..': Factory with either no workprogress or workprogress that isnt <1')
+            if oUnit.GetWorkProgress then LOG(sFunctionRef..': Workprogress='..oUnit:GetWorkProgress()) end
+        end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PauseOrUnpauseEnergyUsage'
@@ -776,7 +819,8 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
             end
         end
         --Normal logic - just pause unit - exception if are dealing with a factory whose workcomplete is 100%
-        if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
+        if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
+            if oUnit.UnitId..GetUnitLifetimeCount(oUnit) == 'xsb23051' and bPauseNotUnpause then M27Utilities.ErrorHandler('Pausing Yolona') end
             oUnit:SetPaused(bPauseNotUnpause)if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
         elseif bDebugMessages == true then
             LOG(sFunctionRef..': Factory with either no workprogress or workprogress that isnt <1')

@@ -359,7 +359,7 @@ function IsCivilianBrain(aiBrain)
             if bDebugMessages == true then LOG('Dealing with an AI brain') end
             --Does it have no personality?
             if not(ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality) or ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality == "" then
-                if bDebugMessages == true then LOG(sFunctionRef..': Index='..aiBrain:GetArmyIndex()..'; Has no AI personality so will treat as being a civilian brain unless nickname contains AI or AIX and doesnt contain civilian.  Will do reprs of this'..repr(repr(aiBrain))) end
+                if bDebugMessages == true then LOG(sFunctionRef..': Index='..aiBrain:GetArmyIndex()..'; Has no AI personality so will treat as being a civilian brain unless nickname contains AI or AIX and doesnt contain civilian.  Will do repr of this'..repru(repru(aiBrain))) end
                 bIsCivilian = true
                 if string.find(aiBrain.Nickname, '%(AI') and not(string.find(aiBrain.Nickname, "civilian")) then
                     if bDebugMessages == true then LOG(sFunctionRef..': AI nickanme suggests its an actual AI and the developer has forgotten to give it a personality') end
@@ -1316,7 +1316,6 @@ function GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, iReturnRangeType)
     local sFunctionRef = 'GetDFAndT1ArtiUnitMinOrMaxRange'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if M27Utilities.IsTableEmpty(M27UnitInfo.refCategorySkirmisher, tUnits) == false then bDebugMessages = true end
 
     local iCurRange = 0
     local iMinRange = 1000000000
@@ -4297,8 +4296,11 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
 
         local bTML = false
         local bSML = false
+        local bCheckForSMD = false
         if EntityCategoryContains(M27UnitInfo.refCategoryTML, oLauncher.UnitId) then bTML = true
-        elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher.UnitId) then bSML = true
+        elseif EntityCategoryContains(M27UnitInfo.refCategorySML, oLauncher.UnitId) then
+            bSML = true
+            if not(EntityCategoryContains(categories.EXPERIMENTAL, oLauncher.UnitId)) then bCheckForSMD = true end
         else M27Utilities.ErrorHandler('Unknown type of launcher, code to fire a missile wont work; oLauncher='..oLauncher.UnitId..M27UnitInfo.GetUnitLifetimeCount(oLauncher)) end
 
         if bTML or bSML then
@@ -4358,10 +4360,11 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                     end
 
                     if iValidTargets == 0 then
-                        if not(oLauncher[M27EconomyOverseer.refbWillReclaimUnit]) then
+                        if not(oLauncher[M27EconomyOverseer.refbWillReclaimUnit]) and not(EntityCategoryContains(categories.EXPERIMENTAL, oLauncher.UnitId)) then
                             --Disable autobuild and pause the TML since we have no targets, so this missile will be our last
                             oLauncher:SetAutoMode(false)
                             oLauncher:SetPaused(true)
+                            if oLauncher.UnitId..M27UnitInfo.GetUnitLifetimeCount(oLauncher) == 'xsb23051' then M27Utilities.ErrorHandler('Pausing Yolona') end
                             if not(oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable]) then
                                 --First time we have no target
                                 oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] = GetGameTimeSeconds()
@@ -4372,7 +4375,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                                 table.insert(aiBrain[M27EconomyOverseer.reftoTMLToReclaim], oLauncher)
                             end--]]
                         else
-                            --Already set to be reclaimed so just need to check for targets
+                            --Already set to be reclaimed, or dealing with a yolona oss so just need to check for targets
                         end
                         --Wait a while then call this function again:
                         ForkThread(RecheckForTMLMissileTarget, aiBrain, oLauncher)
@@ -4418,7 +4421,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                     end--]]
                 else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
                     --First get the best location if just target the start position or locations near here
-                    tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage, bSML, oLauncher:GetPosition())
+                    tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage, bCheckForSMD, oLauncher:GetPosition())
                     local iAirSegmentX, iAirSegmentZ
 
                     --Cycle through other start positions to see if can get a better target, but reduce value of target if we havent scouted it in the last 5 minutes
@@ -4471,7 +4474,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                                     if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTargetValue='..iCurTargetValue..'; location='..repru(oUnit:GetPosition())..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
                                     --Stop looking if tried >=10 targets and have one that is at least 20k of value
                                     if iCurTargetValue > iBestTargetValue then
-                                        if IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), 200) then
+                                        if bCheckForSMD and IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), 200) then
                                             if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking the unit target '..repru(oUnit:GetPosition())..'; will limit damage to 4k') end
                                             iCurTargetValue = 4000 end
                                         if iCurTargetValue > iBestTargetValue then
@@ -4488,7 +4491,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                                 end
                             end
                         end
-                        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage, bSML, oLauncher:GetPosition()) end
+                        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage, bCheckForSMD, oLauncher:GetPosition()) end
                         if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue..'; Best location for this target='..repru(tTarget)) end
                     end
                     if bDebugMessages == true then LOG(sFunctionRef..': If value is <12k then will clear target; iBestTargetValue='..iBestTargetValue..'; tTarget='..repru(tTarget or {'nil'})) end
@@ -4509,9 +4512,9 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         WaitSeconds(10)
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                        if not(oLauncher[M27UnitInfo.refbActiveSMDChecker]) then ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oLauncher) end
-                        --Send a voice taunt if havent in last 6m
-                        ForkThread(M27Chat.SendGloatingMessage, aiBrain, 10, 360)
+                        if not(oLauncher[M27UnitInfo.refbActiveSMDChecker]) and not(EntityCategoryContains(categories.EXPERIMENTAL, oLauncher.UnitId)) then ForkThread(M27EngineerOverseer.CheckForEnemySMD, aiBrain, oLauncher) end
+                        --Send a voice taunt if havent in last 10m
+                        ForkThread(M27Chat.SendGloatingMessage, aiBrain, 10, 600)
                     end
                     break
                 end
@@ -4530,6 +4533,11 @@ function GetT3ArtiTarget(oT3Arti)
     local sFunctionRef = 'GetT3ArtiTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --Redundancy incase we've been gifted a scathis that we havent started construction on:
+    if EntityCategoryContains(categories.MOBILE, oT3Arti) then
+        oT3Arti:GetAIBrain()[M27EngineerOverseer.reftFriendlyScathis][oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)] = oT3Arti
+    end
+
     local iMinRange = 0
     local iMaxRange = 0
     local iAOE = 1
@@ -4544,9 +4552,11 @@ function GetT3ArtiTarget(oT3Arti)
     end
     --Assume that 2.7 shots will land on this target for deciding aoe targets (i.e. unit would need to have massive health to not die)
     iDamage = math.min(14000, iDamage * 2.7) --Want to ignore shields less than this
+    if EntityCategoryContains(categories.EXPERIMENTAL * categories.AEON, oT3Arti.UnitId) then iDamage = math.max(iDamage, 20000) end --rapid fire arti will deal quite a lot of damage to shields since it is very accurate
 
     --Adjust aoe for firing randomness
-    iAOE = iAOE * (1 + iRandomness * 3)
+    iAOE = iAOE * (1 + iRandomness * 2.5)
+    local iEffectiveMaxRange = iMaxRange + iAOE * 0.5
 
     local aiBrain = oT3Arti:GetAIBrain()
     local tTarget
@@ -4564,16 +4574,26 @@ function GetT3ArtiTarget(oT3Arti)
         local iTargetShortlist = 0
         local iFriendlyT3ArtiInRange = 0
         if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through every enemy artillery and experimental structure, size of table='..table.getsize(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure])) end
+        local tExperimentalArti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalArti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 3000)
+        local iExperimentalArti = 0
+        if M27Utilities.IsTableEmpty(tExperimentalArti) == false then
+            for iUnit, oUnit in tExperimentalArti do
+                if oUnit:GetFractionComplete() == 1 then
+                    iExperimentalArti = iExperimentalArti + 1
+                end
+            end
+        end
         for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
             if M27UnitInfo.IsUnitValid(oUnit) then
                 iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                 --Use 15 above normal range due to inaccuracy of shots
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistance='..iCurDistance) end
-                if iCurDistance <= 840 then
+                if iCurDistance <= iEffectiveMaxRange then
 
                     tT3ArtiInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, oUnit:GetPosition(), 840, 'Ally')
-                    if M27Utilities.IsTableEmpty(tT3ArtiInRange) == false then
-                        iFriendlyT3ArtiInRange = 0
+
+                    if M27Utilities.IsTableEmpty(tT3ArtiInRange) == false or iExperimentalArti > 0 then
+                        iFriendlyT3ArtiInRange = iExperimentalArti
                         for iFriendlyArti, oFriendlyArti in tT3ArtiInRange do
                             if oUnit:GetFractionComplete() == 1 then
                                 iFriendlyT3ArtiInRange = iFriendlyT3ArtiInRange + 1
@@ -4612,14 +4632,14 @@ function GetT3ArtiTarget(oT3Arti)
                 end
             end
         end
-        if tTarget and M27Utilities.GetDistanceBetweenPositions(tTarget, oT3Arti:GetPosition()) > 824.99 then
-            tTarget = M27Utilities.MoveInDirection(oT3Arti:GetPosition(), M27Utilities.GetAngleFromAToB(oT3Arti:GetPosition(), tTarget), 824.99, false)
-            if bDebugMessages == true then LOG(sFunctionRef..': Unit is more than 824.99 away, so will adjust target to '..repru(tTarget)) end
+        if tTarget and M27Utilities.GetDistanceBetweenPositions(tTarget, oT3Arti:GetPosition()) > (iMaxRange - 0.01) then
+            tTarget = M27Utilities.MoveInDirection(oT3Arti:GetPosition(), M27Utilities.GetAngleFromAToB(oT3Arti:GetPosition(), tTarget), (iMaxRange - 0.01), false)
+            if bDebugMessages == true then LOG(sFunctionRef..': Unit is more than '..(iMaxRange - 0.01)..' away, so will adjust target to '..repru(tTarget)) end
         end
     end
     if not(tTarget) then
         if bDebugMessages == true then LOG(sFunctionRef..': Have no target so will try and get an alternative one') end
-        local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3 + M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategoryStructure * categories.TECH2, categories.COMMAND}
+        local tEnemyCategoriesOfInterest = {M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryAllHQFactories * categories.TECH3, M27UnitInfo.refCategoryStructure * categories.TECH2, categories.COMMAND}
 
         --First get the best location if just target the start position; note bleow uses similar code to choosing best nuke target
         tTarget = {M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[2], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)[3]}
