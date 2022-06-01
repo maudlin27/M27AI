@@ -70,6 +70,7 @@ refActionAssistShield = 40
 refActionBuildSecondShield = 41
 refActionBuildEmergencyArti = 42
 refActionAssistTML = 43
+refActionBuildQuantumGateway = 44
 tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees, refActionUpgradeBuilding, refActionAssistSMD, refActionAssistTML, refActionAssistAirFactory, refActionUpgradeHQ, refActionAssistNuke, refActionLoadOnTransport, refActionAssistShield}
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 --ALSO update the actions noted in RefreshT3ArtiAdjacencyLocations as being ones that can ignore when deciding whether to clear existing engineer commands
@@ -3999,15 +4000,17 @@ function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
         else
             iCategoryToBuild = M27UnitInfo.refCategoryFixedShield * categories.TECH3 - categories.CYBRAN * categories.CQUEMOV
         end
+    elseif iActionToAssign == refActionBuildQuantumGateway then
+        iCategoryToBuild = M27UnitInfo.refCategoryQuantumGateway
     else
         M27Utilities.ErrorHandler('Need to add code for action='..iActionToAssign)
     end
-    if iMinTechLevel > 1 then
-        if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
+        if iMinTechLevel > 1 then
+    if iMinTechLevel == 3 then iCategoryToBuild = iCategoryToBuild * categories.TECH3 + iCategoryToBuild*categories.EXPERIMENTAL
     else iCategoryToBuild = iCategoryToBuild - categories.TECH1
-    end
-    end
-    return iCategoryToBuild
+        end
+        end
+        return iCategoryToBuild
 end
 
 function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpgrade)
@@ -5210,6 +5213,8 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 end
                             elseif iActionToAssign == refActionFortifyFirebase then
                                 iMaxAreaToSearch = math.min(iMaxAreaToSearch, 12)
+                            elseif iActionToAssign == refActionBuildQuantumGateway then
+                                --Defaults - not worried about mex adjacency at this stage of the game
                             else
                                 M27Utilities.ErrorHandler('Need to add code for action=' .. iActionToAssign .. '; will assume will use default values and have something to build')
                                 --bConstructBuilding = false
@@ -9495,7 +9500,14 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Reclaim: iMaxEngisWanted='..iMaxEngisWanted) end
                             end
                         end
-                    elseif iCurrentConditionToTry == 49 then --Experimental if have loads of mass or satisfy other tests; one of these will be if we ahve already started on an experimental
+                    elseif iCurrentConditionToTry == 49 then --Quantum gateway
+                        if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 700 and not(bHaveLowPower) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 and (not(bHaveLowMass) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 25 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.01) and (not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) or aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 850 or M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryExperimentalLevel) >= 2) then
+                            iActionToAssign = refActionBuildQuantumGateway
+                            iMaxEngisWanted = 3
+                            if not(bHaveLowMass) then iMaxEngisWanted = 6 end
+                            iMinEngiTechLevelWanted = 3
+                        end
+                    elseif iCurrentConditionToTry == 50 then --Experimental if have loads of mass or satisfy other tests; one of these will be if we ahve already started on an experimental
                         if bDebugMessages == true then LOG(sFunctionRef..': Will consider building experimental if lots of mass or other tests. iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..';  Mass stored='..aiBrain:GetEconomyStored('MASS')..'; aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; Mass%='..aiBrain:GetEconomyStoredRatio('MASS')..'; aiBrain[M27EconomyOverseer.refiMassNetBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassNetBaseIncome]..'; bHaveLowPower='..tostring(bHaveLowPower)..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.35='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.35..'; T3 lifetime buildcount='..M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryLandCombat * categories.TECH3)..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.3='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.3..'; Do we already have an active action to build an experimental='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental]))..'; Is it safe to build an experimental='..tostring(SafeToBuildExperimental(aiBrain))) end
                         if iHighestFactoryOrEngineerTechAvailable >= 3 then --at least 250 gross income ignoring reclaim
                             if aiBrain:GetEconomyStored('MASS') >= 10000 or ((aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandMain or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and aiBrain:GetEconomyStored('MASS') >= 8000) or (aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and aiBrain:GetEconomyStored('MASS') >= 4000 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] >= 1 and bHaveLowPower == false and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7) then
@@ -9547,7 +9559,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
 
                         --SPARE ACTIONS BELOW
-                    elseif iCurrentConditionToTry == 50 then
+                    elseif iCurrentConditionToTry == 51 then
                         if bHaveVeryLowPower == false and bHaveLowMass == false then
                             if bWantMorePower then
                                 if iHighestFactoryOrEngineerTechAvailable == 1 then
@@ -9590,7 +9602,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
                         end
 
-                    elseif iCurrentConditionToTry == 51 then
+                    elseif iCurrentConditionToTry == 52 then
                         if bHaveLowMass == false and bHaveLowPower == false then
                             if iMassStoredRatio == nil then iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS') end
                             if iMassStored == nil then iMassStored = aiBrain:GetEconomyStored('MASS') end
@@ -9600,12 +9612,12 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 iMaxEngisWanted = 10
                             end
                         end
-                    elseif iCurrentConditionToTry == 52 then
+                    elseif iCurrentConditionToTry == 53 then
                         if bHaveLowMass == false and iHighestFactoryOrEngineerTechAvailable == 1 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
                             iActionToAssign = refActionBuildThirdPower
                             iMaxEngisWanted = 4
                         end
-                    elseif iCurrentConditionToTry == 53 then
+                    elseif iCurrentConditionToTry == 54 then
                         if bDebugMessages == true then LOG(sFunctionRef..': About to decide if want to build an experimental (or in some cases a factory) if have lots of mass. bHaveLowMass='..tostring(bHaveLowMass)..'; bHaveLowPower='..tostring(bHaveLowPower)..'; iMassStoredRatio='..iMassStoredRatio..'; iMassStored='..iMassStored) end
                         if bHaveLowMass == false and bHaveLowPower == false then
                             iMaxEngisWanted = 10
@@ -9643,7 +9655,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
-                    elseif iCurrentConditionToTry == 54 then
+                    elseif iCurrentConditionToTry == 55 then
                         --If about to overflow mass then build a second factory unless we arent using existing factories
                         if bHaveLowMass == false and bHaveLowPower == false and iMassStoredRatio >= 0.7 and aiBrain:GetEconomyStored('MASS') >= 2000 and aiBrain:GetEconomyStored('ENERGY') >= 0.99 and aiBrain[M27FactoryOverseer.refiFactoriesTemporarilyPaused] == 0 then
                             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
@@ -9669,7 +9681,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
                     else
                         bAreOnSpareActions = true
-                        if iCurrentConditionToTry == 55 then
+                        if iCurrentConditionToTry == 56 then
                             --Start building a second experimental if we look like we might overflow mass, or have a very high mass income
                             if bHaveLowMass == false and bHaveLowPower == false and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental]) == false then
                                 local bAlreadyBuildingFirstExperimental = false
@@ -9715,7 +9727,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             iMaxEngisWanted = 1000
                         end
                     end
-                    end
+                end
                 M27Utilities.FunctionProfiler(sFunctionRef..': Condition'..iCurrentConditionToTry..'Strat'..aiBrain[M27Overseer.refiAIBrainCurrentStrategy], M27Utilities.refProfilerEnd)
                 M27Utilities.FunctionProfiler(sFunctionRef..': EngiConditions', M27Utilities.refProfilerEnd)
 
@@ -9785,7 +9797,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 --Set minimum engineer tech level if not specified and no existing engineers assigned to the action
                                 if (iHighestFactoryOrEngineerTechAvailable > 1 or iHighestFactoryOrEngineerTechAvailable > 1) and iMinEngiTechLevelWanted == nil then
                                     --Are we building power or factory? If so then only build with the highest tech engi unless action is already in progress
-                                    if iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower or iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildLandFactory or iActionToAssign == refActionBuildSecondLandFactory or iActionToAssign == refActionBuildSecondAirFactory then
+                                    if iActionToAssign == refActionBuildPower or iActionToAssign == refActionBuildSecondPower or iActionToAssign == refActionBuildThirdPower or iActionToAssign == refActionBuildAirFactory or iActionToAssign == refActionBuildLandFactory or iActionToAssign == refActionBuildSecondLandFactory or iActionToAssign == refActionBuildSecondAirFactory or iActionToAssign == refActionBuildQuantumGateway then
                                         --Do we have at least 440 gross power or minimal mass stored? othwerise dont set any limit
                                         if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] > 44 or (aiBrain:GetEconomyStoredRatio('MASS') <= 0.1 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99) then
                                             --Have we already got an engineer assigned to this action?

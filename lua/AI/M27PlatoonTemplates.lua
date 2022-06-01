@@ -236,6 +236,27 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = true,
     },
+    ['M27RAS'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbIgnoreStuckAction] = true,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = false,
+        [refiFormMoveCloseDistanceThreshold] = 30,
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil, --
+        [refiPlatoonAmalgamationRange] = 20,
+        [refiPlatoonAmalgamationMaxSize] = 6,
+        [refbUsedByThreatDefender] = false,
+        [refbWantsShieldEscort] = false,
+    },
     ['M27EscortAI'] =
     {
         [refbIdlePlatoon] = false,

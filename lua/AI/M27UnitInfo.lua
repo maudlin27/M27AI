@@ -97,6 +97,7 @@ refCategoryAirFactory = categories.AIR * categories.FACTORY * categories.STRUCTU
 refCategoryNavalFactory = categories.NAVAL * categories.FACTORY * categories.STRUCTURE
 refCategoryAllFactories = refCategoryLandFactory + refCategoryAirFactory + refCategoryNavalFactory
 refCategoryAllHQFactories = refCategoryAllFactories - categories.SUPPORTFACTORY
+refCategoryQuantumGateway = categories.STRUCTURE * categories.GATE * categories.TECH3 * categories.FACTORY
 
 --Building - defensive
 refCategoryT2PlusPD = categories.STRUCTURE * categories.DIRECTFIRE - categories.STRUCTURE * categories.DIRECTFIRE * categories.TECH1
@@ -121,6 +122,7 @@ refCategoryExperimentalStructure = categories.CYBRAN * categories.ARTILLERY * ca
 refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY - categories.UNSELECTABLE
 refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
+refCategoryRASSACU = categories.SUBCOMMANDER * categories.RASPRESET + categories.SUBCOMMANDER * categories.SERAPHIM
 refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT + categories.LAND * categories.MOBILE * categories.TANK * categories.TECH1 * categories.SERAPHIM - categories.ANTIAIR -categories.REPAIR --(repair exclusion added as basic way to differentiate between mantis (which has repair category) and LAB; alternative way is to specify the fastest when choosing the blueprint to build
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA --NOTE: Need to specify slowest (so dont pick LAB)

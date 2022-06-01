@@ -689,6 +689,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
         local tStructures = {}
         local tAir = {}
         local tMobileShield = {}
+        local tRAS = {}
         local tOther = {}
         local tUnderConstruction = {}
 
@@ -720,6 +721,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                         elseif EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalArti, sUnitID) then table.insert(tStructures, oUnit)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, sUnitID) then table.insert(tLandExperimentals, oUnit)
                         elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, sUnitID) then table.insert(tSkirmishers, oUnit)
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryRASSACU, sUnitID) then table.insert(tRAS, oUnit)
                         elseif EntityCategoryContains(refCategoryLandCombat, sUnitID) then table.insert(tCombat, oUnit)
                         elseif EntityCategoryContains(refCategoryIndirectT2Plus, sUnitID) then table.insert(tIndirect, oUnit)
                         elseif EntityCategoryContains(refCategoryAllAir, sUnitID) then
@@ -1537,7 +1539,8 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                             --local refCategoryIndirect = M27UnitInfo.refCategoryIndirect
                             local tMobileShieldUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
                             local tSpecialCombat = EntityCategoryFilterDown(M27UnitInfo.refCategorySkirmisher + M27UnitInfo.refCategoryLandExperimental, tNewUnits)
-                            local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategorySkirmisher - M27UnitInfo.refCategoryLandExperimental, tNewUnits)
+                            local tRAS = EntityCategoryFilterDown(M27UnitInfo.refCategoryRASSACU, tNewUnits)
+                            local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategorySkirmisher - M27UnitInfo.refCategoryLandExperimental - M27UnitInfo.refCategoryRASSACU, tNewUnits)
                             local tEngineerUnits = EntityCategoryFilterDown(refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
                             local tAirUnits = EntityCategoryFilterDown(categories.AIR - refCategoryEngineer, tNewUnits)
                             local tNavalUnits = EntityCategoryFilterDown(categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat, tNewUnits)
@@ -1638,6 +1641,9 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                             if M27Utilities.IsTableEmpty(tSpecialCombat) == false then
                                 AllocateUnitsToIdlePlatoons(aiBrain, tSpecialCombat)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Have special combat units, so will send to idle platoon former instead of combat platoon former') end
+                            end
+                            if M27Utilities.IsTableEmpty(tRAS) == false then
+                                AllocateUnitsToIdlePlatoons(aiBrain, tRAS)
                             end
                             if M27Utilities.IsTableEmpty(tAirUnits) == false then
                                 AllocateUnitsToIdlePlatoons(aiBrain, tAirUnits)

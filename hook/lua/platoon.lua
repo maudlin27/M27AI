@@ -414,11 +414,11 @@ Platoon = Class(M27PlatoonClass) {
                                 if bDebugMessages == true then LOG(sFunctionRef..': Action after updating for nearby enemies is nil, checking for nearby mexes') end
                                 --M27PlatoonUtilities.DetermineActionForNearbyReclaim(self)
                                 --if self[M27PlatoonUtilities.refiCurrentAction] == nil then
-                                    --Check if we have enough mexes built already (below gets only those that have completed construction)
+                                --Check if we have enough mexes built already (below gets only those that have completed construction)
                                 if bDebugMessages == true then LOG(sFunctionRef..' current no. of mexes='..aiBrain:GetCurrentUnits(categories.MASSEXTRACTION * categories.STRUCTURE)..'; will look for nearby mexes if <=2') end
-                                    if aiBrain:GetCurrentUnits(categories.MASSEXTRACTION * categories.STRUCTURE) <= 2 then
-                                        M27PlatoonUtilities.DetermineActionForNearbyMex(self)
-                                    end
+                                if aiBrain:GetCurrentUnits(categories.MASSEXTRACTION * categories.STRUCTURE) <= 2 then
+                                    M27PlatoonUtilities.DetermineActionForNearbyMex(self)
+                                end
                                 --end
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': Action after updating for nearby enemies='..self[M27PlatoonUtilities.refiCurrentAction]) end
@@ -564,7 +564,7 @@ Platoon = Class(M27PlatoonClass) {
                         --Is the engi building something other than a T1 Mex (where it doesn't need assistance)?
                         oBeingBuilt = oEngi:GetFocusUnit()
                         if oBeingBuilt == nil then if bDebugMessages == true then LOG(sPlatoonName..': bACUInPlatoon='..tostring(bACUInPlatoon)..'Engi is building but oBeingBuilt is nil') end --sometimes this is the case so presumably engineer is 'building' when it's about to build but hasn't actually started yet?
-                            else
+                        else
                             if EntityCategoryContains(categories.TECH1*categories.MASSEXTRACTION, oBeingBuilt.UnitId) == false then
                                 if bDebugMessages == true then LOG(sPlatoonName..': bACUInPlatoon='..tostring(bACUInPlatoon)..'iUnit='..iUnit..'; Engi isnt building a T1 Mex') end
                                 --Engi is building something; work out if ACU can path to the unit being built, and (if so) how close it is to the ACU
@@ -666,7 +666,7 @@ Platoon = Class(M27PlatoonClass) {
     end,
 
 
---START OF ACTUAL PLATOON CODE - we just list out every platoon here for now, long term might want to just remove use of platoon.lua entirely
+    --START OF ACTUAL PLATOON CODE - we just list out every platoon here for now, long term might want to just remove use of platoon.lua entirely
     M27AttackNearestUnits = function(self)
         --Has platoon attack nearby structures and (if there are none) nearby land units forever; if no known units then will attack enemy base and then go back to our base and repeat
         M27PlatoonUtilities.PlatoonCycler(self)
@@ -694,6 +694,9 @@ Platoon = Class(M27PlatoonClass) {
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27Skirmisher = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27RAS = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27EscortAI = function(self)

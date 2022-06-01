@@ -3750,14 +3750,14 @@ function MergeNearbyPlatoons(oBasePlatoon)
 
 
         if iMergeCycleCount >= iMergeRefreshPoint then
-            local iMaxGroundPlatoonSize = oPlatoonToMergeInto[M27PlatoonTemplates.refiPlatoonAmalgamationMaxSize]
+            local iMaxGroundPlatoonSize = (oPlatoonToMergeInto[M27PlatoonTemplates.refiPlatoonAmalgamationMaxSize] or 5)
             if iMaxGroundPlatoonSize == nil then
                 M27Utilities.ErrorHandler('No max size specified for amalgamation - will default to 10.  PlatoonToMergeInto='..oPlatoonToMergeInto:GetPlan()..oPlatoonToMergeInto[refiPlatoonCount], true)
                 iMaxGroundPlatoonSize = 10
             end
             if oPlatoonToMergeInto[refiCurrentUnits] < iMaxGroundPlatoonSize then
                 local aiBrain = (oPlatoonToMergeInto[refoBrain] or oPlatoonToMergeInto:GetBrain())
-                local iSearchDistance = oPlatoonToMergeInto[M27PlatoonTemplates.refiPlatoonAmalgamationRange]
+                local iSearchDistance = (oPlatoonToMergeInto[M27PlatoonTemplates.refiPlatoonAmalgamationRange] or 10)
                 local tMergeIntoPlatoonPosition = GetPlatoonFrontPosition(oPlatoonToMergeInto)
                 if M27Utilities.IsTableEmpty(tMergeIntoPlatoonPosition) == false then
                     local tCurPlatoonPos, iCurDistance
@@ -3816,15 +3816,16 @@ function MergeNearbyPlatoons(oBasePlatoon)
     --(Decided wont update platoon unit data this cycle, as if wait then next cycle it will force a refresh due to the change in units)
 end
 
-function CombineNearbySkirmishers(aiBrain)
-    --Called once have a certain number of skirmishers, will combine skirmishers that are near each other so have up to 6 per platoon
+function CombineNearbyPlatoonsOfType(aiBrain, sPlanToCombine)
+
+    --e..g used for skirmishers - Called once have a certain number of skirmishers, will combine skirmishers that are near each other so have up to 6 per platoon
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    local sFunctionRef = 'CombineNearbySkirmishers'
+    local sFunctionRef = 'CombineNearbyPlatoonsOfType'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iSkirmisherCount = 0
     for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-        if oPlatoon.GetPlan and oPlatoon:GetPlan() == 'M27Skirmisher' then
+        if oPlatoon.GetPlan and oPlatoon:GetPlan() == sPlanToCombine then
             iSkirmisherCount = iSkirmisherCount + 1
         end
     end
@@ -3833,9 +3834,9 @@ function CombineNearbySkirmishers(aiBrain)
         local iMergesWanted = 5
         if bDebugMessages == true then LOG(sFunctionRef..': iSkirmisherCount='..iSkirmisherCount..'; will cycle through every platoon and see if can merge any of them') end
         for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-            if oPlatoon.GetPlan and oPlatoon:GetPlan() == 'M27Skirmisher' then
+            if oPlatoon.GetPlan and oPlatoon:GetPlan() == sPlanToCombine then
                 if oPlatoon[refiCurrentUnits] < oPlatoon[M27PlatoonTemplates.refiPlatoonAmalgamationMaxSize] then
-                    oPlatoon[M27PlatoonTemplates.reftPlatoonsToAmalgamate] = {'M27Skirmisher'}
+                    oPlatoon[M27PlatoonTemplates.reftPlatoonsToAmalgamate] = {sPlanToCombine}
                     iUnitsBeforeMerge = oPlatoon[refiCurrentUnits]
                     MergeNearbyPlatoons(oPlatoon)
                     if bDebugMessages == true then LOG(sFunctionRef..': Just told oPlatoon='..(oPlatoon:GetPlan() or 'nil')..' to merge into a nearby platoon if there is one. Units before merge='..(iUnitsBeforeMerge or 'nil')..'; Units after merge='..(oPlatoon[refiCurrentUnits] or 'nil')..'; Max merges wanted='..(iMergesWanted or 'nil')) end
@@ -5741,6 +5742,121 @@ function DecideWhetherACUShouldAssistConstruction(aiBrain, oPlatoon)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function GetNonACUBuilderAction(oPlatoon)
+    --E.g. intended for SACUs, but in theory could expand to cover sparkys
+    --Emergency base defence
+    if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon.GetBrain then
+        if EntityCategoryContains(M27UnitInfo.refCategoryRASSACU, oPlatoon[refoFrontUnit].UnitId) then
+            local aiBrain = oPlatoon:GetBrain()
+            local iSearchRange = 125
+            if EntityCategoryContains(categories.SERAPHIM, oPlatoon[refoFrontUnit].UnitId) then iSearchRange = iSearchRange + 50 end
+            iSearchRange = math.min(iSearchRange, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4)
+            if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iSearchRange then
+                --Enemies near base - move towards them
+                oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
+                oPlatoon[reftTemporaryMoveTarget] = {aiBrain[M27Overseer.reftLocationFromStartNearestThreat][1], aiBrain[M27Overseer.reftLocationFromStartNearestThreat][2], aiBrain[M27Overseer.reftLocationFromStartNearestThreat][3]}
+            else
+                --No nearby enemy threats; do we have engineers actively building emergency defence?
+                local oUnitToAssist
+                local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[refoFrontUnit])
+                local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(sPathing, GetPlatoonFrontPosition(oPlatoon))
+                for iActionRef, sActionRef in {M27EngineerOverseer.refActionBuildEmergencyPD, M27EngineerOverseer.refActionBuildEmergencyArti, M27EngineerOverseer.refActionFortifyFirebase} do
+                    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sActionRef]) == false then
+                        for iUniqueCount, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sActionRef] do
+                            if M27UnitInfo.IsUnitValid(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]) then
+                                --Are we in the same pathing group?
+                                if iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(sPathing, tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]:GetPosition()) then
+                                    oUnitToAssist = tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+                if oUnitToAssist then
+                    oPlatoon[refiCurrentAction] = refActionAssistConstruction
+                    oPlatoon[refoConstructionToAssist] = oUnitToAssist
+                else
+                    --Do we need torp bombers, or bombers for emergency defence?
+                    if aiBrain[M27AirOverseer.refiTorpBombersWanted] > 0 or (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == true and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] < aiBrain[M27AirOverseer.refiBomberDefenceModDistance] - 30) then
+                        local tAirFactories = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirFactory, false, true)
+                        if M27Utilities.IsTableEmpty(tAirFactories) == false then
+                            local iClosestFactory = 10000
+                            local iCurDist
+                            for iFactory, oFactory in tAirFactories do
+                                iCurDist = M27Utilites.GetDistanceBetweenPositions(oFactory:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
+                                if iCurDist < iClosestFactory and iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oFactory:GetPosition()) then
+                                    iClosestFactory = iCurDist
+                                    oUnitToAssist = oFactory
+                                end
+                            end
+                        end
+                    end
+                    if oUnitToAssist then
+                        oPlatoon[refiCurrentAction] = refActionAssistConstruction
+                        oPlatoon[refoConstructionToAssist] = oUnitToAssist
+                    else
+                        --Is there reclaim near our base of a significant amount?
+                        local tBestReclaimSegment
+
+                        if aiBrain:GetEconomyStoredRatio('MASS') <= 0.3 or M27Conditions.HaveLowMass(aiBrain) then
+                            local iMaxSegmentAdjX = math.ceil((iSearchRange / M27MapInfo.iReclaimSegmentSizeX)*0.5)
+                            local iMaxSegmentAdjZ = math.ceil((iSearchRange / M27MapInfo.iReclaimSegmentSizeZ)*0.5)
+                            local iNearestSegmentDist = 10000
+                            local iCurDist
+                            local iBaseSegmentX, iBaseSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            local iMapHighestSegmentX, iMapHighestSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation({M27MapInfo.rMapPlayableArea[3], 0, M27MapInfo.rMapPlayableArea[4]})
+
+                            local tCurReclaimSegment
+                            for iCurSegmentX = math.max(1, iBaseSegmentX - iMaxSegmentAdjX), math.min(iMapHighestSegmentX, iBaseSegmentX + iMaxSegmentAdjX), 1 do
+                                for iCurSegmentZ = math.max(1, iBaseSegmentZ - iMaxSegmentAdjZ), math.min(iMapHighestSegmentZ, iBaseSegmentZ + iMaxSegmentAdjZ), 1 do
+                                    if M27MapInfo.tReclaimAreas[iCurSegmentX][iCurSegmentZ][refReclaimTotalMass] >= 200 then
+                                        tCurReclaimSegment = M27MapInfo.GetReclaimLocationFromSegment(iCurSegmentX, iCurSegmentZ)
+                                        iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tCurReclaimSegment)
+                                        if iCurDist < iNearestSegmentDist then
+                                            iNearestSegmentDist = iCurDist
+                                            tBestReclaimSegment = {tCurReclaimSegment[1], tCurReclaimSegment[2], tCurReclaimSegment[3]}
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        if tBestReclaimSegment then
+                            oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
+                            oPlatoon[reftTemporaryMoveTarget] = tBestReclaimSegment
+                        else
+                            --Do we have any missiles to assist?
+                            local tNearbyMissiles = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySML + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategoryTML - categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Ally')
+                            if M27Utilities.IsTableEmpty(tNearbyMissiles) == false then
+                                local iCurDist
+                                local iNearestDist = 10000
+                                for iUnit, oUnit in tNearbyMissiles do
+                                    if oUnit.GetWorkProgress and oUnit:GetWorkProgress() < 1 then
+                                        if iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) then
+                                            iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oUnit:GetPosition())
+                                            if iCurDist < iNearestDist then
+                                                iNearestDist = iCurDist
+                                                oUnitToAssist = oUnit
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            if oUnitToAssist then
+                                oPlatoon[refiCurrentAction] = refActionAssistConstruction
+                                oPlatoon[refoConstructionToAssist] = oUnitToAssist
+                            else
+
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+
 function DeterminePlatoonAction(oPlatoon)
     --Record current action as previous action
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -6166,19 +6282,24 @@ function DeterminePlatoonAction(oPlatoon)
                                                                                     end
                                                                                 end
                                                                                 if oPlatoon[refiCurrentAction] == nil then
-                                                                                    if bDebugMessages == true then LOG(sFunctionRef..': WIll check if platoon has reached its destination') end
-                                                                                    --Check if have reached current or final destination (also update refiCurrentUnits and refiCurrentPathTarget):
-                                                                                    if HasPlatoonReachedDestination(oPlatoon) == true then
-                                                                                        IncreasePlatoonMovementPath(oPlatoon)
-                                                                                        if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Platoon has reached current destination; oPlatoon[refiCurrentPathTarget] after reaching destination='..oPlatoon[refiCurrentPathTarget]..'; size of movement path='..table.getn(oPlatoon[reftMovementPath])) end
-                                                                                        --Check if reached final destination:
-                                                                                        if oPlatoon[refiCurrentPathTarget] > table.getn(oPlatoon[reftMovementPath]) then
-                                                                                            if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': refiCurrentPathTarget='..oPlatoon[refiCurrentPathTarget]..'; movement path table size='..table.getn(oPlatoon[reftMovementPath])..'; have reached final destination') end
-                                                                                            DeterminePlatoonCompletionAction(oPlatoon)
-                                                                                        else
-                                                                                            if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Not reached final destination, will reissue movement path') end
-                                                                                            oPlatoon[refiCurrentAction] = refActionReissueMovementPath
-                                                                                            ForceActionRefresh(oPlatoon)
+                                                                                    if not(oPlatoon[refbACUInPlatoon]) and oPlatoon[refiBuilders] > 0 then
+                                                                                        GetNonACUBuilderAction(oPlatoon)
+                                                                                    end
+                                                                                    if oPlatoon[refiCurrentAction] == nil then
+                                                                                        if bDebugMessages == true then LOG(sFunctionRef..': WIll check if platoon has reached its destination') end
+                                                                                        --Check if have reached current or final destination (also update refiCurrentUnits and refiCurrentPathTarget):
+                                                                                        if HasPlatoonReachedDestination(oPlatoon) == true then
+                                                                                            IncreasePlatoonMovementPath(oPlatoon)
+                                                                                            if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Platoon has reached current destination; oPlatoon[refiCurrentPathTarget] after reaching destination='..oPlatoon[refiCurrentPathTarget]..'; size of movement path='..table.getn(oPlatoon[reftMovementPath])) end
+                                                                                            --Check if reached final destination:
+                                                                                            if oPlatoon[refiCurrentPathTarget] > table.getn(oPlatoon[reftMovementPath]) then
+                                                                                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': refiCurrentPathTarget='..oPlatoon[refiCurrentPathTarget]..'; movement path table size='..table.getn(oPlatoon[reftMovementPath])..'; have reached final destination') end
+                                                                                                DeterminePlatoonCompletionAction(oPlatoon)
+                                                                                            else
+                                                                                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Not reached final destination, will reissue movement path') end
+                                                                                                oPlatoon[refiCurrentAction] = refActionReissueMovementPath
+                                                                                                ForceActionRefresh(oPlatoon)
+                                                                                            end
                                                                                         end
                                                                                     end
                                                                                 end
@@ -10482,9 +10603,11 @@ function PlatoonInitialSetup(oPlatoon)
         aiBrain[refiLifetimePlatoonCount][sPlatoonName] = aiBrain[refiLifetimePlatoonCount][sPlatoonName] + 1
         oPlatoon[refiPlatoonCount] = aiBrain[refiLifetimePlatoonCount][sPlatoonName]
 
-        --Skirmisher platoon logic - combine if have too many
+        --Skirmisher - combine if have too many
         if oPlatoon[refiPlatoonCount] >= 20 and sPlatoonName == 'M27Skirmisher' then
-            ForkThread(CombineNearbySkirmishers, aiBrain)
+            ForkThread(CombineNearbyPlatoonsOfType, aiBrain, sPlatoonName)
+        elseif oPlatoon[refiPlatoonCount] >= 5 and sPlatoonName == 'M27RAS' then
+            ForkThread(CombineNearbyPlatoonsOfType, aiBrain, sPlatoonName)
         end
 
         local bPlatoonNameDisplay = false
