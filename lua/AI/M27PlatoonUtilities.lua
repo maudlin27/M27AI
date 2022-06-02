@@ -5745,16 +5745,22 @@ end
 function GetNonACUBuilderAction(oPlatoon)
     --E.g. intended for SACUs, but in theory could expand to cover sparkys
     --Emergency base defence
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetNonACUBuilderAction'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon.GetBrain then
         if EntityCategoryContains(M27UnitInfo.refCategoryRASSACU, oPlatoon[refoFrontUnit].UnitId) then
             local aiBrain = oPlatoon:GetBrain()
             local iSearchRange = 125
             if EntityCategoryContains(categories.SERAPHIM, oPlatoon[refoFrontUnit].UnitId) then iSearchRange = iSearchRange + 50 end
             iSearchRange = math.min(iSearchRange, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4)
+            if bDebugMessages == true then LOG(sFunctionRef..': iSearchRange='..iSearchRange..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) end
             if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iSearchRange then
                 --Enemies near base - move towards them
                 oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
                 oPlatoon[reftTemporaryMoveTarget] = {aiBrain[M27Overseer.reftLocationFromStartNearestThreat][1], aiBrain[M27Overseer.reftLocationFromStartNearestThreat][2], aiBrain[M27Overseer.reftLocationFromStartNearestThreat][3]}
+                if bDebugMessages == true then LOG(sFunctionRef..': Have enemies near base so will move towards them') end
             else
                 --No nearby enemy threats; do we have engineers actively building emergency defence?
                 local oUnitToAssist
@@ -5774,6 +5780,7 @@ function GetNonACUBuilderAction(oPlatoon)
                     end
                 end
                 if oUnitToAssist then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oUnitToAssist.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToAssist)..' is building emergency defence so will assist it') end
                     oPlatoon[refiCurrentAction] = refActionAssistConstruction
                     oPlatoon[refoConstructionToAssist] = oUnitToAssist
                 else
@@ -5784,17 +5791,21 @@ function GetNonACUBuilderAction(oPlatoon)
                             local iClosestFactory = 10000
                             local iCurDist
                             for iFactory, oFactory in tAirFactories do
-                                iCurDist = M27Utilites.GetDistanceBetweenPositions(oFactory:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
-                                if iCurDist < iClosestFactory and iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oFactory:GetPosition()) then
-                                    iClosestFactory = iCurDist
-                                    oUnitToAssist = oFactory
+                                if not(oFactory[M27FactoryOverseer.refbFactoryTemporaryPauseActive]) then
+                                    iCurDist = M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
+                                    if iCurDist < iClosestFactory and iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oFactory:GetPosition()) then
+                                        iClosestFactory = iCurDist
+                                        oUnitToAssist = oFactory
+                                    end
                                 end
                             end
                         end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27AirOverseer.refiTorpBombersWanted]='..aiBrain[M27AirOverseer.refiTorpBombersWanted]..'; Is table of available bombers empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]))..'; bomber def range-30='..(aiBrain[M27AirOverseer.refiBomberDefenceModDistance]-30)..'; nearest enemy='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) end
                     if oUnitToAssist then
                         oPlatoon[refiCurrentAction] = refActionAssistConstruction
                         oPlatoon[refoConstructionToAssist] = oUnitToAssist
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will assist air factory '..oUnitToAssist.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToAssist)) end
                     else
                         --Is there reclaim near our base of a significant amount?
                         local tBestReclaimSegment
@@ -5810,7 +5821,7 @@ function GetNonACUBuilderAction(oPlatoon)
                             local tCurReclaimSegment
                             for iCurSegmentX = math.max(1, iBaseSegmentX - iMaxSegmentAdjX), math.min(iMapHighestSegmentX, iBaseSegmentX + iMaxSegmentAdjX), 1 do
                                 for iCurSegmentZ = math.max(1, iBaseSegmentZ - iMaxSegmentAdjZ), math.min(iMapHighestSegmentZ, iBaseSegmentZ + iMaxSegmentAdjZ), 1 do
-                                    if M27MapInfo.tReclaimAreas[iCurSegmentX][iCurSegmentZ][refReclaimTotalMass] >= 200 then
+                                    if M27MapInfo.tReclaimAreas[iCurSegmentX][iCurSegmentZ][M27MapInfo.refReclaimTotalMass] >= 200 then
                                         tCurReclaimSegment = M27MapInfo.GetReclaimLocationFromSegment(iCurSegmentX, iCurSegmentZ)
                                         iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tCurReclaimSegment)
                                         if iCurDist < iNearestSegmentDist then
@@ -5821,17 +5832,20 @@ function GetNonACUBuilderAction(oPlatoon)
                                 end
                             end
                         end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Is the table of good reclaim segment near base empty='..tostring(M27Utilities.IsTableEmpty(tBestReclaimSegment))) end
                         if tBestReclaimSegment then
                             oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
                             oPlatoon[reftTemporaryMoveTarget] = tBestReclaimSegment
                         else
                             --Do we have any missiles to assist?
                             local tNearbyMissiles = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySML + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategoryTML - categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Ally')
+                            if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby missile builders empty='..tostring(M27Utilities.IsTableEmpty(tNearbyMissiles))) end
                             if M27Utilities.IsTableEmpty(tNearbyMissiles) == false then
                                 local iCurDist
                                 local iNearestDist = 10000
                                 for iUnit, oUnit in tNearbyMissiles do
-                                    if oUnit.GetWorkProgress and oUnit:GetWorkProgress() < 1 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering missile builder '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oUnit:GetWorkProgress()='..oUnit:GetWorkProgress()) end
+                                    if oUnit.GetWorkProgress and oUnit:GetWorkProgress() < 1 and (oUnit:GetFractionComplete() < 1 or oUnit:GetWorkProgress() > 0) then
                                         if iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) then
                                             iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oUnit:GetPosition())
                                             if iCurDist < iNearestDist then
@@ -5845,8 +5859,38 @@ function GetNonACUBuilderAction(oPlatoon)
                             if oUnitToAssist then
                                 oPlatoon[refiCurrentAction] = refActionAssistConstruction
                                 oPlatoon[refoConstructionToAssist] = oUnitToAssist
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will assist missile builder '..oUnitToAssist.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToAssist)) end
                             else
-
+                                --Do we have mass stored and quantum gateway isnt paused?
+                                local tQuantumGateways = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryQuantumGateway, false, true)
+                                local iCurDist
+                                local iNearestDist = 10000
+                                if M27Utilities.IsTableEmpty(tQuantumGateways) == false then
+                                    for iUnit, oUnit in tQuantumGateways do
+                                        if oUnit.GetWorkProgress and oUnit:GetWorkProgress() < 1 and (oUnit:GetFractionComplete() < 1 or oUnit:GetWorkProgress() > 0) then
+                                            if iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) then
+                                                iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oUnit:GetPosition())
+                                                if iCurDist < iNearestDist then
+                                                    iNearestDist = iCurDist
+                                                    oUnitToAssist = oUnit
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                                if oUnitToAssist then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will assist quantum gateway '..oUnitToAssist.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToAssist)..'; unless have low mass in which case will move towards it.  Mass stored='..aiBrain:GetEconomyStored('MASS')) end
+                                    if aiBrain:GetEconomyStored('MASS') > 0 and (not(M27Conditions.HaveLowMass(aiBrain)) or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) then
+                                        oPlatoon[refiCurrentAction] = refActionAssistConstruction
+                                        oPlatoon[refoConstructionToAssist] = oUnitToAssist
+                                    else
+                                        oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
+                                        oPlatoon[reftTemporaryMoveTarget] = oUnitToAssist:GetPosition()
+                                    end
+                                else
+                                    --No quantum gateway, return to base
+                                    oPlatoon[refiCurrentAction] = refActionReturnToBase
+                                end
                             end
                         end
                     end
@@ -5854,6 +5898,7 @@ function GetNonACUBuilderAction(oPlatoon)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
@@ -5869,6 +5914,7 @@ function DeterminePlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
+            --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -8872,6 +8918,7 @@ function ProcessPlatoonAction(oPlatoon)
             local sPlatoonName = oPlatoon:GetPlan()
 
             --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
+            --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -10216,7 +10263,7 @@ function ProcessPlatoonAction(oPlatoon)
                                     if oPlatoon[refiOverrideDistanceToReachDestination] == nil then oPlatoon[refiOverrideDistanceToReachDestination] = 3 end --(redundancy as set when platoon first created if there are builders in it)
                                     MoveNearConstruction(aiBrain, oBuilder, tBuildingPosition, oPlatoon[refoConstructionToAssist].UnitId, -oPlatoon[refiOverrideDistanceToReachDestination] - 1, false)
                                 end
-                                if EntityCategoryContains(M27UnitInfo.refCategoryStructure + categories.EXPERIMENTAL, oPlatoon[refoConstructionToAssist].UnitId) then
+                                if EntityCategoryContains(M27UnitInfo.refCategoryStructure + categories.EXPERIMENTAL, oPlatoon[refoConstructionToAssist].UnitId) and oPlatoon[refoConstructionToAssist]:GetFractionComplete() < 1 then
                                     IssueRepair({oBuilder}, oPlatoon[refoConstructionToAssist])
                                 else IssueGuard({oBuilder}, oPlatoon[refoConstructionToAssist])
                                 end

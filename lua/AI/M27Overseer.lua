@@ -55,12 +55,12 @@ iPlayersAtGameStart = 2
 
 --Threat groups:
 
-local reftEnemyThreatGroup = 'M27EnemyThreatGroupObject'
+reftEnemyThreatGroup = 'M27EnemyThreatGroupObject'
 refsEnemyThreatGroup = 'M27EnemyThreatGroupRef'
     --Threat group subtable refs:
     local refiThreatGroupCategory = 'M27EnemyGroupCategory'
     local refiThreatGroupHighestTech = 'M27EnemyGroupHighestTech'
-    local refoEnemyGroupUnits = 'M27EnemyGroupUnits'
+    refoEnemyGroupUnits = 'M27EnemyGroupUnits'
     local refsEnemyGroupName = 'M27EnemyThreatGroupName'
     local refiEnemyThreatGroupUnitCount = 'M27EnemyThreatGroupUnitCount'
     local refiHighestThreatRecorded = 'M27EnemyThreatGroupHighestThreatRecorded'
@@ -83,6 +83,9 @@ refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddis
 refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
 refiPercentageClosestFriendlyLandFromOurBaseToEnemy = 'M27OverseerClosestLandFromOurBaseToEnemy' --as above, but not limited to combat units, e.g. includes mexes
 refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
+
+refbGroundCombatEnemyNearMexCurCycle = 'M27OverseerGroundCombatNearMexCur' --against aibrain, true/false
+reftEnemyGroupsThreateningMexes = 'M27OverseerGroundCombatLocations' --against aiBrain, [x] is count, returns location of threat group average position
 
 local iMaxACUEmergencyThreatRange = 150 --If ACU is more than this distance from our base then won't help even if an emergency threat
 
@@ -2449,7 +2452,8 @@ function ThreatAssessAndRespond(aiBrain)
     --If have a chokepoint firebase then increase navy search range to be 150 above this
     if aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then iNavySearchRange = math.max(iNavySearchRange, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27MapInfo.reftChokepointBuildLocation]) + 150) end
 
-
+    --Reset check of locations of threat groups threatening mexes
+    aiBrain[reftEnemyGroupsThreateningMexes] = {}
 
     local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
 
@@ -2489,6 +2493,8 @@ function ThreatAssessAndRespond(aiBrain)
     if bDebugMessages == true then LOG(sFunctionRef..': tiOurBasePathingGroup='..repru(tiOurBasePathingGroup)) end
     local sPathing
     local bCanPathToTarget
+
+
 
 
 
@@ -2691,6 +2697,16 @@ function ThreatAssessAndRespond(aiBrain)
 
                     --Land based threats: send platoons to deal with them
                     if bConsideringNavy == false then
+                        --Check for friendly mexes that have enemies near them (so bombers can prioritise them)
+                        if tEnemyThreatGroup[refiModDistanceFromOurStart] <= aiBrain[M27AirOverseer.refiBomberDefenceModDistance] then
+                            --Check for mexes near the group
+                            local tNearbyMexes = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMex, tEnemyThreatGroup[reftAveragePosition], 20 + 15 * aiBrain[refiEnemyHighestTechLevel], 'Ally')
+                            if M27Utilities.IsTableEmpty(tNearbyMexes) == false then
+                                table.insert(aiBrain[reftEnemyGroupsThreateningMexes], iEnemyGroup)
+                                aiBrain[refbGroundCombatEnemyNearMexCurCycle] = true
+                            end
+                        end
+
                         for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
                             if bDebugMessages == true then LOG(sFunctionRef..': iPlatoon='..iPlatoon..'; Platoon unit count='..table.getn(oPlatoon:GetPlatoonUnits())) end
                             if oPlatoon[M27PlatoonTemplates.refbUsedByThreatDefender] == true then
@@ -4394,9 +4410,12 @@ function SetMaximumFactoryLevels(aiBrain)
             if M27Conditions.HaveLowMass(aiBrain) then
                 iPrimaryFactoriesWanted = math.max(5 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.5))
                 if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]/8)) end
+                if aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then iPrimaryFactoriesWanted = iPrimaryFactoriesWanted + 1 end
             else
                 iPrimaryFactoriesWanted = math.max(6 - aiBrain[refiOurHighestFactoryTechLevel], math.ceil(iMexesToBaseCalculationOn * 0.7))
                 if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 15 then iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted, math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]/6)) end
+                --Do we have lots of air factories and are restricted by enemy AA?
+                if aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then iPrimaryFactoriesWanted = math.max(iPrimaryFactoriesWanted + 1, aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory)) end
             end
         end
         --Overall cap of 15 factories if are land factories
@@ -5875,7 +5894,7 @@ function GameSettingWarningsAndChecks(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GameSettingWarningsAndChecks'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of compatibility check') end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of compatibility check.  Size of tAllActiveM27Brains='..table.getsize(tAllActiveM27Brains)) end
     local sIncompatibleMessage = ''
     local bIncompatible = false
     if not(ScenarioInfo.Options.Victory == "demoralization") then
@@ -5956,9 +5975,17 @@ function GameSettingWarningsAndChecks(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': iACUEnhancementCount='..iACUEnhancementCount..'; iExpectedCount='..iExpectedCount..'; tGunUpgrades='..repru(M27Conditions.tGunUpgrades)) end
     end
 
-
-
-
+    --Is our start position underwater?
+    local sUnderwaterM27Brains
+    if bDebugMessages == true then LOG(sFunctionRef..': Size of tAllActiveM27Brains='..table.getsize(tAllActiveM27Brains)) end
+    for iBrain, oBrain in tAllActiveM27Brains do
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering start point '..oBrain.M27StartPositionNumber..' for iBrain='..iBrain..' Nickname='..aiBrain.Nickname..'; Position='..repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])..'; Is underwater='..tostring(M27MapInfo.IsUnderwater(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]))) end
+        if M27MapInfo.IsUnderwater(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) then
+            sUnderwaterM27Brains = (sUnderwaterM27Brains or ' ')..oBrain.Nickname..' '
+            if bDebugMessages == true then LOG(sFunctionRef..': Have underwater brain') end
+        end
+    end
+    if sUnderwaterM27Brains then sIncompatibleMessage = sIncompatibleMessage..' Start point underwater for: '..sUnderwaterM27Brains end
 
     if bIncompatible then M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: "..sIncompatibleMessage..' If issues are encountered, report them to maudlin27 via Discord or the forums, and include the replay ID.', 0, 10) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -6497,7 +6524,7 @@ function OverseerManager(aiBrain)
     --ForkThread(M27MiscProfiling.LocalVariableImpact)
 
     --Log of basic info to help with debugging any replays we are sent (want this enabled/running as standard)
-    LOG('M27Brain overseer logic is active. Nickname='..aiBrain.Nickname..'; ArmyIndex='..aiBrain:GetArmyIndex()..'; Start position='..aiBrain.M27StartPositionNumber..'; Start position='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Nearest enemy brain details: Name='..tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain)].Nickname..'; ArmyIndex='..M27Logic.GetNearestEnemyIndex(aiBrain)..'; Start position='..M27Logic.GetNearestEnemyStartNumber(aiBrain)..'; Start position='..repru(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]))
+    LOG('M27Brain overseer logic is active. Nickname='..aiBrain.Nickname..'; ArmyIndex='..aiBrain:GetArmyIndex()..'; Start position number='..aiBrain.M27StartPositionNumber..'; Start position='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Nearest enemy brain details: Name='..tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain)].Nickname..'; ArmyIndex='..M27Logic.GetNearestEnemyIndex(aiBrain)..'; Start position='..M27Logic.GetNearestEnemyStartNumber(aiBrain)..'; Start position='..repru(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]))
 
     --ForkThread(TempCreateReclaim, aiBrain)
 

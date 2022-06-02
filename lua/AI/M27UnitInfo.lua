@@ -107,7 +107,7 @@ refCategoryTMD = categories.STRUCTURE * categories.ANTIMISSILE - categories.SILO
 refCategoryFixedShield = categories.SHIELD * categories.STRUCTURE
 refCategoryFixedT2Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH2
 refCategoryFixedT3Arti = categories.STRUCTURE * categories.INDIRECTFIRE * categories.ARTILLERY * categories.TECH3
-refCategoryExperimentalArti = categories.EXPERIMENTAL * categories.ARTILLERY
+refCategoryExperimentalArti = categories.EXPERIMENTAL * categories.ARTILLERY - categories.MOBILE * categories.UEF
 refCategorySML = categories.NUKE * categories.SILO
 refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * categories.STRUCTURE
 refCategoryTML = categories.SILO * categories.STRUCTURE * categories.TECH2 - categories.ANTIMISSILE
@@ -121,7 +121,7 @@ refCategoryUpgraded = refCategoryT2Radar + refCategoryT3Radar + refCategoryT2Son
 refCategoryExperimentalStructure = categories.CYBRAN * categories.ARTILLERY * categories.EXPERIMENTAL + categories.STRUCTURE * categories.EXPERIMENTAL
 refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY - categories.UNSELECTABLE
 refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE
-refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
+refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER -categories.SUBCOMMANDER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
 refCategoryRASSACU = categories.SUBCOMMANDER * categories.RASPRESET + categories.SUBCOMMANDER * categories.SERAPHIM
 refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT + categories.LAND * categories.MOBILE * categories.TANK * categories.TECH1 * categories.SERAPHIM - categories.ANTIAIR -categories.REPAIR --(repair exclusion added as basic way to differentiate between mantis (which has repair category) and LAB; alternative way is to specify the fastest when choosing the blueprint to build
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
@@ -794,7 +794,6 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
     end
     if IsUnitValid(oUnit, true) and oUnit.SetPaused then
 
-
         --Jamming - check via blueprint since no reliable category
         local oBP = oUnit:GetBlueprint()
         if oBP.Intel.JamRadius then
@@ -837,10 +836,13 @@ end
 
 function GetNumberOfUpgradesObtained(oACU)
     --Returns the number of upgrades a unit (e.g. ACU) has got
+    local oBP = oACU:GetBlueprint()
     local iUpgradeCount = 0
-    for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
-        if oACU:HasEnhancement(sEnhancement) and tEnhancement.BuildCostMass > 1 then
-            iUpgradeCount = iUpgradeCount + 1
+    if M27Utilities.IsTableEmpty(oBP.Enhancements) == false then
+        for sEnhancement, tEnhancement in oACU:GetBlueprint().Enhancements do
+            if oACU:HasEnhancement(sEnhancement) and tEnhancement.BuildCostMass > 1 then
+                iUpgradeCount = iUpgradeCount + 1
+            end
         end
     end
     return iUpgradeCount

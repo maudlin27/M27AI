@@ -10,8 +10,9 @@ AIBrain = Class(M27AIBrainClass) {
     -- Hook m27AI and record it as being used
 
     OnCreateAI = function(self, planName)
+        local sFunctionRef = 'OnCreateAI'
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-        if bDebugMessages == true then LOG('* M27AI: aibrain.lua: OnCreateAI function - before recorded if m27AI') end
+        if bDebugMessages == true then LOG(sFunctionRef..' M27AI: aibrain.lua: OnCreateAI function - before recorded if m27AI') end
 
         --Set aiBrain attribute on all AIs:
         local iArmyNo = M27Utilities.GetAIBrainArmyNumber(self)
@@ -24,16 +25,19 @@ AIBrain = Class(M27AIBrainClass) {
 
         local personality = ScenarioInfo.ArmySetup[self.Name].AIPersonality
         if bDebugMessages == true then
-            LOG('* M27AI: aibrain.lua: personality=' .. personality .. ')')
-            LOG('Start position number='..(iArmyNo or 'nil')..'; ArmyIndex='..self:GetArmyIndex())
+            LOG(sFunctionRef..'* M27AI: aibrain.lua: personality=' .. personality .. ')')
+            LOG(sFunctionRef..'Start position number='..(iArmyNo or 'nil')..'; ArmyIndex='..self:GetArmyIndex())
         end
         if string.find(personality, 'm27') or string.find(personality, 'M27') then
             local bDebugMode = true
 
             -- case sensitive
-            if bDebugMessages == true then LOG('* M27AI: personality (' .. personality .. ') is being used by army name: (' .. self.Name .. '); self.M27AI set to true') end
+            if bDebugMessages == true then LOG(sFunctionRef..'* M27AI: personality (' .. personality .. ') is being used by army name: (' .. self.Name .. '); self.M27AI set to true') end
             self.M27AI = true
             M27Utilities.bM27AIInGame = true
+
+            M27Overseer.tAllActiveM27Brains[self:GetArmyIndex()] = self
+            if bDebugMessages == true then LOG(sFunctionRef..': Size of tAllActiveM27Brains='..table.getsize(M27Overseer.tAllActiveM27Brains)) end
 
             --self:CreateBrainShared(planName)
 

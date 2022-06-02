@@ -734,8 +734,15 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                             end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sUnitID) then table.insert(tMobileShield, oUnit)
                         else table.insert(tOther, oUnit) end
+
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; will go through each table type and note if it is empty now')
+                            for iTable, tTable in {tMAA, tACU, tEngi, tStructures, tLandExperimentals, tSkirmishers, tRAS, tCombat, tIndirect, tAir, tMobileShield} do
+                                LOG(sFunctionRef..': iTable='..iTable..'; Is table empty='..tostring(M27Utilities.IsTableEmpty(tTable)))
+                            end
+                        end
                     else
-                        if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; sUnitID='..oUnit.UnitId) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; sUnitID='..oUnit.UnitId..'; not waiting for assignment') end
                     end
                 end
             end
@@ -757,6 +764,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                 if bDebugMessages == true then LOG(sFunctionRef..': Will create a new skrimisher platoon which includes unit '..tSkirmishers[1].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSkirmishers[1])) end
                 local oNewPlatoon = CreatePlatoon(aiBrain, 'M27Skirmisher', tSkirmishers)
             end
+            if M27Utilities.IsTableEmpty(tRAS) == false then local oNewPlatoon = CreatePlatoon(aiBrain, 'M27RAS', tRAS) end
             if M27Utilities.IsTableEmpty(tCombat) == false then
                 AddIdleUnitsToPlatoon(aiBrain, tCombat, aiBrain[M27PlatoonTemplates.refoIdleCombat])
                 AllocateNewUnitsToPlatoonNotFromFactory(tCombat)
@@ -1284,6 +1292,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     --DONT USE PROFILER HERE as need solution to the waitticks
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
+
     if iDelayInTicks then WaitTicks(iDelayInTicks) end
 
     local iLifetimeCount
@@ -1540,6 +1549,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                             local tMobileShieldUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
                             local tSpecialCombat = EntityCategoryFilterDown(M27UnitInfo.refCategorySkirmisher + M27UnitInfo.refCategoryLandExperimental, tNewUnits)
                             local tRAS = EntityCategoryFilterDown(M27UnitInfo.refCategoryRASSACU, tNewUnits)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Is table tRAS empty='..tostring(M27Utilities.IsTableEmpty(tRAS))) end
                             local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategorySkirmisher - M27UnitInfo.refCategoryLandExperimental - M27UnitInfo.refCategoryRASSACU, tNewUnits)
                             local tEngineerUnits = EntityCategoryFilterDown(refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield, tNewUnits)
                             local tAirUnits = EntityCategoryFilterDown(categories.AIR - refCategoryEngineer, tNewUnits)
