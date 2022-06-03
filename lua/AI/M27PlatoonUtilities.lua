@@ -2690,6 +2690,39 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
             if oPlatoon[refiCurrentAction] then bProceed = false end
         elseif sPlatoonName == 'M27GroundExperimental' then
             --Non-fatboy land experimental - do we have a low range (<60)? If so then run from large numbers of ravagers and T2 PD
+            --Also dont run if have T3+ mobile combat units within our range (or risk being kited to death)
+            if oPlatoon[refiEnemiesInRange] > 0 then
+                local tEnemyT3PlusCombat = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat * categories.TECH3 + M27UnitInfo.refCategoryExperimentalLevel + M27UnitInfo.refCategoryIndirectT3, oPlatoon[reftEnemiesInRange])
+                if M27Utilities.IsTableEmpty(tEnemyT3PlusCombat) == false then
+                    local tNearbyEnemyExperimental = EntityCategoryFilterDown(categories.EXPERIMENTAL, tEnemyT3PlusCombat)
+                    --Enemy experimentals - consider their range, and attack if are in range of them
+                    local iEnemyRange, iEnemyDist
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy experimentals in range empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyExperimental))) end
+                    if M27Utilities.IsTableEmpty(tNearbyEnemyExperimental) == false then
+                        for iUnit, oUnit in tNearbyEnemyExperimental do
+                            iEnemyRange = M27Logic.GetUnitMaxGroundRange({oUnit})
+                            iEnemyDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iEnemyRange='..iEnemyRange..'; iEnemyDist='..iEnemyDist..'; Our max range='..oPlatoon[refiPlatoonMaxRange]) end
+                            if iEnemyDist - 4 < math.max(iEnemyRange, oPlatoon[refiPlatoonMaxRange]) then
+                                oPlatoon[refiCurrentAction] = refActionAttack
+                                if bDebugMessages == true then LOG(sFunctionRef..': Too close to enemy experimental so will attack') end
+                                break
+                            end
+                        end
+                    end
+                    if not(oPlatoon[refiCurrentAction]) then
+                        tEnemyT3PlusCombat = EntityCategoryFilterDown(categories.TECH3, tEnemyT3PlusCombat)
+                        if M27Utilities.IsTableEmpty(tEnemyT3PlusCombat) == false then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemy T3, will see if we are in range of the closest one. Dist to T3='..M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tEnemyT3PlusCombat, GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition(), GetPlatoonFrontPosition(oPlatoon))..'; Our range='..oPlatoon[refiPlatoonMaxRange]) end
+                            if M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tEnemyT3PlusCombat, GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= oPlatoon[refiPlatoonMaxRange] then
+                                oPlatoon[refiCurrentAction] = refActionAttack
+                                if bDebugMessages == true then LOG(sFunctionRef..': Are in range so will attack') end
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemy experimental or T3 unit, action after checking if we are in range='..(oPlatoon[refiCurrentAction] or 'nil')) end
+                end
+            end
 
             local iFriendlyExperimental = 1
             if M27Utilities.IsTableEmpty(oPlatoon[reftFriendlyNearbyCombatUnits]) == false then
@@ -5157,23 +5190,56 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
                                         oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryPD * categories.TECH1
                                         bBuildBehindACU = false
                                     else
-                                        oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryPD * categories.TECH2
-                                    end
-
-                                    if bBuildBehindACU then
-                                        oPlatoon[reftStructureLocationToBuild] = M27Utilities.MoveInDirection(oACU:GetPosition(), M27Utilities.GetAngleFromAToB(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), math.min(oACU:GetBlueprint().Economy.MaxBuildDistance - 0.5, 5), true)
-                                    else
-                                        --Are we near to the chokepoint/ if so pick this as the place to build
-                                        if iDistToFirebase <= 30 then
-                                            oPlatoon[reftStructureLocationToBuild] = {aiBrain[M27MapInfo.reftChokepointBuildLocation][1], aiBrain[M27MapInfo.reftChokepointBuildLocation][2], aiBrain[M27MapInfo.reftChokepointBuildLocation][3]}
+                                        --Do we want PD or T2 arti more urgently?
+                                        if bBuildBehindACU or iDistToFirebase > 30 or iNearbyT2PlusPD <= 3 or aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] > 0 then
+                                            oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryPD * categories.TECH2
                                         else
-                                            --Build towards the chokepoint
-                                            oPlatoon[reftStructureLocationToBuild] = M27Utilities.MoveInDirection(oACU:GetPosition(), M27Utilities.GetAngleFromAToB(oACU:GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]), oACU:GetBlueprint().Economy.MaxBuildDistance - 0.5, true)
+                                            --Are there indirect fire or surface naval units nearby? If so want 1 T2 arti to every 2 T2 PD
+                                            local tNearbyEnemyLongRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLongRangeMobile + M27UnitInfo.refCategoryFrigate, oACU:GetPosition(), 135, 'Enemy')
+                                            if M27Utilities.IsTableEmpty(tNearbyEnemyLongRange) then
+                                                oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryPD * categories.TECH2
+                                            else
+                                                local iNearbyT2Arti = 0
+                                                local oUnderConstructionArti
+                                                local tNearbyT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, oACU:GetPosition(), 50, 'Ally')
+                                                if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
+                                                    for iUnit, oUnit in tNearbyT2Arti do
+                                                        if oUnit:GetFractionComplete() < 1 then
+                                                            oUnderConstructionArti = oUnit
+                                                        else
+                                                            iNearbyT2Arti = iNearbyT2Arti + 1
+                                                        end
+                                                    end
+                                                end
+                                                if iNearbyT2Arti == 0 or iNearbyT2Arti < iNearbyT2PlusPD * 0.6 then
+                                                    if oUnderConstructionArti then
+                                                        oPlatoon[refiCurrentAction] = refActionAssistConstruction
+                                                        oPlatoon[refoConstructionToAssist] = oUnderConstructionPD
+                                                    else
+                                                        oPlatoon[refiStructureCategoryToBuild] = M27UnitInfo.refCategoryFixedT2Arti
+                                                    end
+                                                end
+
+                                            end
                                         end
-
-
                                     end
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Will build T2 PD. bBuildBehindACU='..tostring(bBuildBehindACU)..'; Location to build='..repru(oPlatoon[reftStructureLocationToBuild])) end
+
+                                    if oPlatoon[refiCurrentAction] == refActionBuildStructure then
+                                        if bBuildBehindACU then
+                                            oPlatoon[reftStructureLocationToBuild] = M27Utilities.MoveInDirection(oACU:GetPosition(), M27Utilities.GetAngleFromAToB(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), math.min(oACU:GetBlueprint().Economy.MaxBuildDistance - 0.5, 5), true)
+                                        else
+                                            --Are we near to the chokepoint/ if so pick this as the place to build
+                                            if iDistToFirebase <= 30 then
+                                                oPlatoon[reftStructureLocationToBuild] = {aiBrain[M27MapInfo.reftChokepointBuildLocation][1], aiBrain[M27MapInfo.reftChokepointBuildLocation][2], aiBrain[M27MapInfo.reftChokepointBuildLocation][3]}
+                                            else
+                                                --Build towards the chokepoint
+                                                oPlatoon[reftStructureLocationToBuild] = M27Utilities.MoveInDirection(oACU:GetPosition(), M27Utilities.GetAngleFromAToB(oACU:GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation]), oACU:GetBlueprint().Economy.MaxBuildDistance - 0.5, true)
+                                            end
+
+
+                                        end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will build T2 PD or arti. bBuildBehindACU='..tostring(bBuildBehindACU)..'; Location to build='..repru(oPlatoon[reftStructureLocationToBuild])) end
+                                    end
                                 end
                             elseif iDistToFirebase <= 30 then
                                 --Do we have reclaim nearby and are mass stalling?
@@ -6869,18 +6935,24 @@ function GetPlateauMovementPath(oPlatoon, bDontClearActions)
                 oPlatoon[reftMovementPath][1] = oNearestUnit:GetPosition()
             else
                 --Get the nearest mex in the plateau with the lowest visitation count
-                oPlatoon[reftMovementPath][1] = GetNearestLocationWithFewestVisitations(oPlatoon, M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes], true)
+                if M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes]) == false then
+                    oPlatoon[reftMovementPath][1] = GetNearestLocationWithFewestVisitations(oPlatoon, M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes], true)
+                else
+                    oPlatoon[reftMovementPath][1] = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, iPlateauGroup, GetPlatoonFrontPosition(oPlatoon), 25, 5)
+                end
                 if bDebugMessages == true then LOG(sFunctionRef..': Have got the nearest mex with the lowest visitation count, movement path='..repru(oPlatoon[reftMovementPath][1] or {'nil'})) end
             end
         elseif sPlatoonName == 'M27PlateauMAA' then
             local tOwnedMexes = {}
             local iOwnedMexes = 0
 
-            for iMex, tMexPosition in M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes] do
-                --Treat everything as unclaimed except mexes we or ally have b uilt on, that way can just refer to this
-                if M27Conditions.IsMexUnclaimed(aiBrain, tMexPosition, true, false, true) == false then
-                    iOwnedMexes = iOwnedMexes + 1
-                    tOwnedMexes[iOwnedMexes] = tMexPosition
+            if M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes]) == false then
+                for iMex, tMexPosition in M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes] do
+                    --Treat everything as unclaimed except mexes we or ally have b uilt on, that way can just refer to this
+                    if M27Conditions.IsMexUnclaimed(aiBrain, tMexPosition, true, false, true) == false then
+                        iOwnedMexes = iOwnedMexes + 1
+                        tOwnedMexes[iOwnedMexes] = tMexPosition
+                    end
                 end
             end
             if iOwnedMexes > 0 then
@@ -6889,7 +6961,11 @@ function GetPlateauMovementPath(oPlatoon, bDontClearActions)
                 oPlatoon[reftMovementPath][1] = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, iPlateauGroup, GetPlatoonFrontPosition(oPlatoon), 25, 5)
             end
         elseif sPlatoonName == 'M27PlateauScout' then
-            oPlatoon[reftMovementPath][1] = GetNearestLocationWithFewestVisitations(oPlatoon, M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes], true)
+            if M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes]) == false then
+                oPlatoon[reftMovementPath][1] = GetNearestLocationWithFewestVisitations(oPlatoon, M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMexes], true)
+            else
+                oPlatoon[reftMovementPath][1] = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, iPlateauGroup, GetPlatoonFrontPosition(oPlatoon), 25, 5)
+            end
         else
             local bPathingWasWrong = M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oPlatoon[refoFrontUnit], GetPlatoonFrontPosition(oPlatoon))
             if bPathingWasWrong == false then
@@ -6897,16 +6973,18 @@ function GetPlateauMovementPath(oPlatoon, bDontClearActions)
             end
             oPlatoon[reftMovementPath][1] = {GetPlatoonFrontPosition(oPlatoon)[1] + math.random(-20, 20), 0, GetPlatoonFrontPosition(oPlatoon)[3] + math.random(-20, 20)}
             oPlatoon[reftMovementPath][1][1] = GetSurfaceHeight(oPlatoon[reftMovementPath][1][1], oPlatoon[reftMovementPath][1][3])
-        --M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, iPlateauGroup, GetPlatoonFrontPosition(oPlatoon), 25, 5)
-        if bPathingWasWrong then
-        oPlatoon[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition(oPlatoon))
+            --M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, iPlateauGroup, GetPlatoonFrontPosition(oPlatoon), 25, 5)
+            if bPathingWasWrong then
+                oPlatoon[M27Transport.refiAssignedPlateau] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition(oPlatoon))
             end
         end
-
-        if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath]) then
+        --Backup for if couldnt find a valid position to path to:
+        if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath]) or M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath][1]) then
             M27Utilities.ErrorHandler('Platoon has no movement path, will tell it go to a random point nearby')
-            oPlatoon[reftMovementPath][1] = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, iPlateauGroup, GetPlatoonFrontPosition(oPlatoon), 25, 5)
+            oPlatoon[reftMovementPath][1] = {GetPlatoonFrontPosition(oPlatoon)[1] + math.random(-5, 5), 0, GetPlatoonFrontPosition(oPlatoon)[3] + math.random(-5, 5)}
+            oPlatoon[reftMovementPath][1][2] = GetSurfaceHeight(oPlatoon[reftMovementPath][1][1], oPlatoon[reftMovementPath][1][3])
         end
+
         MoveAlongPath(oPlatoon, oPlatoon[reftMovementPath], 1, bDontClearActions)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

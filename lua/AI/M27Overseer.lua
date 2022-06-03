@@ -152,6 +152,7 @@ refFactoryTypeNavy = 3
 --Other ACU related
 refiACULastTakenUnseenOrTorpedoDamage = 'M27OverseerACULastTakenUnseenDamage' --Used to determine if ACU should run or not
 refoUnitDealingUnseenDamage = 'M27OverseerACUUnitDealingUnseenDamage' --so can see if it was a T2+ PD that should run away from
+refoLastUnitDealingDamage = 'M27OverseerLastUnitDealingDamage' --oUnit[], returns unit that last dealt damage - currently just used for ACU
 refbACUWasDefending = 'M27ACUWasDefending'
 iACUMaxTravelToNearbyMex = 35 --ACU will go up to this distance out of its current position to build a mex (i.e. add 10 to this for actual range)
 local refiCyclesThatACUHasNoPlatoon = 'M27ACUCyclesWithNoPlatoon'
@@ -3989,21 +3990,31 @@ function ACUManager(aiBrain)
                                 local iHealthReduction = 0
                                 if not(M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) then iHealthReduction = 1000 end --If we are getting gun upgrade then we need some health post-upgrade to have any chance of surviving
                                 if aiBrain[refbEnemyACUNearOurs] then iHealthReduction = iHealthReduction + 1000 end
+                                local iTurtleFurtherAdjust = 1
+                                if aiBrain[refiDefaultStrategy] == refStrategyTurtle and M27UnitInfo.GetNumberOfUpgradesObtained(oACU) == 0 then iHealthReduction = iHealthReduction - 2000 iTurtleFurtherAdjust = 0.9 end --If are turtling then really important we get the upgrade, will also get a health boost from T2
                                 if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 125 then iHealthReduction = math.max(0, iHealthReduction * 0.5) end
                                 if iTimeToComplete * iHealthLossPerSec > math.min(oACU[reftACURecentHealth][iCurTime] * 0.9 - iHealthReduction, oACU:GetMaxHealth() * 0.7 - iHealthReduction) then
                                     --ACU will be really low health or die if it keeps upgrading
                                     bCancelUpgradeAndRun = true
                                     bNeedProtecting = true
                                     if bDebugMessages == true then LOG(sFunctionRef..': We will be really low health if we finish the upgrade; consider if we are near base/if expect we might be able to reduce the damage taken where the upgrade is at least 50% done. % done='..oACU[reftACURecentUpgradeProgress][iCurTime]..'; Dist to base='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; oACU[reftACURecentHealth][iCurTime] * 1.1='..oACU[reftACURecentHealth][iCurTime] * 1.1..'; iTimeToComplete * iHealthLossPerSec='..iTimeToComplete * iHealthLossPerSec..'; iHealthReduction='..iHealthReduction..'; ACU Max health='..oACU:GetMaxHealth()) end
-                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.5 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 125 then
+                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.25 * iTurtleFurtherAdjust and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(200, math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.333)) / iTurtleFurtherAdjust then
                                         if iTimeToComplete * iHealthLossPerSec < oACU[reftACURecentHealth][iCurTime] * 1.1 - iHealthReduction then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Will try and finish upgrade and hope units can save us') end
                                             bCancelUpgradeAndRun = false
+                                        else
+                                            --are we taking damage from t1 bombers but have MAA or AirAA nearby?
+                                            local tNearbyEnemyBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber * categories.TECH1, oACU:GetPosition(), 60, 'Enemy')
+                                            local iNearbyEnemyBombers = 0
+                                            if M27Utilities.IsTableEmpty(tNearbyEnemyBombers) == false then iNearbyEnemyBombers = table.getn(tNearbyEnemyBombers) end
+                                            if iNearbyEnemyBombers <= 4 and (EntityCategoryContains(M27UnitInfo.refCategoryBomber, oACU[refoLastUnitDealingDamage].UnitId) or iNearbyEnemyBombers >= 1 and M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], oACU:GetPosition()) >= 60) and oACU[refoUnitsMAAHelper] and M27Utilities.IsTableEmpty(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits]) == false and M27UnitInfo.GetUnitHealthPercent(oACU) > (1 - oACU:GetWorkProgress()) then
+                                                bCancelUpgradeAndRun = false
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Health % is better tahn % to complete, and 4 or fewer t1 bombers and we have MAA assigned to us, so hopefully will kill the bombers soon') end
+                                            end
                                         end
                                     end
-
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec..'; iTimeToComplete='..iTimeToComplete..'; iTimeToComplete * iHealthLossPerSec='..iTimeToComplete * iHealthLossPerSec..'; oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]..'; bCancelUpgradeAndRun='..tostring(bCancelUpgradeAndRun)) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iHealthLossPerSec='..iHealthLossPerSec..'; iTimeToComplete='..iTimeToComplete..'; iTimeToComplete * iHealthLossPerSec='..iTimeToComplete * iHealthLossPerSec..'; oACU[reftACURecentHealth][iCurTime - 10]='..oACU[reftACURecentHealth][iCurTime - 10]..'; oACU[reftACURecentHealth][iCurTime]='..oACU[reftACURecentHealth][iCurTime]..'; oACU[reftACURecentUpgradeProgress][iCurTime]='..oACU[reftACURecentUpgradeProgress][iCurTime]..'; bCancelUpgradeAndRun='..tostring(bCancelUpgradeAndRun)..';  aiBrain[refiDistanceToNearestEnemyBase]='.. aiBrain[refiDistanceToNearestEnemyBase]) end
                             elseif bDebugMessages == true then LOG(sFunctionRef..': Health loss less than 50 so wont cancel for this. iHealthLossPerSec='..iHealthLossPerSec)
                             end
 
@@ -6258,6 +6269,18 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+
+    --Change a unit's speed
+    local oACU = M27Utilities.GetACU(aiBrain)
+    if oACU.SetSpeed then LOG('TestCustom: Use SetSpeed')
+    elseif oACU.SetSpeedMult then LOG('TestCustom: UseSetSpeedMult')
+    elseif oACU.SetMaxSpeed then LOG('TestCustom: Use SetMaxSpeed')
+    elseif oACU.Speed then LOG('TestCustom: ACU has .speed value='..oACU.Speed)
+    end
+    --Above works for SetSpeedMult but not for the others (even if commenting out setspeedmult)
+    oACU:SetSpeedMult(0.1)
+
+    --[[
     --Get the blueprint for a projectile of an SMD
     local oBP = __blueprints['ueb4302']
     local sProjectileBP = oBP.Weapon[1].ProjectileId
@@ -6283,6 +6306,7 @@ function TestCustom(aiBrain)
         end
     end
     LOG('TestCustom: iCurUnitEnergyUsage='..iCurUnitEnergyUsage)
+    --]]
 
     --Check GetEdgeOfMapInDirection(tStart, iAngle) works:
     --[[local tEndPoint
@@ -6351,6 +6375,7 @@ function TestCustom(aiBrain)
           end
        end
     end--]]
+    M27Utilities.ErrorHandler('SHould disable for final, only for testing')
 end
 
 function TempBomberLocation(aiBrain)
@@ -6534,7 +6559,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    TestCustom(aiBrain)
+    --TestCustom(aiBrain)
 
 
 

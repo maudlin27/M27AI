@@ -4824,7 +4824,7 @@ function AirBomberManager(aiBrain)
     local sFunctionRef = 'AirBomberManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if GetGameTimeSeconds() >= 1560 then bDebugMessages = true end
+    local iSystemTimeStart = GetSystemTimeSecondsOnlyForProfileUse()
 
     DetermineBomberDefenceRange(aiBrain) --Updates aiBrain[refiBomberDefenceModDistance]
     if bDebugMessages == true then
@@ -6455,6 +6455,7 @@ function AirBomberManager(aiBrain)
             end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, time taken='..GetSystemTimeSecondsOnlyForProfileUse() - iSystemTimeStart) end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

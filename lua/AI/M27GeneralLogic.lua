@@ -4032,13 +4032,17 @@ function ForkedCheckForAnotherMissile(oUnit)
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitSeconds(10)
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                iMissiles = 0
-                if oUnit.GetTacticalSiloAmmoCount then iMissiles = iMissiles + oUnit:GetTacticalSiloAmmoCount() end
-                if oUnit.GetNukeSiloAmmoCount then iMissiles = iMissiles + oUnit:GetNukeSiloAmmoCount() end
-                if bDebugMessages == true then LOG(sFunctionRef..': iMissiles='..iMissiles) end
-                if iMissiles < 2 then
-                    oUnit:SetPaused(false)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Will change unit state so it isnt paused') end
+                if M27UnitInfo.IsUnitValid(oUnit) then
+                    iMissiles = 0
+                    if oUnit.GetTacticalSiloAmmoCount then iMissiles = iMissiles + oUnit:GetTacticalSiloAmmoCount() end
+                    if oUnit.GetNukeSiloAmmoCount then iMissiles = iMissiles + oUnit:GetNukeSiloAmmoCount() end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iMissiles='..iMissiles) end
+                    if iMissiles < 2 then
+                        oUnit:SetPaused(false)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will change unit state so it isnt paused') end
+                        break
+                    end
+                else
                     break
                 end
 
@@ -4364,7 +4368,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                             --Disable autobuild and pause the TML since we have no targets, so this missile will be our last
                             oLauncher:SetAutoMode(false)
                             oLauncher:SetPaused(true)
-                            if oLauncher.UnitId..M27UnitInfo.GetUnitLifetimeCount(oLauncher) == 'xsb23051' then M27Utilities.ErrorHandler('Pausing Yolona') end
+                            if oLauncher.UnitId == 'xsb2401' then M27Utilities.ErrorHandler('Pausing Yolona') end
                             if not(oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable]) then
                                 --First time we have no target
                                 oLauncher[M27EngineerOverseer.refiFirstTimeNoTargetsAvailable] = GetGameTimeSeconds()
@@ -4932,4 +4936,27 @@ function DetermineTMDWantedForUnits(aiBrain, tUnits)
         LOG(sFunctionRef..': End of code')
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function YthothaDeathBallSearchAndSlow(oOwnerBrain, tLikelyPosition)
+    --E.g. if become aware of an AI that controls the Ythotha death ball then can call this function to reduce the harmful effects
+    local iGameTimeStart = GetGameTimeSeconds()
+    local tNearbyDeathBalls
+    local iDeathBallCategory = categories.EXPERIMENTAL * categories.UNSELECTABLE * categories.SERAPHIM * categories.MOBILE * categories.LAND * categories.INSIGNIFICANTUNIT * categories.UNTARGETABLE
+    local bHaveChanged = false
+    while GetGameTimeSeconds() < (iGameTimeStart + 4) do
+        tNearbyDeathBalls = oOwnerBrain:GetListOfUnits(iDeathBallCategory, false, true)
+        if M27Utilities.IsTableEmpty(tNearbyDeathBalls) == false then
+            for iUnit, oUnit in tNearbyDeathBalls do
+                if not(oUnit.M27DeathBallAdjustActive) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tLikelyPosition) <= 5 then
+                    oUnit.M27DeathBallAdjustActive = true
+                    oUnit:SetSpeedMult(0.4)
+                    bHaveChanged = true
+                    oUnit.M27DeathBallAdjustActive = true
+                end
+            end
+        end
+        if bHaveChanged then break end
+        WaitSeconds(1)
+    end
 end

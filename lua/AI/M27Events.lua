@@ -227,6 +227,10 @@ function OnUnitDeath(oUnit)
                         --Note -seraphimunits.lua contains SEnergyBallUnit which looks like it is for when the death ball is spawned; ID is XSL0402; SpawnElectroStorm is in the ythotha script
                         --Sandbox test - have c.36s from ythotha dying to energy ball dying, so want to run away for half of this (18s) plus extra time based on how far away we already were
                     if EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental * categories.SERAPHIM, oUnit.UnitId) then
+                        --Swarm-AI workaround to deal with how it is controlled as a normal unit - slow it down so it stays in a simialr area to normal
+                        if oUnit:GetAIBrain().M27SwarmAI then
+                            ForkThread(M27Logic.YthothaDeathBallSearchAndSlow, oUnit:GetAIBrain(), oUnit:GetPosition())
+                        end
                         local tNearbyUnits
                         if bDebugMessages == true then LOG(sFunctionRef..': Ythotha has just died, will look for nearby units and tell them to run away') end
                         local iTimeToRun
@@ -428,6 +432,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                 if not(oUnitCausingDamage) and bDebugMessages == true then LOG(sFunctionRef..': Dont ahve a valid unit as instigator') end
 
                                 if oUnitCausingDamage and M27UnitInfo.IsUnitValid(oUnitCausingDamage) then
+                                    self[M27Overseer.refoLastUnitDealingDamage] = oUnitCausingDamage
                                     --Can we see the unit?
                                     if bDebugMessages == true then LOG(sFunctionRef..': Checking if can see the unit that dealt us damage') end
                                     if not(M27Utilities.CanSeeUnit(aiBrain, oUnitCausingDamage, true)) then
@@ -620,7 +625,6 @@ function OnMissileBuilt(self, weapon)
             if bDebugMessages == true then LOG(sFunctionRef..': iMissiles after Nuke silo ammo='..iMissiles) end
             if iMissiles >= 2 and not(EntityCategoryContains(categories.EXPERIMENTAL, self.UnitId)) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Have at least 2 missiles so will set paused to true') end
-                if self.UnitId..M27UnitInfo.GetUnitLifetimeCount(self) == 'xsb23051' then M27Utilities.ErrorHandler('Pausing Yolona') end
                 self:SetPaused(true)
                 --Recheck every minute
                 ForkThread(M27Logic.CheckIfWantToBuildAnotherMissile, self)

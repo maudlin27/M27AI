@@ -770,7 +770,7 @@ function PauseOrUnpauseMassUsage(aiBrain, oUnit, bPauseNotUnpause)
         local bWasUnitPaused = (oUnit[refbPaused] or false)
         --Normal logic - just pause unit - exception if are dealing with a factory whose workcomplete is 100% and want to pause it
         if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
-            if oUnit.UnitId..GetUnitLifetimeCount(oUnit) == 'xsb23051' and bPauseNotUnpause then M27Utilities.ErrorHandler('Pausing Yolona') end
+            if oUnit.UnitId == 'xsb2401' then M27Utilities.ErrorHandler('Pausing Yolona') end
             oUnit:SetPaused(bPauseNotUnpause)if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)..' for unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)) end
         elseif bDebugMessages == true then
             LOG(sFunctionRef..': Factory with either no workprogress or workprogress that isnt <1')
@@ -821,7 +821,7 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
         end
         --Normal logic - just pause unit - exception if are dealing with a factory whose workcomplete is 100%
         if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
-            if oUnit.UnitId..GetUnitLifetimeCount(oUnit) == 'xsb23051' and bPauseNotUnpause then M27Utilities.ErrorHandler('Pausing Yolona') end
+            if oUnit.UnitId == 'xsb2401' then M27Utilities.ErrorHandler('Pausing Yolona') end
             oUnit:SetPaused(bPauseNotUnpause)if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
         elseif bDebugMessages == true then
             LOG(sFunctionRef..': Factory with either no workprogress or workprogress that isnt <1')

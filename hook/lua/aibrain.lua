@@ -61,6 +61,11 @@ AIBrain = Class(M27AIBrainClass) {
             -- self.M27MapInfo = M27MapInfo.CreateM27MapInfo(self)
             ForkThread(M27Overseer.OverseerManager, self)
         else
+            --Flag for swarm so can deal with ythotha cheat
+            if string.find(personality, 'swarm') and string.find(self.Nickname, ': Swarm') then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have a swarm AI') end
+                self.M27SwarmAI = true
+            end
             M27AIBrainClass.OnCreateAI(self, planName)
             ForkThread(M27Overseer.SendWarningIfNoM27, self)
         end
