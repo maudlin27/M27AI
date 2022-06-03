@@ -5730,7 +5730,7 @@ function FilterLocationsBasedOnDefenceCoverage(aiBrain, tLocationsToFilter, bAls
         end
     end
 
-    if bAlsoNeedIntelCoverage == true and M27Utilities.IsTableEmpty(tFilteredLocations) == false and (M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) or not(M27UnitInfo.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandScout, 1))) then
+    if bAlsoNeedIntelCoverage == true and M27Utilities.IsTableEmpty(tFilteredLocations) == false and (M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) or not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryLandScout, 1))) then
         tFilteredLocations = FilterLocationsBasedOnIntelPathCoverage(aiBrain, tFilteredLocations, bNOTYETCODEDAlsoReturnClosest, bTableOfObjectsNotLocations)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
