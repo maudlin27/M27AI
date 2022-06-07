@@ -859,6 +859,8 @@ function OnConstructed(oEngineer, oJustBuilt)
             local sFunctionRef = 'OnConstructed'
             local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
             if bDebugMessages == true then LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; oJustBuilt='..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)) end
 
             oJustBuilt.M27OnConstructedCalled = true
@@ -877,6 +879,7 @@ function OnConstructed(oEngineer, oJustBuilt)
                 if EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then ForkThread(M27EngineerOverseer.RefreshListOfFirebases, aiBrain) end
             end
 
+            --Initial categories below are for if not protecting from TML
             --Mexes built by spare engineers - want to clear already assigned engineers
             if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oJustBuilt.UnitId) then
                 if oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionSpare then
@@ -926,13 +929,17 @@ function OnConstructed(oEngineer, oJustBuilt)
                     ForkThread(M27Logic.GetT3ArtiTarget, oJustBuilt)
                     if bDebugMessages == true then LOG(sFunctionRef..': Just built t3 arti or equivalent so have called the logic to get t3 arti target') end
                 end
+                --Quantum optics redundancy
+                if EntityCategoryContains(M27UnitInfo.refCategoryQuantumOptics, oJustBuilt.UnitId) then
+                    ForkThread(M27AirOverseer.QuantumOpticsManager, aiBrain, oJustBuilt)
+                end
             end
 
             --If have just upgraded a shield then clear tracking (redundancy as should also trigger from 'death' of old shield)
             if EntityCategoryContains(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and M27Utilities.IsTableEmpty(oJustBuilt[M27EngineerOverseer.reftAssistingEngineers]) == false then
                 for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
                     if M27UnitInfo.IsUnitValid(oEngi) then
-                        IssueClearCommands({oEngi})
+                        IssueClearCommands({ oEngi })
                         M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
                     end
                 end
@@ -945,7 +952,8 @@ function OnConstructed(oEngineer, oJustBuilt)
         --Engineer callbacks
         if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
             local sFunctionRef = 'OnConstructed'
-            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+            local bDebugMessages = false
+            if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

@@ -35,7 +35,7 @@ refoMAABasePatrolPlatoon = 'M27PlatoonFormerMAABasePatrol'
 refoMAARallyPatrolPlatoon = 'M27PlatoonFormerMAARallyPatrol'
 refoCombatPatrolPlatoon = 'M27PlatoonCombatPatrol'
 
-local iIdleUnitSearchThreshold = 10
+local iIdleUnitSearchThreshold = 5
 
 function CreatePlatoon(aiBrain, sPlatoonPlan, oPlatoonUnits) --, bRunImmediately)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -227,6 +227,9 @@ function CombatPlatoonFormer(aiBrain)
     local tUnitsWaiting = {}
     local iUnitsWaiting = 0
     local tSuicideUnits = {}
+    local tIndirectUnits = {}
+    local iIndirectUnits = 0
+
     if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
         if aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH2 + M27UnitInfo.refCategoryEngineer * categories.TECH3) >= 3  then
             for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
@@ -235,21 +238,46 @@ function CombatPlatoonFormer(aiBrain)
                     if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true and EntityCategoryContains(categories.TECH1 * M27UnitInfo.refCategoryDFTank, oUnit.UnitId) and M27UnitInfo.GetUnitPathingType(oUnit) == M27UnitInfo.refPathingTypeLand then
                         table.insert(tSuicideUnits, oUnit)
                     else
-                        iUnitsWaiting = iUnitsWaiting + 1
-                        tUnitsWaiting[iUnitsWaiting] = oUnit
+                        --Special T1 arti indirect platoon former if nearest threat is T1 PD
+                        if aiBrain[M27Overseer.refbNeedIndirect] and EntityCategoryContains(categories.INDIRECTFIRE, oUnit.UnitId) and EntityCategoryContains(categories.TECH1, aiBrain[M27Overseer.refoNearestThreat]) then
+                            iIndirectUnits = iIndirectUnits + 1
+                            tIndirectUnits[iIndirectUnits] = oUnit
+                            aiBrain[reftoCombatUnitsWaitingForAssignment][iUnit] = nil
+                            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is an indirect fire unit, and we need indirect, so will allocate separately') end
+                        else
+                            iUnitsWaiting = iUnitsWaiting + 1
+                            tUnitsWaiting[iUnitsWaiting] = oUnit
+                            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is being allcoated to normal combat former.  aiBrain[M27Overseer.refbNeedIndirect]='..tostring(aiBrain[M27Overseer.refbNeedIndirect])) end
+                        end
+
                     end
                 end
             end
         else
             for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
-                iUnitsWaiting = iUnitsWaiting + 1
-                tUnitsWaiting[iUnitsWaiting] = oUnit
+                if aiBrain[M27Overseer.refbNeedIndirect] and EntityCategoryContains(categories.INDIRECTFIRE, oUnit.UnitId) and EntityCategoryContains(categories.TECH1, aiBrain[M27Overseer.refoNearestThreat]) then
+                    --Special T1 arti indirect platoon former if nearest threat is T1 PD
+                    iIndirectUnits = iIndirectUnits + 1
+                    tIndirectUnits[iIndirectUnits] = oUnit
+                    aiBrain[reftoCombatUnitsWaitingForAssignment][iUnit] = nil
+                    if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is an indirect fire unit, and we need indirect, so will allocate separately') end
+                else
+                    iUnitsWaiting = iUnitsWaiting + 1
+                    tUnitsWaiting[iUnitsWaiting] = oUnit
+                    if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is being allcoated to normal combat former.  aiBrain[M27Overseer.refbNeedIndirect]='..tostring(aiBrain[M27Overseer.refbNeedIndirect])) end
+                end
             end
         end
     end
     --Form suicide squad
     if M27Utilities.IsTableEmpty(tSuicideUnits) == false then
         CreatePlatoon(aiBrain, 'M27SuicideSquad', tSuicideUnits)
+    end
+
+    --Form indirect defenders from T1 arti (T2+ indirect shouldnt have even got to this point)
+    if iIndirectUnits > 0 then
+        CreatePlatoon(aiBrain, 'M27IndirectSpareAttacker', tIndirectUnits)
+        if bDebugMessages == true then LOG(sFunctionRef..': iIndirectUnits='..iIndirectUnits..'; Created indirect spare attacker platoon for them') end
     end
 
 
@@ -264,6 +292,7 @@ function CombatPlatoonFormer(aiBrain)
             end
         end
     end
+
 
     if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then
         --Exclude ACU and experimentals - now done above
@@ -647,6 +676,12 @@ function AddIdleUnitsToPlatoon(aiBrain, tUnits, oPlatoonToAddTo)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AddIdleUnitsToPlatoon'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.INDIRECTFIRE * categories.TECH1 + categories.DIRECTFIRE, tUnits)) == false then
+        M27Utilities.ErrorHandler('Have DF and T1 arti as an idle platoon allocation, will send log with all units')
+        for iUnit, oUnit in tUnits do
+            LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+        end
+    end
     local sPlatoonName = 'None'
     if oPlatoonToAddTo.GetPlan then
         sPlatoonName = oPlatoonToAddTo:GetPlan()
@@ -707,6 +742,10 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                 if oUnit:GetFractionComplete() < 1 then table.insert(tUnderConstruction, oUnit)
                 else
                     if not(oUnit[refbWaitingForAssignment]) then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef..': About to allocate unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to an idle platoon')
+                            --M27Utilities.ErrorHandler('Full audit trail for idle unit allocation')
+                        end
                         bHaveValidUnit = true
                         sUnitID = oUnit.UnitId
                         if EntityCategoryContains(refCategoryLandScout, sUnitID) then
@@ -718,7 +757,11 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                         elseif EntityCategoryContains(refCategoryMAA, sUnitID) then table.insert(tMAA, oUnit)
                         elseif EntityCategoryContains(categories.COMMAND, sUnitID) then table.insert(tACU, oUnit)
                         elseif EntityCategoryContains(refCategoryEngineer, sUnitID) then table.insert(tEngi, oUnit)
-                        elseif EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalArti, sUnitID) then table.insert(tStructures, oUnit)
+                        elseif EntityCategoryContains(categories.STRUCTURE + M27UnitInfo.refCategoryExperimentalArti, sUnitID) then
+                            table.insert(tStructures, oUnit)
+                            if EntityCategoryContains(M27UnitInfo.refCategoryQuantumOptics, oUnit.UnitId) then
+                                ForkThread(M27AirOverseer.QuantumOpticsManager, aiBrain, oUnit)
+                            end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, sUnitID) then table.insert(tLandExperimentals, oUnit)
                         elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, sUnitID) then table.insert(tSkirmishers, oUnit)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryRASSACU, sUnitID) then table.insert(tRAS, oUnit)
@@ -767,9 +810,11 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
             if M27Utilities.IsTableEmpty(tRAS) == false then local oNewPlatoon = CreatePlatoon(aiBrain, 'M27RAS', tRAS) end
             if M27Utilities.IsTableEmpty(tCombat) == false then
                 AddIdleUnitsToPlatoon(aiBrain, tCombat, aiBrain[M27PlatoonTemplates.refoIdleCombat])
-                AllocateNewUnitsToPlatoonNotFromFactory(tCombat)
+                ForkThread(AllocateNewUnitsToPlatoonNotFromFactory, tCombat)
             end
-            if M27Utilities.IsTableEmpty(tIndirect) == false then AddIdleUnitsToPlatoon(aiBrain, tIndirect, aiBrain[M27PlatoonTemplates.refoIdleIndirect]) end
+            if M27Utilities.IsTableEmpty(tIndirect) == false then
+                AddIdleUnitsToPlatoon(aiBrain, tIndirect, aiBrain[M27PlatoonTemplates.refoIdleIndirect])
+            end
             if M27Utilities.IsTableEmpty(tStructures) == false then AddIdleUnitsToPlatoon(aiBrain, tStructures, aiBrain[M27PlatoonTemplates.refoAllStructures]) end
             if M27Utilities.IsTableEmpty(tAir) == false then
                 AddIdleUnitsToPlatoon(aiBrain, tAir, aiBrain[M27PlatoonTemplates.refoIdleAir])
@@ -1293,6 +1338,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
 
+
     if iDelayInTicks then WaitTicks(iDelayInTicks) end
 
     local iLifetimeCount
@@ -1790,7 +1836,7 @@ function PlatoonMainIdleUnitLoop(aiBrain, iCycleCount)
     local sFunctionRef = 'PlatoonMainIdleUnitLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    local iIdleUnitSearchThreshold = 10 --Change both here and in earlier code
+    --local iIdleUnitSearchThreshold = 10 --Change both here and in earlier code
 
     if bDebugMessages == true then
         LOG(sFunctionRef..': About to detail unit count of some of the platoons')

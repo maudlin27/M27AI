@@ -19,6 +19,10 @@ tBigGunUpgrades = { 'MicrowaveLaserGenerator',
                     'BlastAttack'
 }
 
+tTMLUpgrades = {'Missile',
+                'TacticalMissile',
+                'TacticalNukeMissile',}
+
 function SafeToUpgradeUnit(oUnit)
     --Intended e.g. for mexes to decide whether to upgrade
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end

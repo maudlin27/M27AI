@@ -295,7 +295,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
-        [refiAirAttackRange] = 20,
+        [refiAirAttackRange] = 25,
     },
     --MAAPatrol - different platoon to MAA assister as the overseer will treat units in MAApatrol as being available for assignment (i.e. its effectively an active 'idle' platoon)
     ['M27MAAPatrol'] =

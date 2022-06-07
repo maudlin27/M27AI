@@ -34,7 +34,7 @@ refbFullyUpgraded = 'M27UnitFullyUpgraded' --used on ACU to avoid running some c
 refbRecentlyRemovedHealthUpgrade = 'M27UnitRecentlyRemovedHealthUpgrade' --Used on ACU to flag if e.g. we removed T2 which will decrease our health
 refbActiveMissileChecker = 'M27UnitMissileTracker' --True if are actively checking for missile targets
 refbActiveSMDChecker = 'M27UnitSMDChecker' -- true if unit is checking for enemy SMD (use on nuke)
-refbActiveTargetChecker = 'M27UnitActiveTargetChecker' --e.g. used for T3 fixed arti
+refbActiveTargetChecker = 'M27UnitActiveTargetChecker' --e.g. used for T3 fixed arti, Quantum optics
 refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will update this when given an IssueAttack order
 reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
 refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
@@ -111,9 +111,11 @@ refCategoryExperimentalArti = categories.EXPERIMENTAL * categories.ARTILLERY - c
 refCategorySML = categories.NUKE * categories.SILO
 refCategorySMD = categories.ANTIMISSILE * categories.SILO * categories.TECH3 * categories.STRUCTURE
 refCategoryTML = categories.SILO * categories.STRUCTURE * categories.TECH2 - categories.ANTIMISSILE
+refCategoryUnitsWithTMLUpgrade = categories.COMMAND * categories.UEF + categories.COMMAND * categories.SERAPHIM + categories.SUBCOMMANDER * categories.SERAPHIM
 refCategoryNovaxCentre = categories.EXPERIMENTAL * categories.STRUCTURE * categories.ORBITALSYSTEM
 refCategorySatellite = categories.EXPERIMENTAL * categories.SATELLITE
 --refCategorySAM = categories.ANTIAIR * categories.STRUCTURE * categories.TECH3
+refCategoryQuantumOptics = categories.INTELLIGENCE * categories.OPTICS * categories.AEON * categories.STRUCTURE * categories.TECH3 - refCategoryRadar
 
 refCategoryUpgraded = refCategoryT2Radar + refCategoryT3Radar + refCategoryT2Sonar + refCategoryT3Sonar + refCategoryAllFactories * categories.TECH2 + refCategoryAllFactories * categories.TECH3 + refCategoryFixedShield * categories.TECH3 + refCategoryT2Mex + refCategoryT3Mex
 
@@ -598,7 +600,15 @@ function SetUnitTargetPriorities(oUnit, tPriorityTable)
         end
     end
 end
-
+function GetUnitMissileRange(oUnit)
+    local oBP = oUnit:GetBlueprint()
+    for iCurWeapon, oCurWeapon in oBP do
+        if oCurWeapon.WeaponCategory == 'Missile' then
+            return oCurWeapon.MaxRadius
+        end
+    end
+    return nil
+end
 function GetUnitAARange(oUnit)
     local iMaxRange = 0
     for iCurWeapon, oCurWeapon in oUnit:GetBlueprint().Weapon do
@@ -850,6 +860,47 @@ end
 
 function GetUnitHealthPercent(oUnit)
     return oUnit:GetHealth() / oUnit:GetMaxHealth()
+end
+
+
+
+function ScryTarget(oUnit, tTarget)
+    oUnit:OnTargetLocation(tTarget)
+
+    --Below for reference - attempts to get things to work (tests 1-4 were put into separate functions, only test2 worked)
+    --local RemoteViewingLua = import('/lua/RemoteViewing.lua')
+    --LOG('Repr of quantum optics='..reprs(oUnit))
+    --LOG('repr of RemoteViewingData='..reprs(oUnit.RemoteViewingData))
+    --LOG('Repr of RemoteViewingFunctions='..reprs(oUnit.RemoteViewingData.RemoteViewingFunctions))
+    --RemoteViewingLua.RemoteViewing:OnTargetLocation(oUnit, tTarget) --This fails
+--[[
+    function Test1(oUnit, tTarget)
+        local RemoteViewingLua = import('/lua/RemoteViewing.lua')
+        local RemoteViewingClass = RemoteViewingLua.RemoteViewingLua
+        oUnit:OnTargetLocation(tTarget)
+        LOG('Test1')
+    end
+    function Test2(oUnit, tTarget)
+        local RemoteViewingLua = import('/lua/RemoteViewing.lua')
+        oUnit:OnTargetLocation(tTarget)
+        LOG('Test2')
+    end
+    function Test3(oUnit, tTarget)
+        local RemoteViewingLua = import('/lua/RemoteViewing.lua')
+        RemoteViewingLua.OnTargetLocation(oUnit, tTarget)
+        LOG('Test3')
+    end
+    function Test4(oUnit, tTarget)
+        local RemoteViewingLua = import('/lua/RemoteViewing.lua')
+        oUnit.RemoteViewingLua:OnTargetLocation(tTarget)
+        LOG('Test4')
+    end--]]
+
+    --ForkThread(Test1, oUnit, tTarget)
+    --ForkThread(Test2, oUnit, tTarget)
+    --ForkThread(Test3, oUnit, tTarget)
+    --ForkThread(Test4, oUnit, tTarget)
+    --RemoteViewingLua.RemoteViewing.OnTargetLocation(oUnit, tTarget)
 end
 
 function GetTransportMaxCapacity(oTransport, iTechLevelToLoad)

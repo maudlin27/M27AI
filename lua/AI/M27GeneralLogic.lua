@@ -1731,27 +1731,33 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     local iStructureBlipThreat = 0 --Assumes an unrevealed structure has no threat rating
     if bMustBeVisibleToIntelOrSight == nil then bMustBeVisibleToIntelOrSight = true end
     if bIncludeAirTorpedo == nil then bIncludeAirTorpedo = bIncludeAirToGround end
-    if bDebugMessages == true then LOG(sFunctionRef..': About to check if table is empty') end
+    if bDebugMessages == true then LOG(sFunctionRef..': About to check if table is empty. bIncludeAirToAir='..tostring(bIncludeAirToAir)) end
     --Decide blip threat values:
+
+    --blip values are lower than actual for tech level since unlikely 100% of blips will be the highest tech level unit of that type (and may be a different type altogether)
+    local tiAirAABlipThreats = {50, 100, 300, 300}
+    local tiAirToGroundBlip = {90, 150, 350, 350}
+    local tiMobileGroundAABlip = {28, 75, 200, 200}
+    local tiNavyBlipAABlip = {28, 200, 1000, 1000}
     if iAirBlipThreatOverride == nil then
         if bIncludeAirToGround == true then
-            iAirBlipThreatOverride = 100
+            iAirBlipThreatOverride = tiAirToGroundBlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
         elseif bIncludeAirToAir == true then
-            iAirBlipThreatOverride = 50
+            iAirBlipThreatOverride = tiAirAABlipThreats[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
         elseif bIncludeNonCombatAir == true then
-            iAirBlipThreatOverride = 40
+            iAirBlipThreatOverride = 40 * aiBrain[M27Overseer.refiEnemyHighestTechLevel]
         else iAirBlipThreatOverride = 0
         end
     end
     if iMobileLandBlipThreatOverride == nil then
         if bIncludeGroundToAir == true then
-            iMobileLandBlipThreatOverride = 28
+            iMobileLandBlipThreatOverride = tiMobileGroundAABlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
         else iMobileLandBlipThreatOverride = 0
         end
     end
     if iNavyBlipThreatOverride == nil then
         if bIncludeGroundToAir == true then
-            iNavyBlipThreatOverride = 28 --Except for aeon, most t1 navy sucks at AA
+            iNavyBlipThreatOverride = tiNavyBlipAABlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
         else iNavyBlipThreatOverride = 0
         end
     end
@@ -1904,16 +1910,16 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                 if bIncludeAirToAir == true and iMassMod < 1 then
                                     if EntityCategoryContains(categories.ANTIAIR * categories.AIR, sCurUnitBP) == true then
                                         iMassMod = 1
-                                        if bDebugMessages == true then LOG(sFunctionRef..': sCurUnitBP='..sCurUnitBP..': about to see if unit doesnt contain onlyantiair category') end
                                         if EntityCategoryContains(categories.BOMBER, sCurUnitBP) or EntityCategoryContains(categories.GROUNDATTACK, sCurUnitBP) then
                                             iMassMod = 0.05
                                             --Manual adjustments for units with good AA that also have direct fire
-                                            if sCurUnitBP == 'XAA0305' then iMassMod = 0.7 --Restorer
-                                            elseif sCurUnitBP == 'XEA0306' then iMassMod = 0.7 --Continental
-                                            elseif sCurUnitBP == 'UAA0310' then iMassMod = 0.55 --Czar
-                                            elseif sCurUnitBP == 'XSA0402' then iMassMod = 0.3 --Sera experi bomber
+                                            if sCurUnitBP == 'xaa0305' then iMassMod = 0.8 --Restorer
+                                            elseif sCurUnitBP == 'xea0306' then iMassMod = 0.7 --Continental
+                                            elseif sCurUnitBP == 'uaa0310' then iMassMod = 0.55 --Czar
+                                            elseif sCurUnitBP == 'xsa0402' then iMassMod = 0.3 --Sera experi bomber
                                             end
                                         end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': sCurUnitBP='..sCurUnitBP..': Mass mod after checking AirAA value='..iMassMod) end
                                     end
                                 end
                             end
@@ -1948,13 +1954,17 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                         if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'iCurThreat='..iCurThreat) end
                     end
                 end
+
                 iTotalThreat = iTotalThreat + iCurThreat
+                if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurThreat='..iCurThreat..'; iTotalThreat='..iTotalThreat) end
             end
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': iTotalThreat='..iTotalThreat) end
+        if bDebugMessages == true then LOG(sFunctionRef..': End of code, iTotalThreat='..iTotalThreat) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iTotalThreat
     end
+    M27Utilities.ErrorHandler('Code shouldve returend before now, will return 0')
+    return 0
 end
 
 function CategoriesInVisibleUnits(aiBrain, tEnemyUnits, category, iReturnType)
@@ -4057,7 +4067,9 @@ function CheckIfWantToBuildAnotherMissile(oUnit)
     ForkThread(ForkedCheckForAnotherMissile, oUnit)
 end
 
-function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
+function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor)
+    --iFriendlyUnitDamageReductionFactor - optional, assumed to be 0 if not specified; will reduce the damage from the bomb by any friendly units in the aoe
+    --iFriendlyUnitAOEFactor - e.g. if 2, then will search for friendly units in 2x the aoe
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetDamageFromBomb'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -4068,38 +4080,57 @@ function GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
     local oCurBP
     local iMassFactor
     local iCurHealth, iMaxHealth, iCurShield, iMaxShield
+    local tFriendlyUnits
+    if iFriendlyUnitDamageReductionFactor then
+        tFriendlyUnits = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - categories.BENIGN - M27UnitInfo.refCategorySatellite, tBaseLocation, iAOE * (iFriendlyUnitAOEFactor or 1), 'Ally')
+        if M27Utilities.IsTableEmpty(tFriendlyUnits) == false then
+            for iUnit, oUnit in tFriendlyUnits do
+                if oUnit.GetBlueprint and not(oUnit.Dead) then
+                    if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
+                        if ScenarioInfo.Options.Victory == "demoralization" then
+                            iTotalDamage = iTotalDamage - 100000
+                        else
+                            iTotalDamage = iTotalDamage - 15000 * iFriendlyUnitDamageReductionFactor
+                        end
+                    else
+                        iTotalDamage = iTotalDamage - oUnit:GetBlueprint().Economy.BuildCostMass * oUnit:GetFractionComplete() * iFriendlyUnitDamageReductionFactor
+                    end
+                end
+            end
+        end
+    end
 
     if M27Utilities.IsTableEmpty(tEnemiesInRange) == false then
         for iUnit, oUnit in tEnemiesInRange do
-           if oUnit.GetBlueprint and not(oUnit.Dead) then
-               oCurBP = oUnit:GetBlueprint()
-               --Is the unit within range of the aoe?
-               if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation) <= iAOE then
-                   --Is the unit shielded by more than 90% of our damage?
-                   if not(IsTargetUnderShield(aiBrain, oUnit, iDamage * 0.9)) then
-                       iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
-                       iCurHealth = iCurShield + oUnit:GetHealth()
-                       iMaxHealth = iMaxShield + oUnit:GetMaxHealth()
-                       --Set base mass value based on health
-                       if iDamage >= iMaxHealth or iDamage >= math.min(iCurHealth * 3, iCurHealth + 1000) then iMassFactor = 1
-                       else
-                           --Still some value in damaging a unit (as might get a second strike), but far less than killing it
-                           iMassFactor = 0.1
-                           if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then iMassFactor = 0.5 end
-                       end
-                       if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
-                       --Is the target mobile and not under construction? Then reduce to 20% as unit might dodge or not be there when bomb lands
-                       if oUnit:GetFractionComplete() == 1 then
-                           if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then iMassFactor = iMassFactor * 0.2
-                           --Is it a mex that will be killed outright? Then increase the value of killing it
-                           elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION, oUnit.UnitId) then iMassFactor = iMassFactor * 2
-                           end
-                       end
-                       iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
-                       if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
-                   end
-               end
-           end
+            if oUnit.GetBlueprint and not(oUnit.Dead) then
+                oCurBP = oUnit:GetBlueprint()
+                --Is the unit within range of the aoe?
+                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBaseLocation) <= iAOE then
+                    --Is the unit shielded by more than 90% of our damage?
+                    if not(IsTargetUnderShield(aiBrain, oUnit, iDamage * 0.9)) then
+                        iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                        iCurHealth = iCurShield + oUnit:GetHealth()
+                        iMaxHealth = iMaxShield + oUnit:GetMaxHealth()
+                        --Set base mass value based on health
+                        if iDamage >= iMaxHealth or iDamage >= math.min(iCurHealth * 3, iCurHealth + 1000) then iMassFactor = 1
+                        else
+                            --Still some value in damaging a unit (as might get a second strike), but far less than killing it
+                            iMassFactor = 0.1
+                            if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then iMassFactor = 0.5 end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iMassFactor after considering if will kill it='..iMassFactor) end
+                        --Is the target mobile and not under construction? Then reduce to 20% as unit might dodge or not be there when bomb lands
+                        if oUnit:GetFractionComplete() == 1 then
+                            if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then iMassFactor = iMassFactor * 0.2
+                                --Is it a mex that will be killed outright? Then increase the value of killing it
+                            elseif iMassFactor >= 1 and EntityCategoryContains(categories.MASSEXTRACTION, oUnit.UnitId) then iMassFactor = iMassFactor * 2
+                            end
+                        end
+                        iTotalDamage = iTotalDamage + oCurBP.Economy.BuildCostMass * oUnit:GetFractionComplete() * iMassFactor
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished considering the unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTotalDamage='..iTotalDamage..'; oCurBP.Economy.BuildCostMass='..oCurBP.Economy.BuildCostMass..'; oUnit:GetFractionComplete()='..oUnit:GetFractionComplete()..'; iMassFactor after considering if unit is mobile='..iMassFactor..'; distance between unit and target='..M27Utilities.GetDistanceBetweenPositions(tBaseLocation, oUnit:GetPosition())) end
+                    end
+                end
+            end
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': Finished going through units in the aoe, iTotalDamage in mass='..iTotalDamage..'; tBaseLocation='..repru(tBaseLocation)..'; iAOE='..iAOE..'; iDamage='..iDamage) end
@@ -4177,7 +4208,7 @@ function GetDamageFromOvercharge(aiBrain, oTargetUnit, iAOE, iDamage, bTargetWal
     return iTotalDamage, iKillsExpected
 end
 
-function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckForSMD, tSMLLocationForSMDCheck, iOptionalTimeSMDNeedsToHaveBeenBuiltFor, iSMDRangeAdjust)
+function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckForSMD, tSMLLocationForSMDCheck, iOptionalTimeSMDNeedsToHaveBeenBuiltFor, iSMDRangeAdjust, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor)
     --Calcualtes the most damaging location for an aoe target; also returns the damage dealt
     --if bOptionalCheckForSMD is true then will ignore targest that are near an SMD
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -4187,7 +4218,7 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckF
 
     local tBestTarget = {tBaseLocation[1], tBaseLocation[2], tBaseLocation[3]}
     --GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
-    local iCurTargetDamage = GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage)
+    local iCurTargetDamage = GetDamageFromBomb(aiBrain, tBaseLocation, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor)
     local iMaxTargetDamage = iCurTargetDamage
     local iMaxDistanceChecks = math.min(4, math.ceil(iAOE / 2))
     local iDistanceFromBase = 0
@@ -4198,7 +4229,7 @@ function GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckF
         iDistanceFromBase = iAOE / iCurDistanceCheck
         for iAngle = 0, 360, 45 do
             tPossibleTarget = M27Utilities.MoveInDirection(tBaseLocation, iAngle, iDistanceFromBase)
-            iCurTargetDamage = GetDamageFromBomb(aiBrain, tPossibleTarget, iAOE, iDamage)
+            iCurTargetDamage = GetDamageFromBomb(aiBrain, tPossibleTarget, iAOE, iDamage, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor)
             if iCurTargetDamage > iMaxTargetDamage then
                 if bOptionalCheckForSMD and IsSMDBlockingTarget(aiBrain, tPossibleTarget, tSMLLocationForSMDCheck, (iOptionalTimeSMDNeedsToHaveBeenBuiltFor or 200), iSMDRangeAdjust) then iCurTargetDamage = math.min(4000, iCurTargetDamage) end
                 if iCurTargetDamage > iMaxTargetDamage then
@@ -4424,8 +4455,37 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         end
                     end--]]
                 else --SML - work out which location would deal the most damage - consider all high value structures and the enemy start position
+                    iBestTargetValue = 0
+                    --Shortlist of locations we have recently nuked
+                    local tRecentlyNuked = {}
+                    if M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations]) == false then
+                        for iTime, tLocation in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations] do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering iTime='..iTime..'; tLocation='..repru(tLocation)..'; GameTime='..GetGameTimeSeconds()) end
+                            if GetGameTimeSeconds() - iTime < 60 then --Testing with Aeon SML on setons it takes 60s to go from one corner to another roughly
+                                table.insert(tRecentlyNuked, tLocation)
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': tRecentlyNuked='..repru((tRecentlyNuked or {'nil'}))) end
+
+                    function HaventRecentlyNukedLocation(tLocation)
+                        if M27Utilities.IsTableEmpty(tRecentlyNuked) then return true
+                        else
+                            for iRecentLocation, tRecentLocation in tRecentlyNuked do
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering tLocation='..repru(tLocation)..'; Distance to tRecentLocation='..M27Utilities.GetDistanceBetweenPositions(tLocation, tRecentLocation)) end
+                                if M27Utilities.GetDistanceBetweenPositions(tLocation, tRecentLocation) <= 50 then
+                                    return false
+                                end
+                            end
+                        end
+                        return true
+                    end
+
                     --First get the best location if just target the start position or locations near here
-                    tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage, bCheckForSMD, oLauncher:GetPosition())
+                    if HaventRecentlyNukedLocation(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
+                        --GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckForSMD, tSMLLocationForSMDCheck, iOptionalTimeSMDNeedsToHaveBeenBuiltFor, iSMDRangeAdjust, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor)
+                        tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage, bCheckForSMD, oLauncher:GetPosition(), nil, nil, 2, 2.5)
+                    end
                     local iAirSegmentX, iAirSegmentZ
 
                     --Cycle through other start positions to see if can get a better target, but reduce value of target if we havent scouted it in the last 5 minutes
@@ -4436,17 +4496,19 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                             iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[iStartPoint])
                             if bDebugMessages == true then LOG(sFunctionRef..': Cycling through start points, iStartPoint='..iStartPoint..'; time last scouted='..(GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted])) end
                             if GetGameTimeSeconds() - (aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] or -300) <= 300 then
-                                iCurTargetValue = GetDamageFromBomb(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], iAOE, iDamage)
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering the start position '..iStartPoint..'='..repru(M27MapInfo.PlayerStartPoints[iStartPoint])..'; value ignroign SMD='..iCurTargetValue) end
-                                if iCurTargetValue > iBestTargetValue then
-                                    if IsSMDBlockingTarget(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], oLauncher:GetPosition(), 200) then
-                                        iCurTargetValue = 4000
-                                        if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking target so reducing value to 4k') end
-                                    end
+                                if HaventRecentlyNukedLocation(M27MapInfo.PlayerStartPoints[iStartPoint]) then
+                                    iCurTargetValue = GetDamageFromBomb(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], iAOE, iDamage, 2, 2.5)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering the start position '..iStartPoint..'='..repru(M27MapInfo.PlayerStartPoints[iStartPoint])..'; value ignroign SMD='..iCurTargetValue) end
                                     if iCurTargetValue > iBestTargetValue then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a better start position target, for the start position='..iStartPoint..' dealing damage of '..iCurTargetValue..' vs prev best value of '..iBestTargetValue) end
-                                        iBestTargetValue = iCurTargetValue
-                                        tTarget = {M27MapInfo.PlayerStartPoints[iStartPoint][1], M27MapInfo.PlayerStartPoints[iStartPoint][2], M27MapInfo.PlayerStartPoints[iStartPoint][3]}
+                                        if IsSMDBlockingTarget(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], oLauncher:GetPosition(), 200) then
+                                            iCurTargetValue = 4000
+                                            if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking target so reducing value to 4k') end
+                                        end
+                                        if iCurTargetValue > iBestTargetValue then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have a better start position target, for the start position='..iStartPoint..' dealing damage of '..iCurTargetValue..' vs prev best value of '..iBestTargetValue) end
+                                            iBestTargetValue = iCurTargetValue
+                                            tTarget = {M27MapInfo.PlayerStartPoints[iStartPoint][1], M27MapInfo.PlayerStartPoints[iStartPoint][2], M27MapInfo.PlayerStartPoints[iStartPoint][3]}
+                                        end
                                     end
                                 end
                             end
@@ -4474,28 +4536,31 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                             if M27Utilities.IsTableEmpty(tEnemyUnitsOfInterest) == false then
                                 for iUnit, oUnit in tEnemyUnitsOfInterest do
                                     iEnemyUnitsConsidered = iEnemyUnitsConsidered + 1
-                                    iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTargetValue='..iCurTargetValue..'; location='..repru(oUnit:GetPosition())..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
-                                    --Stop looking if tried >=10 targets and have one that is at least 20k of value
-                                    if iCurTargetValue > iBestTargetValue then
-                                        if bCheckForSMD and IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), 200) then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking the unit target '..repru(oUnit:GetPosition())..'; will limit damage to 4k') end
-                                            iCurTargetValue = 4000 end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered..'; Have we recently nuked this location='..tostring((HaventRecentlyNukedLocation(oUnit:GetPosition())) or false)) end
+                                    if HaventRecentlyNukedLocation(oUnit:GetPosition()) then
+                                        iCurTargetValue = GetDamageFromBomb(aiBrain, oUnit:GetPosition(), iAOE, iDamage, 2, 2.5)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTargetValue='..iCurTargetValue..'; location='..repru(oUnit:GetPosition())..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
+                                        --Stop looking if tried >=10 targets and have one that is at least 20k of value
                                         if iCurTargetValue > iBestTargetValue then
-                                            iBestTargetValue = iCurTargetValue
-                                            tTarget = oUnit:GetPosition()
-                                            if bDebugMessages == true then LOG(sFunctionRef..': New best target with value='..iBestTargetValue) end
+                                            if bCheckForSMD and IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), 200) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking the unit target '..repru(oUnit:GetPosition())..'; will limit damage to 4k') end
+                                                iCurTargetValue = 4000 end
+                                            if iCurTargetValue > iBestTargetValue then
+                                                iBestTargetValue = iCurTargetValue
+                                                tTarget = oUnit:GetPosition()
+                                                if bDebugMessages == true then LOG(sFunctionRef..': New best target with value='..iBestTargetValue) end
+                                            end
                                         end
-                                    end
-                                    --Note: Mass value of mexes is doubled, so 3 T3 mexes would give a value of 27600
-                                    if iEnemyUnitsConsidered >= 15 and iBestTargetValue >= 20000 and ((iBestTargetValue > 40000 and iEnemyUnitsConsidered >=15) or (iBestTargetValue > 30000 and iEnemyUnitsConsidered >= 30) or (iBestTargetValue >= 20000 and iEnemyUnitsConsidered >= 45)) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Have a target with a decent amount of value and have already tried quite a few units.  iBestTargetValue='..iBestTargetValue..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
-                                        break
+                                        --Note: Mass value of mexes is doubled, so 3 T3 mexes would give a value of 27600
+                                        if iEnemyUnitsConsidered >= 15 and iBestTargetValue >= 20000 and ((iBestTargetValue > 40000 and iEnemyUnitsConsidered >=15) or (iBestTargetValue > 30000 and iEnemyUnitsConsidered >= 30) or (iBestTargetValue >= 20000 and iEnemyUnitsConsidered >= 45)) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have a target with a decent amount of value and have already tried quite a few units.  iBestTargetValue='..iBestTargetValue..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
+                                            break
+                                        end
                                     end
                                 end
                             end
                         end
-                        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage, bCheckForSMD, oLauncher:GetPosition()) end
+                        if tTarget then tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, tTarget, iAOE, iDamage, bCheckForSMD, oLauncher:GetPosition(), nil, nil, 2, 2.5) end
                         if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue..'; Best location for this target='..repru(tTarget)) end
                     end
                     if bDebugMessages == true then LOG(sFunctionRef..': If value is <12k then will clear target; iBestTargetValue='..iBestTargetValue..'; tTarget='..repru(tTarget or {'nil'})) end
@@ -4511,6 +4576,8 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         oLauncher:SetPaused(false)
                     else
                         IssueNuke({oLauncher}, tTarget)
+                        M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations][GetGameTimeSeconds()] = tTarget
+                        if bDebugMessages == true then LOG(sFunctionRef..': Launching nuke at tTarget='..repru(tTarget)..'; M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations]='..repru(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations])) end
                         --Restart SMD monitor after giving time for missile to fire
                         if oLauncher then oLauncher[M27UnitInfo.refbActiveSMDChecker] = false end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -4807,7 +4874,10 @@ function DetermineTMDWantedForTML(aiBrain, oTML, toOptionalUnitsToProtect)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineTMDWantedForTML'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local iTMLRange = (oTML:GetBlueprint().Weapon[1].MaxRadius or 256) + 4 --slight buffer given aoe and building sizes
+
+    if bDebugMessages == true then LOG(sFunctionRef..': oTML='..oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)) end
+
+    local iTMLRange = M27UnitInfo.GetUnitMissileRange(oTML) or M27EngineerOverseer.iTMLMissileRange + 4 --slight buffer given aoe and building sizes
     local tUnitsToProtect
     local tTMLPosition = oTML:GetPosition()
     if toOptionalUnitsToProtect then
@@ -4920,6 +4990,7 @@ function DetermineTMDWantedForUnits(aiBrain, tUnits)
     for iTML, oTML in aiBrain[M27Overseer.reftEnemyTML] do
         if M27UnitInfo.IsUnitValid(oTML) then
             bValidTML = true
+            if bDebugMessages == true then LOG(sFunctionRef..': About to determine TMD wanted for the TML '..oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)) end
             DetermineTMDWantedForTML(aiBrain, oTML, tUnits)
         end
     end
