@@ -5185,8 +5185,9 @@ function AirBomberManager(aiBrain)
                                             iCurModDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                             if iCurModDistance < aiBrain[refiBomberDefenceModDistance] then
                                                 if not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true)) then
+                                                    if EntityCategoryContains(M27UnitInfo.refCategoryMAA, oUnit.UnitId) then iCurPriority = 1 else iCurPriority = 2 end
                                                     --if not (IsTargetCoveredByAA(oUnit, tAllEnemyAA, 1, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], false)) then
-                                                        AddUnitToShortlist(oUnit, iTechLevel, iCurModDistance)
+                                                    AddUnitToShortlist(oUnit, iTechLevel, iCurModDistance)
                                                     --end
                                                 end
                                             end
@@ -5200,8 +5201,8 @@ function AirBomberManager(aiBrain)
                         --Prioritise AA and vulnerable indirect fire units
                         --T2 bombers will use the exact same logic
                         iCurPriority = 1
-                        if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then iCurPriority = 2 end
-                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategorySniperBot, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
+                        if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then iCurPriority = 3 end
+                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategorySniperBot - M27UnitInfo.refCategoryCruiserCarrier, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
                         if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
                             if iTechLevel == 1 and iAvailableBombers > 0 then
                                 --Generate list of locations to avoid for T1 bombers (will have already reduced emergency def range for shielded T2 flak and T3 AA)
@@ -5286,6 +5287,7 @@ function AirBomberManager(aiBrain)
                             for iFirebaseRef, tFirebaseUnits in aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef] do
                                 if iFirebaseRef and M27Utilities.IsTableEmpty(tFirebaseUnits) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebasePosition][iFirebaseRef]) == false then
                                     iCurPriority = 1
+                                    if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then iCurPriority = 2 end
                                     tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryIndirect + M27UnitInfo.refCategorySniperBot - categories.TECH1, aiBrain[M27EngineerOverseer.reftFirebasePosition][iFirebaseRef], 110, 'Enemy')
                                     for iUnit, oUnit in tPotentialTargets do
                                         if not (oUnit:IsUnitState('Attached')) then
@@ -5301,6 +5303,7 @@ function AirBomberManager(aiBrain)
 
                         --Normal combat units
                         iCurPriority = 2
+                        if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then iCurPriority = 4 end
                         tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - categories.COMMAND + M27UnitInfo.refCategorySalem, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
                         for iUnit, oUnit in tPotentialTargets do
                             if not (oUnit:IsUnitState('Attached')) then
@@ -5338,6 +5341,7 @@ function AirBomberManager(aiBrain)
 
                         --ACU
                         iCurPriority = 3
+                        if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then iCurPriority = 5 end
                         if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then
                             iCurActualDistance = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                             if iCurActualDistance <= aiBrain[refiBomberDefenceDistanceCap] then
@@ -5370,9 +5374,10 @@ function AirBomberManager(aiBrain)
                             end
                         end
 
-                        --All structures within emergency defence range - 20 that arent protected by AA
+                        --All non-T2+ AA structures within emergency defence range - 20 that arent protected by AA
                         iCurPriority = 4
-                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange - 20, 'Enemy')
+                        if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then iCurPriority = 6 end
+                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryStructureAA * categories.TECH2 - M27UnitInfo.refCategoryStructureAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange - 20, 'Enemy')
                         for iUnit, oUnit in tPotentialTargets do
                             if not (oUnit:IsUnitState('Attached')) then
                                 iCurActualDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -5411,6 +5416,7 @@ function AirBomberManager(aiBrain)
 
                         --Mex (if not targeted a mex for a while) for T1 bombers
                         iCurPriority = 5
+                        if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then iCurPriority = 7 end
                         if iTechLevel == 1 and iTargetCount == 0 and iAvailableBombers >= 3 then
                             local bTargetMexWithT1Bombers = false
                             local tLivingT1Bombers = {}
@@ -5487,7 +5493,7 @@ function AirBomberManager(aiBrain)
                         if tbConsideredTargetsByTech[1] then
                             --Add any priority 1-3 targets for T1 bombers that still need assigning to the T2 bomber shortlist
                             for iValue, tValue in aiBrain[reftBomberShortlistByTech][1] do
-                                if tValue[refiShortlistPriority] <= 3 then
+                                if tValue[refiShortlistPriority] <= 3 or (aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] and tValue[refiShortlistPriority] <= 5) then
                                     iCurPriority = tValue[refiShortlistPriority]
                                     AddUnitToShortlist(tValue[refiShortlistUnit], iTechLevel, tValue[refiBomberDefenceModDistance], tValue[refiShortlistStrikeDamageWanted])
                                 end
@@ -5499,6 +5505,7 @@ function AirBomberManager(aiBrain)
                         end
                         if iTargetCount == 0 then
                             iCurPriority = 4
+                            if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then iCurPriority = 6 end
                             --Do we still have T2 bombers with LC <= 2? in which case want to try and target a nearby mex
                             local bHaveT2EarlyBombers = false
                             for iBomber, oBomber in tBombersOfTechLevel do

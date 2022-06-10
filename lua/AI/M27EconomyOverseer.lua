@@ -1669,6 +1669,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 
+
     local iMassStored, iMassNetIncome, iEnergyStored, iEnergyNetIncome
     local bHaveHighMass, bHaveEnoughEnergy
     local iMaxToUpgrade = 0
@@ -1774,7 +1775,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
 
 
         --Ecoing strategy - want to have a mex ugprading at all times regardless of mass income if we have mexes available to upgrade and arent getting an HQ upgrade and have at least 6 T1 mexes
-        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and aiBrain[refiMassGrossBaseIncome] >= 1.4 and aiBrain[refiMexesUpgrading] - iPausedMexes <= 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) and (aiBrain[refiMexesAvailableForUpgrade] > 0 or iPausedMexes > 0) and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) then
+        if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and aiBrain[refiMassGrossBaseIncome] >= 1.4 and aiBrain[refiMexesUpgrading] - iPausedMexes <= 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) and (aiBrain[refiMexesAvailableForUpgrade] > 0 or iPausedMexes > 0) and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) then
             tMassThresholds[1] = { 0, -10 }
         elseif bWantHQEvenWithLowMass or (aiBrain[refiPausedUpgradeCount] >= 1 and table.getn(aiBrain[reftUpgrading]) <= 1) then
             --Want to resume unless we're energy stalling
@@ -1785,13 +1786,13 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             tMassThresholds[2] = { 500, -8 }
             tMassThresholds[3] = { 1000, -25 }
             tMassThresholds[4] = { 2500, -200 }
-        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and ((aiBrain[refiPausedUpgradeCount] >= 1 and iPausedMexes == aiBrain[refiMexesUpgrading]) or (aiBrain[refiMexesUpgrading] <= 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true)) then
+        elseif (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and ((aiBrain[refiPausedUpgradeCount] >= 1 and iPausedMexes == aiBrain[refiMexesUpgrading]) or (aiBrain[refiMexesUpgrading] <= 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true)) then
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Want to eco but dont have any active mex upgrades')
             end
             tMassThresholds[1] = { 0, -100.0 }
             tMassThresholds[2] = { 1000, -200 }
-        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech and iT2MexesUpgrading <= 0 and (iPausedMexes > 0 or (M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true and aiBrain[refiMexesUpgrading] <= iT1MexesNearBase and aiBrain[refiMexesAvailableForUpgrade] > 0)) then
+        elseif (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and iT2MexesUpgrading <= 0 and (iPausedMexes > 0 or (M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) == true and aiBrain[refiMexesUpgrading] <= iT1MexesNearBase and aiBrain[refiMexesAvailableForUpgrade] > 0)) then
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Want to eco, dont have any active t2 upgrades, so will either unpause paused mex upgrades, or will start a new upgrade if we arent planning to ctrl-K a T2 mex')
             end
@@ -1838,10 +1839,10 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                     tMassThresholds[8] = {600, -2}
                 end
 
-            elseif aiBrain[refiMassGrossBaseIncome] <= 15 then
+            elseif aiBrain[refiMassGrossBaseIncome] <= 7 then
 
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Arent ecoing and our mass income is less tahn 150')
+                    LOG(sFunctionRef .. ': Arent ecoing and our mass income is less tahn 70 mass per sec')
                 end
                 tMassThresholds[1] = { 400, 1 }
                 tMassThresholds[2] = { 500, 0.5 }
@@ -1854,24 +1855,34 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
                     iFullStorageAmount = aiBrain:GetEconomyStored('MASS') / aiBrain:GetEconomyStoredRatio('MASS')
                 end
 
-                --Are we already upgrading a T2 mex, and either have recently powerstalled, or dont have much gross mass income (so we probably cant support multiple mex upgrades)
-                if iT2MexesUpgrading > 0 and (GetGameTimeSeconds() - aiBrain[refiLastEnergyStall] <= 45 or aiBrain[refiMassGrossBaseIncome] <= 7.5) then
-                    tMassThresholds[1] = { math.min(750, iFullStorageAmount * 0.1), 2.4 }
-                    tMassThresholds[2] = { math.min(1500, iFullStorageAmount * 0.15), 1.2 }
-                    tMassThresholds[3] = { math.min(2000, iFullStorageAmount * 0.35), 0.6 }
-                    tMassThresholds[4] = { math.min(2500, iFullStorageAmount * 0.45), 0.2 }
-                    tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), 0 }
-                    tMassThresholds[6] = { iFullStorageAmount * 0.8, -0.2 }
-                    tMassThresholds[7] = { iFullStorageAmount * 0.9, -1.5 }
+                --Are we not upgrading any mexes?
+                if aiBrain[refiMexesUpgrading] == 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 then
+                    tMassThresholds[1] = {0, -1}
+                    tMassThresholds[2] = { math.min(500, iFullStorageAmount * 0.1), -1.5 }
+                    tMassThresholds[3] = { math.min(1000, iFullStorageAmount * 0.15), -2 }
+                    tMassThresholds[4] = { math.min(1500, iFullStorageAmount * 0.35), -3 }
+                    tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), -7 }
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have no mexes upgrading so using significantly lower thresholds') end
                 else
-                    --if aiBrain[refiPausedUpgradeCount] > 1 or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
-                    tMassThresholds[1] = { math.min(500, iFullStorageAmount * 0.1), 0.1 }
-                    tMassThresholds[2] = { math.min(1000, iFullStorageAmount * 0.15), 0 }
-                    tMassThresholds[3] = { math.min(1500, iFullStorageAmount * 0.35), -0.5 }
-                    tMassThresholds[4] = { math.min(1750, iFullStorageAmount * 0.45), -1.5 }
-                    tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), -2.5 }
-                    tMassThresholds[6] = { iFullStorageAmount * 0.8, -4 }
-                    tMassThresholds[7] = { iFullStorageAmount * 0.98, -10 }
+                    --Are we already upgrading a T2 mex, and either have recently powerstalled, or dont have much gross mass income (so we probably cant support multiple mex upgrades)
+                    if iT2MexesUpgrading > 0 and (GetGameTimeSeconds() - aiBrain[refiLastEnergyStall] <= 45 or aiBrain[refiMassGrossBaseIncome] <= 7.5) then
+                        tMassThresholds[1] = { math.min(750, iFullStorageAmount * 0.1), 2.4 }
+                        tMassThresholds[2] = { math.min(1500, iFullStorageAmount * 0.15), 1.2 }
+                        tMassThresholds[3] = { math.min(2000, iFullStorageAmount * 0.35), 0.6 }
+                        tMassThresholds[4] = { math.min(2500, iFullStorageAmount * 0.45), 0.2 }
+                        tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), 0 }
+                        tMassThresholds[6] = { iFullStorageAmount * 0.8, -0.2 }
+                        tMassThresholds[7] = { iFullStorageAmount * 0.9, -1.5 }
+                    else
+                        --if aiBrain[refiPausedUpgradeCount] > 1 or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
+                        tMassThresholds[1] = { math.min(500, iFullStorageAmount * 0.1), 0.1 }
+                        tMassThresholds[2] = { math.min(1000, iFullStorageAmount * 0.15), 0 }
+                        tMassThresholds[3] = { math.min(1500, iFullStorageAmount * 0.35), -0.5 }
+                        tMassThresholds[4] = { math.min(1750, iFullStorageAmount * 0.45), -1.5 }
+                        tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), -2.5 }
+                        tMassThresholds[6] = { iFullStorageAmount * 0.8, -4 }
+                        tMassThresholds[7] = { iFullStorageAmount * 0.98, -10 }
+                    end
                 end
             end
         end
@@ -2535,16 +2546,23 @@ function ManageMassStalls(aiBrain)
                                     end--]]
                             end
 
-                            --[[if iCategoryRef == categories.COMMAND then
+
+
+                            if iCategoryRef == categories.COMMAND then
                                 --want in addition to above as ACU might have personal shield
                                 if bPauseNotUnpause then
                                     if not (oUnit:IsUnitState('Upgrading')) then
                                         bApplyActionToUnit = false
-                                    elseif oUnit.GetWorkProgress and oUnit:GetWorkProgress() >= 0.85 then
-                                        bApplyActionToUnit = false
+                                    elseif oUnit.GetWorkProgress then
+                                        if oUnit:GetWorkProgress() >= 0.85 then
+                                            bApplyActionToUnit = false
+                                            --dont pause t1 mex construction
+                                        elseif oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
+                                            bApplyActionToUnit = false
+                                        end
                                     end
                                 end
-                            end--]]
+                            end
 
 
                             --Pause the unit
@@ -2971,8 +2989,13 @@ function ManageEnergyStalls(aiBrain)
                                 if bPauseNotUnpause then
                                     if not (oUnit:IsUnitState('Upgrading')) then
                                         bApplyActionToUnit = false
-                                    elseif oUnit.GetWorkProgress and oUnit:GetWorkProgress() >= 0.85 then
-                                        bApplyActionToUnit = false
+                                    elseif oUnit.GetWorkProgress then
+                                        if oUnit:GetWorkProgress() >= 0.85 then
+                                            bApplyActionToUnit = false
+                                        --dont pause t1 mex construction
+                                        elseif oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
+                                            bApplyActionToUnit = false
+                                        end
                                     end
                                 end
                             end

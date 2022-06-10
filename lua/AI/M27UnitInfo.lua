@@ -136,7 +136,7 @@ refCategoryT3MML = categories.SILO * categories.MOBILE * categories.TECH3 * cate
 refCategoryFatboy = categories.EXPERIMENTAL * categories.UEF * categories.MOBILE * categories.LAND * categories.ARTILLERY
 refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER + refCategoryFatboy - refCategoryEngineer -refCategoryLandScout -refCategoryMAA
 refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS - categories.ANTISHIELD * categories.AEON --Dont include aeon T3 anti-shield here as it sucks unless against shields
-refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR
+refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR + categories.NAVALCARRIER * categories.EXPERIMENTAL
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
 refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
 refCategoryIndirectT2Below = categories.MOBILE * categories.INDIRECTFIRE * categories.LAND * categories.TECH1 + categories.MOBILE * categories.INDIRECTFIRE * categories.LAND * categories.TECH2
@@ -171,6 +171,7 @@ refCategoryCruiserCarrier = refCategoryCruiser + categories.NAVAL * categories.N
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted
 refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL + categories.OVERLAYANTINAVY * categories.LAND --If removing overlayantinavy then think up better solution for fatboy/experimentals so they dont run when in water
+
 
 --Multi-category:
 --Antinavy mobile units (can include land units - e.g for land factories to build antisub units)

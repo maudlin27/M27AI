@@ -1176,7 +1176,7 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
             --if bDebugMessages == true then LOG('FunctionProfiler: '..sFunctionRef..': refProfilerStart; iCount='..iCount..'; iGameTimeInTicks='..iGameTimeInTicks..'; System time at start='..GetSystemTimeSecondsOnlyForProfileUse()..'; tProfilerFunctionStart[sFunctionRef][iCount]='..tProfilerFunctionStart[sFunctionRef][iCount]) end
 
         elseif sStartOrEndRef == refProfilerEnd then
-            tProfilerEndCount[sFunctionRef] = tProfilerEndCount[sFunctionRef] + 1
+            tProfilerEndCount[sFunctionRef] = (tProfilerEndCount[sFunctionRef] or 0) + 1
             local iCount = tProfilerEndCount[sFunctionRef]
             local iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
             if tProfilerFunctionStart[sFunctionRef][iCount] == nil then

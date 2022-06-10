@@ -785,7 +785,7 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionFortifyFirebase then
                             local oACU = M27Utilities.GetACU(aiBrain)
                             local iFirebaseCategoryWanted = aiBrain[M27EngineerOverseer.refiFirebaseCategoryWanted][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]
-                            if bDebugMessages == true then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(oACU)) end
+                            if bDebugMessages == true and oPlatoon[refbACUInPlatoon] then LOG(sFunctionRef..': ACU state='..M27Logic.GetUnitState(oACU)) end
                             if iFirebaseCategoryWanted and oACU:IsUnitState('Building') or oACU:IsUnitState('Repairing') then
                                 local oACUTarget = oACU:GetFocusUnit()
                                 if M27UnitInfo.IsUnitValid(oACUTarget) then
