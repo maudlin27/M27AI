@@ -763,7 +763,10 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                                 ForkThread(M27AirOverseer.QuantumOpticsManager, aiBrain, oUnit)
                             end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, sUnitID) then table.insert(tLandExperimentals, oUnit)
-                        elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, sUnitID) then table.insert(tSkirmishers, oUnit)
+                        elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, sUnitID) then
+                            table.insert(tSkirmishers, oUnit)
+                            --Ensure the unit uses the long range sniper weapon
+                            if EntityCategoryContains(M27UnitInfo.refCategorySniperBot * categories.SERAPHIM, oUnit.UnitId) then M27UnitInfo.EnableLongRangeSniper(oUnit) end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryRASSACU, sUnitID) then table.insert(tRAS, oUnit)
                         elseif EntityCategoryContains(refCategoryLandCombat, sUnitID) then table.insert(tCombat, oUnit)
                         elseif EntityCategoryContains(refCategoryIndirectT2Plus, sUnitID) then table.insert(tIndirect, oUnit)
@@ -1393,6 +1396,8 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
 
 
                 oNewUnit[refbJustBuilt] = true
+
+
 
 
 

@@ -2036,7 +2036,7 @@ function AirThreatChecker(aiBrain)
         aiBrain[refiHighestEnemyAirThreat] = 40
     end
 
-    local tMAAUnits = aiBrain:GetListOfUnits(categories.MOBILE * categories.LAND * categories.ANTIAIR, false, true)
+    local tMAAUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMAA, false, true)
     if M27Utilities.IsTableEmpty(tMAAUnits) == true then
         aiBrain[refiOurMAAUnitCount] = 0
     else
@@ -2912,20 +2912,22 @@ function UnloadUnit(oTransport)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UnloadUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Issuing unload command to transport/air staging unit')
+    if M27UnitInfo.IsUnitValid(oTransport) then
+        if bDebugMessages == true then
+            LOG(sFunctionRef .. ': Issuing unload command to transport/air staging unit')
+        end
+        local tTransportPosition = oTransport:GetPosition()
+        local tRefuelingUnits = oTransport:GetCargo()
+        for iUnit, oUnit in tRefuelingUnits do
+            ClearAirUnitAssignmentTrackers(oUnit:GetAIBrain(), oUnit, true)
+            --oUnit[refbOnAssignment] = false
+        end
+        if bDebugMessages == true then
+            LOG(sFunctionRef .. ': Issuing clear commands')
+        end
+        IssueClearCommands({ oTransport })
+        IssueTransportUnload({ oTransport }, { tTransportPosition[1] + 5, tTransportPosition[2], tTransportPosition[3] + 5 })
     end
-    local tTransportPosition = oTransport:GetPosition()
-    local tRefuelingUnits = oTransport:GetCargo()
-    for iUnit, oUnit in tRefuelingUnits do
-        ClearAirUnitAssignmentTrackers(oUnit:GetAIBrain(), oUnit, true)
-        --oUnit[refbOnAssignment] = false
-    end
-    if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Issuing clear commands')
-    end
-    IssueClearCommands({ oTransport })
-    IssueTransportUnload({ oTransport }, { tTransportPosition[1] + 5, tTransportPosition[2], tTransportPosition[3] + 5 })
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -2933,38 +2935,40 @@ function ReleaseRefueledUnitsFromAirStaging(aiBrain, oAirStaging)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReleaseRefueledUnitsFromAirStaging'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local tRefuelingUnits = oAirStaging:GetCargo()
-    local bReadyToLeave = false
-    if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Checking if air staging has any refueling units')
-    end
-    if M27Utilities.IsTableEmpty(tRefuelingUnits) == false then
-        for iRefuelingUnit, oRefuelingUnit in tRefuelingUnits do
-            if not (oRefuelingUnit.Dead) then
-                oRefuelingUnit[refbSentRefuelCommand] = false
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Have a unit refueling, checking tracker')
-                end
-                bReadyToLeave = true
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Have a unit refueling, checking its health and fuel')
-                end
-                if oRefuelingUnit:GetFuelRatio() < 0.99 or M27UnitInfo.GetUnitHealthPercent(oRefuelingUnit) < 0.99 then
-                    bReadyToLeave = false
-                end
-                if bReadyToLeave then
+    if M27UnitInfo.IsUnitValid(oAirStaging) and oAirStaging.GetCargo then
+        local tRefuelingUnits = oAirStaging:GetCargo()
+        local bReadyToLeave = false
+        if bDebugMessages == true then
+            LOG(sFunctionRef .. ': Checking if air staging has any refueling units')
+        end
+        if M27Utilities.IsTableEmpty(tRefuelingUnits) == false then
+            for iRefuelingUnit, oRefuelingUnit in tRefuelingUnits do
+                if not (oRefuelingUnit.Dead) then
+                    oRefuelingUnit[refbSentRefuelCommand] = false
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Telling unit to leave air staging')
+                        LOG(sFunctionRef .. ': Have a unit refueling, checking tracker')
                     end
-                    ForkThread(UnloadUnit, oAirStaging)
-                    M27Utilities.DelayChangeVariable(oRefuelingUnit, refbSentRefuelCommand, false, 5)
-                    break
+                    bReadyToLeave = true
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Have a unit refueling, checking its health and fuel')
+                    end
+                    if oRefuelingUnit:GetFuelRatio() < 0.99 or M27UnitInfo.GetUnitHealthPercent(oRefuelingUnit) < 0.99 then
+                        bReadyToLeave = false
+                    end
+                    if bReadyToLeave then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Telling unit to leave air staging')
+                        end
+                        ForkThread(UnloadUnit, oAirStaging)
+                        M27Utilities.DelayChangeVariable(oRefuelingUnit, refbSentRefuelCommand, false, 5)
+                        break
+                    end
                 end
             end
-        end
-    else
-        if bDebugMessages == true then
-            LOG(sFunctionRef .. ': .Refueling is nil so not proceeding')
+        else
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': .Refueling is nil so not proceeding')
+            end
         end
     end
 
@@ -4194,7 +4198,7 @@ function GetBomberTargetShortlist(aiBrain)
                                                     if aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 then
                                                         --Still include in shortlist if low level of AA/no AA that can easily counter a strat bomber
                                                         --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride)
-                                                        local tEnemyT3OrCruiserGroundAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier + categories.TECH3 * categories.ANTIAIR, tEnemyGroundAA)
+                                                        local tEnemyT3OrCruiserGroundAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier + categories.TECH3 * M27UnitInfo.refCategoryGroundAA, tEnemyGroundAA)
                                                         if M27Utilities.IsTableEmpty(tEnemyT3OrCruiserGroundAA) == true then
                                                             if bDebugMessages == true then
                                                                 LOG(sFunctionRef .. ': T3 anti air not near target')
@@ -9112,6 +9116,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                     LOG(sFunctionRef .. ': Last unit target isnt valid')
                 end
             end
+            local tTempLocation
             if bRefreshAttack then
                 IssueClearCommands({ oUnit })
                 oUnit[refoLastUnitTarget] = oAttackTarget
@@ -9123,9 +9128,17 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                             LOG(sFunctionRef .. ': Given attack ground order to try and hit unit ' .. oAttackTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAttackTarget) .. ' at position ' .. repru(oAttackTarget:GetPosition()))
                         end
                     else
-                        IssueMove({ oUnit }, oAttackTarget:GetPosition())
+                        --Are we close to the target? If so then move slightly beyond it to reduce the likelihood they can keep outrunning us
+                        local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oAttackTarget:GetPosition())
+                        if iDistToTarget <= 8 then
+                            tTempLocation = M27Utilities.MoveInDirection(oUnit:GetPosition(), M27Utilities.GetAngleFromAToB(oUnit:GetPosition(), oAttackTarget:GetPosition()), iDistToTarget + 2, true)
+                        else
+                            tTempLocation = oAttackTarget:GetPosition()
+                        end
+                        IssueMove({ oUnit }, tTempLocation)
+
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Given move order to ' .. repru(oAttackTarget:GetPosition()) .. ' so czar will go near unit to attack it; unit ' .. oAttackTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAttackTarget) .. ' at position ' .. repru(oAttackTarget:GetPosition()))
+                            LOG(sFunctionRef .. ': Given move order to go to '..repru(tTempLocation)..'; unit position='.. repru(oAttackTarget:GetPosition()) .. ' so czar will go near unit to attack it; unit ' .. oAttackTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAttackTarget) .. ' at position ' .. repru(oAttackTarget:GetPosition()))
                         end
                     end
                 else
@@ -9141,7 +9154,9 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': bRefreshAttack is true so will update last location target from ' .. repru((oUnit[reftLastLocationTarget] or { 'nil' })) .. ' to ' .. repru(oAttackTarget:GetPosition()))
                     end
-                    local tTempLocation = oAttackTarget:GetPosition()
+                    if M27Utilities.IsTableEmpty(tTempLocation) then --redundancy as shouldve alreayd set above
+                        tTempLocation = oAttackTarget:GetPosition()
+                    end
                     oUnit[reftLastLocationTarget] = { tTempLocation[1], tTempLocation[2], tTempLocation[3] }
                 elseif bDebugMessages == true then
                     LOG(sFunctionRef .. ': bRefreshAttack is false so wont update the last location target as it hasnt changed')

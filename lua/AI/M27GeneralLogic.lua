@@ -1332,13 +1332,21 @@ function GetDFAndT1ArtiUnitMinOrMaxRange(tUnits, iReturnRangeType)
     end
     local bIncludeT1Arti = false
     for i, oUnit in tAllUnits do
+        --if EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) then bDebugMessages = true end
         if not(oUnit.Dead) then
             if M27Utilities.IsACU(oUnit) == false then
                 if oUnit.GetBlueprint then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have a non-ACU blueprint, adding to the list') end
-                    iBPCount = iBPCount + 1
-                    tUnitBPs[iBPCount] = oUnit:GetBlueprint()
-                    if EntityCategoryContains(categories.TECH1 * categories.ARTILLERY, oUnit.UnitId) then bIncludeT1Arti = true end
+                    if EntityCategoryContains(M27UnitInfo.refCategorySniperBot * categories.SERAPHIM, oUnit.UnitId) and oUnit:GetAIBrain().M27AI then
+                        if oUnit[M27UnitInfo.refbSniperRifleEnabled] then iMaxRange = 75 iMinRange = 75
+                        else iMaxRange = 65 iMinRange = 65 end
+                    elseif oUnit.UnitId == 'url0402' then --Monkeylord - go with its main laser not its other weapons
+                        iMaxRange = 30 iMinRange = 4
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a non-ACU blueprint, adding to the list') end
+                        iBPCount = iBPCount + 1
+                        tUnitBPs[iBPCount] = oUnit:GetBlueprint()
+                        if EntityCategoryContains(categories.TECH1 * categories.ARTILLERY, oUnit.UnitId) then bIncludeT1Arti = true end
+                    end
                 end
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Have an ACU blueprint, using custom logic to work out DF range') end
@@ -1872,7 +1880,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                 if EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
                                     --Include threat of cargo if cargo are LABs
-                                    tCargo = oUnit:GetCargo()
+                                    local tCargo = oUnit:GetCargo()
                                     --Filter to just LABs (note unfortunately it doesnt distinguish between mantis and LABs so matnis get treated as LABs to be prudent)
                                     if tCargo then
                                         tCargo = EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)
@@ -1890,7 +1898,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                     elseif EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
                                         --Include threat of cargo if cargo are LABs
-                                        tCargo = oUnit:GetCargo()
+                                        local tCargo = oUnit:GetCargo()
                                         --Filter to just LABs (note unfortunately it doesnt distinguish between mantis and LABs so matnis get treated as LABs to be prudent)
                                         if tCargo then
                                             tCargo = EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)
@@ -1929,7 +1937,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                             if bIncludeGroundToAir == true then
                                 if EntityCategoryContains(categories.ANTIAIR, sCurUnitBP) == true then
                                     iMassMod = 1 --Cruisers and T3 aircraft carriers have antiair as well as overlay antiair
-                                    if sCurUnitBP == 'urs0103' then iMassMod = 0.1 end --Cybran frigate misclassified as anti-air
+                                    if sCurUnitBP == 'urs0103' or EntityCategoryContains(categories.EXPERIMENTAL, sCurUnitBP) then iMassMod = 0.1 end --Cybran frigate and land experimentals misclassified as anti-air
                                 elseif EntityCategoryContains(categories.OVERLAYANTIAIR, sCurUnitBP) == true then
                                     iMassMod = 0.05
                                     if sCurUnitBP == 'ues0401' then iMassMod = 1 end --atlantis misclassifiefd as not anti-air
@@ -4644,6 +4652,8 @@ function GetT3ArtiTarget(oT3Arti)
         local tTargetShortlist = {}
         local iTargetShortlist = 0
         local iFriendlyT3ArtiInRange = 0
+        local iCompleteOrNearCompleteEnemyArti = 0
+        local iNearCompletePercent = 0.65
         if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through every enemy artillery and experimental structure, size of table='..table.getsize(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure])) end
         local tExperimentalArti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalArti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 3000)
         local iExperimentalArti = 0
@@ -4655,7 +4665,7 @@ function GetT3ArtiTarget(oT3Arti)
             end
         end
         for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
-            if M27UnitInfo.IsUnitValid(oUnit) then
+            if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetFractionComplete() >= 0.2 then
                 iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                 --Use 15 above normal range due to inaccuracy of shots
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistance='..iCurDistance) end
@@ -4680,6 +4690,7 @@ function GetT3ArtiTarget(oT3Arti)
                             iTargetShortlist = iTargetShortlist + 1
                             tTargetShortlist[iTargetShortlist] = oUnit
                             iMostT3ArtiInRange = iFriendlyT3ArtiInRange
+                            if oUnit:GetFractionComplete() >= iNearCompletePercent then iCompleteOrNearCompleteEnemyArti = iCompleteOrNearCompleteEnemyArti + 1 end
                         end
                     end
                 end
@@ -4694,12 +4705,14 @@ function GetT3ArtiTarget(oT3Arti)
             else
                 local iClosestTarget = 100000
                 for iUnit, oUnit in tTargetShortlist do
-                    iCurDistance =  M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
-                    if iCurDistance < iClosestTarget then
-                        tTarget = oUnit:GetPosition()
-                        iClosestTarget = iCurDistance
+                    if iCompleteOrNearCompleteEnemyArti == 0 or oUnit:GetFractionComplete() >= iNearCompletePercent then
+                        iCurDistance =  M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
+                        if iCurDistance < iClosestTarget then
+                            tTarget = oUnit:GetPosition()
+                            iClosestTarget = iCurDistance
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Unit in shortlist='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistance='..iCurDistance..'; iClosestTarget='..iClosestTarget..'; tTarget='..repru(tTarget)) end
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Unit in shortlist='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistance='..iCurDistance..'; iClosestTarget='..iClosestTarget..'; tTarget='..repru(tTarget)) end
                 end
             end
         end

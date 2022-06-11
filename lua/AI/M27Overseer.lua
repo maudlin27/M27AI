@@ -221,6 +221,7 @@ refiIgnoreMexesUntilThisManyUnits = 'M27ThresholdToAttackMexes'
 
 --Other
 bUnitNameUpdateActive = false --true if are cycling through every unit and updating the name
+refbCloseToUnitCap = 'M27OverseerCloseToUnitCap' --True if are about to hit unit cap
 
 
 
@@ -2436,9 +2437,9 @@ function RemoveSpareNonCombatUnits(oPlatoon)
     local sFunctionRef = 'RemoveSpareTypeOfUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tAllUnits = oPlatoon:GetPlatoonUnits()
-    local tCombatUnits = EntityCategoryFilterDown(categories.DIRECTFIRE + categories.INDIRECTFIRE - categories.SCOUT - categories.ANTIAIR, tAllUnits)
+    local tCombatUnits = EntityCategoryFilterDown(categories.DIRECTFIRE + categories.INDIRECTFIRE - categories.SCOUT - M27UnitInfo.refCategoryGroundAA, tAllUnits)
     local tScouts = EntityCategoryFilterDown(categories.SCOUT, tAllUnits)
-    local tMAA = EntityCategoryFilterDown(categories.ANTIAIR, tAllUnits)
+    local tMAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryMAA, tAllUnits)
     local iCombatUnits = 0
     if not (tCombatUnits == nil) then
         iCombatUnits = table.getn(tCombatUnits)
@@ -2902,7 +2903,7 @@ function RemoveSpareUnits(oPlatoon, iThreatNeeded, iMinScouts, iMinMAA, oPlatoon
                                     end
                                 end
                                 if iMAAWanted > 0 then
-                                    if EntityCategoryContains(categories.ANTIAIR, oUnit.UnitId) == true then
+                                    if EntityCategoryContains(M27UnitInfo.refCategoryMAA, oUnit.UnitId) == true then
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Not removing unit as its a MAA and we need a MAA')
                                         end
@@ -3876,7 +3877,7 @@ function ThreatAssessAndRespond(aiBrain)
                                             end
                                         end
                                         if iMinMAA > 0 then
-                                            if not (EntityCategoryFilterDown(categories.ANTIAIR, tBasePlatoonUnits) == nil) then
+                                            if not (EntityCategoryFilterDown(M27UnitInfo.refCategoryMAA, tBasePlatoonUnits) == nil) then
                                                 iMinMAA = 0
                                             end
                                         end
@@ -4093,7 +4094,7 @@ function ThreatAssessAndRespond(aiBrain)
                                     end
                                     if not (bACUNeedsTorpSupport) or (tTorpSubtable[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (tTorpSubtable[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
                                         iAssignedThreatWanted = iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat]
-                                        if EntityCategoryContains(categories.ANTIAIR, oUnit.UnitId) then
+                                        if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then
                                             iAssignedThreatWanted = iAssignedThreatWanted * 1.34
                                         end
                                         if bDebugMessages == true then
@@ -5651,6 +5652,12 @@ function SetMaximumFactoryLevels(aiBrain)
             aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
             if bDebugMessages == true then LOG(sFunctionRef..': Dont have any air factories and enemy has air threat so reducing min land factor ybefore other tyopes to 1') end
         end
+
+        --Cap factories if we are nearing unit cap
+        if aiBrain[refbCloseToUnitCap] then
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.min(10, aiBrain[reftiMaxFactoryByType][refFactoryTypeAir])
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeLand] = math.min(3, aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
+        end
     end
 
     if bDebugMessages == true then
@@ -5885,6 +5892,55 @@ function UpdateAllNonM27Names()
 
 end
 
+function CheckUnitCap(aiBrain)
+    local sFunctionRef = 'CheckUnitCap'
+    local bDebugMessages = false
+    if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iUnitCap = tonumber(ScenarioInfo.Options.UnitCap)
+    local iCurUnits = aiBrain:GetCurrentUnits(categories.ALLUNITS - M27UnitInfo.refCategoryWall) + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryWall) * 0.25
+    local iThreshold = math.ceil(iUnitCap * 0.02)
+    if bDebugMessages == true then LOG(sFunctionRef..': iCurUnits='..iCurUnits..'; iUnitCap='..iUnitCap..'; iThreshold='..iThreshold) end
+    if iCurUnits > (iUnitCap - iThreshold * 5) then
+        aiBrain[refbCloseToUnitCap] = true
+        local iMaxToDestroy = math.ceil(iUnitCap * 0.01)
+        local iCurUnitsDestroyed = 0
+        local tUnitsToDestroy
+        local tiCategoryToDestroy = {
+            [0] = categories.TECH1 - categories.COMMAND,
+            [1] = M27UnitInfo.refCategoryAllAir * categories.TECH1,
+            [2] = M27UnitInfo.refCategoryMobileLand * categories.TECH2 - categories.COMMAND - M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryAirScout + M27UnitInfo.refCategoryAirAA,
+            [3] = M27UnitInfo.refCategoryMobileLand * categories.TECH1 - categories.COMMAND,
+            [4] = M27UnitInfo.refCategoryWall + M27UnitInfo.refCategoryEngineer - categories.TECH3,
+        }
+        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer) > iUnitCap * 0.35 then tiCategoryToDestroy[0] = tiCategoryToDestroy[0] + M27UnitInfo.refCategoryEngineer end
+        for iAdjustmentLevel = 4, 0, -1 do
+            if bDebugMessages == true then LOG(sFunctionRef..': iCurUnitsDestroyed so far='..iCurUnitsDestroyed..'; iMaxToDestroy='..iMaxToDestroy..'; iAdjustmentLevel='..iAdjustmentLevel..'; iCurUnits='..iCurUnits..'; Unit cap='..iUnitCap..'; iThreshold='..iThreshold) end
+            if iCurUnits > (iUnitCap - iThreshold * iAdjustmentLevel) then
+                tUnitsToDestroy = aiBrain:GetListOfUnits(tiCategoryToDestroy[iAdjustmentLevel], false, false)
+                if M27Utilities.IsTableEmpty(tUnitsToDestroy) == false then
+                    for iUnit, oUnit in tUnitsToDestroy do
+                        if oUnit.Kill then
+                            if bDebugMessages == true then LOG(sFunctionRef..': iCurUnitsDestroyed so far='..iCurUnitsDestroyed..'; Will destroy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to avoid going over unit cap') end
+                            oUnit:Kill()
+                            iCurUnitsDestroyed = iCurUnitsDestroyed + 1
+                            if iCurUnitsDestroyed >= iMaxToDestroy then break end
+                        end
+                    end
+                end
+                if iCurUnitsDestroyed >= iMaxToDestroy then break end
+            else
+                break
+            end
+        end
+    else
+        aiBrain[refbCloseToUnitCap] = false
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function StrategicOverseer(aiBrain, iCurCycleCount)
     --also features 'state of game' logs
     local bDebugMessages = false
@@ -6098,7 +6154,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
 
-    if iCurCycleCount <= 0 then
+    if iCurCycleCount <= 0 then --runs once every 10 cycles (seconds)
         --Update list of nearby enemies if any are dead
         local bCheckBrains = true
         local iCurCount = 0
@@ -6136,6 +6192,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
         --Consider if should update enemy start location
         ForkThread(M27MapInfo.UpdateNewPrimaryBaseLocation, aiBrain)
+
+        ForkThread(CheckUnitCap, aiBrain)
 
         --STATE OF GAME LOG BELOW------------------
 
@@ -6507,7 +6565,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                 end
                             end
                             --Eco even if enemy has big threats if we cant path to enemy base with amphibious and we have all mexes in our pathing group
-                            if not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and iAllMexesInPathingGroupWeHaventClaimed == 0 and aiBrain[refiModDistFromStartNearestThrest] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.3 then
+                            if not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and iAllMexesInPathingGroupWeHaventClaimed == 0 and aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.3 then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Want to eco as we cant reach enemy base except by air and we have all mexes in our pathing group')
                                 end
