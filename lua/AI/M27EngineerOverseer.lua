@@ -1117,12 +1117,14 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     local bOnPlateau = false
     if not(oEngineer[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then bOnPlateau = true end
 
+    local sPathing = M27UnitInfo.GetUnitPathingType(oEngineer)
+
     --Run away
     if bNearbyPD and bOnPlateau then
         --Is the PD on the plateau?
         bNearbyPD = false
         for iUnit, oUnit in tNearbyUnits do
-            if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) == oEngineer[M27Transport.refiAssignedPlateau] then
+            if M27MapInfo.GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == oEngineer[M27Transport.refiAssignedPlateau] then
                 bNearbyPD = true
                 break
             end
@@ -1144,7 +1146,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             --Is the enemy on the plateau?
             bAreNearbyEnemies = false
             for iUnit, oUnit in tNearbyUnits do
-                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) == oEngineer[M27Transport.refiAssignedPlateau] then
+                if M27MapInfo.GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == oEngineer[M27Transport.refiAssignedPlateau] then
                     bAreNearbyEnemies = true
                     break
                 end
@@ -1165,7 +1167,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 --Is the enemy on the plateau?
                 bNearbyMobileEnemies = false
                 for iUnit, oUnit in tMobileEnemies do
-                    if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) == oEngineer[M27Transport.refiAssignedPlateau] then
+                    if M27MapInfo.GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == oEngineer[M27Transport.refiAssignedPlateau] then
                         bNearbyMobileEnemies = true
                         break
                     end
@@ -1647,6 +1649,7 @@ function IssuePlateauSpareEngineerAction(aiBrain, oEngineer)
             if bDebugMessages == true then LOG(sFunctionRef..': Have land factory that is building something so will assist it') end
         else
             --Attack-move to a random location
+            local sPathing = M27UnitInfo.GetUnitPathingType(oEngineer)
             if bDebugMessages == true then LOG(sFunctionRef..': iPlateauGroup='..iPlateauGroup..'; aiBrain[M27MapInfo.subrefPlateauMaxXZ]='..repru(aiBrain[M27MapInfo.subrefPlateauMaxXZ])..'; aiBrain[M27MapInfo.subrefPlateauMinXZ]='..repru(aiBrain[M27MapInfo.subrefPlateauMinXZ])..'; will attackmove to random position') end
 
             local iSearchSizeMax
@@ -1656,14 +1659,14 @@ function IssuePlateauSpareEngineerAction(aiBrain, oEngineer)
                 iSearchSizeMax = math.max(4, math.min(aiBrain[M27MapInfo.subrefPlateauMaxXZ][iPlateauGroup][1] - aiBrain[M27MapInfo.subrefPlateauMinXZ][iPlateauGroup][1], aiBrain[M27MapInfo.subrefPlateauMaxXZ][iPlateauGroup][2] - aiBrain[M27MapInfo.subrefPlateauMinXZ][iPlateauGroup][2]) * 0.5)
                 iSearchSizeMin = math.min(15, math.max(iSearchSizeMax * 0.2, iSearchSizeMax - 5, 2))
             end
-            local tRandomTargetLocation = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, iPlateauGroup, oEngineer:GetPosition(), iSearchSizeMax, iSearchSizeMin)
+            local tRandomTargetLocation = M27Logic.GetRandomPointInAreaThatCanPathTo(sPathing, iPlateauGroup, oEngineer:GetPosition(), iSearchSizeMax, iSearchSizeMin)
             if M27Utilities.IsTableEmpty(tRandomTargetLocation) then
                 --Recheck pathing
                 if bDebugMessages == true then LOG(sFunctionRef..': Failed to find somewhere to path to, will draw engineer position in red. PlateauGroup='..oEngineer[M27Transport.refiAssignedPlateau]..'; position='..repru(oEngineer:GetPosition()))
                     M27Utilities.DrawLocation(oEngineer:GetPosition(), nil, 2, 100, nil)
                 end
-                if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer, oEngineer:GetPosition(), nil, nil) then
-                    tRandomTargetLocation = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.refPathingTypeAmphibious, iPlateauGroup, oEngineer:GetPosition(), 40, 15)
+                if M27MapInfo.RecheckPathingOfLocation(sPathing, oEngineer, oEngineer:GetPosition(), nil, nil) then
+                    tRandomTargetLocation = M27Logic.GetRandomPointInAreaThatCanPathTo(sPathing, iPlateauGroup, oEngineer:GetPosition(), 40, 15)
                 end
             end
             if M27Utilities.IsTableEmpty(tRandomTargetLocation) then
@@ -1708,6 +1711,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
 
     local iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
     local tEngineerPosition = oEngineer:GetPosition()
+    local sPathing = M27UnitInfo.GetUnitPathingType(oEngineer)
     local tNearbyBuildings
     local oBuildingProducing
 
@@ -1817,17 +1821,17 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
             table.insert(aiBrain[reftEngineersHelpingACU], oEngineer)
         end
     end
-    local iOurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tEngineerPosition)
+    local iOurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tEngineerPosition)
     if bHaveAction == false then
         --Are there nearby unclaimed mexes? Only consider if we are far from base
         if M27Utilities.GetDistanceBetweenPositions(tEngineerPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 125 then
 
             --[a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
-            if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[M27UnitInfo.refPathingTypeAmphibious][iOurPathingGroup]) == false then
+            if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iOurPathingGroup]) == false then
                 local iClosestDist = 40 --Not interested in mexes further away than this
                 local tClosestMex
                 local iCurDist
-                for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[M27UnitInfo.refPathingTypeAmphibious][iOurPathingGroup] do
+                for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][iOurPathingGroup] do
                     iCurDist = M27Utilities.GetDistanceBetweenPositions(tEngineerPosition, tMex)
                     if iCurDist < iClosestDist then
                         --Is the mex unclaimed?
@@ -1877,7 +1881,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
                     local sLocationRef = M27Utilities.ConvertLocationToReference(tTempTarget)
                     if GetGameTimeSeconds() - (aiBrain[reftSpareEngineerAttackMoveTimeByLocation][sLocationRef] or -1000) >= 14 then
                         --Can we path here?
-                        if M27Utilities.GetDistanceBetweenPositions(tTempTarget, tEngineerPosition) <= (oEngineer:GetBlueprint().Economy.MaxBuildDistance - 0.5) or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tTempTarget) == iOurPathingGroup then
+                        if M27Utilities.GetDistanceBetweenPositions(tTempTarget, tEngineerPosition) <= (oEngineer:GetBlueprint().Economy.MaxBuildDistance - 0.5) or M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTempTarget) == iOurPathingGroup then
                             bHaveAction = true
                             IssueAggressiveMove({oEngineer}, tTempTarget )
                             if bDebugMessages == true then LOG(sFunctionRef..': Have nearby reclaim, at location '..repru(tTempTarget)) end
@@ -1969,7 +1973,7 @@ function IssueSpareEngineerAction(aiBrain, oEngineer)
                         for iUnit, oUnit in tExperimentals do
                             iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEngineerPosition)
                             if oUnit:GetFractionComplete() <= 0.95 or iCurDist <= 10 then
-                                if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) == iOurPathingGroup then
+                                if M27MapInfo.GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == iOurPathingGroup then
                                     if iCurDist < iClosestExperimentalDist then
                                         oClosestByDistExperimental = oUnit
                                         iClosestExperimentalDist = iCurDist
@@ -3150,6 +3154,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
         end
         tTargetLocation = nil
     else
+        local sPathing = M27UnitInfo.GetUnitPathingType(oEngineer)
         local iNewBuildingRadius = M27UnitInfo.GetBuildingSize(sBlueprintToBuild)[1] * 0.5
         local iBuilderRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance + math.min(oEngineer:GetBlueprint().SizeX, oEngineer:GetBlueprint().SizeZ)*0.5
         local iDistanceFromStart = M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -3389,10 +3394,10 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
         end
         --Switch to random location if an amphibious unit cant path there and its not a resource based location
         if not(bFindRandomLocation) and not(bAbortConstruction) then -- and not(bMexHydroOrStorage) then
-            if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tTargetLocation) == M27MapInfo.GetUnitSegmentGroup(oEngineer)) then
+            if not(M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTargetLocation) == M27MapInfo.GetUnitSegmentGroup(oEngineer)) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Pathing group of the target is different to where we are, so will try and get a random location if its not a resource based building; Target amphibious pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tTargetLocation)..'; Pathing group of unit='..M27MapInfo.GetUnitSegmentGroup(oEngineer)..'; Amphibious pathing group of engineer current position='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer:GetPosition())..'; pathing group of base='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
                 --Recheck pathing
-                if not(M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer, tTargetLocation, nil)) and not(bMexHydroOrStorage) then
+                if not(M27MapInfo.RecheckPathingOfLocation(sPathing, oEngineer, tTargetLocation, nil)) and not(bMexHydroOrStorage) then
                     bFindRandomLocation = not(bNeverBuildRandom)
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Pathing was wrong or are trying to build on a resource location so wont try and get random location but will proceed with current location') end
@@ -5979,7 +5984,7 @@ function GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSea
                         if bDebugMessages == true then LOG(sFunctionRef..': Location not assigned to an engineer, so will assist this unless it belongs to a teammate and isnt T3 Plus non-power') end
                         if not(EntityCategoryContains(M27UnitInfo.refCategoryPower + categories.TECH1 + categories.TECH2 - M27UnitInfo.refCategoryT2PlusPD - M27UnitInfo.refCategoryFixedShield - M27UnitInfo.refCategoryFixedT2Arti, oUnit.UnitId)) or oUnit:GetAIBrain():GetArmyIndex() == aiBrain:GetArmyIndex() then
                             --Can we path here?
-                            if M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) then
+                            if iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition()) then
                                 --If distance is >150 and contains experimental level category then only consider if mass cost is >=65k
                                 if (oUnit:GetAIBrain():GetArmyIndex() == aiBrain:GetArmyIndex()) or not(EntityCategoryContains(M27UnitInfo.refCategoryExperimentalLevel, oUnit.UnitId)) or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 150 or oUnit:GetBlueprint().Economy.BuildCostMass >= 65000 then
                                     oNearestPartBuilt = oUnit
@@ -7816,8 +7821,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             ReassignPlateauEngineer(aiBrain, oEngineer)
                         else
                             --Confirm engineer pathing is as expected
-
-                            if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer:GetPosition()) == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
+                            local sPathing = M27UnitInfo.GetUnitPathingType(oEngineer)
+                            if sPathing == M27UnitInfo.refPathingTypeAmphibious and not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer:GetPosition()) == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
                                 --Engineer not marked as a plateau engineer but isnt in same pathing group. recheck pathing
                                 if M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer, oEngineer:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                     --Do nothing - will fix on next cycle
@@ -10657,6 +10662,7 @@ function ReassignPlateauEngineer(aiBrain, oEngineer)
     --Make sure plateau flags that this engineer is assigned to it (used e.g. to track how many engineers we have on the plateau when deciding if should build more)
     if not(aiBrain[M27MapInfo.reftOurPlateauInformation][iPlateauGroup]) or M27Utilities.IsTableEmpty(M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup])) then
         --First recheck pathing and update engineer plateau group if it has changed
+
         local bPathingChanged = M27MapInfo.RecheckPathingOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer, oEngineer:GetPosition())
         if bDebugMessages == true then LOG(sFunctionRef..': iPlateauGroup='..(iPlateauGroup or 'nil')..'; didnt have a table for this so will recheck pathing.  bPathingChanged='..tostring(bPathingChanged)..'; Eng position='..repru(oEngineer:GetPosition())..'; palteau pathing group of cur position='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oEngineer:GetPosition())) end
         if bPathingChanged then

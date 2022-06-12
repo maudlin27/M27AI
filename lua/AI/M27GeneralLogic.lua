@@ -3716,7 +3716,7 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
     local iMinSegmentZ = math.max(1, iMidSegmentZ - iSegmentMaxRange)
     local iMaxSegmentZ = math.min(M27MapInfo.iMaxBaseSegmentZ, iMidSegmentZ + iSegmentMaxRange)
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; tMidpoint='..repru(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; Mid segments='..iMidSegmentX..'-'..iMidSegmentZ..'; iMinSegmentX-Z='..iMinSegmentX..'-'..iMinSegmentZ..'; iMaxSegmentX-Z='..iMaxSegmentX..'-'..iMaxSegmentZ..'; M27MapInfo.iSizeOfBaseLevelSegment='..M27MapInfo.iSizeOfBaseLevelSegment) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, sPathing='..sPathing..'; iSegmentGroup='..(iSegmentGroup or 'nil')..'; tMidpoint='..repru(tMidpoint)..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; Mid segments='..iMidSegmentX..'-'..iMidSegmentZ..'; iMinSegmentX-Z='..iMinSegmentX..'-'..iMinSegmentZ..'; iMaxSegmentX-Z='..iMaxSegmentX..'-'..iMaxSegmentZ..'; M27MapInfo.iSizeOfBaseLevelSegment='..M27MapInfo.iSizeOfBaseLevelSegment) end
 
     local iConstraintMinX = math.max(1, iMidSegmentX - iSegmentMinRange)
     local iConstraintMaxX = math.min(M27MapInfo.iMaxBaseSegmentX, iMidSegmentX + iSegmentMinRange)

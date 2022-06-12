@@ -464,39 +464,53 @@ function InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly, bReturnDe
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if oUnit and not(oUnit.Dead) and oUnit.GetUnitId then
         local sPathing = M27UnitInfo.GetUnitPathingType(oUnit)
-        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
-        local tCurPosition = oUnit:GetPosition()
-        local iSegmentX, iSegmentZ, iUnitGroup, iTargetSegmentX, iTargetSegmentZ, iTargetGroup
-        if not(bReturnDestinationGroupOnly) then
-            iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tCurPosition)
-            iUnitGroup = tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
-        end
-        if not(bReturnUnitGroupOnly) then
-            iTargetSegmentX, iTargetSegmentZ = GetPathingSegmentFromPosition(tDestination)
-            iTargetGroup = tPathingSegmentGroupBySegment[sPathing][iTargetSegmentX][iTargetSegmentZ]
-        end
+        if sPathing == M27UnitInfo.refPathingTypeAir then
+            if bReturnUnitGroupOnly or bReturnDestinationGroupOnly then return 1 else return true end
+        else
+            if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+            local tCurPosition = oUnit:GetPosition()
+            local iSegmentX, iSegmentZ, iUnitGroup, iTargetSegmentX, iTargetSegmentZ, iTargetGroup
+            if not(bReturnDestinationGroupOnly) then
+                iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tCurPosition)
+                iUnitGroup = tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
+            end
+            if not(bReturnUnitGroupOnly) then
+                iTargetSegmentX, iTargetSegmentZ = GetPathingSegmentFromPosition(tDestination)
+                iTargetGroup = tPathingSegmentGroupBySegment[sPathing][iTargetSegmentX][iTargetSegmentZ]
+            end
 
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        if bReturnUnitGroupOnly then
-            return iUnitGroup
-        elseif bReturnDestinationGroupOnly then
-            return iTargetGroup
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            if bReturnUnitGroupOnly then
+                return iUnitGroup
+            elseif bReturnDestinationGroupOnly then
+                return iTargetGroup
+            end
+            if iUnitGroup == iTargetGroup then return true else return false end
         end
-        if iUnitGroup == iTargetGroup then return true else return false end
-    end
+        end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
     --Returns unit group for the target segment position, or nil if its not known; oUnit should be specified to allow it to see if oUnit can path there (in case we havent recorded the location yet)
-    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
-    return tPathingSegmentGroupBySegment[sPathing][iTargetSegmentX][iTargetSegmentZ]
+    if sPathing == M27UnitInfo.refPathingTypeAmphibious or sPathing == M27UnitInfo.refPathingTypeLand or sPathing == M27UnitInfo.refPathingTypeNavy then
+        return tPathingSegmentGroupBySegment[sPathing][iTargetSegmentX][iTargetSegmentZ]
+    elseif sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then
+        return tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeLand][iTargetSegmentX][iTargetSegmentZ]
+    elseif sPathing == M27UnitInfo.refPathingTypeAir then return 1
+    else M27Utilities.ErrorHandler('Unrecognised pathing type, sPathing='..(sPathing or 'nil'))
+    end
 end
 
 function GetSegmentGroupOfLocation(sPathing, tLocation)
     local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tLocation)
-    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
-    return tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
+    if sPathing == M27UnitInfo.refPathingTypeAmphibious or sPathing == M27UnitInfo.refPathingTypeLand or sPathing == M27UnitInfo.refPathingTypeNavy then
+        return tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
+    elseif sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then
+        return tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeLand][iSegmentX][iSegmentZ]
+    elseif sPathing == M27UnitInfo.refPathingTypeAir then return 1
+    else M27Utilities.ErrorHandler('Unrecognised pathing type, sPathing='..(sPathing or 'nil'))
+    end
 end
 
 
@@ -504,7 +518,10 @@ function GetUnitSegmentGroup(oUnit)
     --Intended for convenience not optimisation - if going to be called alot of times use other approach
     local sPathing = M27UnitInfo.GetUnitPathingType(oUnit)
     local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(oUnit:GetPosition())
-    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand
+    elseif sPathing == M27UnitInfo.refPathingTypeAir then return 1
+    end
+
     return tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
 end
 
@@ -513,25 +530,30 @@ function FixSegmentPathingGroup(sPathing, tLocation, iCorrectPathingGroup)
     --Try using RecheckPathingOfLocation in future which incorporates this
 
     --have commented out code re updating amphibious pathing based on land pathing check, as its flawed since the correctpathinggroup might be different for teh amphibious pathing
-    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
-    local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tLocation)
-    --local bUpdateAmphibiousWithSameGroup = false
-    local iOldPathingGroup = tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
-    --if sPathing == M27UnitInfo.refPathingTypeLand and tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] == tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] then bUpdateAmphibiousWithSameGroup = true end
-    tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] = iCorrectPathingGroup
-    --if bUpdateAmphibiousWithSameGroup then tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] = iCorrectPathingGroup end
-    tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tLocation)] = tLocation
-    if M27Utilities.IsTableEmpty(tSegmentBySegmentGroup[sPathing][iOldPathingGroup]) == false then
-        for iEntry, tSegments in tSegmentBySegmentGroup[sPathing][iOldPathingGroup] do
-            --table.insert into this is tSegmentBySegmentGroup[sPathing][iPathingGroup], {iSegmentX, iSegmentZ}
-            if tSegments == {iSegmentX, iSegmentZ} then
-                table.remove(tSegmentBySegmentGroup[sPathing][iOldPathingGroup], iEntry)
-                break
+    if sPathing == M27UnitInfo.refPathingTypeAir then
+        M27Utilities.ErrorHandler('Have air pathing so will ignore pathing inconsistency, but should check code history as should try and avoid fixing in the first place')
+        --Do nothing
+    else
+        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+        local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tLocation)
+        --local bUpdateAmphibiousWithSameGroup = false
+        local iOldPathingGroup = tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]
+        --if sPathing == M27UnitInfo.refPathingTypeLand and tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] == tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] then bUpdateAmphibiousWithSameGroup = true end
+        tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ] = iCorrectPathingGroup
+        --if bUpdateAmphibiousWithSameGroup then tPathingSegmentGroupBySegment[M27UnitInfo.refPathingTypeAmphibious][iSegmentX][iSegmentZ] = iCorrectPathingGroup end
+        tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tLocation)] = tLocation
+        if M27Utilities.IsTableEmpty(tSegmentBySegmentGroup[sPathing][iOldPathingGroup]) == false then
+            for iEntry, tSegments in tSegmentBySegmentGroup[sPathing][iOldPathingGroup] do
+                --table.insert into this is tSegmentBySegmentGroup[sPathing][iPathingGroup], {iSegmentX, iSegmentZ}
+                if tSegments == {iSegmentX, iSegmentZ} then
+                    table.remove(tSegmentBySegmentGroup[sPathing][iOldPathingGroup], iEntry)
+                    break
+                end
             end
         end
+        if not(tSegmentBySegmentGroup[sPathing][iCorrectPathingGroup]) then tSegmentBySegmentGroup[sPathing][iCorrectPathingGroup] = {} end
+        table.insert(tSegmentBySegmentGroup[sPathing][iCorrectPathingGroup], {iSegmentX, iSegmentZ})
     end
-    if not(tSegmentBySegmentGroup[sPathing][iCorrectPathingGroup]) then tSegmentBySegmentGroup[sPathing][iCorrectPathingGroup] = {} end
-    table.insert(tSegmentBySegmentGroup[sPathing][iCorrectPathingGroup], {iSegmentX, iSegmentZ})
 end
 
 function RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iUnitCorrectPathingGroup, tTargetLocation, iSegmentSizeAdjust)
@@ -576,186 +598,190 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
     local sFunctionRef = 'RecheckPathingOfLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
+    local bHaveChangedPathing = false
+    if sPathing == M27UnitInfo.refPathingTypeAir then
+        --Do nothing
+    else
+        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
 
-    if not(tOptionalComparisonKnownCorrectPoint) then
-        --[[if M27Utilities.IsTableEmpty(tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]) == false then
-            tOptionalComparisonKnownCorrectPoint = tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]
-        else--]]
-        tOptionalComparisonKnownCorrectPoint = PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber]
-        --end
-    end
+        if not(tOptionalComparisonKnownCorrectPoint) then
+            --[[if M27Utilities.IsTableEmpty(tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]) == false then
+                tOptionalComparisonKnownCorrectPoint = tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]
+            else--]]
+            tOptionalComparisonKnownCorrectPoint = PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber]
+            --end
+        end
 
-    local iUnitPathingGroup = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
-    local iTargetPathingGroup = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
-    local iBasePathingGroup = GetSegmentGroupOfLocation(sPathing, tOptionalComparisonKnownCorrectPoint)
+        local iUnitPathingGroup = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
+        local iTargetPathingGroup = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
+        local iBasePathingGroup = GetSegmentGroupOfLocation(sPathing, tOptionalComparisonKnownCorrectPoint)
 
-    local iCurManualCheckDist
-    local sClosestManualCheckRef
+        local iCurManualCheckDist
+        local sClosestManualCheckRef
 
-    if bDebugMessages == true then LOG(sFunctionRef..': GameTIMe='..GetGameTimeSeconds()..'; Checking pathing for tTargetLocation='..repru(tTargetLocation)..' using oPathingUnit='..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': GameTIMe='..GetGameTimeSeconds()..'; Checking pathing for tTargetLocation='..repru(tTargetLocation)..' using oPathingUnit='..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)) end
 
 
-    if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) then
-        local iClosestManualCheck = M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tOptionalComparisonKnownCorrectPoint)
-        if bDebugMessages == true then LOG(sFunctionRef..': iClosestManualCheck='..iClosestManualCheck..'; Unit position='..repru(oPathingUnit:GetPosition())..'; targetposition='..repru(tTargetLocation)) end
-        if iClosestManualCheck > 50 then
-            --Find the closest location where have done a manual check that has the same pathing group as the comparison known correct point
-            if M27Utilities.IsTableEmpty(tManualPathingChecks[sPathing]) == false then
-                if bDebugMessages == true then LOG(sFunctionRef..'WIll go through every entry in tManualPathingChecks and see how close it is') end
-                for sLocationRef, tLocationChecked in tManualPathingChecks[sPathing] do
-                    iCurManualCheckDist = M27Utilities.GetDistanceBetweenPositions(tLocationChecked, oPathingUnit:GetPosition())
-                    if bDebugMessages == true then LOG(sFunctionRef..': tLocationChecked='..repru(tLocationChecked)..'; iCurManualCheckDist='..iCurManualCheckDist..'; iClosestManualCheck='..iClosestManualCheck) end
-                    if iCurManualCheckDist < iClosestManualCheck and GetSegmentGroupOfLocation(sPathing, tLocationChecked) == iBasePathingGroup then
-                        sClosestManualCheckRef = sLocationRef
-                        iClosestManualCheck = iCurManualCheckDist
-                        if iClosestManualCheck <= 50 then break end
+        if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) then
+            local iClosestManualCheck = M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tOptionalComparisonKnownCorrectPoint)
+            if bDebugMessages == true then LOG(sFunctionRef..': iClosestManualCheck='..iClosestManualCheck..'; Unit position='..repru(oPathingUnit:GetPosition())..'; targetposition='..repru(tTargetLocation)) end
+            if iClosestManualCheck > 50 then
+                --Find the closest location where have done a manual check that has the same pathing group as the comparison known correct point
+                if M27Utilities.IsTableEmpty(tManualPathingChecks[sPathing]) == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..'WIll go through every entry in tManualPathingChecks and see how close it is') end
+                    for sLocationRef, tLocationChecked in tManualPathingChecks[sPathing] do
+                        iCurManualCheckDist = M27Utilities.GetDistanceBetweenPositions(tLocationChecked, oPathingUnit:GetPosition())
+                        if bDebugMessages == true then LOG(sFunctionRef..': tLocationChecked='..repru(tLocationChecked)..'; iCurManualCheckDist='..iCurManualCheckDist..'; iClosestManualCheck='..iClosestManualCheck) end
+                        if iCurManualCheckDist < iClosestManualCheck and GetSegmentGroupOfLocation(sPathing, tLocationChecked) == iBasePathingGroup then
+                            sClosestManualCheckRef = sLocationRef
+                            iClosestManualCheck = iCurManualCheckDist
+                            if iClosestManualCheck <= 50 then break end
+                        end
                     end
                 end
             end
         end
-    end
-    local tKnownCorrectPoint
-    if sClosestManualCheckRef then
-        tKnownCorrectPoint = tManualPathingChecks[sPathing][sClosestManualCheckRef]
-    else
-        tKnownCorrectPoint = tOptionalComparisonKnownCorrectPoint
-    end
-
-    local bCanPathToTarget = oPathingUnit:CanPathTo(tTargetLocation)
-    local bCanPathToBase = oPathingUnit:CanPathTo(tKnownCorrectPoint)
-    local bExpectedToPathToTarget = false
-    if iUnitPathingGroup == iTargetPathingGroup then bExpectedToPathToTarget = true end
-    local bExpectedToPathToBase = false
-    if iUnitPathingGroup == iBasePathingGroup then bExpectedToPathToBase = true end
-    local bTargetIsBase = false
-    if tTargetLocation[1] == tKnownCorrectPoint[1] and tTargetLocation[3] == tKnownCorrectPoint[3] then bTargetIsBase = true
-    elseif tTargetLocation[1] == PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber][1] and tTargetLocation[3] == PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber][3] then bTargetIsBase = true
-    end
-
-    local bHaveChangedPathing = false
-    if bDebugMessages == true then LOG(sFunctionRef..': About to start main checks, oPathingUnit='..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..'; iUnitPathingGroup='..iUnitPathingGroup..'; iTargetPathingGroup='..iTargetPathingGroup..'; iBasePathingGroup='..iBasePathingGroup..'; manual check for engi position='..repru(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())] or { 'nil'})..'; bCanPathToTarget='..tostring(bCanPathToTarget)..'; bCanPathToBase='..tostring(bCanPathToBase)..'; bExpectedToPathToBase='..tostring(bExpectedToPathToBase)..'; bExpectedToPathToTarget='..tostring(bExpectedToPathToTarget)) end
-
-    --Have we not checked the pathing of either the engineer position or the target?
-    if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) or not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tTargetLocation)]) then
-        local iAmphibiousOrigGroupOfTarget
-        local iAmphibiousOrigGroupOfPathingUnit
-        if sPathing == M27UnitInfo.refPathingTypeAmphibious then
-            iAmphibiousOrigGroupOfTarget = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
-            iAmphibiousOrigGroupOfPathingUnit = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
-            if bDebugMessages == true then LOG(sFunctionRef..': sPathing is amphibious so have recorded iAmphibiousOrigGroupOfTarget and iAmphibiousOrigGroupOfPathingUnit as '..iAmphibiousOrigGroupOfTarget..' and '..iAmphibiousOrigGroupOfPathingUnit) end
-        elseif bDebugMessages == true then LOG(sFunctionRef..': Pathing isnt amphibious. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious)
+        local tKnownCorrectPoint
+        if sClosestManualCheckRef then
+            tKnownCorrectPoint = tManualPathingChecks[sPathing][sClosestManualCheckRef]
+        else
+            tKnownCorrectPoint = tOptionalComparisonKnownCorrectPoint
         end
 
-        if bDebugMessages == true then
-            LOG(sFunctionRef..': Will draw the 3 positions in red, with a line. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil'))
-            M27Utilities.DrawLocations({tKnownCorrectPoint, oPathingUnit:GetPosition(), tTargetLocation}, nil, 2, 200)
-            M27Utilities.ErrorHandler('Temp to see history of function call', true)
+        local bCanPathToTarget = oPathingUnit:CanPathTo(tTargetLocation)
+        local bCanPathToBase = oPathingUnit:CanPathTo(tKnownCorrectPoint)
+        local bExpectedToPathToTarget = false
+        if iUnitPathingGroup == iTargetPathingGroup then bExpectedToPathToTarget = true end
+        local bExpectedToPathToBase = false
+        if iUnitPathingGroup == iBasePathingGroup then bExpectedToPathToBase = true end
+        local bTargetIsBase = false
+        if tTargetLocation[1] == tKnownCorrectPoint[1] and tTargetLocation[3] == tKnownCorrectPoint[3] then bTargetIsBase = true
+        elseif tTargetLocation[1] == PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber][1] and tTargetLocation[3] == PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber][3] then bTargetIsBase = true
         end
 
-        if bDebugMessages == true then LOG(sFunctionRef..': First time doing a manual check for this location') end
-        if bCanPathToBase then
-            if not(iUnitPathingGroup == iBasePathingGroup) then
-                bHaveChangedPathing = true
-                if bDebugMessages == true then LOG(sFunctionRef..': Can path to base but we didnt think we could, will change unit pathing group to '..iBasePathingGroup) end
-                FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iBasePathingGroup)
-                RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, oPathingUnit:GetPosition(), 4)
+        if bDebugMessages == true then LOG(sFunctionRef..': About to start main checks, oPathingUnit='..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..'; iUnitPathingGroup='..iUnitPathingGroup..'; iTargetPathingGroup='..iTargetPathingGroup..'; iBasePathingGroup='..iBasePathingGroup..'; manual check for engi position='..repru(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())] or { 'nil'})..'; bCanPathToTarget='..tostring(bCanPathToTarget)..'; bCanPathToBase='..tostring(bCanPathToBase)..'; bExpectedToPathToBase='..tostring(bExpectedToPathToBase)..'; bExpectedToPathToTarget='..tostring(bExpectedToPathToTarget)) end
 
-                if not(bTargetIsBase) and bCanPathToTarget and not(iTargetPathingGroup == iBasePathingGroup) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': target location cna path to base but we didnt think it could, will change target pathing group to '..iBasePathingGroup) end
-                    FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
-                    --Check an area around the target (if its not really far away)
-                    RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
-                end
-            else
-                --Can path to base, and correctly think we can; can we path to the target?
-                if not(bTargetIsBase) and bCanPathToTarget then
-                    if not(bExpectedToPathToTarget) then
-                        --can path to target but didnt think we could
-                        if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to the target') end
+        --Have we not checked the pathing of either the engineer position or the target?
+        if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) or not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tTargetLocation)]) then
+            local iAmphibiousOrigGroupOfTarget
+            local iAmphibiousOrigGroupOfPathingUnit
+            if sPathing == M27UnitInfo.refPathingTypeAmphibious then
+                iAmphibiousOrigGroupOfTarget = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
+                iAmphibiousOrigGroupOfPathingUnit = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
+                if bDebugMessages == true then LOG(sFunctionRef..': sPathing is amphibious so have recorded iAmphibiousOrigGroupOfTarget and iAmphibiousOrigGroupOfPathingUnit as '..iAmphibiousOrigGroupOfTarget..' and '..iAmphibiousOrigGroupOfPathingUnit) end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Pathing isnt amphibious. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious)
+            end
+
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Will draw the 3 positions in red, with a line. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil'))
+                M27Utilities.DrawLocations({tKnownCorrectPoint, oPathingUnit:GetPosition(), tTargetLocation}, nil, 2, 200)
+                M27Utilities.ErrorHandler('Temp to see history of function call', true)
+            end
+
+            if bDebugMessages == true then LOG(sFunctionRef..': First time doing a manual check for this location') end
+            if bCanPathToBase then
+                if not(iUnitPathingGroup == iBasePathingGroup) then
+                    bHaveChangedPathing = true
+                    if bDebugMessages == true then LOG(sFunctionRef..': Can path to base but we didnt think we could, will change unit pathing group to '..iBasePathingGroup) end
+                    FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iBasePathingGroup)
+                    RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, oPathingUnit:GetPosition(), 4)
+
+                    if not(bTargetIsBase) and bCanPathToTarget and not(iTargetPathingGroup == iBasePathingGroup) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': target location cna path to base but we didnt think it could, will change target pathing group to '..iBasePathingGroup) end
                         FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
+                        --Check an area around the target (if its not really far away)
                         RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
                     end
-                end
-            end
-        else
-            --Cant path to base - below updates to pathing group arent as accurate so will only update the target not the area around it
-            if bExpectedToPathToBase then
-                --Incorrectly think we can path to base, so change our pathing group to something else - add 1 to current size
-                bHaveChangedPathing = true
-                local iNewPathingGroup = table.getn(tSegmentBySegmentGroup[sPathing]) + 1
-                if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to base, will set engineer position group to '..iNewPathingGroup) end
-                FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iNewPathingGroup)
-                --Is there also an issue with the target?
-                if not(bTargetIsBase) and bCanPathToTarget and iTargetPathingGroup == iBasePathingGroup then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think the target can path to base, will set target location group to '..iNewPathingGroup) end
-                    FixSegmentPathingGroup(sPathing, tTargetLocation, iNewPathingGroup)
+                else
+                    --Can path to base, and correctly think we can; can we path to the target?
+                    if not(bTargetIsBase) and bCanPathToTarget then
+                        if not(bExpectedToPathToTarget) then
+                            --can path to target but didnt think we could
+                            if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to the target') end
+                            FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
+                            RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
+                        end
+                    end
                 end
             else
-                --cant path to base, and we correctly think we cant path to base; is the target ok?
-                if not(bTargetIsBase) then
-                    if bCanPathToTarget then
-                        if bExpectedToPathToTarget then
-                            --Correctly think we can path to target so dont need to change anything
+                --Cant path to base - below updates to pathing group arent as accurate so will only update the target not the area around it
+                if bExpectedToPathToBase then
+                    --Incorrectly think we can path to base, so change our pathing group to something else - add 1 to current size
+                    bHaveChangedPathing = true
+                    local iNewPathingGroup = table.getn(tSegmentBySegmentGroup[sPathing]) + 1
+                    if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to base, will set engineer position group to '..iNewPathingGroup) end
+                    FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iNewPathingGroup)
+                    --Is there also an issue with the target?
+                    if not(bTargetIsBase) and bCanPathToTarget and iTargetPathingGroup == iBasePathingGroup then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think the target can path to base, will set target location group to '..iNewPathingGroup) end
+                        FixSegmentPathingGroup(sPathing, tTargetLocation, iNewPathingGroup)
+                    end
+                else
+                    --cant path to base, and we correctly think we cant path to base; is the target ok?
+                    if not(bTargetIsBase) then
+                        if bCanPathToTarget then
+                            if bExpectedToPathToTarget then
+                                --Correctly think we can path to target so dont need to change anything
+                            else
+                                --Can path to target but werent expecting to be able to; Will assume our units pathing group is correct and will update target pathing group to be the engineers pathing group
+                                bHaveChangedPathing = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to target, will set target location pathing group to '..iUnitPathingGroup) end
+                                FixSegmentPathingGroup(sPathing, tTargetLocation, iUnitPathingGroup)
+                            end
                         else
-                            --Can path to target but werent expecting to be able to; Will assume our units pathing group is correct and will update target pathing group to be the engineers pathing group
-                            bHaveChangedPathing = true
-                            if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to target, will set target location pathing group to '..iUnitPathingGroup) end
-                            FixSegmentPathingGroup(sPathing, tTargetLocation, iUnitPathingGroup)
-                        end
-                    else
-                        if bExpectedToPathToTarget then
-                            --Cant path to target but thought we could; increase the targets pathing group
-                            bHaveChangedPathing = true
-                            if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to target, will set target location pathing group to '..(table.getn(tSegmentBySegmentGroup[sPathing]) + 1)) end
-                            FixSegmentPathingGroup(sPathing, tTargetLocation, table.getn(tSegmentBySegmentGroup[sPathing]) + 1)
-                        else
-                            --Dont have enough informatino to say antyhing more, since we cant path to base, or to the target, and we're correctly expecting to not path to either of them
+                            if bExpectedToPathToTarget then
+                                --Cant path to target but thought we could; increase the targets pathing group
+                                bHaveChangedPathing = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to target, will set target location pathing group to '..(table.getn(tSegmentBySegmentGroup[sPathing]) + 1)) end
+                                FixSegmentPathingGroup(sPathing, tTargetLocation, table.getn(tSegmentBySegmentGroup[sPathing]) + 1)
+                            else
+                                --Dont have enough informatino to say antyhing more, since we cant path to base, or to the target, and we're correctly expecting to not path to either of them
+                            end
                         end
                     end
                 end
             end
-        end
-        if bDebugMessages == true then LOG(sFunctionRef..': Seeing if we have changed pathing of a plateau. bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil')) end
-        if bHaveChangedPathing and (iAmphibiousOrigGroupOfTarget or iAmphibiousOrigGroupOfPathingUnit) and not(bPlateauCheckActive) then
-            --Have changed amphibious pathing, will see if this was a plateau that had mexes on it
-            if bDebugMessages == true then LOG(sFunctionRef..': M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]))..'; is table empty based on orig amphib group of pathing unit='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit]))..'; Pathing group of the pathing unit after update='..GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())..'; group of target post update='..GetSegmentGroupOfLocation(sPathing, tTargetLocation)) end
-            local bChangedAnyMex = false
-            local iGroupAlreadyChecked
-            --Has the group of the pathing unit changed, and do we have plateau info recorded for the orig pathing group?
-            if iAmphibiousOrigGroupOfPathingUnit and not(GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition()) == iAmphibiousOrigGroupOfPathingUnit) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes])) then
-                --Need to revise plateau logic - first check pathing of every mex on the plateau
-                if bDebugMessages == true then LOG(sFunctionRef..': The group of the pathing unit has changed, and there were mexes in the original pathing group, so will check all mexes in the orig pathing group') end
-                iGroupAlreadyChecked = iAmphibiousOrigGroupOfPathingUnit
-                for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes] do
-                    if bDebugMessages == true then LOG(sFunctionRef..': Checking for tMex='..repru(tMex)..'; with mex pathing group='..GetSegmentGroupOfLocation(sPathing, tMex)..'; iAmphibiousOrigGroupOfPathingUnit='..iAmphibiousOrigGroupOfPathingUnit) end
-                    if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfPathingUnit) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repru(tMex)..' or the mex shouldnt be assigned to this plateau') end
-                        bChangedAnyMex = true
+            if bDebugMessages == true then LOG(sFunctionRef..': Seeing if we have changed pathing of a plateau. bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil')) end
+            if bHaveChangedPathing and (iAmphibiousOrigGroupOfTarget or iAmphibiousOrigGroupOfPathingUnit) and not(bPlateauCheckActive) then
+                --Have changed amphibious pathing, will see if this was a plateau that had mexes on it
+                if bDebugMessages == true then LOG(sFunctionRef..': M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]))..'; is table empty based on orig amphib group of pathing unit='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit]))..'; Pathing group of the pathing unit after update='..GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())..'; group of target post update='..GetSegmentGroupOfLocation(sPathing, tTargetLocation)) end
+                local bChangedAnyMex = false
+                local iGroupAlreadyChecked
+                --Has the group of the pathing unit changed, and do we have plateau info recorded for the orig pathing group?
+                if iAmphibiousOrigGroupOfPathingUnit and not(GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition()) == iAmphibiousOrigGroupOfPathingUnit) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes])) then
+                    --Need to revise plateau logic - first check pathing of every mex on the plateau
+                    if bDebugMessages == true then LOG(sFunctionRef..': The group of the pathing unit has changed, and there were mexes in the original pathing group, so will check all mexes in the orig pathing group') end
+                    iGroupAlreadyChecked = iAmphibiousOrigGroupOfPathingUnit
+                    for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes] do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Checking for tMex='..repru(tMex)..'; with mex pathing group='..GetSegmentGroupOfLocation(sPathing, tMex)..'; iAmphibiousOrigGroupOfPathingUnit='..iAmphibiousOrigGroupOfPathingUnit) end
+                        if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfPathingUnit) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repru(tMex)..' or the mex shouldnt be assigned to this plateau') end
+                            bChangedAnyMex = true
+                        end
                     end
                 end
-            end
-            --Has the group of the target changed, and do we have plateau info recorded for the orig pathing group?
-            if not(bChangedAnyMex) and iAmphibiousOrigGroupOfTarget and not(iGroupAlreadyChecked == iAmphibiousOrigGroupOfTarget) and not(GetSegmentGroupOfLocation(sPathing, tTargetLocation) == iAmphibiousOrigGroupOfTarget) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes])) then
-                if bDebugMessages == true then LOG(sFunctionRef..': Amphibious group of the target is different to what we originally thought, and the original grouping had mexes in, so will recheck all mexes in the group') end
-                for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes] do
-                    if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfTarget) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repru(tMex)) end
-                        bChangedAnyMex = true
+                --Has the group of the target changed, and do we have plateau info recorded for the orig pathing group?
+                if not(bChangedAnyMex) and iAmphibiousOrigGroupOfTarget and not(iGroupAlreadyChecked == iAmphibiousOrigGroupOfTarget) and not(GetSegmentGroupOfLocation(sPathing, tTargetLocation) == iAmphibiousOrigGroupOfTarget) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes])) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Amphibious group of the target is different to what we originally thought, and the original grouping had mexes in, so will recheck all mexes in the group') end
+                    for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes] do
+                        if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfTarget) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repru(tMex)) end
+                            bChangedAnyMex = true
+                        end
                     end
                 end
-            end
-            if bChangedAnyMex then
-                if bDebugMessages == true then LOG(sFunctionRef..': Have changed pathing of at least one mex, so will re-record all mexes for all pathing groups') end
-                RecordMexForPathingGroup()
-                RecordAllPlateaus()
-                for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
-                    UpdatePlateausToExpandTo(oBrain, true, true)
+                if bChangedAnyMex then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have changed pathing of at least one mex, so will re-record all mexes for all pathing groups') end
+                    RecordMexForPathingGroup()
+                    RecordAllPlateaus()
+                    for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
+                        UpdatePlateausToExpandTo(oBrain, true, true)
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Finished updating details of mexes and plateaus to expand to') end
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': Finished updating details of mexes and plateaus to expand to') end
             end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': Have already done a manual check of this location')
         end
-    elseif bDebugMessages == true then LOG(sFunctionRef..': Have already done a manual check of this location')
     end
 
     if bDebugMessages == true then LOG(sFunctionRef..': bHaveChangedPathing='..tostring(bHaveChangedPathing)) end
@@ -4564,7 +4590,7 @@ end
 
 
 function IdentifyTeamChokepoints(aiBrain)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'IdentifyTeamChokepoints'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -4872,27 +4898,31 @@ function IdentifyTeamChokepoints(aiBrain)
                         end
                         M27Overseer.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart] = {}
                         local bAbort = false
-                        for iChokepointCount, tChokepointSubtables in M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
-                            M27Overseer.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart][iChokepointCount] = iBestChokepointDistFromStart
+                        if not(iBestChokepointDistFromStart) or M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart]) then
+                            bAbort = true
+                        else
+                            for iChokepointCount, tChokepointSubtables in M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
+                                M27Overseer.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart][iChokepointCount] = iBestChokepointDistFromStart
 
-                            --Set build location (move towards start position slightly):
-                            tChokepointMidpoint = M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd]})
-                            local tBuildLocationWanted = M27Utilities.MoveInDirection(tChokepointMidpoint, M27Utilities.GetAngleFromAToB(tChokepointMidpoint, tTeamStart), iDistTowardsBaseThatWillMove, true)
-                            tBuildLocationWanted = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), tBuildLocationWanted, 'ueb0101', 0, 4, false, 10, false, false)
-                            if not(tBuildLocationWanted) then tBuildLocationWanted = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), tChokepointMidpoint, 'ueb0101', 0, 4, false, 10, false, false)
-                                if not(tBuildLocationWanted) then
-                                    M27Utilities.ErrorHandler('Couldnt find a valid location for the firebase, so will clear all trackers and abort trying to setup a firebase')
-                                    M27Overseer.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart] = nil
-                                    bAbort = true
-                                    break
+                                --Set build location (move towards start position slightly):
+                                tChokepointMidpoint = M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd]})
+                                local tBuildLocationWanted = M27Utilities.MoveInDirection(tChokepointMidpoint, M27Utilities.GetAngleFromAToB(tChokepointMidpoint, tTeamStart), iDistTowardsBaseThatWillMove, true)
+                                tBuildLocationWanted = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), tBuildLocationWanted, 'ueb0101', 0, 4, false, 10, false, false)
+                                if not(tBuildLocationWanted) then tBuildLocationWanted = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), tChokepointMidpoint, 'ueb0101', 0, 4, false, 10, false, false)
+                                    if not(tBuildLocationWanted) then
+                                        M27Utilities.ErrorHandler('Couldnt find a valid location for the firebase, so will clear all trackers and abort trying to setup a firebase')
+                                        M27Overseer.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart] = nil
+                                        bAbort = true
+                                        break
+                                    end
                                 end
-                            end
-                            M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iChokepointCount][reftChokepointBuildLocation] = tBuildLocationWanted
+                                M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iChokepointCount][reftChokepointBuildLocation] = tBuildLocationWanted
 
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef..': iBestChokepointDistFromStart='..iBestChokepointDistFromStart..'; iChokepointCount='..iChokepointCount..'; tChokepointSubtables[subrefChokepointStart]='..repru(tChokepointSubtables[subrefChokepointStart])..'; tChokepointSubtables[subrefChokepointEnd]='..repru(tChokepointSubtables[subrefChokepointEnd])..'; average='..repru(M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd]}))..'; our base start point='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; tChokepointMidpoint='..repru(tChokepointMidpoint)..'; tBuildLocationWanted='..repru(tBuildLocationWanted)..'; iDistToMid='..iDistToMid..'; iDistTowardsBaseThatWillMove='..iDistTowardsBaseThatWillMove..'; tChokepointSubtables[subrefChokepointSize]='..tChokepointSubtables[subrefChokepointSize]..'; Will draw chokepoint midpoint in blue, and build location in white')
-                                M27Utilities.DrawLocation(M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd] }), nil, 1, 200, tChokepointSubtables[subrefChokepointSize])
-                                M27Utilities.DrawLocation(tChokepointMidpoint, nil, 7, 200, tChokepointSubtables[subrefChokepointSize])
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef..': iBestChokepointDistFromStart='..iBestChokepointDistFromStart..'; iChokepointCount='..iChokepointCount..'; tChokepointSubtables[subrefChokepointStart]='..repru(tChokepointSubtables[subrefChokepointStart])..'; tChokepointSubtables[subrefChokepointEnd]='..repru(tChokepointSubtables[subrefChokepointEnd])..'; average='..repru(M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd]}))..'; our base start point='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; tChokepointMidpoint='..repru(tChokepointMidpoint)..'; tBuildLocationWanted='..repru(tBuildLocationWanted)..'; iDistToMid='..iDistToMid..'; iDistTowardsBaseThatWillMove='..iDistTowardsBaseThatWillMove..'; tChokepointSubtables[subrefChokepointSize]='..tChokepointSubtables[subrefChokepointSize]..'; Will draw chokepoint midpoint in blue, and build location in white')
+                                    M27Utilities.DrawLocation(M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd] }), nil, 1, 200, tChokepointSubtables[subrefChokepointSize])
+                                    M27Utilities.DrawLocation(tChokepointMidpoint, nil, 7, 200, tChokepointSubtables[subrefChokepointSize])
+                                end
                             end
                         end
                         --Assign chokepoint to M27AI
