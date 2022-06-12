@@ -2737,6 +2737,7 @@ function ManageEnergyStalls(aiBrain)
     local bPauseNotUnpause = true
     local bChangeRequired = false
     local iUnitsAdjusted = 0
+    local bHaveWeCappedUnpauseAmount = false
     if GetGameTimeSeconds() >= 120 or (GetGameTimeSeconds() >= 40 and aiBrain[refiEnergyGrossBaseIncome] >= 15) then
         --Only consider power stall management after 2m, otherwise risk pausing things such as early microbots when we would probably be ok after a couple of seconds; lower time limit put in as a theroetical possibility due to AIX
         if bDebugMessages == true then
@@ -2850,6 +2851,7 @@ function ManageEnergyStalls(aiBrain)
                 if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.15 then iEnergyPerTickSavingNeeded = iEnergyPerTickSavingNeeded * 1.3 end
             else
                 iEnergyPerTickSavingNeeded = math.min(-1, -aiBrain[refiEnergyNetBaseIncome])
+                iEnergyPerTickSavingNeeded = math.max(iEnergyPerTickSavingNeeded, -300)
                 if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.75 then iEnergyPerTickSavingNeeded = iEnergyPerTickSavingNeeded * 0.75 end
             end
 
@@ -2992,7 +2994,7 @@ function ManageEnergyStalls(aiBrain)
                                     elseif oUnit.GetWorkProgress then
                                         if oUnit:GetWorkProgress() >= 0.85 then
                                             bApplyActionToUnit = false
-                                        --dont pause t1 mex construction
+                                            --dont pause t1 mex construction
                                         elseif oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
                                             bApplyActionToUnit = false
                                         end
@@ -3101,7 +3103,7 @@ function ManageEnergyStalls(aiBrain)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. 'If we have no paused units then will set us as not having an energy stall; is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]))..'; aiBrain[refbStallingMass]='..tostring(aiBrain[refbStallingMass])..'; bPauseNotUnpause='..tostring(bPauseNotUnpause))
             end
-            if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == true or (aiBrain[refbStallingMass] and not(bPauseNotUnpause)) then
+            if M27Utilities.IsTableEmpty(aiBrain[reftPausedUnits]) == true or (aiBrain[refbStallingMass] and not(bPauseNotUnpause) and not(bHaveWeCappedUnpauseAmount)) then
                 aiBrain[refbStallingEnergy] = false
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': We are no longer stalling energy')

@@ -43,6 +43,7 @@ refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adja
 refbLastShotBlocked = 'M27UnitLastShotBlocked' --Used for DF units to indicate if last shot was blocked
 refiTimeOfLastSMDCheck = 'M27UnitTimeOfLastSMDCheck'
 refbLastCoveredBySMD = 'M27UnitCoveredBySMD' --Used to record if unit was last covered by SMD
+refbSniperRifleEnabled = 'M27UnitSniperRifleEnabled' --True if seraphim sniperbot has its long range sniperrifle enabled
 
 --TMD:
 refbTMDChecked = 'M27TMDChecked' --Used against enemy TML to flag if we've already checked for TMD we want when it was first detected
@@ -125,8 +126,8 @@ refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * cate
 refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER -categories.SUBCOMMANDER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
 refCategoryRASSACU = categories.SUBCOMMANDER * categories.RASPRESET + categories.SUBCOMMANDER * categories.SERAPHIM
-refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT + categories.LAND * categories.MOBILE * categories.TANK * categories.TECH1 * categories.SERAPHIM - categories.ANTIAIR -categories.REPAIR --(repair exclusion added as basic way to differentiate between mantis (which has repair category) and LAB; alternative way is to specify the fastest when choosing the blueprint to build
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
+refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT + categories.LAND * categories.MOBILE * categories.TANK * categories.TECH1 * categories.SERAPHIM - refCategoryMAA -categories.REPAIR --(repair exclusion added as basic way to differentiate between mantis (which has repair category) and LAB; alternative way is to specify the fastest when choosing the blueprint to build
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA --NOTE: Need to specify slowest (so dont pick LAB)
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
 refCategoryCombatScout = categories.SERAPHIM * categories.SCOUT * categories.DIRECTFIRE
@@ -136,7 +137,7 @@ refCategoryT3MML = categories.SILO * categories.MOBILE * categories.TECH3 * cate
 refCategoryFatboy = categories.EXPERIMENTAL * categories.UEF * categories.MOBILE * categories.LAND * categories.ARTILLERY
 refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER + refCategoryFatboy - refCategoryEngineer -refCategoryLandScout -refCategoryMAA
 refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS - categories.ANTISHIELD * categories.AEON --Dont include aeon T3 anti-shield here as it sucks unless against shields
-refCategoryGroundAA = categories.LAND * categories.ANTIAIR + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR + categories.NAVALCARRIER * categories.EXPERIMENTAL
+refCategoryGroundAA = refCategoryMAA + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR + categories.NAVALCARRIER * categories.EXPERIMENTAL
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
 refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
 refCategoryIndirectT2Below = categories.MOBILE * categories.INDIRECTFIRE * categories.LAND * categories.TECH1 + categories.MOBILE * categories.INDIRECTFIRE * categories.LAND * categories.TECH2
@@ -594,7 +595,7 @@ end
 
 function SetUnitTargetPriorities(oUnit, tPriorityTable)
     if IsUnitValid(oUnit) then
-        if EntityCategoryContains(categories.ANTIAIR * categories.LAND, oUnit) then M27Utilities.ErrorHandler('Changing weapon priority for MAA') end
+        if EntityCategoryContains(refCategoryMAA, oUnit) then M27Utilities.ErrorHandler('Changing weapon priority for MAA') end
         for i =1, oUnit:GetWeaponCount() do
             local wep = oUnit:GetWeapon(i)
             wep:SetWeaponPriorities(tPriorityTable)
@@ -782,7 +783,8 @@ function PauseOrUnpauseMassUsage(aiBrain, oUnit, bPauseNotUnpause)
         --Normal logic - just pause unit - exception if are dealing with a factory whose workcomplete is 100% and want to pause it
         if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
             if oUnit.UnitId == 'xsb2401' then M27Utilities.ErrorHandler('Pausing Yolona') end
-            oUnit:SetPaused(bPauseNotUnpause)if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)..' for unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)) end
+            oUnit:SetPaused(bPauseNotUnpause)
+            if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)..' for unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)) end
         elseif bDebugMessages == true then
             LOG(sFunctionRef..': Factory with either no workprogress or workprogress that isnt <1')
             if oUnit.GetWorkProgress then LOG(sFunctionRef..': Workprogress='..oUnit:GetWorkProgress()) end
@@ -956,4 +958,72 @@ function GetCategoryConditionFromUnitID(sUnitId)
         iFullCategoryCondition = iFullCategoryCondition * ParseEntityCategory(sCategory)
     end
     return iFullCategoryCondition
+end
+
+function EnableLongRangeSniper(oUnit)
+    --If unit has a sniper weapon, then toggle it
+    if oUnit.SetWeaponEnabledByLabel and not(oUnit[refbSniperRifleEnabled]) then
+        --[[LOG(reprs(oUnit))
+        for iWeapon, oWeapon in oUnit.WeaponInstances do
+
+            LOG('iWeapon='..iWeapon..'; Output='..reprs(oWeapon))
+        end--]]
+        local oBP = oUnit:GetBlueprint()
+        local bHaveSniperWeapon = false
+        if oBP.Weapon then
+            for iWeapon, tWeapon in oBP.Weapon do
+                if tWeapon.Label == 'SniperGun' then
+                    bHaveSniperWeapon = true
+                    break
+                end
+            end
+        end
+        --[[if bHaveSniperWeapon then
+            --BELOW DIDNT DO ANYTHING
+            oUnit:SetWeaponEnabledByLabel('SniperGun', true)
+            oUnit:SetWeaponEnabledByLabel('MainGun', false)
+            LOG('Enabled sniper gun on unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit))
+        end
+
+        for iWeapon, oWeapon in oUnit.WeaponInstances do
+            --BELOW DIDNT DO ANYTHING
+            if oWeapon.Label == 'MainGun' then oWeapon:SetWeaponEnabled(false)
+            elseif oWeapon.Label == 'SniperGun' then oWeapon:SetWeaponEnabled(true)
+            end
+            LOG('Alt approach to enabling gun')
+        end
+
+        for iWeapon, oWeapon in oUnit.WeaponInstances do
+            --BELOW DIDNT DO ANYTHING
+            LOG('iWeapon='..iWeapon..'; Label='..oWeapon.Label)
+            if oWeapon.Label == 'MainGun' then LOG('Setting enabled to false for this weapon') oWeapon:SetEnabled(false) end
+            if oWeapon.Label == 'SniperGun' then LOG('Setting enabled to true for this weapon') oWeapon:SetEnabled(true) end
+        end--]]
+
+        if bHaveSniperWeapon then
+            oUnit:OnScriptBitSet(1)
+            oUnit[refbSniperRifleEnabled] = true
+            --LOG('Enabled sniperrifle on unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit))
+        end
+    end
+end
+
+function DisableLongRangeSniper(oUnit)
+    if oUnit.SetWeaponEnabledByLabel and oUnit[refbSniperRifleEnabled] then
+        local bHaveSniperWeapon = true
+        local oBP = oUnit:GetBlueprint()
+        if oBP.Weapon then
+            for iWeapon, tWeapon in oBP.Weapon do
+                if tWeapon.Label == 'SniperGun' then
+                    bHaveSniperWeapon = true
+                    break
+                end
+            end
+        end
+        if bHaveSniperWeapon then
+            oUnit:OnScriptBitClear(1)
+            oUnit[refbSniperRifleEnabled] = false
+            --LOG('Disabled long range sniper on unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit))
+        end
+    end
 end

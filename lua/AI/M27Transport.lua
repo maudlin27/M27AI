@@ -299,7 +299,7 @@ function TransportManager(aiBrain)
         for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTransports] do
             --Does the transport have any units loaded? If so then unload them
             bUnloadFirst = false
-            if oUnit.GetCargo and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false then
+            if oUnit.GetCargo and M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit:GetCargo()) == false then
                 bUnloadFirst = true
             end
             --[[if oUnit[refiEngisLoaded] > 0 then
