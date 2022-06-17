@@ -137,6 +137,7 @@ refCategoryT3MML = categories.SILO * categories.MOBILE * categories.TECH3 * cate
 refCategoryFatboy = categories.EXPERIMENTAL * categories.UEF * categories.MOBILE * categories.LAND * categories.ARTILLERY
 refCategoryLandCombat = categories.MOBILE * categories.LAND * categories.DIRECTFIRE + categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 + categories.FIELDENGINEER + refCategoryFatboy - refCategoryEngineer -refCategoryLandScout -refCategoryMAA
 refCategoryAmphibiousCombat = refCategoryLandCombat * categories.HOVER + refCategoryLandCombat * categories.AMPHIBIOUS - categories.ANTISHIELD * categories.AEON --Dont include aeon T3 anti-shield here as it sucks unless against shields
+refCategorySurfaceAmphibiousCombat = refCategoryLandCombat * categories.HOVER + categories.ANTINAVY * categories.LAND * categories.MOBILE
 refCategoryGroundAA = refCategoryMAA + categories.NAVAL * categories.ANTIAIR + categories.STRUCTURE * categories.ANTIAIR + categories.NAVALCARRIER * categories.EXPERIMENTAL
 refCategoryStructureAA = categories.STRUCTURE * categories.ANTIAIR
 refCategoryIndirectT2Plus = categories.MOBILE * categories.LAND * categories.INDIRECTFIRE - categories.MOBILE * categories.LAND * categories.INDIRECTFIRE * categories.TECH1 - categories.DIRECTFIRE
@@ -146,8 +147,10 @@ refCategoryIndirectT3 = categories.MOBILE * categories.LAND * categories.INDIREC
 refCategoryObsidian = categories.AEON * categories.TECH2 * categories.SHIELD * categories.DIRECTFIRE * categories.MOBILE * categories.LAND * categories.TANK --
 refCategoryMobileLandShield = categories.LAND * categories.MOBILE * categories.SHIELD - refCategoryObsidian --Miscategorised obsidian tank
 refCategoryPersonalShield = categories.PERSONALSHIELD + refCategoryObsidian
+refCategoryMobileLandStealth = categories.LAND * categories.MOBILE * categories.STEALTHFIELD
 refCategorySniperBot = categories.MOBILE * categories.SNIPER * categories.LAND
 refCategorySkirmisher = refCategorySniperBot * categories.TECH3 + refCategoryDFTank * categories.UEF * categories.TECH2 * categories.BOT + refCategoryDFTank * categories.CYBRAN * categories.TECH2 * categories.BOT - categories.BOMB --Mongoose, Hoplite, sniperbot
+
 
 --Air units
 refCategoryAirScout = categories.AIR * categories.SCOUT
@@ -171,7 +174,8 @@ refCategorySalem = categories.NAVAL * categories.AMPHIBIOUS * categories.DIRECTF
 refCategoryCruiserCarrier = refCategoryCruiser + categories.NAVAL * categories.NAVALCARRIER
 refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted
-refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL + categories.OVERLAYANTINAVY * categories.LAND --If removing overlayantinavy then think up better solution for fatboy/experimentals so they dont run when in water
+refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL + categories.OVERLAYANTINAVY * categories.LAND + categories.ANTINAVY * categories.STRUCTURE --If removing overlayantinavy then think up better solution for fatboy/experimentals so they dont run when in water
+refCategoryMissileNavy = categories.NAVAL * categories.SILO - categories.BATTLESHIP --i.e. UEF+Sera cruisers, and nukesubs
 
 
 --Multi-category:
@@ -835,7 +839,8 @@ function PauseOrUnpauseEnergyUsage(aiBrain, oUnit, bPauseNotUnpause)
         --Normal logic - just pause unit - exception if are dealing with a factory whose workcomplete is 100%
         if not(EntityCategoryContains(refCategoryAllFactories, oUnit.UnitId)) or not(bPauseNotUnpause) or (oUnit.GetWorkProgress and oUnit:GetWorkProgress() > 0 and oUnit:GetWorkProgress() < 1) then
             if oUnit.UnitId == 'xsb2401' then M27Utilities.ErrorHandler('Pausing Yolona') end
-            oUnit:SetPaused(bPauseNotUnpause)if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
+            oUnit:SetPaused(bPauseNotUnpause)
+            if bDebugMessages == true then LOG(sFunctionRef..': Just set paused to '..tostring(bPauseNotUnpause)) end
         elseif bDebugMessages == true then
             LOG(sFunctionRef..': Factory with either no workprogress or workprogress that isnt <1')
             if oUnit.GetWorkProgress then LOG(sFunctionRef..': Workprogress='..oUnit:GetWorkProgress()) end

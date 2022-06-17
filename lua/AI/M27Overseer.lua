@@ -86,6 +86,7 @@ refiPercentageOutstandingThreat = 'M27PercentageOutstandingThreat' --% of moddis
 refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestFriendly'
 refiPercentageClosestFriendlyLandFromOurBaseToEnemy = 'M27OverseerClosestLandFromOurBaseToEnemy' --as above, but not limited to combat units, e.g. includes mexes
 refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
+refiHighestEnemyGroundUnitHealth = 'M27OverseerHighestEnemyGroundUnitHealth' --Against aiBrain, used to track how much we want to deal in damage via overcharge
 
 refbGroundCombatEnemyNearBuilding = 'M27OverseerGroundCombatNearMexCur' --against aibrain, true/false
 reftEnemyGroupsThreateningBuildings = 'M27OverseerGroundCombatLocations' --against aiBrain, [x] is count, returns location of threat group average position
@@ -107,6 +108,9 @@ refbCloakedEnemyACU = 'M27OverseerCloakedACU'
 --Total threat values e.g. used for firebase chokepoints
 refiTotalEnemyLongRangeThreat = 'M27OverseerLongRangeThreat' --against aiBrain, returns the mass value, even if under construction
 refiTotalEnemyShortRangeThreat = 'M27OverseerShortRangeThreat' --as above
+refbT2NavyNearOurBase = 'M27OverseerT2NavyNearBase' --Against aiBrain, true if enemy has T2 navy near our base
+refiNearestT2PlusNavalThreat = 'M27OverseerNearestT2PlusNavalThreat' --against aibrain, returns absolute (not mod) distance of nearest enemy naval threat
+
 
 --Platoon references
 --local bArmyPoolInAvailablePlatoons = false
@@ -1547,6 +1551,18 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
     if M27Utilities.IsTableEmpty(tAllScouts) == false then
         iScouts = table.getn(tAllScouts)
     end
+
+    --Set scout shortfalls to 0 for everything (but still calculate how many we want later) to reduce risk we no logner need scout but keep producing
+    if iScouts >= 6 then
+        aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 0
+        aiBrain[refiScoutShortfallACU] = 0
+        aiBrain[refiScoutShortfallPriority] = 0
+        aiBrain[refiScoutShortfallIntelLine] = 0
+        aiBrain[refiScoutShortfallLargePlatoons] = 0
+        aiBrain[refiScoutShortfallAllPlatoons] = 0
+        aiBrain[refiScoutShortfallMexes] = 0
+    end
+
     if iScouts >= 25 then
         local iNonScouts = aiBrain:GetCurrentUnits(categories.MOBILE * categories.LAND - categories.SCOUT)
         if iScouts > 80 then
@@ -2272,7 +2288,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                 tPlatoonUnits = oPlatoon:GetPlatoonUnits()
                                 if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
                                     iPlatoonUnits = table.getn(tPlatoonUnits)
-                                    if iPlatoonUnits >= iPlatoonSizeMin and aiBrain:PlatoonExists(oPlatoon) then
+                                    if (oPlatoon:GetPlan() == 'M27MobileStealth' or oPlatoon:GetPlan() == 'M27Skirmisher' or iPlatoonUnits >= iPlatoonSizeMin) and aiBrain:PlatoonExists(oPlatoon) then
                                         local bPlatoonHasScouts = false
                                         tPlatoonCurrentScouts = EntityCategoryFilterDown(refCategoryLandScout, tPlatoonUnits)
                                         if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then
@@ -3044,8 +3060,10 @@ function ThreatAssessAndRespond(aiBrain)
         iNavySearchRange = math.max(iNavySearchRange, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27MapInfo.reftChokepointBuildLocation]) + 150)
     end
 
-    --Reset check of locations of threat groups threatening mexes
+    --Reset check of locations of threat groups threatening mexes and naval threat
     aiBrain[reftEnemyGroupsThreateningBuildings] = {}
+    aiBrain[refbT2NavyNearOurBase] = false
+    aiBrain[refiNearestT2PlusNavalThreat] = 10000
 
     local oArmyPoolPlatoon = aiBrain:GetPlatoonUniquelyNamed('ArmyPool')
 
@@ -4040,6 +4058,22 @@ function ThreatAssessAndRespond(aiBrain)
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': About to consider if we have any available torp bombers and if so assign them to enemy naval threat. Is table of available torp bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers])))
                         end
+
+                        --Do we have a T2+ naval threat near our base that is close to being in firing range?
+
+                        if tEnemyThreatGroup[refiDistanceFromOurBase] < aiBrain[refiNearestT2PlusNavalThreat] or (not(aiBrain[refiNearestT2PlusNavalThreat]) and tEnemyThreatGroup[refiDistanceFromOurBase] <= 240) then
+                            for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
+                                if EntityCategoryContains(categories.TECH2 + categories.TECH3 + categories.EXPERIMENTAL, oUnit.UnitId) then
+                                    aiBrain[refiNearestT2PlusNavalThreat] = math.min(aiBrain[refiNearestT2PlusNavalThreat], tEnemyThreatGroup[refiDistanceFromOurBase])
+                                    if not(aiBrain[refbT2NavyNearOurBase]) and 40 + math.max(M27UnitInfo.GetUnitIndirectRange(oUnit), M27Logic.GetUnitMaxGroundRange({ oUnit })) >= tEnemyThreatGroup[refiDistanceFromOurBase] then
+                                        aiBrain[refbT2NavyNearOurBase] = true
+                                        break
+                                    end
+                                end
+                            end
+                        end
+
+
                         --tAvailablePlatoons, refiActualDistanceFromEnemy
 
 
@@ -4073,7 +4107,7 @@ function ThreatAssessAndRespond(aiBrain)
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': After going through any available torp bombers. threatgroup='..iEnemyGroup..'; iAvailableThreat=' .. iAvailableThreat .. '; iThreatNeeded=' .. iThreatNeeded .. '; iAvailableTorpBombers=' .. iAvailableTorpBombers .. '; bACUNeedsTorpSupport=' .. tostring(bACUNeedsTorpSupport))
                         end
-                        if not (bACUNeedsTorpSupport) and (iAvailableThreat >= iThreatNeeded or iAvailableTorpBombers >= 30) or (bACUNeedsTorpSupport and iAvailableTorpBombers > 1) then
+                        if not (bACUNeedsTorpSupport) and (iAvailableThreat >= iThreatNeeded or iAvailableTorpBombers >= 30 or (aiBrain[refbT2NavyNearOurBase] and iAvailableTorpBombers >= 8)) or (bACUNeedsTorpSupport and iAvailableTorpBombers > 1) then
                             --and (not(bACUNeedsTorpSupport) or iAvailableTorpBombers >= 3) then
                             for iEntry, tTorpSubtable in M27Utilities.SortTableBySubtable(tTorpBombersByDistance, refiActualDistanceFromEnemy, true) do
                                 --Cycle through each enemy unit in the threat group
@@ -4089,34 +4123,52 @@ function ThreatAssessAndRespond(aiBrain)
                                     iMaxAngleDifToSendTorps = 25
                                 end
 
-                                for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Considering oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' within the curernt threat group. tTorpSubtable[refiActualDistanceFromEnemy]=' .. (tTorpSubtable[refiActualDistanceFromEnemy] or 'nil') .. '; iMaxRangeToSendTorps=' .. (iMaxRangeToSendTorps or 'nil'))
+                                --First try AirAA units in the threat group
+                                local tEnemyUnits
+                                for iPriority = 1, 2 do
+                                    if iPriority == 1 then tEnemyUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryGroundAA + categories.SHIELD, tEnemyThreatGroup[refoEnemyGroupUnits])
+                                    else tEnemyUnits = tEnemyThreatGroup[refoEnemyGroupUnits]
                                     end
-                                    if not (bACUNeedsTorpSupport) or (tTorpSubtable[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (tTorpSubtable[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
-                                        iAssignedThreatWanted = iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat]
-                                        if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then
-                                            iAssignedThreatWanted = iAssignedThreatWanted * 1.34
-                                        end
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Enemy Unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; iAssignedThreat=' .. (oUnit[iArmyIndex][refiAssignedThreat] or 0) .. '; oUnit[iArmyIndex][refiUnitNavalAAThreat]=' .. (oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0) .. '; iNavalThreatMaxFactor=' .. iNavalThreatMaxFactor .. '; iAssignedThreatWanted=' .. iAssignedThreatWanted)
-                                        end
 
-                                        if oUnit[iArmyIndex][refiAssignedThreat] <= iAssignedThreatWanted then
-                                            oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
-                                            IssueClearCommands({ tTorpSubtable[refoTorpUnit] })
-                                            IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
-                                            M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1)
-                                            for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
-                                                IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
-                                            end
-                                            IssueAggressiveMove({ tTorpSubtable[refoTorpUnit] }, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                            tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
+                                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                                        for iUnit, oUnit in tEnemyUnits do
                                             if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Clearing torp bomber and then Telling torpedo bomber with ID ref=' .. tTorpSubtable[refoTorpUnit].UnitId .. M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit]) .. ' to attack ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; GameTime=' .. GetGameTimeSeconds())
+                                                LOG(sFunctionRef .. ': Considering oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' within the curernt threat group. tTorpSubtable[refiActualDistanceFromEnemy]=' .. (tTorpSubtable[refiActualDistanceFromEnemy] or 'nil') .. '; iMaxRangeToSendTorps=' .. (iMaxRangeToSendTorps or 'nil'))
                                             end
-                                            iAvailableTorpBombers = iAvailableTorpBombers - 1
-                                            break
+                                            --If need to protect ACU then ignore other naval threats
+                                            if not (bACUNeedsTorpSupport) or (tTorpSubtable[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (tTorpSubtable[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
+                                                if iPriority == 2 then
+                                                    iAssignedThreatWanted = iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat]
+                                                    if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then
+                                                        iAssignedThreatWanted = iAssignedThreatWanted * 1.34
+                                                    end
+                                                else
+                                                    --T2 torp bomber should have threat of 270 and a strike damage of 750; however some may die on the way, so try to assign enough to kill the target and a bit more; during testing, if enemy cruiser isnt doing kiting retreat then 5 torp bombers can kill 1 cruiser of most factions (not seraphim)
+                                                    iAssignedThreatWanted = 270 / 750 * oUnit:GetMaxHealth() * 1.5
+                                                    if oUnit:GetMaxHealth() > 2500 then iAssignedThreatWanted = iAssignedThreatWanted + 270 end
+                                                end
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': Enemy Unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; iAssignedThreat=' .. (oUnit[iArmyIndex][refiAssignedThreat] or 0) .. '; oUnit[iArmyIndex][refiUnitNavalAAThreat]=' .. (oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0) .. '; iNavalThreatMaxFactor=' .. iNavalThreatMaxFactor .. '; iAssignedThreatWanted=' .. iAssignedThreatWanted)
+                                                end
+
+                                                if oUnit[iArmyIndex][refiAssignedThreat] <= iAssignedThreatWanted then
+                                                    oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
+                                                    IssueClearCommands({ tTorpSubtable[refoTorpUnit] })
+                                                    IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
+                                                    M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, true)
+                                                    for iUnit, oUnit in tEnemyUnits do
+                                                        IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
+                                                        M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, false)
+                                                    end
+                                                    IssueAggressiveMove({ tTorpSubtable[refoTorpUnit] }, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                                    tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef .. ': Clearing torp bomber and then Telling torpedo bomber with ID ref=' .. tTorpSubtable[refoTorpUnit].UnitId .. M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit]) .. ' to attack ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; GameTime=' .. GetGameTimeSeconds())
+                                                    end
+                                                    iAvailableTorpBombers = iAvailableTorpBombers - 1
+                                                    break
+                                                end
+                                            end
                                         end
                                     end
                                 end
@@ -6509,85 +6561,88 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                         if aiBrain[refiDefaultStrategy] == refStrategyTurtle then
                             aiBrain[refiAIBrainCurrentStrategy] = refStrategyTurtle
                         else
-                            local bChokepointsAreProtected = M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)
+                            --Dont eco if nearby naval threat
+                            if not(aiBrain[refbT2NavyNearOurBase]) then
+                                local bChokepointsAreProtected = M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)
 
 
 
-                            --How far away is the enemy?
-                            local bBigEnemyThreat = false
-                            if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then
-                                bBigEnemyThreat = true
-                            end
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs]))
-                            end
+                                --How far away is the enemy?
+                                local bBigEnemyThreat = false
+                                if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then
+                                    bBigEnemyThreat = true
+                                end
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs]))
+                                end
 
 
 
 
 
-                            --Dont eco if enemy ACU near ours as likely will need backup
-                            if aiBrain[refbEnemyACUNearOurs] == false then
-                                if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
-                                    if aiBrain[refiPercentageOutstandingThreat] > 0.55 and (bBigEnemyThreat == false or aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.5) and (iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 0.8 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not (iT3Mexes >= math.min(iMexesNearStart, 7) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': No big enemy threats and good defence and mex coverage so will eco')
-                                        end
-                                        bWantToEco = true
-                                    else
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Dont want to eco based on initial tests: bBigEnemyThreat=' .. tostring(bBigEnemyThreat) .. '; %threat=' .. aiBrain[refiPercentageOutstandingThreat] .. '; UnclaimedMex%=' .. iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup .. '; EnemyDist=' .. aiBrain[refiDistanceToNearestEnemyBase])
-                                        end
-                                        --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
-                                        if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
+                                --Dont eco if enemy ACU near ours as likely will need backup
+                                if aiBrain[refbEnemyACUNearOurs] == false then
+                                    if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
+                                        if aiBrain[refiPercentageOutstandingThreat] > 0.55 and (bBigEnemyThreat == false or aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.5) and (iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 0.8 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not (iT3Mexes >= math.min(iMexesNearStart, 7) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
                                             if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Ok defence coverage and income not changed in a while so will eco')
+                                                LOG(sFunctionRef .. ': No big enemy threats and good defence and mex coverage so will eco')
                                             end
                                             bWantToEco = true
                                         else
                                             if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Checking if we are making use of tanks - if not then will switch to eco if have a decent number of tanks. aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]=' .. tostring(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]))
+                                                LOG(sFunctionRef .. ': Dont want to eco based on initial tests: bBigEnemyThreat=' .. tostring(bBigEnemyThreat) .. '; %threat=' .. aiBrain[refiPercentageOutstandingThreat] .. '; UnclaimedMex%=' .. iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup .. '; EnemyDist=' .. aiBrain[refiDistanceToNearestEnemyBase])
                                             end
-                                            if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
-                                                --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
-                                                local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
+                                            --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
+                                            if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
                                                 if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': iMinTanksWanted=' .. iMinTanksWanted .. '; iLandCombatUnits=' .. iLandCombatUnits)
+                                                    LOG(sFunctionRef .. ': Ok defence coverage and income not changed in a while so will eco')
                                                 end
-                                                if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
+                                                bWantToEco = true
+                                            else
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': Checking if we are making use of tanks - if not then will switch to eco if have a decent number of tanks. aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]=' .. tostring(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]))
+                                                end
+                                                if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
+                                                    --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
+                                                    local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
                                                     if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco')
+                                                        LOG(sFunctionRef .. ': iMinTanksWanted=' .. iMinTanksWanted .. '; iLandCombatUnits=' .. iLandCombatUnits)
                                                     end
-                                                    bWantToEco = true
+                                                    if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
+                                                        if bDebugMessages == true then
+                                                            LOG(sFunctionRef .. ': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco')
+                                                        end
+                                                        bWantToEco = true
+                                                    end
                                                 end
                                             end
                                         end
                                     end
                                 end
-                            end
-                            --Eco even if enemy has big threats if we cant path to enemy base with amphibious and we have all mexes in our pathing group
-                            if not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and iAllMexesInPathingGroupWeHaventClaimed == 0 and aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.3 then
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Want to eco as we cant reach enemy base except by air and we have all mexes in our pathing group')
+                                --Eco even if enemy has big threats if we cant path to enemy base with amphibious and we have all mexes in our pathing group
+                                if not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and iAllMexesInPathingGroupWeHaventClaimed == 0 and aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.3 then
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': Want to eco as we cant reach enemy base except by air and we have all mexes in our pathing group')
+                                    end
+                                    bWantToEco = true
                                 end
-                                bWantToEco = true
-                            end
 
-                            if bChokepointsAreProtected then
-                                bWantToEco = true
-                            end
-                            if bWantToEco == true then
-                                if not (bChokepointsAreProtected) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
-                                    bWantToEco = false
-                                    --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
-                                elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then
-                                    bWantToEco = false
-                                    --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
-                                elseif M27UnitInfo.GetUnitHealthPercent(oACU) < 0.45 and (M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 125 or oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0) then
-                                    bWantToEco = false
-                                    --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
-                                elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
-                                    bWantToEco = false
+                                if bChokepointsAreProtected then
+                                    bWantToEco = true
+                                end
+                                if bWantToEco == true then
+                                    if not (bChokepointsAreProtected) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
+                                        bWantToEco = false
+                                        --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
+                                    elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then
+                                        bWantToEco = false
+                                        --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
+                                    elseif M27UnitInfo.GetUnitHealthPercent(oACU) < 0.45 and (M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 125 or oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0) then
+                                        bWantToEco = false
+                                        --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
+                                    elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
+                                        bWantToEco = false
+                                    end
                                 end
                             end
 
@@ -6906,6 +6961,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
                 end
             end
+        end
+
+        --Increase health to run on if ACU has recently taken torpedo damage
+        if GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100) <= 60 and not(oACU:HasEnhancement('NaniteTorpedoTube')) then
+            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
         end
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Finished setting ACU health to run on. ACU max health=' .. oACU:GetMaxHealth() .. '; ACU health to run on=' .. aiBrain[refiACUHealthToRunOn])
@@ -7232,6 +7292,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refiInitialRaiderPlatoonsWanted] = 2
     aiBrain[refbIntelPathsGenerated] = false
     aiBrain[refbConfirmedInitialRaidersHaveScouts] = false
+    aiBrain[refiHighestEnemyGroundUnitHealth] = 300
 
     --Intel BO related:
     aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 1
@@ -7314,7 +7375,9 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refiModDistFromStartNearestOutstandingThreat] = 1000
     aiBrain[refiModDistFromStartNearestThreat] = 1000
     aiBrain[reftLocationFromStartNearestThreat] = { 0, 0, 0 }
+    aiBrain[refiNearestT2PlusNavalThreat] = 10000
     aiBrain[refiEnemyHighestTechLevel] = 1
+
 
     aiBrain[refiTotalEnemyLongRangeThreat] = 0
     aiBrain[refiTotalEnemyShortRangeThreat] = 1000

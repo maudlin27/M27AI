@@ -20,6 +20,7 @@ refbAmalgamateIntoEscort = 'M27PlatoonAmalgamateIntoEscort' --true if any amalga
 refbDontDisplayName = 'M27PlatoonDontDisplayName' --Used for idle platoons so dont overwrite name when arent really using the platoon and are assigning names via separate method (e.g. for engis and air)
 refbUsedByThreatDefender = 'M27PlatoonUsedByThreatDefender' --Overseer's threat assess and respond will consider this platoon if this is set to true
 refbWantsShieldEscort = 'M27PlatoonWantsShieldEscort' --true if should be considered when assigning mobile shields
+refbWantsStealthEscort = 'M27PlatoonWantsStealthEscort' --true if should consider when assigning mobile stealth; will be nil (or false) otherwise
 refiAirAttackRange = 'M27PlatoonAirAttackRange' --If this is not nil, then will check if the platoon has any MAA in it, and if so will search for enemy air units within this value + the MAA range; if any are detected, the platoon will move towards these air units (assuming there aren't ground units nearby that they're running from)
 
 --AI global idle platoon references (i.e. only have 1 of these per aibrain):
@@ -57,6 +58,7 @@ PlatoonTemplate = {
             [refiPlatoonAmalgamationMaxSize] = 10,
             [refbUsedByThreatDefender] = true,
             [refbWantsShieldEscort] = true,
+            [refbWantsStealthEscort] = true,
         },
     ['M27MexRaiderAI'] =
     {
@@ -76,6 +78,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
     },
     ['M27MexLargerRaiderAI'] =
     {
@@ -95,6 +98,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
     },
     ['M27CombatPatrolAI'] =
     {
@@ -116,6 +120,7 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = true,
         [refiPlatoonAmalgamationMaxSize] = 20,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
     },
     ['M27LargeAttackForce'] =
     {
@@ -136,6 +141,7 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = 28,
         [refiPlatoonAmalgamationMaxSize] = 40,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
     },
     ['M27GroundExperimental'] =
     {
@@ -154,6 +160,7 @@ PlatoonTemplate = {
         [refbAttackMove] = false,
         [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = false,
+        [refbWantsStealthEscort] = true,
     },
     ['M27DefenderAI'] =
     {
@@ -174,6 +181,28 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = true,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
+    },
+    ['M27AmphibiousDefender'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = false,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1, --This wont do anything as have coded amphibious defence ahead of main platoon forming logic
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = true,
+        [refiFormMoveCloseDistanceThreshold] = 30,
+        [refbDisbandIfReachDestination] = true,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = true,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbUsedByThreatDefender] = false,
+        [refbWantsShieldEscort] = false,
+        [refbWantsStealthEscort] = false,
     },
     ['M27IndirectDefender'] =
     {
@@ -194,6 +223,7 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = true,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
     },
     ['M27IndirectSpareAttacker'] =
     {
@@ -214,6 +244,7 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = true,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
     },
     ['M27Skirmisher'] =
     {
@@ -229,12 +260,13 @@ PlatoonTemplate = {
         [refbSwitchToAttackIfReachDestination] = false,
         [refbRunFromAllEnemies] = false,
         [refbAlwaysAttack] = false,
-        [refbAttackMove] = false,
+        [refbAttackMove] = true,
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = 20, --By default wont amalgamate, but have code to start amalgamation when number gets really high
         [refiPlatoonAmalgamationMaxSize] = 6,
         [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
     },
     ['M27RAS'] =
     {
@@ -275,6 +307,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
     },
     ['M27MAAAssister'] =
     {
@@ -295,6 +328,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
         [refiAirAttackRange] = 25,
     },
     --MAAPatrol - different platoon to MAA assister as the overseer will treat units in MAApatrol as being available for assignment (i.e. its effectively an active 'idle' platoon)
@@ -317,6 +351,7 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
         [refiAirAttackRange] = 40,
     },
     ['M27ScoutAssister'] =
@@ -386,6 +421,7 @@ PlatoonTemplate = {
         [refbAmalgamateIntoEscort] = true, --E.g. overseer will in some cases set amalgamation to happen in which case want it to be into escort
         [refbUsedByThreatDefender] = false, --Some of functionality in platoon utilities such as building factory is turned off if this is true
         [refbWantsShieldEscort] = true,
+        [refbWantsStealthEscort] = true,
     },
     ['M27AssistHydroEngi'] = --Dont think this is used any more
     {
@@ -406,6 +442,25 @@ PlatoonTemplate = {
     },
 
     ['M27MobileShield'] =
+    {
+        [refbIdlePlatoon] = false,
+        [refbRequiresUnitToFollow] = true,
+        [refbIgnoreStuckAction] = false,
+        [refiMinimumPlatoonSize] = 1,
+        [refsDefaultFormation] = 'GrowthFormation',
+        [refbFormMoveIfCloseTogetherAndNoEnemies] = false, --Dont want on assister platoons as they refresh too often and cause wierd results
+        [refiFormMoveCloseDistanceThreshold] = 30,
+        [refbDisbandIfReachDestination] = false,
+        [refbDisbandAfterRunningAway] = false,
+        [refbSwitchToAttackIfReachDestination] = false,
+        [refbRunFromAllEnemies] = false,
+        [refbAlwaysAttack] = false,
+        [refbAttackMove] = false,
+        [reftPlatoonsToAmalgamate] = nil,
+        [refiPlatoonAmalgamationRange] = nil,
+        [refbUsedByThreatDefender] = false,
+    },
+    ['M27MobileStealth'] =
     {
         [refbIdlePlatoon] = false,
         [refbRequiresUnitToFollow] = true,

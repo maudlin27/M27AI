@@ -687,6 +687,9 @@ Platoon = Class(M27PlatoonClass) {
     M27DefenderAI = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
+    M27AmphibiousDefender = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
     M27IndirectDefender = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
@@ -730,6 +733,9 @@ Platoon = Class(M27PlatoonClass) {
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27MobileShield = function(self)
+        M27PlatoonUtilities.PlatoonCycler(self)
+    end,
+    M27MobileStealth = function(self)
         M27PlatoonUtilities.PlatoonCycler(self)
     end,
     M27RetreatingShieldUnits = function(self)

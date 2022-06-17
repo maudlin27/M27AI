@@ -1584,7 +1584,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
         local iTotalThreat = 0
         local bCalcActualThreat = false
         local iTotalUnits = table.getn(tUnits)
-        local iHealthPercentage
+        local iHealthPercentage, iMaxHealth
         local bOurUnits = false
         local iHealthFactor --if unit has 40% health, then threat reduced by (1-40%)*iHealthFactor
         local iCurShield, iMaxShield
@@ -1659,38 +1659,46 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                 else
                     iMassMod = 0
                     if not(bIndirectFireThreatOnly) then
-                        if EntityCategoryContains(categories.DIRECTFIRE, oUnit) then
-                            if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit) then
+                        if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then
+                            if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit.UnitId) then
                                 iMassMod = 0.6 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
+                            elseif EntityCategoryContains(M27UnitInfo.refCategoryCruiserCarrier, oUnit.UnitId) then
+                                if EntityCategoryContains(categories.CYBRAN * categories.TECH2, oUnit.UnitId) then iMassMod = 0.45
+                                else
+                                    iMassMod = 0.2
+                                end
                             else iMassMod = 1
                             end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) then
                             iMassMod = 0.55
-                        elseif EntityCategoryContains(categories.SUBCOMMANDER, oUnit) then iMassMod = 1 --SACUs dont have directfire category for some reason (they have subcommander and overlaydirectfire)
-                        elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.STRUCTURE * categories.TECH2, oUnit) then iMassMod = 0.1 --Gets doubled as its a structure
-                        elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH1, oUnit) then iMassMod = 0.9
-                        elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH3, oUnit) then iMassMod = 0.5
-                        elseif EntityCategoryContains(categories.SHIELD, oUnit) then iMassMod = 0.75 --will be doubled for structures
-                        elseif EntityCategoryContains(categories.COMMAND, oUnit) then iMassMod = 1 --Put in just in case - code was working before this, but dont want it to be affected yb more recenlty added engineer category
-                        elseif EntityCategoryContains(categories.ENGINEER,oUnit) then iMassMod = 0.1 --Engis can reclaim and capture so can't just e.g. beat with a scout
+                        elseif EntityCategoryContains(categories.SUBCOMMANDER, oUnit.UnitId) then iMassMod = 1 --SACUs dont have directfire category for some reason (they have subcommander and overlaydirectfire)
+                        elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.STRUCTURE * categories.TECH2, oUnit.UnitId) then iMassMod = 0.1 --Gets doubled as its a structure
+                        elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH1, oUnit.UnitId) then iMassMod = 0.9
+                        elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH3, oUnit.UnitId) then iMassMod = 0.5
+                        elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 0.75 --will be doubled for structures
+                        elseif EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then iMassMod = 1 --Put in just in case - code was working before this, but dont want it to be affected yb more recenlty added engineer category
+                        elseif EntityCategoryContains(categories.ENGINEER,oUnit.UnitId) then iMassMod = 0.1 --Engis can reclaim and capture so can't just e.g. beat with a scout
                         end
                     else
-                        if EntityCategoryContains(categories.INDIRECTFIRE, oUnit) then
+                        if EntityCategoryContains(categories.INDIRECTFIRE, oUnit.UnitId) then
                             iMassMod = 1
-                            if EntityCategoryContains(categories.DIRECTFIRE, oUnit) then iMassMod = 0.5 end
-                        elseif EntityCategoryContains(categories.ANTIMISSILE, oUnit) then iMassMod = 2 --Doubled for structures ontop of this, i.e. want 4xmass of TMD in indirect fire so can overwhelm it
-                        elseif EntityCategoryContains(categories.SHIELD, oUnit) then iMassMod = 1
+                            if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then iMassMod = 0.5 end
+                        elseif EntityCategoryContains(categories.ANTIMISSILE, oUnit.UnitId) then iMassMod = 2 --Doubled for structures ontop of this, i.e. want 4xmass of TMD in indirect fire so can overwhelm it
+                        elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 1
                         end
                     end
-                    if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit) then iMassMod = iMassMod * 2 end
+                    if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit.UnitId) then iMassMod = iMassMod * 2 end
                     iMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
 
 
                     iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
-                    iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
+                    iMaxHealth = oUnit:GetMaxHealth() + iMaxShield
+                    iHealthPercentage = (oUnit:GetHealth() + iCurShield) / iMaxHealth
+                    if EntityCategoryContains(M27UnitInfo.refCategoryLandCombat - categories.COMMAND - categories.SUBCOMMANDER, oUnit.UnitId) and iMaxHealth > aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] then aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] = iMaxHealth end
+                    --[[iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
                     if iMaxShield > 0 and iHealthPercentage > 0 then
                         iHealthPercentage = (oUnit:GetHealth() + iCurShield) / (oUnit:GetHealth() / M27UnitInfo.GetUnitHealthPercent(oUnit) + iMaxShield)
-                    end
+                    end--]]
                     --Reduce threat by health, with the amount depending on if its an ACU and if its an enemy
                     if iMassMod > 0 then
                         if M27Utilities.IsACU(oUnit) == true then
@@ -1751,12 +1759,16 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
         if bIncludeAirToGround == true then
             iAirBlipThreatOverride = tiAirToGroundBlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
         elseif bIncludeAirToAir == true then
-            iAirBlipThreatOverride = tiAirAABlipThreats[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
+
+            if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 then iAirBlipThreatOverride = tiAirAABlipThreats[3]
+            elseif aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] > 0 then iAirBlipThreatOverride = tiAirAABlipThreats[2]
+            else iAirBlipThreatOverride = tiAirAABlipThreats[1]
+            end
         elseif bIncludeNonCombatAir == true then
             iAirBlipThreatOverride = 40 * aiBrain[M27Overseer.refiEnemyHighestTechLevel]
         else iAirBlipThreatOverride = 0
         end
-    end
+        end
     if iMobileLandBlipThreatOverride == nil then
         if bIncludeGroundToAir == true then
             iMobileLandBlipThreatOverride = tiMobileGroundAABlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
@@ -2026,7 +2038,9 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
         if bMovingUnassignedEngiIsIdle == nil then bMovingUnassignedEngiIsIdle = false end
         if oUnit:IsUnitState('Building') then
             if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Building') end
+            --If target is flagged for reclaim then treat as idle
             bIsIdle = false
+            if oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit()[M27EconomyOverseer.refbWillReclaimUnit] then bIsIdle = true end
         elseif oUnit:IsUnitState('Moving') then
             if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Moving') end
             if bMovingUnassignedEngiIsIdle == true and not(oUnit[M27EngineerOverseer.refiEngineerCurrentAction]) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) then
@@ -2052,12 +2066,27 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
         elseif oUnit:IsUnitState('Guarding') then
             if bDebugMessages == true then LOG('IsUnitIdle: Unit state is guarding; bGuardIsIdle='..tostring(bGuardWithFocusUnitIsIdle)) end
             local bHaveValidFocusUnit = false
+            local oGuardedUnit
             if oUnit.GetFocusUnit then
-                local oGuardedUnit = oUnit:GetFocusUnit()
-                if oGuardedUnit and not(oGuardedUnit.Dead) and oGuardedUnit.GetUnitId then
+                oGuardedUnit = oUnit:GetFocusUnit()
+                if oGuardedUnit and not(oGuardedUnit.Dead) and oGuardedUnit.GetUnitId and not(oGuardedUnit[M27EconomyOverseer.refbWillReclaimUnit]) then
                     bHaveValidFocusUnit = true
                 end
             end
+
+            --Engineer specific - treat unit as idle if it is assisting a factory or silo unit that isnt doing anything
+            if not(bGuardWithFocusUnitIsIdle) and bHaveValidFocusUnit and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) and EntityCategoryContains(M27UnitInfo.refCategorySML + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategoryTML + M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryQuantumGateway, oGuardedUnit.UnitId) then
+                --Is the focus unit idle?
+                if (oGuardedUnit.GetWorkProgress and oGuardedUnit:GetWorkProgress() > 0) or oGuardedUnit:GetFractionComplete() < 1 then
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                    return true
+                else
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                    return false
+                end
+            end
+
+
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             if bHaveValidFocusUnit == true then
                 return bGuardWithFocusUnitIsIdle
@@ -2066,6 +2095,7 @@ function IsUnitIdle(oUnit, bGuardWithFocusUnitIsIdle, bGuardWithNoFocusUnitIsIdl
         elseif oUnit:IsUnitState('Repairing') then
             if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Repairing') end
             bIsIdle = false
+            if oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit()[M27EconomyOverseer.refbWillReclaimUnit] then bIsIdle = true end
         elseif oUnit:IsUnitState('Busy') then
             if bDebugMessages == true then LOG('IsUnitIdle: Unit state is Busy') end
             bIsIdle = false
@@ -3694,7 +3724,7 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
     local sFunctionRef = 'GetRandomPointInAreaThatCanPathTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = (bDebugMode or false) if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if sPathing == M27UnitInfo.refPathingTypeAir then bDebugMessages = true end
+    --if sPathing == M27UnitInfo.refPathingTypeAir then bDebugMessages = true end
 
 
 

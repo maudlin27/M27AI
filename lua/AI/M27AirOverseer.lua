@@ -875,6 +875,7 @@ function GetAirRallyPoint(aiBrain)
             iMaxDistance = M27Utilities.GetDistanceBetweenPositions(oNearestAir:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) - 60
         end--]]
         if M27UnitInfo.IsUnitValid(aiBrain[refoNearestEnemyAirThreat]) then iMaxDistance = M27Utilities.GetDistanceBetweenPositions(aiBrain[refoNearestEnemyAirThreat]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) - 60 end
+        iMaxDistance = math.min(iMaxDistance, aiBrain[M27Overseer.refiNearestT2PlusNavalThreat] - 150)
         M27MapInfo.RecordAllRallyPoints(aiBrain)
         if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftRallyPoints]) then
             if GetGameTimeSeconds() >= 150 then
@@ -911,7 +912,7 @@ function GetAirRallyPoint(aiBrain)
     end
 end
 
-function TrackBomberTarget(oBomber, oTarget, iPriority)
+function TrackBomberTarget(oBomber, oTarget, iPriority, bFirstTorpTarget)
     local sFunctionRef = 'TrackBomberTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -926,7 +927,7 @@ function TrackBomberTarget(oBomber, oTarget, iPriority)
     if oBomber[reftTargetList] == nil then
         oBomber[reftTargetList] = {}
     end
-    if EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oBomber.UnitId) then
+    if bFirstTorpTarget and EntityCategoryContains(M27UnitInfo.refCategoryTorpBomber, oBomber.UnitId) then
         oBomber[refoTorpBomberPrimaryTarget] = oTarget
     end
 
@@ -5048,7 +5049,7 @@ function AirBomberManager(aiBrain)
                 end
             end
         end
-        if iNearestCruiserModDistance <= aiBrain[refiBomberDefenceModDistance] + 30 then
+        if iNearestCruiserModDistance >= aiBrain[refiBomberDefenceModDistance] + 30 or not(aiBrain[M27Overseer.refbT2NavyNearOurBase]) then
             bAvoidCruisers = true
         end
 
@@ -5116,7 +5117,7 @@ function AirBomberManager(aiBrain)
 
         for iTechLevel = 1, 4 do
             if iTechLevel >= 3 then
-                if iTechLevel >= 4 or (iTechLevel == 3 and (M27Utilities.IsTableEmpty(aiBrain[reftAvailableTorpBombers]) or table.getsize(aiBrain[reftAvailableTorpBombers]) <= 4)) then
+                if iTechLevel >= 4 or (iTechLevel == 3 and aiBrain[M27Overseer.refbT2NavyNearOurBase]) then
                     bAvoidCruisers = false
                 end
             end
@@ -5669,7 +5670,10 @@ function AirBomberManager(aiBrain)
                             if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
                                 for iUnit, oUnit in tPotentialTargets do
                                     if M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition()) <= aiBrain[refiBomberDefenceModDistance] + 30 then
-                                        AddUnitToShortlist(oUnit, iTechLevel)
+                                        --Dont add if unit is shielded or has high max health
+                                        if (oUnit:GetMaxHealth() <= 2750 or oUnit:GetHealth() <= 2400) and not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, false)) then
+                                            AddUnitToShortlist(oUnit, iTechLevel)
+                                        end
                                     end
                                 end
                             end
