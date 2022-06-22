@@ -1685,6 +1685,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then iMassMod = 0.5 end
                         elseif EntityCategoryContains(categories.ANTIMISSILE, oUnit.UnitId) then iMassMod = 2 --Doubled for structures ontop of this, i.e. want 4xmass of TMD in indirect fire so can overwhelm it
                         elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 1
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryLongRangeDFLand, oUnit.UnitId) then iMassMod = 0.5
                         end
                     end
                     if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit.UnitId) then iMassMod = iMassMod * 2 end
@@ -4497,6 +4498,38 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                     iBestTargetValue = 0
                     --Shortlist of locations we have recently nuked
                     local tRecentlyNuked = {}
+                    local iTimeSMDNeedsToHaveBeenBuiltFor = 240 --default, will adjust
+                    local iMissileSpeed = (__blueprints[oWeapon.Blueprint.ProjectileId].Physics.MaxSpeed or 40)
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': oLauncher='..oLauncher.UnitId..M27UnitInfo.GetUnitLifetimeCount(oLauncher)..'; Breakdown of the weapon table='..reprs(oWeapon)..'; iMissileSpeed='..iMissileSpeed..'; missile speed per BP='..__blueprints[oWeapon.Blueprint.ProjectileId].Physics.MaxSpeed)
+                    end
+                    --local oMissileBP = __blueprints[oWeapon.ProjectileId]
+                    --[[local sMissile = oMissileBP.Label
+                    local oSMLBP = oLauncher:GetBlueprint()
+                    for iWeapon, tWeapon in oSMLBP do
+                        if tWeapon.label == sMissile then
+                            iMissileSpeed = tWeapon.Physics.MaxSpeed
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have an actual speed value for the SML of '..iMissileSpeed) end
+                            break
+                        end
+                    end--]]
+
+
+                    --[[if bDebugMessages == true then
+                        LOG(sFunctionRef..': oLauncher='..oLauncher.UnitId..M27UnitInfo.GetUnitLifetimeCount(oLauncher)..'; Breakdown of the weapon table='..reprs(oWeapon))
+                        LOG(sFunctionRef..': Breakdown of oMissileBP='..reprs(oMissileBP))
+                        LOG(sFunctionRef..': Breakdown of .Blueprint='..reprs(oWeapon.Blueprint)..'; projectile Id='..oWeapon.Blueprint.ProjectileId)
+                        local sMissile = oMissileBP.Label
+                        local oSMLBP = oLauncher:GetBlueprint()
+                        for iWeapon, tWeapon in oSMLBP do
+                            if tWeapon.label == sMissile then
+                                LOG(sFunctionRef..': Breakdown of reprs for blueprint[projectileid]='..reprs(__blueprints[tWeapon.ProjectileId]))
+                                break
+                            end
+                        end
+                        LOG(sFunctionRef..': Breakdown of Weapon blueprint proj ID='..reprs(__blueprints[oWeapon.Blueprint.ProjectileId]))
+                    end--]]
+
                     if M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations]) == false then
                         for iTime, tLocation in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations] do
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering iTime='..iTime..'; tLocation='..repru(tLocation)..'; GameTime='..GetGameTimeSeconds()) end
@@ -4523,6 +4556,7 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                     --First get the best location if just target the start position or locations near here
                     if HaventRecentlyNukedLocation(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) then
                         --GetBestAOETarget(aiBrain, tBaseLocation, iAOE, iDamage, bOptionalCheckForSMD, tSMLLocationForSMDCheck, iOptionalTimeSMDNeedsToHaveBeenBuiltFor, iSMDRangeAdjust, iFriendlyUnitDamageReductionFactor, iFriendlyUnitAOEFactor)
+                        iTimeSMDNeedsToHaveBeenBuiltFor = 200 --3m20
                         tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage, bCheckForSMD, oLauncher:GetPosition(), nil, nil, 2, 2.5)
                     end
                     local iAirSegmentX, iAirSegmentZ
@@ -4539,12 +4573,13 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                                     iCurTargetValue = GetDamageFromBomb(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], iAOE, iDamage, 2, 2.5)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Considering the start position '..iStartPoint..'='..repru(M27MapInfo.PlayerStartPoints[iStartPoint])..'; value ignroign SMD='..iCurTargetValue) end
                                     if iCurTargetValue > iBestTargetValue then
-                                        if IsSMDBlockingTarget(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], oLauncher:GetPosition(), 200) then
+                                        iTimeSMDNeedsToHaveBeenBuiltFor = 230 - (M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iStartPoint], oLauncher:GetPosition()) / iMissileSpeed + 10)
+                                        if IsSMDBlockingTarget(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], oLauncher:GetPosition(), iTimeSMDNeedsToHaveBeenBuiltFor) then
                                             iCurTargetValue = 4000
-                                            if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking target so reducing value to 4k') end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking target so reducing value to 4k. iTimeSMDNeedsToHaveBeenBuiltFor='..iTimeSMDNeedsToHaveBeenBuiltFor) end
                                         end
                                         if iCurTargetValue > iBestTargetValue then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Have a better start position target, for the start position='..iStartPoint..' dealing damage of '..iCurTargetValue..' vs prev best value of '..iBestTargetValue) end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have a better start position target, for the start position='..iStartPoint..' dealing damage of '..iCurTargetValue..' vs prev best value of '..iBestTargetValue..'; iTimeSMDNeedsToHaveBeenBuiltFor='..iTimeSMDNeedsToHaveBeenBuiltFor) end
                                             iBestTargetValue = iCurTargetValue
                                             tTarget = {M27MapInfo.PlayerStartPoints[iStartPoint][1], M27MapInfo.PlayerStartPoints[iStartPoint][2], M27MapInfo.PlayerStartPoints[iStartPoint][3]}
                                         end
@@ -4581,13 +4616,14 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                                         if bDebugMessages == true then LOG(sFunctionRef..': target oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurTargetValue='..iCurTargetValue..'; location='..repru(oUnit:GetPosition())..'; iEnemyUnitsConsidered='..iEnemyUnitsConsidered) end
                                         --Stop looking if tried >=10 targets and have one that is at least 20k of value
                                         if iCurTargetValue > iBestTargetValue then
-                                            if bCheckForSMD and IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), 200) then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking the unit target '..repru(oUnit:GetPosition())..'; will limit damage to 4k') end
+                                            iTimeSMDNeedsToHaveBeenBuiltFor = 230 - (M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oLauncher:GetPosition()) / iMissileSpeed + 10)
+                                            if bCheckForSMD and IsSMDBlockingTarget(aiBrain, oUnit:GetPosition(), oLauncher:GetPosition(), iTimeSMDNeedsToHaveBeenBuiltFor) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': SMD is blocking the unit target '..repru(oUnit:GetPosition())..'; will limit damage to 4k; iTimeSMDNeedsToHaveBeenBuiltFor='..iTimeSMDNeedsToHaveBeenBuiltFor) end
                                                 iCurTargetValue = 4000 end
                                             if iCurTargetValue > iBestTargetValue then
                                                 iBestTargetValue = iCurTargetValue
                                                 tTarget = oUnit:GetPosition()
-                                                if bDebugMessages == true then LOG(sFunctionRef..': New best target with value='..iBestTargetValue) end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': New best target with value='..iBestTargetValue..'; iTimeSMDNeedsToHaveBeenBuiltFor='..iTimeSMDNeedsToHaveBeenBuiltFor) end
                                             end
                                         end
                                         --Note: Mass value of mexes is doubled, so 3 T3 mexes would give a value of 27600

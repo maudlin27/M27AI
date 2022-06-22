@@ -3417,6 +3417,9 @@ function ThreatAssessAndRespond(aiBrain)
                                 if bIndirectThreatOnly then
                                     if oPlatoon[M27PlatoonUtilities.refiIndirectUnits] and oPlatoon[M27PlatoonUtilities.refiIndirectUnits] > 0 then
                                         bPlatoonHasRelevantUnits = true
+                                    elseif oPlatoon[M27PlatoonUtilities.refiDFUnits] > 0 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryLongRangeDFLand, oPlatoon[M27PlatoonUtilities.reftDFUnits])) == false then
+                                        --e.g. shield disruptors, sniperbots (although sniperbots should be going ot skirmisher which doesnt get used by defender)
+                                        bPlatoonHasRelevantUnits = true
                                     end
                                     --[[
                                     if sPlan == M27PlatoonTemplates.refoIdleIndirect or sPlan == 'M27IndirectSpareAttacker' then bPlatoonHasRelevantUnits = true
@@ -3426,11 +3429,9 @@ function ThreatAssessAndRespond(aiBrain)
                                     --Check that have units of the desired tech level
                                     if tEnemyThreatGroup[refiThreatGroupHighestTech] > 1 and bPlatoonHasRelevantUnits == true then
                                         bPlatoonHasRelevantUnits = false
-                                        if oPlatoon[M27PlatoonUtilities.refiIndirectUnits] > 0 then
-                                            --Check we have at least 1 T2 unit in here
-                                            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus, oPlatoon[M27PlatoonUtilities.reftIndirectUnits])) == false then
-                                                bPlatoonHasRelevantUnits = true
-                                            end
+                                        --Check we have at least 1 T2 unit in here
+                                        if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategoryLongRangeDFLand - categories.TECH1, oPlatoon[M27PlatoonUtilities.reftCurrentUnits])) == false then
+                                            bPlatoonHasRelevantUnits = true
                                         end
                                     end
                                 else
@@ -3491,10 +3492,11 @@ function ThreatAssessAndRespond(aiBrain)
                                             end
                                         end
                                         if bPlatoonIsAvailable == true then
-                                            --Does the platoon have DF units in it but we're targetting structures?
+                                            --Does the platoon have non-long range DF units in it but we're targetting structures?
                                             if oPlatoon[M27PlatoonUtilities.refiDFUnits] > 0 and bIndirectThreatOnly then
                                                 --RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo)
-                                                M27PlatoonUtilities.RemoveUnitsFromPlatoon(oPlatoon, oPlatoon[M27PlatoonUtilities.reftDFUnits], false, nil)
+                                                local tUnitsToRemove = EntityCategoryFilterDown(categories.ALLUNITS - M27UnitInfo.refCategoryLongRangeDFLand, oPlatoon[M27PlatoonUtilities.reftDFUnits])
+                                                if M27Utilities.IsTableEmpty(tUnitsToRemove) == false then M27PlatoonUtilities.RemoveUnitsFromPlatoon(oPlatoon, oPlatoon[M27PlatoonUtilities.reftDFUnits], false, nil) end
                                             end
                                             --Add current platoon details:
                                             iDistFromEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPos, tEnemyThreatGroup[reftAveragePosition])
@@ -6642,6 +6644,25 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                         --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
                                     elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
                                         bWantToEco = false
+                                    elseif aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
+                                        --Does the enemy have more mobile threat than us and our allies, and we have < 65% mex control, and have gained income recently
+                                        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo >= 1 then
+                                            local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])
+                                            local tAllThreatUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryShortRangeMobile, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Ally')
+
+                                            --For performance reasons will just get mass cost total
+                                            local iCurMassTotal = 0
+                                            if M27Utilities.IsTableEmpty(tAllThreatUnits) == false then
+                                                for iUnit, oUnit in tAllThreatUnits do
+                                                    iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
+                                                end
+                                            end
+                                            if iCurMassTotal < aiBrain[refiTotalEnemyShortRangeThreat] then
+                                                bWantToEco = false
+                                            end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': iCurMassTotal of our and ally shortrange threat='..iCurMassTotal..'; Enemy short range threat='..aiBrain[refiTotalEnemyShortRangeThreat]..'; bWantToEco='..tostring(bWantToEco)) end
+                                        end
+
                                     end
                                 end
                             end
@@ -7775,7 +7796,7 @@ function CoordinateLandExperimentals(aiBrain)
                         local tRallyPoint = M27Logic.GetNearestRallyPoint(oClosestBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(oClosestBrain))
 
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Will be considering experimentals close to tRallyPoint=' .. repru(tRallyPoint))
+                            LOG(sFunctionRef .. ': Will be considering experimentals close to tRallyPoint=' .. repru(tRallyPoint)..'; Dist from rally point to oClosestBrain base='..M27Utilities.GetDistanceBetweenPositions(tRallyPoint, M27MapInfo.PlayerStartPoints[oClosestBrain.M27StartPositionNumber]))
                         end
 
                         for iUnit, oUnit in tM27LandExperimentals do

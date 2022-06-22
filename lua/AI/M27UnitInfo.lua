@@ -44,6 +44,7 @@ refbLastShotBlocked = 'M27UnitLastShotBlocked' --Used for DF units to indicate i
 refiTimeOfLastSMDCheck = 'M27UnitTimeOfLastSMDCheck'
 refbLastCoveredBySMD = 'M27UnitCoveredBySMD' --Used to record if unit was last covered by SMD
 refbSniperRifleEnabled = 'M27UnitSniperRifleEnabled' --True if seraphim sniperbot has its long range sniperrifle enabled
+refiTimeConstructed = 'M27UnitTimeConstructed' --Game seconds when unit was constructed; only called for M27 units
 
 --TMD:
 refbTMDChecked = 'M27TMDChecked' --Used against enemy TML to flag if we've already checked for TMD we want when it was first detected
@@ -126,6 +127,9 @@ refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * cate
 refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER -categories.SUBCOMMANDER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
 refCategoryRASSACU = categories.SUBCOMMANDER * categories.RASPRESET + categories.SUBCOMMANDER * categories.SERAPHIM
+refCategoryRover = categories.POD * categories.ENGINEER * categories.MOBILE - categories.CONSTRUCTION -refCategoryEngineer
+refCategoryEngineerStation = categories.ENGINEERSTATION + refCategoryRover
+
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
 refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT + categories.LAND * categories.MOBILE * categories.TANK * categories.TECH1 * categories.SERAPHIM - refCategoryMAA -categories.REPAIR --(repair exclusion added as basic way to differentiate between mantis (which has repair category) and LAB; alternative way is to specify the fastest when choosing the blueprint to build
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA --NOTE: Need to specify slowest (so dont pick LAB)
@@ -150,6 +154,7 @@ refCategoryPersonalShield = categories.PERSONALSHIELD + refCategoryObsidian
 refCategoryMobileLandStealth = categories.LAND * categories.MOBILE * categories.STEALTHFIELD
 refCategorySniperBot = categories.MOBILE * categories.SNIPER * categories.LAND
 refCategorySkirmisher = refCategorySniperBot * categories.TECH3 + refCategoryDFTank * categories.UEF * categories.TECH2 * categories.BOT + refCategoryDFTank * categories.CYBRAN * categories.TECH2 * categories.BOT - categories.BOMB --Mongoose, Hoplite, sniperbot
+refCategoryShieldDisruptor = categories.LAND * categories.MOBILE * categories.ANTISHIELD
 
 
 --Air units
@@ -189,12 +194,14 @@ refCategoryStealthAndCloakPersonal = categories.STEALTH
 refCategoryProtectFromTML = refCategoryT2Mex + refCategoryT3Mex + refCategoryT2Power + refCategoryT3Power + refCategoryFixedT2Arti
 refCategoryExperimentalLevel = categories.EXPERIMENTAL + refCategoryFixedT3Arti + refCategorySML
 refCategoryFirebaseSuitable = refCategoryPD + refCategoryT1Radar + refCategoryT2Radar + refCategorySMD + refCategoryTMD + refCategoryFixedShield + refCategoryFixedT2Arti + refCategoryStructureAA
-refCategoryLongRangeMobile = refCategoryFatboy + refCategorySniperBot + refCategoryNavalSurface * categories.DIRECTFIRE + refCategoryNavalSurface * categories.INDIRECTFIRE - refCategoryNavalSurface * categories.TECH1 + refCategoryIndirectT2Plus
+refCategoryLongRangeDFLand = refCategoryFatboy + refCategorySniperBot + refCategoryShieldDisruptor
+refCategoryLongRangeMobile = refCategoryLongRangeDFLand + refCategoryNavalSurface * categories.DIRECTFIRE + refCategoryNavalSurface * categories.INDIRECTFIRE - refCategoryNavalSurface * categories.TECH1 + refCategoryIndirectT2Plus
 refCategoryShortRangeMobile = refCategoryLandCombat + refCategoryFrigate - refCategoryLongRangeMobile
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
 refWeaponPriorityNormal = {refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat - categories.COMMAND, refCategoryEngineer, categories.LAND * categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
+refWeaponPriorityShieldDisruptor = {refCategoryFixedShield, refCategoryMobileLandShield, refCategoryPersonalShield + refCategoryFatboy, refCategoryRadar, categories.ALLUNITS - categories.BENIGN}
 refWeaponPriorityOurGroundExperimental = {categories.COMMAND, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryFixedT2Arti, refCategoryT3PD, refCategoryPD, refCategoryFixedShield, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
 refWeaponPriorityOurFatboy = {refCategoryFixedShield, refCategoryFixedT2Arti, refCategoryLandExperimental, categories.EXPERIMENTAL, refCategoryT3PD, refCategoryPD, categories.COMMAND, refCategoryLandCombat * categories.TECH3, refCategoryStructure - categories.TECH1, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}
 refWeaponPriorityTorpBomber = {refCategoryCruiser, refCategoryCruiserCarrier, refCategoryFrigate, refCategoryNavyThatCanBeTorpedoed, categories.ALLUNITS - categories.BENIGN}

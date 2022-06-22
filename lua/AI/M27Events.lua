@@ -864,6 +864,7 @@ function OnConstructed(oEngineer, oJustBuilt)
             if bDebugMessages == true then LOG(sFunctionRef..': oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; oJustBuilt='..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)) end
 
             oJustBuilt.M27OnConstructedCalled = true
+            oJustBuilt[M27UnitInfo.refiTimeConstructed] = GetGameTimeSeconds()
 
             --LOG('OnConstructed hook test; oJustBuilt='..oJustBuilt.UnitId..'; oEngineer='..oEngineer.UnitId)
             local aiBrain = oJustBuilt:GetAIBrain()
@@ -909,6 +910,32 @@ function OnConstructed(oEngineer, oJustBuilt)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryPD, oJustBuilt.UnitId) then
                 --Update PD tracking
                 aiBrain[M27EngineerOverseer.refiMassSpentOnPD] = aiBrain[M27EngineerOverseer.refiMassSpentOnPD] + oJustBuilt:GetBlueprint().Economy.BuildCostMass
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryRadar - categories.TECH1, oJustBuilt.UnitId) then
+                local tNearbyLowerTechRadar
+                local iIntelRange = oJustBuilt:GetBlueprint().Intel.RadarRadius
+                if iIntelRange >= 120 then
+                    if M27UnitInfo.GetUnitTechLevel(oJustBuilt) >= 3 then
+                        tNearbyLowerTechRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Radar + M27UnitInfo.refCategoryT2Radar, oJustBuilt:GetPosition(), iIntelRange, 'Ally')
+                    else
+                        tNearbyLowerTechRadar = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT1Radar, oJustBuilt:GetPosition(), iIntelRange, 'Ally')
+                    end
+                    if M27Utilities.IsTableEmpty(tNearbyLowerTechRadar) == false then
+                        local iCurDist
+                        local iCurIntel
+                        for iUnit, oUnit in tNearbyLowerTechRadar do
+                            if oUnit:GetAIBrain().M27AI then
+                                --Are we adding any intel from here?
+                                iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oJustBuilt:GetPosition())
+                                iCurIntel = oUnit:GetBlueprint().Intel.RadarRadius or 0
+                                if bDebugMessages == true then LOG(sFunctionRef..': Just built radar '..oJustBuilt.UnitId..M27UnitInfo.GetUnitLifetimeCount(oJustBuilt)..'; will consider whether have obsolete radar to destroy, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' where iCurDist='..iCurDist..'; iCurIntel='..iCurIntel..'; iIntelRange='..iIntelRange) end
+                                if iCurDist + iCurIntel <= iIntelRange then
+                                    oUnit:Kill()
+                                end
+                            end
+                        end
+                    end
+                end
+
             else
                 --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
                 if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then
@@ -961,12 +988,31 @@ function OnConstructed(oEngineer, oJustBuilt)
     end
 end
 
+function OnReclaimStarted(oEngineer, oReclaim)
+    if M27Utilities.bM27AIInGame then
+        local sFunctionRef = 'OnReclaimStarted'
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+        if oEngineer:GetAIBrain().M27AI then
+            if oEngineer.PlatoonHandle and oEngineer.PlatoonHandle[M27PlatoonUtilities.refbNotStartedReclaimingYet] then
+                --Platoon specific - flag that have started the reclaim
+                oEngineer.PlatoonHandle[M27PlatoonUtilities.refbNotStartedReclaimingYet] = false
+            end
+        end
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    end
+end
+
 function OnReclaimFinished(oEngineer, oReclaim)
     if M27Utilities.bM27AIInGame then
         --Update the segment that the reclaim is at, or the engineer if hte reclaim doesnt have one
         local sFunctionRef = 'OnReclaimFinished'
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+        if bDebugMessages == true then LOG(sFunctionRef..': oEngineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just finished reclaiming, gametime='..GetGameTimeSeconds()) end
 
         if oReclaim and oReclaim.CachePosition then
             --LOG('OnReclaimFinished temp log - remove once confirmed this works - about to update reclaim data near location='..repru(oReclaim.CachePosition))
@@ -976,6 +1022,24 @@ function OnReclaimFinished(oEngineer, oReclaim)
             --LOG('OnReclaimFinished alt temp log - couldnt find reclaim position so will use engineer position')
             ForkThread(M27MapInfo.RecordThatWeWantToUpdateReclaimAtLocation, oEngineer:GetPosition(), 1)
             --M27MapInfo.UpdateReclaimDataNearLocation(oEngineer:GetPosition(), 1, nil)
+        end
+        --If dealing with M27 unit that is in a platoon that is reclaiming a specific target, then look for a new target
+        if M27UnitInfo.IsUnitValid(oEngineer) and oEngineer:GetAIBrain().M27AI then
+            if oEngineer.PlatoonHandle then
+                if bDebugMessages == true then LOG(sFunctionRef..': Platoon current action='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] or 'nil')..'; last order type='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] or 'nil')) end
+                if oEngineer.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReclaimTarget or oEngineer.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueReclaim then
+                    local iBuildRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
+                    if iBuildRange > 1 then
+                        local tEnemiesToReclaim = oEngineer:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryAllNavy - categories.COMMAND - categories.SUBCOMMANDER, oEngineer:GetPosition(), iBuildRange, 'Enemy')
+                        if M27Utilities.IsTableEmpty(tEnemiesToReclaim) == false then
+                            local oUnitToReclaim = M27Utilities.GetNearestUnit(tEnemiesToReclaim, oEngineer:GetPosition())
+                            IssueClearCommands({oEngineer})
+                            IssueReclaim({oEngineer}, oUnitToReclaim)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Telling engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to reclaim enemy unit '..oUnitToReclaim.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToReclaim)) end
+                        end
+                    end
+                end
+            end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end

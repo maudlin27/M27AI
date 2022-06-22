@@ -27,6 +27,10 @@ do --Per Balthazaar - encasing the code in do .... end means that you dont have 
             ForkThread(M27Events.OnConstructionStarted, self, built, order)
             return M27OldUnit.OnStartBuild(self, built, order, unpack(arg))
         end,
+        OnStartReclaim = function(self, target)
+            ForkThread(M27Events.OnReclaimStarted, self, target)
+            return M27OldUnit.OnStartReclaim(self, target)
+        end,
         OnStopReclaim = function(self, target)
             ForkThread(M27Events.OnReclaimFinished, self, target)
             return M27OldUnit.OnStopReclaim(self, target)

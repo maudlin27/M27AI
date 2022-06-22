@@ -7950,7 +7950,7 @@ function UpdateMexScoutingPriorities(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Start')
+        LOG(sFunctionRef .. ': Start of code. Is table of sorted mexes empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftSortedMexesInOriginalGroup]))..'; CurGameTime='..GetGameTimeSeconds())
     end
     if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftSortedMexesInOriginalGroup]) == true then
         if GetGameTimeSeconds() > 15 then

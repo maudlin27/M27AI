@@ -153,6 +153,7 @@ refiPlatoonCount = 'M27PlatoonCount' --Count of how many times a particular plat
 refiPlatoonUniqueCount = 'M27PlatoonUniqueCount' --Unique number for an ai brain, to help track platoons when debugging and the platoon plan has changed
 reftNearbyMexToBuildOn = 'M27NearbyMexBuildTarget'
 refoNearbyReclaimTarget = 'M27NearbyReclaimTarget'
+refbNotStartedReclaimingYet = 'M27PlatoonNotStartedReclaimingYet' --Against platoon; true when told to reclaim a unit, get set to false when the event for reclaimstarted triggers
 refoConstructionToAssist = 'M27NearbyConstructionTarget'
 refbHasBeenGivenExpansionOrder = 'M27HasBeenGivenExpansionOrder' --used for ACU platoon so can add extra checks if its not the first time its expanding
 refbKiteEnemies = 'M27KiteEnemies' --True/false; set to true if want combat units to try and kite the enemy
@@ -166,7 +167,7 @@ reftLastBuildLocation = 'M27EngineerLastBuildLocation' --Used by ACU to track wh
 refiPlatoonMergeCount = 'M27PlatoonMergeCount' --Number of times a platoon has been involved in a merger
 refiStructureCategoryToBuild = 'M27PlatoonStructureCategory' --Category to build
 reftStructureLocationToBuild = 'M27PlatoonStructureLocationToBuild' --Rough location that want to build at
-refiPlatoonMaxRange = 'M27PlatoonMaxRange' --Higher of direct and indirect fire range for the platoon
+refiPlatoonMaxRange = 'M27PlatoonMaxRange' --Higher of direct and indirect fire range for the platoon's front unit
 reftSkirmisherPlatoonWantingIntel = 'M27PlatoonSkirmishersWantingIntel' --against aiBrain, [x] is [PlatoonName+Count], returns the platoon
 
 --Plateau
@@ -203,6 +204,7 @@ end
 function UpdatePlatoonName(oPlatoon, sNewName)
     local sFunctionRef = 'UpdatePlatoonName'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --M27Utilities.ErrorHandler('TEMP AUDIT TRAIL')
     if oPlatoon.GetPlan then
         local sPlan = oPlatoon:GetPlan()
         if sPlan == M27PlatoonTemplates.refoAllEngineers then
@@ -1535,7 +1537,7 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
         --if oPlatoon[reftEnemiesInRange] == nil then oPlatoon[reftEnemiesInRange] = {} end
         local iMobileEnemyCategories = categories.LAND * categories.MOBILE
         if oPlatoon[refbPlatoonHasOverwaterLand] == true then iMobileEnemyCategories = categories.LAND * categories.MOBILE + categories.NAVAL * categories.MOBILE
-        elseif sPlatoonName == 'M27Skirmisher' then iMobileEnemyCategories = iMobileEnemyCategories + M27UnitInfo.refCategoryNavalSurface
+        elseif oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] then iMobileEnemyCategories = iMobileEnemyCategories + M27UnitInfo.refCategoryNavalSurface
         elseif oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies] then iMobileEnemyCategories = categories.LAND * categories.MOBILE + M27UnitInfo.refCategoryNavalSurface end
         tNearbyEnemies = aiBrain:GetUnitsAroundPoint(iMobileEnemyCategories, tCurPos, iEnemySearchRadius, 'Enemy')
         local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit])
@@ -1636,7 +1638,7 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
     local sPlatoonName = oPlatoon:GetPlan()
 
     --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 and GetGameTimeSeconds() >= 660 then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
@@ -1646,7 +1648,7 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
     --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
 
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for '..sPlatoonName..oPlatoon[refiPlatoonCount]) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for '..sPlatoonName..oPlatoon[refiPlatoonCount]..' at gametime='..GetGameTimeSeconds()) end
 
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local iNearTargetForSupport = 40 --if are within this range of destination then will ignore isstuck action)
@@ -1959,10 +1961,12 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 855 then bDebugMessages = true end
+    --if oPlatoon:GetPlan() == 'M27GroundExperimental' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(GetPlatoonFrontPosition(oPlatoon), true)
-    local iMaxDistanceForLandSearch = 20
+    local iMaxDistanceForLandSearch = math.max(20, oPlatoon[refiPlatoonMaxRange] * 0.5)
+
     if bDebugMessages == true then LOG(sFunctionRef..': Checking if underwater; iHeightAtWhichConsideredUnderwater='..iHeightAtWhichConsideredUnderwater..'; Cur Position height='..GetPlatoonFrontPosition(oPlatoon)[2]..'; Surface height='..GetSurfaceHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])..'; terrain height='..GetTerrainHeight(GetPlatoonFrontPosition(oPlatoon)[1], GetPlatoonFrontPosition(oPlatoon)[3])) end
     if GetPlatoonFrontPosition(oPlatoon)[2] < iHeightAtWhichConsideredUnderwater then
         if oPlatoon:GetPlan() == 'M27GroundExperimental' then
@@ -1988,6 +1992,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
                 local tOurAntiNavy = EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpedoLandAndNavy, GetPlatoonUnitsOrUnitCount(oPlatoon, reftCurrentUnits, false))
                 if M27Utilities.IsTableEmpty(tNearbyAntiNavy) == false and M27Utilities.IsTableEmpty(tOurAntiNavy) == true and not(oPlatoon:GetPlan() == 'M27GroundExperimental') then
                     oPlatoon[refiCurrentAction] = refActionRun
+                    if bDebugMessages == true then LOG(sFunctionRef..': Need to run as enemy has nearby antinavy and we dont have anti navy, and we arent an experimental') end
                 else
                     --Do we have antinavy in our platoon, and the nearest enemy is on water? Then move towards nearest enemy
                     local bMoveToNearbyLand, tNearbyLandPosition, bAbort
@@ -2001,6 +2006,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
                                 if GetSurfaceHeight(tNearestUnitPosition[1], tNearestUnitPosition[3]) <= iHeightAtWhichConsideredUnderwater then
                                     oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
                                     bAbort = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': We have antinavy and nearest enemy unit doesnt have hover, so will move towards it') end
                                 end
                             end
                         end
@@ -2063,11 +2069,33 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
                                         end
                                     end
                                 else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will see if have nearby land') end
-                                    tNearbyLandPosition = M27MapInfo.GetNearestPathableLandPosition(oUnderwaterUnit, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], iMaxDistanceForLandSearch)
-                                    if M27Utilities.IsTableEmpty(tNearbyLandPosition) == false then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies but nearby land so will move there') end
-                                        bMoveToNearbyLand = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': No reclaimers in our platoon.  If we have nearby antynavy enemies or enemies within our max range then will see if have nearby land') end
+                                    if M27Utilities.IsTableEmpty(tNearbyAntiNavy) == false then
+                                        tNearbyLandPosition = M27MapInfo.GetNearestPathableLandPosition(oUnderwaterUnit, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], iMaxDistanceForLandSearch)
+                                        if M27Utilities.IsTableEmpty(tNearbyLandPosition) == false then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Nearby antinavy enemies and nearby land so will move there') end
+                                            bMoveToNearbyLand = true
+                                        end
+                                    elseif oPlatoon[refiEnemiesInRange] > 0 then
+                                        --Is the threat of mobile enemies sufficient to justify moving to land to attack them? (e.g. dont want an experimental chasing a T1 engineer)
+                                        local tInRangeMobileThreat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategoryNavalSurface, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refiPlatoonMaxRange], 'Enemy')
+                                        local iEnemyMobileThreatMass = M27Logic.GetCombatThreatRating(aiBrain, tInRangeMobileThreat, true, nil, nil, false, true)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iEnemyMobileThreatMass='..iEnemyMobileThreatMass..'; oPlatoon[refiPlatoonMassValue]='..oPlatoon[refiPlatoonMassValue]..'; will ignore very low threats relative to our mass value') end
+
+                                        if iEnemyMobileThreatMass >= math.max(50, oPlatoon[refiPlatoonMassValue] * 0.04) then
+
+                                            local oNearestMobileEnemy = M27Utilities.GetNearestUnit(oPlatoon[reftEnemiesInRange], GetPlatoonFrontPosition(oPlatoon))
+                                            if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oNearestMobileEnemy:GetPosition()) < oPlatoon[refiPlatoonMaxRange] then
+                                                tNearbyLandPosition = M27MapInfo.GetNearestPathableLandPosition(oUnderwaterUnit, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], iMaxDistanceForLandSearch)
+                                                if M27Utilities.IsTableEmpty(tNearbyLandPosition) == false then
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef..': Nearby mobile enemy '..oNearestMobileEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestMobileEnemy)..' withi nour max range of '..oPlatoon[refiPlatoonMaxRange]..' and nearby land so will move there.  Will draw the temporary target in white. Cur platoon front position='..repru(GetPlatoonFrontPosition(oPlatoon)))
+                                                        M27Utilities.DrawLocation(tNearbyLandPosition, false, 7)
+                                                    end
+                                                    bMoveToNearbyLand = true
+                                                end
+                                            end
+                                        end
                                     end
                                 end
                                 if bMoveToNearbyLand == true then
@@ -2176,13 +2204,13 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 855 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
-    --if sPlatoonName == 'M27IndirectSpareAttacker' then bDebugMessages = true end
+    --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = false end
@@ -2190,6 +2218,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
     --if sPlatoonName == 'M27MobileStealth' then bDebugMessages = true end
+    --if sPlatoonName == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
 
     if oPlatoon[refbACUInPlatoon] and bDebugMessages and M27UnitInfo.GetUnitHealthPercent(oPlatoon[refoFrontUnit]) > 1 then
         LOG('Unit max health='..oPlatoon[refoFrontUnit]:GetMaxHealth()..'; Health percent='..M27UnitInfo.GetUnitHealthPercent(oPlatoon[refoFrontUnit]))
@@ -2199,6 +2228,31 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
 
     if sPlatoonName == 'M27MobileShield' then
+        if M27Utilities.IsTableEmpty(GetSupportTargetLocation(oPlatoon)) or M27Utilities.GetDistanceBetweenPositions(GetSupportTargetLocation(oPlatoon), GetPlatoonFrontPosition(oPlatoon)) <= 60 then
+            --Do nothing - either have no support platoon so something has gone wrong, or are near enough to our support platoon that we should ignore nearby enemies
+            if bDebugMessages == true then LOG(sFunctionRef..': Dealing with mobile shield platoon, support target location is either nil or <=60, support location='..repru((GetSupportTargetLocation(oPlatoon) or {'nil'}))..'; Platoon front position='..repru(GetPlatoonFrontPosition(oPlatoon))) end
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..': Dealing with mobile shield platoon that is far from support location, support target location='..repru(GetSupportTargetLocation(oPlatoon))..'; Platoon front position='..repru(GetPlatoonFrontPosition(oPlatoon))..'; distance='..M27Utilities.GetDistanceBetweenPositions(GetSupportTargetLocation(oPlatoon), GetPlatoonFrontPosition(oPlatoon))) end
+            --Are far away from the unit we shoudl be shielding, so avoid nearby enemies with a combat threat
+            local iEnemyThreat = 0
+            if oPlatoon[refiEnemiesInRange] > 0 then
+                iEnemyThreat = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemiesInRange], true, nil, nil, false, false)
+            end
+            if iEnemyThreat <= 50 then
+                --Are there enmy PD in range?
+                if oPlatoon[refiEnemyStructuresInRange] > 0 then
+                    local tNearbyPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, oPlatoon[reftEnemyStructuresInRange])
+                    if M27Utilities.IsTableEmpty(tNearbyPD) == false then iEnemyThreat = iEnemyThreat + 300 end
+                end
+            end
+
+            if iEnemyThreat > 50 then
+                --Run from enemy
+                oPlatoon[refiCurrentAction] = refActionRun
+                if bDebugMessages == true then LOG(sFunctionRef..': iEnemyThreat='..iEnemyThreat..'( PD value is hardcoded); will run since distance to our support position='..M27Utilities.GetDistanceBetweenPositions(GetSupportTargetLocation(oPlatoon), GetPlatoonFrontPosition(oPlatoon))) end
+            end
+
+        end
         --Mobile shield normal platoon - will be assisting a unit so dont care about whether are nearby enemies, instead only care if shield is failing (handled via separate logic)
     elseif sPlatoonName == 'M27MobileStealth' then
         --Not interest in most threat logic in this function ,but do want to run if we wont be helping friendly units
@@ -2778,19 +2832,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                             end
                         end
                     end
-                    --Siginficant enemy mobile threat? (uses different threshold to conventional 'do we have more mass than nearby enemy' calc done later)
-                    if not(oPlatoon[refiCurrentAction]) then
-                        local tEnemyCombatUnitsActuallyInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat - categories.TECH1 + M27UnitInfo.refCategoryIndirectT2Plus, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refiPlatoonMaxRange], 'Enemy')
-                        if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby T2+ mobile land threats empty='..tostring(M27Utilities.IsTableEmpty(tEnemyCombatUnitsActuallyInRange))..'; Intel coverage='..M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), nil, true)) end
-                        if M27Utilities.IsTableEmpty(tEnemyCombatUnitsActuallyInRange) == false then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Size of table of enemy land units='..table.getn(tEnemyCombatUnitsActuallyInRange)..'; mass value='..M27Logic.GetCombatThreatRating(aiBrain, tEnemyCombatUnitsActuallyInRange, true, nil, nil, false, true)) end
-                            if table.getn(tEnemyCombatUnitsActuallyInRange) >= 15 or M27Logic.GetCombatThreatRating(aiBrain, tEnemyCombatUnitsActuallyInRange, true, nil, nil, false, true) >= 3000 then
-                                --Temporary retreat to try and kite enemy threat
-                                oPlatoon[refiCurrentAction] = refActionKitingRetreat
-                                if bDebugMessages == true then LOG(sFunctionRef..': Will do kiting retreat') end
-                            end
-                        end
-                    end
+
                 end
             end
             if oPlatoon[refiCurrentAction] then bProceed = false end
@@ -2870,7 +2912,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     end
                 end
             end
-        elseif sPlatoonName == 'M27Skirmisher' then
+        elseif oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] then
             aiBrain[reftSkirmisherPlatoonWantingIntel][sPlatoonName..oPlatoon[refiPlatoonCount]] = nil
         end
 
@@ -2991,8 +3033,26 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     end
                     --Soemtimes may already ahve had action (e.g. from override) before running the logic, so this checks if action has changed following underwater logic
                     if not(oPlatoon[refiCurrentAction] == iExistingAction) then bDontConsiderFurtherOrders = true end
+
+                    --fatboy - run from lots of T2+ mobile units
+                    if not(bDontConsiderFurtherOrders) and sPlatoonName == 'M27GroundExperimental' and EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId) then
+                        --Siginficant enemy mobile threat? (uses different threshold to conventional 'do we have more mass than nearby enemy' calc done later)
+                        if not(oPlatoon[refiCurrentAction]) then
+                            local tEnemyCombatUnitsActuallyInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat - categories.TECH1 + M27UnitInfo.refCategoryIndirectT2Plus, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refiPlatoonMaxRange], 'Enemy')
+                            if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby T2+ mobile land threats empty='..tostring(M27Utilities.IsTableEmpty(tEnemyCombatUnitsActuallyInRange))..'; Intel coverage='..M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), nil, true)) end
+                            if M27Utilities.IsTableEmpty(tEnemyCombatUnitsActuallyInRange) == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Size of table of enemy land units='..table.getn(tEnemyCombatUnitsActuallyInRange)..'; mass value='..M27Logic.GetCombatThreatRating(aiBrain, tEnemyCombatUnitsActuallyInRange, true, nil, nil, false, true)) end
+                                if table.getn(tEnemyCombatUnitsActuallyInRange) >= 15 or M27Logic.GetCombatThreatRating(aiBrain, tEnemyCombatUnitsActuallyInRange, true, nil, nil, false, true) >= 3000 then
+                                    --Temporary retreat to try and kite enemy threat
+                                    oPlatoon[refiCurrentAction] = refActionKitingRetreat
+                                    bDontConsiderFurtherOrders = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will do kiting retreat') end
+                                end
+                            end
+                        end
+                    end
+
                     if bDontConsiderFurtherOrders == false then
-                        --Is the platoon front unit underwater, and the nearest mobile enemy unit is on water? If so then dont undertake actions for nearby enemies, unless we have anti-navy and the enemy unit isn't hover in which case move towards it
 
 
 
@@ -3178,7 +3238,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                     if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..': Dont have nearby PD; iNearestEnemyDistance='..iNearestEnemyDistance..'; oPlatoon[refiPlatoonMaxRange]='..oPlatoon[refiPlatoonMaxRange]..'; Intel coverage (relevant for skirmishers)='..M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), nil, false)) end
                                                     if iNearestEnemyDistance > oPlatoon[refiPlatoonMaxRange] then
                                                         --If are a skirmisher then only move closer if we have decent intel coverage
-                                                        if not(sPlatoonName == 'M27Skirmisher') or M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), math.max(oPlatoon[refiPlatoonMaxRange] - 5, math.min(iNearestEnemyDistance, oPlatoon[refiPlatoonMaxRange])), false) then
+                                                        if not(oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic]) or M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), math.max(oPlatoon[refiPlatoonMaxRange] - 5, math.min(iNearestEnemyDistance, oPlatoon[refiPlatoonMaxRange])), false) then
                                                             bDontConsiderFurtherOrders = true
                                                             oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
                                                             if bDebugMessages == true then LOG(sFunctionRef..': Nearest enemy is further than our max range, so want to move to the nearest enemy') end
@@ -3202,7 +3262,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                             local iPrevDistanceInsideOurRange = oPlatoon[refiPrevNearestEnemyDistance]
                                                             oPlatoon[refiPrevNearestEnemyDistance] = iDistanceInsideOurRange
                                                             local iDistToConsiderIfTheyAreRunningAway = 5
-                                                            if sPlatoonName == 'M27Skirmisher' then iDistToConsiderIfTheyAreRunningAway = 0 end
+                                                            if oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] then iDistToConsiderIfTheyAreRunningAway = 0 end
                                                             if EntityCategoryContains(categories.STRUCTURE, oNearestEnemy.UnitId) or (oNearestEnemy:GetBlueprint().Physics.MaxSpeed - oPlatoon[refoFrontUnit]:GetBlueprint().Physics.MaxSpeed) <= 0.95 then iDistToConsiderIfTheyAreRunningAway = math.min(4.5, math.max(oPlatoon[refoFrontUnit]:GetBlueprint().Physics.MaxSpeed, 2.5)) end
                                                             if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..': iDistanceInsideOurRange='..iDistanceInsideOurRange..'; iDistToConsiderIfTheyAreRunningAway='..iDistToConsiderIfTheyAreRunningAway) end
                                                             if iDistanceInsideOurRange > iDistToConsiderIfTheyAreRunningAway then
@@ -3214,7 +3274,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                                     oPlatoon[refiCurrentAction] = refActionKitingRetreat
                                                                 else
                                                                     --Skirmisher platoon - require 40 intel to not retreat
-                                                                    if sPlatoonName == 'M27Skirmisher' and iIntelCoverage < math.min(40, oPlatoon[refiPlatoonMaxRange]) then
+                                                                    if oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] and iIntelCoverage < math.min(40, oPlatoon[refiPlatoonMaxRange]) then
                                                                         if bDebugMessages == true then LOG(sFunctionRef..': Skirmisher platoon, iIntelCoverage='..iIntelCoverage..'; platoon max range='..oPlatoon[refiPlatoonMaxRange]) end
                                                                         bDontConsiderFurtherOrders = true
                                                                         oPlatoon[refiCurrentAction] = refActionKitingRetreat
@@ -3238,7 +3298,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                                     end
                                                                 end
                                                             end
-                                                        elseif sPlatoonName == 'M27Skirmisher' then
+                                                        elseif oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] then
                                                             --We lack sufficient intel so want to retreat
                                                             aiBrain[reftSkirmisherPlatoonWantingIntel][sPlatoonName..oPlatoon[refiPlatoonCount]] = oPlatoon
                                                             oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
@@ -3251,7 +3311,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                 --oPlatoon[refiCurrentAction] = refActionMoveDFToNearestEnemy
                                             end
                                             --Kiting override - if have >=3 unit closer to enemy than us in different platoons, then want to just attack rather than running away
-                                            if oPlatoon[refiCurrentAction] == refActionKitingRetreat and M27UnitInfo.IsUnitValid(oNearestEnemy) and not(sPlatoonName == 'M27Skirmisher') then
+                                            if oPlatoon[refiCurrentAction] == refActionKitingRetreat and M27UnitInfo.IsUnitValid(oNearestEnemy) and not(oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic]) then
                                                 local iCloserAllyCount = 0
                                                 local tCloserAllies = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.DIRECTFIRE + categories.LAND * categories.INDIRECTFIRE, tPlatoonPosition, iNearestEnemyDistance, 'Ally')
                                                 if M27Utilities.IsTableEmpty(tCloserAllies) == false then
@@ -3684,11 +3744,17 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                 local oNearestPD = M27Utilities.GetNearestUnit(tEnemyT2PlusPD, GetPlatoonFrontPosition(oPlatoon), aiBrain)
                                                 if oNearestPD and M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= iMaxRangeToUse + 3 then
                                                     bInRangeOfT2PlusPD = true
+
+                                                    if oPlatoon[refiPlatoonMaxRange] > M27Logic.GetUnitMaxGroundRange(tEnemyT2PlusPD) then bRunFromPD = true end
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Are in range of enemy T2PlusPD, will run if we outrange the PD. oPlatoon[refiPlatoonMaxRange]='..oPlatoon[refiPlatoonMaxRange]..'; T2PluasPDRange='..M27Logic.GetUnitMaxGroundRange(tEnemyT2PlusPD)) end
                                                 else
                                                     if table.getn(tEnemyT2PlusPD) >= 3 then
                                                         bRunFromPD = true
+                                                        if oPlatoon[refiPlatoonMaxRange] > M27Logic.GetUnitMaxGroundRange(tEnemyT2PlusPD) then bRunFromPD = false end
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': At least 3 T2Plus enemy PD in range, will run unless we outrange them (since per above they shouldnt be able to hit us). bRunFromPD='..tostring(bRunFromPD)..'; oPlatoon[refiPlatoonMaxRange]='..oPlatoon[refiPlatoonMaxRange]..'; GetUnitMaxGroundRange(tEnemyT2PlusPD)='..M27Logic.GetUnitMaxGroundRange(tEnemyT2PlusPD)) end
                                                     end
                                                 end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Distance to nearest PD='..M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon))..'; Size of enemy T2+ Pd table='..table.getn(tEnemyT2PlusPD)..'; bRunFromPD='..tostring(bRunFromPD)..'; bInRangeOfT2PlusPD='..tostring(bInRangeOfT2PlusPD)) end
                                                 --end
                                             end
                                         end
@@ -3853,7 +3919,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
         else
             oPlatoon[refiPrevNearestEnemyDistance] = nil
             --If skirmisher platoon then still consider running if lack intel
-            if sPlatoonName == 'M27Skirmisher' then
+            if oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] then
                 if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies but are a skirmisher platoon so will check our intel coverage if we arent near base. Intel coverage='..M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), nil, false)..'; Platoon max range='..oPlatoon[refiPlatoonMaxRange]) end
                 if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 40 and not(M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), math.min(oPlatoon[refiPlatoonMaxRange], 40), false)) then
                     --Dont have intel coverage
@@ -4011,6 +4077,42 @@ function CombineNearbyPlatoonsOfType(aiBrain, sPlanToCombine)
             end
         end
     end
+end
+
+function GetSupportTargetLocation(oPlatoon)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetSupportTargetLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --if oPlatoon:GetPlan() == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+
+    local tSupportLocation
+    if M27Utilities.IsTableEmpty(oPlatoon[reftLocationToGuard]) == false then
+        tSupportLocation = oPlatoon[reftLocationToGuard]
+        if bDebugMessages == true then LOG(sFunctionRef..': Have location to guard='..repru(tSupportLocation)) end
+    elseif oPlatoon[refoSupportHelperUnitTarget] and M27UnitInfo.IsUnitValid(oPlatoon[refoSupportHelperUnitTarget]) then
+        tSupportLocation = oPlatoon[refoSupportHelperUnitTarget]:GetPosition()
+        if bDebugMessages == true then LOG(sFunctionRef..': Have valid support helper unit target='..oPlatoon[refoSupportHelperUnitTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoSupportHelperUnitTarget])..'; location='..repru(tSupportLocation)) end
+    elseif oPlatoon[refoSupportHelperPlatoonTarget] and oPlatoon[refoSupportHelperPlatoonTarget][refiCurrentUnits] > 0 then
+        tSupportLocation = GetPlatoonFrontPosition(oPlatoon[refoSupportHelperPlatoonTarget])
+        if bDebugMessages == true then LOG(sFunctionRef..': Have valid support helper unit target platoon='..oPlatoon[refoSupportHelperPlatoonTarget]:GetPlan()..oPlatoon[refoSupportHelperPlatoonTarget][refiPlatoonCount]..'; location='..repru(tSupportLocation)) end
+    elseif oPlatoon[refoPlatoonOrUnitToEscort] then
+        if oPlatoon[refoPlatoonOrUnitToEscort].UnitId and M27UnitInfo.IsUnitValid(oPlatoon[refoPlatoonOrUnitToEscort]) then
+            tSupportLocation = oPlatoon[refoPlatoonOrUnitToEscort]:GetPosition()
+            if bDebugMessages == true then LOG(sFunctionRef..': Have valid support helper unit escort='..oPlatoon[refoPlatoonOrUnitToEscort].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoPlatoonOrUnitToEscort])..'; location='..repru(tSupportLocation)) end
+        elseif oPlatoon[refoPlatoonOrUnitToEscort][refiCurrentUnits] > 0 then
+            tSupportLocation = GetPlatoonFrontPosition(oPlatoon[refoPlatoonOrUnitToEscort])
+            if bDebugMessages == true then LOG(sFunctionRef..': Have valid support escort target platoon='..oPlatoon[refoPlatoonOrUnitToEscort]:GetPlan()..oPlatoon[refoPlatoonOrUnitToEscort][refiPlatoonCount]..'; location='..repru(tSupportLocation)) end
+        elseif bDebugMessages == true then
+            LOG(sFunctionRef..': Have platoon or unit to escort recorded, but doesnt appear to be valid; will give details in log if it has platoon handle or unit id')
+            if oPlatoon[refoPlatoonOrUnitToEscort].GetPlan then LOG(sFunctionRef..': Escort is a platoon with plan='..oPlatoon[refoPlatoonOrUnitToEscort]:GetPlan()..(oPlatoon[refoPlatoonOrUnitToEscort][refiPlatoonCount] or 'nil')..'; units in platoon='..(oPlatoon[refoPlatoonOrUnitToEscort][refiCurrentUnits] or 'nil')) end
+            if oPlatoon[refoPlatoonOrUnitToEscort].UnitId then LOG(sFunctionRef..': Escort is a unit with ID='..oPlatoon[refoPlatoonOrUnitToEscort].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoPlatoonOrUnitToEscort])) end
+            LOG(sFunctionRef..': reprs of refoPlatoonOrUnitToEscort]'..reprs(oPlatoon[refoPlatoonOrUnitToEscort]))
+        end
+    elseif bDebugMessages == true then LOG(sFunctionRef..': No escort or helper assigned')
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return tSupportLocation
 end
 
 function DoesPlatoonStillHaveSupportTarget(oPlatoon)
@@ -4193,8 +4295,10 @@ function SetIfPlatoonCanKite(oPlatoon)
     elseif oPlatoon[refiCurrentUnits] > 0 and (oPlatoon[refiDFUnits] > 0 or oPlatoon[refiIndirectUnits] > 0) then
         if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Plaoton range='..oPlatoon[refiPlatoonMaxRange]..'; Mass value='..oPlatoon[refiPlatoonMassValue]..'; DF units='..oPlatoon[refiDFUnits]) end
         if oPlatoon.GetPlan and not(oPlatoon:GetPlan() == 'M27GroundExperimental') and (oPlatoon[refiPlatoonMassValue] or 0) <= 10000 then
-            local iMaxDFRange = M27Logic.GetDFAndT1ArtiUnitMinOrMaxRange(oPlatoon[reftCurrentUnits], 2)
-            if iMaxDFRange and iMaxDFRange > 22 then
+            local iMaxPlatoonRange = oPlatoon[refiPlatoonMaxRange]
+            local bAllWeaponsNeedToUnpack
+            local oBP
+            if iMaxPlatoonRange and iMaxPlatoonRange > 22 then
                 --Do we have any units that cant fire while retreating?
                 oPlatoon[refbKiteEnemies] = true
                 if bDebugMessages == true then LOG(sFunctionRef..': Set that platoon can kite enemies, will now consider if have any units that cant kite and change flag to false if there are any') end
@@ -4202,14 +4306,24 @@ function SetIfPlatoonCanKite(oPlatoon)
                     for iUnit, oUnit in oPlatoon[reftDFUnits] do
                         if M27UnitInfo.IsUnitValid(oUnit) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has any weapons that are salved to body or turret') end
-                            for iWeapon, tWeapon in oUnit:GetBlueprint().Weapon do
-                                if tWeapon.SlavedToBody or tWeapon.SlavedToTurret then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Weapon is slaved to body or turret so will set can kite to false') end
+                            oBP = oUnit:GetBlueprint()
+                            if M27Utilities.IsTableEmpty(oBP.Weapon) == false then
+                                bAllWeaponsNeedToUnpack = true
+                                for iWeapon, tWeapon in oBP.Weapon do
+                                    if not(tWeapon.WeaponUnpacks) then bAllWeaponsNeedToUnpack = false end
+                                    if tWeapon.SlavedToBody or tWeapon.SlavedToTurret then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Weapon is slaved to body or turret so will set can kite to false') end
+                                        oPlatoon[refbKiteEnemies] = false
+                                        break
+                                    end
+                                end
+                                if bAllWeaponsNeedToUnpack then
                                     oPlatoon[refbKiteEnemies] = false
                                     break
                                 end
                             end
                         end
+                        if not(oPlatoon[refbKiteEnemies]) then break end
                     end
                 end
             end
@@ -4253,6 +4367,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
+    --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
 
 
     if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..oPlatoon[refiPlatoonCount]..': Start of code') end
@@ -4312,9 +4427,9 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                 if oPlatoon[refiPrevCurrentUnits] < oPlatoon[refiCurrentUnits] then
                     if bDebugMessages == true then LOG(sFunctionRef..': Units in platoon has increased so refreshing platoon action') end
                     oPlatoon[refbForceActionRefresh] = true end
-                oPlatoon[reftDFUnits] = EntityCategoryFilterDown(categories.DIRECTFIRE + M27UnitInfo.refCategoryFatboy - categories.SCOUT - M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryCombatScout, oPlatoon[reftCurrentUnits])
+                oPlatoon[reftDFUnits] = EntityCategoryFilterDown(categories.DIRECTFIRE + M27UnitInfo.refCategoryFatboy - categories.SCOUT - M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryCombatScout - M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[reftCurrentUnits])
                 oPlatoon[reftScoutUnits] = EntityCategoryFilterDown(categories.SCOUT, oPlatoon[reftCurrentUnits])
-                oPlatoon[reftIndirectUnits] = EntityCategoryFilterDown(categories.INDIRECTFIRE, oPlatoon[reftCurrentUnits])
+                oPlatoon[reftIndirectUnits] = EntityCategoryFilterDown(categories.INDIRECTFIRE + M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[reftCurrentUnits])
                 oPlatoon[reftBuilders] = EntityCategoryFilterDown(categories.CONSTRUCTION, oPlatoon[reftCurrentUnits])
                 oPlatoon[reftReclaimers] = EntityCategoryFilterDown(categories.RECLAIM, oPlatoon[reftCurrentUnits])
                 oPlatoon[reftUnitsWithShields] = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryPersonalShield, oPlatoon[reftCurrentUnits])
@@ -4342,6 +4457,22 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                 else oPlatoon[refiPlatoonMassValue] = oPlatoon[refiPlatoonThreatValue] end--]]
                 if bDebugMessages == true then LOG(sFunctionRef..': Just got mass value for platoon='..oPlatoon[refiPlatoonMassValue]..'; oPlatoon[refbShouldHaveEscort]='..tostring(oPlatoon[refbShouldHaveEscort])) end
 
+                --Get the front unit in the platoon
+                oPlatoon[refoFrontUnit] = M27Logic.GetUnitNearestEnemy(aiBrain, oPlatoon[reftCurrentUnits])
+                oPlatoon[refoRearUnit] = M27Utilities.GetNearestUnit(oPlatoon[reftCurrentUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, false)
+
+                --Shield disruptor prioritisation
+                if oPlatoon[refiIndirectUnits] > 0 then
+                    local tDisruptors = EntityCategoryFilterDown(M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[reftIndirectUnits])
+                    if M27Utilities.IsTableEmpty(tDisruptors) == false then
+                        for iUnit, oUnit in tDisruptors do
+                            if M27UnitInfo.IsUnitValid(oUnit) then
+                                M27UnitInfo.SetUnitTargetPriorities(oUnit, M27UnitInfo.refWeaponPriorityShieldDisruptor)
+                            end
+                        end
+                    end
+                end
+
                 --Set platoon range (unless ACU in platoon as we have already done this above)
                 if not(bACUInPlatoon) then
                     --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
@@ -4356,22 +4487,43 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
 
                     oPlatoon[refiPlatoonMaxRange] = 2
                     if oPlatoon[refiDFUnits] > 0 then
-                        oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27Logic.GetUnitMaxGroundRange(oPlatoon[reftCurrentUnits]))
+                        if EntityCategoryContains(categories.DIRECTFIRE, oPlatoon[refoFrontUnit].UnitId) then
+                            oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27Logic.GetUnitMaxGroundRange({oPlatoon[refoFrontUnit]}))
+                        else
+                            oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27Logic.GetUnitMaxGroundRange(oPlatoon[reftCurrentUnits]))
+                        end
                         --MOnkeylord - cap range at 30 (range of laser) not the bolters
                         if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonMaxRange] >= 30 and oPlatoon[refoFrontUnit].UnitId == 'url0402' then
                             oPlatoon[refiPlatoonMaxRange] = 30
                         end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Platoon has DF units, range after checking DF units='..oPlatoon[refiPlatoonMaxRange]) end
+
                     end
                     if oPlatoon[refiIndirectUnits] > 0 then
-                        if oPlatoon[refiDFUnits] == 0 then oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27UnitInfo.GetUnitIndirectRange(oPlatoon[refoFrontUnit]))
-                        else oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27UnitInfo.GetUnitIndirectRange(M27Utilities.GetNearestUnit(oPlatoon[reftIndirectUnits], GetPlatoonFrontPosition(oPlatoon), aiBrain)))
+                        if oPlatoon[refiDFUnits] == 0 then
+                            oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27UnitInfo.GetUnitIndirectRange(oPlatoon[refoFrontUnit]))
+                            if bDebugMessages == true then LOG(sFunctionRef..': Platoon has no DF units but has indirect fire units, range after checking DF units='..oPlatoon[refiPlatoonMaxRange]..'; front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])) end
+                        elseif EntityCategoryContains(categories.INDIRECTFIRE + M27UnitInfo.refCategoryLongRangeDFLand, oPlatoon[refoFrontUnit].UnitId) then
+                            oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27UnitInfo.GetUnitIndirectRange(oPlatoon[refoFrontUnit]))
+                            if bDebugMessages == true then LOG(sFunctionRef..': Platoon has DF units but contains indirect or long range DF land, units but has indirect fire units, range after checking DF units='..oPlatoon[refiPlatoonMaxRange]..'; front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])) end
+                        else
+                            oPlatoon[refiPlatoonMaxRange] = math.max(oPlatoon[refiPlatoonMaxRange], M27UnitInfo.GetUnitIndirectRange(M27Utilities.GetNearestUnit(oPlatoon[reftIndirectUnits], GetPlatoonFrontPosition(oPlatoon), aiBrain)))
+                            if bDebugMessages == true then LOG(sFunctionRef..': Platoon has DF units but no long range DF land, will get range of the indirect fire unit nearest to the platoon front.  Range='..oPlatoon[refiPlatoonMaxRange]) end
                         end
                     end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Finnished setting platoon max range, iDFUnits='..oPlatoon[refiDFUnits]..'; IndirectUnits='..oPlatoon[refiIndirectUnits]..'; platoon max range='..oPlatoon[refiPlatoonMaxRange]) end
                 end
 
                 --Do we want to enable kiting (e.g. if longer range unit recently added to platoon)?
                 if not(oPlatoon[refbKiteEnemies]) then
                     SetIfPlatoonCanKite(oPlatoon)
+                end
+
+                --Refresh the skirmisherretreat flag in case we have switched between defender and non-defender plans
+                if oPlatoon[refiIndirectUnits] > 0 then
+                    local bUseSkirmisherRetreatLogic = false
+                    if oPlatoon[refbKiteEnemies] and M27PlatoonTemplates.PlatoonTemplate[oPlatoon:GetPlan()][M27PlatoonTemplates.refbSkirmisherRetreatLogic] then bUseSkirmisherRetreatLogic = true end
+                    oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] = bUseSkirmisherRetreatLogic
                 end
 
                 --Does the platoon contain underwater or overwater land units? (for now assumes will only have 1 or the other)
@@ -4390,7 +4542,11 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                             end
                         end
                         for iUnit, oUnit in oPlatoon[reftDFUnits] do
-                            M27UnitInfo.SetUnitTargetPriorities(oUnit, oPlatoon[reftPlatoonDFTargettingCategories])
+                            if EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oUnit.UnitId) then
+                                M27UnitInfo.SetUnitTargetPriorities(oUnit, M27UnitInfo.refWeaponPriorityShieldDisruptor)
+                            else
+                                M27UnitInfo.SetUnitTargetPriorities(oUnit, oPlatoon[reftPlatoonDFTargettingCategories])
+                            end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Finished setting unit target priorities for all units in platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..'; Strategy at this point='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]) end
 
@@ -4433,9 +4589,6 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                 end
                 if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': iBuilders='..oPlatoon[refiBuilders]..'; iReclaimers='..oPlatoon[refiReclaimers]) end
 
-                --Get the front unit in the platoon
-                oPlatoon[refoFrontUnit] = M27Logic.GetUnitNearestEnemy(aiBrain, oPlatoon[reftCurrentUnits])
-                oPlatoon[refoRearUnit] = M27Utilities.GetNearestUnit(oPlatoon[reftCurrentUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, false)
                 oPlatoon[refiFrontUnitRefreshCount] = 0
                 oPlatoon[refiRearUnitRefreshCount] = 0
             else
@@ -5874,11 +6027,13 @@ function RetreatToMobileShields(oPlatoon)
     --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 then bDebugMessages = true end
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
 
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 855 then bDebugMessages = true end
+
     --If the platoon has a mobile shield assisting platoon whose front units are far away, and arent in retreat, then fall back to it
     if oPlatoon[refoSupportingShieldPlatoon] and oPlatoon[refoSupportingShieldPlatoon][refiUnitsWithShields] > 0 and aiBrain:PlatoonExists(oPlatoon[refoSupportingShieldPlatoon]) then
         local iDistanceToShieldHelper = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), GetPlatoonFrontPosition(oPlatoon[refoSupportingShieldPlatoon]))
-        if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToShieldHelper='..iDistanceToShieldHelper) end
-        if iDistanceToShieldHelper > 50 and iDistanceToShieldHelper <= 250 and not(oPlatoon[refoSupportingShieldPlatoon]:GetPlan() == 'M27RetreatingShieldUnits') then
+        if bDebugMessages == true then LOG(sFunctionRef..': iDistanceToShieldHelper='..iDistanceToShieldHelper..'; is platoon underwater='..tostring(M27MapInfo.IsUnderwater(GetPlatoonFrontPosition(oPlatoon)))) end
+        if iDistanceToShieldHelper > 50 and iDistanceToShieldHelper <= 150 and not(oPlatoon[refoSupportingShieldPlatoon]:GetPlan() == 'M27RetreatingShieldUnits') and not(M27MapInfo.IsUnderwater(GetPlatoonFrontPosition(oPlatoon))) then
             if bDebugMessages == true then LOG(sFunctionRef..': Telling platoon to move to temporary location to meet up with mobile shield using plan '..oPlatoon[refoSupportingShieldPlatoon]:GetPlan()..oPlatoon[refoSupportingShieldPlatoon][refiPlatoonCount]..' with '..oPlatoon[refoSupportingShieldPlatoon][refiUnitsWithShields]..' units with a shield in it') end
             oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
             if M27Utilities.IsTableEmpty(oPlatoon[refoSupportingShieldPlatoon][reftMovementPath][1]) == true then
@@ -6132,8 +6287,8 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' and aiBrain:GetArmyIndex() == 6 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 855 then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
@@ -6148,9 +6303,9 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = false end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            --if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+            --if sPlatoonName == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MobileStealth' then bDebugMessages = true end
-            --if sPlatoonName == 'M27IndirectSpareAttacker' then bDebugMessages = true end
+            --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
             --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
 
@@ -6272,7 +6427,7 @@ function DeterminePlatoonAction(oPlatoon)
                             if bDebugMessages == true then LOG(sFunctionRef..': Checking nearby enemy data and checking if we have an escort platoon. oPlatoon[refiPlatoonMaxRange]='..(oPlatoon[refiPlatoonMaxRange] or 'nil')) end
                             if not(oPlatoon[refiPlatoonMaxRange]) then
                                 M27Utilities.ErrorHandler('Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..' doesnt have a range set so will update it')
-                                if oPlatoon[refiCurrentUnits] > 0 then oPlatoon[refiPlatoonMaxRange] = math.max(2, GetUnitMaxGroundRange(oPlatoon[reftCurrentUnits]))
+                                if oPlatoon[refiCurrentUnits] > 0 then oPlatoon[refiPlatoonMaxRange] = math.max(2, M27Logic.GetUnitMaxGroundRange(oPlatoon[reftCurrentUnits]))
                                 else oPlatoon[refiPlatoonMaxRange] = 2
                                 end
                             end
@@ -6682,6 +6837,20 @@ function DeterminePlatoonAction(oPlatoon)
                 if oPlatoon[refiCurrentAction] == refActionGoToRandomLocationForAWhile then
                     iRefreshActionThreshold = 9
                 elseif oPlatoon[refiCurrentAction] == refActionDisband then iRefreshActionThreshold = 0
+                elseif oPlatoon[refiCurrentAction] == refActionMoveToTemporaryLocation then
+                    iRefreshActionThreshold = 9
+                    local tCurTarget
+                    if oPlatoon[refoFrontUnit].GetNavigator then
+                        local oNavigator = oPlatoon[refoFrontUnit]:GetNavigator()
+                        if oNavigator and oNavigator.GetCurrentTargetPos then
+                            if M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftTemporaryMoveTarget], oNavigator:GetCurrentTargetPos()) >= 5 then
+                                iRefreshActionThreshold = 1
+                                if bDebugMessages == true then LOG(sFunctionRef..': Front platoon unit naviagor target='..repru(oNavigator:GetCurrentTargetPos())..'; temp move target='..repru(oPlatoon[reftTemporaryMoveTarget])..'; dist between them='..M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftTemporaryMoveTarget], oNavigator:GetCurrentTargetPos())..'; will reduce refresh rate to 1') end
+                            elseif M27Utilities.GetDistanceBetweenPositions(oNavigator:GetCurrentTargetPos(), GetPlatoonFrontPosition(oPlatoon)) <= 2 then iRefreshActionThreshold = 2
+                            end
+                        end
+                    end
+                    --M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftTemporaryMoveTarget],
                 else
                     if oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow] == true or oPlatoon[M27PlatoonTemplates.refbRequiresSingleLocationToGuard] == true then
                         if oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionTemporaryRetreat or oPlatoon[refiCurrentAction] == refActionKitingRetreat then
@@ -6758,6 +6927,11 @@ function DeterminePlatoonAction(oPlatoon)
                                             end
                                         end
                                     end
+                                end
+                                --If unit state is reclaiming but target is a unit (not wreck) on full health or we havent started reclaiming yet, then still refresh
+                                if not(bRefreshAction) and (oPlatoon[refbNotStartedReclaimingYet] or (M27UnitInfo.IsUnitValid(oPlatoon[refoNearbyReclaimTarget]) and M27UnitInfo.GetUnitHealthPercent(oPlatoon[refoNearbyReclaimTarget]) == 1)) then
+                                    iRefreshActionThreshold = 0
+                                    bRefreshAction = true
                                 end
                                 if bDebugMessages == true then LOG(sFunctionRef..': bRefreshAction after checking if unit state is reclaiming='..tostring(bRefreshAction)) end
                             elseif oPlatoon[refiCurrentAction] == refActionAttackSpecificUnit then
@@ -6917,11 +7091,13 @@ function ReturnToBaseOrRally(oPlatoon, tLocationToReturnTo, iOnlyGoThisFarToward
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local sPlatoonName = oPlatoon:GetPlan()
     --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27AttackNearestUnits' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+
     local aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
     local iArmyStartNumber = aiBrain.M27StartPositionNumber
 
@@ -7233,7 +7409,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
         --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
 
         --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
-        --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
+        --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 2 then bDebugMessages = true end
         --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
         --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
         --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -7709,17 +7885,33 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                     if bDebugMessages == true then LOG(sFunctionRef..': RAS platoon so will return to base') end
                 else
                     if bDisbandAsNoUnits == false and oPlatoon[refbACUInPlatoon] == false then
-                        local iCurrentMexPriorities = table.getn(aiBrain[M27MapInfo.reftHighPriorityMexes])
-                        local iMexWanted = math.random(1, iCurrentMexPriorities)
-                        local tTargetMex = aiBrain[M27MapInfo.reftHighPriorityMexes][iMexWanted]
-                        oPlatoon[reftMovementPath][1] = {tTargetMex[1], tTargetMex[2], tTargetMex[3]}
+                        --Backup in case we dont have any high priority mexes yet
+                        if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftHighPriorityMexes]) then
+                            if GetGameTimeSeconds() >= 15 then M27Utilities.ErrorHandler('Dont have any high priority mexes recorded, so platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' cant get a target') end
+                            --Just move towards the enemy by 20
 
-                        --oPlatoon[reftMovementPath] = M27MapInfo.GetMexPatrolLocations(aiBrain, 3, true)
+                            local tBackupLocation = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)), 20 + oPlatoon[refiCurrentUnits], true)
+                            local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit])
+                            local iSegmentGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(sPathing, GetPlatoonFrontPosition(oPlatoon))
+                            if not(iSegmentGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(sPathing, tBackupLocation)) then
+                                tBackupLocation = M27Logic.GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroupWanted, tBackupLocation, 150, 0)
+                            end
 
-                        --oPlatoon[reftMovementPath] = M27Logic.GetMexRaidingPath(oPlatoon, 50)
-                        if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath]) then
-                            bDisbandAsNoUnits = true
-                            LOG('WARNING -  RaidingPath returned nil movement path so disbanding platoon')
+                            oPlatoon[reftMovementPath][1] = tBackupLocation
+
+                        else
+                            local iCurrentMexPriorities = table.getn(aiBrain[M27MapInfo.reftHighPriorityMexes])
+                            local iMexWanted = math.random(1, iCurrentMexPriorities)
+                            local tTargetMex = aiBrain[M27MapInfo.reftHighPriorityMexes][iMexWanted]
+                            oPlatoon[reftMovementPath][1] = {tTargetMex[1], tTargetMex[2], tTargetMex[3]}
+
+                            --oPlatoon[reftMovementPath] = M27MapInfo.GetMexPatrolLocations(aiBrain, 3, true)
+
+                            --oPlatoon[reftMovementPath] = M27Logic.GetMexRaidingPath(oPlatoon, 50)
+                            if M27Utilities.IsTableEmpty(oPlatoon[reftMovementPath]) then
+                                bDisbandAsNoUnits = true
+                                LOG('WARNING -  RaidingPath returned nil movement path so disbanding platoon')
+                            end
                         end
                         --oPlatoon[refiLastPathTarget] = table.getn(oPlatoon[reftMovementPath])
                     end
@@ -8043,6 +8235,7 @@ function IssueIndirectAttack(oPlatoon, bDontClearActions)
         local bSpreadAttack = false
         local bAreNearbyT2PlusPD = false
 
+
         if M27Utilities.IsTableEmpty(oPlatoon[reftIndirectUnits]) == true then
             M27Utilities.ErrorHandler('No indirect fire units in platoon despite iIndirectUnits = '..oPlatoon[refiIndirectUnits])
         else
@@ -8064,347 +8257,403 @@ function IssueIndirectAttack(oPlatoon, bDontClearActions)
                 end
             end
 
-            local iUnitRangeMod = 0 --Will treat any units within range+mod as being in range of the unit for choosing attack orders
-            local iRevisedSearchRangeForBuildlings = oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures]
-            local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
-            if bDebugMessages == true then LOG(sFunctionRef..': oPlatoon[refiEnemyStructuresInRange]='..oPlatoon[refiEnemyStructuresInRange]..'; oPlatoon[refiIndirectUnits]='..oPlatoon[refiIndirectUnits]..'; iPlatoonAttackRange='..iPlatoonAttackRange) end
-            local tNearbyEnemyT2PlusPD
-            local bNearbyAeonTMD, bNearbyNonAeonTMD, tNearbyTMD
-            local bNearbyShieldOrTMD = false
-            local oNearestT2PlusPD
-            if oPlatoon[refiEnemyStructuresInRange] > 0 then
-                --Check if there are nearby enemy PD, in which case want to only look for buildings within a smaller range
-                if bDebugMessages == true then LOG(sFunctionRef..': Have enemy structures in range, checking if any PD') end
+            local tShieldDisruptorUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryShieldDisruptor, GetPlatoonUnitsOrUnitCount(oPlatoon, reftIndirectUnits, false, true))
+            local tNonShieldDisruptorUnits = EntityCategoryFilterDown(categories.ALLUNITS - M27UnitInfo.refCategoryShieldDisruptor, GetPlatoonUnitsOrUnitCount(oPlatoon, reftIndirectUnits, false, true))
+            local iNonShieldDisruptorUnits = 0
 
-                tNearbyEnemyT2PlusPD = EntityCategoryFilterDown(categories.DIRECTFIRE * categories.TECH2 + categories.DIRECTFIRE * categories.TECH3, oPlatoon[reftEnemyStructuresInRange])
-                local iNearestT2PlusPD
-                bAreNearbyT2PlusPD = not(M27Utilities.IsTableEmpty(tNearbyEnemyT2PlusPD))
-                if bAreNearbyT2PlusPD == true then
-                    --Get nearest enemy PD
-                    oNearestT2PlusPD = M27Utilities.GetNearestUnit(tNearbyEnemyT2PlusPD, tPlatoonPosition, aiBrain, true)
-                    iNearestT2PlusPD = M27Utilities.GetDistanceBetweenPositions(oNearestT2PlusPD:GetPosition(), tPlatoonPosition)
-                    if iNearestT2PlusPD <= 70 then iRevisedSearchRangeForBuildlings = math.min(iNearestT2PlusPD + 5, iRevisedSearchRangeForBuildlings) end
+
+            --Update range to the range of non-shield disruptor units if we have a mix and the front unit is a shield disruptor
+            if M27Utilities.IsTableEmpty(tShieldDisruptorUnits) == false and M27Utilities.IsTableEmpty(tNonShieldDisruptorUnits) == false then
+                if EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[refoFrontUnit].UnitId) then
+                    iPlatoonAttackRange = M27UnitInfo.GetUnitIndirectRange(tNonShieldDisruptorUnits[1])
+                end
+            elseif M27Utilities.IsTableEmpty(tNonShieldDisruptorUnits) == false then
+                iNonShieldDisruptorUnits = oPlatoon[refiIndirectUnits] --have no shield disruptor units
+            end
+
+            --Shield disruptor specific logic
+            if M27Utilities.IsTableEmpty(tShieldDisruptorUnits) == false then
+                local oNearestShieldedEnemy
+                local iNearestShieldedEnemy = 10000
+                local iCurShield, iMaxShield, iCurDist
+
+                function RecordIfClosestShieldedUnit(oUnit)
+                    iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                    if iCurShield > 0 or M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, false) then
+                        iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oUnit:GetPosition())
+                        if iCurDist < iNearestShieldedEnemy then
+                            oNearestShieldedEnemy = oUnit
+                        end
+                    end
                 end
 
-                if iRevisedSearchRangeForBuildlings < (iPlatoonAttackRange - 3) then iRevisedSearchRangeForBuildlings = iPlatoonAttackRange end
-                iRevisedSearchRangeForBuildlings = math.min(iRevisedSearchRangeForBuildlings, iPlatoonAttackRange + 10)
-                tStructuresCloseToMaxPlatoonRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tPlatoonPosition, iRevisedSearchRangeForBuildlings, 'Enemy')
-                if bDebugMessages == true then
-                    if iNearestT2PlusPD == nil then iNearestT2PlusPD = 'nil' end
-                    LOG(sFunctionRef..': iRevisedSearchRangeForBuildlings='..iRevisedSearchRangeForBuildlings..'; Platoon.refiSearchRangeForEnemyStructures='..oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures]..'; iPlatoonAttackRange='..iPlatoonAttackRange..'; iNearestT2PlusPD='..iNearestT2PlusPD)
+                if oPlatoon[refiEnemiesInRange] > 0 then
+                    for iUnit, oUnit in oPlatoon[reftEnemiesInRange] do
+                        RecordIfClosestShieldedUnit(oUnit)
+                    end
                 end
-                if M27Utilities.IsTableEmpty(tStructuresCloseToMaxPlatoonRange) == false then
-                    if oPlatoon[refiIndirectUnits] >= 4 then
-                        bSpreadAttack = true
-                        iUnitRangeMod = 4
-                        if oPlatoon[refiIndirectUnits] > 10 then iUnitRangeMod = 6 end
+                if oPlatoon[refiEnemyStructuresInRange] > 0 then
+                    for iUnit, oUnit in oPlatoon[reftEnemyStructuresInRange] do
+                        RecordIfClosestShieldedUnit(oUnit)
+                    end
+                end
+                if iNearestShieldedEnemy <= oPlatoon[refiPlatoonMaxRange] + 10 then
+                    --Attack the nearest unit
+                    IssueClearCommands(tShieldDisruptorUnits)
+                    IssueAttack(tShieldDisruptorUnits, oNearestShieldedEnemy)
+                else
+                    --Not near enemy so just do an aggressive move order to our movement path destination
+                    IssueClearCommands(tShieldDisruptorUnits)
+                    IssueAggressiveMove(tShieldDisruptorUnits, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
+                end
+            end
+
+            if iNonShieldDisruptorUnits > 0 then
+                --Normal (nondisruptor) attack logic
+
+
+                local iUnitRangeMod = 0 --Will treat any units within range+mod as being in range of the unit for choosing attack orders
+                local iRevisedSearchRangeForBuildlings = oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures]
+                local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
+                if bDebugMessages == true then LOG(sFunctionRef..': oPlatoon[refiEnemyStructuresInRange]='..oPlatoon[refiEnemyStructuresInRange]..'; iNonShieldDisruptorUnits='..iNonShieldDisruptorUnits..'; iPlatoonAttackRange='..iPlatoonAttackRange) end
+                local tNearbyEnemyT2PlusPD
+                local bNearbyAeonTMD, bNearbyNonAeonTMD, tNearbyTMD
+                local bNearbyShieldOrTMD = false
+                local oNearestT2PlusPD
+                if oPlatoon[refiEnemyStructuresInRange] > 0 then
+                    --Check if there are nearby enemy PD, in which case want to only look for buildings within a smaller range
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have enemy structures in range, checking if any PD') end
+
+                    tNearbyEnemyT2PlusPD = EntityCategoryFilterDown(categories.DIRECTFIRE * categories.TECH2 + categories.DIRECTFIRE * categories.TECH3, oPlatoon[reftEnemyStructuresInRange])
+                    local iNearestT2PlusPD
+                    bAreNearbyT2PlusPD = not(M27Utilities.IsTableEmpty(tNearbyEnemyT2PlusPD))
+                    if bAreNearbyT2PlusPD == true then
+                        --Get nearest enemy PD
+                        oNearestT2PlusPD = M27Utilities.GetNearestUnit(tNearbyEnemyT2PlusPD, tPlatoonPosition, aiBrain, true)
+                        iNearestT2PlusPD = M27Utilities.GetDistanceBetweenPositions(oNearestT2PlusPD:GetPosition(), tPlatoonPosition)
+                        if iNearestT2PlusPD <= 70 then iRevisedSearchRangeForBuildlings = math.min(iNearestT2PlusPD + 5, iRevisedSearchRangeForBuildlings) end
                     end
 
-                    --Prioritise any shields and TMD
-                    bNearbyAeonTMD = false
-                    bNearbyNonAeonTMD = false
-                    tPriorityEnemiesNearFiringRange = EntityCategoryFilterDown(categories.ANTIMISSILE + categories.SHIELD, tStructuresCloseToMaxPlatoonRange)
-                    if M27Utilities.IsTableEmpty(tPriorityEnemiesNearFiringRange) == true then
-                        --Target PD if no shields or TMD
-                        tPriorityEnemiesNearFiringRange = EntityCategoryFilterDown(categories.DIRECTFIRE, tStructuresCloseToMaxPlatoonRange)
+                    if iRevisedSearchRangeForBuildlings < (iPlatoonAttackRange - 3) then iRevisedSearchRangeForBuildlings = iPlatoonAttackRange end
+                    iRevisedSearchRangeForBuildlings = math.min(iRevisedSearchRangeForBuildlings, iPlatoonAttackRange + 10)
+                    tStructuresCloseToMaxPlatoonRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tPlatoonPosition, iRevisedSearchRangeForBuildlings, 'Enemy')
+                    if bDebugMessages == true then
+                        if iNearestT2PlusPD == nil then iNearestT2PlusPD = 'nil' end
+                        LOG(sFunctionRef..': iRevisedSearchRangeForBuildlings='..iRevisedSearchRangeForBuildlings..'; Platoon.refiSearchRangeForEnemyStructures='..oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures]..'; iPlatoonAttackRange='..iPlatoonAttackRange..'; iNearestT2PlusPD='..iNearestT2PlusPD)
+                    end
+                    if M27Utilities.IsTableEmpty(tStructuresCloseToMaxPlatoonRange) == false then
+                        if iNonShieldDisruptorUnits >= 4 then
+                            bSpreadAttack = true
+                            iUnitRangeMod = 4
+                            if iNonShieldDisruptorUnits > 10 then iUnitRangeMod = 6 end
+                        end
+
+                        --Prioritise any shields and TMD
+                        bNearbyAeonTMD = false
+                        bNearbyNonAeonTMD = false
+                        tPriorityEnemiesNearFiringRange = EntityCategoryFilterDown(categories.ANTIMISSILE + categories.SHIELD, tStructuresCloseToMaxPlatoonRange)
                         if M27Utilities.IsTableEmpty(tPriorityEnemiesNearFiringRange) == true then
-                            --Target other structures
-                            tPriorityEnemiesNearFiringRange = tStructuresCloseToMaxPlatoonRange
+                            --Target PD if no shields or TMD
+                            tPriorityEnemiesNearFiringRange = EntityCategoryFilterDown(categories.DIRECTFIRE, tStructuresCloseToMaxPlatoonRange)
+                            if M27Utilities.IsTableEmpty(tPriorityEnemiesNearFiringRange) == true then
+                                --Target other structures
+                                tPriorityEnemiesNearFiringRange = tStructuresCloseToMaxPlatoonRange
+                            end
+                        else
+                            bNearbyShieldOrTMD = true
+                            tNearbyTMD = EntityCategoryFilterDown(categories.AEON * M27UnitInfo.refCategoryTMD, tPriorityEnemiesNearFiringRange)
+                            if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                                bNearbyAeonTMD = true
+                            else
+                                tNearbyTMD = EntityCategoryFilterDown(M27UnitInfo.refCategoryTMD, tPriorityEnemiesNearFiringRange)
+                                if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                                    bNearbyNonAeonTMD = true
+                                end
+                            end
+                        end
+                    end
+                end
+                if M27Utilities.IsTableEmpty(tPriorityEnemiesNearFiringRange) == true then
+                    tPriorityEnemiesNearFiringRange = aiBrain:GetUnitsAroundPoint(categories.LAND + M27UnitInfo.refCategoryStructure + categories.NAVAL, tPlatoonPosition, math.min(iRevisedSearchRangeForBuildlings, iPlatoonAttackRange), 'Enemy')
+                    if M27Utilities.IsTableEmpty(tPriorityEnemiesNearFiringRange) == true then
+                        tPriorityEnemiesNearFiringRange = oPlatoon[reftEnemiesInRange]
+                        if M27Utilities.IsTableEmpty(oPlatoon[reftEnemiesInRange]) then tPriorityEnemiesNearFiringRange = oPlatoon[reftEnemyStructuresInRange] end
+                    end
+                    if iNonShieldDisruptorUnits > 1 then bSpreadAttack = true end --1 arti shell can kill 1 tank in some cases so want to spraed attack
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have no priority enemies so will include nearby mobile units when considering targets') end
+                elseif bDebugMessages == true then LOG(sFunctionRef..': Have priority enemies near firing range')
+                end
+                if M27Utilities.IsTableEmpty(tPriorityEnemiesNearFiringRange) == true then
+                    M27Utilities.ErrorHandler('No units to target for indirect attack, will resume movement path instead')
+                    ReissueMovementPath(oPlatoon, bDontClearActions)
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have some enemies that can attack, will go through each unit in platoon and allocate targets') end
+                    --IssueAttack(oPlatoon[reftIndirectUnits], M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon)))
+
+
+
+                    --Track no. of times a unit has been targetted - first reset variables
+                    if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonUniqueRef..': No nearby structures so attacking nearest units') end
+                    for iEnemyUnit, oEnemyUnit in tPriorityEnemiesNearFiringRange do
+                        oEnemyUnit[sTargetedRef] = 0
+                    end
+                    --Cycle through each indirect fire unit, and then check for each enemy unit in its range
+                    --Default target in case can't find one: the closest unit:
+                    local oNearestEnemyUnit
+                    local iNearestEnemyUnitDistance
+                    local iCurDistanceToEnemy
+                    local oNearestEnemyT2PlusPD, iNearestT2PlusPD
+                    local bCurUnitSpreadAttack
+                    local bQueueUpOtherAttacks
+
+                    local bSynchroniseFiring = false
+                    local iMMLs = 0
+                    local tMMLNearFront = {}
+                    local iMMLNearFront = 0
+                    local tCurMMLPosition, oNearestTMD, tNearestTMD, iDistanceToNearestTMD
+                    --Check if should consider using Synchronised firing
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to consider if should synchronise fire; iNonShieldDisruptorUnits='..iNonShieldDisruptorUnits) end
+                    if iNonShieldDisruptorUnits >= 3 then
+                        local tMMLs = EntityCategoryFilterDown(categories.SILO, tNonShieldDisruptorUnits)
+                        if M27Utilities.IsTableEmpty(tMMLs) == false then iMMLs = table.getn(tMMLs) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iMMLs='..iMMLs) end
+                        if iMMLs >= 3 then
+                            --More than 30s since we last Synchronised?
+                            local iCurGameTime = GetGameTimeSeconds()
+                            if bDebugMessages == true then
+                                local iTimeOfLastRefresh = oPlatoon[refiTimeOfLastSyncronisation]
+                                if iTimeOfLastRefresh == nil then iTimeOfLastRefresh = 'nil' end
+                                LOG(sFunctionRef..': iTimeOfLastRefresh='..iTimeOfLastRefresh..'; iCurGameTime='..iCurGameTime..'; bNearbyAeonTMD='..tostring(bNearbyAeonTMD)..'; bNearbyNonAeonTMD='..tostring(bNearbyNonAeonTMD))
+                            end
+                            if oPlatoon[refiTimeOfLastSyncronisation] == nil or iCurGameTime - oPlatoon[refiTimeOfLastSyncronisation] > 9 then
+                                --Only 9s, since hte way this works will be turning off once, and then turning on once; therefore even if this runs several times in the same cycle we should avoid units being permanently stuck waiting to attack
+                                --Are there any nearby TMD?
+                                if bNearbyAeonTMD == false and bNearbyNonAeonTMD == false then
+                                    --Check in a larger search range
+                                    local iTMDSearchRange = math.max(iPlatoonAttackRange, 70)
+                                    tNearbyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, tPlatoonPosition, iTMDSearchRange, 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                                        if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.AEON, tNearbyTMD)) == false then
+                                            bNearbyAeonTMD = true
+                                        else
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef..': Size of table='..table.getn(tNearbyTMD))
+                                                for iUnit, oUnit in tNearbyTMD do
+                                                    LOG('TMD iUnit='..iUnit)
+                                                end
+                                            end
+                                            bNearbyNonAeonTMD = true
+                                        end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iNearbyTMD='..table.getn(tNearbyTMD)..'bNearbyAeonTMD='..tostring(bNearbyAeonTMD)..'; bNearbyNonAeonTMD='..tostring(bNearbyNonAeonTMD)) end
+                                end
+                                if bNearbyAeonTMD == true or bNearbyNonAeonTMD == true then
+                                    --Get nearest TMD or PD or shield to front platoon unit; Do we have at least 3 MMLs within range of this?
+
+                                    local oNearestPriorityUnit = M27Utilities.GetNearestUnit(tPriorityEnemiesNearFiringRange, GetPlatoonFrontPosition(oPlatoon), aiBrain, true)
+                                    local tNearestUnit = oNearestPriorityUnit:GetPosition()
+                                    local iNearestPriorityUnit = M27Utilities.GetDistanceBetweenPositions(tNearestUnit, GetPlatoonFrontPosition(oPlatoon))
+                                    local oNearestUnit = oNearestPriorityUnit
+                                    local tNearestT2PlusPD
+                                    if M27Utilities.IsTableEmpty(tNearbyEnemyT2PlusPD) == false then
+                                        oNearestEnemyT2PlusPD = M27Utilities.GetNearestUnit(tNearbyEnemyT2PlusPD, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil)
+                                        tNearestT2PlusPD = oNearestEnemyT2PlusPD:GetPosition()
+                                        iNearestT2PlusPD = M27Utilities.GetDistanceBetweenPositions(tNearestT2PlusPD, GetPlatoonFrontPosition(oPlatoon))
+                                        if iNearestPriorityUnit > iNearestT2PlusPD then
+                                            oNearestUnit = oNearestT2PlusPD
+                                            iNearestPriorityUnit = iNearestT2PlusPD
+                                            tNearestUnit = tNearestT2PlusPD
+                                        end
+                                    end
+                                    for iUnit, oUnit in tMMLs do
+                                        if not(oUnit.Dead) and oUnit.GetPosition then
+                                            tCurMMLPosition = oUnit:GetPosition()
+                                            if M27Utilities.GetDistanceBetweenPositions(tCurMMLPosition, tNearestUnit) <= iPlatoonAttackRange then
+                                                iMMLNearFront = iMMLNearFront + 1
+                                                tMMLNearFront[iMMLNearFront] = oUnit
+                                            end
+                                        end
+                                    end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iMMLNearFront='..iMMLNearFront) end
+                                    if iMMLNearFront >= 3 then
+                                        if bDebugMessages == true then
+                                            LOG('Size of tNearbyTMD='..table.getn(tNearbyTMD))
+                                            for iUnit, oUnit in tNearbyTMD do
+                                                LOG('iUnit='..iUnit)
+                                            end
+                                        end
+                                        --Has the TMD moved since we last Synchronised?
+                                        oNearestTMD = M27Utilities.GetNearestUnit(tNearbyTMD, tPlatoonPosition, aiBrain)
+                                        if oNearestTMD then
+                                            tNearestTMD = oNearestTMD:GetPosition()
+                                            if bDebugMessages == true then
+                                                local iDistanceToLastTMD = 0
+                                                local iMMLFromLastSynchronisation = oPlatoon[refiMMLCountWhenLastSynchronised]
+                                                if iMMLFromLastSynchronisation == nil then iMMLFromLastSynchronisation = 'nil' end
+                                                if oPlatoon[reftNearestTMDWhenLastSynchronised] then iDistanceToLastTMD = M27Utilities.GetDistanceBetweenPositions(tNearestTMD, oPlatoon[reftNearestTMDWhenLastSynchronised]) end
+                                                LOG(sFunctionRef..': iDistanceToLastTMD='..iDistanceToLastTMD..'; iMMLFromLastSynchronisation='..iMMLFromLastSynchronisation)
+                                            end
+                                            if oPlatoon[reftNearestTMDWhenLastSynchronised] == nil or M27Utilities.GetDistanceBetweenPositions(tNearestTMD, oPlatoon[reftNearestTMDWhenLastSynchronised]) >3 then
+                                                bSynchroniseFiring = true
+                                            else
+                                                if oPlatoon[refiMMLCountWhenLastSynchronised] == nil or iMMLNearFront - oPlatoon[refiMMLCountWhenLastSynchronised] >= 2 then
+                                                    bSynchroniseFiring = true
+                                                end
+                                            end
+                                            if bSynchroniseFiring == true then
+                                                oPlatoon[refiTimeOfLastSyncronisation] = iCurGameTime
+                                                oPlatoon[reftNearestTMDWhenLastSynchronised] = tNearestTMD
+                                                oPlatoon[refiMMLCountWhenLastSynchronised] = iMMLNearFront
+                                                local iTimeToSpreadOver = 0
+                                                if bNearbyAeonTMD == true then iTimeToSpreadOver = 3.1 end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': About to call function to synchronise unit firing') end
+                                                SynchroniseUnitFiring(tMMLNearFront, iTimeToSpreadOver)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+
+                    if M27Utilities.IsTableEmpty(tNonShieldDisruptorUnits) == false then
+                        local bFirstTargetAttacked
+                        for iUnit, oUnit in tNonShieldDisruptorUnits do
+                            if not(oUnit.Dead) then
+                                bFirstTargetAttacked = true
+                                iMinTargetsAll = 100000
+                                iMinTargetsInRange = 100000
+                                iCurUnitRange = M27UnitInfo.GetUnitIndirectRange(oUnit) + iUnitRangeMod
+                                tCurPos = oUnit:GetPosition()
+                                iUnitsInRange = 0
+                                tUnitsInRange = {}
+                                iNearestEnemyUnitDistance = 10000
+                                oNearestEnemyT2PlusPD = nil
+                                iNearestT2PlusPD = 10000
+                                bCurUnitSpreadAttack = bSpreadAttack
+                                bQueueUpOtherAttacks = true
+                                if bAreNearbyT2PlusPD then
+                                    oNearestEnemyT2PlusPD = M27Utilities.GetNearestUnit(tNearbyEnemyT2PlusPD, tCurPos, aiBrain, nil)
+                                    iNearestT2PlusPD = M27Utilities.GetDistanceBetweenPositions(oNearestEnemyT2PlusPD:GetPosition(), tCurPos)
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': iNearestT2PlusPD='..iNearestT2PlusPD..': Will either pick the nearest T2 PD if <=56, or will cycle through priority targets') end
+                                if iNearestT2PlusPD <= 56 then
+                                    bCurUnitSpreadAttack = false
+                                    bQueueUpOtherAttacks = false
+                                    --Do we have TMD within our range? If so then attack them first
+                                    if bNearbyShieldOrTMD == true then
+                                        local tWithinRangeTMDAndShield = {}
+                                        local iWithinRangeTMDAndShield = 0
+                                        for iEnemy, oEnemy in tPriorityEnemiesNearFiringRange do
+                                            if M27Utilities.GetDistanceBetweenPositions(tCurPos, oUnit:GetPosition()) <= iCurUnitRange then
+                                                if bFirstTargetAttacked then
+                                                    bFirstTargetAttacked = false
+                                                    if not(bDontClearActions) and not(oUnit[M27UnitInfo.refoLastTargetUnit] == oEnemy) then IssueClearCommands({oUnit}) end
+                                                    oUnit[M27UnitInfo.refoLastTargetUnit] = oEnemy
+                                                end
+                                                IssueAttack({oUnit}, oEnemy)
+                                            end
+                                        end
+                                        oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                                    end
+                                    oNearestEnemyUnit = oNearestEnemyT2PlusPD
+                                else
+                                    for iEnemyUnit, oEnemyUnit in tPriorityEnemiesNearFiringRange do
+                                        if not(oEnemyUnit.Dead) then
+                                            bCurUnitInRange = false
+                                            iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPos, oEnemyUnit:GetPosition())
+                                            if iCurDistanceToEnemy <= iCurUnitRange then bCurUnitInRange = true end
+                                            if iCurDistanceToEnemy <= iNearestEnemyUnitDistance then
+                                                iNearestEnemyUnitDistance = iCurDistanceToEnemy
+                                                oNearestEnemyUnit = oEnemyUnit
+                                            end
+                                            if bCurUnitInRange == true then
+                                                table.insert(tUnitsInRange, 1,oEnemyUnit)
+                                                iUnitsInRange = iUnitsInRange + 1
+                                                if oEnemyUnit[sTargetedRef] == nil then oEnemyUnit[sTargetedRef] = 0 end
+                                                if oEnemyUnit[sTargetedRef] < iMinTargetsInRange then
+                                                    iMinTargetsInRange = oEnemyUnit[sTargetedRef]
+                                                    oFirstUnitWithMinTargetsInRange = oEnemyUnit
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+
+                                if bCurUnitSpreadAttack == false then
+                                    --Target nearest enemy (and queue up attacks on all other units)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Telling cur unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to attack the nearest enemy unit '..oNearestEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestEnemyUnit)..'; bQueueUpOtherAttacks='..tostring(bQueueUpOtherAttacks)) end
+                                    if bFirstTargetAttacked then
+                                        bFirstTargetAttacked = false
+                                        if not(bDontClearActions) and not(oUnit[M27UnitInfo.refoLastTargetUnit] == oNearestEnemyUnit) then IssueClearCommands({oUnit}) end
+                                        oUnit[M27UnitInfo.refoLastTargetUnit] = oNearestEnemyUnit
+                                    end
+                                    IssueAttack({oUnit}, oNearestEnemyUnit)
+                                    oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+
+                                    if oNearestEnemyUnit[sTargetedRef] == nil then oNearestEnemyUnit[sTargetedRef] = 0 end
+                                    oNearestEnemyUnit[sTargetedRef] = oNearestEnemyUnit[sTargetedRef] + 1
+                                    if bQueueUpOtherAttacks == true then
+                                        oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                                        if iUnitsInRange > 0 then
+                                            for iEnemyUnit, oEnemyUnit in tUnitsInRange do
+                                                if not(oEnemyUnit == oNearestEnemyUnit) then IssueAttack({oUnit}, oEnemyUnit) end
+                                            end
+                                        else
+                                            for iEnemyUnit, oEnemyUnit in tPriorityEnemiesNearFiringRange do
+                                                if not(oEnemyUnit == oNearestEnemyUnit) then IssueAttack({oUnit}, oEnemyUnit) end
+                                            end
+                                        end
+                                    end
+                                else
+                                    --Spread attack - target the unit in range with the least existing targets (or the nearest enemy unit if no units in range), and queue up attacks on all other priority units
+                                    --If any units in range, then queue up attacks on all of them, starting with the one with min targets:
+                                    if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonUniqueRef..': iUnit='..iUnit..'; iUnitsInRange='..iUnitsInRange..'; iMinTargetsInRange='..iMinTargetsInRange..'; bQueueUpOtherAttacks='..tostring(bQueueUpOtherAttacks)) end
+                                    if bQueueUpOtherAttacks == true then
+                                        oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                                        if iUnitsInRange > 0 then
+                                            if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonUniqueRef..': Telling unit to attack the least targetted enemy unit in range, iUnit='..iUnit..'; X position of target='..oFirstUnitWithMinTargetsInRange:GetPosition()[1]..'; oPlatoon[refiEnemiesInRange]='..oPlatoon[refiEnemiesInRange]..'; iIndirectUnits='..iNonShieldDisruptorUnits) end
+                                            if bDebugMessages == true then LOG('oUnit ID='..oUnit.UnitId) end
+                                            if bFirstTargetAttacked then
+                                                bFirstTargetAttacked = false
+                                                if not(bDontClearActions) and not(oUnit[M27UnitInfo.refoLastTargetUnit] == oFirstUnitWithMinTargetsInRange) then IssueClearCommands({oUnit}) end
+                                                oUnit[M27UnitInfo.refoLastTargetUnit] = oFirstUnitWithMinTargetsInRange
+                                            end
+
+                                            IssueAttack({oUnit}, oFirstUnitWithMinTargetsInRange)
+                                            if oFirstUnitWithMinTargetsInRange[sTargetedRef] == nil then oFirstUnitWithMinTargetsInRange[sTargetedRef] = 0 end
+                                            oFirstUnitWithMinTargetsInRange[sTargetedRef] = oFirstUnitWithMinTargetsInRange[sTargetedRef] + 1
+                                            for iEnemyUnit, oEnemyUnit in tUnitsInRange do
+                                                if not(oEnemyUnit == oFirstUnitWithMinTargetsInRange) then IssueAttack({oUnit}, oEnemyUnit) end
+                                            end
+                                        else
+                                            --No units in range, so target the closest unit
+                                            if oNearestEnemyUnit == nil then M27Utilities.ErrorHandler('Dont have any unit to target')
+                                            else
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Telling unit to attack the nearest enemy unit') end
+                                                if bFirstTargetAttacked then
+                                                    bFirstTargetAttacked = false
+                                                    if not(bDontClearActions) and not(oUnit[M27UnitInfo.refoLastTargetUnit] == oNearestEnemyUnit) then IssueClearCommands({oUnit}) end
+                                                    oUnit[M27UnitInfo.refoLastTargetUnit] = oNearestEnemyUnit
+                                                end
+
+                                                IssueAttack({oUnit}, oNearestEnemyUnit)
+                                                if oNearestEnemyUnit[sTargetedRef] == nil then oNearestEnemyUnit[sTargetedRef] = 0 end
+                                                oNearestEnemyUnit[sTargetedRef] = oNearestEnemyUnit[sTargetedRef] + 1
+                                            end
+
+                                            for iEnemyUnit, oEnemyUnit in tPriorityEnemiesNearFiringRange do
+                                                if not(oEnemyUnit == oNearestEnemyUnit) then IssueAttack({oUnit}, oEnemyUnit) end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
                         end
                     else
-                        bNearbyShieldOrTMD = true
-                        tNearbyTMD = EntityCategoryFilterDown(categories.AEON * M27UnitInfo.refCategoryTMD, tPriorityEnemiesNearFiringRange)
-                        if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
-                            bNearbyAeonTMD = true
-                        else
-                            tNearbyTMD = EntityCategoryFilterDown(M27UnitInfo.refCategoryTMD, tPriorityEnemiesNearFiringRange)
-                            if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
-                                bNearbyNonAeonTMD = true
-                            end
-                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Warning - table of indirect units is empty') end
                     end
-                end
-            end
-            if M27Utilities.IsTableEmpty(tPriorityEnemiesNearFiringRange) == true then
-                tPriorityEnemiesNearFiringRange = aiBrain:GetUnitsAroundPoint(categories.LAND + M27UnitInfo.refCategoryStructure + categories.NAVAL, tPlatoonPosition, math.min(iRevisedSearchRangeForBuildlings, iPlatoonAttackRange), 'Enemy')
-                if M27Utilities.IsTableEmpty(tPriorityEnemiesNearFiringRange) == true then
-                    tPriorityEnemiesNearFiringRange = oPlatoon[reftEnemiesInRange]
-                    if M27Utilities.IsTableEmpty(oPlatoon[reftEnemiesInRange]) then tPriorityEnemiesNearFiringRange = oPlatoon[reftEnemyStructuresInRange] end
-                end
-                if oPlatoon[refiIndirectUnits] > 1 then bSpreadAttack = true end --1 arti shell can kill 1 tank in some cases so want to spraed attack
-                if bDebugMessages == true then LOG(sFunctionRef..': Have no priority enemies so will include nearby mobile units when considering targets') end
-            elseif bDebugMessages == true then LOG(sFunctionRef..': Have priority enemies near firing range')
-            end
-            if M27Utilities.IsTableEmpty(tPriorityEnemiesNearFiringRange) == true then
-                M27Utilities.ErrorHandler('No units to target for indirect attack, will resume movement path instead')
-                ReissueMovementPath(oPlatoon, bDontClearActions)
-            else
-                if bDebugMessages == true then LOG(sFunctionRef..': Have some enemies that can attack, will go through each unit in platoon and allocate targets') end
-                --IssueAttack(oPlatoon[reftIndirectUnits], M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon)))
-
-
-
-                --Track no. of times a unit has been targetted - first reset variables
-                if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonUniqueRef..': No nearby structures so attacking nearest units') end
-                for iEnemyUnit, oEnemyUnit in tPriorityEnemiesNearFiringRange do
-                    oEnemyUnit[sTargetedRef] = 0
-                end
-                --Cycle through each indirect fire unit, and then check for each enemy unit in its range
-                --Default target in case can't find one: the closest unit:
-                local oNearestEnemyUnit
-                local iNearestEnemyUnitDistance
-                local iCurDistanceToEnemy
-                local oNearestEnemyT2PlusPD, iNearestT2PlusPD
-                local bCurUnitSpreadAttack
-                local bQueueUpOtherAttacks
-
-                local bSynchroniseFiring = false
-                local iMMLs = 0
-                local tMMLNearFront = {}
-                local iMMLNearFront = 0
-                local tCurMMLPosition, oNearestTMD, tNearestTMD, iDistanceToNearestTMD
-                --Check if should consider using Synchronised firing
-                if bDebugMessages == true then LOG(sFunctionRef..': About to consider if should synchronise fire; oPlatoon[refiIndirectUnits]='..oPlatoon[refiIndirectUnits]) end
-                if oPlatoon[refiIndirectUnits] >= 3 then
-                    local tMMLs = EntityCategoryFilterDown(categories.SILO, oPlatoon[reftIndirectUnits])
-                    if M27Utilities.IsTableEmpty(tMMLs) == false then iMMLs = table.getn(tMMLs) end
-                    if bDebugMessages == true then LOG(sFunctionRef..': iMMLs='..iMMLs) end
-                    if iMMLs >= 3 then
-                        --More than 30s since we last Synchronised?
-                        local iCurGameTime = GetGameTimeSeconds()
-                        if bDebugMessages == true then
-                            local iTimeOfLastRefresh = oPlatoon[refiTimeOfLastSyncronisation]
-                            if iTimeOfLastRefresh == nil then iTimeOfLastRefresh = 'nil' end
-                            LOG(sFunctionRef..': iTimeOfLastRefresh='..iTimeOfLastRefresh..'; iCurGameTime='..iCurGameTime..'; bNearbyAeonTMD='..tostring(bNearbyAeonTMD)..'; bNearbyNonAeonTMD='..tostring(bNearbyNonAeonTMD))
-                        end
-                        if oPlatoon[refiTimeOfLastSyncronisation] == nil or iCurGameTime - oPlatoon[refiTimeOfLastSyncronisation] > 9 then
-                            --Only 9s, since hte way this works will be turning off once, and then turning on once; therefore even if this runs several times in the same cycle we should avoid units being permanently stuck waiting to attack
-                            --Are there any nearby TMD?
-                            if bNearbyAeonTMD == false and bNearbyNonAeonTMD == false then
-                                --Check in a larger search range
-                                local iTMDSearchRange = math.max(iPlatoonAttackRange, 70)
-                                tNearbyTMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, tPlatoonPosition, iTMDSearchRange, 'Enemy')
-                                if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
-                                    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.AEON, tNearbyTMD)) == false then
-                                        bNearbyAeonTMD = true
-                                    else
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef..': Size of table='..table.getn(tNearbyTMD))
-                                            for iUnit, oUnit in tNearbyTMD do
-                                                LOG('TMD iUnit='..iUnit)
-                                            end
-                                        end
-                                        bNearbyNonAeonTMD = true
-                                    end
-                                end
-                                if bDebugMessages == true then LOG(sFunctionRef..': iNearbyTMD='..table.getn(tNearbyTMD)..'bNearbyAeonTMD='..tostring(bNearbyAeonTMD)..'; bNearbyNonAeonTMD='..tostring(bNearbyNonAeonTMD)) end
-                            end
-                            if bNearbyAeonTMD == true or bNearbyNonAeonTMD == true then
-                                --Get nearest TMD or PD or shield to front platoon unit; Do we have at least 3 MMLs within range of this?
-
-                                local oNearestPriorityUnit = M27Utilities.GetNearestUnit(tPriorityEnemiesNearFiringRange, GetPlatoonFrontPosition(oPlatoon), aiBrain, true)
-                                local tNearestUnit = oNearestPriorityUnit:GetPosition()
-                                local iNearestPriorityUnit = M27Utilities.GetDistanceBetweenPositions(tNearestUnit, GetPlatoonFrontPosition(oPlatoon))
-                                local oNearestUnit = oNearestPriorityUnit
-                                local tNearestT2PlusPD
-                                if M27Utilities.IsTableEmpty(tNearbyEnemyT2PlusPD) == false then
-                                    oNearestEnemyT2PlusPD = M27Utilities.GetNearestUnit(tNearbyEnemyT2PlusPD, GetPlatoonFrontPosition(oPlatoon), aiBrain, nil)
-                                    tNearestT2PlusPD = oNearestEnemyT2PlusPD:GetPosition()
-                                    iNearestT2PlusPD = M27Utilities.GetDistanceBetweenPositions(tNearestT2PlusPD, GetPlatoonFrontPosition(oPlatoon))
-                                    if iNearestPriorityUnit > iNearestT2PlusPD then
-                                        oNearestUnit = oNearestT2PlusPD
-                                        iNearestPriorityUnit = iNearestT2PlusPD
-                                        tNearestUnit = tNearestT2PlusPD
-                                    end
-                                end
-                                for iUnit, oUnit in tMMLs do
-                                    if not(oUnit.Dead) and oUnit.GetPosition then
-                                        tCurMMLPosition = oUnit:GetPosition()
-                                        if M27Utilities.GetDistanceBetweenPositions(tCurMMLPosition, tNearestUnit) <= iPlatoonAttackRange then
-                                            iMMLNearFront = iMMLNearFront + 1
-                                            tMMLNearFront[iMMLNearFront] = oUnit
-                                        end
-                                    end
-                                end
-                                if bDebugMessages == true then LOG(sFunctionRef..': iMMLNearFront='..iMMLNearFront) end
-                                if iMMLNearFront >= 3 then
-                                    if bDebugMessages == true then
-                                        LOG('Size of tNearbyTMD='..table.getn(tNearbyTMD))
-                                        for iUnit, oUnit in tNearbyTMD do
-                                            LOG('iUnit='..iUnit)
-                                        end
-                                    end
-                                    --Has the TMD moved since we last Synchronised?
-                                    oNearestTMD = M27Utilities.GetNearestUnit(tNearbyTMD, tPlatoonPosition, aiBrain)
-                                    if oNearestTMD then
-                                        tNearestTMD = oNearestTMD:GetPosition()
-                                        if bDebugMessages == true then
-                                            local iDistanceToLastTMD = 0
-                                            local iMMLFromLastSynchronisation = oPlatoon[refiMMLCountWhenLastSynchronised]
-                                            if iMMLFromLastSynchronisation == nil then iMMLFromLastSynchronisation = 'nil' end
-                                            if oPlatoon[reftNearestTMDWhenLastSynchronised] then iDistanceToLastTMD = M27Utilities.GetDistanceBetweenPositions(tNearestTMD, oPlatoon[reftNearestTMDWhenLastSynchronised]) end
-                                            LOG(sFunctionRef..': iDistanceToLastTMD='..iDistanceToLastTMD..'; iMMLFromLastSynchronisation='..iMMLFromLastSynchronisation)
-                                        end
-                                        if oPlatoon[reftNearestTMDWhenLastSynchronised] == nil or M27Utilities.GetDistanceBetweenPositions(tNearestTMD, oPlatoon[reftNearestTMDWhenLastSynchronised]) >3 then
-                                            bSynchroniseFiring = true
-                                        else
-                                            if oPlatoon[refiMMLCountWhenLastSynchronised] == nil or iMMLNearFront - oPlatoon[refiMMLCountWhenLastSynchronised] >= 2 then
-                                                bSynchroniseFiring = true
-                                            end
-                                        end
-                                        if bSynchroniseFiring == true then
-                                            oPlatoon[refiTimeOfLastSyncronisation] = iCurGameTime
-                                            oPlatoon[reftNearestTMDWhenLastSynchronised] = tNearestTMD
-                                            oPlatoon[refiMMLCountWhenLastSynchronised] = iMMLNearFront
-                                            local iTimeToSpreadOver = 0
-                                            if bNearbyAeonTMD == true then iTimeToSpreadOver = 3.1 end
-                                            if bDebugMessages == true then LOG(sFunctionRef..': About to call function to synchronise unit firing') end
-                                            SynchroniseUnitFiring(tMMLNearFront, iTimeToSpreadOver)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-
-                if M27Utilities.IsTableEmpty(oPlatoon[reftIndirectUnits]) == false and GetPlatoonUnitsOrUnitCount(oPlatoon, reftIndirectUnits, true, true) > 0 then
-                    local bFirstTargetAttacked
-                    for iUnit, oUnit in GetPlatoonUnitsOrUnitCount(oPlatoon, reftIndirectUnits, false, true) do
-                        if not(oUnit.Dead) then
-                            bFirstTargetAttacked = true
-                            iMinTargetsAll = 100000
-                            iMinTargetsInRange = 100000
-                            iCurUnitRange = M27UnitInfo.GetUnitIndirectRange(oUnit) + iUnitRangeMod
-                            tCurPos = oUnit:GetPosition()
-                            iUnitsInRange = 0
-                            tUnitsInRange = {}
-                            iNearestEnemyUnitDistance = 10000
-                            oNearestEnemyT2PlusPD = nil
-                            iNearestT2PlusPD = 10000
-                            bCurUnitSpreadAttack = bSpreadAttack
-                            bQueueUpOtherAttacks = true
-                            if bAreNearbyT2PlusPD then
-                                oNearestEnemyT2PlusPD = M27Utilities.GetNearestUnit(tNearbyEnemyT2PlusPD, tCurPos, aiBrain, nil)
-                                iNearestT2PlusPD = M27Utilities.GetDistanceBetweenPositions(oNearestEnemyT2PlusPD:GetPosition(), tCurPos)
-                            end
-                            if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..': iNearestT2PlusPD='..iNearestT2PlusPD..': Will either pick the nearest T2 PD if <=56, or will cycle through priority targets') end
-                            if iNearestT2PlusPD <= 56 then
-                                bCurUnitSpreadAttack = false
-                                bQueueUpOtherAttacks = false
-                                --Do we have TMD within our range? If so then attack them first
-                                if bNearbyShieldOrTMD == true then
-                                    local tWithinRangeTMDAndShield = {}
-                                    local iWithinRangeTMDAndShield = 0
-                                    for iEnemy, oEnemy in tPriorityEnemiesNearFiringRange do
-                                        if M27Utilities.GetDistanceBetweenPositions(tCurPos, oUnit:GetPosition()) <= iCurUnitRange then
-                                            if bFirstTargetAttacked then
-                                                bFirstTargetAttacked = false
-                                                if not(bDontClearActions) and not(oUnit[M27UnitInfo.refoLastTargetUnit] == oEnemy) then IssueClearCommands({oUnit}) end
-                                                oUnit[M27UnitInfo.refoLastTargetUnit] = oEnemy
-                                            end
-                                            IssueAttack({oUnit}, oEnemy)
-                                        end
-                                    end
-                                    oPlatoon[refiLastOrderType] = refiOrderIssueAttack
-                                end
-                                oNearestEnemyUnit = oNearestEnemyT2PlusPD
-                            else
-                                for iEnemyUnit, oEnemyUnit in tPriorityEnemiesNearFiringRange do
-                                    if not(oEnemyUnit.Dead) then
-                                        bCurUnitInRange = false
-                                        iCurDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tCurPos, oEnemyUnit:GetPosition())
-                                        if iCurDistanceToEnemy <= iCurUnitRange then bCurUnitInRange = true end
-                                        if iCurDistanceToEnemy <= iNearestEnemyUnitDistance then
-                                            iNearestEnemyUnitDistance = iCurDistanceToEnemy
-                                            oNearestEnemyUnit = oEnemyUnit
-                                        end
-                                        if bCurUnitInRange == true then
-                                            table.insert(tUnitsInRange, 1,oEnemyUnit)
-                                            iUnitsInRange = iUnitsInRange + 1
-                                            if oEnemyUnit[sTargetedRef] == nil then oEnemyUnit[sTargetedRef] = 0 end
-                                            if oEnemyUnit[sTargetedRef] < iMinTargetsInRange then
-                                                iMinTargetsInRange = oEnemyUnit[sTargetedRef]
-                                                oFirstUnitWithMinTargetsInRange = oEnemyUnit
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-
-                            if bCurUnitSpreadAttack == false then
-                                --Target nearest enemy (and queue up attacks on all other units)
-                                if bDebugMessages == true then LOG(sFunctionRef..': Telling cur unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to attack the nearest enemy unit '..oNearestEnemyUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestEnemyUnit)..'; bQueueUpOtherAttacks='..tostring(bQueueUpOtherAttacks)) end
-                                if bFirstTargetAttacked then
-                                    bFirstTargetAttacked = false
-                                    if not(bDontClearActions) and not(oUnit[M27UnitInfo.refoLastTargetUnit] == oNearestEnemyUnit) then IssueClearCommands({oUnit}) end
-                                    oUnit[M27UnitInfo.refoLastTargetUnit] = oNearestEnemyUnit
-                                end
-                                IssueAttack({oUnit}, oNearestEnemyUnit)
-                                oPlatoon[refiLastOrderType] = refiOrderIssueAttack
-
-                                if oNearestEnemyUnit[sTargetedRef] == nil then oNearestEnemyUnit[sTargetedRef] = 0 end
-                                oNearestEnemyUnit[sTargetedRef] = oNearestEnemyUnit[sTargetedRef] + 1
-                                if bQueueUpOtherAttacks == true then
-                                    oPlatoon[refiLastOrderType] = refiOrderIssueAttack
-                                    if iUnitsInRange > 0 then
-                                        for iEnemyUnit, oEnemyUnit in tUnitsInRange do
-                                            if not(oEnemyUnit == oNearestEnemyUnit) then IssueAttack({oUnit}, oEnemyUnit) end
-                                        end
-                                    else
-                                        for iEnemyUnit, oEnemyUnit in tPriorityEnemiesNearFiringRange do
-                                            if not(oEnemyUnit == oNearestEnemyUnit) then IssueAttack({oUnit}, oEnemyUnit) end
-                                        end
-                                    end
-                                end
-                            else
-                                --Spread attack - target the unit in range with the least existing targets (or the nearest enemy unit if no units in range), and queue up attacks on all other priority units
-                                --If any units in range, then queue up attacks on all of them, starting with the one with min targets:
-                                if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonUniqueRef..': iUnit='..iUnit..'; iUnitsInRange='..iUnitsInRange..'; iMinTargetsInRange='..iMinTargetsInRange..'; bQueueUpOtherAttacks='..tostring(bQueueUpOtherAttacks)) end
-                                if bQueueUpOtherAttacks == true then
-                                    oPlatoon[refiLastOrderType] = refiOrderIssueAttack
-                                    if iUnitsInRange > 0 then
-                                        if bDebugMessages == true then LOG(sFunctionRef..':'..sPlatoonUniqueRef..': Telling unit to attack the least targetted enemy unit in range, iUnit='..iUnit..'; X position of target='..oFirstUnitWithMinTargetsInRange:GetPosition()[1]..'; oPlatoon[refiEnemiesInRange]='..oPlatoon[refiEnemiesInRange]..'; iIndirectUnits='..oPlatoon[refiIndirectUnits]) end
-                                        if bDebugMessages == true then LOG('oUnit ID='..oUnit.UnitId) end
-                                        if bFirstTargetAttacked then
-                                            bFirstTargetAttacked = false
-                                            if not(bDontClearActions) and not(oUnit[M27UnitInfo.refoLastTargetUnit] == oFirstUnitWithMinTargetsInRange) then IssueClearCommands({oUnit}) end
-                                            oUnit[M27UnitInfo.refoLastTargetUnit] = oFirstUnitWithMinTargetsInRange
-                                        end
-
-                                        IssueAttack({oUnit}, oFirstUnitWithMinTargetsInRange)
-                                        if oFirstUnitWithMinTargetsInRange[sTargetedRef] == nil then oFirstUnitWithMinTargetsInRange[sTargetedRef] = 0 end
-                                        oFirstUnitWithMinTargetsInRange[sTargetedRef] = oFirstUnitWithMinTargetsInRange[sTargetedRef] + 1
-                                        for iEnemyUnit, oEnemyUnit in tUnitsInRange do
-                                            if not(oEnemyUnit == oFirstUnitWithMinTargetsInRange) then IssueAttack({oUnit}, oEnemyUnit) end
-                                        end
-                                    else
-                                        --No units in range, so target the closest unit
-                                        if oNearestEnemyUnit == nil then M27Utilities.ErrorHandler('Dont have any unit to target')
-                                        else
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Telling unit to attack the nearest enemy unit') end
-                                            if bFirstTargetAttacked then
-                                                bFirstTargetAttacked = false
-                                                if not(bDontClearActions) and not(oUnit[M27UnitInfo.refoLastTargetUnit] == oNearestEnemyUnit) then IssueClearCommands({oUnit}) end
-                                                oUnit[M27UnitInfo.refoLastTargetUnit] = oNearestEnemyUnit
-                                            end
-
-                                            IssueAttack({oUnit}, oNearestEnemyUnit)
-                                            if oNearestEnemyUnit[sTargetedRef] == nil then oNearestEnemyUnit[sTargetedRef] = 0 end
-                                            oNearestEnemyUnit[sTargetedRef] = oNearestEnemyUnit[sTargetedRef] + 1
-                                        end
-
-                                        for iEnemyUnit, oEnemyUnit in tPriorityEnemiesNearFiringRange do
-                                            if not(oEnemyUnit == oNearestEnemyUnit) then IssueAttack({oUnit}, oEnemyUnit) end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Warning - table of indirect units is empty') end
                 end
             end
         end
@@ -9253,12 +9502,12 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 930 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' and aiBrain:GetArmyIndex() == 6 then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
@@ -9271,9 +9520,9 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-            --if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+            --if sPlatoonName == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MobileStealth' then bDebugMessages = true end
-            --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 26 then bDebugMessages = true end
+            --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
             --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
 
@@ -9415,6 +9664,7 @@ function ProcessPlatoonAction(oPlatoon)
                         if sPlatoonName == 'M27LargeAttackForce' then
                             --If only a small number of enemies then target the nearest DF structure or the slowest enemy unit
                             if oPlatoon[refiEnemiesInRange] < math.min(8, oPlatoon[refiDFUnits] * 0.5) then
+                                local oTargetEnemy
                                 if oPlatoon[refiEnemyStructuresInRange] > 0 then
                                     --Are there any nearby PD? If so are we in range of them
                                     local tNearbyPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, oPlatoon[reftEnemyStructuresInRange])
@@ -9423,13 +9673,15 @@ function ProcessPlatoonAction(oPlatoon)
                                         local oNearestPD = M27Utilities.GetNearestUnit(tNearbyPD, GetPlatoonFrontPosition(oPlatoon))
                                         if M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) < (iEnemyPDRange + 4) then
                                             --have a PD thats in range or almost in range of us, so should attack it
-                                            tDFTargetPosition = oNearestPD:GetPosition()
+                                            oTargetEnemy = oNearestPD
+                                            --tDFTargetPosition = oNearestPD:GetPosition()
                                             bAlreadyDeterminedTargetEnemy = true
                                         end
                                     end
                                     if bAlreadyDeterminedTargetEnemy == false then
                                         --No nearby PD so just go for nearest structure
-                                        tDFTargetPosition = M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon)):GetPosition()
+                                        oTargetEnemy = M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon))
+                                        --tDFTargetPosition = M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon)):GetPosition()
                                         bAlreadyDeterminedTargetEnemy = true
                                     end
                                 end
@@ -9439,10 +9691,22 @@ function ProcessPlatoonAction(oPlatoon)
                                     if not(tSlowerEnemies==nil) then
                                         if table.getn(tSlowerEnemies) > 0 then
                                             if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': ProcessPlatoonAction: table.getn(tSlowerEnemies)='..table.getn(tSlowerEnemies)) end
-                                            tDFTargetPosition[1], tDFTargetPosition[2], tDFTargetPosition[3] = M27Utilities.GetNearestUnit(tSlowerEnemies, GetPlatoonFrontPosition(oPlatoon)):GetPositionXYZ()
+                                            oTargetEnemy = M27Utilities.GetNearestUnit(tSlowerEnemies, GetPlatoonFrontPosition(oPlatoon))
+                                            --tDFTargetPosition[1], tDFTargetPosition[2], tDFTargetPosition[3] = M27Utilities.GetNearestUnit(tSlowerEnemies, GetPlatoonFrontPosition(oPlatoon)):GetPositionXYZ()
                                             bAlreadyDeterminedTargetEnemy = true
                                         end
                                     end
+                                end
+                                if oTargetEnemy then
+                                    local iDistAwayFromTarget = 3
+                                    if EntityCategoryContains(categories.VOLATILE, oTargetEnemy.UnitId) then iDistAwayFromTarget = 7 end --energy storage has an aoe of 5, dont want to just set equal to this since then we wouldnt attack things like a paragon
+                                    --If shot is blocked and are already within this distance (or close to it) then reduce the distance from target
+
+                                    if oPlatoon[refoFrontUnit][M27UnitInfo.refbLastShotBlocked] then
+                                        local iCurDistToTarget = M27Utilities.GetDistanceBetweenPositions(oPlatoon[refoFrontUnit]:GetPosition(), oTargetEnemy:GetPosition())
+                                        if iCurDistToTarget <= iDistAwayFromTarget + 1 then iDistAwayFromTarget = math.max(1, iCurDistToTarget - 2) end
+                                    end
+                                    tDFTargetPosition = M27Utilities.MoveInDirection(oTargetEnemy:GetPosition(), M27Utilities.GetAngleFromAToB(oTargetEnemy:GetPosition(), GetPlatoonFrontPosition(oPlatoon)), iDistAwayFromTarget, true)
                                 end
                             end
                         elseif sPlatoonName == 'M27GroundExperimental' then
@@ -9798,8 +10062,6 @@ function ProcessPlatoonAction(oPlatoon)
                                     end
                                 end
                                 if M27Utilities.IsTableEmpty(tDFTargetPosition) == true then tDFTargetPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain) end
-                                oPlatoon[reftTemporaryMoveTarget] = tDFTargetPosition
-                                if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary move target to tDFTargetPosition='..repru(oPlatoon[reftTemporaryMoveTarget])) end
 
                                 --Is the target under shield? If so then change the target to the shield itself unless we are an ACU and doing so brings us in range of T1 PD
                                 local oNearestEnemyShield = M27Logic.GetNearestActiveFixedEnemyShield(aiBrain, tDFTargetPosition)
@@ -9815,6 +10077,9 @@ function ProcessPlatoonAction(oPlatoon)
                                         bMoveNotAttack = false
                                     end
                                 end
+
+                                oPlatoon[reftTemporaryMoveTarget] = tDFTargetPosition
+                                if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary move target to tDFTargetPosition='..repru(oPlatoon[reftTemporaryMoveTarget])) end
 
 
                                 if bMoveNotAttack and M27Conditions.HaveNearbyMobileShield(oPlatoon) and not(oNearestEnemyShield) then bMoveNotAttack = false end
@@ -10262,7 +10527,7 @@ function ProcessPlatoonAction(oPlatoon)
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionDisband') end
                     if oPlatoon then
                         --Clear skirmisher intel request tracker
-                        if sPlatoonName == 'M27Skirmisher' then aiBrain[reftSkirmisherPlatoonWantingIntel][sPlatoonName..oPlatoon[refiPlatoonCount]] = nil end
+                        if oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] then aiBrain[reftSkirmisherPlatoonWantingIntel][sPlatoonName..oPlatoon[refiPlatoonCount]] = nil end
 
                         --Refresh all plateau trackers
                         if oPlatoon[M27Transport.refiAssignedPlateau] then
@@ -10339,7 +10604,7 @@ function ProcessPlatoonAction(oPlatoon)
                                 if not(tRemainingUnits[1].PlatoonHandle) or tRemainingUnits[1].PlatoonHandle == oPlatoon then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Will send aggressive move order to remaining units in the platoon. Size of table='..table.getsize(tRemainingUnits)) end
                                     IssueAggressiveMove(tRemainingUnits, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                    UpdateUnitNames(tRemainingUnits, "DisbandedReturnToBase", true)
+                                    if M27Config.M27ShowUnitNames == true then UpdateUnitNames(tRemainingUnits, "DisbandedReturnToBase", true) end
                                     for iUnit, oUnit in tRemainingUnits do
                                         oUnit[M27PlatoonFormer.refbWaitingForAssignment] = false
                                     end
@@ -10370,8 +10635,18 @@ function ProcessPlatoonAction(oPlatoon)
                                     if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Clearing commands; Gametime='..GetGameTimeSeconds()) end
                                     IssueClearCommands(GetPlatoonUnitsOrUnitCount(oPlatoon, reftDFUnits, false, true))
                                 end
-                                oPlatoon[reftTemporaryMoveTarget] = {}
-                                oPlatoon[reftTemporaryMoveTarget][1], oPlatoon[reftTemporaryMoveTarget][2], oPlatoon[reftTemporaryMoveTarget][3] = oTargetEnemy:GetPositionXYZ()
+                                local iDistAwayFromTarget = 3
+                                if EntityCategoryContains(categories.VOLATILE, oTargetEnemy.UnitId) then iDistAwayFromTarget = 7 end --energy storage has an aoe of 5, dont want to just set equal to this since then we wouldnt attack things like a paragon
+                                --If shot is blocked and are already within this distance (or close to it) then reduce the distance from target
+
+                                if oPlatoon[refoFrontUnit][M27UnitInfo.refbLastShotBlocked] then
+                                    local iCurDistToTarget = M27Utilities.GetDistanceBetweenPositions(oPlatoon[refoFrontUnit]:GetPosition(), oTargetEnemy:GetPosition())
+                                    if iCurDistToTarget <= iDistAwayFromTarget + 1 then iDistAwayFromTarget = math.max(1, iCurDistToTarget - 2) end
+                                end
+
+
+                                oPlatoon[reftTemporaryMoveTarget] = M27Utilities.MoveInDirection(oTargetEnemy:GetPosition(), M27Utilities.GetAngleFromAToB(oTargetEnemy:GetPosition(), GetPlatoonFrontPosition(oPlatoon)), iDistAwayFromTarget, true)
+                                --oPlatoon[reftTemporaryMoveTarget][1], oPlatoon[reftTemporaryMoveTarget][2], oPlatoon[reftTemporaryMoveTarget][3] = oTargetEnemy:GetPositionXYZ()
 
                                 --Record location and switch to continuing with movement path if we have tried going here too many times and cant path
                                 if ReconsiderTarget(oPlatoon, oPlatoon[reftTemporaryMoveTarget]) then
@@ -10452,8 +10727,56 @@ function ProcessPlatoonAction(oPlatoon)
                             if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Clearing commands; Gametime='..GetGameTimeSeconds()) end
                             IssueClearCommands(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true))
                         end
+
+                        --Change the target to reclaim if we think we are having issues reclaiming it
+                        if oPlatoon[refbNotStartedReclaimingYet] then
+                            local iBuildRange = GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true)[1]:GetBlueprint().Economy.MaxBuildDistance
+                            if iBuildRange > 1  then
+                                local oEngineer = GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true)[1]
+                                local tEnemiesToReclaim = oEngineer:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryAllNavy - categories.COMMAND - categories.SUBCOMMANDER, oEngineer:GetPosition(), iBuildRange, 'Enemy')
+                                if M27Utilities.IsTableEmpty(tEnemiesToReclaim) == false then
+                                    local oPreferredReclaimTarget
+                                    local oBackupReclaimTarget
+                                    local iClosestDist = 10000
+                                    local iCurDist
+                                    for iUnit, oUnit in tEnemiesToReclaim do
+                                        if not(oUnit == oPlatoon[refoNearbyReclaimTarget]) then
+                                            iCurDist =  M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oEngineer:GetPosition())
+                                            if iCurDist >= 2 then
+                                                iClosestDist = iCurDist
+                                                oPreferredReclaimTarget = oUnit
+                                            else
+                                                oBackupReclaimTarget = oUnit
+                                            end
+                                        end
+                                    end
+                                    if not(oPreferredReclaimTarget) then oPreferredReclaimTarget = oBackupReclaimTarget end
+                                    if oPreferredReclaimTarget then
+                                        oPlatoon[refoNearbyReclaimTarget] = oPreferredReclaimTarget
+                                    else
+                                        --No other suitable reclaim targets so move a bit then try reclaiming
+                                        if M27UnitInfo.IsUnitValid(oPlatoon[refoNearbyReclaimTarget]) then
+                                            iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoNearbyReclaimTarget])
+                                            if iCurDist <= 2 then
+                                                --Move away from the unit
+                                                IssueMove(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(oPlatoon[refoNearbyReclaimTarget]:GetPosition(), GetPlatoonFrontPosition(oPlatoon)), iCurDist + 1, true))
+                                            else
+                                                --Move towards the unit
+                                                IssueMove(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), M27Utilities.MoveInDirection(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoNearbyReclaimTarget]:GetPosition()), iCurDist - 1, true))
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
                         IssueReclaim(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), oPlatoon[refoNearbyReclaimTarget])
+                        if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoNearbyReclaimTarget]:GetPosition()) <= GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true)[1]:GetBlueprint().Economy.MaxBuildDistance then
+                            --Are within range to start reclaiming immediately so set the flag that we should reclaim (to help coutner issue where sometimes we dont due to glitch if are too close)
+                            oPlatoon[refbNotStartedReclaimingYet] = true
+                        end
                         oPlatoon[refiLastOrderType] = refiOrderIssueReclaim
+
                     else
                         if M27Utilities.IsTableEmpty(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true)) == true then
                             --Aborted due to units being busy on micro
@@ -10464,9 +10787,9 @@ function ProcessPlatoonAction(oPlatoon)
                             LOG('Size of tReclaimers='..GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, true, true))
                         end
                     end
-                    --Add move command so unit wont stay idle
+                    --Add move command so unit wont stay idle (but dont record this as the last order type)
                     IssueMove(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
-                    oPlatoon[refiLastOrderType] = refiOrderIssueMove
+                    --oPlatoon[refiLastOrderType] = refiOrderIssueMove --(want to have reclaim as the last order type as the move order is just backup logic)
                 elseif oPlatoon[refiCurrentAction] == refActionReclaimAllNearby then
                     --Have reclaim potentially near us - action will be cleared as part of engineer logic
                     local tAvailableReclaimers = GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true)
@@ -10897,7 +11220,11 @@ function ProcessPlatoonAction(oPlatoon)
                             for iDFUnit, oDFUnit in tDFUnits do
                                 if M27UnitInfo.IsUnitValid(oDFUnit) then
                                     --Dont wait for the normal logic on weapon targeting to trigger
-                                    M27UnitInfo.SetUnitTargetPriorities(oDFUnit, oPlatoon[reftPlatoonDFTargettingCategories])
+                                    if EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oDFUnit.UnitId) then
+                                        M27UnitInfo.SetUnitTargetPriorities(oDFUnit, M27UnitInfo.refWeaponPriorityShieldDisruptor)
+                                    else
+                                        M27UnitInfo.SetUnitTargetPriorities(oDFUnit, oPlatoon[reftPlatoonDFTargettingCategories])
+                                    end
                                     --Are we further from target than our ACU and our ACU is in the attack?
                                     if bDebugMessages == true then LOG(sFunctionRef..': oDFUnit='..oDFUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oDFUnit)..'; Position to enemy ACU='..M27Utilities.GetDistanceBetweenPositions(oDFUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU])..'; iACUDistanceToTarget='..iACUDistanceToTarget..'; iOffsetToNotBlockACUDistance='..iOffsetToNotBlockACUDistance) end
                                     --Check if we're further away from target than ACU (ignore if within a bit of ACU distance to avoid us dobuling back)
@@ -10963,7 +11290,11 @@ function ProcessPlatoonAction(oPlatoon)
 
                         --Set weapon priorities
                         for iUnit, oUnit in tDFUnits do
-                            M27UnitInfo.SetUnitTargetPriorities(oUnit, oPlatoon[reftPlatoonDFTargettingCategories])
+                            if EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oUnit.UnitId) then
+                                M27UnitInfo.SetUnitTargetPriorities(oUnit, M27UnitInfo.refWeaponPriorityShieldDisruptor)
+                            else
+                                M27UnitInfo.SetUnitTargetPriorities(oUnit, oPlatoon[reftPlatoonDFTargettingCategories])
+                            end
                         end
                     end
 

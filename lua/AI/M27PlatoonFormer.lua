@@ -86,8 +86,8 @@ function RefreshUnitsWaitingForAssignment(aiBrain)
     if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then
         for iUnit, oUnit in tUnitsWaiting do
             if not(oUnit.Dead) then
-                --Exclude T2+ indirect fire units
-                if not(EntityCategoryContains(refCategoryIndirectT2Plus, oUnit.UnitId)) then
+                --Exclude T2+ indirect fire units and shield disruptors
+                if not(EntityCategoryContains(refCategoryIndirectT2Plus + M27UnitInfo.refCategoryShieldDisruptor, oUnit.UnitId)) then
                     iValidUnits = iValidUnits + 1
                     tValidRemainingUnits[iValidUnits] = oUnit
                     oUnit[refbWaitingForAssignment] = true
@@ -293,6 +293,19 @@ function CombatPlatoonFormer(aiBrain)
     if iIndirectUnits > 0 then
         CreatePlatoon(aiBrain, 'M27IndirectSpareAttacker', tIndirectUnits)
         if bDebugMessages == true then LOG(sFunctionRef..': iIndirectUnits='..iIndirectUnits..'; Created indirect spare attacker platoon for them') end
+        --[[--If shield disruptor in platoon then form skirmisher
+        local tShieldDisruptors = EntityCategoryFilterDown(M27UnitInfo.refCategoryShieldDisruptor, tIndirectUnits)
+        if M27Utilities.IsTableEmpty(tShieldDisruptors) then
+
+        else
+            local tOtherIndirect = EntityCategoryFilterDown(categories.ALLUNITS - M27UnitInfo.refCategoryShieldDisruptor, tIndirectUnits)
+            if M27Utilities.IsTableEmpty(tOtherIndirect) == false then
+                CreatePlatoon(aiBrain, 'M27IndirectSpareAttacker', tOtherIndirect)
+                if bDebugMessages == true then LOG(sFunctionRef..': iIndirectUnits='..iIndirectUnits..'; Created indirect spare attacker platoon for those units in tOtherIndirect that arent shield disruptors') end
+            end
+            CreatePlatoon(aiBrain, 'M27Skirmisher', tShieldDisruptors)
+            if bDebugMessages == true then LOG(sFunctionRef..': iIndirectUnits='..iIndirectUnits..'; Creating shield disruptor platoon using skirmisher logic') end
+        end--]]
     end
 
     --Form amphibious defenders
@@ -789,6 +802,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                             --Ensure the unit uses the long range sniper weapon
                             if EntityCategoryContains(M27UnitInfo.refCategorySniperBot * categories.SERAPHIM, oUnit.UnitId) then M27UnitInfo.EnableLongRangeSniper(oUnit) end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryRASSACU, sUnitID) then table.insert(tRAS, oUnit)
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, sUnitID) then table.insert(tIndirect, oUnit)
                         elseif EntityCategoryContains(refCategoryLandCombat, sUnitID) then table.insert(tCombat, oUnit)
                         elseif EntityCategoryContains(refCategoryIndirectT2Plus, sUnitID) then table.insert(tIndirect, oUnit)
                         elseif EntityCategoryContains(refCategoryAllAir, sUnitID) then
@@ -1766,11 +1780,11 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                             local tSpecialCombat = EntityCategoryFilterDown(M27UnitInfo.refCategorySkirmisher + M27UnitInfo.refCategoryLandExperimental, tNewUnits)
                             local tRAS = EntityCategoryFilterDown(M27UnitInfo.refCategoryRASSACU, tNewUnits)
                             if bDebugMessages == true then LOG(sFunctionRef..': Is table tRAS empty='..tostring(M27Utilities.IsTableEmpty(tRAS))) end
-                            local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategorySkirmisher - M27UnitInfo.refCategoryLandExperimental - M27UnitInfo.refCategoryRASSACU - M27UnitInfo.refCategoryMobileLandStealth, tNewUnits)
+                            local tCombatUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategorySkirmisher - M27UnitInfo.refCategoryLandExperimental - M27UnitInfo.refCategoryRASSACU - M27UnitInfo.refCategoryMobileLandStealth - M27UnitInfo.refCategoryShieldDisruptor, tNewUnits)
                             local tEngineerUnits = EntityCategoryFilterDown(refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategoryMobileLandStealth, tNewUnits)
                             local tAirUnits = EntityCategoryFilterDown(categories.AIR - refCategoryEngineer, tNewUnits)
                             local tNavalUnits = EntityCategoryFilterDown(categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandStealth, tNewUnits)
-                            local tIndirectT2Plus = EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategoryMobileLandStealth, tNewUnits)
+                            local tIndirectT2Plus = EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategoryShieldDisruptor - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategoryMobileLandStealth, tNewUnits)
                             local tMAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryMAA  - M27UnitInfo.refCategoryIndirectT2Plus - categories.NAVAL - categories.AIR - refCategoryEngineer - M27UnitInfo.refCategoryLandCombat - M27UnitInfo.refCategoryMobileLandShield - M27UnitInfo.refCategoryMobileLandStealth, tNewUnits)
 
                             local tNeedingAssigningCombatUnits = {}
@@ -1994,7 +2008,7 @@ function UpdateIdlePlatoonActions(aiBrain, iCycleCount)
         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any T2+ indirect units in idle platoon, in which case will assign them to attacknearest temporary platoon') end
         local tIdleIndirectUnits = aiBrain[M27PlatoonTemplates.refoIdleIndirect]:GetPlatoonUnits()
         if M27Utilities.IsTableEmpty(tIdleIndirectUnits) == false then
-            local tIdleIndirectT2Plus = EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus, tIdleIndirectUnits)
+            local tIdleIndirectT2Plus = EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategoryShieldDisruptor, tIdleIndirectUnits)
             if M27Utilities.IsTableEmpty(tIdleIndirectT2Plus) == false then
                 if bDebugMessages == true then LOG(sFunctionRef..': Allocating idle indirect units to indirectspareattacker platoon') end
                 CreatePlatoon(aiBrain, 'M27IndirectSpareAttacker', tIdleIndirectT2Plus)

@@ -98,6 +98,23 @@ function SafeToUpgradeUnit(oUnit)
             end
         end
     end
+
+
+    --TML extra logic for mexes (in reality will only stop T2 mexes upgrading to T3; t1 mex would be harder since would need to recreate the 'protected from TMD' logic here for T1 mexes, without recording the mex as wanting an upgrade, and would then risk never upgrading mexes
+    if bSafeToGetUpgrade and EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
+        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftUnitsWantingTMD]) == false then
+            for iAltUnit, oAltUnit in aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] do
+                if oUnit == oAltUnit then
+                    bSafeToGetUpgrade = false
+                end
+            end
+        end
+        --T1 mexes - dont upgrade if recently built and far from base
+        if bSafeToGetUpgrade and EntityCategoryContains(categories.TECH1, oUnit.UnitId) and GetGameTimeSeconds() - (oUnit[M27UnitInfo.refiTimeConstructed] or 0) <= 40 and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) >= 80 then
+            bSafeToGetUpgrade = false
+        end
+    end
+
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, bSafeToGetUpgrade='..tostring(bSafeToGetUpgrade)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bSafeToGetUpgrade
