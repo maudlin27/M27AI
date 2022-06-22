@@ -12,7 +12,7 @@ local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 
-
+bUsingArmyIndexForStartPosition = false --by default will assume armies are ARMY_1 etc.; this will be changed to true if any exceptions are found
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
 tMexPointsByLocationRef = {} --As per mass points, but the key is the locationref value, and it returns the position
 tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
@@ -299,6 +299,7 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
     local sFunctionRef = 'RecordResourceNearStartPosition'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, iArmy='..(iArmy or 'nil')..'; iMaxDistance='..(iMaxDistance or 'nil')..'; bCountOnly='..tostring(bCountOnly or false)..'; bMexNotHydro='..tostring(bMexNotHydro or false)..'; Full PlayerStartPoints table='..repru(PlayerStartPoints)) end
     if iMaxDistance == nil then iMaxDistance = 12 end --NOTE: As currently only run the actual code to locate nearby mexes once, the first iMaxDistance will determine what to use, and any subsequent uses it wont matter
     if bMexNotHydro == nil then bMexNotHydro = true end
     if bCountOnly == nil then bCountOnly = false end
@@ -307,6 +308,7 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
     if bMexNotHydro == false then iResourceType = 2 end
 
     if tResourceNearStart[iArmy] == nil then tResourceNearStart[iArmy] = {} end
+
     if tResourceNearStart[iArmy][iResourceType] == nil then
         --Haven't determined nearby resource yet
         local iDistance = 0
@@ -360,19 +362,33 @@ end
 function RecordPlayerStartLocations()
     -- Updates PlayerStartPoints to Record all the possible player start points
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'RecordPlayerStartLocations'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMarkerType = 3
-    for i = 1, 16 do
-        local tempPos = ScenarioUtils.GetMarker('ARMY_'..i).position
-        if tempPos ~= nil then
-            PlayerStartPoints[i] = tempPos
-            if bDebugMessages == true then LOG('* M27AI: Recording Player start point, ARMY_'..i..' x=' ..PlayerStartPoints[i][1]..';y='..PlayerStartPoints[i][2]..';z='..PlayerStartPoints[i][3]) end
-            for iPathingType, sPathing in M27UnitInfo.refPathingTypeAll do
-                if tUnmappedMarker[sPathing] == nil then tUnmappedMarker[sPathing] = {} end
-                if tUnmappedMarker[sPathing][iMarkerType] == nil then tUnmappedMarker[sPathing][iMarkerType] = {} end
-                tUnmappedMarker[sPathing][iMarkerType][i] = tempPos
+    if not(bUsingArmyIndexForStartPosition) then
+        for i = 1, 16 do
+            local tempPos = ScenarioUtils.GetMarker('ARMY_'..i).position
+            if tempPos ~= nil then
+                PlayerStartPoints[i] = tempPos
+                if bDebugMessages == true then LOG('* M27AI: Recording Player start point, ARMY_'..i..' x=' ..PlayerStartPoints[i][1]..';y='..PlayerStartPoints[i][2]..';z='..PlayerStartPoints[i][3]) end
+                for iPathingType, sPathing in M27UnitInfo.refPathingTypeAll do
+                    if tUnmappedMarker[sPathing] == nil then tUnmappedMarker[sPathing] = {} end
+                    if tUnmappedMarker[sPathing][iMarkerType] == nil then tUnmappedMarker[sPathing][iMarkerType] = {} end
+                    tUnmappedMarker[sPathing][iMarkerType][i] = tempPos
+                end
             end
         end
+    else
+        if bDebugMessages == true then LOG(sFunctionRef..': Dont have ARMY references in a numerical format, so will revert to just recording the aiBrains start positions by their army index and ignore markers') end
+        for iBrain, oBrain in ArmyBrains do
+
+            PlayerStartPoints[oBrain:GetArmyIndex()] = {}
+            PlayerStartPoints[oBrain:GetArmyIndex()][1], PlayerStartPoints[oBrain:GetArmyIndex()][3] = oBrain:GetArmyStartPos()
+            PlayerStartPoints[oBrain:GetArmyIndex()][2] = GetTerrainHeight(PlayerStartPoints[oBrain:GetArmyIndex()][1], PlayerStartPoints[oBrain:GetArmyIndex()][3])
+            if bDebugMessages == true then LOG(sFunctionRef..': Brain name='..oBrain.Name..'; iBrain='..iBrain..'; Start position='..repru(PlayerStartPoints[oBrain:GetArmyIndex()])) end
+        end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GetResourcesNearTargetLocation(tTargetPos, iMaxDistance, bMexNotHydro)
@@ -2226,7 +2242,9 @@ function GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchR
     --first looks in a straight line along tTravelTarget, and only if no match does it consider looking left, right and behind
     --Returns nil if cant find target
     local sFunctionRef = 'GetNearestPathableLandPosition'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local tValidTarget
     if oPathingUnit and not(oPathingUnit.Dead) and M27Utilities.IsTableEmpty(tTravelTarget)==false and iMaxSearchRange then
         local iDistanceForEachCheckLow = 2.5
@@ -2236,11 +2254,12 @@ function GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchR
         local tCurPosition
         local tStartPosition = oPathingUnit:GetPosition()
         local bFoundTarget = false
+        if bDebugMessages == true then LOG(sFunctionRef..': tStartPosition='..repru(tStartPosition)..'; tTravelTarget='..repru(tTravelTarget)..'; iMaxSearchRange='..iMaxSearchRange..'; iHigherThanMaxDistanceCycle='..iHigherThanMaxDistanceCycle) end
         for iAngleCycle = 1, 4 do
             if iAngleCycle == 1 then iAngleToPath = 0
-                elseif iAngleCycle == 2 then iAngleToPath = 90
-                elseif iAngleCycle == 3 then iAngleToPath = 270
-                else iAngleToPath = 180
+            elseif iAngleCycle == 2 then iAngleToPath = 90
+            elseif iAngleCycle == 3 then iAngleToPath = 270
+            else iAngleToPath = 180
             end
 
             local iDistanceMod
@@ -2252,10 +2271,13 @@ function GetNearestPathableLandPosition(oPathingUnit, tTravelTarget, iMaxSearchR
                 if iDistanceCycle > iMaxSearchRange then iDistanceCycle = iMaxSearchRange bLastDistanceCycle = true end
 
                 tCurPosition = M27Utilities.MoveTowardsTarget(tStartPosition, tTravelTarget, iDistanceMod, iAngleToPath)
+                tCurPosition[2] = GetTerrainHeight(tCurPosition[1], tCurPosition[3])
                 if M27Utilities.IsTableEmpty(tCurPosition) == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Trying to find position that isnt underwater. iDistanceCycle='..iDistanceCycle..'; iDistanceMod='..iDistanceMod..'; iAngleToPath='..iAngleToPath..'; tCurPosition='..repru(tCurPosition)..'; Terrain height='..GetTerrainHeight(tCurPosition[1], tCurPosition[3])..'; GetSurfaceHeight='..GetSurfaceHeight(tCurPosition[1], tCurPosition[3])..'; IsUnderwater(tCurPosition)='..tostring(IsUnderwater(tCurPosition))..'; iMapWaterHeight='..iMapWaterHeight) end
                     if IsUnderwater(tCurPosition) == false then
                         bFoundTarget = true
                         tValidTarget = tCurPosition
+                        if bDebugMessages == true then LOG(sFunctionRef..': Found target so will stop searching') end
                         break
                     end
                 end
@@ -4931,9 +4953,11 @@ function IdentifyTeamChokepoints(aiBrain)
                             local iClosestDist = 10000
                             local oClosestBrain
                             for iChokepointCount, tChokepointSubtables in M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
+                                iClosestDist = 10000
                                 for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
                                     if not(oBrain[refiAssignedChokepointCount]) and GetSegmentGroupOfLocation(sPathing, PlayerStartPoints[oBrain.M27StartPositionNumber]) == iLandPathingGroupWanted then
                                         iCurDist = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[oBrain.M27StartPositionNumber], tChokepointSubtables[reftChokepointBuildLocation])
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Looking for nearest M27 near the chokepoint at position '..repru(tChokepointSubtables[reftChokepointBuildLocation])..'; aiBrain='..aiBrain:GetArmyIndex()..'; iCurDist='..iCurDist..'; iClosestDist='..iClosestDist) end
                                         if iCurDist <= iClosestDist then
                                             iClosestDist = iCurDist
                                             oClosestBrain = oBrain

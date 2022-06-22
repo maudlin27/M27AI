@@ -758,8 +758,29 @@ function GetAIBrainArmyNumber(aiBrain)
         --if bDebugMessages == true then LOG('GetAIBrainArmyNumber: aiBrain.Name='..aiBrain.Name..'; string.sub5='..string.sub(aiBrain.Name, (string.len(aiBrain.Name)-5))..'; string.sub7='..string.sub(aiBrain.Name, (string.len(aiBrain.Name)-7))..'; string.sub custom='..string.sub(aiBrain.Name, 6, string.len(aiBrain.Name) - 6)..'string.sub custom2='..string.sub(aiBrain.Name, 6, 1)..'; sub custom3='..string.sub(aiBrain.Name, 6, 2)..'; tostring'..string.sub(tostring(aiBrain.Name), 3, 2)..'; gsub='..string.gsub(aiBrain.Name, 'ARMY_', '')) end
 
         local sArmyNumber = string.gsub(aiBrain.Name, 'ARMY_', '')
-        if bDebugMessages == true then LOG('GetAIBrainArmyNumber: sArmyNumber='..sArmyNumber) end
-        if string.len(sArmyNumber) <= 2 then return tonumber(sArmyNumber) else return nil end
+        if bDebugMessages == true then LOG('GetAIBrainArmyNumber: sArmyNumber='..sArmyNumber..'; M27MapInfo.bUsingArmyIndexForStartPosition='..tostring(M27MapInfo.bUsingArmyIndexForStartPosition)) end
+        if not(M27MapInfo.bUsingArmyIndexForStartPosition) then
+            if string.len(sArmyNumber) <= 2 then
+                if M27MapInfo.bUsingArmyIndexForStartPosition then
+                    ErrorHandler('Some brains are using numerical army indexes, others arent, will lead to errors; Brain name='..aiBrain.Name..'; will just use army index')
+                    return aiBrain:GetArmyIndex()
+                else
+                    M27MapInfo.bUsingArmyIndexForStartPosition = false
+                end
+                return tonumber(sArmyNumber)
+            end
+        end
+        if not(M27MapInfo.bUsingArmyIndexForStartPosition) then
+            --Is this a non-civilian brain?
+            if not(M27Logic.IsCivilianBrain(aiBrain)) then
+                ErrorHandler('Army reference for '..aiBrain.Name..' doesnt use numbers, so will overwrite all brains start position number to be the army index number and hten use armyindex going forwards', true)
+                M27MapInfo.bUsingArmyIndexForStartPosition = true
+                for iBrain, oBrain in ArmyBrains do
+                    oBrain.M27StartPositionNumber = oBrain:GetArmyIndex()
+                end
+            end
+        end
+        return aiBrain:GetArmyIndex()
     else
         ErrorHandler('aiBrain is nil')
         return nil
