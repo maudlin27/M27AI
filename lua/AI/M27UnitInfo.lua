@@ -34,8 +34,8 @@ refbFullyUpgraded = 'M27UnitFullyUpgraded' --used on ACU to avoid running some c
 refbRecentlyRemovedHealthUpgrade = 'M27UnitRecentlyRemovedHealthUpgrade' --Used on ACU to flag if e.g. we removed T2 which will decrease our health
 refbActiveMissileChecker = 'M27UnitMissileTracker' --True if are actively checking for missile targets
 refbActiveSMDChecker = 'M27UnitSMDChecker' -- true if unit is checking for enemy SMD (use on nuke)
-refbActiveTargetChecker = 'M27UnitActiveTargetChecker' --e.g. used for T3 fixed arti, Quantum optics
-refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will update this when given an IssueAttack order
+refbActiveTargetChecker = 'M27UnitActiveTargetChecker' --e.g. used for T3 fixed arti, Quantum optics, hive
+refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will update this when given an IssueAttack order; hives will update when given a reclaim order
 reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
 refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
 refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
@@ -128,7 +128,9 @@ refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER -categories.SUBCOMMANDER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
 refCategoryRASSACU = categories.SUBCOMMANDER * categories.RASPRESET + categories.SUBCOMMANDER * categories.SERAPHIM
 refCategoryRover = categories.POD * categories.ENGINEER * categories.MOBILE - categories.CONSTRUCTION -refCategoryEngineer
-refCategoryEngineerStation = categories.ENGINEERSTATION + refCategoryRover
+refCategoryHive = categories.STRUCTURE * categories.STATIONASSISTPOD * categories.ENGINEERSTATION
+refCategoryKennel = categories.STRUCTURE * categories.ENGINEERSTATION * categories.PODSTAGINGPLATFORM
+refCategoryEngineerStation = refCategoryRover + refCategoryHive + refCategoryKennel
 
 refCategoryMAA = categories.LAND * categories.MOBILE * categories.ANTIAIR - categories.EXPERIMENTAL
 refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFIRE * categories.BOT + categories.LAND * categories.MOBILE * categories.TANK * categories.TECH1 * categories.SERAPHIM - refCategoryMAA -categories.REPAIR --(repair exclusion added as basic way to differentiate between mantis (which has repair category) and LAB; alternative way is to specify the fastest when choosing the blueprint to build
@@ -197,6 +199,7 @@ refCategoryFirebaseSuitable = refCategoryPD + refCategoryT1Radar + refCategoryT2
 refCategoryLongRangeDFLand = refCategoryFatboy + refCategorySniperBot + refCategoryShieldDisruptor
 refCategoryLongRangeMobile = refCategoryLongRangeDFLand + refCategoryNavalSurface * categories.DIRECTFIRE + refCategoryNavalSurface * categories.INDIRECTFIRE - refCategoryNavalSurface * categories.TECH1 + refCategoryIndirectT2Plus
 refCategoryShortRangeMobile = refCategoryLandCombat + refCategoryFrigate - refCategoryLongRangeMobile
+refCategoryReclaimable = categories.RECLAIMABLE - refCategoryAllAir
 
 --Weapon target priorities
 refWeaponPriorityACU = {categories.COMMAND, refCategoryMobileLandShield, refCategoryFixedShield, refCategoryPD, refCategoryLandCombat, categories.MOBILE, refCategoryStructure - categories.BENIGN, categories.ALLUNITS - categories.BENIGN}

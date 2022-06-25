@@ -662,6 +662,8 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
     local sFunctionRef = 'UpgradeUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --if oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade) == 'urb01012' then bDebugMessages = true end
+
     --Do we have any HQs of the same factory type of a higher tech level?
     local sUpgradeID = M27UnitInfo.GetUnitUpgradeBlueprint(oUnitToUpgrade, true) --If not a factory or dont recognise the faction then just returns the normal unit ID
     --local oUnitBP = oUnitToUpgrade:GetBlueprint()
@@ -675,6 +677,16 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
 
     if sUpgradeID then
         local aiBrain = oUnitToUpgrade:GetAIBrain()
+
+        --Factory specific - if work progress is <=5% then cancel so can do the upgrade
+        if EntityCategoryContains(M27UnitInfo.refCategoryAllFactories, oUnitToUpgrade.UnitId) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are upgrading a factory '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..'; work progress='..oUnitToUpgrade:GetWorkProgress()) end
+            if oUnitToUpgrade.GetWorkProgress and oUnitToUpgrade:GetWorkProgress() <= 0.05 then
+                IssueClearCommands({ oUnitToUpgrade })
+                if bDebugMessages == true then LOG(sFunctionRef..': Have barely started with current construction so will cancel so can get upgrade sooner') end
+            end
+        end
+
         --Issue upgrade
         IssueUpgrade({ oUnitToUpgrade }, sUpgradeID)
 
@@ -707,12 +719,12 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
         elseif EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnitToUpgrade.UnitId) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
             M27Logic.DetermineTMDWantedForUnits(aiBrain, { oUnitToUpgrade })
             if bDebugMessages == true then
-                LOG(sFunctionRef..': Have just checked if oUnitToUpgrade '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..' needs protecting from TML; will list out all units flagged as wanting tmd')
+                LOG(sFunctionRef .. ': Have just checked if oUnitToUpgrade ' .. oUnitToUpgrade.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade) .. ' needs protecting from TML; will list out all units flagged as wanting tmd')
                 if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftUnitsWantingTMD]) then
-                    LOG(sFunctionRef..': No units wanting TMD')
+                    LOG(sFunctionRef .. ': No units wanting TMD')
                 else
                     for iUnit, oUnit in aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] do
-                        LOG(sFunctionRef..': '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                        LOG(sFunctionRef .. ': ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
                     end
                 end
             end
@@ -908,7 +920,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
             LOG(sFunctionRef .. ': No active HQ upgrades so will see if we have lost our HQ and need a new one first. aiBrain[M27Overseer.refiOurHighestLandFactoryTech]=' .. aiBrain[M27Overseer.refiOurHighestLandFactoryTech] .. '; aiBrain[M27Overseer.refiOurHighestLandFactoryTech]=' .. aiBrain[M27Overseer.refiOurHighestLandFactoryTech] .. '; iT2LandFactories=' .. iT2LandFactories .. '; iT3LandFactories=' .. iT3LandFactories)
         end
         if aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and (iT2LandFactories + iT3LandFactories) > 0 then
---Have lower tech level than we have in factories (e.g. our HQ was destroyed)
+            --Have lower tech level than we have in factories (e.g. our HQ was destroyed)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Only have T1 land factory tech available, but have T2 and T3 factories so assuming we lost our HQ')
             end
@@ -2268,7 +2280,7 @@ function UpgradeMainLoop(aiBrain)
                                                 if oUnitToUpgrade == nil then
                                                     --Consider whether to show an error message or not
 
-                                                --FOR DEBUG ONLY: Is it unexpected that there is nothing to upgrade?
+                                                    --FOR DEBUG ONLY: Is it unexpected that there is nothing to upgrade?
 
                                                     --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
                                                     if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 150 then

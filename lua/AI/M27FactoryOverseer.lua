@@ -316,6 +316,10 @@ function GetPreferredArtiProportion(aiBrain, oFactory)
 end
 
 function GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, bEmergency)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetLandCombatCategory'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     --if bEmergency is true then will check the desired category can be buitl and if not will revert to a more general category
     local iCategoryToBuild = refCategoryDFTank
     --Aeon shield disruptor if nearest unit has a shield:
@@ -335,8 +339,9 @@ function GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, bEmergency)
                 end
             end
         else
+            if bDebugMessages == true then LOG(sFunctionRef..': oFactory='..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; Tech level='..iFactoryTechLevel..'; NeedIndirect='..tostring(aiBrain[M27Overseer.refbNeedIndirect])..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; Skirmisher mass kills='..(aiBrain[M27Overseer.refiSkirmisherMassKills] or 0)..'; Skirmisher mass built='..(aiBrain[M27Overseer.refiSkirmisherMassBuilt] or 0)..'; Skirmisher mass kills='..(aiBrain[M27Overseer.refiSkirmisherMassDeathsAll] or 0)) end
             --Can path with land; build Skirmishers if they're effective
-            if iFactoryTechLevel > 1 and not(aiBrain[M27Overseer.refbNeedIndirect]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain[M27Overseer.refiSkirmisherMassKills] > math.max(400, aiBrain[M27Overseer.refiSkirmisherMassDeathsAll], aiBrain[M27Overseer.refiSkirmisherMassDeathsFromLand] * 1.5, aiBrain[M27Overseer.refiSkirmisherMassBuilt] * 0.25) then
+            if iFactoryTechLevel > 1 and not(aiBrain[M27Overseer.refbNeedIndirect]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and (aiBrain[M27Overseer.refiSkirmisherMassKills] or 0) >= math.min((aiBrain[M27Overseer.refiSkirmisherMassBuilt] or 0), math.max(200, aiBrain[M27Overseer.refiSkirmisherMassDeathsAll] * 0.75, aiBrain[M27Overseer.refiSkirmisherMassDeathsFromLand], (aiBrain[M27Overseer.refiSkirmisherMassBuilt] or 0) * 0.2)) then
                 --Can we actually build a skirmisher
                 local iFactionIndex = M27UnitInfo.GetUnitFaction(oFactory)
                 if (iFactionIndex == M27UnitInfo.refFactionUEF or iFactionIndex == M27UnitInfo.refFactionCybran) then
@@ -352,6 +357,10 @@ function GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, bEmergency)
             end
         end
     end
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Returning list of BPs that meet the category we want to build'..reprs(EntityCategoryGetUnitList(iCategoryCondition)))
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return iCategoryToBuild
 end
 

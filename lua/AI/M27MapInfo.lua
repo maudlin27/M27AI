@@ -159,7 +159,7 @@ refiAssignedChokepointFirebaseRef = 'M27AssignedFirebaseRef' --When a firebase i
 
 function DetermineMaxTerrainHeightDif()
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    if M27Config.M27ShowPathingGraphically then bDebugMessages = true end
+    if M27Config.M27ShowPathingGraphically then bDebugMessages = true end --Based on config settings
     --Manually specify the terrain height difference to use for certain maps (e.g. where there are ramps and the pathfinding default options return incorrect pathing)
     --To find out the map name, run with 'display pathing graphically' config option set to true, and search for the last entry containing "DetermineMaxTerrainHeightDif: sMapName="
     local sFunctionRef = 'DetermineMaxTerrainHeightDif'
@@ -1322,7 +1322,7 @@ function ReclaimManager()
                     iLoopCount = 0
                     if bDebugMessages == true then LOG(sFunctionRef..': About to update for iUpdateCount='..iUpdateCount..' entries; max updates per tick='..iMaxUpdatesPerTick..'; tAreasToUpdateThisCycle='..repru(tAreasToUpdateThisCycle)) end
                     for iSegmentX, tSubtable1 in tAreasToUpdateThisCycle do
-                        for iSegmentZ, tSubtable2 in tAreasToUpdateThisCycle do
+                        for iSegmentZ, tSubtable2 in tAreasToUpdateThisCycle[iSegmentX] do
                             iLoopCount = iLoopCount + 1
                             if iLoopCount > iMaxUpdatesPerTick then
                                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -1385,7 +1385,7 @@ function UpdateReclaimDataNearSegments(iBaseSegmentX, iBaseSegmentZ, iSegmentRan
             iTotalMassValue = 0
             tReclaimables = GetReclaimablesInRect(Rect((iCurX - 1) * iReclaimSegmentSizeX, (iCurZ - 1) * iReclaimSegmentSizeZ, iCurX * iReclaimSegmentSizeX, iCurZ * iReclaimSegmentSizeZ))
             iLargestCurReclaim = 0
-            
+
             if tReclaimables and table.getn( tReclaimables ) > 0 then
                 -- local iWreckCount = 0
                 --local bIsProp = nil  --only used for log/testing
@@ -1406,7 +1406,7 @@ function UpdateReclaimDataNearSegments(iBaseSegmentX, iBaseSegmentZ, iSegmentRan
                 tReclaimAreas[iCurX][iCurZ][refReclaimHighestIndividualReclaim] = iLargestCurReclaim
                 iHighestReclaimInASegment = math.max(iHighestReclaimInASegment, iTotalMassValue)
                 tReclaimAreas[iCurX][iCurZ][refReclaimTotalEnergy] = iTotalEnergyValue
-        
+
                 --Determine reclaim areas of interest
                 if not(tReclaimAreas[iCurX][iCurZ][refiReclaimTotalPrev] == iTotalMassValue) then
 

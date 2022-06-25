@@ -186,6 +186,7 @@ refiOrderIssueGuard = 7
 refiOrderIssueRepair = 8
 refiOrderIssueBuild = 9
 refiOrderOvercharge = 10
+refiOrderUpgrade = 11
 
 function UpdateUnitNames(tUnits, sNewName, bAddLifetimeCount)
     local sUnitNewName = sNewName
@@ -2204,7 +2205,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 855 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon[refiPlatoonCount] == 3 and oPlatoon[refoFrontUnit].UnitId == 'url0001' and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
@@ -2309,7 +2310,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
         --ACU RunAway logic (highest priority):
         if oPlatoon[refbACUInPlatoon] == true then
-            if bDebugMessages == true then LOG(sFunctionRef..': ACU in platoon, will consider if should run. Strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; Include ACU in all out attack='..tostring(aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] or false)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': ACU in platoon, will consider if should run. Strategy='..(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] or 'nil')..'; Include ACU in all out attack='..tostring(aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] or false)) end
 
             if M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then
                 if bDebugMessages == true then LOG(sFunctionRef..': ACU should run from a big threat') end
@@ -4397,9 +4398,9 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
             local tACUs = EntityCategoryFilterDown(categories.COMMAND, oPlatoon[reftCurrentUnits])
             local bACUInPlatoon = false
             if not(M27Utilities.IsTableEmpty(tACUs)) then
-                local oACU = M27Utilities.GetACU(aiBrain)
+                --local oACU = M27Utilities.GetACU(aiBrain)
                 for iUnit, oUnit in tACUs do
-                    if oUnit == oACU then
+                    if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
                         bACUInPlatoon = true
                         break
                     end
@@ -5016,7 +5017,7 @@ function DetermineIfACUShouldBuildFactory(oPlatoon)
                                     end
                                 end
                             elseif iFactoryCount < 4 then
-                                if M27Conditions.DoesACUHaveUpgrade(aiBrain) == false then
+                                if M27Conditions.DoesACUHaveUpgrade(aiBrain, oPlatoon[reftBuilders][1]) == false then
                                     if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
                                         if aiBrain:GetEconomyStored('MASS') >= 400 then
                                             if iStoredEnergy >= 750 then
@@ -5029,7 +5030,7 @@ function DetermineIfACUShouldBuildFactory(oPlatoon)
                                     end
                                 end
                             elseif iFactoryCount < 6 then
-                                if M27Conditions.DoesACUHaveUpgrade(aiBrain) == false then
+                                if M27Conditions.DoesACUHaveUpgrade(aiBrain, oPlatoon[reftBuilders][1]) == false then
                                     if aiBrain:GetEconomyTrend('ENERGY') >= 5 then -->=50 energy income
                                         if aiBrain:GetEconomyStored('MASS') >= 600 then
                                             if iStoredEnergy >= 1000 then
@@ -6287,7 +6288,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 855 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and oPlatoon[refiPlatoonCount] == 3 and oPlatoon[refoFrontUnit].UnitId == 'url0001' and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -6878,7 +6879,7 @@ function DeterminePlatoonAction(oPlatoon)
                                 for iBuilder, oBuilder in oPlatoon[reftBuilders] do
                                     --Units can build something by 'repairing' it, so check for both unit states:
                                     if bDebugMessages == true then LOG(sFunctionRef..': oBuilder='..oBuilder.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBuilder)..'; Unit state='..M27Logic.GetUnitState(oBuilder)) end
-                                    if oBuilder:IsUnitState('Building') == true or (oBuilder:IsUnitState('Repairing') and oBuilder:GetFocusUnit():GetFractionComplete() < 1) then
+                                    if oBuilder:IsUnitState('Building') == true or (oBuilder:IsUnitState('Repairing') and (oBuilder:GetFocusUnit().GetFractionComplete and oBuilder:GetFocusUnit():GetFractionComplete() < 1)) then
                                         --refActionAssistConstruction - check that we have the target we want
                                         if not(oPlatoon[refiCurrentAction] == refActionAssistConstruction or (oBuilder.GetFocusUnit and oBuilder:GetFocusUnit() == oPlatoon[refoConstructionToAssist])) then
                                             oPlatoon[refbMovingToBuild] = false
@@ -6982,9 +6983,9 @@ function DeterminePlatoonAction(oPlatoon)
                         end
                     end
                 end
-                    if bDebugMessages == true then
+                if bDebugMessages == true then
                     LOG(sFunctionRef .. ': iRefreshActionThreshold after logic for where action is the same as before=' .. iRefreshActionThreshold)
-                    end
+                end
             else
                 if oPlatoon[refiCurrentAction] == refActionAssistConstruction and oPlatoon[refiBuilders] > 0 then
                     --Check if have any builders who are building
@@ -6993,7 +6994,7 @@ function DeterminePlatoonAction(oPlatoon)
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': oBuilder=' .. oBuilder.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBuilder) .. '; Unit state=' .. M27Logic.GetUnitState(oBuilder))
                         end
-                        if oBuilder:IsUnitState('Building') == true or (oBuilder:IsUnitState('Repairing') and oBuilder:GetFocusUnit():GetFractionComplete() < 1) then
+                        if oBuilder:IsUnitState('Building') == true or (oBuilder:IsUnitState('Repairing') and (oBuilder:GetFocusUnit().GetFractionComplete and oBuilder:GetFocusUnit():GetFractionComplete() < 1)) then
                             oPlatoon[refbMovingToBuild] = false
                             if bDebugMessages == true then
                                 LOG(sPlatoonName .. oPlatoon[refiPlatoonCount] .. ': Builder is building, so dont refresh action')
@@ -7694,7 +7695,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                             end
                         else
                             --Are we before the first ACU upgrade? then Choose priority expansion target
-                            if M27Conditions.DoesACUHaveUpgrade(aiBrain) == false then
+                            if M27Conditions.DoesACUHaveUpgrade(aiBrain, oPlatoon[reftBuilders][1]) == false then
                                 --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': Considered whether ACU has gun yet') end
                                 if bDebugMessages == true then LOG(sFunctionRef..': ACU doesnt have gun yet, will get expansion movement path') end
                                 oPlatoon[reftMovementPath] = M27Logic.GetPriorityExpansionMovementPath(aiBrain, GetPathingUnit(oPlatoon))
@@ -7965,7 +7966,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                 end
             end
             --DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
-            if oPlatoon[refbACUInPlatoon] == true and M27Conditions.DoesACUHaveUpgrade(aiBrain) == false then
+            if oPlatoon[refbACUInPlatoon] == true and M27Conditions.DoesACUHaveUpgrade(aiBrain, oPlatoon[reftBuilders][1]) == false then
                 --Update engineer tracker varaibles to factor in that ACU expected to build mexes
                 --if bDebugMessages == true then M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..': About to call function to ACU action tracker') end
                 M27EngineerOverseer.UpdateActionsForACUMovementPath(oPlatoon[reftMovementPath], aiBrain, M27Utilities.GetACU(aiBrain), oPlatoon[refiCurrentPathTarget])
@@ -8103,7 +8104,7 @@ function ReissueMovementPath(oPlatoon, bDontClearActions, bCalledFromNewMovement
                         if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionReissueMovementPath: About to update platoon name and movement path, current target='..oPlatoon[refiCurrentPathTarget]..'; position of this='..repru(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])..'PlatoonUnitCount='..table.getn(oPlatoon[reftCurrentUnits])..'; plaotonaction='..oPlatoon[refiCurrentAction]) end
                         if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..'-'..oPlatoon[refiPlatoonUniqueCount]..': A'..refActionReissueMovementPath) end
                         MoveAlongPath(oPlatoon, oPlatoon[reftMovementPath], oPlatoon[refiCurrentPathTarget], bDontClearActions)
-                        if oPlatoon[refbACUInPlatoon] and not(M27Conditions.DoesACUHaveUpgrade(aiBrain)) and not(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(oPlatoon[reftBuilders][1])])) then
+                        if oPlatoon[refbACUInPlatoon] and not(M27Conditions.DoesACUHaveUpgrade(aiBrain, oPlatoon[reftBuilders][1])) and not(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerActionsByEngineerRef][M27EngineerOverseer.GetEngineerUniqueCount(oPlatoon[reftBuilders][1])])) then
                             M27EngineerOverseer.UpdateActionsForACUMovementPath(oPlatoon[reftMovementPath], aiBrain, oPlatoon[reftBuilders][1], oPlatoon[refiCurrentPathTarget])
                         end
                     end

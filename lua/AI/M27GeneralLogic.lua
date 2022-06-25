@@ -1588,6 +1588,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
         local bOurUnits = false
         local iHealthFactor --if unit has 40% health, then threat reduced by (1-40%)*iHealthFactor
         local iCurShield, iMaxShield
+        local oBP
 
         local iBlipThreat = 54
         if iMassValueOfBlipsOverride then iBlipThreat = iMassValueOfBlipsOverride
@@ -1620,19 +1621,20 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                         bCalcActualThreat = true
                                     else
                                         --Is it a structure:
-                                        if EntityCategoryContains(categories.STRUCTURE, oUnit:GetBlueprint().BlueprintId) then
+                                        oBP = oUnit:GetBlueprint()
+                                        if EntityCategoryContains(categories.STRUCTURE, oBP.BlueprintId) then
                                             if bDebugMessages == true then LOG('iUnit='..iUnit..'; IsSeenEver is false; have a structure so will be reduced threat') end
                                             iCurThreat = 0
                                         else
                                             --Specific speed checks
                                             if bDebugMessages == true and oUnit.GetBlueprint then LOG('Unit has blueprint with maxpseed='..oUnit:GetBlueprint().Physics.MaxSpeed) end
-                                            if oUnit.GetBlueprint and oUnit:GetBlueprint().Physics.MaxSpeed == 1.9 then
+                                            if oUnit.GetBlueprint and oBP.Physics.MaxSpeed == 1.9 then
                                                 --Unit is same speed as engineer so more likely tahn not its an engineer
                                                 iCurThreat = 10
-                                            elseif oUnit.GetBlueprint and oUnit:GetBlueprint().Physics.MaxSpeed == 1.7 then
+                                            elseif oUnit.GetBlueprint and oBP.Physics.MaxSpeed == 1.7 then
                                                 --Unit is same speed as ACU so more likely than not its an ACU
                                                 iCurThreat = 800
-                                            elseif oUnit.GetBlueprint and oUnit:GetBlueprint().Physics.MaxSpeed == aiBrain[refiEnemyScoutSpeed] then
+                                            elseif oUnit.GetBlueprint and oBP.Physics.MaxSpeed == aiBrain[refiEnemyScoutSpeed] then
                                                 iCurThreat = 10
                                             else
                                                 if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not; will be using blip threat override of '..(iMassValueOfBlipsOverride or 54)..' if more than one blip') end
@@ -1655,7 +1657,8 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
             if bCalcActualThreat == true then
                 if bDebugMessages == true then LOG(sFunctionRef..': About to calculate threat using actual unit data; unitID='..oUnit.UnitId) end
                 --get actual threat calc
-                if bJustGetMassValue == true then iCurThreat = oUnit:GetBlueprint().Economy.BuildCostMass
+                oBP = oUnit:GetBlueprint()
+                if bJustGetMassValue == true then iCurThreat = oBP.Economy.BuildCostMass
                 else
                     iMassMod = 0
                     if not(bIndirectFireThreatOnly) then
@@ -1689,12 +1692,17 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                         end
                     end
                     if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit.UnitId) then iMassMod = iMassMod * 2 end
-                    iMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
+                    iMassCost = oBP.Economy.BuildCostMass
 
 
                     iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                     iMaxHealth = oUnit:GetMaxHealth() + iMaxShield
                     iHealthPercentage = (oUnit:GetHealth() + iCurShield) / iMaxHealth
+
+                    if oUnit.Sync.VeteranLevel > 0 then
+                        iHealthPercentage = iHealthPercentage * ((oUnit:GetMaxHealth() + iMaxShield) / (oBP.Defense.MaxHealth + iMaxShield) + oUnit.Sync.VeteranLevel * 0.04)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' veterancy level='..oUnit.Sync.VeteranLevel..'; max health='..iMaxHealth..'; BP max health='..oBP.Defense.MaxHealth..'; Unit max health='..oUnit:GetMaxHealth()..'; iMaxShield='..iMaxShield..'; iHealthPercentage='..iHealthPercentage) end
+                    end
                     if EntityCategoryContains(M27UnitInfo.refCategoryLandCombat - categories.COMMAND - categories.SUBCOMMANDER, oUnit.UnitId) and iMaxHealth > aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] then aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] = iMaxHealth end
                     --[[iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
                     if iMaxShield > 0 and iHealthPercentage > 0 then
@@ -1718,13 +1726,17 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                             if bOurUnits == true then iHealthFactor = iHealthPercentage
                             else
                                 if iHealthPercentage > 0.25 then
-                                    iHealthFactor = iHealthPercentage * (1 + (1 - iHealthPercentage))
+                                    --For enemy damaged units treat them as still ahving high threat, since enemy likely could use them effectively still
+                                    if iHealthPercentage >= 1 then iHealthFactor = iHealthPercentage
+                                    else
+                                        iHealthFactor = iHealthPercentage * (1 + (1 - iHealthPercentage))
+                                    end
                                 else iHealthFactor = 0.25 end
                             end
                         end
                         iCurThreat = iMassCost * iMassMod * iHealthFactor
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'; iHealthPercentage='..iHealthPercentage..'; UnitHealth='..oUnit:GetHealth()..'; UnitMaxHealth='..oUnit:GetBlueprint().Defense.MaxHealth..'; UnitHealth='..oUnit:GetBlueprint().Defense.Health) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'; iHealthPercentage='..iHealthPercentage..'; UnitHealth='..oUnit:GetHealth()..'; UnitMaxHealth='..oBP.Defense.MaxHealth..'; UnitHealth='..oBP.Defense.Health) end
                 end
                 --Reduce threat if its under construction
                 if oUnit:GetFractionComplete() <= 0.75 then iCurThreat = iCurThreat * 0.1 end
@@ -1825,7 +1837,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
         local iHealthPercentage
         local bOurUnits = false
         local sCurUnitPathing
-        local oCurUnitBlueprint
+        local oBP
         local sCurUnitBP
         local iGhettoGunshipAdjust = 0
         for iUnit, oUnit in tUnits do
@@ -1882,8 +1894,8 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                     --Is unit still valid? If so then consider its weapons/categories more precisely:
                     if bDebugMessages == true then LOG(sFunctionRef..': bUnitFitsDesiredCategory='..tostring(bUnitFitsDesiredCategory)) end
                     if bUnitFitsDesiredCategory == true then
-                        oCurUnitBlueprint = oUnit:GetBlueprint()
-                        sCurUnitBP = oCurUnitBlueprint.BlueprintId
+
+                        sCurUnitBP = oBP.BlueprintId
 
                         --Get values for air units:
                         if sCurUnitPathing == M27UnitInfo.refPathingTypeAir then

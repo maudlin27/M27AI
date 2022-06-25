@@ -86,6 +86,31 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     oKilledBrain[M27EngineerOverseer.refbPotentialFirebaseBuildingChangedSinceLastFirebaseCheck] = true
                 end
 
+                --Hive assistance for fixed shields
+                if EntityCategoryContains(M27UnitInfo.refCategoryHive, oUnitKilled.UnitId) then
+                    local aiBrain = oUnitKilled:GetAIBrain()
+                    local tNearbyHives = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryHive, oUnitKilled:GetPosition(), 20, 'Ally')
+                    if M27Utilities.IsTableEmpty(tNearbyHives) then
+                        local tNearbyFixedShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oUnitKilled:GetPosition(), 23, 'Ally')
+                        if M27Utilities.IsTableEmpty(tNearbyFixedShields) == false then
+                            --Is the shield already flagged as wanting a hive?
+                            for iNearbyShield, oNearbyShield in tNearbyFixedShields do
+                                local bAddToTable = true
+                                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftShieldsWantingHives]) == false then
+
+                                    for iShield, oShield in aiBrain[M27EngineerOverseer.reftShieldsWantingHives] do
+                                        if oShield == oNearbyShield then
+                                            bAddToTable = false
+                                            break
+                                        end
+                                    end
+                                end
+                                if bAddToTable then table.insert(aiBrain[M27EngineerOverseer.reftShieldsWantingHives], oNearbyShield) end
+                            end
+                        end
+                    end
+                end
+
                 if EntityCategoryContains(M27UnitInfo.refCategoryPD, oUnitKilled.UnitId) then
                     --If a PD that didnt compelte construction then track mass value so we adjust PD effectiveness
                     if not(oUnitKilled.M27OnConstructedCalled) then
@@ -878,6 +903,11 @@ function OnConstructed(oEngineer, oJustBuilt)
                 ForkThread(M27EngineerOverseer.FirebaseTrackingOfConstruction, aiBrain, oEngineer, oJustBuilt)
                 --If just built by ACU than refresh firebase so ACU doesnt risk building loads more T2 PD to try and get a firebase to register
                 if EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then ForkThread(M27EngineerOverseer.RefreshListOfFirebases, aiBrain) end
+
+                --Shields wanting hives
+                if EntityCategoryContains(M27UnitInfo.refCategoryFixedShield * categories.TECH3, oJustBuilt.UnitId) then
+                    table.insert(aiBrain[M27EngineerOverseer.reftShieldsWantingHives], oJustBuilt)
+                end
             end
 
             --Initial categories below are for if not protecting from TML
@@ -935,6 +965,8 @@ function OnConstructed(oEngineer, oJustBuilt)
                         end
                     end
                 end
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryHive, oJustBuilt.UnitId) then
+                ForkThread(M27EngineerOverseer.HiveManager, oJustBuilt)
 
             else
                 --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
@@ -964,12 +996,12 @@ function OnConstructed(oEngineer, oJustBuilt)
 
             --If have just upgraded a shield then clear tracking (redundancy as should also trigger from 'death' of old shield)
             if EntityCategoryContains(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and M27Utilities.IsTableEmpty(oJustBuilt[M27EngineerOverseer.reftAssistingEngineers]) == false then
-                for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
-                    if M27UnitInfo.IsUnitValid(oEngi) then
-                        IssueClearCommands({ oEngi })
-                        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
-                    end
-                end
+            for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
+            if M27UnitInfo.IsUnitValid(oEngi) then
+            IssueClearCommands({ oEngi })
+            M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+            end
+            end
             end
 
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -999,6 +1031,8 @@ function OnReclaimStarted(oEngineer, oReclaim)
             if oEngineer.PlatoonHandle and oEngineer.PlatoonHandle[M27PlatoonUtilities.refbNotStartedReclaimingYet] then
                 --Platoon specific - flag that have started the reclaim
                 oEngineer.PlatoonHandle[M27PlatoonUtilities.refbNotStartedReclaimingYet] = false
+            elseif oEngineer[M27PlatoonUtilities.refbNotStartedReclaimingYet] then
+                oEngineer[M27PlatoonUtilities.refbNotStartedReclaimingYet] = false
             end
         end
 
@@ -1023,19 +1057,29 @@ function OnReclaimFinished(oEngineer, oReclaim)
             ForkThread(M27MapInfo.RecordThatWeWantToUpdateReclaimAtLocation, oEngineer:GetPosition(), 1)
             --M27MapInfo.UpdateReclaimDataNearLocation(oEngineer:GetPosition(), 1, nil)
         end
-        --If dealing with M27 unit that is in a platoon that is reclaiming a specific target, then look for a new target
+        --If dealing with M27 unit that is in a platoon that is reclaiming a specific target or a hive, then look for a new target
         if M27UnitInfo.IsUnitValid(oEngineer) and oEngineer:GetAIBrain().M27AI then
-            if oEngineer.PlatoonHandle then
-                if bDebugMessages == true then LOG(sFunctionRef..': Platoon current action='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] or 'nil')..'; last order type='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] or 'nil')) end
-                if oEngineer.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReclaimTarget or oEngineer.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueReclaim then
-                    local iBuildRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
-                    if iBuildRange > 1 then
-                        local tEnemiesToReclaim = oEngineer:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryAllNavy - categories.COMMAND - categories.SUBCOMMANDER, oEngineer:GetPosition(), iBuildRange, 'Enemy')
-                        if M27Utilities.IsTableEmpty(tEnemiesToReclaim) == false then
-                            local oUnitToReclaim = M27Utilities.GetNearestUnit(tEnemiesToReclaim, oEngineer:GetPosition())
-                            IssueClearCommands({oEngineer})
-                            IssueReclaim({oEngineer}, oUnitToReclaim)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Telling engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to reclaim enemy unit '..oUnitToReclaim.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToReclaim)) end
+            if oEngineer.PlatoonHandle or EntityCategoryContains(M27UnitInfo.refCategoryHive, oEngineer.UnitId) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Platoon current action='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] or 'nil')..'; last order type='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] or 'nil')..'; Engineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
+                local aiBrain = oEngineer:GetAIBrain()
+                if aiBrain:GetEconomyStoredRatio('MASS') <= 0.6 then
+                    if oEngineer.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReclaimTarget or oEngineer.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueReclaim or EntityCategoryContains(M27UnitInfo.refCategoryHive, oEngineer.UnitId) then
+                        local iBuildRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
+                        if iBuildRange > 1 then
+                            local tEnemiesToReclaim = oEngineer:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryAllNavy - categories.COMMAND - categories.SUBCOMMANDER, oEngineer:GetPosition(), iBuildRange, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tEnemiesToReclaim) == false then
+                                local oUnitToReclaim = M27Utilities.GetNearestUnit(tEnemiesToReclaim, oEngineer:GetPosition())
+                                IssueClearCommands({oEngineer}) --need to clear commands or else we will continue reclaiming a wreck when we coudl be reclaiming an enemy
+                                IssueReclaim({oEngineer}, oUnitToReclaim)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Telling engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to reclaim enemy unit '..oUnitToReclaim.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToReclaim)) end
+                            else
+                                --Check for wrecks to reclaim within build range
+                                local oNearestReclaim, iNearestReclaim = M27EngineerOverseer.GetWreckInCurrentRangeToReclaim(oEngineer:GetAIBrain(), oEngineer)
+                                if iNearestReclaim <= iBuildRange + 0.5 and oNearestReclaim then
+                                    --(shouldnt need to issue clear commands)
+                                    IssueReclaim({oEngineer}, oNearestReclaim)
+                                end
+                            end
                         end
                     end
                 end
@@ -1056,6 +1100,12 @@ function OnCreateWreck(tPosition, iMass, iEnergy)
             ForkThread(M27MapInfo.DelayedReclaimRecordAtLocation, tPosition, 0, 5)
         else
             ForkThread(M27MapInfo.RecordThatWeWantToUpdateReclaimAtLocation, tPosition, 0)
+            --[[if GetGameTimeSeconds() >= 590 then bDebugMessages = true end
+            if bDebugMessages == true then
+                local iReclaimSegmentX, iReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tPosition)
+                LOG(sFunctionRef..' wreck just created, iMass='..(iMass or 0)..'; tPosition='..repru(tPosition)..'; reclaim segments of position='..iReclaimSegmentX..'-'..iReclaimSegmentZ)
+                --bDebugMessages = false WaitTicks(1) LOG(sFunctionRef..': repr of tReclaimSegmentsToUpdate='..repru(M27MapInfo.tReclaimSegmentsToUpdate))
+            end--]]
         end
         --M27MapInfo.UpdateReclaimDataNearLocation(tPosition, 0, nil)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

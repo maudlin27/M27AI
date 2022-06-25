@@ -837,7 +837,10 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                 if tACU[1] and tACU[1][M27Overseer.refbACUOnInitialBuildOrder] == true then
                     AddIdleUnitsToPlatoon(aiBrain, tEngi, aiBrain[M27PlatoonTemplates.refoAllEngineers])
                 else
-                    CreatePlatoon(aiBrain, 'M27ACUMain', tACU)
+                    for iACU, oACU in tACU do
+                        CreatePlatoon(aiBrain, 'M27ACUMain', { oACU })
+                    end
+
                 end
             end
             if M27Utilities.IsTableEmpty(tEngi) == false then AddIdleUnitsToPlatoon(aiBrain, tEngi, aiBrain[M27PlatoonTemplates.refoAllEngineers]) end
@@ -854,7 +857,12 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
             if M27Utilities.IsTableEmpty(tIndirect) == false then
                 AddIdleUnitsToPlatoon(aiBrain, tIndirect, aiBrain[M27PlatoonTemplates.refoIdleIndirect])
             end
-            if M27Utilities.IsTableEmpty(tStructures) == false then AddIdleUnitsToPlatoon(aiBrain, tStructures, aiBrain[M27PlatoonTemplates.refoAllStructures]) end
+            if M27Utilities.IsTableEmpty(tStructures) == false then
+                AddIdleUnitsToPlatoon(aiBrain, tStructures, aiBrain[M27PlatoonTemplates.refoAllStructures])
+                for iHive, oHive in EntityCategoryFilterDown(M27UnitInfo.refCategoryHive, tStructures) do
+                    ForkThread(M27EngineerOverseer.HiveManager, oHive)
+                end
+            end
             if M27Utilities.IsTableEmpty(tAir) == false then
                 AddIdleUnitsToPlatoon(aiBrain, tAir, aiBrain[M27PlatoonTemplates.refoIdleAir])
                 --Are we dealing with experimental air?
