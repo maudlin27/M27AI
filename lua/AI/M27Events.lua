@@ -131,31 +131,43 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         aiBrain[M27Overseer.refiSkirmisherMassDeathsFromLand] = aiBrain[M27Overseer.refiSkirmisherMassDeathsFromLand] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
                     end
                 end
-            else
-                --Did a PD or skirmisher we own kill something?
-                if instigator and not(instigator.Launcher) and instigator.UnitId and IsUnit(instigator) then
-                    local oKillerBrain = instigator:GetAIBrain()
-                    if oKillerBrain.M27AI then
-                        if EntityCategoryContains(M27UnitInfo.refCategoryPD, instigator.UnitId) then
-                            oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] = oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
-                        elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, instigator.UnitId) then
-                            --Did we kill something with a TML that wasnt our last target (so e.g. a unit might have managed to block the TML missile meaning we can try again)?
-                            if M27UnitInfo.IsUnitValid(instigator[M27EngineerOverseer.refoLastTMLTarget]) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': TML last target='..instigator[M27EngineerOverseer.refoLastTMLTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator[M27EngineerOverseer.refoLastTMLTarget])..'; shots fired at last target='..(instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0)..'; Mass killed currently='..instigator.Sync.totalMassKilled..'; mass killed when fired missile='..instigator[M27EngineerOverseer.refiLastTMLMassKills]) end
-                                --if instigator[M27EngineerOverseer.refiLastTMLMassKills] < (instigator.Sync.totalMassKilled or 0) and (instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0) > 0 then
-                                --if bDebugMessages == true then LOG(sFunctionRef..': TML killed a unit that wasnt its last target so missile may have been blocked') end
+            end
+            --Did a PD or skirmisher we own kill something?
+            if instigator and not(instigator.Launcher) and instigator.UnitId and IsUnit(instigator) then
+                local oKillerBrain = instigator:GetAIBrain()
+                if oKillerBrain.M27AI then
+                    if EntityCategoryContains(M27UnitInfo.refCategoryPD, instigator.UnitId) then
+                        oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] = oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
+                    elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, instigator.UnitId) then
+                        --Did we kill something with a TML that wasnt our last target (so e.g. a unit might have managed to block the TML missile meaning we can try again)?
+                        if M27UnitInfo.IsUnitValid(instigator[M27EngineerOverseer.refoLastTMLTarget]) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': TML last target='..instigator[M27EngineerOverseer.refoLastTMLTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator[M27EngineerOverseer.refoLastTMLTarget])..'; shots fired at last target='..(instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0)..'; Mass killed currently='..instigator.Sync.totalMassKilled..'; mass killed when fired missile='..instigator[M27EngineerOverseer.refiLastTMLMassKills]) end
+                            --if instigator[M27EngineerOverseer.refiLastTMLMassKills] < (instigator.Sync.totalMassKilled or 0) and (instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0) > 0 then
+                            --if bDebugMessages == true then LOG(sFunctionRef..': TML killed a unit that wasnt its last target so missile may have been blocked') end
 
-                                --Allow to go to -1 to give a small margin for error incase e.g. the next time it is blocked by a higher health unit
-                                instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] = math.max((instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 1) - 1, -1)
-                                --end
-                            end
-                        elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, instigator.UnitId) then
-                            local aiBrain = instigator:GetAIBrain()
-                            aiBrain[M27Overseer.refiSkirmisherMassKills] = aiBrain[M27Overseer.refiSkirmisherMassKills] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
+                            --Allow to go to -1 to give a small margin for error incase e.g. the next time it is blocked by a higher health unit
+                            instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] = math.max((instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 1) - 1, -1)
+                            --end
+                        end
+                    elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, instigator.UnitId) then
+                        local aiBrain = instigator:GetAIBrain()
+                        aiBrain[M27Overseer.refiSkirmisherMassKills] = aiBrain[M27Overseer.refiSkirmisherMassKills] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
+                    end
+                end
+
+            end
+            --AirAA tracking
+            if EntityCategoryContains(M27UnitInfo.refCategoryAirNonScout * categories.ANTIAIR, oUnitKilled.UnitId) then
+                if M27Utilities.IsTableEmpty(M27Overseer.tAllActiveM27Brains) == false then
+                    for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
+                        if IsEnemy(oBrain:GetArmyIndex(), oKilledBrain:GetArmyIndex()) then
+                            oBrain[M27AirOverseer.refiEnemyAirAAThreat] = math.max(oBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] * 0.5, oBrain[M27AirOverseer.refiEnemyAirAAThreat] - oUnitKilled:GetBlueprint().Economy.BuildCostMass / 3)
                         end
                     end
                 end
             end
+
+
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end
@@ -439,7 +451,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                     if aiBrain.M27AI then
                         --Has our ACU been hit by an enemy we have no sight of? Or a mex taking damage? Or a land experimental taking naval damage?
                         if M27UnitInfo.IsUnitValid(self) and ((M27Utilities.IsACU(self) and self == M27Utilities.GetACU(aiBrain)) or EntityCategoryContains(M27UnitInfo.refCategoryMex, self.UnitId) or (EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, self.UnitId) and M27UnitInfo.IsUnitUnderwater(self))) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': ACU has just taken damage, checking if can see the unit that damaged it') end
+                            if bDebugMessages == true then LOG(sFunctionRef..': ACU mex or experimental has just taken damage, checking if can see the unit that damaged it') end
                             --Do we have a unit that damaged us?
                             local oUnitCausingDamage
                             if instigator and not(instigator:BeenDestroyed()) then
@@ -485,20 +497,31 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                     --If we're upgrading consider cancelling
 
                                     if self.IsUnitState and self:IsUnitState('Upgrading') and EntityCategoryContains(categories.INDIRECTFIRE, oUnitCausingDamage.UnitId) and not(M27Conditions.DoesACUHaveGun(aiBrain, false, self)) then
-                                        if self:GetWorkProgress() <= 0.25 then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Taken indirect fire, consider cancelling upgrade as onl yat '..self:GetWorkProgress()) end
-                                            --Do we have nearby friendly units?
-                                            if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
-                                                --Is the unit within range of us?
-                                                local iOurMaxRange = M27Logic.GetUnitMaxGroundRange({self})
-                                                if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
-                                                    IssueClearCommands({self})
-                                                    IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                        --ACU - consider cancelling
+                                        if EntityCategoryContains(categories.COMMAND, self) then
+                                            if self:GetWorkProgress() <= 0.25 then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Taken indirect fire, consider cancelling upgrade as onl yat '..self:GetWorkProgress()) end
+                                                --Do we have nearby friendly units?
+                                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
+                                                    --Is the unit within range of us?
+                                                    local iOurMaxRange = M27Logic.GetUnitMaxGroundRange({self})
+                                                    if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
+                                                        IssueClearCommands({self})
+                                                        IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                                    end
                                                 end
                                             end
-                                        end
-                                        if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill) then
-                                            aiBrain[M27Overseer.refiAIBrainCurrentStrategy] = M27Overseer.refStrategyProtectACU
+                                            if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance) and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': ACU upgrading so switching to protect ACU mode. oUnitCausingDamage='..oUnitCausingDamage.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitCausingDamage)..'; self='..self.UnitId..M27UnitInfo.GetUnitLifetimeCount(self)..'; ACU state='..M27Logic.GetUnitState(self)..'; health%='..M27UnitInfo.GetUnitHealthPercent(self)..'; GameTime='..GetGameTimeSeconds()) end
+                                                aiBrain[M27Overseer.refiAIBrainCurrentStrategy] = M27Overseer.refStrategyProtectACU
+                                            end
+                                        else
+                                            --Other unit e.g. mex upgrading - just pause the upgrade and then unpause in 30s
+                                            if self:GetWorkProgress() <= 0.9 then
+                                                self:SetPaused(true)
+                                                self[M27UnitInfo.refbPaused] = true
+                                            end
+
                                         end
                                     end
                                 end

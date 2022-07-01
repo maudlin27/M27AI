@@ -116,7 +116,7 @@ iNoRushRange = 0
 reftNoRushCentre = 'M27MapNoRushCentre' --Centrepoint of the norush radius, recorded against M27 aiBrains
 
 --Plateaus
-tAllPlateausWithMexes = 'M27PlateausWithMexes' --[x] = AmphibiousPathingGroup, [y]: subrefs, e.g. subrefPlateauMexes;
+tAllPlateausWithMexes = {} --[x] = AmphibiousPathingGroup, [y]: subrefs, e.g. subrefPlateauMexes;
     --aibrain variables for plateaus:
 reftPlateausOfInterest = 'M27PlateausOfInterest' --[x] = Amphibious pathing group; will record a table of the pathing groups we're interested in expanding to, returns the location of then earest mex
 refiLastPlateausUpdate = 'M27LastTimeUpdatedPlateau' --gametime that we last updated the plateaus
@@ -3273,7 +3273,7 @@ function RecordAllPlateaus()
     --Records any plateaus that contain mexes, along with info on the plateau such as a rectangle that covers the entire plateau
 
     --tMexByPathingAndGrouping --[a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
-    tAllPlateausWithMexes = {}
+    --tAllPlateausWithMexes = {} --v41 - decided to take this out to see if it helps with issue where plateau number changes and all existing platoons become invalid
 
 
     local iCurPlateauMex, iMinX, iMaxX, iMinZ, iMaxZ, iSegmentCount

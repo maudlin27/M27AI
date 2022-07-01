@@ -146,6 +146,7 @@ local iBombersToTrackEffectiveness = 3 --Will track the last n bombers killed
 --Air threat related
 refiHighestEnemyAirThreat = 'M27HighestEnemyAirThreat' --highest ever value the enemy's air threat has reached in a single map snapshot
 refiEnemyAirAAThreat = 'M27HighestEnemyAirAAThreat'
+refiHighestEverEnemyAirAAThreat = 'M27HighestEverAirAAThreat'
 refiEnemyAirToGroundThreat = 'M27HighestEnemyAirToGroundThreat'
 refiEnemyMassInGroundAA = 'M27HighestEnemyGroundAAThreat'
 refbHaveAirControl = 'M27AirHaveAirControl' --Against aiBrain, true if our team has air control (Considering only M27 airAA)
@@ -1987,7 +1988,8 @@ function AirThreatChecker(aiBrain)
         LOG(sFunctionRef .. ': About to calcualte threat level of enemy antiair units.  Threat before this='..aiBrain[refiEnemyAirAAThreat])
     end
 
-    aiBrain[refiEnemyAirAAThreat] = math.max(aiBrain[refiEnemyAirAAThreat], M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, false, false, nil, 0, 0, 0)*1.2)
+    aiBrain[refiEnemyAirAAThreat] = math.max(aiBrain[refiEnemyAirAAThreat], M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, false, false, nil, 0, 0, 0)*1.1)
+    aiBrain[refiHighestEverEnemyAirAAThreat] = math.max(aiBrain[refiHighestEverEnemyAirAAThreat], aiBrain[refiEnemyAirAAThreat]) --Unlike airaathreat it doesnt get reduced when enemy airaa dies
     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[refiEnemyAirAAThreat] after update='..aiBrain[refiEnemyAirAAThreat]) end
     --local iAllAirThreat =
     --iAllAirThreat = iAllAirThreat + M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, true, false, true, true, nil, 0, 0, 0) * 0.4
@@ -7046,6 +7048,7 @@ function AirAAManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirAAManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local iMAANearACURange = 25
     local bACUUnderShield = false
     if M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, M27Utilities.GetACU(aiBrain):GetPosition()) then bACUUnderShield = true end
@@ -7244,10 +7247,21 @@ function AirAAManager(aiBrain)
                 end
             end
 
+            --Adjust base defence range further if is <=200 and have lots of available AirAA units
+            if iCloseToBaseRange < 200 and aiBrain[refiOurMassInAirAA] >= 3000 and M27Utilities.IsTableEmpty(aiBrain[reftAvailableAirAA]) == false then
+                local iAvailableAirAA = 0
+                for iUnit, oUnit in aiBrain[reftAvailableAirAA] do
+                    iAvailableAirAA = iAvailableAirAA + 1
+                end
+                if iAvailableAirAA >= 50 then iCloseToBaseRange = math.min(180, math.max(iCloseToBaseRange, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.3, aiBrain[refiBomberDefenceModDistance])) end
+            end
+
+
+
             --Create a table with all air threats and their distance
             for iUnit, oUnit in tEnemyAirUnits do
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Considering if we want to attack enemy unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' that is at position ' .. repru(oUnit:GetPosition()) .. ' which is ' .. M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+                    LOG(sFunctionRef .. ': Considering if we want to attack enemy unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' that is at position ' .. repru(oUnit:GetPosition()) .. ' which is ' .. M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; iCloseToBaseRange='..iCloseToBaseRange)
                 end
                 bShouldAttackThreat = false
                 if not (oUnit.Dead) and oUnit.GetUnitId then
@@ -7285,7 +7299,7 @@ function AirAAManager(aiBrain)
                     end
                     iCurTargetModDistanceFromStart = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tUnitCurPosition)
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': iCurTargetModDistanceFromStart=' .. iCurTargetModDistanceFromStart .. '; iMapMidpointDistance=' .. iMapMidpointDistance)
+                        LOG(sFunctionRef .. ': iCurTargetModDistanceFromStart=' .. iCurTargetModDistanceFromStart .. '; iMapMidpointDistance=' .. iMapMidpointDistance..'; iCurDistanceToStart='..iCurDistanceToStart..'; aiBrain[refiNearToACUThreshold]='..(aiBrain[refiNearToACUThreshold] or 'nil')..'; iCloseToBaseRange='..iCloseToBaseRange)
                     end
                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
                         --Dont care about AA or distance, just want to kill any air unit
@@ -7299,6 +7313,7 @@ function AirAAManager(aiBrain)
                             iCurTargetModDistanceFromStart = iCurDistanceToStart
                         else
                             --Ignore enemy AA if near another type of unit to defend
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will ignore enemy AA if near another type of unit we want to defend. bCheckForOtherUnitsToDefend='..tostring((bCheckForOtherUnitsToDefend or false))..'; iOtherUnitDefenceRange='..(iOtherUnitDefenceRange or 'nil')) end
                             if bCheckForOtherUnitsToDefend then
                                 tOtherUnitsToDefend = aiBrain:GetUnitsAroundPoint(iOtherUnitCategoriesToDefend, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
                                 if M27Utilities.IsTableEmpty(tOtherUnitsToDefend) == false then
@@ -7307,6 +7322,7 @@ function AirAAManager(aiBrain)
                                     else
                                         --Only help out if we have groundAA nearby
                                         local tFriendlyGroundAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA - categories.TECH1, oUnit:GetPosition(), iOtherUnitDefenceRange, 'Ally')
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy air threat near unit we want to protect but we dont have air control; is table of nearby ground units empty='..tostring(M27Utilities.IsTableEmpty(tFriendlyGroundAA))) end
                                         if M27Utilities.IsTableEmpty(tFriendlyGroundAA) == false then
                                             bShouldAttackThreat = true
                                         end
@@ -7495,9 +7511,8 @@ function AirAAManager(aiBrain)
                             for iAirAA, oAirAA in aiBrain[reftAvailableAirAA] do
                                 if iAirAA > iMaxAirAA then
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Considering more AA than want to this cycle so aborting')
+                                        LOG(sFunctionRef .. ': iAirAA='..iAirAAll'; iMaxAirAA='..iMaxAirAA..'; Wont try and find any closer AirAA as already been through more than want')
                                     end
-                                    bAbortAsNoMoreAirAA = true
                                     break
                                 end
 
@@ -7838,6 +7853,7 @@ function SetupAirOverseer(aiBrain)
     aiBrain[refiTeamMassInAirAA] = 0
     aiBrain[refiOurMassInAirAA] = 0
     aiBrain[refiEnemyAirAAThreat] = 0
+    aiBrain[refiHighestEverEnemyAirAAThreat] = 0
     aiBrain[refiEnemyAirToGroundThreat] = 0
 
     aiBrain[refiBomberIneffectivenessByDefenceModRange] = {}
@@ -8474,6 +8490,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     local refoLastUnitTarget = 'M27AirLastUnitTarget'
     local refbPreviouslyRun = 'M27AirPreviouslyRun'
     local refiTimeSinceLastRan = 'M27AirTimePreviouslyRan'
+    local refiTimeWhenFirstRan = 'M27AirTimeWhenFirstRan'
     local refbCanRunFromLastTarget = 'M27AirCanRunFromLastTarget' --i.e. dont want to track how often we have run from our base or rally point since those are meant to be 'safe'
     local iCurShield = 0
     local iMaxShield = 0
@@ -8691,19 +8708,63 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
 
         --(if changing the time since last ran here, then also change for the ACU logic above to be consistent)
         if bWantToRun or (not (oAttackTarget) and iTimeSinceLastRan <= 50) then
-
             local bStillRun = true
             if not (bWantToRun) then
                 if M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.99 and iCurShield >= iMaxShield * 0.95 then
                     bStillRun = false
                 end
             end
+
+            --While running, see if are targets of opportunity that can kill on the way back to base
+            --Need to have run for longer if dealing with soulripper vs czar
+            --Will target T2 AA first in priority to everything else; will look for targets that are either unshielded or only have a T2 UEF or worse shield covering them
+            local iTimeSinceFirstRan = 0
+            if oUnit[refiTimeWhenFirstRan] then iTimeSinceFirstRan = GetGameTimeSeconds() - oUnit[refiTimeWhenFirstRan] end
+            if bStillRun and iTimeSinceFirstRan >= 15 and (bIsCzar or iTimeSinceFirstRan >= 25) then
+                --Does the enemy not have any SAMs (or other T3 ground AA) within range of us?
+                local tNearbyEnemySAMs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, 60 + iCombatRangeToUse + 6, 'Enemy')
+                if M27Utilities.IsTableEmpty(tNearbyEnemySAMs) then
+                    local tNearbyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface - categories.TECH1, tCurPosition, iCombatRangeToUse, 'Enemy')
+                    if M27Utilities.IsTableEmpty(tNearbyUnits) then
+                        local iClosestUnshieldedEnemy = 10000
+                        local oClosestUnshieldedEnemy
+                        local iCurDistToCzar
+                        local iCurDistToBase
+                        local iCzarDistToBase = M27Utilities.GetDistanceBetweenPositions(tCurPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                        local oClosestT2PlusAA
+                        for iUnit, oUnit in tNearbyUnits do
+                            if oUnit:GetFractionComplete() >= 0.7 then
+                                if not(oClosestT2PlusAA) or EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then
+                                    iCurDistToCzar = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tCurPosition)
+                                    if iCurDistToCzar < iClosestUnshieldedEnemy then
+                                        iCurDistToBase = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                        if iCurDistToBase + 6 <= iCzarDistToBase then
+                                            if not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 9000, false, true, false)) then
+                                                iClosestUnshieldedEnemy = iCurDistToCzar
+                                                oClosestUnshieldedEnemy = oUnit
+                                                if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then oClosestT2PlusAA = oClosestUnshieldedEnemy end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        if oClosestUnshieldedEnemy then
+                            bStillRun = false
+                            oAttackTarget = oClosestUnshieldedEnemy
+                        end
+                    end
+                end
+            end
+
+
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': We either want to run, or have recently want to run; bWantToRun=' .. tostring(bWantToRun) .. '; Health %=' .. M27UnitInfo.GetUnitHealthPercent(oUnit) .. '; Cur shield=' .. iCurShield .. '; MaxShield=' .. iMaxShield .. '; bStillRun=' .. tostring(bStillRun))
             end
             if bStillRun then
                 if bWantToRun then
                     oUnit[refiTimeSinceLastRan] = GetGameTimeSeconds()
+                    if not(oUnit[refbPreviouslyRun]) then oUnit[refiTimeWhenFirstRan] = GetGameTimeSeconds() end
                 end
                 oAttackTarget = nil
                 bUpdateLocationAttemptCount = false

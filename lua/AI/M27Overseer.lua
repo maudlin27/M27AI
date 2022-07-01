@@ -4055,6 +4055,7 @@ function ThreatAssessAndRespond(aiBrain)
                         --iThreatNeeded = tEnemyThreatGroup[refiTotalThreat]
                         --iThreatWanted = tEnemyThreatGroup[refiHighestThreatRecorded] * iThreatMaxFactor
                         --tEnemyThreatGroup[reftFrontPosition]
+
                         local tTorpBombersByDistance = {}
                         local iAvailableTorpBombers = 0
                         local refoTorpUnit = 'M27OTorp'
@@ -4068,9 +4069,9 @@ function ThreatAssessAndRespond(aiBrain)
 
                         if tEnemyThreatGroup[refiDistanceFromOurBase] < aiBrain[refiNearestT2PlusNavalThreat] or (not(aiBrain[refiNearestT2PlusNavalThreat]) and tEnemyThreatGroup[refiDistanceFromOurBase] <= 240) then
                             for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
-                                if EntityCategoryContains(categories.TECH2 + categories.TECH3 + categories.EXPERIMENTAL, oUnit.UnitId) then
+                                if EntityCategoryContains(M27UnitInfo.refCategoryAllNavy - categories.TECH1, oUnit.UnitId) then
                                     aiBrain[refiNearestT2PlusNavalThreat] = math.min(aiBrain[refiNearestT2PlusNavalThreat], tEnemyThreatGroup[refiDistanceFromOurBase])
-                                    if not(aiBrain[refbT2NavyNearOurBase]) and 40 + math.max(M27UnitInfo.GetUnitIndirectRange(oUnit), M27Logic.GetUnitMaxGroundRange({ oUnit })) >= tEnemyThreatGroup[refiDistanceFromOurBase] then
+                                    if not(aiBrain[refbT2NavyNearOurBase]) and 50 + math.max(130, M27UnitInfo.GetUnitIndirectRange(oUnit), M27Logic.GetUnitMaxGroundRange({ oUnit })) >= tEnemyThreatGroup[refiDistanceFromOurBase] then
                                         aiBrain[refbT2NavyNearOurBase] = true
                                         break
                                     end
@@ -4338,7 +4339,7 @@ function ThreatAssessAndRespond(aiBrain)
         for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTorpBombers] do
             tCurDestination = nil
             if not (oUnit[M27AirOverseer.refbOnAssignment]) then
-                if oUnit.GetNavigator then
+                if oUnit.GetNavigator and M27UnitInfo.IsUnitValid(oUnit) then
                     oNavigator = oUnit:GetNavigator()
                     if oNavigator and oNavigator.GetCurrentTargetPos then
                         tCurDestination = oNavigator:GetCurrentTargetPos()
@@ -4366,8 +4367,7 @@ function ACUManager(aiBrain)
     --Almost all the functionality has now been integrated into the M27ACUMain platoon logic, with a few exceptions (such as calling for help), although these could probably be moved over as well
     --Decided to add more global based ACU logic here, e.g. if we want to attack enemy ACU, or if we want to retreat to base immediately rather than waiting for platoon, or if want to cancel upgrade
 
-    local bDebugMessages = false
-    if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -5955,6 +5955,7 @@ function CheckUnitCap(aiBrain)
     local bDebugMessages = false
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if GetGameTimeSeconds() >= 2100 then bDebugMessages = true end
 
     local iUnitCap = tonumber(ScenarioInfo.Options.UnitCap)
     local iCurUnits = aiBrain:GetCurrentUnits(categories.ALLUNITS - M27UnitInfo.refCategoryWall) + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryWall) * 0.25
@@ -6761,8 +6762,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             aiBrain[M27Utilities.refiLastSystemTimeRecorded] = GetSystemTimeSecondsOnlyForProfileUse()
             tsGameState['02.SystemTimeTotal'] = aiBrain[M27Utilities.refiLastSystemTimeRecorded]
 
-            --Grand Strategy
+            --Grand Strategy and enemy base
             tsGameState['03.' .. refiAIBrainCurrentStrategy] = aiBrain[refiAIBrainCurrentStrategy]
+            tsGameState['03. NearestEnemyStartNumber'] = M27Logic.GetNearestEnemyStartNumber(aiBrain)
+            tsGameState['03. EnemyT2PlusNavyNearBase'] = aiBrain[refbT2NavyNearOurBase]
 
             --Economy:
             tsGameState['04.iMassGrossIncome'] = aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]
@@ -7277,6 +7280,10 @@ function ACUInitialisation(aiBrain)
 
     local oNewPlatoon = aiBrain:MakePlatoon('', '')
     aiBrain:AssignUnitsToPlatoon(oNewPlatoon, { oACU }, 'Support', 'None')
+    --Set movement path to current position so wont force a new movement path as the first action, but will update once have done initial construction
+    oNewPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+    oNewPlatoon[M27PlatoonUtilities.reftMovementPath][1] = oACU:GetPosition()
+    oNewPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] = 1
     oNewPlatoon:SetAIPlan('M27ACUMain')
     oACU[refbACUOnInitialBuildOrder] = false
     if bDebugMessages == true then

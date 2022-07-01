@@ -376,6 +376,7 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
     local sFunctionRef = 'WantToGetFirstACUUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Returns true if meet all the conditions that mean will want gun upgrade
+    --if GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if bIgnoreEnemies == nil then bIgnoreEnemies = false end
     local bWantToGetGun = true
@@ -403,8 +404,20 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
                         elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
                             iResourceThresholdAdjustFactor = 1.3
                         end
+
+                        if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 400 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
+                            iResourceThresholdAdjustFactor = iResourceThresholdAdjustFactor * 0.9
+                            local iDistToBase = M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            local iCloseDist = math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25))
+                            if iDistToBase <= iCloseDist then
+                                iResourceThresholdAdjustFactor = iResourceThresholdAdjustFactor * 0.9
+                            end
+                            if M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) <= 0.8 and (M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) >= 0.5 or iDistToBase <= iCloseDist) then iResourceThresholdAdjustFactor = math.max(0.75, iResourceThresholdAdjustFactor * 0.9) end
+                        end
+
+
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': GrowwEnergyIncome=' .. aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] .. '; Netincome=' .. aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] .. '; Net income based on trend=' .. aiBrain:GetEconomyTrend('ENERGY') .. '; EnergyStored=' .. aiBrain:GetEconomyStored('ENERGY'))
+                            LOG(sFunctionRef .. ': GrowwEnergyIncome=' .. aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] .. '; Netincome=' .. aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] .. '; Net income based on trend=' .. aiBrain:GetEconomyTrend('ENERGY') .. '; EnergyStored=' .. aiBrain:GetEconomyStored('ENERGY')..'; iResourceThresholdAdjustFactor='..iResourceThresholdAdjustFactor..'; ACU health%'..M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain))..'; Dist from ACU to our base='..M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetACU(aiBrain):GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Close distance='..math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)))
                         end
                         if aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 120 * 0.1 * iResourceThresholdAdjustFactor then
                             if bDebugMessages == true then
@@ -578,13 +591,18 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                     local iEnergyWanted = (iUpgradeEnergyCost / (iUpgradeBuildTime / iACUBuildRate)) * 0.1 * 1.2 --Want slight margin for error in case we're just inbetween building power
                     if iUpgradeEnergyCost >= 250000 then iEnergyWanted = iEnergyWanted * 2 end
 
-                    --Increase threshold if we want to eco
-                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then iEnergyWanted = iEnergyWanted * 2 end
+                    --Increase threshold if we want to eco, but not if we are turtling
+                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then iEnergyWanted = iEnergyWanted * 2
+                    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then iEnergyWanted = iEnergyWanted * 0.8
+                    end
                     --Aif our ACU isnt going gun due to not pathign to enemy base then wait until we have enough energy to indicate we have T2 power as well
                     if oACU[M27Overseer.refbACUCantPathAwayFromBase] and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 100 then iEnergyWanted = math.max(iEnergyWanted, aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] + 10) end
 
                     --Be more likely to get an upgrade if we are low health
                     iEnergyWanted = iEnergyWanted * math.max(0.4, oACU:GetHealth() / oACU:GetMaxHealth())
+
+
+
 
 
                     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; iEnergyWanted='..iEnergyWanted) end
@@ -595,9 +613,9 @@ function WantToGetAnotherACUUpgrade(aiBrain)
                         if iUpgradeMassCost >= 2400 then iUpgradeMassCost = iUpgradeMassCost * 2 end
                         local iMassIncomePerTickWanted = iUpgradeMassCost / iUpgradeBuildTime * iACUBuildRate * 0.5 --I.e. if took 10% of this, then that's the mass per tick needed; however we want the mass required for the upgrade to represent <20% of our total mass income
                         --Increase threshold if we want to eco
-                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then
+                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
                             if M27Utilities.GetACU(aiBrain)[M27Overseer.refbACUCantPathAwayFromBase] then iMassIncomePerTickWanted = iMassIncomePerTickWanted * 4 end
-                        else iMassIncomePerTickWanted = iMassIncomePerTickWanted * 1.5
+                        elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then iMassIncomePerTickWanted = iMassIncomePerTickWanted * 0.8
                         end
 
                         --Be more likely to upgrade if low health
@@ -797,6 +815,8 @@ function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable,
     --bNotYetBuiltOn - if true, only includes hydro if it's not already built on
     local sFunctionRef = 'HydroNearACUAndBase'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
     if bNearBaseOnlyCheck == nil then bNearBaseOnlyCheck = false end
     local iMaxDistanceForHydro = 70 --must be within this distance of start position and ACU
     local iCurDistanceToACU
@@ -809,18 +829,22 @@ function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable,
     local iHydroGroup
     if M27Utilities.GetACU(aiBrain) then
         for iHydro, tHydro in M27MapInfo.HydroPoints do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering tHydro='..repru(tHydro)..'; Dist to ACU='..M27Utilities.GetDistanceBetweenPositions(tHydro, M27Utilities.GetACU(aiBrain):GetPosition())..'; Dist to start position='..M27Utilities.GetDistanceBetweenPositions(tHydro, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; iMaxDistanceForHydro='..iMaxDistanceForHydro) end
             if bNearBaseOnlyCheck == false then iCurDistanceToACU = M27Utilities.GetDistanceBetweenPositions(tHydro, M27Utilities.GetACU(aiBrain):GetPosition()) end
             if bNearBaseOnlyCheck == true or iCurDistanceToACU <= iMaxDistanceForHydro then
                 --InSameSegmentGroup(oUnit, tDestination, bReturnUnitGroupOnly)
                 iHydroGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tHydro)
+                if bDebugMessages == true then LOG(sFunctionRef..': Hydro pathing group='..iHydroGroup..'; iStartGroup='..iStartGroup) end
                 if iStartGroup == iHydroGroup then
                     iDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tHydro, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                     if iDistanceToStart <= iMaxDistanceForHydro then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Is table of uncliamed hydros containing just this hydro empty='..tostring(M27Utilities.IsTableEmpty(M27EngineerOverseer.FilterLocationsBasedOnIfUnclaimed(aiBrain, { tHydro }, false)))) end
                         if not(bNotYetBuiltOn) or M27Utilities.IsTableEmpty(M27EngineerOverseer.FilterLocationsBasedOnIfUnclaimed(aiBrain, { tHydro }, false)) == false then
                             bHydroNear = true
                             if bAlsoReturnHydroTable == false then
                                 break
                             else
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have a valid hydro location') end
                                 iValidHydroCount = iValidHydroCount + 1
                                 tValidHydro[iValidHydroCount] = tHydro
                             end

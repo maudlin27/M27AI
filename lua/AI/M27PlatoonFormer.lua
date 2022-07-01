@@ -682,9 +682,17 @@ function CombatPlatoonFormer(aiBrain)
                     end --]]
                     if M27Utilities.IsTableEmpty(tTargetPosition) == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': About to clear commands for all units waiting for assignment to a platoon and tell them to move to '..repru(tTargetPosition)) end
-                        IssueClearCommands(aiBrain[reftoCombatUnitsWaitingForAssignment])
-                        IssueMove(aiBrain[reftoCombatUnitsWaitingForAssignment], tTargetPosition)
-                        if M27Config.M27ShowUnitNames == true then M27PlatoonUtilities.UpdateUnitNames(aiBrain[reftoCombatUnitsWaitingForAssignment], 'WaitingToForm '..sPlatoonToForm) end
+                        if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
+                            for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
+                                if M27UnitInfo.IsUnitValid(oUnit) then
+                                    IssueClearCommands({ oUnit })
+                                    IssueMove({ oUnit }, tTargetPosition)
+                                    if M27Config.M27ShowUnitNames == true then M27PlatoonUtilities.UpdateUnitNames({ oUnit }, 'WaitingToForm '..sPlatoonToForm) end
+                                else
+                                    aiBrain[reftoCombatUnitsWaitingForAssignment][iUnit] = nil
+                                end
+                            end
+                        end
                     else M27Utilities.ErrorHandler('target position doesnt exist')
                     end
 
@@ -1928,6 +1936,7 @@ function AllocateNewUnitToPlatoonFromFactory(oNewUnit, oFactory)
     if not(oNewUnit.Dead) and not(oNewUnit.GetUnitId) then M27Utilities.ErrorHandler('oNewUnit doesnt have a unit ID so likely isnt a unit')
     elseif bDebugMessages == true then LOG('AllocateNewUnitToPlatoonFromFactory: oNewUnit='..oNewUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewUnit)) end
     oNewUnit[M27UnitInfo.refoFactoryThatBuildThis] = oFactory
+    oNewUnit[M27Transport.refiAssignedPlateau] = oFactory[M27Transport.refiAssignedPlateau]
     ForkThread(AllocateNewUnitToPlatoonBase, {oNewUnit}, false)
 end
 
