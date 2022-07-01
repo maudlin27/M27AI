@@ -4422,6 +4422,7 @@ function ACUManager(aiBrain)
             local bWantEscort
             local bEmergencyRequisition
             local bAllInAttack
+            local bACUAirSnipe
 
             --ACU platoon and idle overrides
             if M27Utilities.IsACU(oACU) then
@@ -4903,13 +4904,43 @@ function ACUManager(aiBrain)
                                 bAllInAttack = true
                             end
                         end
+                        if not(bAllInAttack) then
+                            --Is ACU low enough health that we might kill it with bombers alone?
+                            if aiBrain[refoLastNearestACU]:GetHealth() <= 6000 and aiBrain[M27AirOverseer.refbHaveAirControl] then
+                                --If enemy ACU not shielded, and doesnt have AA nearby, then consider switching just to kill it with bombers, if we have close to enough strike damage already
+                                if not (M27Logic.IsTargetUnderShield(aiBrain, aiBrain[refoLastNearestACU], 0, false, false, true)) then
+                                    local iBomberStrikeDamage = 0
+                                    local iCurAOE, iCurStrike
+                                    local tOurBombers = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryBomber, false, true)
+                                    if M27Utilities.IsTableEmpty(tOurBombers) == false then
+                                        for iUnit, oUnit in tOurBombers do
+                                            iCurAOE, iCurStrike = M27UnitInfo.GetBomberAOEAndStrikeDamage(oUnit)
+                                            iBomberStrikeDamage = iBomberStrikeDamage + iCurStrike
+                                        end
+                                    end
+                                    local iHealthPercentWanted = 0.5
+                                    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iHealthPercentWanted = 0.4 end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have enough strike damage to just kill the enemy ACU with air. iBomberStrikeDamage='..iBomberStrikeDamage..'; iHealthPercentWanted='..iHealthPercentWanted..'; Enemy ACU health='..aiBrain[refoLastNearestACU]:GetHealth()) end
+                                    if iBomberStrikeDamage >= aiBrain[refoLastNearestACU]:GetHealth() * iHealthPercentWanted then
+                                        bIncludeACUInAttack = false
+                                        bCheckThreatBeforeCommitting = false
+                                        bAllInAttack = true
+                                        bACUAirSnipe = true
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will laucnh all out attack as we think we might be able to kill their ACU with air') end
+                                    end
+                                end
+                            end
+
+                        end
                     end
 
                     if bAllInAttack and not (oACU:IsUnitState('Upgrading')) and M27UnitInfo.GetUnitHealthPercent(oACU) > 0.5 then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Include ACU in all out attack as it has more than 50% health')
                         end
-                        bIncludeACUInAttack = true
+                        if not(bACUAirSnipe) then
+                            bIncludeACUInAttack = true
+                        end
                     end
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': bAllInAttack=' .. tostring(bAllInAttack))
@@ -4917,7 +4948,7 @@ function ACUManager(aiBrain)
                 end
 
                 --Override decision if enemy ACU has significantly more threat than us
-                if bAllInAttack then
+                if bAllInAttack and not(bACUAirSnipe) then
                     if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then
                         iThreatFactor = 0.9
                     end
@@ -6891,6 +6922,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 tsGameState['08.RemainingBomberTargets'] = table.getn(aiBrain[M27AirOverseer.reftBomberTargetShortlist])
             end
             tsGameState['08.TorpBombersWanted'] = aiBrain[M27AirOverseer.refiTorpBombersWanted]
+            tsGameState['08.HaveAirControl'] = aiBrain[M27AirOverseer.refbHaveAirControl]
 
             --Mobile shields
             tsGameState['09.WantMoreMobileShields'] = tostring(aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons])
