@@ -500,14 +500,20 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                         --ACU - consider cancelling
                                         if EntityCategoryContains(categories.COMMAND, self) then
                                             if self:GetWorkProgress() <= 0.25 then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Taken indirect fire, consider cancelling upgrade as onl yat '..self:GetWorkProgress()) end
-                                                --Do we have nearby friendly units?
-                                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
-                                                    --Is the unit within range of us?
-                                                    local iOurMaxRange = M27Logic.GetUnitMaxGroundRange({self})
-                                                    if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
-                                                        IssueClearCommands({self})
-                                                        IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+
+
+                                                --Is the unit that damaged us within our range?
+                                                local iOurRange = GetUnitMaxGroundRange({ self })
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Taken indirect fire, consider cancelling upgrade as onl yat '..self:GetWorkProgress()..'; iOurRange='..iOurRange) end
+                                                if iOurRange < M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) then
+                                                    --Do we have nearby friendly units?
+                                                    if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, self:GetPosition(), 40, 'Ally')) == true then
+                                                        --Is the unit within range of us?
+                                                        local iOurMaxRange = M27Logic.GetUnitMaxGroundRange({self})
+                                                        if M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) > iOurMaxRange then
+                                                            IssueClearCommands({self})
+                                                            IssueMove({self}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                                        end
                                                     end
                                                 end
                                             end
@@ -516,20 +522,23 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                                 aiBrain[M27Overseer.refiAIBrainCurrentStrategy] = M27Overseer.refStrategyProtectACU
                                             end
                                         else
+                                            function Unpause(oUnit, iWait)
+                                                WaitSeconds(iWait)
+                                                if M27UnitInfo.IsUnitValid(oUnit) then
+                                                    oUnit:SetPaused(false)
+                                                    oUnit[M27UnitInfo.refbPaused] = false
+                                                end
+                                            end
                                             --Other unit e.g. mex upgrading - just pause the upgrade and then unpause in 30s
                                             if self:GetWorkProgress() <= 0.9 then
                                                 self:SetPaused(true)
                                                 self[M27UnitInfo.refbPaused] = true
+                                                ForkThread(Unpause, self, 60)
                                             end
-
                                         end
                                     end
                                 end
                             end
-                        elseif EntityCategoryContains(M27UnitInfo.refCategoryMex, self.UnitId) and M27UnitInfo.IsUnitValid(self) then
-                            --Can we see the enemy?
-
-
                         end
                         --General logic for shields so are very responsive with micro
                         if self.MyShield and self.MyShield.GetHealth and self.MyShield:GetHealth() < 100 and EntityCategoryContains((M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryPersonalShield) * categories.MOBILE, self) then

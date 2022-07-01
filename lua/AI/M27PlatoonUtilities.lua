@@ -6566,7 +6566,7 @@ function DeterminePlatoonAction(oPlatoon)
                             end
 
                             local iIntelRange = (oPlatoon[reftCurrentUnits][1]:GetBlueprint().Intel.RadarRadius or 0)
-                            local iEnemySearchRadius = math.max(oPlatoon[refiPlatoonMaxRange] * 2, 40, iIntelRange) --Will consider responses if any enemies get within 2 times the max range of platoon
+                            local iEnemySearchRadius = math.max(aiBrain[M27Overseer.refiHighestMobileLandEnemyRange] + 10, oPlatoon[refiPlatoonMaxRange] * 2, 40, iIntelRange) --Will consider responses if any enemies get within 2 times the max range of platoon
                             if aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 3 then iEnemySearchRadius = math.max(iEnemySearchRadius, 60)
                             elseif oPlatoon[refiCurrentUnits] == 1 and iEnemySearchRadius < 50 and not(oPlatoon[refbACUInPlatoon]) and (oPlatoon[refoFrontUnit]:GetBlueprint().Physics.MaxSpeed or 0) >= 3.5 then iEnemySearchRadius = 50
                             end

@@ -4693,6 +4693,9 @@ function DetermineBomberDefenceRange(aiBrain)
         end
         aiBrain[refiBomberDefenceCriticalThreatDistance] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27MapInfo.reftChokepointBuildLocation]) + 35
         aiBrain[refiBomberDefenceDistanceCap] = aiBrain[refiBomberDefenceCriticalThreatDistance] + 100
+    elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
+        aiBrain[refiBomberDefenceModDistance] = math.min(130, math.max(60, 20 + aiBrain[M27Overseer.refiHighestMobileLandEnemyRange]))
+        aiBrain[refiBomberDefenceCriticalThreatDistance] = math.max(50, aiBrain[refiBomberDefenceModDistance] - 20)
     else
         aiBrain[refiBomberDefenceCriticalThreatDistance] = math.min(math.max(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.2, math.min(130, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35)))
 
@@ -5736,8 +5739,8 @@ function AirBomberManager(aiBrain)
                                         end
                                     end
                                 end
-                                --Consider T2 MAA within bomber defence range+40 given how bad t1 bombers are against them
-                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH2, tStartPoint, aiBrain[refiBomberDefenceModDistance] * 2, 'Enemy')
+                                --Consider T2 MAA and fixed T1 AA within bomber defence range+40 given how bad t1 bombers are against them
+                                tEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH2 + M27UnitInfo.refCategoryStructureAA * categories.TECH1, tStartPoint, aiBrain[refiBomberDefenceModDistance] * 2, 'Enemy')
                                 if M27Utilities.IsTableEmpty(tEnemies) == false then
                                     for iUnit, oUnit in tEnemies do
                                         if (oUnit[refiStrikeDamageAssigned] or 0) == 0 then

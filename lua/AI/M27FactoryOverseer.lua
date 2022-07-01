@@ -758,11 +758,22 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
                                     end
                                 elseif iCurrentConditionToTry == 9 then --Emergency defence where enemy near our base, even if we think we can beat them
-                                    if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * aiBrain[M27Overseer.refiMaxDefenceCoverageWanted], math.max(math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35, 180), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                                    local iImmediateRange = math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * aiBrain[M27Overseer.refiMaxDefenceCoverageWanted], math.max(math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35, 180), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25))
+                                    if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iImmediateRange and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                         if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                             iCategoryToBuild = refCategoryIndirect
                                         else
-                                            iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true)
+                                            --Does the enemy have dangerous structures within this range? If so then have 50% of our units being indirect fire
+                                            if math.random(0, 1) == 1 then --assuming more efficient to generate random coin flip than to get all nearby units
+                                                local tNearbyEnemyStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.ANTIAIR + M27UnitInfo.refCategoryStructure * categories.DIRECTFIRE + M27UnitInfo.refCategoryStructure * categories.INDIRECTFIRE, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iImmediateRange, 'Enemy')
+                                                if M27Utilities.IsTableEmpty(tNearbyEnemyStructures) == false then
+                                                    iCategoryToBuild = refCategoryIndirect
+                                                else
+                                                    iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true)
+                                                end
+                                            else
+                                                iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true)
+                                            end
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 10 then --Build engineer if have just gained a new tech level or have engis waiting for transport
@@ -868,11 +879,24 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         elseif iCurrentConditionToTry == 18 then --Emergency defence - enemies are within 32.5% of our base
                                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if need emergency defence') end
-                                            if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < math.min(0.325, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]) and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                                            local iImmediateRange = math.min(0.325, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted])
+                                            if aiBrain[M27Overseer.refiPercentageOutstandingThreat] < iImmediateRange and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                                 if aiBrain[M27Overseer.refbNeedIndirect] == true then
                                                     iCategoryToBuild = refCategoryIndirect
 
-                                                else iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true) end
+                                                else
+                                                    --Does the enemy have dangerous structures within this range? If so then have 50% of our units being indirect fire
+                                                    if math.random(0, 1) == 1 then --assuming more efficient to generate random coin flip than to get all nearby units
+                                                        local tNearbyEnemyStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure * categories.ANTIAIR + M27UnitInfo.refCategoryStructure * categories.DIRECTFIRE + M27UnitInfo.refCategoryStructure * categories.INDIRECTFIRE, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iImmediateRange, 'Enemy')
+                                                        if M27Utilities.IsTableEmpty(tNearbyEnemyStructures) == false then
+                                                            iCategoryToBuild = refCategoryIndirect
+                                                        else
+                                                            iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true)
+                                                        end
+                                                    else
+                                                        iCategoryToBuild = GetLandCombatCategory(aiBrain, oFactory, iFactoryTechLevel, true)
+                                                    end
+                                                end
                                             end
                                         elseif iCurrentConditionToTry == 19 then --Min of 3 engineers of the current tech level
                                             if iFactoryTechLevel >= 2 and iFactoryTechLevel >= aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) < 3 then

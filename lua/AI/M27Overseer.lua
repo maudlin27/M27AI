@@ -87,6 +87,7 @@ refiPercentageClosestFriendlyFromOurBaseToEnemy = 'M27OverseerPercentageClosestF
 refiPercentageClosestFriendlyLandFromOurBaseToEnemy = 'M27OverseerClosestLandFromOurBaseToEnemy' --as above, but not limited to combat units, e.g. includes mexes
 refiMaxDefenceCoverageWanted = 'M27OverseerMaxDefenceCoverageWanted'
 refiHighestEnemyGroundUnitHealth = 'M27OverseerHighestEnemyGroundUnitHealth' --Against aiBrain, used to track how much we want to deal in damage via overcharge
+refiHighestMobileLandEnemyRange = 'M27overseerHighestMobileEnemyRange' --Against aiBrain, used to track the longest range unit the enemy has had
 
 refbGroundCombatEnemyNearBuilding = 'M27OverseerGroundCombatNearMexCur' --against aibrain, true/false
 reftEnemyGroupsThreateningBuildings = 'M27OverseerGroundCombatLocations' --against aiBrain, [x] is count, returns location of threat group average position
@@ -2708,6 +2709,16 @@ function AddNearbyUnitsToThreatGroup(aiBrain, oEnemyUnit, sThreatGroup, iRadius,
                     if bNewUnitIsOnRightTerrain and M27Utilities.CanSeeUnit(aiBrain, oUnit, true) == true then
                         AddNearbyUnitsToThreatGroup(aiBrain, oUnit, sThreatGroup, iRadius, iCategory, bMustBeOnLand, bMustBeOnWater, iNavalBlipThreat, true)
                     end
+                end
+                if bMustBeOnLand and M27Utilities.IsTableEmpty(tNearbyUnits) == false then
+                    --Get highest range
+                    local tMobileLand = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryIndirect, tNearbyUnits)
+                    if M27Utilities.IsTableEmpty(tMobileLand) == false then
+                        for iUnit, oUnit in tMobileLand do
+                            aiBrain[refiHighestMobileLandEnemyRange] = math.max(aiBrain[refiHighestMobileLandEnemyRange], M27UnitInfo.GetUnitMaxGroundRange(oUnit))
+                        end
+                    end
+
                 end
             end
         end
@@ -7206,24 +7217,33 @@ function RecordAllEnemiesAndAllies(aiBrain)
     ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain, true, true)
 
     WaitTicks(1) --wait 1 tick before checking enemy brains, so any M27brains can run the above function themselves
-    --Assign enemies to a team if not already
-    for iEnemyBrain, oEnemyBrain in aiBrain[toEnemyBrains] do
-        if not (oEnemyBrain.M27Team) then
-            iTotalTeamCount = iTotalTeamCount + 1
-            oEnemyBrain.M27Team = iTotalTeamCount
-            if M27Utilities.IsTableEmpty(tTeamData[oEnemyBrain.M27Team]) then
-                tTeamData[oEnemyBrain.M27Team] = {}
-            end
-            tTeamData[oEnemyBrain.M27Team][reftFriendlyActiveM27Brains] = {}
-            if oEnemyBrain.M27AI then
-                tTeamData[oEnemyBrain.M27Team][reftFriendlyActiveM27Brains][oEnemyBrain:GetArmyIndex()] = oEnemyBrain
-            end
-            for iCurBrain, oBrain in aiBrain[toEnemyBrains] do
-                if not (oBrain.M27Team) and IsAlly(oBrain:GetArmyIndex(), oEnemyBrain:GetArmyIndex()) then
-                    oBrain.M27Team = iTotalTeamCount
-                    if oBrain.M27AI then
-                        --redundancy - should have already recorded
-                        tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
+
+    --REDUNDANCY (code in overseer initialisation triggers first)
+    if aiBrain.M27AI and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) then
+        if GetGameTimeSeconds() <= 10 then
+            --REDUNDANCY (code in overseer initialisation triggers first)
+            M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI will not function.', 0, 10)
+        end
+    else
+        --Assign enemies to a team if not already
+        for iEnemyBrain, oEnemyBrain in aiBrain[toEnemyBrains] do
+            if not (oEnemyBrain.M27Team) then
+                iTotalTeamCount = iTotalTeamCount + 1
+                oEnemyBrain.M27Team = iTotalTeamCount
+                if M27Utilities.IsTableEmpty(tTeamData[oEnemyBrain.M27Team]) then
+                    tTeamData[oEnemyBrain.M27Team] = {}
+                end
+                tTeamData[oEnemyBrain.M27Team][reftFriendlyActiveM27Brains] = {}
+                if oEnemyBrain.M27AI then
+                    tTeamData[oEnemyBrain.M27Team][reftFriendlyActiveM27Brains][oEnemyBrain:GetArmyIndex()] = oEnemyBrain
+                end
+                for iCurBrain, oBrain in aiBrain[toEnemyBrains] do
+                    if not (oBrain.M27Team) and IsAlly(oBrain:GetArmyIndex(), oEnemyBrain:GetArmyIndex()) then
+                        oBrain.M27Team = iTotalTeamCount
+                        if oBrain.M27AI then
+                            --redundancy - should have already recorded
+                            tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
+                        end
                     end
                 end
             end
@@ -7334,6 +7354,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refbIntelPathsGenerated] = false
     aiBrain[refbConfirmedInitialRaidersHaveScouts] = false
     aiBrain[refiHighestEnemyGroundUnitHealth] = 300
+    aiBrain[refiHighestMobileLandEnemyRange] = 30 --i.e. t1 arti
 
     --Intel BO related:
     aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 1
@@ -7405,10 +7426,14 @@ function OverseerInitialisation(aiBrain)
     --Nearest enemy and ACU and threat
     aiBrain[toEnemyBrains] = {}
     aiBrain[toAllyBrains] = {}
-    iPreviousNearestEnemyIndex = M27Logic.GetNearestEnemyIndex(aiBrain, false)
-    aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iPreviousNearestEnemyIndex)])
-    aiBrain[reftLastNearestACU] = M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iPreviousNearestEnemyIndex)]
-    aiBrain[refoLastNearestACU] = M27Utilities.GetACU(tAllAIBrainsByArmyIndex[iPreviousNearestEnemyIndex])
+    local iNearestEnemyIndex = M27Logic.GetNearestEnemyIndex(aiBrain, false)
+    if not(iNearestEnemyIndex) and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) then
+        M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI will not function.', 0, 10)
+    else
+        aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyIndex)])
+        aiBrain[reftLastNearestACU] = M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyIndex)]
+        aiBrain[refoLastNearestACU] = M27Utilities.GetACU(tAllAIBrainsByArmyIndex[iNearestEnemyIndex])
+    end
     aiBrain[refiLastNearestACUDistance] = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
 
     aiBrain[refiPercentageOutstandingThreat] = 0.5
@@ -7900,15 +7925,22 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+    --Test new GetUnitMaxGroundRange function
+    local tOurUnits = aiBrain:GetListOfUnits(categories.DIRECTFIRE + categories.INDIRECTFIRE + categories.ANTIAIR, false, true)
+    if M27Utilities.IsTableEmpty(tOurUnits) == false then
+        for iUnit, oUnit in tOurUnits do
+            LOG('Range of unit '..oUnit.UnitId..'='..M27UnitInfo.GetUnitMaxGroundRange(oUnit))
+        end
+    end
 
     --Check if experimental isnt moving
-    local tEnemyExperimentals = aiBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL * categories.LAND, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Enemy')
+    --[[local tEnemyExperimentals = aiBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL * categories.LAND, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Enemy')
     LOG('TestCustom table of enemy experimentals empty='..tostring(M27Utilities.IsTableEmpty(tEnemyExperimentals)))
     if M27Utilities.IsTableEmpty(tEnemyExperimentals) == false then
         for iUnit, oUnit in tEnemyExperimentals do
             LOG('TestCustom considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; is Civilian based on flag='..tostring(oUnit.IsCivilian or false)..'; brain army index='..oUnit:GetAIBrain():GetArmyIndex()..'; function isCivilian='..tostring(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))..'; Unit state='..M27Logic.GetUnitState(oUnit))
         end
-    end
+    end--]]
 
     --[[
     --Change a unit's speed
@@ -8222,6 +8254,7 @@ function OverseerManager(aiBrain)
 
     local bSetHook = false
     while (not (aiBrain:IsDefeated())) do
+        --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
         if aiBrain.M27IsDefeated then
             break
