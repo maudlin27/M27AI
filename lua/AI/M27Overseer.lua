@@ -4155,7 +4155,8 @@ function ThreatAssessAndRespond(aiBrain)
                                             --If need to protect ACU then ignore other naval threats
                                             if not (bACUNeedsTorpSupport) or (tTorpSubtable[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (tTorpSubtable[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
                                                 if iPriority == 2 then
-                                                    iAssignedThreatWanted = iNavalThreatMaxFactor * oUnit[iArmyIndex][refiUnitNavalAAThreat]
+                                                    --Not dealing with dedicated AA units, assign torp bombers based on strike damage, or AA threat if higher
+                                                    iAssignedThreatWanted = math.max(iNavalThreatMaxFactor * (oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0), (tTorpSubtable[refiCurThreat] or 270) / 750 * oUnit:GetHealth())
                                                     if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then
                                                         iAssignedThreatWanted = iAssignedThreatWanted * 1.34
                                                     end

@@ -4392,6 +4392,9 @@ function AirBomberManager(aiBrain)
         end
         local tbConsideredTargetsByTech = { [1] = false, [2] = false, [3] = false, [4] = false }
 
+        local iAssumedAOE = 1
+
+
         function TargetUnit(oTarget, oBomber, iPriority, iExpectedMaxHealth)
             TrackBomberTarget(oBomber, oTarget, iPriority)
             --Does our bomber have good aoe and is targetting a structure?
@@ -4411,15 +4414,21 @@ function AirBomberManager(aiBrain)
             end
 
             if oUnit[refiStrikeDamageAssigned] < oUnit[refiMaxStrikeDamageWanted] or EntityCategoryContains(categories.COMMAND + categories.EXPERIMENTAL + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategorySML, oUnit.UnitId) then
-                iTargetCount = iTargetCount + 1
-                aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount] = {}
-                aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistPriority] = iCurPriority
-                aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistUnit] = oUnit
-                --Increase the mod distance based on the priority so we effectively only consider highest priority first
-                oUnit[refiBomberDefenceModDistance] = (iOptionalModDistanceToBase or M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)) + iCurPriority * 10000
-                aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiBomberDefenceModDistance] = oUnit[refiBomberDefenceModDistance]
-                aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistStrikeDamageWanted] = oUnit[refiMaxStrikeDamageWanted]
-                iHighestPriorityFound = math.min(iHighestPriorityFound, iCurPriority)
+                --Is the target underwater so much that aoe wont hurt it?
+                local tTargetPosition = oUnit:GetPosition()
+                if bDebugMessages == true then LOG(sFunctionRef..': oUnit position='..repru(tTargetPosition)..'; iAssumedAOE='..iAssumedAOE..'; SizeY='..(oUnit:GetBlueprint().SizeY or 0)..'; Underwater height='..M27MapInfo.iMapWaterHeight) end
+                if not(M27MapInfo.IsUnderwater({tTargetPosition[1], tTargetPosition[2] + math.max(0, iAssumedAOE + (oUnit:GetBlueprint().SizeY or 0) - 0.1), tTargetPosition[3]}, false)) then --This is a duplication in part of checks done in most of hte bomber targeting, but not all of them have an underwater check and this one is more accurate
+                    iTargetCount = iTargetCount + 1
+                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount] = {}
+                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistPriority] = iCurPriority
+                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistUnit] = oUnit
+                    --Increase the mod distance based on the priority so we effectively only consider highest priority first
+                    oUnit[refiBomberDefenceModDistance] = (iOptionalModDistanceToBase or M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition(), false)) + iCurPriority * 10000
+                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiBomberDefenceModDistance] = oUnit[refiBomberDefenceModDistance]
+                    aiBrain[reftBomberShortlistByTech][iTechLevel][iTargetCount][refiShortlistStrikeDamageWanted] = oUnit[refiMaxStrikeDamageWanted]
+                    iHighestPriorityFound = math.min(iHighestPriorityFound, iCurPriority)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Added unit to the shortlist as it isnt underwater') end
+                end
             elseif bDebugMessages == true then
                 LOG(sFunctionRef .. ': Already assigned enough strike damage')
             end
@@ -4448,6 +4457,7 @@ function AirBomberManager(aiBrain)
         end
 
         for iTechLevel = 1, 4 do
+
             if iTechLevel >= 3 then
                 if iTechLevel >= 4 or (iTechLevel == 3 and aiBrain[M27Overseer.refbT2NavyNearOurBase]) then
                     bAvoidCruisers = false
@@ -4466,6 +4476,7 @@ function AirBomberManager(aiBrain)
             end
             if M27Utilities.IsTableEmpty(tBombersOfTechLevel) == false then
                 iAvailableBombers = table.getn(tBombersOfTechLevel)
+                iAssumedAOE = M27UnitInfo.GetBomberAOEAndStrikeDamage(tBombersOfTechLevel[1])
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': iAvailableBombers=' .. iAvailableBombers .. '; strategy=' .. aiBrain[M27Overseer.refiAIBrainCurrentStrategy])
                 end
@@ -4474,10 +4485,10 @@ function AirBomberManager(aiBrain)
                     bAvoidCruisers = false
                     tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryNavalSurface, tBasePosition, 90, 'Enemy')
                     for iUnit, oUnit in tPotentialTargets do
-                        if not (M27UnitInfo.IsUnitUnderwater(oUnit)) then
+                        --if not (M27UnitInfo.IsUnitUnderwater(oUnit)) then
                             iCurModDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBasePosition)
                             AddUnitToShortlist(oUnit, iTechLevel, iCurModDistance)
-                        end
+                        --end
                     end
                     --Are we in kill ACU mode? Then target ACU unless its underwater (but allow ahwassa to target if it is underwater)
                 elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and (M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) or (iTechLevel == 4 and not (M27MapInfo.IsUnderwater({ aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[1], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[2] + 18, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[3] }, false)))) then
@@ -4718,7 +4729,7 @@ function AirBomberManager(aiBrain)
                             if iCurActualDistance <= aiBrain[refiBomberDefenceDistanceCap] then
                                 iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), false) + math.min(75, (aiBrain[M27Overseer.refoLastNearestACU][refiFailedHitCount] or 0) * 15)
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': CurPriority=' .. iCurPriority .. '; Considering whether to add enemy ACU to bomber target. Mod distance for enemy ACU=' .. iCurModDistance .. '; aiBrain[refiBomberDefenceModDistance]=' .. aiBrain[refiBomberDefenceModDistance]..'; aiBrain[M27Overseer.refoLastNearestACU][refiFailedHitCount]='..aiBrain[M27Overseer.refoLastNearestACU][refiFailedHitCount])
+                                    LOG(sFunctionRef .. ': CurPriority=' .. iCurPriority .. '; Considering whether to add enemy ACU to bomber target. Mod distance for enemy ACU=' .. iCurModDistance .. '; aiBrain[refiBomberDefenceModDistance]=' .. aiBrain[refiBomberDefenceModDistance]..'; aiBrain[M27Overseer.refoLastNearestACU][refiFailedHitCount]='..(aiBrain[M27Overseer.refoLastNearestACU][refiFailedHitCount] or 0))
                                 end
                                 if iCurModDistance <= aiBrain[refiBomberDefenceModDistance] and (not (bAvoidCruisers) or iCurModDistance < iNearestCruiserModDistance - 30) then
                                     bTargetNearAreaToAvoid = false
@@ -4897,7 +4908,7 @@ function AirBomberManager(aiBrain)
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Early t2 bomber logic - Considering mex ' .. oMex.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oMex) .. '; is it underwater=' .. tostring(M27UnitInfo.IsUnitUnderwater(oMex)) .. '; Is under shield=' .. tostring(M27Logic.IsTargetUnderShield(aiBrain, oMex, 0, false, false, true)) .. '; is protected by AA=' .. tostring(IsTargetCoveredByAA(oMex, tEnemyAA, 3, tStartPoint)))
                                         end
-                                        if not (M27UnitInfo.IsUnitUnderwater(oMex)) then
+                                        if not (M27UnitInfo.IsUnitUnderwater(oMex)) then --might be quicker to duplicate this check rather than waiting until doing the shield and AA coverage checks
                                             if not (bAvoidCruisers) or M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oMex:GetPosition()) < iNearestCruiserModDistance - 30 then
                                                 --Include if its unshielded with no AA on the way to it from our base (assume part-compelte shields will be built by the time we get there)
                                                 if not (M27Logic.IsTargetUnderShield(aiBrain, oMex, 0, false, false, true)) then

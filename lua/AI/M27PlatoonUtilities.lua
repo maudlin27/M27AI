@@ -5460,7 +5460,7 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 
-    if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 360 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 360 then bDebugMessages = true end
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -9676,7 +9676,7 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 360 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 360 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
