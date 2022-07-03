@@ -7236,6 +7236,8 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RefreshListOfFirebases'
 
+    if GetGameTimeSeconds() >= 360 then bDebugMessages = true end
+
     --if aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 20000 then bDebugMessages = true end
 
     local iRefreshInterval = 20
@@ -7691,7 +7693,11 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
 
                             if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tFirebaseUnits)) == false then
                                 if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH1, tFirebaseUnits)) then
-                                    CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH1, 25, 1)
+                                    local tNearbyEnemyLand = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDFTank + categories.COMMAND, aiBrain[reftFirebasePosition][iFirebaseRef], 80, 'Enemy')
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have no T1 PD for firebase; is table of nearby enemy land empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyLand))) end
+                                    if M27Utilities.IsTableEmpty(tNearbyEnemyLand) == false then
+                                        CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH1, 25, 1)
+                                    end
                                 end
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': First checking for T1 PD, is table empty=' .. tostring(M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH1, tFirebaseUnits))) .. '; bWantFortification after checking for t1 PD=' .. tostring(bWantFortification))
@@ -7778,7 +7784,10 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                 local iLowestRatio = 10000
                                 local sRefWanted
                                 local iRatioWanted = 0.8
-                                if M27Conditions.HaveLowMass(aiBrain) and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryIndirect, aiBrain[reftFirebasePosition][iFirebaseRef], 120)) then iRatioWanted = 0.55 end
+                                if M27Conditions.HaveLowMass(aiBrain) then iRatioWanted = 0.675 end
+                                if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat + M27UnitInfo.refCategoryIndirect, aiBrain[reftFirebasePosition][iFirebaseRef], 120)) then iRatioWanted = iRatioWanted - 0.125 end
+                                if aiBrain:GetEconomyStored('MASS') == 0 then iRatioWanted = iRatioWanted - 0.05 end
+
                                 for sThreatVariableRef, iCategory in tiCategoriesWanted do
                                     tOurUnitsOfRelevance = EntityCategoryFilterDown(iCategory, tFirebaseUnits)
                                     --For performance reasons will just get mass cost total
@@ -7793,22 +7802,38 @@ function RefreshListOfFirebases(aiBrain, bForceRefresh)
                                             end
                                         end
                                     end
-                                    tiOurThreatVsEnemyThreat[sThreatVariableRef] = iCurMassTotal / math.max(aiBrain[sThreatVariableRef], 0.001)
+                                    local iEnemyThreatLevel = aiBrain[sThreatVariableRef]
+                                    if sThreatVariableRef == M27Overseer.refiTotalEnemyShortRangeThreat and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], aiBrain[reftFirebasePosition][iFirebaseRef]) >= 180 then
+                                        local iEnemyACUs = 0
+                                        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]) == false then
+                                            for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
+                                                iEnemyACUs = iEnemyACUs + 1
+                                            end
+                                        end
+                                        iEnemyACUs = math.max(1, iEnemyACUs)
+                                        iEnemyThreatLevel = iEnemyThreatLevel - M27Logic.GetCombatThreatRating(aiBrain, { aiBrain[M27Overseer.refoLastNearestACU] }) * 0.5 - 800 * (iEnemyACUs - 1)
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Nearest enemy ACU is far away so reducing the short range threat of the enemy slightly. Combat rating of nearest enemy ACU='..M27Logic.GetCombatThreatRating(aiBrain, { aiBrain[M27Overseer.refoLastNearestACU] })..'; threat before reuding by a % of this, aiBrain[sThreatVariableRef]='..aiBrain[sThreatVariableRef]..'; threat after reducing='..iEnemyThreatLevel..'; iEnemyACUs='..iEnemyACUs) end
+                                    end
+
+
+                                    tiOurThreatVsEnemyThreat[sThreatVariableRef] = iCurMassTotal / math.max(iEnemyThreatLevel, 0.001)
                                     if tiOurThreatVsEnemyThreat[sThreatVariableRef] < iLowestRatio then
                                         iLowestRatio = tiOurThreatVsEnemyThreat[sThreatVariableRef]
                                         sRefWanted = sThreatVariableRef
                                     end
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering sThreatVariableRef='..sThreatVariableRef..'; iCurMassTotal='..iCurMassTotal..'; aiBrain[sThreatVariableRef]='..aiBrain[sThreatVariableRef]..'; tiOurThreatVsEnemyThreat[sThreatVariableRef]='..tiOurThreatVsEnemyThreat[sThreatVariableRef]..'; iLowestRatio='..iLowestRatio..'; tiUnitCap[sRefWanted]='..tiUnitCap[sRefWanted]) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering sThreatVariableRef='..sThreatVariableRef..'; iCurMassTotal='..iCurMassTotal..'; aiBrain[sThreatVariableRef]='..aiBrain[sThreatVariableRef]..'; tiOurThreatVsEnemyThreat[sThreatVariableRef]='..tiOurThreatVsEnemyThreat[sThreatVariableRef]..'; iLowestRatio='..iLowestRatio..'; tiUnitCap[sRefWanted]='..tiUnitCap[sRefWanted]..'; iRatioWanted ='..iRatioWanted) end
                                 end
-                                if iLowestRatio < 0.7 and sRefWanted then
+                                if iLowestRatio < iRatioWanted and sRefWanted then
                                     CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], tiCategoriesWanted[sRefWanted] - M27UnitInfo.refCategoryFixedShield, 50, tiUnitCap[sRefWanted])
                                     if bDebugMessages == true then LOG(sFunctionRef..': Will try and build something to satisfy sRefWanted='..sRefWanted..'; bWantFortification after checking='..tostring(bWantFortification)) end
                                 end
                             end
                             --Force the building of ravagers if are UEF and have lots of T2 PD but not many ravagers
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will build ravagers as UEF if have lots of T2PD already. bWantFortification='..tostring(bWantFortification)..'; Mass gross income='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; Energy net income='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; ACU is UEF='..tostring(EntityCategoryContains(categories.UEF, M27Utilities.GetACU(aiBrain).UnitId))) end
                             if not(bWantFortification) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 14 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 150 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 3 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 500 and EntityCategoryContains(categories.UEF, M27Utilities.GetACU(aiBrain).UnitId) then
-                                if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPD * categories.TECH3) <= 5 then
-                                    CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH3, 40, 3)
+                                local iCurRavagers = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryPD * categories.TECH3)
+                                if iCurRavagers == 0 or (iCurRavagers <= 6 and (aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] - 8000)/2000 >= iCurRavagers) then
+                                    CheckForNearbySupportUnits(aiBrain, iFirebaseRef, aiBrain[reftFirebaseFrontPDPosition][iFirebaseRef], M27UnitInfo.refCategoryPD * categories.TECH3, 40, iCurRavagers + 1)
                                 end
                             end
                         end

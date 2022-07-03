@@ -1928,7 +1928,7 @@ function CheckIfTargetHardToHitBase(oBomber, oTarget)
                 if bFailedAttack == true then
                     oTarget[refiFailedHitCount] = (oTarget[refiFailedHitCount] or 0) + 1
                 else
-                    if (oTarget[refiFailedHitCount] or 0) <= 0 then oTarget[refiFailedHitCount] = oTarget[refiFailedHitCount] - 0.5
+                    if (oTarget[refiFailedHitCount] or 0) <= 0 then oTarget[refiFailedHitCount] = (oTarget[refiFailedHitCount] or 0) - 0.5
                     else oTarget[refiFailedHitCount] = 0 end
                 end
                 if oTarget[refiFailedHitCount] >= 2 then
@@ -4712,8 +4712,8 @@ function AirBomberManager(aiBrain)
                         --ACU
                         iCurPriority = 3
                         if aiBrain[M27Overseer.refbGroundCombatEnemyNearBuilding] then iCurPriority = 5 end
-                        if aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() <= 3000 then iCurPriority = iCurPriority - 1 end
                         if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then
+                            if aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() <= 3000 then iCurPriority = iCurPriority - 1 end
                             iCurActualDistance = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                             if iCurActualDistance <= aiBrain[refiBomberDefenceDistanceCap] then
                                 iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), false) + math.min(75, (aiBrain[M27Overseer.refoLastNearestACU][refiFailedHitCount] or 0) * 15)

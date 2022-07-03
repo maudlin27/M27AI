@@ -6779,7 +6779,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             iCurMassTotal = 0
             if M27Utilities.IsTableEmpty(tAllThreatUnits) == false then
                 for iUnit, oUnit in tAllThreatUnits do
-                    iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
+                    if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
+                        iCurMassTotal = iCurMassTotal + M27Logic.GetCombatThreatRating(aiBrain, { oUnit})
+                    else
+                        iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
+                    end
                 end
             end
             aiBrain[sThreatVariableRef] = math.max(aiBrain[sThreatVariableRef], iCurMassTotal)

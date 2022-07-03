@@ -5458,9 +5458,13 @@ function ConsiderConstructionForACU(aiBrain, oPlatoon, oACU) --Intended to be ru
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ConsiderConstructionForACU'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 360 then bDebugMessages = true end
+
+
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
 
-    --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 11 and GetGameTimeSeconds() >= 90 and GetGameTimeSeconds() <= 400 then bDebugMessages = true end
 
     if oACU:HasEnhancement('AdvancedEngineering') or oACU:HasEnhancement('T3Engineering') then
         if bDebugMessages == true then LOG(sFunctionRef..': ACU has access to T2 tech, if strategy is turtle will consider what to build. aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; M27Logic.IsTargetUnderShield(aiBrain, oACU, 8000, nil, false, false)='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oACU, 8000, nil, false, false))) end
@@ -9672,7 +9676,7 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
+            if oPlatoon[refbACUInPlatoon] == true and aiBrain:GetArmyIndex() == 2 and GetGameTimeSeconds() >= 360 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
