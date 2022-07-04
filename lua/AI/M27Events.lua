@@ -18,6 +18,7 @@ local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
+local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -1076,7 +1077,7 @@ function OnReclaimFinished(oEngineer, oReclaim)
     if M27Utilities.bM27AIInGame then
         --Update the segment that the reclaim is at, or the engineer if hte reclaim doesnt have one
         local sFunctionRef = 'OnReclaimFinished'
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then LOG(sFunctionRef..': oEngineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just finished reclaiming, gametime='..GetGameTimeSeconds()) end
 
@@ -1091,8 +1092,8 @@ function OnReclaimFinished(oEngineer, oReclaim)
         end
         --If dealing with M27 unit that is in a platoon that is reclaiming a specific target or a hive, then look for a new target
         if M27UnitInfo.IsUnitValid(oEngineer) and oEngineer:GetAIBrain().M27AI then
-            if oEngineer.PlatoonHandle or EntityCategoryContains(M27UnitInfo.refCategoryHive, oEngineer.UnitId) then
-                if bDebugMessages == true then LOG(sFunctionRef..': Platoon current action='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] or 'nil')..'; last order type='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] or 'nil')..'; Engineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Platoon current action='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] or 'nil')..'; last order type='..(oEngineer.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] or 'nil')..'; Engineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; Engineer action='..(oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')..'; Is idle platoon='..tostring((oEngineer.PlatoonHandle[M27PlatoonTemplates.refbIdlePlatoon]) or false)) end
+            if (oEngineer.PlatoonHandle and not(oEngineer.PlatoonHandle[M27PlatoonTemplates.refbIdlePlatoon])) or EntityCategoryContains(M27UnitInfo.refCategoryHive, oEngineer.UnitId) then
                 local aiBrain = oEngineer:GetAIBrain()
                 if aiBrain:GetEconomyStoredRatio('MASS') <= 0.6 then
                     if oEngineer.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReclaimTarget or oEngineer.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType] == M27PlatoonUtilities.refiOrderIssueReclaim or EntityCategoryContains(M27UnitInfo.refCategoryHive, oEngineer.UnitId) then
@@ -1115,6 +1116,11 @@ function OnReclaimFinished(oEngineer, oReclaim)
                         end
                     end
                 end
+            elseif oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionSelenMexBuild and not(oEngineer:IsUnitState('Building')) and not(oEngineer:IsUnitState('Repairing')) then
+                bDebugMessages = true
+                IssueClearCommands({oEngineer})
+                M27EngineerOverseer.BuildStructureAtLocation(oEngineer:GetAIBrain(), oEngineer, M27UnitInfo.refCategoryT1Mex, 1, nil, oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget], true, false, nil, true, nil, nil, M27EngineerOverseer.refActionSelenMexBuild)
+                if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just finished reclaiming something, and its action was selenbuildmex, so will try and get it to build a mex at its target location of '..repru((oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] or {'nil'}))) end
             end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

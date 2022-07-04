@@ -73,6 +73,7 @@ refActionAssistTML = 43
 refActionBuildQuantumGateway = 44
 refActionBuildQuantumOptics = 45
 refActionBuildHive = 46
+refActionSelenMexBuild = 47
 tiEngiActionsThatDontBuild = {refActionReclaimArea, refActionSpare, refActionHasNearbyEnemies, refActionReclaimUnit, refActionReclaimTrees, refActionUpgradeBuilding, refActionAssistSMD, refActionAssistTML, refActionAssistAirFactory, refActionUpgradeHQ, refActionAssistNuke, refActionLoadOnTransport, refActionAssistShield}
 --NOTE: IF ADDING MORE ACTIONS, UPDATE THE ACTIONS IN THE POWER STALL MANAGER
 --ALSO update the actions noted in RefreshT3ArtiAdjacencyLocations as being ones that can ignore when deciding whether to clear existing engineer commands
@@ -1432,6 +1433,88 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
         IssueAggressiveMove({oEngineer}, oNearestUnit:GetPosition())
         local sLocationRef = M27Utilities.ConvertLocationToReference(oNearestUnit:GetPosition())
         aiBrain[reftSpareEngineerAttackMoveTimeByLocation][sLocationRef] = GetGameTimeSeconds()
+    end
+
+    --Selen logic
+    if not(bAreNearbyEnemies) and oEngineer[refiEngineerCurrentAction] == refActionBuildMex then
+        local iBuildRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': Considering engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UC='..GetEngineerUniqueCount(oEngineer)..'; Cur target='..repru(oEngineer[reftEngineerCurrentTarget])..'; cur position of engineer='..repru(oEngineer:GetPosition())..'; dist to target='..M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), oEngineer[reftEngineerCurrentTarget])..'; iBuildRange='..iBuildRange)
+            if oEngineer.GetNavigator then LOG('Navigator position='..repru(oEngineer:GetNavigator():GetCurrentTargetPos())) end
+        end
+
+        function CheckForSelenBuildMexOrder(oEngineer, tMexLocation)
+        --Checks if selen is blocking mex construction and if so does attack-move followed by a new build mex order
+            local tEnemiesOnTarget = GetUnitsInRect(Rect(tMexLocation[1] - 1.5, tMexLocation[3] - 1.5, tMexLocation[1] + 1.5, tMexLocation[3] + 1.5))
+            if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemies at target empty='..tostring(M27Utilities.IsTableEmpty(tEnemiesOnTarget))) end
+            if M27Utilities.IsTableEmpty(tEnemiesOnTarget) == false then
+                --Are any of these units a mobile unit owned by an enemy?
+                local bMobileEnemy = false
+                local oNearestEnemy
+                for iUnit, oUnit in tEnemiesOnTarget do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; owned by brain with army index='..oUnit:GetAIBrain():GetArmyIndex()..'; is enemy='..tostring(IsEnemy(aiBrain:GetArmyIndex(), oUnit:GetAIBrain():GetArmyIndex()))) end
+                    if EntityCategoryContains(categories.MOBILE, oUnit.UnitId) then
+                        if IsEnemy(aiBrain:GetArmyIndex(), oUnit:GetAIBrain():GetArmyIndex()) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have mobile enemy') end
+                            bMobileEnemy = true
+                            oNearestEnemy = oUnit
+                            break
+                        end
+                    end
+                end
+
+                if bMobileEnemy then
+                    bAreNearbyEnemies = true
+                    IssueClearCommands({oEngineer})
+                    --Do we need to move to be in range first?
+                    local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oNearestEnemy:GetPosition(), oEngineer:GetPosition())
+                    local oEnemyBP = oNearestEnemy:GetBlueprint()
+                    iDistToEnemy = iDistToEnemy - math.min(oEnemyBP.SizeX, oEnemyBP.SizeZ)
+                    if iDistToEnemy > iBuildRange then
+                        local iDistToMex = M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), tMexLocation)
+                        IssueMove({oEngineer}, M27Utilities.MoveInDirection(oEngineer:GetPosition(), M27Utilities.GetAngleFromAToB(oEngineer:GetPosition(), tMexLocation), math.max(1, 0.75 + iDistToMex - iBuildRange), true))
+                    end
+                    IssueAggressiveMove({oEngineer}, tMexLocation)
+                    local tLocationBuiltAt = BuildStructureAtLocation(aiBrain, oEngineer, refCategoryT1Mex, 1, nil, tMexLocation, true, false, nil, true, nil, nil, refActionSelenMexBuild)
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Given engineer aggressive move order then told it to rebuild the mex at location '..repru(tMexLocation)..';  Will draw the affected mex in white. new tLocationBuiltAt='..repru(tLocationBuiltAt)..'; iDistToEnemy='..iDistToEnemy)
+                        M27Utilities.DrawLocation(tMexLocation, false, 7, 100, 3)
+                    end
+                    UpdateEngineerActionTrackers(aiBrain, oEngineer, refActionSelenMexBuild, tLocationBuiltAt, false, 1000)
+
+                end
+            end
+        end
+
+        --[[if M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), oEngineer[reftEngineerCurrentTarget]) <= math.max(2, iBuildRange + 0.75) then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are getting close to engineer current target '..repru(oEngineer[reftEngineerCurrentTarget])..', will check for selens') end
+            CheckForSelenBuildMexOrder(oEngineer, oEngineer[reftEngineerCurrentTarget])
+        elseif oEngineer.GetNavigator and oEngineer:GetNavigator() then
+            local tNewTarget = oEngineer:GetNavigator():GetCurrentTargetPos()
+            if M27Utilities.IsTableEmpty(tNewTarget) == false and M27Utilities.GetDistanceBetweenPositions(tNewTarget, oEngineer[reftEngineerCurrentTarget]) > (iBuildRange + 2) then
+
+                local sLocationRef = M27Utilities.ConvertLocationToReference(tNewTarget)
+                if bDebugMessages == true then LOG(sFunctionRef..': sLocationRef='..sLocationRef..'; is table of assignments for this location empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByLocation][sLocationRef]))..'; reprs of assignmentsbylocation='..reprs(aiBrain[reftEngineerAssignmentsByLocation])) end
+                if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByLocation][sLocationRef]) == false and M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), tNewTarget) <= math.max(2, iBuildRange + 0.75) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Are getting close to tNewTarget='..repru(tNewTarget)..'; dist='..M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), tNewTarget)..'; will check for selens') end
+                    CheckForSelenBuildMexOrder(oEngineer, tNewTarget)
+                else
+
+                end
+            end
+        end--]]
+        local iUC = GetEngineerUniqueCount(oEngineer)
+        if bDebugMessages == true then LOG(sFunctionRef..': Reproducing list of actions for engineer ref '..iUC..'='..reprs(aiBrain[reftEngineerActionsByEngineerRef][iUC])) end
+        for iQueue, tSubtable in aiBrain[reftEngineerActionsByEngineerRef][iUC] do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering location '..repru(tSubtable[refEngineerAssignmentActualLocation])..'; Dist to engineer='..M27Utilities.GetDistanceBetweenPositions(tSubtable[refEngineerAssignmentActualLocation], oEngineer:GetPosition())..'; iBuildRange='..iBuildRange) end
+
+            --NOTE: Distance mod - tried with 0.75 but get cases where doesnt trigger, e.g. in one case dist to mex was 6.6 away, engi build range was 5, engi stopped at 6.6 away; hence doing +2 to be safe
+
+            if M27Utilities.IsTableEmpty(tSubtable[refEngineerAssignmentActualLocation]) == false and M27Utilities.GetDistanceBetweenPositions(tSubtable[refEngineerAssignmentActualLocation], oEngineer:GetPosition()) <= math.max(2, iBuildRange + 2) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Will check for selens at the target location') end
+                CheckForSelenBuildMexOrder(oEngineer, tSubtable[refEngineerAssignmentActualLocation])
+            end
+        end
     end
     --end
 
@@ -4523,7 +4606,7 @@ end
 function GetCategoryToBuildFromAction(iActionToAssign, iMinTechLevel, aiBrain)
     --Returns the building category type based on the action; iMinTechLevel is optional; aiBrain is required if dealing with construction of experimental
     local iCategoryToBuild
-    if iActionToAssign == refActionBuildMex or iActionToAssign == refActionBuildPlateauMex then
+    if iActionToAssign == refActionBuildMex or iActionToAssign == refActionBuildPlateauMex or iActionToAssign == refActionSelenMexBuild then
         iCategoryToBuild = refCategoryT1Mex --Note: Will override this separately in some cases
     elseif iActionToAssign == refActionBuildT3MexOverT2 then
         iCategoryToBuild = M27UnitInfo.refCategoryT3Mex
@@ -8332,6 +8415,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 if bDebugMessages == true then LOG(sFunctionRef..': will give plateau spare engi action') end
                                 IssuePlateauSpareEngineerAction(aiBrain, oEngineer)
                                 if M27UnitInfo.IsUnitValid(oEngineer) then UpdateEngineerActionTrackers(aiBrain, oEngineer, refActionPlateauSpareAction, nil, false, 1000) end
+                            elseif oEngineer[refiCurrentAction] == refActionSelenMexBuild then
+                                --Dont want to interfere with special logic
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': Engi has nearby enemies but appears idle so will give spare engi action. Is unit valid='..tostring(M27UnitInfo.IsUnitValid(oEngineer))) end
                                 IssueSpareEngineerAction(aiBrain, oEngineer)
