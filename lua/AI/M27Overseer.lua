@@ -5150,7 +5150,7 @@ function ACUManager(aiBrain)
                                 --Abort ACU upgrade if >=3 TML and its not safe to upgrade
                                 local iEnemyTML = 0
                                 for iUnit, oUnit in aiBrain[reftEnemyTML] do
-                                    if M27UnitInfo.IsUnitValid(oUnit) then
+                                    if M27UnitInfo.IsUnitValid(oUnit) and EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) then
                                         iEnemyTML = iEnemyTML + 1
                                     end
                                 end
@@ -5159,7 +5159,7 @@ function ACUManager(aiBrain)
                                         --Double-check all 3 TML are in-range, since safetoget upgrade only uses threshold of 2
                                         iEnemyTML = 0
                                         for iUnit, oUnit in aiBrain[reftEnemyTML] do
-                                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tACUPos) <= 259 then
+                                            if EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tACUPos) <= 259 then
                                                 iEnemyTML = iEnemyTML + 1
                                             end
                                         end
@@ -6053,7 +6053,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
     local iBigThreatSearchRange = 10000
 
-    local tEnemyBigThreatCategories = { M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategorySMD }
+    local tEnemyBigThreatCategories = { M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryMissileNavy, M27UnitInfo.refCategorySMD }
     local tCurCategoryUnits
     local tReferenceTable, bRemovedUnit
     local sUnitUniqueRef
@@ -6072,7 +6072,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 LOG(sFunctionRef .. ': Looking for enemy nukes')
             end
             bWantACUToReturnToBase = true
-        elseif iCategory == M27UnitInfo.refCategoryTML then
+        elseif iCategory == M27UnitInfo.refCategoryTML or iCategory == M27UnitInfo.refCategoryMissileNavy then
             tReferenceTable = aiBrain[reftEnemyTML]
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Looking for enemy TML')
@@ -6161,8 +6161,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
     if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false then
         for iUnit, oUnit in aiBrain[reftEnemyTML] do
-            if not (oUnit[M27UnitInfo.refbTMDChecked]) then
+            if not (oUnit[M27UnitInfo.refbTMDChecked]) or (EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oUnit[M27UnitInfo.reftPositionWhenTMDChecked]) > 50) then
                 oUnit[M27UnitInfo.refbTMDChecked] = true
+                oUnit[M27UnitInfo.reftPositionWhenTMDChecked] = {}
+                oUnit[M27UnitInfo.reftPositionWhenTMDChecked][1], oUnit[M27UnitInfo.reftPositionWhenTMDChecked][2], oUnit[M27UnitInfo.reftPositionWhenTMDChecked][3] = oUnit:GetPositionXYZ()
                 ForkThread(M27Logic.DetermineTMDWantedForTML, aiBrain, oUnit)
             end
         end

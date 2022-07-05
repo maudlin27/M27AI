@@ -299,7 +299,7 @@ function SafeToGetACUUpgrade(aiBrain)
                                     if bIsSafe and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
                                         local iTMLInRange = 0
                                         for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyTML] do
-                                            if M27Utilities.GetDistanceBetweenPositions(tACUPos, oUnit:GetPosition()) <= 259 then
+                                            if EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(tACUPos, oUnit:GetPosition()) <= 259 then
                                                 if bDebugMessages == true then LOG(sFunctionRef..': In range of TML') end
                                                 iTMLInRange = iTMLInRange + 1
                                                 if iTMLInRange >= 2 then

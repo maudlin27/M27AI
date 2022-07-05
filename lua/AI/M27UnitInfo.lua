@@ -48,9 +48,11 @@ refiTimeConstructed = 'M27UnitTimeConstructed' --Game seconds when unit was cons
 
 --TMD:
 refbTMDChecked = 'M27TMDChecked' --Used against enemy TML to flag if we've already checked for TMD we want when it was first detected
+reftPositionWhenTMDChecked = 'M27PositionTMDCheck' --Used for enemy TML and mobile long range missiles (e.g. cruisers) to flag if we've checked for TMD near the current position
 reftTMLDefence = 'M27TMLDefence' --[sTMLRef] - returns either nil if not considered, or the unit object of TMD protecting it
 reftTMLThreats = 'M27TMLThreats' --[sTMLRef] - returns object number of TML that is threatening this unit
 refbCantBuildTMDNearby = 'M27CantBuildTMDNearby'
+refiNearbyTMD = 'M27TMDNearby' --Number of friendly TMD nearby
 
 
 --Factions

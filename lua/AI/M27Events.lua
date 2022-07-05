@@ -262,8 +262,8 @@ function OnUnitDeath(oUnit)
                 --Is the unit owned by M27AI?
                 if oUnit.GetAIBrain then
                     --Ythotha deathball avoidance - all M27 units run away regardless of whether it was an M27 or enemy Ythotha
-                        --Note -seraphimunits.lua contains SEnergyBallUnit which looks like it is for when the death ball is spawned; ID is XSL0402; SpawnElectroStorm is in the ythotha script
-                        --Sandbox test - have c.36s from ythotha dying to energy ball dying, so want to run away for half of this (18s) plus extra time based on how far away we already were
+                    --Note -seraphimunits.lua contains SEnergyBallUnit which looks like it is for when the death ball is spawned; ID is XSL0402; SpawnElectroStorm is in the ythotha script
+                    --Sandbox test - have c.36s from ythotha dying to energy ball dying, so want to run away for half of this (18s) plus extra time based on how far away we already were
                     if EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental * categories.SERAPHIM, oUnit.UnitId) then
                         --Swarm-AI workaround to deal with how it is controlled as a normal unit - slow it down so it stays in a simialr area to normal
                         if oUnit:GetAIBrain().M27SwarmAI then
@@ -366,6 +366,23 @@ function OnUnitDeath(oUnit)
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
                         OnMexDeath(oUnit)
+                    end
+
+                    --TMD - refresh nearby TMD
+                    if EntityCategoryContains(M27UnitInfo.refCategoryTMD, oUnit.UnitId) then
+                        local tTMDPosition = oUnit:GetPosition()
+                        local iRadiusSize = M27EngineerOverseer.iTMDNearbyRange
+                        local tNearbyTMD = GetUnitsInRect(Rect(tTMDPosition[1]-iRadiusSize, tTMDPosition[3]-iRadiusSize, tTMDPosition[1]+iRadiusSize, tTMDPosition[3]+iRadiusSize))
+                        if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                            tNearbyTMD = EntityCategoryFilterDown(M27UnitInfo.refCategoryTMD, tNearbyTMD)
+                            if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                                for iTMD, oTMD in tNearbyTMD do
+                                    if M27UnitInfo.IsUnitValid(oTMD) then
+                                        ForkThread(M27EngineerOverseer.RecordNearbyTMD, oTMD)
+                                    end
+                                end
+                            end
+                        end
                     end
                 end
             end
@@ -900,6 +917,23 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
                     if EntityCategoryContains(M27UnitInfo.refCategoryExperimentalArti * categories.MOBILE, oConstruction.UnitId) then
                         aiBrain[M27EngineerOverseer.reftFriendlyScathis][oConstruction.UnitId..M27UnitInfo.GetUnitLifetimeCount(oConstruction)] = oConstruction
                     end
+
+                    --TMD tracking for multiple TMD
+                    if EntityCategoryContains(M27UnitInfo.refCategoryTMD, oConstruction.UnitId) then
+                        local tTMDPosition = oConstruction:GetPosition()
+                        local iRadiusSize = M27EngineerOverseer.iTMDNearbyRange
+                        local tNearbyTMD = GetUnitsInRect(Rect(tTMDPosition[1]-iRadiusSize, tTMDPosition[3]-iRadiusSize, tTMDPosition[1]+iRadiusSize, tTMDPosition[3]+iRadiusSize))
+                        if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                            tNearbyTMD = EntityCategoryFilterDown(M27UnitInfo.refCategoryTMD, tNearbyTMD)
+                            if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                                for iTMD, oTMD in tNearbyTMD do
+                                    if M27UnitInfo.IsUnitValid(oTMD) then
+                                        ForkThread(M27EngineerOverseer.RecordNearbyTMD, oTMD)
+                                    end
+                                end
+                            end
+                        end
+                    end
                 end
             end
 
@@ -1077,7 +1111,7 @@ function OnReclaimFinished(oEngineer, oReclaim)
     if M27Utilities.bM27AIInGame then
         --Update the segment that the reclaim is at, or the engineer if hte reclaim doesnt have one
         local sFunctionRef = 'OnReclaimFinished'
-        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then LOG(sFunctionRef..': oEngineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just finished reclaiming, gametime='..GetGameTimeSeconds()) end
 
@@ -1117,7 +1151,6 @@ function OnReclaimFinished(oEngineer, oReclaim)
                     end
                 end
             elseif oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionSelenMexBuild and not(oEngineer:IsUnitState('Building')) and not(oEngineer:IsUnitState('Repairing')) then
-                bDebugMessages = true
                 IssueClearCommands({oEngineer})
                 M27EngineerOverseer.BuildStructureAtLocation(oEngineer:GetAIBrain(), oEngineer, M27UnitInfo.refCategoryT1Mex, 1, nil, oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget], true, false, nil, true, nil, nil, M27EngineerOverseer.refActionSelenMexBuild)
                 if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' has just finished reclaiming something, and its action was selenbuildmex, so will try and get it to build a mex at its target location of '..repru((oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] or {'nil'}))) end

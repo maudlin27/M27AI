@@ -7911,7 +7911,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                                     if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
                                         local iTMLCount = 0
                                         for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyTML] do
-                                            if M27UnitInfo.IsUnitValid(oUnit) then
+                                            if M27UnitInfo.IsUnitValid(oUnit) and EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) then
                                                 iTMLCount = iTMLCount + 1
                                             end
                                         end
