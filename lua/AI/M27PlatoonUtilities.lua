@@ -3267,6 +3267,9 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
                                         local tNearbyPD = {}
                                         local oNearestPD
+                                        local bInRangeOfT2PlusPD = false
+                                        local bNearbyT2PlusPD = false
+
                                         if oPlatoon[refiEnemyStructuresInRange] > 0 then
                                             tNearbyPD = EntityCategoryFilterDown(categories.DIRECTFIRE, oPlatoon[reftEnemyStructuresInRange])
                                             if M27Utilities.IsTableEmpty(tNearbyPD) == false then
@@ -3278,11 +3281,15 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                             local iNearestEnemyDistance = 1000
                                             local iNearestPDDistance = 1000
                                             local tNearestPD, tNearestEnemy
+
+
                                             if oNearestPD then
                                                 tNearestPD = oNearestPD:GetPosition()
                                                 iNearestPDDistance = M27Utilities.GetDistanceBetweenPositions(tNearestPD, tPlatoonPosition)
+                                                iEnemyMaxRange = math.max(iEnemyMaxRange, M27Logic.GetDFAndT1ArtiUnitMinOrMaxRange(tNearbyPD, 2))
                                             end
                                             if oNearestEnemy then
+                                                iEnemyMaxRange = math.max(iEnemyMaxRange, M27Logic.GetDFAndT1ArtiUnitMinOrMaxRange(tNearbyPD, 2))
                                                 tNearestEnemy = oNearestEnemy:GetPosition()
                                                 iNearestEnemyDistance = M27Utilities.GetDistanceBetweenPositions(tNearestEnemy, tPlatoonPosition)
                                                 if bDebugMessages == true then LOG(sFunctionRef..': tNearestEnemy='..repru(tNearestEnemy)..'; tPlatoonPosition='..repru(tPlatoonPosition)..'; oNearestEnemy='..oNearestEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestEnemy)..'; Platoon front position='..repru(GetPlatoonFrontPosition(oPlatoon))..'; Platoon front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])) end
@@ -3291,12 +3298,15 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                 oNearestEnemy = oNearestPD
                                             end
                                             --CanSeeUnit(aiBrain, oUnit, bTrueIfOnlySeeBlip)
-                                            if oNearestEnemy == oNearestPD then
+                                            --[[if oNearestEnemy == oNearestPD then
                                                 --Dont need CanSeeUnit, as in reality will have visual effect from enemy PD that is distinctive such that will know if there's an enemy PD nearby
                                                 iEnemyMaxRange = M27Logic.GetDFAndT1ArtiUnitMinOrMaxRange({oNearestEnemy}, 2)
                                             else
                                                 if M27Utilities.CanSeeUnit(aiBrain, oNearestEnemy, false) then iEnemyMaxRange = M27Logic.GetDFAndT1ArtiUnitMinOrMaxRange({oNearestEnemy}, 2) end
-                                            end
+                                            end--]]
+
+
+
                                             if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..': iPlatoonMaxRange='..oPlatoon[refiPlatoonMaxRange]..'; iEnemyMaxRange='..iEnemyMaxRange) end
                                             if oPlatoon[refiPlatoonMaxRange] >= iEnemyMaxRange then --if have same max range may still be benefit to kiting if enemy lacks intel
                                                 if oNearestEnemy == oNearestPD then
@@ -3853,8 +3863,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                             local iEnemyThreatRating = 0
                                             if oPlatoon[refiEnemiesInRange] > 0 then iEnemyThreatRating = iEnemyThreatRating + M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemiesInRange], true, nil) end
                                             if oPlatoon[refiEnemyStructuresInRange] > 0 then iEnemyThreatRating = iEnemyThreatRating + M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemyStructuresInRange], true) end
-
-                                            if iOurThreatRating * 0.95 >= iEnemyThreatRating then
+                                            if (not(bNearbyT2PlusPD) and iOurThreatRating * 0.95 >= iEnemyThreatRating) or (bNearbyT2PlusPD and iOurThreatRating * 0.7 >= iEnemyThreatRating) then
                                                 bWillWinAttack = true
                                                 if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': UpdateActionForNearbyEnemies - our threat is better than theirs; iEnemyThreatRating='..iEnemyThreatRating..'; iOurThreatRating='..iOurThreatRating) end
                                             end
