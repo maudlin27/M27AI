@@ -1180,8 +1180,8 @@ function UpdateReclaimSegmentAreaOfInterest(iReclaimSegmentX, iReclaimSegmentZ, 
                                             if iCurDistToBase < iCurDistToEnemyBase then
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Are on our side of map') end
                                                 --Priority 1 - have current visual intel of location or intel coverage
-                                                iCurAirSegmentX, iCurAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tCurMidpoint)
-                                                if GetGameTimeSeconds() - (aiBrain[M27AirOverseer.reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][M27AirOverseer.refiLastScouted] or -100) <= 1.1 then
+                                                --iCurAirSegmentX, iCurAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tCurMidpoint)
+                                                if M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, tCurMidpoint) <= 1.1 then
                                                     iCurPriority = 1
                                                     --Check if we have radar coverage (ignore visual sight and non-radar structure intel units for performance reasons)
                                                 elseif M27Logic.GetIntelCoverageOfPosition(aiBrain, tCurMidpoint, 10, true) then iCurPriority = 1
@@ -1821,8 +1821,8 @@ function UpdateReclaimAreasOfInterest(aiBrain)
                                                             if iCurDistToBase < iCurDistToEnemyBase then
                                                                 if bDebugMessages == true then LOG(sFunctionRef..': Are on our side of map') end
                                                                 --Priority 1 - have current visual intel of location or intel coverage
-                                                                iCurAirSegmentX, iCurAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tCurMidpoint)
-                                                                if GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][M27AirOverseer.refiLastScouted] <= 1.1 then
+                                                                --iCurAirSegmentX, iCurAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tCurMidpoint)
+                                                                if M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, tCurMidpoint) <= 1.1 then
                                                                     iCurPriority = 1
                                                                     --Check if we have radar coverage (ignore visual sight and non-radar structure intel units for performance reasons)
                                                                 elseif M27Logic.GetIntelCoverageOfPosition(aiBrain, tCurMidpoint, 10, true) then iCurPriority = 1
@@ -4202,9 +4202,9 @@ function CanWeMoveInSameGroupInLineToTarget(sPathing, tStart, tEnd)
 end
 
 function IsEnemyStartPositionValid(aiBrain, tEnemyBase)
-    local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tEnemyBase)
+    --local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tEnemyBase)
     --Have we had sight of the enemy start position in the last 6 mins?
-    if GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] <= 360 then
+    if M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, tEnemyBase) <= 360 then
         --Are there any enemy structures within 50 of the base?
         local tEnemyStructures = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tEnemyBase, 50, 'Enemy')
         if M27Utilities.IsTableEmpty(tEnemyStructures) then

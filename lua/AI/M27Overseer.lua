@@ -6448,14 +6448,14 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 iBaseScoutingTime = aiBrain[M27AirOverseer.refiIntervalEnemyBase] + 60
                 iEnemyGroundAAFactor = 0.2
             end
-            local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+            --local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
             local bEnemyHasEnoughAA = false
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': iBaseScoutingTime=' .. iBaseScoutingTime .. '; CurTime=' .. GetGameTimeSeconds() .. '; Time last scouted enemy base=' .. aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted])
+                LOG(sFunctionRef .. ': iBaseScoutingTime=' .. iBaseScoutingTime .. '; CurTime=' .. GetGameTimeSeconds() .. '; Time last scouted enemy base=' .. M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)))
             end
-            if math.max(iBaseScoutingTime + 30, GetGameTimeSeconds()) - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] <= iBaseScoutingTime then
+            if math.max(iBaseScoutingTime + 30 - GetGameTimeSeconds(),0) + M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= iBaseScoutingTime then
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Time since last scouted enemy base=' .. (GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted]) .. '; Scouting interval=' .. iBaseScoutingTime .. '; therefore considering whether to switch to air dominance')
+                    LOG(sFunctionRef .. ': Time since last scouted enemy base=' .. M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) .. '; Scouting interval=' .. iBaseScoutingTime .. '; therefore considering whether to switch to air dominance')
                 end
                 --Have we either had no bombers die, or the last bomber was effective?
                 if bDebugMessages == true then

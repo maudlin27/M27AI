@@ -227,6 +227,12 @@ function GetAirPositionFromSegment(iSegmentX, iSegmentZ)
     return { iPosX, GetTerrainHeight(iPosX, iPosZ), iPosZ }
 end
 
+function GetTimeSinceLastScoutedLocation(aiBrain, tLocation)
+    --Returns the game-time since we last had intel of a location
+    local iAirSegmentX, iAirSegmentZ = GetAirSegmentFromPosition(tLocation)
+    return GetGameTimeSeconds() - (aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiLastScouted] or 0)
+end
+
 function ClearAirScoutDeathFromSegmentInFuture(aiBrain, iAirSegmentX, iAirSegmentZ)
     --CALL VIA FORKED THREAD
     WaitSeconds(200)
@@ -1332,8 +1338,8 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
 
                         for iMex, tMex in tPotentialMexes do
                             bAlreadyCoveredByOtherBomber = false
-                            iCurSegmentX, iCurSegmentZ = GetAirSegmentFromPosition(tMex)
-                            iLastVisualSight =  aiBrain[reftAirSegmentTracker][iCurSegmentX][iCurSegmentZ][refiLastScouted]
+                            --iCurSegmentX, iCurSegmentZ = GetAirSegmentFromPosition(tMex)
+                            iLastVisualSight =  GetTimeSinceLastScoutedLocation(aiBrain, tMex)
                             if iCurTime - iLastVisualSight >= 60 then
                                 --Been more than 60s since had sight of the mex so consider it if its closer to enemy base than our base
                                 iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tMex, tEnemyBase)
@@ -3723,7 +3729,8 @@ function RecordSegmentsThatHaveVisualOf(aiBrain)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
-function GetVulnerableMexes(aiBrain, tStartPoint, iShieldHealthToIgnore)
+function GetVulnerableMexes(aiBrain, tStartPoint, iShieldHealthToIgnore, iMinDistanceAwayFromEnemyBase)
+    --iMinDistanceAwayFromEnemyBase will default to 0
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetVulnerableMexes'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -3737,6 +3744,13 @@ function GetVulnerableMexes(aiBrain, tStartPoint, iShieldHealthToIgnore)
         local iVulnerableMexes = 0
         local tEnemyT3AA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tStartPoint, aiBrain[refiMaxScoutRadius], 'Enemy')
         local iRangeToUse = 65 --For performance reasons will approximate with this range; SAMs have a range of 60
+        local tEnemyBases
+        if iMinDistanceAwayFromEnemyBase > 0 then
+            tEnemyBases = {}
+            for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
+                table.insert(tEnemyBases, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
+            end
+        end
         if M27Utilities.IsTableEmpty(tEnemyT3AA) == false then
             local iDistFromBaseToMex, iDistFromBaseToAA, iDistFromMexToAA, iAngleFromBaseToMex, iAngleFromBaseToAA
 
@@ -3744,49 +3758,60 @@ function GetVulnerableMexes(aiBrain, tStartPoint, iShieldHealthToIgnore)
             local bIsVulnerable
             for iMex, oMex in tEnemyMexes do
                 bIsVulnerable = true
-
-                --Is it under heavy shield?
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Checking if oMex=' .. oMex.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oMex) .. ' is under a shield')
-                end
-                if not (M27Logic.IsTargetUnderShield(aiBrain, oMex, iShieldHealthToIgnore, false, false, true)) then
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Mex isnt under a shield, will see if any T3 AA that will block us')
-                    end
-                    tMex = oMex:GetPosition()
-                    iDistFromBaseToMex = M27Utilities.GetDistanceBetweenPositions(tStartPoint, tMex)
-                    iAngleFromBaseToMex = M27Utilities.GetAngleFromAToB(tStartPoint, tMex)
-
-                    --IsLineFromAToBInRangeOfCircleAtC(iDistFromAToB, iDistFromAToC, iDistFromBToC, iAngleFromAToB, iAngleFromAToC, iCircleRadius)
-
-                    for iAA, oAA in tEnemyT3AA do
-                        iDistFromBaseToAA = M27Utilities.GetDistanceBetweenPositions(tStartPoint, oAA:GetPosition())
-                        iAngleFromBaseToAA = M27Utilities.GetAngleFromAToB(tStartPoint, oAA:GetPosition())
-                        iDistFromMexToAA = M27Utilities.GetDistanceBetweenPositions(tMex, oAA:GetPosition())
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Will check if mex has AA that will block it; oAA=' .. oAA.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAA) .. '; iDistFromBaseToMex=' .. iDistFromBaseToMex .. '; iDistFromBaseToAA=' .. iDistFromBaseToAA .. '; iDistFromMexToAA=' .. iDistFromMexToAA)
-                        end
-                        if M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iDistFromBaseToMex, iDistFromBaseToAA, iDistFromMexToAA, iAngleFromBaseToMex, iAngleFromBaseToAA, iRangeToUse) then
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': AA is blocking the path to mex')
-                            end
+                tMex = oMex:GetPosition()
+                --Check if too close to enemy base
+                if iMinDistanceAwayFromEnemyBase > 0 and M27Utilities.IsTableEmpty(tEnemyBases) == false then
+                    for iStart, tStart in tEnemyBases do
+                        if M27Utilities.GetDistanceBetweenPositions(tMex, tStart) <= iMinDistanceAwayFromEnemyBase then
                             bIsVulnerable = false
                             break
                         end
                     end
-                else
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Mex is under a shield')
-                    end
-                    bIsVulnerable = false
                 end
-
-                if not (bIsVulnerable) then
+                if bIsVulnerable then
+                    --Is it under heavy shield?
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Mex is vulnerable so recording')
+                        LOG(sFunctionRef .. ': Checking if oMex=' .. oMex.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oMex) .. ' is under a shield')
                     end
-                    iVulnerableMexes = iVulnerableMexes + 1
-                    tVulnerableMexes[iVulnerableMexes] = tMex
+                    if not (M27Logic.IsTargetUnderShield(aiBrain, oMex, iShieldHealthToIgnore, false, false, true)) then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Mex isnt under a shield, will see if any T3 AA that will block us')
+                        end
+
+                        iDistFromBaseToMex = M27Utilities.GetDistanceBetweenPositions(tStartPoint, tMex)
+                        iAngleFromBaseToMex = M27Utilities.GetAngleFromAToB(tStartPoint, tMex)
+
+                        --IsLineFromAToBInRangeOfCircleAtC(iDistFromAToB, iDistFromAToC, iDistFromBToC, iAngleFromAToB, iAngleFromAToC, iCircleRadius)
+
+                        for iAA, oAA in tEnemyT3AA do
+                            iDistFromBaseToAA = M27Utilities.GetDistanceBetweenPositions(tStartPoint, oAA:GetPosition())
+                            iAngleFromBaseToAA = M27Utilities.GetAngleFromAToB(tStartPoint, oAA:GetPosition())
+                            iDistFromMexToAA = M27Utilities.GetDistanceBetweenPositions(tMex, oAA:GetPosition())
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Will check if mex has AA that will block it; oAA=' .. oAA.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAA) .. '; iDistFromBaseToMex=' .. iDistFromBaseToMex .. '; iDistFromBaseToAA=' .. iDistFromBaseToAA .. '; iDistFromMexToAA=' .. iDistFromMexToAA)
+                            end
+                            if M27Utilities.IsLineFromAToBInRangeOfCircleAtC(iDistFromBaseToMex, iDistFromBaseToAA, iDistFromMexToAA, iAngleFromBaseToMex, iAngleFromBaseToAA, iRangeToUse) then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': AA is blocking the path to mex')
+                                end
+                                bIsVulnerable = false
+                                break
+                            end
+                        end
+                    else
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Mex is under a shield')
+                        end
+                        bIsVulnerable = false
+                    end
+
+                    if not (bIsVulnerable) then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Mex is vulnerable so recording')
+                        end
+                        iVulnerableMexes = iVulnerableMexes + 1
+                        tVulnerableMexes[iVulnerableMexes] = tMex
+                    end
                 end
             end
         else
@@ -7273,6 +7298,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                                 iCurDPSMod = iCurDPSMod + (oUnit:GetBlueprint().Defense.RegenRate or 0)
                                 iTimeToTarget = math.max(0, M27Utilities.GetDistanceBetweenPositions(oNovax:GetPosition(), oUnit:GetPosition()) - iRange) / iSpeed
                                 iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+
                                 iTimeToKillTarget = (oUnit:GetHealth() + iCurShield + math.min(iMaxShield - iCurShield, iTimeToTarget * iCurDPSMod)) / math.max(0.001, iDPS - iCurDPSMod)
                                 if iMaxShield == 0 and not (EntityCategoryContains(categories.COMMAND, oUnit.UnitId)) then
                                     iCurValue = iCurValue * math.max(M27UnitInfo.GetUnitHealthPercent(oUnit), 0.25)
@@ -7491,7 +7517,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     --Broad idea (at time of first draft) - target locations that expect to be lightly defended, but try to dominate enemy groundAA when come across threats
     --bIsCzar - will affect some of the logic
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ExperimentalGunshipCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -7508,12 +7534,14 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
         iCombatRangeToUse = 25
         iImmediateCombatRange = 17 --Given czar's speed, this is a reasonable approximation
     end
+    local iSAMSearchRange = 60 + iCombatRangeToUse + 6
 
     local reftLastLocationTarget = 'M27AirLastLocationTarget'
     local refoLastUnitTarget = 'M27AirLastUnitTarget'
     local refbPreviouslyRun = 'M27AirPreviouslyRun'
     local refiTimeSinceLastRan = 'M27AirTimePreviouslyRan'
-    local refiTimeWhenFirstRan = 'M27AirTimeWhenFirstRan'
+    local refiTimeWhenFirstRan = 'M27AirTimeWhenFirstRan' --First time started to run in this 'cycle' (will reset when recover health)
+    local refiTimeWhenFirstEverRan = 'M27AirTimeFirstEverRan' --First time ever ran, wont reset
     local refbCanRunFromLastTarget = 'M27AirCanRunFromLastTarget' --i.e. dont want to track how often we have run from our base or rally point since those are meant to be 'safe'
     local iCurShield = 0
     local iMaxShield = 0
@@ -7528,7 +7556,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     local tNearbyAirExperimental = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL, tCurPosition, 90, 'Ally')
     local iNearbyFriendlyAirExperimental = 0
     if M27Utilities.IsTableEmpty(tNearbyAirExperimental) == false then
-        iNearbyFriendlyAirExperimental = table.getn(tNearbyAirExperimental)
+        iNearbyFriendlyAirExperimental = table.getn(tNearbyAirExperimental) - 1
     end
 
     local iSAMThreshold
@@ -7589,7 +7617,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 iOurDPS = 3330
             end
             if iNearbyFriendlyAirExperimental > 0 then
-                iOurDPS = iOurDPS * (iNearbyFriendlyAirExperimental + 1)
+                iOurDPS = iOurDPS + (iNearbyFriendlyAirExperimental * iOurDPS)
             end
 
             local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), tCurPosition)
@@ -7605,12 +7633,13 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 iTimeToTarget = iDistToTarget / iActualRange
             end
             local iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(aiBrain[M27Overseer.refoLastNearestACU])
-            local iNearbyShieldHealth = M27Logic.IsTargetUnderShield(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], 0, true, false, false)
+            local iNearbyShieldHealth = M27Logic.IsTargetUnderShield(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], 0, true, false, false, true)
             local iCrashDamage = 0
             if bIsCzar then
                 iCrashDamage = 10000
             end
-            local iTimeToKillTarget = iTimeToTarget + math.max(1, (iNearbyShieldHealth + aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() + iACUCurShield - iCrashDamage)) / math.max(0.001, iOurDPS)
+            if bDebugMessages == true then LOG(sFunctionRef..': iNearbyShieldHealth='..iNearbyShieldHealth..'; iCrashDamage='..iCrashDamage..'; ACU cur health='..aiBrain[M27Overseer.refoLastNearestACU]:GetHealth()..'; iACUCurShield='..(iACUCurShield or 0)..'; iOurDPS='..iOurDPS) end
+            local iTimeToKillTarget = iTimeToTarget + math.max(1, (iNearbyShieldHealth * 1.1 + aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() + iACUCurShield - iCrashDamage)) / math.max(0.001, iOurDPS)
             local iTimeUntilWeDie
 
             local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA + M27UnitInfo.refCategoryGroundAA, tCurPosition, 100, 'Enemy')
@@ -7637,6 +7666,8 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 LOG(sFunctionRef .. ': iOurTotalHealth=' .. iOurTotalHealth .. '; iEstimatedEnemyAADPS=' .. iEstimatedEnemyAADPS .. '; iTimeToKillTarget=' .. iTimeToKillTarget .. '; iTimeUntilWeDie=' .. iTimeUntilWeDie)
             end
             --Give a small margin of error
+            local iTimeToKillFactor = 0.9 --Want to kill enemy in 90% of the time it will take for us to die
+            if not(ScenarioInfo.Options.Victory == "demoralization") then iTimeToKillFactor = 0.4 end
             if iTimeToKillTarget > 2 and (iTimeUntilWeDie * 0.9 - 2) < iTimeToKillTarget then
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': We will die before we kill the target so want to revert to normal logic (which will likely ahve us retreat once low on health')
@@ -7676,6 +7707,8 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             if aiBrain[refbPreviouslyRun] then
                 if bIsCzar then
                     iPercentMod = 0.4
+                elseif aiBrain[refiTimeWhenFirstEverRan] then
+                    iPercentMod = 0.3
                 else
                     iPercentMod = 0.1
                 end
@@ -7698,6 +7731,8 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 if iNearbyFriendlyAirExperimental > 0 then
                     iMaxASF = iMaxASF * (1 + iNearbyFriendlyAirExperimental)
                 end
+
+                if oUnit[refiTimeWhenFirstEverRan] then iMaxASF = iMaxASF * 0.75 end
 
                 local tNearbyASF = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA * categories.TECH3, tCurPosition, iASFSearchRange, 'Enemy')
                 if M27Utilities.IsTableEmpty(tNearbyASF) == false and table.getn(tNearbyASF) >= iMaxASF then
@@ -7745,7 +7780,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             if oUnit[refiTimeWhenFirstRan] then iTimeSinceFirstRan = GetGameTimeSeconds() - oUnit[refiTimeWhenFirstRan] end
             if bStillRun and iTimeSinceFirstRan >= 15 and (bIsCzar or iTimeSinceFirstRan >= 25) then
                 --Does the enemy not have any SAMs (or other T3 ground AA) within range of us?
-                local tNearbyEnemySAMs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, 60 + iCombatRangeToUse + 6, 'Enemy')
+                local tNearbyEnemySAMs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, iSAMSearchRange + 10, 'Enemy')
                 if M27Utilities.IsTableEmpty(tNearbyEnemySAMs) then
                     local tNearbyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface - categories.TECH1, tCurPosition, iCombatRangeToUse, 'Enemy')
                     if M27Utilities.IsTableEmpty(tNearbyUnits) then
@@ -7787,7 +7822,10 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             if bStillRun then
                 if bWantToRun then
                     oUnit[refiTimeSinceLastRan] = GetGameTimeSeconds()
-                    if not(oUnit[refbPreviouslyRun]) then oUnit[refiTimeWhenFirstRan] = GetGameTimeSeconds() end
+                    if not(oUnit[refbPreviouslyRun]) then
+                        oUnit[refiTimeWhenFirstRan] = GetGameTimeSeconds()
+                        if not(oUnit[refiTimeWhenFirstEverRan]) then oUnit[refiTimeWhenFirstEverRan] = GetGameTimeSeconds() end
+                    end
                 end
                 oAttackTarget = nil
                 bUpdateLocationAttemptCount = false
@@ -7807,7 +7845,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': No immediate targets so will consider units nearby')
             end
-            local tNearbySAM = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, 65, 'Enemy')
+            local tNearbySAM = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, iSAMSearchRange, 'Enemy')
             iSAMThreshold = 6
             if iNearbyFriendlyAirExperimental > 0 then
                 iSAMThreshold = iSAMThreshold * (1 + iNearbyFriendlyAirExperimental)
@@ -7823,9 +7861,12 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                     iSAMThreshold = iSAMThreshold - 1
                 end
             end
+            if oUnit[refiTimeWhenFirstEverRan] then
+                iSAMThreshold = math.max(math.min(iSAMThreshold, 2), iSAMThreshold - 2)
+            end
             if M27Utilities.IsTableEmpty(tNearbySAM) == false and table.getn(tNearbySAM) >= iSAMThreshold then
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': At least 4 T3 AA nearby so want to run unless theyre in range')
+                    LOG(sFunctionRef .. ': At least ' .. iSAMThreshold .. ' T3 AA nearby so want to run unless theyre in range')
                 end
                 --Are any of the T3 air within range of us? If so and its unshielded, then attack the nearest one
                 local oNearestSAM
@@ -8002,38 +8043,44 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     --Do we still need a target (as dont want to run and no nearby units of interest)?
     if not (oAttackTarget) and M27Utilities.IsTableEmpty(tLocationToMoveTo) then
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': No nearby targets so will consider further away targets')
+            LOG(sFunctionRef .. ': No nearby targets so will consider further away targets. refiTimeWhenFirstEverRan='..(oUnit[refiTimeWhenFirstEverRan] or 'nil'))
         end
         --Is the enemy ACU on land, has minimal AA near it, and isn't under >=10k of shields?
         if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and not (IsTargetInDeepWater(aiBrain[M27Overseer.refoLastNearestACU])) and not (M27Logic.IsTargetUnderShield(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], 14000, false, false, true)) and GetSegmentFailedAttempts(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) < iMaxPrevTargets then
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Can see enemy ACU and its on land and not well shielded so head towards it')
+                LOG(sFunctionRef .. ': Can see enemy ACU and its on land and not well shielded so head towards it subject to intel')
             end
-            if M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) or aiBrain[M27Overseer.refoLastNearestACU] == oUnit[refoLastUnitTarget] then
-                oAttackTarget = aiBrain[M27Overseer.refoLastNearestACU]
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Last ACU position based on unit=' .. repru(oAttackTarget:GetPosition()))
-                end
-            else
-                tLocationToMoveTo = aiBrain[M27Overseer.reftLastNearestACU]
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Last ACU position based on location=' .. repru(tLocationToMoveTo))
+
+            if not(oUnit[refiTimeWhenFirstEverRan]) or M27Logic.GetIntelCoverageOfPosition(aiBrain, aiBrain[M27Overseer.reftLastNearestACU], 40, true) then
+
+                if M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) or aiBrain[M27Overseer.refoLastNearestACU] == oUnit[refoLastUnitTarget] then
+                    oAttackTarget = aiBrain[M27Overseer.refoLastNearestACU]
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Last ACU position based on unit=' .. repru(oAttackTarget:GetPosition()))
+                    end
+                else
+                    tLocationToMoveTo = aiBrain[M27Overseer.reftLastNearestACU]
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Last ACU position based on location=' .. repru(tLocationToMoveTo))
+                    end
                 end
             end
         else
             --Alternative: Target enemy experimental if within 55% of our base, or within 100 of us, or 60% if it's our last target, provided it's on land
             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Enemy has land experimerntasls so will see if any are close')
+                    LOG(sFunctionRef .. ': Enemy has land experimerntasls so will see if any are close subject to intel')
                 end
                 local tPotentialTargets = {}
                 local iPotentialTargets = 0
                 for iExperimental, oExperimental in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
                     if M27UnitInfo.IsUnitValid(oExperimental) and oExperimental:GetFractionComplete() >= 0.05 and M27Utilities.CanSeeUnit(aiBrain, oExperimental, true) and GetSegmentFailedAttempts(oExperimental:GetPosition()) < iMaxPrevTargets and (M27Utilities.GetDistanceBetweenPositions(oExperimental:GetPosition(), tCurPosition) <= 120 or (M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false) <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6 and M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false) <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.55 or oUnit[refoLastUnitTarget] == oExperimental)) then
-                        iPotentialTargets = iPotentialTargets + 1
-                        tPotentialTargets[iPotentialTargets] = oExperimental
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Potential experimental target found')
+                        if not(oUnit[refiTimeWhenFirstEverRan]) or M27Logic.GetIntelCoverageOfPosition(aiBrain, oExperimental:GetPosition(), 30, true) then
+                            iPotentialTargets = iPotentialTargets + 1
+                            tPotentialTargets[iPotentialTargets] = oExperimental
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Potential experimental target found')
+                            end
                         end
                     end
                 end
@@ -8044,18 +8091,22 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             if not (oAttackTarget) then
                 --Is the enemy base vulnerable?
                 if GetSegmentFailedAttempts(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) < iMaxPrevTargets then
-                    local tSAMByBase = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 120, 'Enemy')
+                    local tSAMByBase = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), math.max(iSAMSearchRange + 10, 120), 'Enemy')
                     local iSAMByBase = 0
                     if M27Utilities.IsTableEmpty(tSAMByBase) == false then
                         iSAMByBase = table.getn(tSAMByBase)
                     end
-                    if iSAMByBase < (iSAMThreshold - 1) then
-                        tLocationToMoveTo = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                    if iSAMByBase < math.max(2, (iSAMThreshold - 1)) then
+                        if not(oUnit[refiTimeWhenFirstEverRan]) or M27Logic.GetIntelCoverageOfPosition(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 40, true) then
+                            tLocationToMoveTo = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                        end
                     end
                 end
                 if M27Utilities.IsTableEmpty(tLocationToMoveTo) then
                     --Alternative: Vulnerable T2 or T3 mexes (mexes with minimal AA and shielding)
-                    local tVulnerableMexes = GetVulnerableMexes(aiBrain, tCurPosition, 14000)
+                    local iMinDistanceAwayFromEnemyBase = 0
+                    if oUnit[refiTimeWhenFirstEverRan] then iMinDistanceAwayFromEnemyBase = 80 end
+                    local tVulnerableMexes = GetVulnerableMexes(aiBrain, tCurPosition, 14000, iMinDistanceAwayFromEnemyBase)
                     if M27Utilities.IsTableEmpty(tVulnerableMexes) == false then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Have vulnerable mexes so will target the nearest one')
@@ -8064,8 +8115,10 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                         for iLocation, tLocation in tVulnerableMexes do
                             iCurDistance = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tLocation)
                             if iCurDistance < iNearestDistance and GetSegmentFailedAttempts(tLocation) < iMaxPrevTargets then
-                                tLocationToMoveTo = tLocation
-                                iNearestDistance = iCurDistance
+                                if not(oUnit[refiTimeWhenFirstEverRan]) or GetLastTimeScoutedLocation(aiBrain, tLocation) <= 60 or M27Logic.GetIntelCoverageOfPosition(aiBrain, tLocation, 20, true) then
+                                    tLocationToMoveTo = tLocation
+                                    iNearestDistance = iCurDistance
+                                end
                             end
                         end
                     end

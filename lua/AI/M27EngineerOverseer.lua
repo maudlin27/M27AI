@@ -4322,9 +4322,9 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Building second experimental, will check if the last experimental category was a nuke. iFriendlyNukes='..iFriendlyNukes) end
                 end
                 if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 600 and (iFriendlyNukes == 0 or (aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML) == 0 and (not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) or iFriendlyNukes < table.getsize(aiBrain[M27Overseer.toEnemyBrains]))))  then
-                    local iEnemyBaseSegmentX, iEnemyBaseSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to build a nuke; Time since last had sight of enemy start='..aiBrain[M27AirOverseer.reftAirSegmentTracker][iEnemyBaseSegmentX][iEnemyBaseSegmentZ][M27AirOverseer.refiLastScouted]..'; Cur gametime='..GetGameTimeSeconds()) end
-                    if GetGameTimeSeconds() - (aiBrain[M27AirOverseer.reftAirSegmentTracker][iEnemyBaseSegmentX][iEnemyBaseSegmentZ][M27AirOverseer.refiLastScouted] or 0) <= 100 then
+                    --local iEnemyBaseSegmentX, iEnemyBaseSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to build a nuke; Time since last had sight of enemy start='..M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))) end
+                    if M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= 100 then
                         --Anti-nuke has range of 90; SML has aoe of 30
                         local tEnemySMD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySMD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] + 60, 'Enemy')
                         if bDebugMessages == true then LOG(sFunctionRef..': Have recent sight of enemy base; Is tEnemySMD empty='..tostring(M27Utilities.IsTableEmpty(tEnemySMD))) end

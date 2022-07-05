@@ -4579,16 +4579,16 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         iTimeSMDNeedsToHaveBeenBuiltFor = 200 --3m20
                         tTarget, iBestTargetValue = GetBestAOETarget(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), iAOE, iDamage, bCheckForSMD, oLauncher:GetPosition(), nil, nil, 2, 2.5)
                     end
-                    local iAirSegmentX, iAirSegmentZ
+                    --local iAirSegmentX, iAirSegmentZ
 
                     --Cycle through other start positions to see if can get a better target, but reduce value of target if we havent scouted it in the last 5 minutes
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering best target for nuke.  If target enemy base then iBestTargetValue='..iBestTargetValue) end
                     for iStartPoint = 1, table.getn(M27MapInfo.PlayerStartPoints) do
                         if not(iStartPoint == aiBrain.M27StartPositionNumber) and M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[iStartPoint], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) >= 30 then
                             --Have we scouted this location recently?
-                            iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[iStartPoint])
-                            if bDebugMessages == true then LOG(sFunctionRef..': Cycling through start points, iStartPoint='..iStartPoint..'; time last scouted='..(GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted])) end
-                            if GetGameTimeSeconds() - (aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiLastScouted] or -300) <= 300 then
+                            --iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.PlayerStartPoints[iStartPoint])
+                            if bDebugMessages == true then LOG(sFunctionRef..': Cycling through start points, iStartPoint='..iStartPoint..'; time last scouted='..M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint])) end
+                            if M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint]) <= 300 then
                                 if HaventRecentlyNukedLocation(M27MapInfo.PlayerStartPoints[iStartPoint]) then
                                     iCurTargetValue = GetDamageFromBomb(aiBrain, M27MapInfo.PlayerStartPoints[iStartPoint], iAOE, iDamage, 2, 2.5)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Considering the start position '..iStartPoint..'='..repru(M27MapInfo.PlayerStartPoints[iStartPoint])..'; value ignroign SMD='..iCurTargetValue) end
