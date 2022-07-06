@@ -341,7 +341,7 @@ function OnUnitDeath(oUnit)
                             aiBrain[M27Overseer.refiSkirmisherMassDeathsAll] = aiBrain[M27Overseer.refiSkirmisherMassDeathsAll] + oUnit:GetBlueprint().Economy.BuildCostMass
                         end
 
-                        --All non-mex/hydro structures - if have shield locations that cant build on, then check if this was near any of them
+                        --All non-mex/hydro - if have shield locations that cant build on, then check if this was near any of them
                         if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFailedShieldLocations]) == false and EntityCategoryContains(categories.STRUCTURE - M27UnitInfo.refCategoryMex - M27UnitInfo.refCategoryHydro, sUnitBP) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Have failed shield locations so will check if any buildings need adjusting') end
                             local iBuildingSize = math.max(1, math.ceil(oUnit:GetBlueprint().Physics.SkirtSizeX))

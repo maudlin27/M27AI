@@ -3267,8 +3267,6 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
                                         local tNearbyPD = {}
                                         local oNearestPD
-                                        local bInRangeOfT2PlusPD = false
-                                        local bNearbyT2PlusPD = false
 
                                         if oPlatoon[refiEnemyStructuresInRange] > 0 then
                                             tNearbyPD = EntityCategoryFilterDown(categories.DIRECTFIRE, oPlatoon[reftEnemyStructuresInRange])
@@ -3809,9 +3807,11 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         --Are there lots of T2+ PD nearby? If so run (even if we have a similar threat) unless we're already in range
                                         local bRunFromPD = false
                                         local bInRangeOfT2PlusPD = false
+                                        local bNearbyT2PlusPD
                                         if oPlatoon[refiEnemyStructuresInRange] > 0 then
                                             local tEnemyT2PlusPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryT2PlusPD, oPlatoon[reftEnemyStructuresInRange])
                                             if M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false then
+                                                bNearbyT2PlusPD = true
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Have T2 PD within the enemy structures in range, will see if we have nearby T1 indirect fire units for calculating our range, and then attack if we are almost within range') end
                                                 local iMaxRangeToUse = math.max(15, oPlatoon[refiPlatoonMaxRange]) --M27Logic.GetUnitMaxGroundRange({ oPlatoon[refoFrontUnit] })) --striker has range of 18
                                                 --if table.getn(tEnemyT2PlusPD) >= 3 then

@@ -3132,6 +3132,7 @@ function GetBuildLocationForShield(aiBrain, sShieldBP,  tPositionToCoverWithShie
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetBuildLocationForShield'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if aiBrain:GetArmyIndex() == 5 and GetGameTimeSeconds() >= 2160 then bDebugMessages = true end
 
 
     local iShieldRadius = math.floor(__blueprints[sShieldBP].Defense.Shield.ShieldSize * 0.5 - 0.5)
@@ -3198,6 +3199,7 @@ function GetBuildLocationForShield(aiBrain, sShieldBP,  tPositionToCoverWithShie
             --Get best location
             tPossibleLocation = ttValidLocationPositions[iHighestAngleDifLocationRef]
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': iValidLocations='..iValidLocations..'; tPossibleLocation that will return='..repru(tPossibleLocation)) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return tPossibleLocation
     end
@@ -5664,6 +5666,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
     --if GetEngineerUniqueCount(oEngineer) == 169 and GetGameTimeSeconds() >= 2300 then bDebugMessages = true end
     --if iActionToAssign == refActionBuildHive then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
+    --if aiBrain:GetArmyIndex() == 5 and GetGameTimeSeconds() >= 2160 and (iActionToAssign == refActionBuildShield or iActionToAssign == refActionBuildSecondShield) then bDebugMessages = true end
 
 
     if oEngineer then
@@ -5706,8 +5709,13 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                     ForkThread(RegularlyCheckForNearbyReclaim, oEngineer, true)
                     UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, false, iConditionNumber)
                 else
+                    if bDebugMessages == true then
+                        if oActionTargetObject then LOG(sFunctionRef..': Have action target object='..oActionTargetObject.UnitId..M27UnitInfo.GetUnitLifetimeCount(oActionTargetObject)..'; iActionToAssign='..iActionToAssign)
+                        else LOG(sFunctionRef..': Dont have an action target. iActionToAssign='..iActionToAssign)
+                        end
+                    end
                     if oActionTargetObject then
-                        if not(iActionToAssign == refActionReclaimArea) and not(iActionToAssign == refActionPlateauReclaim) and not(iActionToAssign == refActionReclaimTrees) and not((iActionToAssign == refActionBuildShield or iActionToAssign == refActionBuildSecondShield) and not(EntityCategoryContains(categories.MOBILE - M27UnitInfo.refCategoryExperimentalStructure, oActionTargetObject.UnitId))) then
+                        if not(iActionToAssign == refActionReclaimArea) and not(iActionToAssign == refActionPlateauReclaim) and not(iActionToAssign == refActionReclaimTrees) and not((iActionToAssign == refActionBuildShield or iActionToAssign == refActionBuildSecondShield) and not(EntityCategoryContains(categories.MOBILE + M27UnitInfo.refCategoryFixedShield - M27UnitInfo.refCategoryExperimentalStructure, oActionTargetObject.UnitId))) then
                             if iActionToAssign == refActionReclaimUnit then
                                 IssueReclaim({oEngineer}, oActionTargetObject)
                                 --UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTargetLocation, bAreAssisting, iConditionNumber, oUnitToAssist, bDontClearExistingTrackers, oUnitToBeDestroyed, iPrimaryEngineerCategoryBuilt)
@@ -6642,6 +6650,8 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetActionTargetAndObject'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --if aiBrain:GetArmyIndex() == 5 and GetGameTimeSeconds() >= 2160 and (iActionRefToAssign == refActionBuildShield or iActionRefToAssign == refActionBuildSecondShield) then bDebugMessages = true end
 
     --if iActionRefToAssign == refActionBuildHive then bDebugMessages = true end
 
@@ -8235,6 +8245,7 @@ function RefreshUnitsWantingFixedShields(aiBrain)
     local iLoopCount = 0
 
     if M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingFixedShield]) == false then
+        --if aiBrain:GetArmyIndex() == 5 and GetGameTimeSeconds() >= 2160 then bDebugMessages = true end
         while bChangesMade do
             bChangesMade = false
             iLoopCount = iLoopCount + 1
@@ -8263,6 +8274,7 @@ function RefreshUnitsWantingFixedShields(aiBrain)
                         bChangesMade = true
                         table.insert(aiBrain[reftUnitsWithFixedShield], oUnit)
                         table.remove(aiBrain[reftUnitsWantingFixedShield], iUnit)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Unit has enough shield so adding it to units with fixed shield') end
                         break
                     elseif iTotalShieldHealth >= iShieldingWanted * 0.6 then
                         --Check we dont have lots of shields nearby already
@@ -8271,6 +8283,7 @@ function RefreshUnitsWantingFixedShields(aiBrain)
                             bChangesMade = true
                             table.insert(aiBrain[reftUnitsWithFixedShield], oUnit)
                             table.remove(aiBrain[reftUnitsWantingFixedShield], iUnit)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have lots of shields nearby already and unit has most of the shielding wanted so dont want to build a shield') end
                             break
                         end
                     end
@@ -10088,7 +10101,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     elseif iCurrentConditionToTry == 32 then --Extra TMD by existing TMD if enemy has significant missile threat
                         --Does the enemy have a significant missile threat?
                         if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
-                            if table.getn(aiBrain[M27Overseer.reftEnemyTML]) >= 2 then bDebugMessages = true end
+                            --if table.getn(aiBrain[M27Overseer.reftEnemyTML]) >= 2 then bDebugMessages = true end
                             local iEnemyTMLThreatRating = 0
                             local iEnemyMobileTMLThreatRating = 0
                             local iClosestTMLToOurBase = 10000
