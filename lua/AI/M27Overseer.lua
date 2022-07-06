@@ -5355,7 +5355,7 @@ function ACUManager(aiBrain)
                                 local tNearbyOwnedCombat = {}
                                 local iNearbyOwnedCombatCount = 0
                                 for iUnit, oUnit in tNearbyCombat do
-                                    if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain() == aiBrain and not (M27Utilities.IsACU(oUnit)) then
+                                    if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain() == aiBrain and not (M27Utilities.IsACU(oUnit)) and not(EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId)) then
                                         if not (oUnit.PlatoonHandle) or not (oUnit.PlatoonHandle == oEscortingPlatoon) then
                                             iNearbyOwnedCombatCount = iNearbyOwnedCombatCount + 1
                                             tNearbyOwnedCombat[iNearbyOwnedCombatCount] = oUnit
@@ -6785,6 +6785,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
                         iCurMassTotal = iCurMassTotal + M27Logic.GetCombatThreatRating(aiBrain, { oUnit})
                     else
+                        --NOTE: If updating how calcualte this, then also update events since we reduce mass based on mass cost for experimentals
                         iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
                     end
                 end

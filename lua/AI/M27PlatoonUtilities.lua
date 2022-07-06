@@ -2224,7 +2224,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+    if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -2765,6 +2765,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
             end
         elseif sPlatoonName == 'M27GroundExperimental' and EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oPlatoon[refoFrontUnit].UnitId) then
             --Run if against enemy experimental or 5+ T2 arti or low shield
+            if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a fatboy, will run if lots of enemy T2 arti or a low shield') end
             local iFriendlyExperimental = 1
             if M27Utilities.IsTableEmpty(oPlatoon[reftFriendlyNearbyCombatUnits]) == false then
                 local tFriendlyExperimentals = EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, oPlatoon[reftFriendlyNearbyCombatUnits])
@@ -3537,14 +3538,14 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
                 --Fatboy and megalith - just want to attack if nearby enemies
                 if sPlatoonName == 'M27GroundExperimental' and EntityCategoryContains(M27UnitInfo.refCategoryFatboy + M27UnitInfo.refCategorySniperBot, oPlatoon[refoFrontUnit].UnitId) then
-                    bDontConsiderFurtherOrders = true
+                    bDontChangeCurrentAction = true
                     bProceed = false
                     if bDebugMessages == true then LOG(sFunctionRef..': Have fatboy or megalith so will ignore normal threat based logic since megalith cant kite and fatboy is best if firing at enemy rather than running before it meets the threat') end
                 else
-                    if oPlatoon[refiCurrentAction] == nil then bDontConsiderFurtherOrders = false
+                    if oPlatoon[refiCurrentAction] == nil then bDontChangeCurrentAction = false
                     else
-                        if bAlreadyHaveAttackActionFromOverseer == true and oPlatoon[refiCurrentAction] == iExistingAction then bDontConsiderFurtherOrders = false
-                        else bDontConsiderFurtherOrders = true
+                        if bAlreadyHaveAttackActionFromOverseer == true and oPlatoon[refiCurrentAction] == iExistingAction then bDontChangeCurrentAction = false
+                        else bDontChangeCurrentAction = true
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Have an action now, refiCurrentAction='..oPlatoon[refiCurrentAction]) end
                     end
@@ -6434,7 +6435,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+            if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
@@ -7250,7 +7251,7 @@ function ReturnToBaseOrRally(oPlatoon, tLocationToReturnTo, iOnlyGoThisFarToward
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local sPlatoonName = oPlatoon:GetPlan()
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+    if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27AttackNearestUnits' then bDebugMessages = true end
@@ -7591,7 +7592,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
 
         --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
         --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
-        --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+        if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
         --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
         --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
         --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -7646,6 +7647,8 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                 end
             end
 
+            if bDebugMessages == true then LOG(sFunctionRef..': bDontGetNewPath='..tostring(bDontGetNewPath)) end
+
             if bDontGetNewPath == false then
 
                 --First check if we can path to the enemy, if not then udpate pathing for platoon
@@ -7686,21 +7689,24 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                     oPlatoon[refiCurrentPathTarget] = 1
                 elseif sPlatoonName == 'M27GroundExperimental' then
                     oPlatoon[reftMovementPath] = {}
-                    --Do we have a chokepoint on our team? If so then defend the nearest one
+                    --Do we have a chokepoint on our team? If so then defend the nearest one if the enemy has a certain level of mobile threat
                     local tChokepointToDefend
-                    if not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+                    if (aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 21000 or aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] >= 21000 or oPlatoon[refbHavePreviouslyRun]) and not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
                         local iNearestChokepointDist = 10000
                         local iCurDist
                         for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
                             if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle then
                                 iCurDist = M27Utilities.GetDistanceBetweenPositions(oBrain[M27MapInfo.reftChokepointBuildLocation], GetPlatoonFrontPosition(oPlatoon))
+                                if bDebugMessages == true then LOG(sFunctionRef..': oBrain index '..oBrain:GetArmyIndex()..'; name='..oBrain.Nickname..'; Chokepoint='..repru(oBrain[M27MapInfo.reftChokepointBuildLocation] or {'nil'})..'; Dist to chokepoint='..iCurDist..'; iNearestChokepointDist='..iNearestChokepointDist) end
                                 if iCurDist < iNearestChokepointDist then
                                     tChokepointToDefend = {oBrain[M27MapInfo.reftChokepointBuildLocation][1], oBrain[M27MapInfo.reftChokepointBuildLocation][2], oBrain[M27MapInfo.reftChokepointBuildLocation][3]}
+                                    iNearestChokepointDist = iCurDist
                                 end
                             end
                         end
                     end
-                    if not(tChokepointToDefend) and aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a ground experimental, Is tChokepointToDefend empty='..tostring(M27Utilities.IsTableEmpty(tChokepointToDefend))) end
+                    if not(tChokepointToDefend) and (aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 21000 or aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] >= 21000) and aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle then
                         M27Utilities.ErrorHandler(sFunctionRef..': Couldnt locate a movement point for experimental when searching through all brains but our brain is turtling, so code for teamgames likely has error. WIll just go to our chokepoint')
                         oPlatoon[reftMovementPath][1] = {aiBrain[M27MapInfo.reftChokepointBuildLocation][1], aiBrain[M27MapInfo.reftChokepointBuildLocation][2], aiBrain[M27MapInfo.reftChokepointBuildLocation][3]}
                     end
@@ -7709,15 +7715,18 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                         --oPlatoon[reftMovementPath][1] = M27Logic.GetRandomPointInAreaThatCanPathTo(M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit]), M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit]), GetPlatoonFrontPosition(oPlatoon)), tChokepointToDefend, 30, 10, false)
                         --else
                         oPlatoon[reftMovementPath][1] = tChokepointToDefend
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will defend the chokepoint '..repru(tChokepointToDefend)) end
                         --end
                     else
 
                         if oPlatoon[refbHavePreviouslyRun] then --Patorl 2 mexes and rally point
                             oPlatoon[reftMovementPath] = M27MapInfo.GetMexPatrolLocations(aiBrain, 2, true)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have previously run so will get mex patrol locations') end
                         else
                             local tTargetBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
                             if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tTargetBase) >= 40 then
                                 oPlatoon[reftMovementPath][1] = tTargetBase
+                                if bDebugMessages == true then LOG(sFunctionRef..': Are more than 40 from target base so will go to target base') end
                             else
                                 if bDebugMessages == true then LOG(sFunctionRef..': Are within 40 of the enemy target base; will target the last known enemy ACU position if there is one') end
                                 if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then
@@ -9690,7 +9699,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' then bDebugMessages = true end
+            if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end

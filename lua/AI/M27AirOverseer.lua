@@ -141,6 +141,8 @@ refiTimesThatHaveMetLargeAttackThreshold = 'M27AirLargeBomberTimesMetThreshold' 
 reftBomberEffectiveness = 'M27AirBomberEffectiveness' --[x][y]: x = unit tech level, y = nth entry; returns subtable {MassCost}{MassKilled}
 refiBomberMassCost = 'M27AirBomberMassCost' --Subtable ref
 refiBomberMassKilled = 'M27AirBomberMassKilled' --Subtable ref
+subrefoBomber = 'M27AirBomberUnit' --Stores the unit ref of the bomber that the table entry relates to, so can check if it is still alive
+
 local iBombersToTrackEffectiveness = 3 --Will track the last n bombers killed
 
 --Air threat related
@@ -572,6 +574,7 @@ function UpdateBomberEffectiveness(aiBrain, oBomber, bBomberNotDead)
             end
             tNewEntry[refiBomberMassCost] = oBomber:GetBlueprint().Economy.BuildCostMass
             tNewEntry[refiBomberMassKilled] = (oBomber.Sync.totalMassKilled or 0)
+            tNewEntry[subrefoBomber] = oBomber
 
             if not (bBomberNotDead) or iExistingEntries == 0 then
                 table.insert(aiBrain[reftBomberEffectiveness][iTechLevel], 1, tNewEntry)
@@ -8073,9 +8076,10 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 end
                 local tPotentialTargets = {}
                 local iPotentialTargets = 0
+                local iDistFromBase = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false)
                 for iExperimental, oExperimental in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
-                    if M27UnitInfo.IsUnitValid(oExperimental) and oExperimental:GetFractionComplete() >= 0.05 and M27Utilities.CanSeeUnit(aiBrain, oExperimental, true) and GetSegmentFailedAttempts(oExperimental:GetPosition()) < iMaxPrevTargets and (M27Utilities.GetDistanceBetweenPositions(oExperimental:GetPosition(), tCurPosition) <= 120 or (M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false) <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6 and M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false) <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.55 or oUnit[refoLastUnitTarget] == oExperimental)) then
-                        if not(oUnit[refiTimeWhenFirstEverRan]) or M27Logic.GetIntelCoverageOfPosition(aiBrain, oExperimental:GetPosition(), 30, true) then
+                    if M27UnitInfo.IsUnitValid(oExperimental) and oExperimental:GetFractionComplete() >= 0.05 and M27Utilities.CanSeeUnit(aiBrain, oExperimental, true) and GetSegmentFailedAttempts(oExperimental:GetPosition()) < iMaxPrevTargets and (M27Utilities.GetDistanceBetweenPositions(oExperimental:GetPosition(), tCurPosition) <= 120 or (M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false) <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6 and iDistFromBase <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.55 or oUnit[refoLastUnitTarget] == oExperimental)) then
+                        if not(oUnit[refiTimeWhenFirstEverRan]) or iDistFromBase <= aiBrain[refiBomberDefenceCriticalThreatDistance] + 40 or M27Logic.GetIntelCoverageOfPosition(aiBrain, oExperimental:GetPosition(), 30, true) then
                             iPotentialTargets = iPotentialTargets + 1
                             tPotentialTargets[iPotentialTargets] = oExperimental
                             if bDebugMessages == true then

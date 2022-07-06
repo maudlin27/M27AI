@@ -290,8 +290,24 @@ function OnUnitDeath(oUnit)
                         end
                     end
 
+                    --Enemy experimental dies - update all M27 threat values
+
 
                     local aiBrain = oUnit:GetAIBrain()
+                    if EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnit.UnitId) then
+                        for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
+                            if IsEnemy(oBrain:GetArmyIndex(), aiBrain:GetArmyIndex()) then
+                                local iMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
+
+                                if EntityCategoryContains(M27UnitInfo.refCategoryLongRangeMobile, oUnit.UnitId) then
+                                    oBrain[M27Overseer.refiTotalEnemyLongRangeThreat] = oBrain[M27Overseer.refiTotalEnemyLongRangeThreat] - iMassCost
+                                end
+                                if EntityCategoryContains(M27UnitInfo.refCategoryShortRangeMobile, oUnit.UnitId) then
+                                    oBrain[M27Overseer.refiTotalEnemyShortRangeThreat] = oBrain[M27Overseer.refiTotalEnemyShortRangeThreat] - iMassCost
+                                end
+                            end
+                        end
+                    end
 
                     if aiBrain.M27AI then
                         --Flag for the platoon count of units to be updated:
