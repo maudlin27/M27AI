@@ -1541,7 +1541,6 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
     local tAllScouts = aiBrain:GetListOfUnits(refCategoryLandScout, false, true)
     local iScouts = 0
     local iIntelPathEnemySearchRange = 35 --min scout range is 40, some are higher, this gives a bit of leeway
-    local bAbort = false
 
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code')
@@ -1564,6 +1563,866 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
         aiBrain[refiScoutShortfallMexes] = 0
     end
 
+    local oArmyPoolPlatoon, tArmyPoolScouts
+    if iScouts > 0 then
+        local oScoutToGive
+        --============Initial mex raider scouts and skirmishers-----------------------
+        --Check initial raiders have scouts (1-off at start of game)
+        if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] == nil then
+            aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] = {}
+        end
+        local iRaiderCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI']
+        if iRaiderCount == nil then
+            iRaiderCount = 0
+            aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] = 0
+        end
+        --local iMinScoutsWantedInPool = 0 --This is also changed several times below
+        if bDebugMessages == true then
+            LOG(sFunctionRef .. ': Have iScouts=' .. iScouts .. '; About to check if raiders have been checked for scouts; iScouts=' .. iScouts .. '; iRaiderCount=' .. iRaiderCount .. '; aiBrain[refbConfirmedInitialRaidersHaveScouts]=' .. tostring(aiBrain[refbConfirmedInitialRaidersHaveScouts]))
+        end
+
+        local iAvailableScouts = iScouts
+        local iRaiderScoutsMissing = 0
+        if iRaiderCount > 0 then
+            --Have we checked that the raiders have scouts in them?  If not, then as a 1-off add scouts to them
+            if aiBrain[refbConfirmedInitialRaidersHaveScouts] == false then
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': About to check if we have enough scouts to assign to the raider platoons if they need them')
+                end
+                if iScouts >= 1 then
+                    --we should have a scout for the raider platoon
+                    --if iScouts >= aiBrain[refiInitialRaiderPlatoonsWanted] and iRaiderCount >= aiBrain[refiInitialRaiderPlatoonsWanted] then aiBrain[refbConfirmedInitialRaidersHaveScouts] = true end --will be giving scouts in later step
+                    --iMinScoutsWantedInPool = 0
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': About to cycle through each platoon to get the initialraider platoons')
+                    end
+                    for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
+                        if not (oPlatoon == oArmyPoolPlatoon) then
+                            if oPlatoon:GetPlan() == 'M27MexRaiderAI' then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Have found a raider platoon, oPlatoon[M27PlatoonUtilities.refiPlatoonCount]=' .. oPlatoon[M27PlatoonUtilities.refiPlatoonCount])
+                                end
+                                if oPlatoon[M27PlatoonUtilities.refiPlatoonCount] <= aiBrain[refiInitialRaiderPlatoonsWanted] then
+                                    local tRaiders = oPlatoon:GetPlatoonUnits()
+                                    if M27Utilities.IsTableEmpty(tRaiders) == false then
+                                        local tRaiderScouts = EntityCategoryFilterDown(refCategoryLandScout, tRaiders)
+                                        local bHaveScout = false
+                                        if M27Utilities.IsTableEmpty(tRaiderScouts) == false then
+                                            bHaveScout = true
+                                        elseif oPlatoon[refoScoutHelper] then
+                                            tRaiderScouts = oPlatoon[refoScoutHelper]:GetPlatoonUnits()
+                                            if M27Utilities.IsTableEmpty(tRaiderScouts) == false then
+                                                bHaveScout = true
+                                            end
+                                        end
+                                        if bHaveScout == false then
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': Raider platoon' .. oPlatoon[M27PlatoonUtilities.refiPlatoonCount] .. ' doesnt have any scouts, seeing if we can give it a scout')
+                                            end
+                                            --Platoon doesnt have a scout - can we give it one?
+                                            local tPlatoonPosition = M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)
+                                            oScoutToGive = GetNearestMAAOrScout(aiBrain, tPlatoonPosition, true, true, true)
+                                            if oScoutToGive == nil then
+                                                oScoutToGive = GetNearestMAAOrScout(aiBrain, tPlatoonPosition, true, true, false)
+                                            end
+                                            if oScoutToGive == nil then
+                                                iRaiderScoutsMissing = iRaiderScoutsMissing + 1
+                                            else
+                                                iAvailableScouts = iAvailableScouts - 1
+
+                                                AssignHelperToPlatoonOrUnit(oScoutToGive, oPlatoon, true)
+
+                                            end
+                                            oPlatoon:SetPlatoonFormationOverride('AttackFormation') --want raider bots and scouts to stick together
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    --Available scouts will include those under construction; if are already constructing the scouts we need then update flag so we dont produce more:
+                    if iRaiderScoutsMissing == 0 and iRaiderCount >= aiBrain[refiInitialRaiderPlatoonsWanted] then
+                        aiBrain[refbConfirmedInitialRaidersHaveScouts] = true
+                        aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 0
+                    else
+                        aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = math.max(aiBrain[refiInitialRaiderPlatoonsWanted] - iRaiderCount, 0) + iRaiderScoutsMissing
+                    end
+                end
+            end
+        end
+        iAvailableScouts = iAvailableScouts - iRaiderScoutsMissing
+        if iAvailableScouts < 0 then
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': iAvailableScouts=' .. iAvailableScouts .. '; not enough for intiial raider so will flag as having shortfall')
+            end
+            if aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] < 1 then
+                aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = -iAvailableScouts
+            end --redundancy/backup - shouldnt need due to above
+            aiBrain[refiScoutShortfallACU] = 1
+            aiBrain[refiScoutShortfallPriority] = 1
+            aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
+        else
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': Have enough scouts for initial raiders, will now consider skirmishers. iAvailableScouts=' .. iAvailableScouts)
+            end
+            if M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel]) == false then
+                local iSkirmishersNeedingScouts = 0
+                for iPlatoon, oPlatoon in aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel] do
+                    if aiBrain:PlatoonExists(oPlatoon) then
+                        if not (oPlatoon[refoScoutHelper]) or oPlatoon[refoScoutHelper][M27PlatoonUtilities.refiCurrentUnits] <= 0 then
+                            iSkirmishersNeedingScouts = iSkirmishersNeedingScouts + 1
+                            if iAvailableScouts > 0 then
+                                oScoutToGive = GetNearestMAAOrScout(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), true, true, true)
+                                if oScoutToGive then
+                                    iAvailableScouts = iAvailableScouts - 1
+                                    iSkirmishersNeedingScouts = iSkirmishersNeedingScouts - 1
+                                    AssignHelperToPlatoonOrUnit(oScoutToGive, oPlatoon, true)
+                                end
+                            end
+                        end
+                    else
+                        aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel][iPlatoon] = nil
+                    end
+                end
+                aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] + iSkirmishersNeedingScouts
+            else
+                aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 0
+            end
+
+            if iAvailableScouts <= 0 then
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Dont ahve any more available scouts so setting shortfall to 1 for ACU')
+                end
+                aiBrain[refiScoutShortfallACU] = 1
+                aiBrain[refiScoutShortfallPriority] = 1
+                aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
+            else
+                --Have at least 1 available scout
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Have at least 1 available scout so will assign to ACU')
+                end
+
+                --===========ACU Scout helper--------------------------
+                --We have more than enough scouts to cover initial raiders; next priority is the ACU
+                local bACUNeedsScoutHelper = true
+                if not (M27Utilities.GetACU(aiBrain)[refoScoutHelper] == nil) then
+                    --A scout helper was assigned, check if it still exists
+                    if M27Utilities.GetACU(aiBrain)[refoScoutHelper] and aiBrain:PlatoonExists(M27Utilities.GetACU(aiBrain)[refoScoutHelper]) then
+                        --Platoon still exists; does it have the right aiplan?
+                        local sScoutHelperName = M27Utilities.GetACU(aiBrain)[refoScoutHelper]:GetPlan()
+                        if sScoutHelperName and sScoutHelperName == 'M27ScoutAssister' then
+                            --does it have a scout in it?
+                            local tACUScout = M27Utilities.GetACU(aiBrain)[refoScoutHelper]:GetPlatoonUnits()
+                            if M27Utilities.IsTableEmpty(tACUScout) == false then
+                                if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(refCategoryLandScout, tACUScout)) == false then
+                                    bACUNeedsScoutHelper = false
+                                end
+                            end
+                        end
+                    end
+                end
+                if bACUNeedsScoutHelper == true then
+                    --Assign a scout if we have any available; as its the ACU we want the nearest scout of any platoon (except initial raiders with count of 1 or 2)
+                    oScoutToGive = GetNearestMAAOrScout(aiBrain, M27Utilities.GetACU(aiBrain):GetPosition(), true, true, false)
+
+                    if not (oScoutToGive == nil) then
+                        AssignHelperToPlatoonOrUnit(oScoutToGive, M27Utilities.GetACU(aiBrain), true)
+
+                    end
+                end
+                iAvailableScouts = iAvailableScouts - 1
+                aiBrain[refiScoutShortfallACU] = 0
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Finished assining to ACU, aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU])
+                end
+
+                --Priority scout locations (e.g. mexes under attack from unseen enemy) - update the list
+                local iPriorityTargets = 0
+                if M27Utilities.IsTableEmpty(aiBrain[reftPriorityLandScoutTargets]) == false then
+                    for iPriorityTarget, oPriorityTarget in aiBrain[reftPriorityLandScoutTargets] do
+                        if M27UnitInfo.IsUnitValid(oPriorityTarget) then
+                            iPriorityTargets = iPriorityTargets + 1
+                        else
+                            aiBrain[reftPriorityLandScoutTargets][iPriorityTarget] = nil
+                        end
+                    end
+                end
+
+                if iAvailableScouts > 0 then
+                    if iPriorityTargets == 0 then
+                        aiBrain[refiScoutShortfallPriority] = 0
+                    else
+                        --do all of the priority targets have a scout assigned?
+                        for iPriorityTarget, oPriorityTarget in aiBrain[reftPriorityLandScoutTargets] do
+                            if not (M27UnitInfo.IsUnitValid(oPriorityTarget[refoScoutHelper])) then
+                                --Need a scout, can take from most places
+                                oScoutToGive = GetNearestMAAOrScout(aiBrain, oPriorityTarget:GetPosition(), true, true, false)
+                                if oScoutToGive then
+                                    AssignHelperToPlatoonOrUnit(oScoutToGive, oPriorityTarget, true)
+                                    iAvailableScouts = iAvailableScouts - 1
+                                    iPriorityTargets = iPriorityTargets - 1
+                                else
+                                    aiBrain[refiScoutShortfallPriority] = iPriorityTargets
+                                    break
+                                end
+                            end
+                        end
+                    end
+                else
+                    aiBrain[refiScoutShortfallPriority] = iPriorityTargets
+                end
+
+                --==========Intel Line manager
+                if iAvailableScouts <= 0 then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': No available scouts so will flag intel path shortfall')
+                    end
+                    aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
+                else
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': iAvailableScouts=' .. iAvailableScouts .. '; will now assign to intel path')
+                    end
+                    --Do we have an intel platoon yet?
+                    local tIntelPlatoons = {}
+                    local iIntelPlatoons = 0
+                    --local oFirstIntelPlatoon
+                    local tCurIntelScouts = {}
+                    local iCurIntelScouts = 0
+                    local iIntelScouts = 0
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Cycling through all platoons to identify intel platoons. aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU])
+                    end
+                    for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
+                        if oPlatoon:GetPlan() == sIntelPlatoonRef then
+                            tCurIntelScouts = EntityCategoryFilterDown(refCategoryLandScout, oPlatoon:GetPlatoonUnits())
+                            if not (tCurIntelScouts == nil) then
+                                iCurIntelScouts = table.getn(tCurIntelScouts)
+                                if iCurIntelScouts > 0 then
+                                    iIntelScouts = iIntelScouts + iCurIntelScouts
+                                    iIntelPlatoons = iIntelPlatoons + 1
+                                    tIntelPlatoons[iIntelPlatoons] = oPlatoon
+                                end
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Intel platoons identified; aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; iIntelPlatoons=' .. iIntelPlatoons)
+                    end
+                    --if iIntelPlatoons > 0 then
+
+                    --First determine what intel path line we want, and if we have enough scouts to achieve this
+                    local bRefreshPath = false
+                    local iPrevIntelLineTarget = aiBrain[refiCurIntelLineTarget]
+                    if aiBrain[refiCurIntelLineTarget] == nil then
+                        aiBrain[refiCurIntelLineTarget] = 1
+                        bRefreshPath = true
+                    end
+                    --Determine the point on the path that we want:
+                    --Do we have at least the minimum number of scouts needed for any intel path to be covered in full? Otherwise will stick with the first path
+                    if iAvailableScouts >= (aiBrain[refiMinScoutsNeededForAnyPath] - 2) then
+                        --Determine the preferred path, if we ignore the number of scouts needed for now:
+                        --Is the ACU further forwards than the central path point?
+                        local tACUPos = M27Utilities.GetACU(aiBrain):GetPosition()
+
+                        if M27Logic.GetNearestEnemyStartNumber(aiBrain) then
+                            local iACUDistToEnemy = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                            local iACUDistToHome = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            local iPathDistToEnemy = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]][1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                            local iPathDistToHome = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            local bACUNeedsSupport = false
+                            if iACUDistToEnemy < iPathDistToEnemy then
+                                if iACUDistToHome > iPathDistToHome then
+                                    bACUNeedsSupport = true
+                                    --Does the ACU have nearby scout support?
+                                    local tScoutsNearACU = aiBrain:GetUnitsAroundPoint(refCategoryLandScout, tACUPos, iIntelPathEnemySearchRange, 'Ally')
+                                    if not (tScoutsNearACU == nil) then
+                                        if table.getn(tScoutsNearACU) > 0 then
+                                            bACUNeedsSupport = false
+                                        end
+                                    end
+                                end
+                            end
+                            if bACUNeedsSupport == true then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Want to move scouts forward so ACU has better intel')
+                                end
+                                aiBrain[refiCurIntelLineTarget] = aiBrain[refiCurIntelLineTarget] + 1
+                            else
+                                --Cycle through each point on the current path, and check various conditions:
+
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': About to loop through subpath positions to see if we can move the line forward. aiBrain[refiCurIntelLineTarget]=' .. aiBrain[refiCurIntelLineTarget])
+                                end
+                                local iTotalEnemyNetThreat, bScoutNearAllMexes = GetEnemyNetThreatAlongIntelPath(aiBrain, aiBrain[refiCurIntelLineTarget], iIntelPathEnemySearchRange, 35)
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Finished looping through subpath positions, iTotalEnemyNetThreat=' .. iTotalEnemyNetThreat .. '; bScoutNearAllMexes=' .. tostring(bScoutNearAllMexes))
+                                end
+                                if iTotalEnemyNetThreat > 170 then
+                                    aiBrain[refiCurIntelLineTarget] = aiBrain[refiCurIntelLineTarget] - 1
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': Enemy net threat of ' .. iTotalEnemyNetThreat .. ' exceeds 170 so reducing current intel line target by 1 to ' .. aiBrain[refiCurIntelLineTarget])
+                                    end
+                                else
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': iTotalEnemyNetThreat=' .. iTotalEnemyNetThreat .. '; If 0 or less and scouts are in position then will increase intel base path')
+                                    end
+                                    if iTotalEnemyNetThreat <= 0 then
+                                        --Are all scouts in position?
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Checking if all scouts are in position. bScoutNearAllMexes=' .. tostring(bScoutNearAllMexes) .. '; table.getn(aiBrain[reftIntelLinePositions])=' .. table.getn(aiBrain[reftIntelLinePositions]) .. '; aiBrain[refiCurIntelLineTarget=' .. aiBrain[refiCurIntelLineTarget])
+                                        end
+                                        if bScoutNearAllMexes == true and table.getn(aiBrain[reftIntelLinePositions]) > aiBrain[refiCurIntelLineTarget] then
+                                            --If we move the intel line up by 1 will we have too much enemy threat?
+                                            iTotalEnemyNetThreat = GetEnemyNetThreatAlongIntelPath(aiBrain, aiBrain[refiCurIntelLineTarget] + 1, iIntelPathEnemySearchRange, 35)
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': If we increase the intel path by 1, then the total enemy net threat is ' .. iTotalEnemyNetThreat .. '; will only increase if this is <= 0')
+                                            end
+                                            if iTotalEnemyNetThreat <= 0 then
+                                                aiBrain[refiCurIntelLineTarget] = aiBrain[refiCurIntelLineTarget] + 1
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': All scouts are in position so increasing intel path by 1 to ' .. aiBrain[refiCurIntelLineTarget])
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        else
+                            if not (M27Logic.iTimeOfLastBrainAllDefeated) or M27Logic.iTimeOfLastBrainAllDefeated < 10 then
+                                M27Utilities.ErrorHandler('M27Logic.GetNearestEnemyStartNumber(aiBrain) is nil')
+                            end
+                        end
+                    else
+                        --Dont have enough scouts to cover any path, to stick with initial base path
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Dont have enough scouts to cover any intel path, stay at base path; aiBrain[refiMinScoutsNeededForAnyPath]=' .. aiBrain[refiMinScoutsNeededForAnyPath] .. '; iIntelPlatoons=' .. iIntelPlatoons)
+                        end
+                        aiBrain[refiCurIntelLineTarget] = 1
+                    end
+                    --Keep within min and max (this is repeated as needed here to make sure iscoutswanted doesnt cause error)
+                    if aiBrain[refiCurIntelLineTarget] <= 0 then
+                        aiBrain[refiCurIntelLineTarget] = 1
+                    elseif aiBrain[refiCurIntelLineTarget] > aiBrain[refiMaxIntelBasePaths] then
+                        aiBrain[refiCurIntelLineTarget] = aiBrain[refiMaxIntelBasePaths]
+                    end
+
+                    if bDebugMessages == true then
+                        LOG('aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; aiBrain[refiCurIntelLineTarget]=' .. aiBrain[refiCurIntelLineTarget] .. '; table.getn(aiBrain[reftIntelLinePositions])=' .. table.getn(aiBrain[reftIntelLinePositions]) .. '; aiBrain[refiMaxIntelBasePaths]=' .. aiBrain[refiMaxIntelBasePaths])
+                    end
+                    local iScoutsWanted = table.getn(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]])
+                    local iScoutsForNextPath = aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget] + 1]
+                    if iScoutsForNextPath then
+                        iScoutsForNextPath = table.getn(iScoutsForNextPath)
+                    end
+                    if iScoutsForNextPath == nil then
+                        iScoutsForNextPath = iScoutsWanted
+                    end
+
+                    if iAvailableScouts <= iScoutsWanted or iAvailableScouts <= iScoutsForNextPath then
+                        local iScoutsToBuild = iScoutsWanted - iAvailableScouts
+                        if iScoutsForNextPath > iScoutsWanted then
+                            iScoutsToBuild = iScoutsForNextPath - iScoutsWanted
+                        end
+                        iScoutsToBuild = iScoutsToBuild + 1
+                        aiBrain[refiScoutShortfallIntelLine] = iScoutsToBuild
+                    else
+                        aiBrain[refiScoutShortfallIntelLine] = 0
+                    end
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; iScoutsWanted=' .. iScoutsWanted .. '; iScoutsForNextPath=' .. iScoutsForNextPath .. 'aiBrain[refiScoutShortfallIntelLine]=' .. aiBrain[refiScoutShortfallIntelLine])
+                    end
+
+                    local iLoopCount = 0
+                    local iLoopMax = 100
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': refiCurIntelLineTarget=' .. aiBrain[refiCurIntelLineTarget] .. '; About to loop through scouts wanted; iScoutsWanted=' .. iScoutsWanted .. '; iIntelScouts=' .. iIntelScouts)
+                        LOG('About to log every path in the current line:')
+                        for iCurSubPath, tPath in aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]] do
+                            LOG('iCurSubPath=' .. iCurSubPath .. '; repr=' .. repru(tPath))
+                        end
+                    end
+                    while iAvailableScouts < (iScoutsWanted - 2) do
+                        --Too few to try and maintain intel path, so fall back 1 position
+                        iLoopCount = iLoopCount + 1
+                        if iLoopCount > iLoopMax then
+                            M27Utilities.ErrorHandler('likely infinite loop - exceeded iLoopMax of ' .. iLoopMax .. '; refiCurIntelLineTarget=' .. aiBrain[refiCurIntelLineTarget])
+                            break
+                        end
+                        aiBrain[refiCurIntelLineTarget] = aiBrain[refiCurIntelLineTarget] - 1
+                        if aiBrain[refiCurIntelLineTarget] <= 1 then
+                            break
+                        end
+                        iScoutsWanted = table.getn(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]])
+                    end
+                    --Keep within min and max possible targets:
+                    if aiBrain[refiCurIntelLineTarget] <= 0 then
+                        aiBrain[refiCurIntelLineTarget] = 1
+                    elseif aiBrain[refiCurIntelLineTarget] > aiBrain[refiMaxIntelBasePaths] then
+                        aiBrain[refiCurIntelLineTarget] = aiBrain[refiMaxIntelBasePaths]
+                    end
+
+                    --Consider moving forwards at individual points if already have a scout near the current position and no enemies:
+                    if aiBrain[refiCurIntelLineTarget] <= 0 then
+                        aiBrain[refiCurIntelLineTarget] = 1
+                    elseif aiBrain[refiCurIntelLineTarget] > aiBrain[refiMaxIntelBasePaths] then
+                        aiBrain[refiCurIntelLineTarget] = aiBrain[refiMaxIntelBasePaths]
+                    end
+
+
+                    --If we have enough scouts for the current path, then consider each individual point on the path and whether it can go further forwards than the base, provided we have enough scouts to
+                    if aiBrain[refiScoutShortfallIntelLine] == 0 then
+                        local tNearbyEnemiesBase
+                        local tNearbyEnemiesPlus1, tSubPathPlus1
+                        local tNearbyEnemiesPlus2, tSubPathPlus2
+                        local iIncreaseInSubpath, iMaxIncreaseInSubpath, iNextMaxIncrease
+                        local iCurIntelLineTarget = aiBrain[refiCurIntelLineTarget]
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; aiBrain[refiCurIntelLineTarget]=' .. aiBrain[refiCurIntelLineTarget] .. '; size of intel paths=' .. table.getn(aiBrain[reftIntelLinePositions]))
+                        end
+
+                        for iSubPath, tSubPathPosition in aiBrain[reftIntelLinePositions][iCurIntelLineTarget] do
+                            iIncreaseInSubpath = 0
+                            iMaxIncreaseInSubpath = 0
+
+                            --Determine max subpath that can use based on neighbours:
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Determining subpath modification from base to apply for iSubPath=' .. iSubPath)
+                            end
+                            if aiBrain[reftiSubpathModFromBase] == nil then
+                                aiBrain[reftiSubpathModFromBase] = {}
+                            end
+                            if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget] == nil then
+                                aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget] = {}
+                            end
+                            if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath] == nil then
+                                aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath] = 0
+                            end
+                            if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath - 1] == nil then
+                                aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath - 1] = 0
+                            end
+                            if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath + 1] == nil then
+                                aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath + 1] = 0
+                            end
+
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget]=' .. repru(aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget]))
+                            end
+                            --Get for -1 subpath:
+                            if iSubPath > 1 then
+                                iMaxIncreaseInSubpath = aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath - 1] + 1
+                            end
+                            --Get for +1 subpath if it exists
+                            if iSubPath < aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLineTarget] then
+                                if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath + 1] then
+                                    iNextMaxIncrease = aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath + 1] + 1
+                                else
+                                    iNextMaxIncrease = 1
+                                end
+                            end
+                            if iNextMaxIncrease > iMaxIncreaseInSubpath then
+                                iMaxIncreaseInSubpath = iNextMaxIncrease
+                            end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': iSubPath=' .. iSubPath .. '; iMaxIncreaseInSubpath =' .. iMaxIncreaseInSubpath)
+                            end
+
+                            tNearbyEnemiesBase = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPosition, iIntelPathEnemySearchRange, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tNearbyEnemiesBase) == true then
+                                tSubPathPlus1 = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + 1][iSubPath]
+                                if M27Utilities.IsTableEmpty(tSubPathPlus1) == false then
+                                    tNearbyEnemiesPlus1 = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPlus1, iIntelPathEnemySearchRange, 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tNearbyEnemiesPlus1) == true then
+                                        iIncreaseInSubpath = 1
+                                        tSubPathPlus2 = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + 2][iSubPath]
+                                        if M27Utilities.IsTableEmpty(tSubPathPlus2) == false then
+                                            tNearbyEnemiesPlus2 = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPlus2, iIntelPathEnemySearchRange, 'Enemy')
+                                            if M27Utilities.IsTableEmpty(tNearbyEnemiesPlus2) == true then
+                                                iIncreaseInSubpath = 2
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU=' .. aiBrain[refiScoutShortfallACU] .. '; iSubPath=' .. iSubPath .. '; iMaxIncreaseInSubpath =' .. iMaxIncreaseInSubpath .. '; iIncrease wnated before applying max=' .. iIncreaseInSubpath)
+                            end
+                            if iIncreaseInSubpath > iMaxIncreaseInSubpath then
+                                iIncreaseInSubpath = iMaxIncreaseInSubpath
+                            end
+                            local tCurPathPos
+                            tCurPathPos = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + iIncreaseInSubpath][iSubPath]
+                            while M27Utilities.IsTableEmpty(tCurPathPos) == true do
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': iSubPath=' .. iSubPath .. '; iIncreaseInSubpath=' .. iIncreaseInSubpath .. '; position given by this is invalid, so decreasing by 1')
+                                end
+                                iIncreaseInSubpath = iIncreaseInSubpath - 1
+                                if iIncreaseInSubpath <= 0 then
+                                    break
+                                end
+                                tCurPathPos = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + iIncreaseInSubpath][iSubPath]
+                            end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': iSubPath=' .. iSubPath .. '; tCurPathPos=' .. repru(tCurPathPos))
+                            end
+
+                            aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath] = iIncreaseInSubpath
+                        end
+                    end
+
+
+                    --Create intel platoons if needed (choosing scouts nearest to the start point of the intel path for simplicity)
+                    local tBasePathPosition = aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]][1]
+                    local iNewIntelPlatoonsNeeded = iScoutsWanted - iIntelPlatoons
+                    if iNewIntelPlatoonsNeeded > iAvailableScouts then
+                        iNewIntelPlatoonsNeeded = iAvailableScouts
+                    end
+                    local oNewScoutPlatoon
+                    local iCount = 0
+                    while iNewIntelPlatoonsNeeded > 0 do
+                        iCount = iCount + 1
+                        if iCount > 100 then
+                            M27Utilities.ErrorHandler('Infinite loop')
+                            break
+                        end
+                        oScoutToGive = GetNearestMAAOrScout(aiBrain, tBasePathPosition, true, true, true)
+                        if oScoutToGive then
+                            local oNewScoutPlatoon = aiBrain:MakePlatoon('', '')
+                            if oScoutToGive.PlatoonHandle and aiBrain:PlatoonExists(oScoutToGive.PlatoonHandle) then
+                                M27PlatoonUtilities.RemoveUnitsFromPlatoon(oScoutToGive.PlatoonHandle, { oScoutToGive }, false, oNewScoutPlatoon)
+                            else
+                                --Redundancy in case there's a scenario where you dont have a platoon handle for a scout
+                                aiBrain:AssignUnitsToPlatoon(oNewScoutPlatoon, { oScoutToGive }, 'Attack', 'GrowthFormation')
+                            end
+                            oNewScoutPlatoon:SetAIPlan('M27IntelPathAI')
+                            iIntelPlatoons = iIntelPlatoons + 1
+                            tIntelPlatoons[iIntelPlatoons] = oNewScoutPlatoon
+                            if bDebugMessages == true then
+                                local iPlatoonCount = oNewScoutPlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                if iPlatoonCount == nil then
+                                    iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27IntelPathAI']
+                                    if iPlatoonCount == nil then
+                                        iPlatoonCount = 1
+                                    else
+                                        iPlatoonCount = iPlatoonCount + 1
+                                    end
+                                end
+                                LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; Created new platoon with Plan name and count=' .. oNewScoutPlatoon:GetPlan() .. iPlatoonCount)
+                            end
+                        else
+                            --Any remaining scouts must still be being constructed
+                            break
+                        end
+
+                        iNewIntelPlatoonsNeeded = iNewIntelPlatoonsNeeded - 1
+
+                    end
+                    --Sort platoons by distance, and check if their current path target is different from what we want
+                    --SortTableBySubtable(tTableToSort, sSortByRef, bLowToHigh)
+                    local iDistFromCurPath
+                    local iMinDistFromCurPath
+                    local oClosestPlatoon
+                    local iClosestPlatoon
+                    local tCurPathPos
+                    local iSubpathMod
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; About to loop subpaths in current target')
+                    end
+                    if iIntelPlatoons >= 1 then
+                        for iCurSubpath = 1, table.getn(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]]) do
+                            iMinDistFromCurPath = 100000
+                            oClosestPlatoon = nil
+                            iClosestPlatoon = 0
+                            iSubpathMod = aiBrain[reftiSubpathModFromBase][aiBrain[refiCurIntelLineTarget]][iCurSubpath]
+                            if iSubpathMod == nil then
+                                iSubpathMod = 0
+                            end --e.g. if not got enough scouts for a full path wont have set subpath mods yet
+                            tCurPathPos = aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget] + iSubpathMod][iCurSubpath]
+                            if M27Utilities.IsTableEmpty(tCurPathPos) == true then
+                                M27Utilities.ErrorHandler('tCurPathPos is empty for iCurSubpath=' .. iCurSubpath .. '; iIntelLineTarget=' .. aiBrain[refiCurIntelLineTarget] .. '; iSubpathMod=' .. iSubpathMod)
+                            else
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': iCurSubpath=' .. iCurSubpath .. '; iSubpathMod = ' .. iSubpathMod .. ': tCurPathPos=' .. repru(tCurPathPos))
+                                    M27Utilities.DrawLocation(tCurPathPos)
+                                end
+                                for iPlatoon, oPlatoon in tIntelPlatoons do
+                                    if bDebugMessages == true then
+                                        local iPlatoonCount = oPlatoon[M27PlatoonUtilities.refiPlatoonCount]
+                                        if iPlatoonCount == nil then
+                                            iPlatoonCount = 'nil'
+                                        end
+                                        LOG(sFunctionRef .. ': Cycling through all platoons in tIntelPlatoons, iPlatoon=' .. iPlatoon .. '; oPlatoon count=' .. iPlatoonCount)
+                                    end
+                                    iDistFromCurPath = M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tCurPathPos)
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': iDistFromCurPath=' .. iDistFromCurPath)
+                                    end
+                                    if iDistFromCurPath < iMinDistFromCurPath then
+                                        iMinDistFromCurPath = iDistFromCurPath
+                                        oClosestPlatoon = oPlatoon
+                                        iClosestPlatoon = iPlatoon
+                                    end
+                                end
+                                if oClosestPlatoon == nil then
+                                    break
+                                else
+                                    table.remove(tIntelPlatoons, iClosestPlatoon)
+                                    if oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] == nil then
+                                        oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                        oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1] = {}
+                                    end
+                                    if not (oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1][1] == tCurPathPos[1] and oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1][3] == tCurPathPos[3]) then
+                                        if bDebugMessages == true and oClosestPlatoon.GetPlan then
+                                            LOG(sFunctionRef .. ': Giving override action to oClosestPlatoon ' .. oClosestPlatoon:GetPlan() .. (oClosestPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil') .. ': tCurPathPosition=' .. repru(tCurPathPos) .. '; movement path=' .. repru((oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1] or { 'nil' })) .. ' unless its prev action was to run; platoon prevaction=' .. (oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] or 'nil'))
+                                        end
+                                        if not (oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] == M27PlatoonUtilities.refActionRun) and not (oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] == M27PlatoonUtilities.refActionTemporaryRetreat) and not (oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] == M27PlatoonUtilities.refActionReturnToBase) then
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': Prev action wasnt to run so updating movement path, will force a refresh of this if we havent given an override in last 5s; oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride]=' .. (oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] or 'nil'))
+                                            end
+                                            if oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] >= 5 and M27Utilities.GetDistanceBetweenPositions(((oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] or { 0, 0, 0 })[(oClosestPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] or 1)] or { 0, 0, 0 }), tCurPathPos) > 10 then
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': Forcing a refresh of the platoon')
+                                                end
+                                                M27PlatoonUtilities.ForceActionRefresh(oClosestPlatoon)
+                                                oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
+                                                oClosestPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
+                                            end
+                                            oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tCurPathPos
+                                        end
+                                    end
+                                    iIntelPlatoons = iIntelPlatoons - 1
+                                end
+                            end
+                        end
+                    end
+
+                    --If we have too many scouts then remove excess ones (unless we had to fall back because we didn't have enough)
+                    if not (tIntelPlatoons == nil) and iIntelPlatoons > 0 then
+                        local iRemainingScouts = table.getn(tIntelPlatoons)
+                        if iRemainingScouts >= 2 then
+                            local iSpareScoutsWanted
+                            local iMaxScoutsWanted = iScoutsWanted
+                            local iFirstPathToCheck = math.max(1, aiBrain[refiCurIntelLineTarget] - 2)
+                            local iLastPathToCheck = math.min(table.getn(aiBrain[reftIntelLinePositions]), aiBrain[refiCurIntelLineTarget] + 2)
+                            local iCurScoutsWanted
+                            --Cycle through previous and next intel paths to see if they need more scouts than current path
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; About to loop through previous and next intel paths')
+                            end
+                            for iCurPathToCheck = iFirstPathToCheck, iLastPathToCheck do
+                                iCurScoutsWanted = table.getn(aiBrain[reftIntelLinePositions][iCurPathToCheck])
+                                if iCurScoutsWanted > iMaxScoutsWanted then
+                                    iMaxScoutsWanted = iCurScoutsWanted
+                                end
+                            end
+                            iSpareScoutsWanted = iMaxScoutsWanted - iScoutsWanted
+                            if iSpareScoutsWanted < iRemainingScouts then
+                                --Have too many scouts - remove spare ones
+                                local iScoutsToRemove = iRemainingScouts - iSpareScoutsWanted
+
+                                for iCurRemoval = 1, iScoutsToRemove do
+                                    tIntelPlatoons[iCurRemoval][M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
+                                    tIntelPlatoons[iCurRemoval][M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionDisband
+                                    tIntelPlatoons[iCurRemoval][M27PlatoonUtilities.refbOverseerAction] = true
+                                end
+                            end
+
+
+                        end
+                    end
+                end
+            end
+        end
+
+        if aiBrain[refiScoutShortfallIntelLine] > 0 then
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; Have a shortfall of scouts for intel line=' .. aiBrain[refiScoutShortfallIntelLine])
+            end
+            --Defaults for other scouts wanted - just set to 1 for simplicity
+
+            aiBrain[refiScoutShortfallLargePlatoons] = 1
+            aiBrain[refiScoutShortfallAllPlatoons] = 1
+            aiBrain[refiScoutShortfallMexes] = 0
+            aiBrain[refbNeedScoutPlatoons] = true
+        else
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; Dont have a shortfall of scouts for intel line so will consider large platoons')
+            end
+            aiBrain[refbNeedScoutPlatoons] = false
+
+            --=================Large platoons - ensure they have scouts available, and if not then add scout to them
+
+            local iLargePlatoonsMissingScouts = 0
+            local iSmallPlatoonMissingScouts = 0
+
+            local tPlatoonUnits, iPlatoonUnits, tPlatoonCurrentScouts, oScoutToAdd, oScoutOldPlatoon
+            local iPlatoonSizeMin, iPlatoonSizeMissingScouts
+            if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true or (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and sScoutPathing == M27UnitInfo.refPathingTypeAmphibious) then
+                for iPlatoonCurSize = 1, 2 do
+                    if iPlatoonCurSize == 1 then
+                        iPlatoonSizeMin = iScoutLargePlatoonThreshold
+                    else
+                        iPlatoonSizeMin = iSmallPlatoonMinSizeForScout
+                    end
+                    iPlatoonSizeMissingScouts = 0
+
+                    for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
+                        if not (oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
+                            tPlatoonUnits = oPlatoon:GetPlatoonUnits()
+                            if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
+                                iPlatoonUnits = table.getn(tPlatoonUnits)
+                                if (oPlatoon:GetPlan() == 'M27MobileStealth' or oPlatoon:GetPlan() == 'M27Skirmisher' or iPlatoonUnits >= iPlatoonSizeMin) and aiBrain:PlatoonExists(oPlatoon) then
+                                    local bPlatoonHasScouts = false
+                                    tPlatoonCurrentScouts = EntityCategoryFilterDown(refCategoryLandScout, tPlatoonUnits)
+                                    if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then
+                                        bPlatoonHasScouts = true
+                                    elseif oPlatoon[refoScoutHelper] and oPlatoon[refoScoutHelper].GetPlatoonUnits then
+                                        tPlatoonCurrentScouts = oPlatoon[refoScoutHelper]:GetPlatoonUnits()
+                                        if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then
+                                            bPlatoonHasScouts = true
+                                        end
+                                    end
+                                    if bPlatoonHasScouts == false then
+                                        --Need scouts in the platoon
+                                        if iPlatoonSizeMissingScouts > 0 or iAvailableScouts <= 0 then
+                                            --Wont find any more scouts, so just increase
+                                            iPlatoonSizeMissingScouts = iPlatoonSizeMissingScouts + 1
+                                        else
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': About to get a scout to assign to a large platoon.  Large platoon count=' .. oPlatoon[M27PlatoonUtilities.refiPlatoonCount])
+                                            end
+                                            oScoutToAdd = GetNearestMAAOrScout(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), true, true, true)
+                                            if oScoutToAdd == nil then
+                                                iPlatoonSizeMissingScouts = iPlatoonSizeMissingScouts + 1
+                                            else
+                                                iAvailableScouts = iAvailableScouts - 1
+
+                                                AssignHelperToPlatoonOrUnit(oScoutToAdd, oPlatoon, true)
+                                                --[[--Have a valid scout - add it to the platoon
+                                                oScoutOldPlatoon = oScoutToAdd.PlatoonHandle
+                                                if oScoutOldPlatoon then
+                                                    --RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo)
+                                                    M27PlatoonUtilities.RemoveUnitsFromPlatoon(oScoutOldPlatoon, { oScoutToAdd}, false, oPlatoon)
+                                                else
+                                                    --Dont have platoon for the scout so add manually (backup for unexpected scenarios)
+                                                    aiBrain:AssignUnitsToPlatoon(oPlatoon, { oScoutToAdd}, 'Unassigned', 'None')
+                                                end--]]
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    if iPlatoonCurSize == 1 then
+                        iLargePlatoonsMissingScouts = iPlatoonSizeMissingScouts
+                    else
+                        iSmallPlatoonMissingScouts = iPlatoonSizeMissingScouts
+                    end
+                end
+            end
+            aiBrain[refiScoutShortfallLargePlatoons] = iLargePlatoonsMissingScouts
+            aiBrain[refiScoutShortfallAllPlatoons] = iSmallPlatoonMissingScouts
+            if iLargePlatoonsMissingScouts + iSmallPlatoonMissingScouts > 0 then
+                aiBrain[refiScoutShortfallMexes] = 1
+            else
+                --========MEXES (non-urgent)
+                --Assign scouts to every mex on our side of the map that is land pathable to our start
+                --local iStartPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                --local sLocationRef
+                local oCurScout
+                local iScoutShortfall = 0
+                local bNoMoreScouts = false
+                --Get positions of any omni sensors (as we dont need a scout if we have omni coverage)
+                local tFriendlyOmni = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3Radar, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
+                local bConsiderOmni = not (M27Utilities.IsTableEmpty(tFriendlyOmni))
+                local bCurPositionInOmniRange
+                local iCurOmniRange
+                local iDistanceWithinOmniWanted = 30
+                local oCurBlueprint
+                local sLocationRef
+
+                if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftMexesToKeepScoutsBy]) == false then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': have some mexes in the table of mexes that want scouts (tablegetn wont work for this variable)')
+                    end
+                    for iMex, tMex in aiBrain[M27MapInfo.reftMexesToKeepScoutsBy] do
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Considering tMex=' .. repru(tMex) .. '; iMex=' .. iMex)
+                        end
+                        if M27Utilities.GetDistanceBetweenPositions(tMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > 40 then
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Mex is at least 40 away from start')
+                            end
+                            sLocationRef = iMex --M27Utilities.ConvertLocationToReference(tMex)
+                            --Do we have a scout assigned that is still alive?
+                            oCurScout = aiBrain[tScoutAssignedToMexLocation][sLocationRef]
+                            if oCurScout and not (oCurScout.Dead) and oCurScout.GetUnitId then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Already have a scout assigned to the mex')
+                                end
+                                --Do nothing
+                            else
+                                aiBrain[tScoutAssignedToMexLocation][sLocationRef] = nil
+                                --Do we have omni coverage?
+                                bCurPositionInOmniRange = false
+                                if bConsiderOmni then
+                                    for iOmni, oOmni in tFriendlyOmni do
+                                        iCurOmniRange = 0
+                                        if oOmni.GetBlueprint and not (oOmni.Dead) and oOmni.GetFractionComplete and oOmni:GetFractionComplete() == 1 then
+                                            oCurBlueprint = oOmni:GetBlueprint()
+                                            if oCurBlueprint.Intel and oCurBlueprint.Intel.OmniRadius then
+                                                iCurOmniRange = oCurBlueprint.Intel.OmniRadius
+                                            end
+                                        end
+                                        if iCurOmniRange > 0 then
+                                            if M27Utilities.GetDistanceBetweenPositions(oOmni:GetPosition(), tMex) - iCurOmniRange <= iDistanceWithinOmniWanted then
+                                                bCurPositionInOmniRange = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                                if not (bCurPositionInOmniRange) then
+                                    --Try to find a scout to assign
+                                    if bNoMoreScouts == false then
+                                        oCurScout = GetNearestMAAOrScout(aiBrain, tMex, true, true, true)
+                                    else
+                                        oCurScout = nil
+                                    end
+                                    if oCurScout then
+                                        aiBrain[tScoutAssignedToMexLocation][sLocationRef] = oCurScout
+                                        local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(tMex, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                                        local tPositionToGuard = M27Utilities.MoveInDirection(tMex, iAngleToEnemyBase, 6) --dont want to block mex or storage, and want to get slight advance warning of enemies
+                                        AssignHelperToLocation(aiBrain, oCurScout, tPositionToGuard)
+                                    else
+                                        bNoMoreScouts = true
+                                        iScoutShortfall = iScoutShortfall + 1
+                                    end
+                                end
+                            end
+                        elseif bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Mex is within 40 of start so dont want a scout')
+                        end
+                    end
+                else
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': No mexes that want scouts by')
+                    end
+                end
+                aiBrain[refiScoutShortfallMexes] = iScoutShortfall
+            end
+        end
+    else
+        if bDebugMessages == true then
+            LOG(sFunctionRef .. ': No scouts so will set as needing more scouts for ACU and initial raider')
+        end
+        aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = aiBrain[refiInitialRaiderPlatoonsWanted]
+        aiBrain[refiScoutShortfallACU] = 1
+        aiBrain[refiScoutShortfallPriority] = 1
+        aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
+    end
+
+
     if iScouts >= 25 then
         local iNonScouts = aiBrain:GetCurrentUnits(categories.MOBILE * categories.LAND - categories.SCOUT)
         if iScouts > 80 then
@@ -1577,870 +2436,19 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                 aiBrain[refiScoutShortfallLargePlatoons] = 0
                 aiBrain[refiScoutShortfallAllPlatoons] = 0
                 aiBrain[refiScoutShortfallMexes] = 0
-                bAbort = true
             end
         end
     end
-    if bAbort == false then
-        local oArmyPoolPlatoon, tArmyPoolScouts
-        if iScouts > 0 then
-            local oScoutToGive
-            --============Initial mex raider scouts and skirmishers-----------------------
-            --Check initial raiders have scouts (1-off at start of game)
-            if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] == nil then
-                aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount] = {}
-            end
-            local iRaiderCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI']
-            if iRaiderCount == nil then
-                iRaiderCount = 0
-                aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] = 0
-            end
-            --local iMinScoutsWantedInPool = 0 --This is also changed several times below
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Have iScouts=' .. iScouts .. '; About to check if raiders have been checked for scouts; iScouts=' .. iScouts .. '; iRaiderCount=' .. iRaiderCount .. '; aiBrain[refbConfirmedInitialRaidersHaveScouts]=' .. tostring(aiBrain[refbConfirmedInitialRaidersHaveScouts]))
-            end
-
-            local iAvailableScouts = iScouts
-            local iRaiderScoutsMissing = 0
-            if iRaiderCount > 0 then
-                --Have we checked that the raiders have scouts in them?  If not, then as a 1-off add scouts to them
-                if aiBrain[refbConfirmedInitialRaidersHaveScouts] == false then
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': About to check if we have enough scouts to assign to the raider platoons if they need them')
-                    end
-                    if iScouts >= 1 then
-                        --we should have a scout for the raider platoon
-                        --if iScouts >= aiBrain[refiInitialRaiderPlatoonsWanted] and iRaiderCount >= aiBrain[refiInitialRaiderPlatoonsWanted] then aiBrain[refbConfirmedInitialRaidersHaveScouts] = true end --will be giving scouts in later step
-                        --iMinScoutsWantedInPool = 0
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': About to cycle through each platoon to get the initialraider platoons')
-                        end
-                        for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-                            if not (oPlatoon == oArmyPoolPlatoon) then
-                                if oPlatoon:GetPlan() == 'M27MexRaiderAI' then
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Have found a raider platoon, oPlatoon[M27PlatoonUtilities.refiPlatoonCount]=' .. oPlatoon[M27PlatoonUtilities.refiPlatoonCount])
-                                    end
-                                    if oPlatoon[M27PlatoonUtilities.refiPlatoonCount] <= aiBrain[refiInitialRaiderPlatoonsWanted] then
-                                        local tRaiders = oPlatoon:GetPlatoonUnits()
-                                        if M27Utilities.IsTableEmpty(tRaiders) == false then
-                                            local tRaiderScouts = EntityCategoryFilterDown(refCategoryLandScout, tRaiders)
-                                            local bHaveScout = false
-                                            if M27Utilities.IsTableEmpty(tRaiderScouts) == false then
-                                                bHaveScout = true
-                                            elseif oPlatoon[refoScoutHelper] then
-                                                tRaiderScouts = oPlatoon[refoScoutHelper]:GetPlatoonUnits()
-                                                if M27Utilities.IsTableEmpty(tRaiderScouts) == false then
-                                                    bHaveScout = true
-                                                end
-                                            end
-                                            if bHaveScout == false then
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': Raider platoon' .. oPlatoon[M27PlatoonUtilities.refiPlatoonCount] .. ' doesnt have any scouts, seeing if we can give it a scout')
-                                                end
-                                                --Platoon doesnt have a scout - can we give it one?
-                                                local tPlatoonPosition = M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)
-                                                oScoutToGive = GetNearestMAAOrScout(aiBrain, tPlatoonPosition, true, true, true)
-                                                if oScoutToGive == nil then
-                                                    oScoutToGive = GetNearestMAAOrScout(aiBrain, tPlatoonPosition, true, true, false)
-                                                end
-                                                if oScoutToGive == nil then
-                                                    iRaiderScoutsMissing = iRaiderScoutsMissing + 1
-                                                else
-                                                    iAvailableScouts = iAvailableScouts - 1
-
-                                                    AssignHelperToPlatoonOrUnit(oScoutToGive, oPlatoon, true)
-
-                                                end
-                                                oPlatoon:SetPlatoonFormationOverride('AttackFormation') --want raider bots and scouts to stick together
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                        --Available scouts will include those under construction; if are already constructing the scouts we need then update flag so we dont produce more:
-                        if iRaiderScoutsMissing == 0 and iRaiderCount >= aiBrain[refiInitialRaiderPlatoonsWanted] then
-                            aiBrain[refbConfirmedInitialRaidersHaveScouts] = true
-                            aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 0
-                        else
-                            aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = math.max(aiBrain[refiInitialRaiderPlatoonsWanted] - iRaiderCount, 0) + iRaiderScoutsMissing
-                        end
-                    end
-                end
-            end
-            iAvailableScouts = iAvailableScouts - iRaiderScoutsMissing
-            if iAvailableScouts < 0 then
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': iAvailableScouts=' .. iAvailableScouts .. '; not enough for intiial raider so will flag as having shortfall')
-                end
-                if aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] < 1 then
-                    aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = -iAvailableScouts
-                end --redundancy/backup - shouldnt need due to above
-                aiBrain[refiScoutShortfallACU] = 1
-                aiBrain[refiScoutShortfallPriority] = 1
-                aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
-            else
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Have enough scouts for initial raiders, will now consider skirmishers. iAvailableScouts=' .. iAvailableScouts)
-                end
-                if M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel]) == false then
-                    local iSkirmishersNeedingScouts = 0
-                    for iPlatoon, oPlatoon in aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel] do
-                        if aiBrain:PlatoonExists(oPlatoon) then
-                            if not (oPlatoon[refoScoutHelper]) or oPlatoon[refoScoutHelper][M27PlatoonUtilities.refiCurrentUnits] <= 0 then
-                                iSkirmishersNeedingScouts = iSkirmishersNeedingScouts + 1
-                                if iAvailableScouts > 0 then
-                                    oScoutToGive = GetNearestMAAOrScout(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), true, true, true)
-                                    if oScoutToGive then
-                                        iAvailableScouts = iAvailableScouts - 1
-                                        iSkirmishersNeedingScouts = iSkirmishersNeedingScouts - 1
-                                        AssignHelperToPlatoonOrUnit(oScoutToGive, oPlatoon, true)
-                                    end
-                                end
-                            end
-                        else
-                            aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel][iPlatoon] = nil
-                        end
-                    end
-                    aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] + iSkirmishersNeedingScouts
-                else
-                    aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 0
-                end
-
-                if iAvailableScouts <= 0 then
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Dont ahve any more available scouts so setting shortfall to 1 for ACU')
-                    end
-                    aiBrain[refiScoutShortfallACU] = 1
-                    aiBrain[refiScoutShortfallPriority] = 1
-                    aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
-                else
-                    --Have at least 1 available scout
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Have at least 1 available scout so will assign to ACU')
-                    end
-
-                    --===========ACU Scout helper--------------------------
-                    --We have more than enough scouts to cover initial raiders; next priority is the ACU
-                    local bACUNeedsScoutHelper = true
-                    if not (M27Utilities.GetACU(aiBrain)[refoScoutHelper] == nil) then
-                        --A scout helper was assigned, check if it still exists
-                        if M27Utilities.GetACU(aiBrain)[refoScoutHelper] and aiBrain:PlatoonExists(M27Utilities.GetACU(aiBrain)[refoScoutHelper]) then
-                            --Platoon still exists; does it have the right aiplan?
-                            local sScoutHelperName = M27Utilities.GetACU(aiBrain)[refoScoutHelper]:GetPlan()
-                            if sScoutHelperName and sScoutHelperName == 'M27ScoutAssister' then
-                                --does it have a scout in it?
-                                local tACUScout = M27Utilities.GetACU(aiBrain)[refoScoutHelper]:GetPlatoonUnits()
-                                if M27Utilities.IsTableEmpty(tACUScout) == false then
-                                    if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(refCategoryLandScout, tACUScout)) == false then
-                                        bACUNeedsScoutHelper = false
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    if bACUNeedsScoutHelper == true then
-                        --Assign a scout if we have any available; as its the ACU we want the nearest scout of any platoon (except initial raiders with count of 1 or 2)
-                        oScoutToGive = GetNearestMAAOrScout(aiBrain, M27Utilities.GetACU(aiBrain):GetPosition(), true, true, false)
-
-                        if not (oScoutToGive == nil) then
-                            AssignHelperToPlatoonOrUnit(oScoutToGive, M27Utilities.GetACU(aiBrain), true)
-
-                        end
-                    end
-                    iAvailableScouts = iAvailableScouts - 1
-                    aiBrain[refiScoutShortfallACU] = 0
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Finished assining to ACU, aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU])
-                    end
-
-                    --Priority scout locations (e.g. mexes under attack from unseen enemy) - update the list
-                    local iPriorityTargets = 0
-                    if M27Utilities.IsTableEmpty(aiBrain[reftPriorityLandScoutTargets]) == false then
-                        for iPriorityTarget, oPriorityTarget in aiBrain[reftPriorityLandScoutTargets] do
-                            if M27UnitInfo.IsUnitValid(oPriorityTarget) then
-                                iPriorityTargets = iPriorityTargets + 1
-                            else
-                                aiBrain[reftPriorityLandScoutTargets][iPriorityTarget] = nil
-                            end
-                        end
-                    end
-
-                    if iAvailableScouts > 0 then
-                        if iPriorityTargets == 0 then
-                            aiBrain[refiScoutShortfallPriority] = 0
-                        else
-                            --do all of the priority targets have a scout assigned?
-                            for iPriorityTarget, oPriorityTarget in aiBrain[reftPriorityLandScoutTargets] do
-                                if not (M27UnitInfo.IsUnitValid(oPriorityTarget[refoScoutHelper])) then
-                                    --Need a scout, can take from most places
-                                    oScoutToGive = GetNearestMAAOrScout(aiBrain, oPriorityTarget:GetPosition(), true, true, false)
-                                    if oScoutToGive then
-                                        AssignHelperToPlatoonOrUnit(oScoutToGive, oPriorityTarget, true)
-                                        iAvailableScouts = iAvailableScouts - 1
-                                        iPriorityTargets = iPriorityTargets - 1
-                                    else
-                                        aiBrain[refiScoutShortfallPriority] = iPriorityTargets
-                                        break
-                                    end
-                                end
-                            end
-                        end
-                    else
-                        aiBrain[refiScoutShortfallPriority] = iPriorityTargets
-                    end
-
-                    --==========Intel Line manager
-                    if iAvailableScouts <= 0 then
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': No available scouts so will flag intel path shortfall')
-                        end
-                        aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
-                    else
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': iAvailableScouts=' .. iAvailableScouts .. '; will now assign to intel path')
-                        end
-                        --Do we have an intel platoon yet?
-                        local tIntelPlatoons = {}
-                        local iIntelPlatoons = 0
-                        --local oFirstIntelPlatoon
-                        local tCurIntelScouts = {}
-                        local iCurIntelScouts = 0
-                        local iIntelScouts = 0
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Cycling through all platoons to identify intel platoons. aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU])
-                        end
-                        for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-                            if oPlatoon:GetPlan() == sIntelPlatoonRef then
-                                tCurIntelScouts = EntityCategoryFilterDown(refCategoryLandScout, oPlatoon:GetPlatoonUnits())
-                                if not (tCurIntelScouts == nil) then
-                                    iCurIntelScouts = table.getn(tCurIntelScouts)
-                                    if iCurIntelScouts > 0 then
-                                        iIntelScouts = iIntelScouts + iCurIntelScouts
-                                        iIntelPlatoons = iIntelPlatoons + 1
-                                        tIntelPlatoons[iIntelPlatoons] = oPlatoon
-                                    end
-                                end
-                            end
-                        end
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Intel platoons identified; aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; iIntelPlatoons=' .. iIntelPlatoons)
-                        end
-                        --if iIntelPlatoons > 0 then
-
-                        --First determine what intel path line we want, and if we have enough scouts to achieve this
-                        local bRefreshPath = false
-                        local iPrevIntelLineTarget = aiBrain[refiCurIntelLineTarget]
-                        if aiBrain[refiCurIntelLineTarget] == nil then
-                            aiBrain[refiCurIntelLineTarget] = 1
-                            bRefreshPath = true
-                        end
-                        --Determine the point on the path that we want:
-                        --Do we have at least the minimum number of scouts needed for any intel path to be covered in full? Otherwise will stick with the first path
-                        if iAvailableScouts >= (aiBrain[refiMinScoutsNeededForAnyPath] - 2) then
-                            --Determine the preferred path, if we ignore the number of scouts needed for now:
-                            --Is the ACU further forwards than the central path point?
-                            local tACUPos = M27Utilities.GetACU(aiBrain):GetPosition()
-
-                            if M27Logic.GetNearestEnemyStartNumber(aiBrain) then
-                                local iACUDistToEnemy = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                                local iACUDistToHome = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                local iPathDistToEnemy = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]][1], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                                local iPathDistToHome = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                local bACUNeedsSupport = false
-                                if iACUDistToEnemy < iPathDistToEnemy then
-                                    if iACUDistToHome > iPathDistToHome then
-                                        bACUNeedsSupport = true
-                                        --Does the ACU have nearby scout support?
-                                        local tScoutsNearACU = aiBrain:GetUnitsAroundPoint(refCategoryLandScout, tACUPos, iIntelPathEnemySearchRange, 'Ally')
-                                        if not (tScoutsNearACU == nil) then
-                                            if table.getn(tScoutsNearACU) > 0 then
-                                                bACUNeedsSupport = false
-                                            end
-                                        end
-                                    end
-                                end
-                                if bACUNeedsSupport == true then
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Want to move scouts forward so ACU has better intel')
-                                    end
-                                    aiBrain[refiCurIntelLineTarget] = aiBrain[refiCurIntelLineTarget] + 1
-                                else
-                                    --Cycle through each point on the current path, and check various conditions:
-
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': About to loop through subpath positions to see if we can move the line forward. aiBrain[refiCurIntelLineTarget]=' .. aiBrain[refiCurIntelLineTarget])
-                                    end
-                                    local iTotalEnemyNetThreat, bScoutNearAllMexes = GetEnemyNetThreatAlongIntelPath(aiBrain, aiBrain[refiCurIntelLineTarget], iIntelPathEnemySearchRange, 35)
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Finished looping through subpath positions, iTotalEnemyNetThreat=' .. iTotalEnemyNetThreat .. '; bScoutNearAllMexes=' .. tostring(bScoutNearAllMexes))
-                                    end
-                                    if iTotalEnemyNetThreat > 170 then
-                                        aiBrain[refiCurIntelLineTarget] = aiBrain[refiCurIntelLineTarget] - 1
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Enemy net threat of ' .. iTotalEnemyNetThreat .. ' exceeds 170 so reducing current intel line target by 1 to ' .. aiBrain[refiCurIntelLineTarget])
-                                        end
-                                    else
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': iTotalEnemyNetThreat=' .. iTotalEnemyNetThreat .. '; If 0 or less and scouts are in position then will increase intel base path')
-                                        end
-                                        if iTotalEnemyNetThreat <= 0 then
-                                            --Are all scouts in position?
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Checking if all scouts are in position. bScoutNearAllMexes=' .. tostring(bScoutNearAllMexes) .. '; table.getn(aiBrain[reftIntelLinePositions])=' .. table.getn(aiBrain[reftIntelLinePositions]) .. '; aiBrain[refiCurIntelLineTarget=' .. aiBrain[refiCurIntelLineTarget])
-                                            end
-                                            if bScoutNearAllMexes == true and table.getn(aiBrain[reftIntelLinePositions]) > aiBrain[refiCurIntelLineTarget] then
-                                                --If we move the intel line up by 1 will we have too much enemy threat?
-                                                iTotalEnemyNetThreat = GetEnemyNetThreatAlongIntelPath(aiBrain, aiBrain[refiCurIntelLineTarget] + 1, iIntelPathEnemySearchRange, 35)
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': If we increase the intel path by 1, then the total enemy net threat is ' .. iTotalEnemyNetThreat .. '; will only increase if this is <= 0')
-                                                end
-                                                if iTotalEnemyNetThreat <= 0 then
-                                                    aiBrain[refiCurIntelLineTarget] = aiBrain[refiCurIntelLineTarget] + 1
-                                                    if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': All scouts are in position so increasing intel path by 1 to ' .. aiBrain[refiCurIntelLineTarget])
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            else
-                                if not (M27Logic.iTimeOfLastBrainAllDefeated) or M27Logic.iTimeOfLastBrainAllDefeated < 10 then
-                                    M27Utilities.ErrorHandler('M27Logic.GetNearestEnemyStartNumber(aiBrain) is nil')
-                                end
-                            end
-                        else
-                            --Dont have enough scouts to cover any path, to stick with initial base path
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Dont have enough scouts to cover any intel path, stay at base path; aiBrain[refiMinScoutsNeededForAnyPath]=' .. aiBrain[refiMinScoutsNeededForAnyPath] .. '; iIntelPlatoons=' .. iIntelPlatoons)
-                            end
-                            aiBrain[refiCurIntelLineTarget] = 1
-                        end
-                        --Keep within min and max (this is repeated as needed here to make sure iscoutswanted doesnt cause error)
-                        if aiBrain[refiCurIntelLineTarget] <= 0 then
-                            aiBrain[refiCurIntelLineTarget] = 1
-                        elseif aiBrain[refiCurIntelLineTarget] > aiBrain[refiMaxIntelBasePaths] then
-                            aiBrain[refiCurIntelLineTarget] = aiBrain[refiMaxIntelBasePaths]
-                        end
-
-                        if bDebugMessages == true then
-                            LOG('aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; aiBrain[refiCurIntelLineTarget]=' .. aiBrain[refiCurIntelLineTarget] .. '; table.getn(aiBrain[reftIntelLinePositions])=' .. table.getn(aiBrain[reftIntelLinePositions]) .. '; aiBrain[refiMaxIntelBasePaths]=' .. aiBrain[refiMaxIntelBasePaths])
-                        end
-                        local iScoutsWanted = table.getn(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]])
-                        local iScoutsForNextPath = aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget] + 1]
-                        if iScoutsForNextPath then
-                            iScoutsForNextPath = table.getn(iScoutsForNextPath)
-                        end
-                        if iScoutsForNextPath == nil then
-                            iScoutsForNextPath = iScoutsWanted
-                        end
-
-                        if iAvailableScouts <= iScoutsWanted or iAvailableScouts <= iScoutsForNextPath then
-                            local iScoutsToBuild = iScoutsWanted - iAvailableScouts
-                            if iScoutsForNextPath > iScoutsWanted then
-                                iScoutsToBuild = iScoutsForNextPath - iScoutsWanted
-                            end
-                            iScoutsToBuild = iScoutsToBuild + 1
-                            aiBrain[refiScoutShortfallIntelLine] = iScoutsToBuild
-                        else
-                            aiBrain[refiScoutShortfallIntelLine] = 0
-                        end
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; iScoutsWanted=' .. iScoutsWanted .. '; iScoutsForNextPath=' .. iScoutsForNextPath .. 'aiBrain[refiScoutShortfallIntelLine]=' .. aiBrain[refiScoutShortfallIntelLine])
-                        end
-
-                        local iLoopCount = 0
-                        local iLoopMax = 100
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': refiCurIntelLineTarget=' .. aiBrain[refiCurIntelLineTarget] .. '; About to loop through scouts wanted; iScoutsWanted=' .. iScoutsWanted .. '; iIntelScouts=' .. iIntelScouts)
-                            LOG('About to log every path in the current line:')
-                            for iCurSubPath, tPath in aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]] do
-                                LOG('iCurSubPath=' .. iCurSubPath .. '; repr=' .. repru(tPath))
-                            end
-                        end
-                        while iAvailableScouts < (iScoutsWanted - 2) do
-                            --Too few to try and maintain intel path, so fall back 1 position
-                            iLoopCount = iLoopCount + 1
-                            if iLoopCount > iLoopMax then
-                                M27Utilities.ErrorHandler('likely infinite loop - exceeded iLoopMax of ' .. iLoopMax .. '; refiCurIntelLineTarget=' .. aiBrain[refiCurIntelLineTarget])
-                                break
-                            end
-                            aiBrain[refiCurIntelLineTarget] = aiBrain[refiCurIntelLineTarget] - 1
-                            if aiBrain[refiCurIntelLineTarget] <= 1 then
-                                break
-                            end
-                            iScoutsWanted = table.getn(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]])
-                        end
-                        --Keep within min and max possible targets:
-                        if aiBrain[refiCurIntelLineTarget] <= 0 then
-                            aiBrain[refiCurIntelLineTarget] = 1
-                        elseif aiBrain[refiCurIntelLineTarget] > aiBrain[refiMaxIntelBasePaths] then
-                            aiBrain[refiCurIntelLineTarget] = aiBrain[refiMaxIntelBasePaths]
-                        end
-
-                        --Consider moving forwards at individual points if already have a scout near the current position and no enemies:
-                        if aiBrain[refiCurIntelLineTarget] <= 0 then
-                            aiBrain[refiCurIntelLineTarget] = 1
-                        elseif aiBrain[refiCurIntelLineTarget] > aiBrain[refiMaxIntelBasePaths] then
-                            aiBrain[refiCurIntelLineTarget] = aiBrain[refiMaxIntelBasePaths]
-                        end
-
-
-                        --If we have enough scouts for the current path, then consider each individual point on the path and whether it can go further forwards than the base, provided we have enough scouts to
-                        if aiBrain[refiScoutShortfallIntelLine] == 0 then
-                            local tNearbyEnemiesBase
-                            local tNearbyEnemiesPlus1, tSubPathPlus1
-                            local tNearbyEnemiesPlus2, tSubPathPlus2
-                            local iIncreaseInSubpath, iMaxIncreaseInSubpath, iNextMaxIncrease
-                            local iCurIntelLineTarget = aiBrain[refiCurIntelLineTarget]
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; aiBrain[refiCurIntelLineTarget]=' .. aiBrain[refiCurIntelLineTarget] .. '; size of intel paths=' .. table.getn(aiBrain[reftIntelLinePositions]))
-                            end
-
-                            for iSubPath, tSubPathPosition in aiBrain[reftIntelLinePositions][iCurIntelLineTarget] do
-                                iIncreaseInSubpath = 0
-                                iMaxIncreaseInSubpath = 0
-
-                                --Determine max subpath that can use based on neighbours:
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Determining subpath modification from base to apply for iSubPath=' .. iSubPath)
-                                end
-                                if aiBrain[reftiSubpathModFromBase] == nil then
-                                    aiBrain[reftiSubpathModFromBase] = {}
-                                end
-                                if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget] == nil then
-                                    aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget] = {}
-                                end
-                                if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath] == nil then
-                                    aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath] = 0
-                                end
-                                if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath - 1] == nil then
-                                    aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath - 1] = 0
-                                end
-                                if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath + 1] == nil then
-                                    aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath + 1] = 0
-                                end
-
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget]=' .. repru(aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget]))
-                                end
-                                --Get for -1 subpath:
-                                if iSubPath > 1 then
-                                    iMaxIncreaseInSubpath = aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath - 1] + 1
-                                end
-                                --Get for +1 subpath if it exists
-                                if iSubPath < aiBrain[reftScoutsNeededPerPathPosition][iCurIntelLineTarget] then
-                                    if aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath + 1] then
-                                        iNextMaxIncrease = aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath + 1] + 1
-                                    else
-                                        iNextMaxIncrease = 1
-                                    end
-                                end
-                                if iNextMaxIncrease > iMaxIncreaseInSubpath then
-                                    iMaxIncreaseInSubpath = iNextMaxIncrease
-                                end
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': iSubPath=' .. iSubPath .. '; iMaxIncreaseInSubpath =' .. iMaxIncreaseInSubpath)
-                                end
-
-                                tNearbyEnemiesBase = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPosition, iIntelPathEnemySearchRange, 'Enemy')
-                                if M27Utilities.IsTableEmpty(tNearbyEnemiesBase) == true then
-                                    tSubPathPlus1 = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + 1][iSubPath]
-                                    if M27Utilities.IsTableEmpty(tSubPathPlus1) == false then
-                                        tNearbyEnemiesPlus1 = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPlus1, iIntelPathEnemySearchRange, 'Enemy')
-                                        if M27Utilities.IsTableEmpty(tNearbyEnemiesPlus1) == true then
-                                            iIncreaseInSubpath = 1
-                                            tSubPathPlus2 = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + 2][iSubPath]
-                                            if M27Utilities.IsTableEmpty(tSubPathPlus2) == false then
-                                                tNearbyEnemiesPlus2 = aiBrain:GetUnitsAroundPoint(categories.MOBILE + M27UnitInfo.refCategoryStructure, tSubPathPlus2, iIntelPathEnemySearchRange, 'Enemy')
-                                                if M27Utilities.IsTableEmpty(tNearbyEnemiesPlus2) == true then
-                                                    iIncreaseInSubpath = 2
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU=' .. aiBrain[refiScoutShortfallACU] .. '; iSubPath=' .. iSubPath .. '; iMaxIncreaseInSubpath =' .. iMaxIncreaseInSubpath .. '; iIncrease wnated before applying max=' .. iIncreaseInSubpath)
-                                end
-                                if iIncreaseInSubpath > iMaxIncreaseInSubpath then
-                                    iIncreaseInSubpath = iMaxIncreaseInSubpath
-                                end
-                                local tCurPathPos
-                                tCurPathPos = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + iIncreaseInSubpath][iSubPath]
-                                while M27Utilities.IsTableEmpty(tCurPathPos) == true do
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': iSubPath=' .. iSubPath .. '; iIncreaseInSubpath=' .. iIncreaseInSubpath .. '; position given by this is invalid, so decreasing by 1')
-                                    end
-                                    iIncreaseInSubpath = iIncreaseInSubpath - 1
-                                    if iIncreaseInSubpath <= 0 then
-                                        break
-                                    end
-                                    tCurPathPos = aiBrain[reftIntelLinePositions][iCurIntelLineTarget + iIncreaseInSubpath][iSubPath]
-                                end
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': iSubPath=' .. iSubPath .. '; tCurPathPos=' .. repru(tCurPathPos))
-                                end
-
-                                aiBrain[reftiSubpathModFromBase][iCurIntelLineTarget][iSubPath] = iIncreaseInSubpath
-                            end
-                        end
-
-
-                        --Create intel platoons if needed (choosing scouts nearest to the start point of the intel path for simplicity)
-                        local tBasePathPosition = aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]][1]
-                        local iNewIntelPlatoonsNeeded = iScoutsWanted - iIntelPlatoons
-                        if iNewIntelPlatoonsNeeded > iAvailableScouts then
-                            iNewIntelPlatoonsNeeded = iAvailableScouts
-                        end
-                        local oNewScoutPlatoon
-                        local iCount = 0
-                        while iNewIntelPlatoonsNeeded > 0 do
-                            iCount = iCount + 1
-                            if iCount > 100 then
-                                M27Utilities.ErrorHandler('Infinite loop')
-                                break
-                            end
-                            oScoutToGive = GetNearestMAAOrScout(aiBrain, tBasePathPosition, true, true, true)
-                            if oScoutToGive then
-                                local oNewScoutPlatoon = aiBrain:MakePlatoon('', '')
-                                if oScoutToGive.PlatoonHandle and aiBrain:PlatoonExists(oScoutToGive.PlatoonHandle) then
-                                    M27PlatoonUtilities.RemoveUnitsFromPlatoon(oScoutToGive.PlatoonHandle, { oScoutToGive }, false, oNewScoutPlatoon)
-                                else
-                                    --Redundancy in case there's a scenario where you dont have a platoon handle for a scout
-                                    aiBrain:AssignUnitsToPlatoon(oNewScoutPlatoon, { oScoutToGive }, 'Attack', 'GrowthFormation')
-                                end
-                                oNewScoutPlatoon:SetAIPlan('M27IntelPathAI')
-                                iIntelPlatoons = iIntelPlatoons + 1
-                                tIntelPlatoons[iIntelPlatoons] = oNewScoutPlatoon
-                                if bDebugMessages == true then
-                                    local iPlatoonCount = oNewScoutPlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                                    if iPlatoonCount == nil then
-                                        iPlatoonCount = aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27IntelPathAI']
-                                        if iPlatoonCount == nil then
-                                            iPlatoonCount = 1
-                                        else
-                                            iPlatoonCount = iPlatoonCount + 1
-                                        end
-                                    end
-                                    LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; Created new platoon with Plan name and count=' .. oNewScoutPlatoon:GetPlan() .. iPlatoonCount)
-                                end
-                            else
-                                --Any remaining scouts must still be being constructed
-                                break
-                            end
-
-                            iNewIntelPlatoonsNeeded = iNewIntelPlatoonsNeeded - 1
-
-                        end
-                        --Sort platoons by distance, and check if their current path target is different from what we want
-                        --SortTableBySubtable(tTableToSort, sSortByRef, bLowToHigh)
-                        local iDistFromCurPath
-                        local iMinDistFromCurPath
-                        local oClosestPlatoon
-                        local iClosestPlatoon
-                        local tCurPathPos
-                        local iSubpathMod
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; About to loop subpaths in current target')
-                        end
-                        if iIntelPlatoons >= 1 then
-                            for iCurSubpath = 1, table.getn(aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget]]) do
-                                iMinDistFromCurPath = 100000
-                                oClosestPlatoon = nil
-                                iClosestPlatoon = 0
-                                iSubpathMod = aiBrain[reftiSubpathModFromBase][aiBrain[refiCurIntelLineTarget]][iCurSubpath]
-                                if iSubpathMod == nil then
-                                    iSubpathMod = 0
-                                end --e.g. if not got enough scouts for a full path wont have set subpath mods yet
-                                tCurPathPos = aiBrain[reftIntelLinePositions][aiBrain[refiCurIntelLineTarget] + iSubpathMod][iCurSubpath]
-                                if M27Utilities.IsTableEmpty(tCurPathPos) == true then
-                                    M27Utilities.ErrorHandler('tCurPathPos is empty for iCurSubpath=' .. iCurSubpath .. '; iIntelLineTarget=' .. aiBrain[refiCurIntelLineTarget] .. '; iSubpathMod=' .. iSubpathMod)
-                                else
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': iCurSubpath=' .. iCurSubpath .. '; iSubpathMod = ' .. iSubpathMod .. ': tCurPathPos=' .. repru(tCurPathPos))
-                                        M27Utilities.DrawLocation(tCurPathPos)
-                                    end
-                                    for iPlatoon, oPlatoon in tIntelPlatoons do
-                                        if bDebugMessages == true then
-                                            local iPlatoonCount = oPlatoon[M27PlatoonUtilities.refiPlatoonCount]
-                                            if iPlatoonCount == nil then
-                                                iPlatoonCount = 'nil'
-                                            end
-                                            LOG(sFunctionRef .. ': Cycling through all platoons in tIntelPlatoons, iPlatoon=' .. iPlatoon .. '; oPlatoon count=' .. iPlatoonCount)
-                                        end
-                                        iDistFromCurPath = M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tCurPathPos)
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': iDistFromCurPath=' .. iDistFromCurPath)
-                                        end
-                                        if iDistFromCurPath < iMinDistFromCurPath then
-                                            iMinDistFromCurPath = iDistFromCurPath
-                                            oClosestPlatoon = oPlatoon
-                                            iClosestPlatoon = iPlatoon
-                                        end
-                                    end
-                                    if oClosestPlatoon == nil then
-                                        break
-                                    else
-                                        table.remove(tIntelPlatoons, iClosestPlatoon)
-                                        if oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] == nil then
-                                            oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
-                                            oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1] = {}
-                                        end
-                                        if not (oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1][1] == tCurPathPos[1] and oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1][3] == tCurPathPos[3]) then
-                                            if bDebugMessages == true and oClosestPlatoon.GetPlan then
-                                                LOG(sFunctionRef .. ': Giving override action to oClosestPlatoon ' .. oClosestPlatoon:GetPlan() .. (oClosestPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil') .. ': tCurPathPosition=' .. repru(tCurPathPos) .. '; movement path=' .. repru((oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1] or { 'nil' })) .. ' unless its prev action was to run; platoon prevaction=' .. (oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] or 'nil'))
-                                            end
-                                            if not (oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] == M27PlatoonUtilities.refActionRun) and not (oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] == M27PlatoonUtilities.refActionTemporaryRetreat) and not (oClosestPlatoon[M27PlatoonUtilities.reftPrevAction][1] == M27PlatoonUtilities.refActionReturnToBase) then
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': Prev action wasnt to run so updating movement path, will force a refresh of this if we havent given an override in last 5s; oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride]=' .. (oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] or 'nil'))
-                                                end
-                                                if oClosestPlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] >= 5 and M27Utilities.GetDistanceBetweenPositions(((oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] or { 0, 0, 0 })[(oClosestPlatoon[M27PlatoonUtilities.refiCurrentPathTarget] or 1)] or { 0, 0, 0 }), tCurPathPos) > 10 then
-                                                    if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Forcing a refresh of the platoon')
-                                                    end
-                                                    M27PlatoonUtilities.ForceActionRefresh(oClosestPlatoon)
-                                                    oClosestPlatoon[M27PlatoonUtilities.reftMovementPath] = {}
-                                                    oClosestPlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
-                                                end
-                                                oClosestPlatoon[M27PlatoonUtilities.reftMovementPath][1] = tCurPathPos
-                                            end
-                                        end
-                                        iIntelPlatoons = iIntelPlatoons - 1
-                                    end
-                                end
-                            end
-                        end
-
-                        --If we have too many scouts then remove excess ones (unless we had to fall back because we didn't have enough)
-                        if not (tIntelPlatoons == nil) and iIntelPlatoons > 0 then
-                            local iRemainingScouts = table.getn(tIntelPlatoons)
-                            if iRemainingScouts >= 2 then
-                                local iSpareScoutsWanted
-                                local iMaxScoutsWanted = iScoutsWanted
-                                local iFirstPathToCheck = math.max(1, aiBrain[refiCurIntelLineTarget] - 2)
-                                local iLastPathToCheck = math.min(table.getn(aiBrain[reftIntelLinePositions]), aiBrain[refiCurIntelLineTarget] + 2)
-                                local iCurScoutsWanted
-                                --Cycle through previous and next intel paths to see if they need more scouts than current path
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; About to loop through previous and next intel paths')
-                                end
-                                for iCurPathToCheck = iFirstPathToCheck, iLastPathToCheck do
-                                    iCurScoutsWanted = table.getn(aiBrain[reftIntelLinePositions][iCurPathToCheck])
-                                    if iCurScoutsWanted > iMaxScoutsWanted then
-                                        iMaxScoutsWanted = iCurScoutsWanted
-                                    end
-                                end
-                                iSpareScoutsWanted = iMaxScoutsWanted - iScoutsWanted
-                                if iSpareScoutsWanted < iRemainingScouts then
-                                    --Have too many scouts - remove spare ones
-                                    local iScoutsToRemove = iRemainingScouts - iSpareScoutsWanted
-
-                                    for iCurRemoval = 1, iScoutsToRemove do
-                                        tIntelPlatoons[iCurRemoval][M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband
-                                        tIntelPlatoons[iCurRemoval][M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionDisband
-                                        tIntelPlatoons[iCurRemoval][M27PlatoonUtilities.refbOverseerAction] = true
-                                    end
-                                end
-
-
-                            end
-                        end
-                    end
-                end
-            end
-
-            if aiBrain[refiScoutShortfallIntelLine] > 0 then
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; Have a shortfall of scouts for intel line=' .. aiBrain[refiScoutShortfallIntelLine])
-                end
-                --Defaults for other scouts wanted - just set to 1 for simplicity
-
-                aiBrain[refiScoutShortfallLargePlatoons] = 1
-                aiBrain[refiScoutShortfallAllPlatoons] = 1
-                aiBrain[refiScoutShortfallMexes] = 0
-                aiBrain[refbNeedScoutPlatoons] = true
-            else
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; Dont have a shortfall of scouts for intel line so will consider large platoons')
-                end
-                aiBrain[refbNeedScoutPlatoons] = false
-
-                --=================Large platoons - ensure they have scouts available, and if not then add scout to them
-
-                local iLargePlatoonsMissingScouts = 0
-                local iSmallPlatoonMissingScouts = 0
-
-                local tPlatoonUnits, iPlatoonUnits, tPlatoonCurrentScouts, oScoutToAdd, oScoutOldPlatoon
-                local iPlatoonSizeMin, iPlatoonSizeMissingScouts
-                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true or (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and sScoutPathing == M27UnitInfo.refPathingTypeAmphibious) then
-                    for iPlatoonCurSize = 1, 2 do
-                        if iPlatoonCurSize == 1 then
-                            iPlatoonSizeMin = iScoutLargePlatoonThreshold
-                        else
-                            iPlatoonSizeMin = iSmallPlatoonMinSizeForScout
-                        end
-                        iPlatoonSizeMissingScouts = 0
-
-                        for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-                            if not (oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
-                                tPlatoonUnits = oPlatoon:GetPlatoonUnits()
-                                if M27Utilities.IsTableEmpty(tPlatoonUnits) == false then
-                                    iPlatoonUnits = table.getn(tPlatoonUnits)
-                                    if (oPlatoon:GetPlan() == 'M27MobileStealth' or oPlatoon:GetPlan() == 'M27Skirmisher' or iPlatoonUnits >= iPlatoonSizeMin) and aiBrain:PlatoonExists(oPlatoon) then
-                                        local bPlatoonHasScouts = false
-                                        tPlatoonCurrentScouts = EntityCategoryFilterDown(refCategoryLandScout, tPlatoonUnits)
-                                        if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then
-                                            bPlatoonHasScouts = true
-                                        elseif oPlatoon[refoScoutHelper] and oPlatoon[refoScoutHelper].GetPlatoonUnits then
-                                            tPlatoonCurrentScouts = oPlatoon[refoScoutHelper]:GetPlatoonUnits()
-                                            if M27Utilities.IsTableEmpty(tPlatoonCurrentScouts) == false then
-                                                bPlatoonHasScouts = true
-                                            end
-                                        end
-                                        if bPlatoonHasScouts == false then
-                                            --Need scouts in the platoon
-                                            if iPlatoonSizeMissingScouts > 0 or iAvailableScouts <= 0 then
-                                                --Wont find any more scouts, so just increase
-                                                iPlatoonSizeMissingScouts = iPlatoonSizeMissingScouts + 1
-                                            else
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': About to get a scout to assign to a large platoon.  Large platoon count=' .. oPlatoon[M27PlatoonUtilities.refiPlatoonCount])
-                                                end
-                                                oScoutToAdd = GetNearestMAAOrScout(aiBrain, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), true, true, true)
-                                                if oScoutToAdd == nil then
-                                                    iPlatoonSizeMissingScouts = iPlatoonSizeMissingScouts + 1
-                                                else
-                                                    iAvailableScouts = iAvailableScouts - 1
-
-                                                    AssignHelperToPlatoonOrUnit(oScoutToAdd, oPlatoon, true)
-                                                    --[[--Have a valid scout - add it to the platoon
-                                                    oScoutOldPlatoon = oScoutToAdd.PlatoonHandle
-                                                    if oScoutOldPlatoon then
-                                                        --RemoveUnitsFromPlatoon(oPlatoon, tUnits, bReturnToBase, oPlatoonToAddTo)
-                                                        M27PlatoonUtilities.RemoveUnitsFromPlatoon(oScoutOldPlatoon, { oScoutToAdd}, false, oPlatoon)
-                                                    else
-                                                        --Dont have platoon for the scout so add manually (backup for unexpected scenarios)
-                                                        aiBrain:AssignUnitsToPlatoon(oPlatoon, { oScoutToAdd}, 'Unassigned', 'None')
-                                                    end--]]
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                        if iPlatoonCurSize == 1 then
-                            iLargePlatoonsMissingScouts = iPlatoonSizeMissingScouts
-                        else
-                            iSmallPlatoonMissingScouts = iPlatoonSizeMissingScouts
-                        end
-                    end
-                end
-                aiBrain[refiScoutShortfallLargePlatoons] = iLargePlatoonsMissingScouts
-                aiBrain[refiScoutShortfallAllPlatoons] = iSmallPlatoonMissingScouts
-                if iLargePlatoonsMissingScouts + iSmallPlatoonMissingScouts > 0 then
-                    aiBrain[refiScoutShortfallMexes] = 1
-                else
-                    --========MEXES (non-urgent)
-                    --Assign scouts to every mex on our side of the map that is land pathable to our start
-                    --local iStartPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                    --local sLocationRef
-                    local oCurScout
-                    local iScoutShortfall = 0
-                    local bNoMoreScouts = false
-                    --Get positions of any omni sensors (as we dont need a scout if we have omni coverage)
-                    local tFriendlyOmni = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT3Radar, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
-                    local bConsiderOmni = not (M27Utilities.IsTableEmpty(tFriendlyOmni))
-                    local bCurPositionInOmniRange
-                    local iCurOmniRange
-                    local iDistanceWithinOmniWanted = 30
-                    local oCurBlueprint
-                    local sLocationRef
-
-                    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftMexesToKeepScoutsBy]) == false then
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': have some mexes in the table of mexes that want scouts (tablegetn wont work for this variable)')
-                        end
-                        for iMex, tMex in aiBrain[M27MapInfo.reftMexesToKeepScoutsBy] do
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Considering tMex=' .. repru(tMex) .. '; iMex=' .. iMex)
-                            end
-                            if M27Utilities.GetDistanceBetweenPositions(tMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > 40 then
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Mex is at least 40 away from start')
-                                end
-                                sLocationRef = iMex --M27Utilities.ConvertLocationToReference(tMex)
-                                --Do we have a scout assigned that is still alive?
-                                oCurScout = aiBrain[tScoutAssignedToMexLocation][sLocationRef]
-                                if oCurScout and not (oCurScout.Dead) and oCurScout.GetUnitId then
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Already have a scout assigned to the mex')
-                                    end
-                                    --Do nothing
-                                else
-                                    aiBrain[tScoutAssignedToMexLocation][sLocationRef] = nil
-                                    --Do we have omni coverage?
-                                    bCurPositionInOmniRange = false
-                                    if bConsiderOmni then
-                                        for iOmni, oOmni in tFriendlyOmni do
-                                            iCurOmniRange = 0
-                                            if oOmni.GetBlueprint and not (oOmni.Dead) and oOmni.GetFractionComplete and oOmni:GetFractionComplete() == 1 then
-                                                oCurBlueprint = oOmni:GetBlueprint()
-                                                if oCurBlueprint.Intel and oCurBlueprint.Intel.OmniRadius then
-                                                    iCurOmniRange = oCurBlueprint.Intel.OmniRadius
-                                                end
-                                            end
-                                            if iCurOmniRange > 0 then
-                                                if M27Utilities.GetDistanceBetweenPositions(oOmni:GetPosition(), tMex) - iCurOmniRange <= iDistanceWithinOmniWanted then
-                                                    bCurPositionInOmniRange = true
-                                                    break
-                                                end
-                                            end
-                                        end
-                                    end
-                                    if not (bCurPositionInOmniRange) then
-                                        --Try to find a scout to assign
-                                        if bNoMoreScouts == false then
-                                            oCurScout = GetNearestMAAOrScout(aiBrain, tMex, true, true, true)
-                                        else
-                                            oCurScout = nil
-                                        end
-                                        if oCurScout then
-                                            aiBrain[tScoutAssignedToMexLocation][sLocationRef] = oCurScout
-                                            local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(tMex, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                                            local tPositionToGuard = M27Utilities.MoveInDirection(tMex, iAngleToEnemyBase, 6) --dont want to block mex or storage, and want to get slight advance warning of enemies
-                                            AssignHelperToLocation(aiBrain, oCurScout, tPositionToGuard)
-                                        else
-                                            bNoMoreScouts = true
-                                            iScoutShortfall = iScoutShortfall + 1
-                                        end
-                                    end
-                                end
-                            elseif bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Mex is within 40 of start so dont want a scout')
-                            end
-                        end
-                    else
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': No mexes that want scouts by')
-                        end
-                    end
-                    aiBrain[refiScoutShortfallMexes] = iScoutShortfall
-                end
-            end
-        else
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': No scouts so will set as needing more scouts for ACU and initial raider')
-            end
-            aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = aiBrain[refiInitialRaiderPlatoonsWanted]
-            aiBrain[refiScoutShortfallACU] = 1
-            aiBrain[refiScoutShortfallPriority] = 1
-            aiBrain[refiScoutShortfallIntelLine] = aiBrain[refiMinScoutsNeededForAnyPath]
-        end
+    if aiBrain[M27AirOverseer.refbHaveOmniVision] then
+        aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] = 0
+        aiBrain[refiScoutShortfallACU] = 0
+        aiBrain[refiScoutShortfallPriority] = 0
+        aiBrain[refiScoutShortfallIntelLine] = 0
+        aiBrain[refiScoutShortfallLargePlatoons] = 0
+        aiBrain[refiScoutShortfallAllPlatoons] = 0
+        aiBrain[refiScoutShortfallMexes] = 0
     end
+
     if bDebugMessages == true then
         LOG(sFunctionRef .. ':End of code, gametime=' .. GetGameTimeSeconds() .. '; aiBrain[refiScoutShortfallACU]=' .. aiBrain[refiScoutShortfallACU] .. '; aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher]=' .. aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher] .. '; aiBrain[refiScoutShortfallIntelLine]=' .. aiBrain[refiScoutShortfallIntelLine])
     end
@@ -6968,7 +6976,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
 
-        bDebugMessages = true
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurShareOfMexesOnMap=' .. iOurShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed..'; iAllMexesInPathingGroup='..iAllMexesInPathingGroup)
         end
@@ -7130,6 +7137,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
     local iEnemyCount = 0
     local iAllyCount = 0
     local iArmyIndex
+
     tAllActiveM27Brains = {}
     if M27Utilities.IsTableEmpty(ArmyBrains) == false then
         aiBrain[toEnemyBrains] = {}
@@ -7202,6 +7210,31 @@ function RecordAllEnemiesAndAllies(aiBrain)
                 tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
             end
         end
+
+    end
+
+
+    --Record if we have omni vision for every AI in our team; want to do here so this re-runs whenever an AI dies
+    local bHaveOmniVision = false
+    if bDebugMessages == true then LOG(sFunctionRef..': Omni cheat setting='..ScenarioInfo.Options.OmniCheat..'; Does this equal on='..tostring(ScenarioInfo.Options.OmniCheat == 'on')) end
+    if ScenarioInfo.Options.OmniCheat == 'on' then
+        if aiBrain.CheatEnabled then
+            bHaveOmniVision = true
+        else
+            for iCurBrain, oBrain in aiBrain[toAllyBrains] do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering AI '..oBrain.Nickname..'; .CheatEnabled='..tostring( oBrain.CheatEnabled)) end
+                if oBrain.CheatEnabled then
+                    bHaveOmniVision = true
+                    break
+                end
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Do any of our team have omni vision='..tostring(bHaveOmniVision)) end
+        for iCurBrain, oBrain in aiBrain[toAllyBrains] do
+            oBrain[M27AirOverseer.refbHaveOmniVision] = bHaveOmniVision
+        end
+        aiBrain[M27AirOverseer.refbHaveOmniVision] = bHaveOmniVision
+        if bDebugMessages == true then LOG(sFunctionRef..': Brain '..aiBrain.Nickname..': Has Omni Vision='..tostring(aiBrain[M27AirOverseer.refbHaveOmniVision])) end
     end
 
     --Group enemies
@@ -7995,6 +8028,8 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+    LOG('Log of ScenarioInfo='..repru(ScenarioInfo))
+    --[[
     --Test new GetUnitMaxGroundRange function
     local tOurUnits = aiBrain:GetListOfUnits(categories.DIRECTFIRE + categories.INDIRECTFIRE + categories.ANTIAIR, false, true)
     if M27Utilities.IsTableEmpty(tOurUnits) == false then
@@ -8002,7 +8037,7 @@ function TestCustom(aiBrain)
             LOG('Range of unit '..oUnit.UnitId..'='..M27UnitInfo.GetUnitMaxGroundRange(oUnit))
         end
     end
-
+--]]
     --Check if experimental isnt moving
     --[[local tEnemyExperimentals = aiBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL * categories.LAND, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Enemy')
     LOG('TestCustom table of enemy experimentals empty='..tostring(M27Utilities.IsTableEmpty(tEnemyExperimentals)))
@@ -8318,7 +8353,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    --TestCustom(aiBrain)
+    TestCustom(aiBrain)
 
 
 

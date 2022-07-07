@@ -43,6 +43,7 @@ refiIntervalEnemyBase = 'M27AirIntervalEnemyBase'
 reftAirSegmentTracker = 'M27AirSegmentTracker' --[x][z]{a,b,c,d etc.} - x = segment x, z = segment z, a, b, c etc. = subtable refs - Used to track all things relating to air scouting for a particular segment
 --Subtable values (include in SetupAirSegments to make sure these can be referenced)
 refiLastScouted = 'M27AirLastScouted'
+refbHaveOmniVision = 'M27AirHaveOmniVision' --against aiBrain, true if have omni vision of whole map
 local refiAirScoutsAssigned = 'M27AirScoutsAssigned'
 refiNormalScoutingIntervalWanted = 'M27AirScoutIntervalWanted' --What to default to if e.g. temporairly increased
 refiCurrentScoutingInterval = 'M27AirScoutCurrentIntervalWanted' --e.g. can temporarily override this if a unit dies and want to make it higher priority
@@ -229,17 +230,27 @@ function GetAirPositionFromSegment(iSegmentX, iSegmentZ)
     return { iPosX, GetTerrainHeight(iPosX, iPosZ), iPosZ }
 end
 
+function TimeSinceLastHadVisualOrIntelOfLocation()  end --Done solely to help find the below function
 function GetTimeSinceLastScoutedLocation(aiBrain, tLocation)
     --Returns the game-time since we last had intel of a location
-    local iAirSegmentX, iAirSegmentZ = GetAirSegmentFromPosition(tLocation)
-    return GetGameTimeSeconds() - (aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiLastScouted] or 0)
+    if aiBrain[refbHaveOmniVision] then return 0
+    else
+        local iAirSegmentX, iAirSegmentZ = GetAirSegmentFromPosition(tLocation)
+        return GetGameTimeSeconds() - (aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiLastScouted] or 0)
+    end
+end
+
+function GetTimeSinceLastScoutedSegment(aiBrain, iAirSegmentX, iAirSegmentZ)
+    if aiBrain[refbHaveOmniVision] then return 0
+    else return GetGameTimeSeconds() - (aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiLastScouted] or 0)
+    end
 end
 
 function ClearAirScoutDeathFromSegmentInFuture(aiBrain, iAirSegmentX, iAirSegmentZ)
     --CALL VIA FORKED THREAD
     WaitSeconds(200)
     --Have we failed to reveal the area since this time?
-    if GetGameTimeSeconds() - aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiLastScouted] >= 200 then
+    if GetTimeSinceLastScoutedSegment(aiBrain, iAirSegmentX, iAirSegmentZ) >= 200 then
         if aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiDeadScoutsSinceLastReveal] > 0 then
             aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiDeadScoutsSinceLastReveal] = aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiDeadScoutsSinceLastReveal] - 1
         end
@@ -2297,7 +2308,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                                                     end
                                                     --Check if are either close to the target, or have had recent visual of the target
 
-                                                    while iDistanceToCurTarget <= iDistanceToComplete or iTimeStamp - (aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] or 0 - 1000) <= math.max(2, aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] or 500 - 10) do
+                                                    while iDistanceToCurTarget <= iDistanceToComplete or GetTimeSinceLastScoutedLocation(aiBrain, tCurWaypointTarget) <= math.max(2, aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] or 500 - 10) do
                                                         if bDebugMessages == true then
                                                             LOG(sFunctionRef .. ': Are close enough to target or have already had recent visual of the target, checking unit on assignment, iCurLoopCount=' .. iCurLoopCount .. '; iTimeStamp=' .. iTimeStamp .. '; [refiLastScouted]=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] .. '; iCurAirSegmentX-Z=' .. iCurAirSegmentX .. '-' .. iCurAirSegmentZ)
                                                         end
@@ -3050,13 +3061,13 @@ function UpdateScoutingSegmentRequirements(aiBrain)
 
     for iCurAirSegmentX = iScoutMinSegmentX, iScoutMaxSegmentX, 1 do
         for iCurAirSegmentZ = iScoutMinSegmentZ, iScoutMaxSegmentZ, 1 do
-            iLastScoutedTime = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]
+            --iLastScoutedTime = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]
             if bDebugMessages == true then
                 if iCurAirSegmentX <= 4 and iCurAirSegmentZ then
-                    LOG(sFunctionRef .. ': iCurAirSegmentXZ=' .. iCurAirSegmentX .. '-' .. iCurAirSegmentZ .. '; iLastScoutedTime=' .. iLastScoutedTime .. ';[refiCurrentScoutingInterval]=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] .. '; iCurTime=' .. iCurTime .. '; iIntervalInSecondsBeforeRefresh=' .. iIntervalInSecondsBeforeRefresh)
+                    LOG(sFunctionRef .. ': iCurAirSegmentXZ=' .. iCurAirSegmentX .. '-' .. iCurAirSegmentZ .. '; Time since last scouted=' .. GetTimeSinceLastScoutedSegment(aiBrain, iCurAirSegmentX, iCurAirSegmentZ) .. ';[refiCurrentScoutingInterval]=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] .. '; iCurTime=' .. iCurTime .. '; iIntervalInSecondsBeforeRefresh=' .. iIntervalInSecondsBeforeRefresh)
                 end
             end
-            if iCurTime - iLastScoutedTime >= iIntervalInSecondsBeforeRefresh then
+            if GetTimeSinceLastScoutedSegment(aiBrain, iCurAirSegmentX, iCurAirSegmentZ) >= iIntervalInSecondsBeforeRefresh then
                 --tCurPosition = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][reftMidpointPosition]
                 --[[if CanSeePosition(aiBrain, tCurPosition, iMaxSearchRange) then
             aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] = iCurTime
@@ -3064,7 +3075,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
             aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiNormalScoutingIntervalWanted]
         else--]]
                 iCurIntervalWanted = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval]
-                iCurTimeSinceWantedToScout = iCurTime - iLastScoutedTime - iCurIntervalWanted
+                iCurTimeSinceWantedToScout = GetTimeSinceLastScoutedSegment(aiBrain, iCurAirSegmentX, iCurAirSegmentZ) - iCurIntervalWanted
                 if iCurTimeSinceWantedToScout > 0 then
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Found a location that we havent scouted for a while, X-Z=' .. iCurAirSegmentX .. '-' .. iCurAirSegmentZ .. '; Dead scouts=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiDeadScoutsSinceLastReveal] .. '; assigned scouts=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned])
@@ -3158,7 +3169,7 @@ function GetEndDestinationForScout(aiBrain, oScout)
     local bHaveLocationsReallyOverdue = false
     --If any location is more than 2.5m overdue then will filter to only consider locations overdue by this; if enemy base is overdue by 2m, then will prioritise scouting the base
     local iReallyOverduePriorityThreshold = 150
-    if GetGameTimeSeconds() - aiBrain[reftAirSegmentTracker][iEnemyBaseSegmentX][iEnemyBaseSegmentZ][refiLastScouted] - aiBrain[reftAirSegmentTracker][iEnemyBaseSegmentX][iEnemyBaseSegmentZ][refiCurrentScoutingInterval] >= math.min(120, iReallyOverduePriorityThreshold) then
+    if GetTimeSinceLastScoutedSegment(aiBrain, iEnemyBaseSegmentX, iEnemyBaseSegmentZ) - aiBrain[reftAirSegmentTracker][iEnemyBaseSegmentX][iEnemyBaseSegmentZ][refiCurrentScoutingInterval] >= math.min(120, iReallyOverduePriorityThreshold) then
         bHaveLocationsReallyOverdue = true
     end
     --If any location is more than 2m overdue then will filter to only consider locations overdue by this
@@ -3581,13 +3592,13 @@ function QuantumOpticsManager(aiBrain, oUnit)
         local iScoutMinSegmentZ = aiBrain[refiMinSegmentZ]
         local iScoutMaxSegmentZ = aiBrain[refiMaxSegmentZ]
 
-        local iLastScoutedTime, iTimeUntilWantToScout, iCurActiveScoutsAssigned
+        local iTimeSinceLastScouted, iTimeUntilWantToScout, iCurActiveScoutsAssigned
         local iLowestTimeUntilWantToScoutUnassigned
         local iLowestTimeUntilWantToScoutAssigned
 
         function UpdateOverdueSegment(iCurAirSegmentX, iCurAirSegmentZ)
-            iLastScoutedTime = (aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted] or 0)
-            iTimeUntilWantToScout = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] - iLastScoutedTime
+            iTimeSinceLastScouted = GetTimeSinceLastScoutedSegment(aiBrain, iCurAirSegmentX, iCurAirSegmentZ)
+            iTimeUntilWantToScout = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] - iTimeSinceLastScouted
             iCurActiveScoutsAssigned = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned]
             --If more than 1 scout assigned suggests location with AA so treat same as unassigned
             if iCurActiveScoutsAssigned == 1 then
@@ -3692,38 +3703,41 @@ function RecordSegmentsThatHaveVisualOf(aiBrain)
     -- aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiLastScouted] = iTimeStamp
 
 
+
     local sFunctionRef = 'RecordSegmentsThatHaveVisualOf'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code')
     end
-    local iTimeStamp = GetGameTimeSeconds()
+    if not(aiBrain[refbHaveOmniVision]) then
+        local iTimeStamp = GetGameTimeSeconds()
 
-    local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    local tAirScouts = aiBrain:GetUnitsAroundPoint(refCategoryAirScout * categories.TECH1, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
-    local iAirVision = 42
-    for iUnit, oUnit in tAirScouts do
-        if not (oUnit.Dead) then
-            UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+        local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        local tAirScouts = aiBrain:GetUnitsAroundPoint(refCategoryAirScout * categories.TECH1, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
+        local iAirVision = 42
+        for iUnit, oUnit in tAirScouts do
+            if not (oUnit.Dead) then
+                UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+            end
         end
-    end
-    local tSpyPlanes = aiBrain:GetUnitsAroundPoint(refCategoryAirScout * categories.TECH3, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
-    iAirVision = 64
-    for iUnit, oUnit in tSpyPlanes do
-        if not (oUnit.Dead) then
-            UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+        local tSpyPlanes = aiBrain:GetUnitsAroundPoint(refCategoryAirScout * categories.TECH3, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
+        iAirVision = 64
+        for iUnit, oUnit in tSpyPlanes do
+            if not (oUnit.Dead) then
+                UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+            end
         end
-    end
 
-    local tAllOtherUnits = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - refCategoryAirScout - M27UnitInfo.refCategoryMex - M27UnitInfo.refCategoryHydro, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
-    local oCurBP, iCurVision
-    for iUnit, oUnit in tAllOtherUnits do
-        if not (oUnit.Dead) and oUnit.GetBlueprint then
-            oCurBP = oUnit:GetBlueprint()
-            iCurVision = oCurBP.Intel.VisionRadius
-            if iCurVision and iCurVision >= iAirSegmentSize then
-                UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iCurVision, iTimeStamp)
+        local tAllOtherUnits = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - refCategoryAirScout - M27UnitInfo.refCategoryMex - M27UnitInfo.refCategoryHydro, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
+        local oCurBP, iCurVision
+        for iUnit, oUnit in tAllOtherUnits do
+            if not (oUnit.Dead) and oUnit.GetBlueprint then
+                oCurBP = oUnit:GetBlueprint()
+                iCurVision = oCurBP.Intel.VisionRadius
+                if iCurVision and iCurVision >= iAirSegmentSize then
+                    UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iCurVision, iTimeStamp)
+                end
             end
         end
     end

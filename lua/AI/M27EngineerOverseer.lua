@@ -9817,7 +9817,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
                         end
                     elseif iCurrentConditionToTry == 20 then --Omni to protect from cloaked ACU/SACU, or if have ok resources and either enemy has large air threat or we are Sera/Aeon with skirmishers needing intel
-                        if iHighestFactoryOrEngineerTechAvailable >= 3 and (aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 350 or aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 1000) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 5 then
+                        if iHighestFactoryOrEngineerTechAvailable >= 3 and (aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 350 or aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 1000) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 5 and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                             --Want if enemy has cloaked ACU
                             local bWantEmergencyOmni = aiBrain[M27Overseer.refbCloakedEnemyACU]
                             local iMaxFriendlyOmniDistance = 100 --Will build our own omni if we want an omni and no friendly omni within this range
@@ -10068,7 +10068,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
                         end
                     elseif iCurrentConditionToTry == 31 then --T1/T2 radar if enemy may have significant air threat or high tech units, and radar if we have skirmishers needing better intel
-                        if bHaveLowPower == false then
+                        if bHaveLowPower == false and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                             if iCurRadarCount == nil then iCurRadarCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryRadar) end
                             if iCurRadarCount == 0 then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering if want first radar. iNetCurEnergyIncome='..iNetCurEnergyIncome..'; iEnergyStored='..iEnergyStored..'; bHaveLowMass='..tostring(bHaveLowMass)..'; aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]='..aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; Mass stored='..aiBrain:GetEconomyStored('MASS')..'; is table of skirmisher platoons wanting intel empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27PlatoonUtilities.reftSkirmisherPlatoonWantingIntel]))) end
@@ -10189,7 +10189,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
 
                     elseif iCurrentConditionToTry == 34 then --Hive near firebase T3 shield that has reclaim nearby
-                        bDebugMessages = false
                         if M27Utilities.IsTableEmpty(aiBrain[reftShieldsWantingHives]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.CYBRAN - categories.TECH1, tIdleEngineers)) == false then
                             RefreshShieldsWantingHives(aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to build hive by t3 shield. is table of shields wanting hives empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftShieldsWantingHives]))) end
@@ -10779,7 +10778,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             end
                         end
                     elseif iCurrentConditionToTry == 53 then --Radar near base
-                        if bHaveLowPower == false then
+                        if bHaveLowPower == false and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                             if iCurRadarCount == nil then iCurRadarCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryRadar) end
                             if iCurRadarCount == 0 and iNetCurEnergyIncome > 5 and iEnergyStored >= 2000 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 2.5 then
                                 iActionToAssign = refActionBuildT1Radar

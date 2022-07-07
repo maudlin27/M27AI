@@ -2223,7 +2223,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
@@ -4829,7 +4829,6 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                 local iCurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], oPlatoon[refoFrontUnit]:GetPosition())
                 if not(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][iCurPathingGroup]) and M27Utilities.IsTableEmpty(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount]) == false then
                     --Likely pathing error unless the platoon has no other values
-                    bDebugMessages = true
                     if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..': Likely pathing error, will check pathing, cur segment group='..iCurPathingGroup..'; Front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])..'; Prev segment group counts for unit='..repru(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount])) end
                     if oPlatoon[refoFrontUnit][M27UnitInfo.refiLastPathingGroup] and oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][oPlatoon[refoFrontUnit][M27UnitInfo.refiLastPathingGroup]] >= 2 then
                         if M27MapInfo.RecheckPathingOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], oPlatoon[refoFrontUnit], oPlatoon[refoFrontUnit]:GetPosition(), oPlatoon[refoFrontUnit][M27UnitInfo.reftLastLocationOfPathingGroup], false) then
@@ -6529,7 +6528,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -9789,7 +9788,7 @@ function ProcessPlatoonAction(oPlatoon)
 
             local sPlatoonName = oPlatoon:GetPlan()
 
-            if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end

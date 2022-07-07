@@ -3265,90 +3265,100 @@ function GetIntelCoverageOfPosition(aiBrain, tTargetPosition, iMinCoverageWanted
     local sFunctionRef = 'GetIntelCoverageOfPosition'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --Visual range - base on air segments and if they've been flagged as having had recent visual
-    local iAirSegmentAdjSize = 1
-    if iMinCoverageWanted then iAirSegmentAdjSize = math.ceil(iMinCoverageWanted / M27AirOverseer.iAirSegmentSize) end
-    local iBaseAirSegmentX, iBaseAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tTargetPosition)
-    local bHaveRecentVisual = true
-    for iAdjX = -iAirSegmentAdjSize, iAirSegmentAdjSize do
-        for iAdjZ = -iAirSegmentAdjSize, iAirSegmentAdjSize do
-            if aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX] and aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX][iBaseAirSegmentZ + iAdjZ]
-                    and GetGameTimeSeconds() - aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX][iBaseAirSegmentZ + iAdjZ][M27AirOverseer.refiLastScouted] > 1.1 then
-                --Dont have recent visual - check are either 0 adj, or are within iMinCoverageWanted
-                if iAdjX == 0 and iAdjZ == 0 then
-                    bHaveRecentVisual = false
-                    break
-                elseif M27Utilities.GetDistanceBetweenPositions(tTargetPosition, M27AirOverseer.GetAirPositionFromSegment(iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ)) <= iMinCoverageWanted then
-                    bHaveRecentVisual = false
-                    break
-                end
-            end
-        end
-    end
+    if aiBrain[M27AirOverseer.refbHaveOmniVision] then
 
-
-    local iMaxIntelCoverage = 0
-    if iMinCoverageWanted == nil and bHaveRecentVisual then iMaxIntelCoverage = M27AirOverseer.iAirSegmentSize end
-    if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverageWanted='..(iMinCoverageWanted or 'nil')..'; bHaveRecentVisual='..tostring(bHaveRecentVisual)..'; iMaxIntelCoverage='..(iMaxIntelCoverage or 'nil')) end
-    if bHaveRecentVisual == false or iMinCoverageWanted == nil then
-        --Dont have recent visual, so see if have nearby radar or scout
-        local tCategoryList = {M27UnitInfo.refCategoryRadar, categories.SCOUT}
-        if bOnlyGetRadarCoverage then tCategoryList = {M27UnitInfo.refCategoryRadar} end
-        local tiSearchRange = {570, 70} --Omni radar is 600; spy plan is 96; want to be at least 30
-        local iCurIntelRange, iCurDistanceToPosition, iCurIntelCoverage
-        local tCurUnits = {}
-
-        for iCategoryTableRef, iCategoryType in tCategoryList do
-            tCurUnits = aiBrain:GetUnitsAroundPoint(iCategoryType, tTargetPosition, tiSearchRange[iCategoryTableRef], 'Ally')
-            --tCurUnits = aiBrain:GetListOfUnits(iCategoryType, false, true)
-            for iUnit, oUnit in tCurUnits do
-                iCurIntelRange = oUnit:GetBlueprint().Intel.RadarRadius
-                iCurDistanceToPosition = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPosition)
-                iCurIntelCoverage = iCurIntelRange - iCurDistanceToPosition
-                if iCurIntelCoverage > iMaxIntelCoverage then
-
-                    --if iMinCoverageWanted == nil then
-                    iMaxIntelCoverage = iCurIntelCoverage
-                    --else
-                    if not(iMinCoverageWanted==nil) then
-                        if iCurIntelCoverage > iMinCoverageWanted then
-                            if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage) end
-                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                            return true end
-                    end
-                end
-            end
-        end
-        --Below removed from v15 for performance reasons and replaced with check to air segments above
-        --[[
-        if iMaxIntelCoverage <= 30 and not(bOnlyGetRadarCoverage) then
-            --Consider vision range of nearest friendly units
-            local iCurVisionRange
-            for iUnit, oUnit in aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, tTargetPosition, 30, 'Ally') do
-                iCurVisionRange = oUnit.Intel.VisionRadius
-                if iCurVisionRange and iCurVisionRange > iMaxIntelCoverage then
-                    iCurIntelCoverage = iCurVisionRange - M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPosition)
-                    if iCurIntelCoverage > iMaxIntelCoverage then
-                        iMaxIntelCoverage = iCurIntelCoverage
-                        if not(iMinCoverageWanted==nil) and iCurIntelCoverage > iMinCoverageWanted then
-                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                            return true end
-                    end
-                end
-            end
-        end--]]
-    elseif bHaveRecentVisual and iMinCoverageWanted then
-        if bDebugMessages == true then LOG(sFunctionRef..': Have recent visual of all nearby segments so returning true') end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        return true
-    end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    if iMinCoverageWanted == nil then
-        if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage is nil; returning iMaxIntelCoverage='..iMaxIntelCoverage) end
-        return iMaxIntelCoverage
+        if iMinCoverageWanted then return true
+        else return 100000
+        end
     else
-        if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage..'; returning false') end
-        return false end
+
+
+        --Visual range - base on air segments and if they've been flagged as having had recent visual
+        local iAirSegmentAdjSize = 1
+        if iMinCoverageWanted then iAirSegmentAdjSize = math.ceil(iMinCoverageWanted / M27AirOverseer.iAirSegmentSize) end
+        local iBaseAirSegmentX, iBaseAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(tTargetPosition)
+        local bHaveRecentVisual = true
+        for iAdjX = -iAirSegmentAdjSize, iAirSegmentAdjSize do
+            for iAdjZ = -iAirSegmentAdjSize, iAirSegmentAdjSize do
+                if aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX] and aiBrain[M27AirOverseer.reftAirSegmentTracker][iBaseAirSegmentX + iAdjX][iBaseAirSegmentZ + iAdjZ]
+                        and M27AirOverseer.GetTimeSinceLastScoutedSegment(aiBrain, iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ) > 1.1 then
+                    --Dont have recent visual - check are either 0 adj, or are within iMinCoverageWanted
+                    if iAdjX == 0 and iAdjZ == 0 then
+                        bHaveRecentVisual = false
+                        break
+                    elseif M27Utilities.GetDistanceBetweenPositions(tTargetPosition, M27AirOverseer.GetAirPositionFromSegment(iBaseAirSegmentX + iAdjX, iBaseAirSegmentZ + iAdjZ)) <= iMinCoverageWanted then
+                        bHaveRecentVisual = false
+                        break
+                    end
+                end
+            end
+        end
+
+
+        local iMaxIntelCoverage = 0
+        if iMinCoverageWanted == nil and bHaveRecentVisual then iMaxIntelCoverage = M27AirOverseer.iAirSegmentSize end
+        if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverageWanted='..(iMinCoverageWanted or 'nil')..'; bHaveRecentVisual='..tostring(bHaveRecentVisual)..'; iMaxIntelCoverage='..(iMaxIntelCoverage or 'nil')) end
+        if bHaveRecentVisual == false or iMinCoverageWanted == nil then
+            --Dont have recent visual, so see if have nearby radar or scout
+            local tCategoryList = {M27UnitInfo.refCategoryRadar, categories.SCOUT}
+            if bOnlyGetRadarCoverage then tCategoryList = {M27UnitInfo.refCategoryRadar} end
+            local tiSearchRange = {570, 70} --Omni radar is 600; spy plan is 96; want to be at least 30
+            local iCurIntelRange, iCurDistanceToPosition, iCurIntelCoverage
+            local tCurUnits = {}
+
+            for iCategoryTableRef, iCategoryType in tCategoryList do
+                tCurUnits = aiBrain:GetUnitsAroundPoint(iCategoryType, tTargetPosition, tiSearchRange[iCategoryTableRef], 'Ally')
+                --tCurUnits = aiBrain:GetListOfUnits(iCategoryType, false, true)
+                for iUnit, oUnit in tCurUnits do
+                    iCurIntelRange = oUnit:GetBlueprint().Intel.RadarRadius
+                    iCurDistanceToPosition = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPosition)
+                    iCurIntelCoverage = iCurIntelRange - iCurDistanceToPosition
+                    if iCurIntelCoverage > iMaxIntelCoverage then
+
+                        --if iMinCoverageWanted == nil then
+                        iMaxIntelCoverage = iCurIntelCoverage
+                        --else
+                        if not(iMinCoverageWanted==nil) then
+                            if iCurIntelCoverage > iMinCoverageWanted then
+                                if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage) end
+                                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                                return true end
+                        end
+                    end
+                end
+            end
+            --Below removed from v15 for performance reasons and replaced with check to air segments above
+            --[[
+            if iMaxIntelCoverage <= 30 and not(bOnlyGetRadarCoverage) then
+                --Consider vision range of nearest friendly units
+                local iCurVisionRange
+                for iUnit, oUnit in aiBrain:GetUnitsAroundPoint(categories.ALLUNITS, tTargetPosition, 30, 'Ally') do
+                    iCurVisionRange = oUnit.Intel.VisionRadius
+                    if iCurVisionRange and iCurVisionRange > iMaxIntelCoverage then
+                        iCurIntelCoverage = iCurVisionRange - M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPosition)
+                        if iCurIntelCoverage > iMaxIntelCoverage then
+                            iMaxIntelCoverage = iCurIntelCoverage
+                            if not(iMinCoverageWanted==nil) and iCurIntelCoverage > iMinCoverageWanted then
+                                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                                return true end
+                        end
+                    end
+                end
+            end--]]
+        elseif bHaveRecentVisual and iMinCoverageWanted then
+            if bDebugMessages == true then LOG(sFunctionRef..': Have recent visual of all nearby segments so returning true') end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return true
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        if iMinCoverageWanted == nil then
+            if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage is nil; returning iMaxIntelCoverage='..iMaxIntelCoverage) end
+            return iMaxIntelCoverage
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..': iMinCoverage='..iMinCoverageWanted..'; iMaxIntelCoverage='..iMaxIntelCoverage..'; returning false') end
+            return false end
+    end
 
 end
 
