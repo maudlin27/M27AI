@@ -45,6 +45,10 @@ refiTimeOfLastSMDCheck = 'M27UnitTimeOfLastSMDCheck'
 refbLastCoveredBySMD = 'M27UnitCoveredBySMD' --Used to record if unit was last covered by SMD
 refbSniperRifleEnabled = 'M27UnitSniperRifleEnabled' --True if seraphim sniperbot has its long range sniperrifle enabled
 refiTimeConstructed = 'M27UnitTimeConstructed' --Game seconds when unit was constructed; only called for M27 units
+refsPathing = 'M27UnitPathing' --Pathing type of the unit
+reftPathingGroupCount = 'M27UnitPathingGroupCount' --Count of the pathing groups the unit has been in
+refiLastPathingGroup = 'M27UnitLastPathingGroup' --Last pathing group of the unit where there was sufficient count (done in platoon utilities)
+reftLastLocationOfPathingGroup = 'M27UnitLastLocationOfPathingGroup' --Unit's position when it last had a pathing group with sufficient count
 
 --TMD:
 refbTMDChecked = 'M27TMDChecked' --Used against enemy TML to flag if we've already checked for TMD we want when it was first detected

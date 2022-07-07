@@ -6965,41 +6965,57 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
             LOG(repru(tsGameState))
         end
+
+
+
+        bDebugMessages = true
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurShareOfMexesOnMap=' .. iOurShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed)
+            LOG(sFunctionRef .. ': iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurShareOfMexesOnMap=' .. iOurShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed..'; iAllMexesInPathingGroup='..iAllMexesInPathingGroup)
         end
 
         aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
         --Play safe with ACU if we have almost half or more of mexes
         local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
         local iKeyUpgradesWanted = 1
+
         if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 0.9 then
             if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.1 then
                 --We have 55% of mexes on map so shoudl be ahead on eco
-                aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
-                if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.2 then
-                    --Set equal to max health (so run) if we dont have a supporting upgrade
 
-                    if EntityCategoryContains(categories.AEON, oACU) then
-                        iKeyUpgradesWanted = 2
-                    end
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': iUpgradeCount=' .. iUpgradeCount .. '; iKeyUpgradesWanted=' .. iKeyUpgradesWanted)
-                    end
-                    if iUpgradeCount < iKeyUpgradesWanted and M27Conditions.HaveEnoughGrossIncomeToForceFirstUpgrade(aiBrain) then
-                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
-                    end
+
+                if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.2 or not(M27Conditions.DoesACUHaveGun(aiBrain, false)) then
+                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
+                else
+                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.8
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': Have 10% more than our share of mexes, so setting health to run at 95% of max health') end
+                --if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.2 then
+                --Set equal to max health (so run) if we dont have a supporting upgrade as we are ahead on eco so can afford to drop back for an upgrade
+
+                if EntityCategoryContains(categories.AEON, oACU.UnitId) then
+                    iKeyUpgradesWanted = 2
+                end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': iUpgradeCount=' .. iUpgradeCount .. '; iKeyUpgradesWanted=' .. iKeyUpgradesWanted)
+                end
+                if iUpgradeCount < iKeyUpgradesWanted and M27Conditions.HaveEnoughGrossIncomeToForceFirstUpgrade(aiBrain) then
+                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want to force an upgrade so will set health to run at max health') end
+                end
+                --end
 
             else
                 --We have almost half of the mexes on the map.  Given the delay in claiming mexes it's likely we're at least even with the enemy
                 if M27Conditions.DoesACUHaveGun(aiBrain, false) then
                     aiBrain[refiACUHealthToRunOn] = math.max(8000, oACU:GetMaxHealth() * 0.7)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have almost half of map mexes, and acu has gun, so setting health to retreat to be 70%') end
                 else
                     --ACU doesnt have gun so be very careful
                     aiBrain[refiACUHealthToRunOn] = math.max(9000, oACU:GetMaxHealth() * 0.8)
                 end
             end
+        elseif iMexesInPathingGroupWeHaveClaimed <= iOurShareOfMexesOnMap * 0.7 then
+            aiBrain[refiACUHealthToRunOn] = math.max(4250, oACU:GetMaxHealth() * 0.35)
         end
         --Do we have a firebase? if so increase health to run on
         if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
@@ -7008,6 +7024,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
         --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
         if aiBrain[refiEnemyHighestTechLevel] >= 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
+            if bDebugMessags == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
             if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
                 if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                     --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
@@ -7031,6 +7048,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             end
         end
 
+        if bDebugMessages == true then LOG(sFunctionRef..': Health to run on before further adjustments='..aiBrain[refiACUHealthToRunOn]) end
+
         --Increase health to run on if enemy has air nearby and we lack AA
         if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
             local bHaveNearbyMAA = false
@@ -7046,7 +7065,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 local tEnemyAirThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGunship + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, oACU:GetPosition(), 40, 'Enemy')
                 if M27Utilities.IsTableEmpty(tEnemyAirThreats) == false then
                     --Do we have nearby MAA or have no AirAA needed?
-                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
+                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air threats so setting health to run at 95% of ACU health') end
                 end
             end
         end
@@ -7054,10 +7074,20 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         --Increase health to run on if ACU has recently taken torpedo damage
         if GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100) <= 60 and not(oACU:HasEnhancement('NaniteTorpedoTube')) then
             aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
+            if bDebugMessages == true then LOG(sFunctionRef..': ACU recently taken unseen or torpedo damage so setting health to run to 85% of its health') end
         end
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Finished setting ACU health to run on. ACU max health=' .. oACU:GetMaxHealth() .. '; ACU health to run on=' .. aiBrain[refiACUHealthToRunOn])
         end
+
+        --Increase health to run if we are on enemy side of the map
+        local iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+        if iDistToOurBase > iDistToEnemyBase then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.95)) end
+
+        --Increase health to run if we lack basic intel coverage
+        if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oACU:GetPosition(), 30, false)) then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.95)) end
+
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
