@@ -1253,15 +1253,24 @@ function RecordThatWeWantToUpdateReclaimAtLocation(tLocation, iNearbySegmentsToU
     local sFunctionRef = 'RecordThatWeWantToUpdateReclaimAtLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    if iReclaimSegmentSizeX == 0 then
+        M27Utilities.ErrorHandler('Dont have a reclaim segment size specified, will set it to 8.5, but something else has likely gone wrong')
+        iReclaimSegmentSizeX = 8.5
+        iReclaimSegmentSizeZ = 8.5
+    end
     local iReclaimSegmentX, iReclaimSegmentZ = GetReclaimSegmentsFromLocation(tLocation)
-    if iNearbySegmentsToUpdate then
-        for iSegmentX = iReclaimSegmentX - iNearbySegmentsToUpdate, iReclaimSegmentX + iNearbySegmentsToUpdate do
-            for iSegmentZ = iReclaimSegmentZ - iNearbySegmentsToUpdate, iReclaimSegmentZ + iNearbySegmentsToUpdate do
-                RecordThatWeWantToUpdateReclaimSegment(iSegmentX, iSegmentZ)
-            end
-        end
+    if iReclaimSegmentX >= 10000 or iNearbySegmentsToUpdate >= 10000 or iReclaimSegmentZ >= 10000 then M27Utilities.ErrorHandler('Likely infinite loop about to start. iReclaimSegmentX='..(iReclaimSegmentX or 'nil')..'; iNearbySegmentsToUpdate='..(iNearbySegmentsToUpdate or 'nil')..'; iReclaimSegmentSizeX='..(iReclaimSegmentSizeX or 'nil')..'; iReclaimSegmentSizeZ='..(iReclaimSegmentSizeX or 'nil')..'; rMapPlayableArea='..repru(rMapPlayableArea or {'nil'})..'; iMaxSegmentInterval='..(iMaxSegmentInterval or 'nil'))
     else
-        RecordThatWeWantToUpdateReclaimSegment(iReclaimSegmentX, iReclaimSegmentZ)
+
+        if iNearbySegmentsToUpdate then
+            for iSegmentX = iReclaimSegmentX - iNearbySegmentsToUpdate, iReclaimSegmentX + iNearbySegmentsToUpdate do
+                for iSegmentZ = iReclaimSegmentZ - iNearbySegmentsToUpdate, iReclaimSegmentZ + iNearbySegmentsToUpdate do
+                    RecordThatWeWantToUpdateReclaimSegment(iSegmentX, iSegmentZ)
+                end
+            end
+        else
+            RecordThatWeWantToUpdateReclaimSegment(iReclaimSegmentX, iReclaimSegmentZ)
+        end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -1936,16 +1945,28 @@ function RecordMexForPathingGroup()
         tMexByPathingAndGrouping[sPathing] = {}
         iValidCount = 0
 
+        if bDebugMessages == true then
+            LOG(sFunctionRef..': sPathing='..sPathing..'; Is table of pathing segment group empty='..tostring(M27Utilities.IsTableEmpty(tPathingSegmentGroupBySegment[sPathing])))
+        end
+
         for iCurMex, tMexLocation in MassPoints do
             iValidCount = iValidCount + 1
             iCurResourceGroup = GetSegmentGroupOfLocation(sPathing, tMexLocation)
-            if tMexByPathingAndGrouping[sPathing][iCurResourceGroup] == nil then
-                tMexByPathingAndGrouping[sPathing][iCurResourceGroup] = {}
-                iValidCount = 1
-            else iValidCount = table.getn(tMexByPathingAndGrouping[sPathing][iCurResourceGroup]) + 1
+            if not(iCurResourceGroup) then M27Utilities.ErrorHandler('Dont have a resource group for mex location '..repru(tMexLocation)..'; This is expected if mexes are located outside the playable area', true)
+            else
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': iCurMex='..iCurMex..'; About to get segment group for pathing='..sPathing..'; location='..repru((tMexLocation or {'nil'}))..'; iCurResourceGroup='..(iCurResourceGroup or 'nil'))
+                    local iSegmentX, iSegmentZ = GetPathingSegmentFromPosition(tMexLocation)
+                    LOG(sFunctionRef..': Pathing segments='..(iSegmentX or 'nil')..'; iSegmentZ='..(iSegmentZ or 'nil')..'; rMapPlayableArea='..repru(rMapPlayableArea)..'; iSizeOfBaseLevelSegment='..(iSizeOfBaseLevelSegment or 'nil'))
+                end
+                if tMexByPathingAndGrouping[sPathing][iCurResourceGroup] == nil then
+                    tMexByPathingAndGrouping[sPathing][iCurResourceGroup] = {}
+                    iValidCount = 1
+                else iValidCount = table.getn(tMexByPathingAndGrouping[sPathing][iCurResourceGroup]) + 1
+                end
+                tMexByPathingAndGrouping[sPathing][iCurResourceGroup][iValidCount] = tMexLocation
+                if bDebugMessages == true then LOG(sFunctionRef..': iValidCount='..iValidCount..'; sPathing='..sPathing..'; iCurResourceGroup='..iCurResourceGroup..'; just added tMexLocation='..repru(tMexLocation)..' to this group') end
             end
-            tMexByPathingAndGrouping[sPathing][iCurResourceGroup][iValidCount] = tMexLocation
-            if bDebugMessages == true then LOG(sFunctionRef..': iValidCount='..iValidCount..'; sPathing='..sPathing..'; iCurResourceGroup='..iCurResourceGroup..'; just added tMexLocation='..repru(tMexLocation)..' to this group') end
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..'; tMexByPathingAndGrouping='..repru(tMexByPathingAndGrouping)) end

@@ -841,7 +841,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                     elseif iCurrentConditionToTry == 13 then
                                         if bDebugMessages == true then LOG(sFunctionRef..': early t1 arti builder: aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.5='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]..'; M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryIndirect)='..M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryIndirect)..'; Need indirect='..tostring(aiBrain[M27Overseer.refbNeedIndirect])) end
-                                        if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5 and M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryIndirect) <= 8 then --Nearest threat is a structure
+                                        if iFactoryTechLevel == 1 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5 and M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryIndirect) <= 8 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then --Nearest threat is a structure
                                             iCategoryToBuild = refCategoryIndirect
                                             iTotalWanted = 1
                                         end
@@ -938,10 +938,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         elseif iCurrentConditionToTry == 22 then --T3 mobile artillery if are turtling and havent tried building any and enemy has significant mobile threat
                                             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and iFactoryTechLevel >= 3 then
-                                                local iT3MobileArtiBuilt = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryIndirectT3 * categories.ARTILLERY)
-                                                if iT3MobileArtiBuilt <= 4 or (iT3MobileArtiBuilt <= 7 and aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 5000 and (aiBrain:GetEconomyStored('MASS') >= 10 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10)) or (not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 5000 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH3) >= 8) then
-                                                    iTotalWanted = 1
-                                                    iCategoryToBuild = M27UnitInfo.refCategoryIndirectT3 * categories.ARTILLERY
+                                                --Only want if enemy has mobile short range threat, but no land experimental
+                                                if (aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 5000 or aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] >= 200) and (M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) or aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] >= 400) then
+                                                    local iT3MobileArtiBuilt = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryIndirectT3 * categories.ARTILLERY)
+                                                    if iT3MobileArtiBuilt <= 4 or (iT3MobileArtiBuilt <= 7 and aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 8000 and (aiBrain:GetEconomyStored('MASS') >= 10 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10)) or (not(M27Conditions.HaveLowMass(aiBrain)) and aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 5000 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH3) >= 8) then
+                                                        iTotalWanted = 1
+                                                        iCategoryToBuild = M27UnitInfo.refCategoryIndirectT3 * categories.ARTILLERY
+                                                    end
                                                 end
                                             end
                                         elseif iCurrentConditionToTry == 23 then --Higher priority land scouts for intel path based on lifetime count
@@ -1100,7 +1103,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     end
                                                 elseif iCurrentConditionToTry == 36 then --Arti ratio provided not building experimental or have high mass
                                                     if iStrategy == M27Overseer.refStrategyLandMain then
-                                                        if aiBrain:GetEconomyStored('MASS') >= 3000 or M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
+                                                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] and aiBrain:GetEconomyStored('MASS') >= 3000 or M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
                                                             local iCurrentArti = aiBrain:GetCurrentUnits(refCategoryIndirect)
                                                             local iCurrentTanks = aiBrain:GetCurrentUnits(refCategoryDFTank)
                                                             local iArtiProportion = GetPreferredArtiProportion(aiBrain, oFactory)
@@ -1115,7 +1118,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     if aiBrain:GetEconomyStored('MASS') >= 3000 or M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildExperimental]) then
                                                         if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]='..aiBrain[M27Overseer.refiMaxDefenceCoverageWanted]..'; aiBrain[M27Overseer.refiPercentageOutstandingThreat]='..aiBrain[M27Overseer.refiPercentageOutstandingThreat]) end
                                                         if aiBrain[M27Overseer.refiPercentageOutstandingThreat] <= aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
-                                                            if aiBrain[M27Overseer.refbNeedIndirect] == true then
+                                                            if aiBrain[M27Overseer.refbNeedIndirect] == true and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                                                                 iCategoryToBuild = refCategoryIndirect
 
                                                             else
@@ -2310,7 +2313,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                             --Basic backup for unlikely unit restriction scenarios:
                             if sBPIDToBuild == nil and M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) == false then
                                 if iCategoryToBuild == M27UnitInfo.refCategoryT3MobileArtillery then
-                                    iCategoryToBuild = M27UnitInfo.refCategoryIndirect
+                                    iCategoryToBuild = refCategoryIndirect
                                 end
                                 sBPIDToBuild = GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryToBuild, oFactory, bGetSlowest, bGetFastest)
                             end
@@ -2381,13 +2384,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                         sBPIDToBuild = nil
                                     end
-                                elseif EntityCategoryContains(M27UnitInfo.refCategoryIndirect, sBPIDToBuild) then
+                                elseif EntityCategoryContains(refCategoryIndirect, sBPIDToBuild) then
                                     if iUnitToBuildTechLevel >= 3 then
-                                        iUnitCapCategory = M27UnitInfo.refCategoryIndirect * categories.TECH3
+                                        iUnitCapCategory = refCategoryIndirect * categories.TECH3
                                     elseif iUnitToBuildTechLevel >= 2 then
-                                        iUnitCapCategory = M27UnitInfo.refCategoryIndirect - categories.TECH1
+                                        iUnitCapCategory = refCategoryIndirect - categories.TECH1
                                     else
-                                        iUnitCapCategory = M27UnitInfo.refCategoryIndirect
+                                        iUnitCapCategory = refCategoryIndirect
                                     end
 
                                     if aiBrain:GetCurrentUnits(iUnitCapCategory) > aiBrain[refiIndirectCap] then
@@ -2398,7 +2401,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                 end
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': DF tanks=' .. aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryDFTank * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) .. '; MAA=' .. aiBrain:GetCurrentUnits(refCategoryMAA * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) .. '; Indirect=' .. aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryIndirect * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) .. '; DFcap=' .. aiBrain[refiDFCap] .. '; sBPIDToBuild=' .. (sBPIDToBuild or 'nil'))
+                                    LOG(sFunctionRef .. ': DF tanks=' .. aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryDFTank * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) .. '; MAA=' .. aiBrain:GetCurrentUnits(refCategoryMAA * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) .. '; Indirect=' .. aiBrain:GetCurrentUnits(refCategoryIndirect * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)) .. '; DFcap=' .. aiBrain[refiDFCap] .. '; sBPIDToBuild=' .. (sBPIDToBuild or 'nil'))
                                 end
                             elseif bIsAirFactory then
                                 if EntityCategoryContains(M27UnitInfo.refCategoryAirAA, sBPIDToBuild) then

@@ -7031,7 +7031,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
         --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
         if aiBrain[refiEnemyHighestTechLevel] >= 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
-            if bDebugMessags == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
             if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
                 if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                     --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
@@ -8028,7 +8028,7 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
-    LOG('Log of ScenarioInfo='..repru(ScenarioInfo))
+    --LOG('Log of ScenarioInfo='..repru(ScenarioInfo))
     --[[
     --Test new GetUnitMaxGroundRange function
     local tOurUnits = aiBrain:GetListOfUnits(categories.DIRECTFIRE + categories.INDIRECTFIRE + categories.ANTIAIR, false, true)
@@ -8353,7 +8353,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    TestCustom(aiBrain)
+    --TestCustom(aiBrain)
 
 
 

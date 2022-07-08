@@ -2548,9 +2548,16 @@ function ManageMassStalls(aiBrain)
                                 for iActionCount, iActionRef in tEngineerActionSubtable do
                                     if iActionRef == oUnit[M27EngineerOverseer.refiEngineerCurrentAction] then
                                         bApplyActionToUnit = true
-                                        --Dont pause the last engi building power
+                                        --Dont pause the last engi building power, and also dont pause if are building PD/T2 Arti/Shield/Experimental and have a fraction complete of at least 70%
                                         if bPauseNotUnpause and iActionRef == M27EngineerOverseer.refActionBuildPower and (oUnit[M27EngineerOverseer.refbPrimaryBuilder] or aiBrain:GetEconomyStoredRatio('MASS') >= 0.7) then
                                             bApplyActionToUnit = false
+                                        elseif oUnit.GetFocusUnit then
+                                            local oFocusUnit = oUnit:GetFocusUnit()
+                                            if M27UnitInfo.IsUnitValid(oFocusUnit) and oFocusUnit:GetFractionComplete() >= 0.7 and oFocusUnit:GetFractionComplete() < 1 then
+                                                if EntityCategoryContains(M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryExperimentalLevel, oFocusUnit.UnitId) then
+                                                    bApplyActinoToUnit = false
+                                                end
+                                            end
                                         end
                                         break
                                     end
