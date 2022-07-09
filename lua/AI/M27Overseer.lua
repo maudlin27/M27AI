@@ -7069,11 +7069,15 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 end
             end
             if not (bHaveNearbyMAA) then
-                local tEnemyAirThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGunship + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, oACU:GetPosition(), 40, 'Enemy')
-                if M27Utilities.IsTableEmpty(tEnemyAirThreats) == false then
-                    --Do we have nearby MAA or have no AirAA needed?
-                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air threats so setting health to run at 95% of ACU health') end
+                if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 2000 and not(oACU:HasEnhancement('CloakingGenerator')) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Lack air control and enemy has T3 air so setting ACU health to run at ACU max health') end
+                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                else
+                    local tEnemyAirThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGunship + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, oACU:GetPosition(), 40, 'Enemy')
+                    if M27Utilities.IsTableEmpty(tEnemyAirThreats) == false then
+                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air threats so setting health to run at 95% of ACU health') end
+                    end
                 end
             end
         end
@@ -7249,8 +7253,26 @@ function RecordAllEnemiesAndAllies(aiBrain)
     for iEnemy, oBrain in aiBrain[toEnemyBrains] do
         if not (oBrain:IsDefeated()) then
             tBrainsNeedingAGroup[iEnemy] = oBrain
+
         end
     end
+
+    --Determine if any enemy brains have map wide omni vision
+    local bEnemyHaveOmni = false
+    if ScenarioInfo.Options.OmniCheat == 'on' then
+        for iEnemyBrain, oBrain in tBrainsNeedingAGroup do
+            if oBrain.CheatEnabled then
+                bEnemyHaveOmni = true
+                break
+            end
+        end
+    end
+    for iBrain, oBrain in aiBrain[toAllyBrains] do
+        oBrain[M27AirOverseer.refbEnemyHasOmniVision] = bEnemyHaveOmni
+    end
+    aiBrain[M27AirOverseer.refbEnemyHasOmniVision] = bEnemyHaveOmni
+
+
     while iLastGroup < iCurGroup do
         --[[if iCurGroup > 1 then
                 for iEnemy, oBrain in tEnemyBrainsByGroup[iLastGroup] do

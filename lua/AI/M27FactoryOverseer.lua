@@ -915,7 +915,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iTotalWanted = 1
                                             end
                                         elseif iCurrentConditionToTry == 20 then --High priority mobile stealth
-                                            if iFactoryTechLevel >= 2 then
+                                            if iFactoryTechLevel >= 2 and not(aiBrain[M27AirOverseer.refbEnemyHasOmniVision]) then
                                                 oNearestPlatoonWantingStealth = M27PlatoonFormer.GetClosestPlatoonWantingMobileStealth(aiBrain, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27UnitInfo.refPathingTypeLand)
                                                 if oNearestPlatoonWantingStealth and ((oNearestPlatoonWantingStealth[M27PlatoonUtilities.refiPlatoonMassValue] or 0) >= 2000 or oNearestPlatoonWantingStealth[M27PlatoonUtilities.refbACUInPlatoon]) then
                                                     iCategoryToBuild = M27UnitInfo.refCategoryMobileLandStealth
@@ -1013,7 +1013,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                         LOG(sFunctionRef..': Dont have a nearby platoon wanting stealth')
                                                     end
                                                 end
-                                                if iFactoryTechLevel >= 2 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 5 then
+                                                if iFactoryTechLevel >= 2 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] >= 5 and not(aiBrain[M27AirOverseer.refbEnemyHasOmniVision]) then
                                                     if oNearestPlatoonWantingStealth and ((oNearestPlatoonWantingStealth[M27PlatoonUtilities.refiPlatoonMassValue] or 0) >= 800 or not(M27Conditions.HaveLowMass(aiBrain)) or oNearestPlatoonWantingStealth:GetPlan() == 'M27Skirmisher' or M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryMobileLandStealth) == 0) then
                                                         iCategoryToBuild = M27UnitInfo.refCategoryMobileLandStealth
                                                         iTotalWanted = 1

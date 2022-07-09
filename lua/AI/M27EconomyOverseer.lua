@@ -2413,8 +2413,7 @@ function ManageMassStalls(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageMassStalls'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
-    --if GetGameTimeSeconds() >= 1200 and aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.5 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 1800 and aiBrain:GetEconomyStoredRatio('MASS') <= 0.01 then bDebugMessages = true end
 
     local bPauseNotUnpause = true
     local bChangeRequired = false
@@ -2551,11 +2550,18 @@ function ManageMassStalls(aiBrain)
                                         --Dont pause the last engi building power, and also dont pause if are building PD/T2 Arti/Shield/Experimental and have a fraction complete of at least 70%
                                         if bPauseNotUnpause and iActionRef == M27EngineerOverseer.refActionBuildPower and (oUnit[M27EngineerOverseer.refbPrimaryBuilder] or aiBrain:GetEconomyStoredRatio('MASS') >= 0.7) then
                                             bApplyActionToUnit = false
-                                        elseif oUnit.GetFocusUnit then
+                                        elseif bPauseNotUnpause and oUnit.GetFocusUnit then
                                             local oFocusUnit = oUnit:GetFocusUnit()
+                                            if bDebugMessages == true then
+                                                if M27UnitInfo.IsUnitValid(oFocusUnit) then
+                                                    LOG(sFunctionRef..': Considering engineer '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; UC='..M27EngineerOverseer.GetEngineerUniqueCount(oUnit)..'; Focus unit='..oFocusUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFocusUnit)..'; Fraction complete='..oFocusUnit:GetFractionComplete())
+                                                else LOG(sFunctionRef..': Focus unit for engineer '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; UC='..M27EngineerOverseer.GetEngineerUniqueCount(oUnit)..' isnt valid') end
+                                            end
                                             if M27UnitInfo.IsUnitValid(oFocusUnit) and oFocusUnit:GetFractionComplete() >= 0.7 and oFocusUnit:GetFractionComplete() < 1 then
                                                 if EntityCategoryContains(M27UnitInfo.refCategoryPD + M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryExperimentalLevel, oFocusUnit.UnitId) then
-                                                    bApplyActinoToUnit = false
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Wont apply action to unit as it is PD/Arti/Experimental') end
+                                                    bApplyActionToUnit = false
+                                                elseif bDebugMessages == true then LOG(sFunctionRef..': Will apply action to focus unit as it isnt PD/Experimental level')
                                                 end
                                             end
                                         end

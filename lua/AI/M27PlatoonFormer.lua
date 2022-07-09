@@ -793,7 +793,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                         if EntityCategoryContains(refCategoryLandScout, sUnitID) then
                             table.insert(tScouts, oUnit)
                             --Enable stealth on cybran moles (but not selens)
-                            if oUnit:GetBlueprint().Intel.Cloak and (oUnit:GetBlueprint().Intel.StealthWaitTime or 0) == 0 then
+                            if oUnit:GetBlueprint().Intel.Cloak and (oUnit:GetBlueprint().Intel.StealthWaitTime or 0) == 0 and not(aiBrain[M27AirOverseer.refbEnemyHasOmniVision]) then
                                 M27UnitInfo.EnableUnitStealth(oUnit)
                             end
                         elseif EntityCategoryContains(refCategoryMAA, sUnitID) then table.insert(tMAA, oUnit)
@@ -817,7 +817,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                             if bDebugMessages == true then LOG(sFunctionRef..': Adding air unit '..sUnitID..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to table to include in air platoon') end
                             table.insert(tAir, oUnit)
                             --Enable stealth on any air units
-                            if EntityCategoryContains(categories.STEALTH, sUnitID) then
+                            if EntityCategoryContains(categories.STEALTH, sUnitID) and not(aiBrain[M27AirOverseer.refbEnemyHasOmniVision]) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Unit contains stealth so will enable stealth on it') end
                                 M27UnitInfo.EnableUnitStealth(oUnit)
                             end

@@ -44,6 +44,7 @@ reftAirSegmentTracker = 'M27AirSegmentTracker' --[x][z]{a,b,c,d etc.} - x = segm
 --Subtable values (include in SetupAirSegments to make sure these can be referenced)
 refiLastScouted = 'M27AirLastScouted'
 refbHaveOmniVision = 'M27AirHaveOmniVision' --against aiBrain, true if have omni vision of whole map
+refbEnemyHasOmniVision = 'M27AirEnemyHasOmniVision' --against aiBrain, true if any brains on enemy team have omni vision of whole map
 local refiAirScoutsAssigned = 'M27AirScoutsAssigned'
 refiNormalScoutingIntervalWanted = 'M27AirScoutIntervalWanted' --What to default to if e.g. temporairly increased
 refiCurrentScoutingInterval = 'M27AirScoutCurrentIntervalWanted' --e.g. can temporarily override this if a unit dies and want to make it higher priority
@@ -159,7 +160,7 @@ refiOurMassInAirAA = 'M27OurMassInAirAA'
 refiTeamMassInAirAA = 'M27AirTeamMassInAirAA'
 refiTimeOfLastMercy = 'M27TimeOfLastMercy'
 refbMercySightedRecently = 'M27MercySightedRecently'
-reftEnemyAirFactoryByTech = 'M27AirEnemyHighestAirFactory'
+reftEnemyAirFactoryByTech = 'M27AirEnemyHighestAirFactory' --Against aiBrain, [x] is the tech level, returns number of enemy air factories for the given tech level
 reftNearestEnemyAirThreat = 'M27AirNearestThreat'
 refoNearestEnemyAirThreat = 'M27AirNearestEnemyAirUnit'
 refiNearestEnemyAirThreatActualDist = 'M27AirNearestEnemyAirUnitDist'
@@ -7537,6 +7538,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ExperimentalGunshipCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if GetGameTimeSeconds() >= 2872 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true end
 
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of loop for unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit))
@@ -8082,7 +8084,8 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                     end
                 end
             end
-        else
+        end
+        if not (oAttackTarget) and M27Utilities.IsTableEmpty(tLocationToMoveTo) then
             --Alternative: Target enemy experimental if within 55% of our base, or within 100 of us, or 60% if it's our last target, provided it's on land
             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
                 if bDebugMessages == true then
@@ -8090,9 +8093,10 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 end
                 local tPotentialTargets = {}
                 local iPotentialTargets = 0
-                local iDistFromBase = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false)
+                local iDistFromBase
                 for iExperimental, oExperimental in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
                     if M27UnitInfo.IsUnitValid(oExperimental) and oExperimental:GetFractionComplete() >= 0.05 and M27Utilities.CanSeeUnit(aiBrain, oExperimental, true) and GetSegmentFailedAttempts(oExperimental:GetPosition()) < iMaxPrevTargets and (M27Utilities.GetDistanceBetweenPositions(oExperimental:GetPosition(), tCurPosition) <= 120 or (M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false) <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6 and iDistFromBase <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.55 or oUnit[refoLastUnitTarget] == oExperimental)) then
+                        iDistFromBase = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oExperimental:GetPosition(), false)
                         if not(oUnit[refiTimeWhenFirstEverRan]) or iDistFromBase <= aiBrain[refiBomberDefenceCriticalThreatDistance] + 40 or M27Logic.GetIntelCoverageOfPosition(aiBrain, oExperimental:GetPosition(), 30, true) then
                             iPotentialTargets = iPotentialTargets + 1
                             tPotentialTargets[iPotentialTargets] = oExperimental

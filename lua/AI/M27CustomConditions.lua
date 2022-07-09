@@ -571,6 +571,7 @@ function WantToGetAnotherACUUpgrade(aiBrain)
     local sFunctionRef = 'WantToGetAnotherACUUpgrade'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if GetGameTimeSeconds() >= 1020 and aiBrain:GetArmyIndex() == 1 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local bWantUpgrade = false
     local bSafeToGetUpgrade = true

@@ -128,7 +128,8 @@ refCategoryQuantumOptics = categories.INTELLIGENCE * categories.OPTICS * categor
 refCategoryUpgraded = refCategoryT2Radar + refCategoryT3Radar + refCategoryT2Sonar + refCategoryT3Sonar + refCategoryAllFactories * categories.TECH2 + refCategoryAllFactories * categories.TECH3 + refCategoryFixedShield * categories.TECH3 + refCategoryT2Mex + refCategoryT3Mex
 
 --Land units
-refCategoryExperimentalStructure = categories.CYBRAN * categories.ARTILLERY * categories.EXPERIMENTAL + categories.STRUCTURE * categories.EXPERIMENTAL
+refCategoryScathis = categories.CYBRAN * categories.ARTILLERY * categories.EXPERIMENTAL
+refCategoryExperimentalStructure = refCategoryScathis + categories.STRUCTURE * categories.EXPERIMENTAL
 refCategoryLandExperimental = categories.EXPERIMENTAL * categories.MOBILE * categories.LAND - categories.CYBRAN * categories.ARTILLERY - categories.UNSELECTABLE
 refCategoryMobileLand = categories.LAND * categories.MOBILE  - categories.UNSELECTABLE
 refCategoryEngineer = categories.LAND * categories.MOBILE * categories.ENGINEER - categories.COMMAND - categories.FIELDENGINEER -categories.SUBCOMMANDER --Dont include sparkys as they cant build a lot of things, so just treat them as a combat unit that can reclaim
@@ -143,7 +144,7 @@ refCategoryAttackBot = categories.LAND * categories.MOBILE * categories.DIRECTFI
 refCategoryDFTank = categories.LAND * categories.MOBILE * categories.DIRECTFIRE - categories.SCOUT - refCategoryMAA --NOTE: Need to specify slowest (so dont pick LAB)
 refCategoryLandScout = categories.LAND * categories.MOBILE * categories.SCOUT
 refCategoryCombatScout = categories.SERAPHIM * categories.SCOUT * categories.DIRECTFIRE
-refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE - refCategoryLandExperimental
+refCategoryIndirect = categories.LAND * categories.MOBILE * categories.INDIRECTFIRE - categories.DIRECTFIRE - refCategoryLandExperimental - refCategoryScathis
 refCategoryT3MobileArtillery = categories.ARTILLERY * categories.LAND * categories.MOBILE * categories.TECH3
 refCategoryT3MML = categories.SILO * categories.MOBILE * categories.TECH3 * categories.LAND
 refCategoryFatboy = categories.EXPERIMENTAL * categories.UEF * categories.MOBILE * categories.LAND * categories.ARTILLERY
