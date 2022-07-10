@@ -8050,6 +8050,7 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+    M27MiscProfiling.ListAmphibiousUnitsMissingAmphibiousCategory()
     --LOG('Log of ScenarioInfo='..repru(ScenarioInfo))
     --[[
     --Test new GetUnitMaxGroundRange function
@@ -8375,7 +8376,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    --TestCustom(aiBrain)
+    TestCustom(aiBrain)
 
 
 

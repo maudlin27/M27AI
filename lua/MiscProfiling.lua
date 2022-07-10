@@ -23,6 +23,28 @@ TestProfilerIsActive = false
 --    _ALERT(repru(allCategories))
 --end--]]
 
+function ListAmphibiousUnitsMissingAmphibiousCategory()
+    local sFunctionRef = 'ListCategoriesUsedByCount'
+    local tsAmphibiousPathingMissingCategory = {}
+    local tsIncorrectlyHasAmphibious = {}
+    local iMissingCategoryCount = 0
+    local iIncorrectCategoryCount = 0
+
+    for iBP, oBP in __blueprints do
+        if oBP.Physics.MotionType == 'RULEUMT_AmphibiousFloating' or oBP.Physics.MotionType == 'RULEUMT_Amphibious' or oBP.Physics.AltMotionType == 'RULEUMT_AmphibiousFloating' or oBP.Physics.AltMotionType == 'RULEUMT_Amphibious' then
+            if not(EntityCategoryContains(categories.AMPHIBIOUS, oBP.BlueprintId)) then
+                iMissingCategoryCount = iMissingCategoryCount + 1
+                tsAmphibiousPathingMissingCategory[iMissingCategoryCount] = {oBP.BlueprintId, oBP.Description, oBP.General.UnitName}
+            end
+        elseif EntityCategoryContains(categories.AMPHIBIOUS, oBP.BlueprintId) then
+            iIncorrectCategoryCount = iIncorrectCategoryCount + 1
+            tsIncorrectlyHasAmphibious[iIncorrectCategoryCount] = {oBP.BlueprintId, oBP.Description, oBP.General.UnitName}
+        end
+    end
+    LOG(sFunctionRef..': Categories missing AMPHIBIOUS category but having amphibious pathing='..repru(tsAmphibiousPathingMissingCategory))
+    LOG(sFunctionRef..': Categories that incorrectly have AMPHIBIOUS category='..repru(tsIncorrectlyHasAmphibious))
+end
+
 --Alterantive - originally used with __blueprints - it gave numbers that looked to be double what they should be; therefore tried using Balthazaar's approach above, gave same result, so must just be blueprints file that list things multiple times
 function ListCategoriesUsedByCount(tAllBlueprints)
     local sFunctionRef = 'ListCategoriesUsedByCount'
