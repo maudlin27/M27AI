@@ -1531,12 +1531,17 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     --if bNoDelay is true then wont do normal waiting for the unit to move away from the factory (nb: should only set this to true if we're not talking about a newly produced unit from a factory as it will bypass the workaround for factory error where factories stop building)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AllocateNewUnitToPlatoonBase'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --DONT USE PROFILER HERE as need solution to the waitticks
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
 
 
-    if iDelayInTicks then WaitTicks(iDelayInTicks) end
+    if iDelayInTicks then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitTicks(iDelayInTicks)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    end
 
     local iLifetimeCount
     local iUnits = 0
@@ -1622,7 +1627,9 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                             M27Utilities.ErrorHandler('Waited 10 seconds for unit to leave land factory area and it still hasnt, will proceed with trying to form a platoon with it anyway', true) break
                         end
                         if oNewUnit and not(oNewUnit.Dead) then
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             WaitTicks(1)
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                             if M27UnitInfo.IsUnitValid(oNewUnit[M27UnitInfo.refoFactoryThatBuildThis]) and M27Logic.IsUnitIdle(oNewUnit[M27UnitInfo.refoFactoryThatBuildThis]) == false then
                                 bProceed = true
                                 break
@@ -1693,7 +1700,6 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                 end
             end
 
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 
             if bProceed == true then
@@ -1920,9 +1926,9 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                     end
                 end
             end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AllocateNewUnitsToPlatoonNotFromFactory(tNewUnits, iDelayInTicks)
@@ -2072,10 +2078,13 @@ end
 function PlatoonIdleUnitOverseer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonIdleUnitOverseer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iCycleCount = 0
 
     --Initial setup - create the idle platoons
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(60)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleScouts)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleMAA)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoAllEngineers)
@@ -2092,6 +2101,9 @@ function PlatoonIdleUnitOverseer(aiBrain)
         iCycleCount = iCycleCount + 1
         ForkThread(PlatoonMainIdleUnitLoop, aiBrain, iCycleCount)
         if iCycleCount == iIdleUnitSearchThreshold then iCycleCount = 0 end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

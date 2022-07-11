@@ -228,6 +228,8 @@ Platoon = Class(M27PlatoonClass) {
         --does nothing if engineer is busy
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local bPlatoonNameDisplay = false
+        local sFunctionRef = 'M27ReclaimAI'
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
         local sPlatoonName = 'M27ReclaimAI'
         M27Utilities.ErrorHandler('Redundant AI logic '..sPlatoonName..' still being used')
@@ -271,11 +273,15 @@ Platoon = Class(M27PlatoonClass) {
                         IssueAggressiveMove({eng}, tTarget )
                         if bDebugMessages==true then LOG('ReclaimPlatoon: Telling enginneer to attack-move to tTarget='..tTarget[1]..'-'..tTarget[2]..'-'..tTarget[3]..'; GetGameTimeSeconds='..GetGameTimeSeconds()) end
                     end
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     WaitTicks(100)
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                     if eng and self and not(eng.Dead) then
                         if eng:IsUnitState('Moving')==false and eng:IsUnitState('Attacking') == false and eng:IsUnitState('Busy') == false and eng:IsUnitState('Reclaiming') == false then --possible IsUnitStates that have been able to identify so far: Moving, Attacking, Upgrading, Building, Teleporting, Enhancing, Attached, Guarding, Repairing, Busy
                             if bDebugMessages==true then LOG('ReclaimPlatoon: Engineer isnt moving or attacking so reset target if still the case after 1 tick.  Gametime='..GetGameTimeSeconds()..'; iCycle='..iCycle) end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             WaitTicks(1)
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                             if eng and self and not(eng.Dead) then
                                 if eng:IsUnitState('Moving')==false and eng:IsUnitState('Attacking') == false and eng:IsUnitState('Busy') == false and eng:IsUnitState('Reclaiming') == false then
                                     iCycle = 1
@@ -298,6 +304,7 @@ Platoon = Class(M27PlatoonClass) {
             if bDebugMessages == true then LOG('M27ReclaimAI: About to disband platoon') end
             self:PlatoonDisband()
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end,
     M27AssistHydroEngi = function(self)
         --NOTE: REDUNDANT AI LOGIC - HAVE INCORPORATED MAIN PARTS INTO ACU MAIN; ACU Main might not be quite as good/efficient, but means dont have to worry about switching AI plans
@@ -306,6 +313,7 @@ Platoon = Class(M27PlatoonClass) {
         --Done before had introduced main platoon logic, so most of this is manual, but it's been updated to reference some of the standard platoon logic re nearby enemies, mexes and reclaim
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sPlatoonName = 'M27AssistHydroEngi'
+        local sFunctionRef = 'M27AssistHydroEngi'
         M27Utilities.ErrorHandler('Redundant AI logic '..sPlatoonName..' still being used')
         local sFunctionRef = sPlatoonName
         --Set platoon names
@@ -350,7 +358,9 @@ Platoon = Class(M27PlatoonClass) {
 
                 local oUnitBeingBuilt
                 local bConstructionStarted = false
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(10)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 if oGuardedUnit and eng and aiBrain and self and aiBrain.PlatoonExists and aiBrain:PlatoonExists(self) then
                     --oGuardedUnit = eng:GetGuardedUnit()
                     if not(oGuardedUnit==nil) and not(oGuardedUnit.Dead) then
@@ -468,7 +478,9 @@ Platoon = Class(M27PlatoonClass) {
                                 end
                             end
 
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             WaitTicks(3) --Dont set too low or ACU may not do anything
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                             if eng.PlatoonHandle and eng.PlatoonHandle.GetPlan and eng.PlatoonHandle:GetPlan() == sPlatoonName then
                                 --Proceed
                             else
@@ -508,6 +520,8 @@ Platoon = Class(M27PlatoonClass) {
         --will keep searching for engi that is building something nearby; once located will assist the engi and cancel the platoon
         --if no ACU in platoon, then will attack-move to home base if no nearby units
         local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local sFunctionRef = 'M27EngiAssister'
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         local bPlatoonNameDisplay = false
         if M27Config.M27ShowUnitNames == true then bPlatoonNameDisplay = true end
         local sPlatoonName = 'M27EngiAssister'
@@ -609,7 +623,9 @@ Platoon = Class(M27PlatoonClass) {
                 else
                     --If ACU then wait slightly then disband
                     if bDebugMessages == true then LOG(sPlatoonName..': bACUInPlatoon='..tostring(bACUInPlatoon)..' Disbanding engi assister as no nearby engis to assist') end
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     WaitTicks(5)
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                     if not(M27Utilities.GetACU(aiBrain).Dead) then
                         if self and aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(self) then
                             if bPlatoonNameDisplay == true then M27PlatoonUtilities.UpdatePlatoonName(self, 'No longer assisting') end
@@ -620,8 +636,9 @@ Platoon = Class(M27PlatoonClass) {
                 end
             end
 
-
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(5)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             if self and aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(self) then
                 if oFirstUnit.Dead then
                     for iCurUnit, oUnit in tOwnUnits do
@@ -633,14 +650,18 @@ Platoon = Class(M27PlatoonClass) {
             end
         end
         --Unit is now busy; however when disband platoon it will reset its orders, so wait until the unit has been constructed and at least 3 seconds from when move command was given before checking if other higher priority orders
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(25)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if self and aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(self) then
             local bConstructionEnd = false
             iCount = 0
             while bConstructionEnd == false do
                 iCount = iCount + 1
                 if iCount > 250 then M27Utilities.ErrorHandler('Infinite loop 4') break end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(5)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 if self and aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(self) then
                     if oBeingBuilt == nil then
                         bConstructionEnd = true
@@ -663,6 +684,7 @@ Platoon = Class(M27PlatoonClass) {
             if bDebugMessages == true then LOG('M27EngiAssister: About to disband platoon') end
             if self and aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(self) then self:PlatoonDisband() end
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     end,
 
 

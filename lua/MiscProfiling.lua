@@ -252,6 +252,7 @@ function LocalVariableImpact()
 
 
     local sFunctionRef = 'LocalVariableImpact'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iCumulativeTime = 0
     local iCurCycleTime
     local iNewVariable
@@ -266,14 +267,17 @@ function LocalVariableImpact()
             --[[for iCurCycleCount = 1, 10000000 do
                 iNewVariable = math.random(1, 100)
             end--]]
-
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitSeconds(1)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
             iCurCycleTime = GetSystemTimeSecondsOnlyForProfileUse() - iTimeCycleStart
             iCumulativeTime = iCumulativeTime + iCurCycleTime
             LOG(sFunctionRef..'GameTime='..math.floor(GetGameTimeSeconds())..'; Last cycle time='..iCurCycleTime..'; Cumulative time='..iCumulativeTime)
         end
 
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function BlueprintMethods()

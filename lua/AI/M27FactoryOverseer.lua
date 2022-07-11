@@ -2484,6 +2484,8 @@ function RemoveTemporaryFactoryPause(aiBrain, oFactory)
     --Call via forkthread
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RemoveTemporaryFactoryPause'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(iFactoryDelayBeforeConsiderBuildingAgain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary pause to false for factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; GameTIme='..GetGameTimeSeconds()) end
@@ -2749,6 +2751,7 @@ end
 function FactoryOverseer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FactoryOverseer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iTicksBetweenCycle = 1
     iMaxCyclesBeforeOverride = 28 / iTicksBetweenCycle --2.5s triggers often; 3s doesnt
@@ -2758,10 +2761,13 @@ function FactoryOverseer(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any idle factories') end
         ForkThread(FactoryMainOverseerLoop, aiBrain)
       --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Pre wait tick')
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(iTicksBetweenCycle)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
       --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Post wait tick')
         if aiBrain:IsDefeated() or aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function SetPreferredUnitsByCategory(aiBrain)
