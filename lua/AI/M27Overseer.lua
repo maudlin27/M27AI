@@ -4984,14 +4984,19 @@ function ACUManager(aiBrain)
                                 end
                             else
                                 --Do we have more than our share of mexes?
-
-                                local iOurTeamsShareOfMexesOnMap = aiBrain[refiAllMexesInBasePathingGroup] / iTotalTeamCount
+                                local iTotalActivePlayers = 1
+                                for iBrain, oBrain in aiBrain[toAllyBrains] do
+                                    iTotalActivePlayers = iTotalActivePlayers + 1
+                                end
+                                for iBrain, oBrain in aiBrain[toEnemyBrains] do
+                                    iTotalActivePlayers = iTotalActivePlayers + 1
+                                end
+                                local iOurShareOfMexesOnMap = aiBrain[refiAllMexesInBasePathingGroup] / iTotalActivePlayers
                                 local bAheadOnEco = false
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; aiBrain[refiAllMexesInBasePathingGroup] =' .. aiBrain[refiAllMexesInBasePathingGroup] .. '; aiBrain[refiUnclaimedMexesInBasePathingGroup]=' .. aiBrain[refiUnclaimedMexesInBasePathingGroup])
+                                    LOG(sFunctionRef .. ': iOurShareOfMexesOnMap=' .. iOurShareOfMexesOnMap .. '; aiBrain[refiAllMexesInBasePathingGroup] =' .. aiBrain[refiAllMexesInBasePathingGroup] .. '; aiBrain[refiUnclaimedMexesInBasePathingGroup]=' .. aiBrain[refiUnclaimedMexesInBasePathingGroup])
                                 end
-                                --refiUnclaimedMexesInBasePathingGroup doesn't include mexes claimed by teammates, i.e. below looks at things overall on a team basis rather than us individually
-                                if (aiBrain[refiAllMexesInBasePathingGroup] - aiBrain[refiUnclaimedMexesInBasePathingGroup]) > iOurTeamsShareOfMexesOnMap then
+                                if (aiBrain[refiAllMexesInBasePathingGroup] - aiBrain[refiUnclaimedMexesInBasePathingGroup]) > iOurShareOfMexesOnMap then
                                     --Are ahead on eco so play safe
                                     bAheadOnEco = true
                                 else
@@ -5530,22 +5535,15 @@ end
 function WaitTicksSpecial(aiBrain, iTicksToWait)
     --calls the GetACU function since that will check if ACU is alive, and if not will delay to avoid a crash
     --Returns false if ACU no longer valid or all enemies are defeated
-    local sFunctionRef = 'WaitTicksSpecial'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return false
     else
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(iTicksToWait)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         local oACU = M27Utilities.GetACU(aiBrain)
         if oACU.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return false
         end
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return true
 end
 
@@ -5985,8 +5983,8 @@ function UpdateAllNonM27Names()
                         if iCurUpdateCount >= iMaxUpdatePerTick then
                             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             WaitTicks(1)
-                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                             iCurUpdateCount = 0
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                         end
                     end
                 end
@@ -6060,8 +6058,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
-    if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 900 then bDebugMessages = true end
+    if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
     --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
     local iBigThreatSearchRange = 10000
 
@@ -6379,11 +6376,17 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         aiBrain[refiUnclaimedMexesInBasePathingGroup] = iAllMexesInPathingGroupWeHaventClaimed
         aiBrain[refiAllMexesInBasePathingGroup] = iAllMexesInPathingGroup
 
-
-        local iOurTeamsShareOfMexesOnMap = iAllMexesInPathingGroup / iTotalTeamCount
+        local iTotalActivePlayers = 1
+        for iBrain, oBrain in aiBrain[toAllyBrains] do
+            iTotalActivePlayers = iTotalActivePlayers + 1
+        end
+        for iBrain, oBrain in aiBrain[toEnemyBrains] do
+            iTotalActivePlayers = iTotalActivePlayers + 1
+        end
+        local iOurShareOfMexesOnMap = iAllMexesInPathingGroup / iTotalActivePlayers
         local iMexesInPathingGroupWeHaveClaimed = iAllMexesInPathingGroup - iAllMexesInPathingGroupWeHaventClaimed
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': Pre determining grand strategy, iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed)
+            LOG(sFunctionRef .. ': Pre determining grand strategy, iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurShareOfMexesOnMap=' .. iOurShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed)
         end
 
         local tLandCombatUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandCombat, false, true)
@@ -6429,6 +6432,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             end
         end
         local iPrevStrategy = aiBrain[refiAIBrainCurrentStrategy]
+        local bChokepointsAreProtected = M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)
         --Are we in ACU kill mode and want to stay in it (determined b y ACU manager)?
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and not (aiBrain[refbStopACUKillStrategy]) then
             --set as part of ACU manager
@@ -6627,7 +6631,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                         else
                             --Dont eco if nearby naval threat
                             if not(aiBrain[refbT2NavyNearOurBase]) then
-                                local bChokepointsAreProtected = M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)
 
 
 
@@ -6637,46 +6640,50 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     bBigEnemyThreat = true
                                 end
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs]))
+                                    LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs])..'; ACU health 1s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1]..'; ACU health 11s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]..'; Are all chokepoitns covered='..tostring(M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)))
                                 end
 
 
 
 
 
-                                --Dont eco if enemy ACU near ours as likely will need backup
-                                if aiBrain[refbEnemyACUNearOurs] == false then
-                                    if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
-                                        if aiBrain[refiPercentageOutstandingThreat] > 0.55 and (bBigEnemyThreat == false or aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.5) and (iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.8 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not (iT3Mexes >= math.min(iMexesNearStart, 7) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': No big enemy threats and good defence and mex coverage so will eco')
-                                            end
-                                            bWantToEco = true
-                                        else
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Dont want to eco based on initial tests: bBigEnemyThreat=' .. tostring(bBigEnemyThreat) .. '; %threat=' .. aiBrain[refiPercentageOutstandingThreat] .. '; UnclaimedMex%=' .. iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup .. '; EnemyDist=' .. aiBrain[refiDistanceToNearestEnemyBase])
-                                            end
-                                            --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
-                                            if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
+                                --Dont eco if enemy ACU near ours as likely will need backup, unless we are on a chokepoint map and our ACU hasnt taken any damage recently (or if it has, it's less than 5 per sec)
+                                if aiBrain[refbEnemyACUNearOurs] == false or (bChokepointsAreProtected and M27Utilities.GetACU(aiBrain):GetHealth() >= 7000 and (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 or (oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or 0) + 50 >= oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]))  then
+                                    if bChokepointsAreProtected then
+                                        bWantToEco = true
+                                    else
+                                        if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
+                                            if aiBrain[refiPercentageOutstandingThreat] > 0.55 and (bBigEnemyThreat == false or aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.5) and (iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 0.8 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not (iT3Mexes >= math.min(iMexesNearStart, 7) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
                                                 if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': Ok defence coverage and income not changed in a while so will eco')
+                                                    LOG(sFunctionRef .. ': No big enemy threats and good defence and mex coverage so will eco')
                                                 end
                                                 bWantToEco = true
                                             else
                                                 if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': Checking if we are making use of tanks - if not then will switch to eco if have a decent number of tanks. aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]=' .. tostring(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]))
+                                                    LOG(sFunctionRef .. ': Dont want to eco based on initial tests: bBigEnemyThreat=' .. tostring(bBigEnemyThreat) .. '; %threat=' .. aiBrain[refiPercentageOutstandingThreat] .. '; UnclaimedMex%=' .. iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup .. '; EnemyDist=' .. aiBrain[refiDistanceToNearestEnemyBase])
                                                 end
-                                                if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
-                                                    --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
-                                                    local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
+                                                --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
+                                                if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
                                                     if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': iMinTanksWanted=' .. iMinTanksWanted .. '; iLandCombatUnits=' .. iLandCombatUnits)
+                                                        LOG(sFunctionRef .. ': Ok defence coverage and income not changed in a while so will eco')
                                                     end
-                                                    if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
+                                                    bWantToEco = true
+                                                else
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef .. ': Checking if we are making use of tanks - if not then will switch to eco if have a decent number of tanks. aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]=' .. tostring(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]))
+                                                    end
+                                                    if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
+                                                        --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
+                                                        local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
                                                         if bDebugMessages == true then
-                                                            LOG(sFunctionRef .. ': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco')
+                                                            LOG(sFunctionRef .. ': iMinTanksWanted=' .. iMinTanksWanted .. '; iLandCombatUnits=' .. iLandCombatUnits)
                                                         end
-                                                        bWantToEco = true
+                                                        if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
+                                                            if bDebugMessages == true then
+                                                                LOG(sFunctionRef .. ': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco')
+                                                            end
+                                                            bWantToEco = true
+                                                        end
                                                     end
                                                 end
                                             end
@@ -6691,22 +6698,24 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     bWantToEco = true
                                 end
 
-                                if bChokepointsAreProtected then
-                                    bWantToEco = true
-                                end
+
                                 if bWantToEco == true then
                                     if not (bChokepointsAreProtected) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
                                         bWantToEco = false
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Chokepoints arent protected, can path to enemy base with land, and dont have friendly units on enemy side of map') end
                                         --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
-                                    elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] then
+                                    elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] and (not(bChokepointsAreProtected) or (aiBrain[refiModDistFromStartNearestThreat] <= aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance] and M27UnitInfo.IsUnitValid(aiBrain[refoNearestThreat]) and M27Utilities.GetDistanceBetweenPositions(aiBrain[refoNearestThreat]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(150, aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]))) then
                                         bWantToEco = false
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Bomber defence restricted by AA so will stop ecoing. aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]..'; Bomber def range='..aiBrain[M27AirOverseer.refiBomberDefenceModDistance]) end
                                         --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
                                     elseif M27UnitInfo.GetUnitHealthPercent(oACU) < 0.45 and (M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 125 or oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0) then
                                         bWantToEco = false
+                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU is low health and has nearby enemies so wont eco') end
                                         --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
                                     elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
                                         bWantToEco = false
-                                    elseif aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Our ACU is near enemy base') end
+                                    elseif not(bChokepointsAreProtected) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
                                         --Does the enemy have more mobile threat than us and our allies, and we have < 65% mex control, and have gained income recently
                                         if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo >= 1 then
                                             local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])
@@ -6721,6 +6730,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                             end
                                             if iCurMassTotal < aiBrain[refiTotalEnemyShortRangeThreat] then
                                                 bWantToEco = false
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy has significant mobile threat and we are behind on eco and have just gained some eco, so want to try and build more units to regain map control') end
                                             end
                                             if bDebugMessages == true then LOG(sFunctionRef..': iCurMassTotal of our and ally shortrange threat='..iCurMassTotal..'; Enemy short range threat='..aiBrain[refiTotalEnemyShortRangeThreat]..'; bWantToEco='..tostring(bWantToEco)) end
                                         end
@@ -6760,7 +6770,12 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
         --Max target defence coverage for strategy
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then
-            aiBrain[refiMaxDefenceCoverageWanted] = 0.65
+            if bChokepointsAreProtected then
+                aiBrain[refiMaxDefenceCoverageWanted] = math.min(0.65, (30 + GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27MapInfo.reftClosestChokepoint]) / aiBrain[refiDistanceToNearestEnemyBase]))
+                if bDebugMessages == true then LOG(sFunctionRef..': Have chokepoint and are ecoing so will set defence coverage to '..aiBrain[refiMaxDefenceCoverageWanted]) end
+            else
+                aiBrain[refiMaxDefenceCoverageWanted] = 0.65
+            end
         elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
             aiBrain[refiMaxDefenceCoverageWanted] = 0.4
         elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyTurtle then
@@ -6975,7 +6990,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed..'; iAllMexesInPathingGroup='..iAllMexesInPathingGroup)
+            LOG(sFunctionRef .. ': iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurShareOfMexesOnMap=' .. iOurShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed..'; iAllMexesInPathingGroup='..iAllMexesInPathingGroup)
         end
 
         aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
@@ -6983,18 +6998,18 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
         local iKeyUpgradesWanted = 1
 
-        if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.9 then
-            if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.1 then
+        if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 0.9 then
+            if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.1 then
                 --We have 55% of mexes on map so shoudl be ahead on eco
 
 
-                if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 or not(M27Conditions.DoesACUHaveGun(aiBrain, false)) then
+                if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.2 or not(M27Conditions.DoesACUHaveGun(aiBrain, false)) then
                     aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
                 else
                     aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.8
                 end
                 if bDebugMessages == true then LOG(sFunctionRef..': Have 10% more than our share of mexes, so setting health to run at 95% of max health') end
-                --if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 then
+                --if iMexesInPathingGroupWeHaveClaimed >= iOurShareOfMexesOnMap * 1.2 then
                 --Set equal to max health (so run) if we dont have a supporting upgrade as we are ahead on eco so can afford to drop back for an upgrade
 
                 if EntityCategoryContains(categories.AEON, oACU.UnitId) then
@@ -7019,7 +7034,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     aiBrain[refiACUHealthToRunOn] = math.max(9000, oACU:GetMaxHealth() * 0.8)
                 end
             end
-        elseif iMexesInPathingGroupWeHaveClaimed <= iOurTeamsShareOfMexesOnMap * 0.7 then
+        elseif iMexesInPathingGroupWeHaveClaimed <= iOurShareOfMexesOnMap * 0.7 then
             aiBrain[refiACUHealthToRunOn] = math.max(4250, oACU:GetMaxHealth() * 0.35)
         end
         --Do we have a firebase? if so increase health to run on
@@ -7108,13 +7123,8 @@ function InitiateLandFactoryConstructionManager(aiBrain)
 end
 
 function InitiateEngineerManager(aiBrain)
-    local sFunctionRef = 'InitiateEngineerManager'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(3)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     ForkThread(M27EngineerOverseer.EngineerManager, aiBrain)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function InitiateUpgradeManager(aiBrain)
@@ -7123,13 +7133,8 @@ end
 
 function SwitchSoMexesAreNeverIgnored(aiBrain, iDelayInSeconds)
     --Initially want raiders to hunt engis, after a set time want to switch to attack mexes even if few units in platoon
-    local sFunctionRef = 'SwitchSoMexesAreNeverIgnored'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(iDelayInSeconds)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     aiBrain[refiIgnoreMexesUntilThisManyUnits] = 0
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordAllEnemiesAndAllies(aiBrain)
@@ -7137,12 +7142,9 @@ function RecordAllEnemiesAndAllies(aiBrain)
     local bDebugMessages = false
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecordAllEnemiesAndAllies'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of attempt to get backup list of enemies for aiBrain with army index=' .. aiBrain:GetArmyIndex() .. ', called for brain with armyindex=' .. aiBrain:GetArmyIndex() .. '; will wait 2 seconds first')
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(1) --Note - when waited 4 seconds this would run after the strategic overseer code, which would be checking things like unclaimedm exes and lead to an error
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
@@ -7351,9 +7353,8 @@ function RecordAllEnemiesAndAllies(aiBrain)
 
     --Force refresh of plateaus to consider expanding to since those of interest may have changed
     ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain, true, true)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
     WaitTicks(1) --wait 1 tick before checking enemy brains, so any M27brains can run the above function themselves
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --REDUNDANCY (code in overseer initialisation triggers first)
     if aiBrain.M27AI and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) then
@@ -7394,11 +7395,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
 end
 
 function RefreshMexPositions(aiBrain)
-    local sFunctionRef = 'RefreshMexPositions'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(80)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Force refresh of mexes to try and fix bug where not all mexes recorded as being pathable
     --M27MapInfo.RecheckPathingToMexes(aiBrain)
     ForkThread(M27MapInfo.RecordMexForPathingGroup)
@@ -7408,21 +7405,18 @@ function RefreshMexPositions(aiBrain)
     --[[WaitTicks(400)
     ForkThread(M27MapInfo.RecordMexForPathingGroup, M27Utilities.GetACU(aiBrain), true)
     ForkThread(M27MapInfo.RecordSortedMexesInOriginalPathingGroup, aiBrain)--]]
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ACUInitialisation(aiBrain)
     local bDebugMessages = false
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ACUInitialisation'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Wait until 4.5s have elapsed as humans cant start building before 4.5-5s it seems
     while GetGameTimeSeconds() <= 4.5 do
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(1)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code')
     end
@@ -7433,11 +7427,11 @@ function ACUInitialisation(aiBrain)
     local iCategoryToBuildBy = M27UnitInfo.refCategoryT1Mex
     --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild)
     M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil, false, false, nil, false, M27UnitInfo.refCategoryEngineer)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     while aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllHQFactories) == 0 do
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(1)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Have a factory unit now, so will set ACU platoon to use ACUMain')
     end
@@ -7459,8 +7453,6 @@ end
 function RevealCiviliansToAI(aiBrain)
     --On some maps like burial mounds civilians are revealed to human players but not AI; meanwhile on other maps even if theyre not revealed to humans, the humans will likely know where the buildings are having played the map before
     --Thanks to Relent0r for providing code that achieved this
-    local sFunctionRef = 'RevealCiviliansToAI'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iOurIndex = aiBrain:GetArmyIndex()
     local iBrainIndex
@@ -7470,13 +7462,10 @@ function RevealCiviliansToAI(aiBrain)
         if ArmyIsCivilian(iBrainIndex) then
             sRealState = IsAlly(iOurIndex, iBrainIndex) and 'Ally' or IsEnemy(iOurIndex, iBrainIndex) and 'Enemy' or 'Neutral'
             SetAlliance(iOurIndex, iBrainIndex, 'Ally')
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(5)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             SetAlliance(iOurIndex, iBrainIndex, sRealState)
         end
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function OverseerInitialisation(aiBrain)
@@ -7642,16 +7631,10 @@ end
 
 function SendWarningIfNoM27(aiBrain)
     --Whenever an aiBrain is initialised this should be called as a fork thread
-    local sFunctionRef = 'SendWarningIfNoM27'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(5)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
     if not (M27Utilities.bM27AIInGame) then
         M27Chat.SendGameCompatibilityWarning(aiBrain, 'No Active M27 AI detected, disable M27AI mod to make the game run faster', 0, 1)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function GameSettingWarningsAndChecks(aiBrain)
@@ -7908,9 +7891,7 @@ function CoordinateNovax(aiBrain)
                     end
                 end
             end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitSeconds(10)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
         tTeamData[aiBrain.M27Team][refbActiveNovaxCoordinator] = false
     end
@@ -8027,9 +8008,7 @@ function CoordinateLandExperimentals(aiBrain)
                         end
                     end
                 end
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitSeconds(10)
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             end
 
             tTeamData[aiBrain.M27Team][refbActiveLandExperimentalCoordinator] = false
@@ -8053,12 +8032,8 @@ function TEMPUNITPOSITIONLOG(aiBrain)
 end
 
 function TempEnemyACUDirection(aiBrain)
-    local sFunctionRef = 'TempEnemyACUDirection'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     while aiBrain do
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(1)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         local tAllACUs = EntityCategoryFilterDown(categories.COMMAND, GetUnitsInRect(Rect(0, 0, 1000, 1000)))
         local oEnemyACU
         for iACU, oACU in tAllACUs do
@@ -8073,7 +8048,6 @@ function TempEnemyACUDirection(aiBrain)
         LOG('ACU Angle direction=' .. M27UnitInfo.GetUnitFacingAngle(oEnemyACU))
         LOG('ACU position=' .. repru(oEnemyACU:GetPosition()))
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function TestNewMovementCommands(aiBrain)
@@ -8089,7 +8063,6 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
-    M27MiscProfiling.ListAmphibiousUnitsMissingAmphibiousCategory()
     --LOG('Log of ScenarioInfo='..repru(ScenarioInfo))
     --[[
     --Test new GetUnitMaxGroundRange function
@@ -8245,15 +8218,10 @@ function TempBomberLocation(aiBrain)
 end
 
 function ConstantBomberLocation(aiBrain)
-    local sFunctionRef = 'ConstantBomberLocation'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     while not (aiBrain:IsDefeated()) do
         ForkThread(TempBomberLocation, aiBrain)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(1)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function TempCreateReclaim(aiBrain)
@@ -8342,7 +8310,6 @@ function OverseerManager(aiBrain)
     local bDebugMessages = false
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OverseerManager'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --With thanks to Balthazar for suggesting the below for where e.g. FAF develop has a function that isnt yet in FAF main
     _G.repru = rawget(_G, 'repru') or repr
@@ -8374,17 +8341,14 @@ function OverseerManager(aiBrain)
         --ForkThread(M27MapInfo.DrawHeightMapAstro)
         --ForkThread(M27MapInfo.LogMapTerrainTypes)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(1)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     ForkThread(M27MapInfo.SetupNoRushDetails, aiBrain)
 
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Pre wait 9 ticks')
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
     WaitTicks(9)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Hopefully have ACU now so can re-check pathing
     --if bDebugMessages == true then LOG(sFunctionRef..': About to check pathing to mexes') end
@@ -8420,9 +8384,7 @@ function OverseerManager(aiBrain)
 
     --Start of game - wait until units can build (seems to be around 4.5-5s)
     while (GetGameTimeSeconds() <= 4.5) do
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(1)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
@@ -8434,11 +8396,13 @@ function OverseerManager(aiBrain)
     while (not (aiBrain:IsDefeated())) do
         --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
+        if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
         if aiBrain.M27IsDefeated then
             break
         end
 
-        if GetGameTimeSeconds() >= 2916 then M27Utilities.bGlobalDebugOverride = true end
+
+        --if GetGameTimeSeconds() >= 1459 then M27Utilities.bGlobalDebugOverride = true end
         --[[if not(bSetHook) and GetGameTimeSeconds() >= 1459 then
             bDebugMessages = true
             bSetHook = true
@@ -8568,5 +8532,4 @@ function OverseerManager(aiBrain)
 
         --M27Utilities.ProfilerOutput() --Handled via the time per tick
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

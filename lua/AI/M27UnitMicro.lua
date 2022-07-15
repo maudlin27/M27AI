@@ -138,7 +138,6 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
     --More intensive version of MoveAwayFromTargetTemporarily, intended e.g. for ACUs
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ForkedMoveInCircle'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --KEY CONFIG SETTINGS: (these will work sometimes but not always against an aeon strat)
     local iInitialAngleAdj = 15
@@ -211,9 +210,7 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
         if iLoopCount == 1 then iTempDistanceAwayToMove = iDistanceAwayToMove + iInitialDistanceAdj end
         tTempLocationToMove = M27Utilities.MoveInDirection(tUnitStartPosition, iTempAngleDirectionToMove, iTempDistanceAwayToMove)
         IssueMove({oUnit}, tTempLocationToMove)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(iTicksBetweenOrders)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if not(bDontTreatAsMicroAction) and not((oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun)) then bTimeToStop = true end
     end
 
@@ -231,7 +228,6 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
 
         WaitTicks(iTicksBetweenOrders)
     end --]]
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function MoveInCircleTemporarily(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontClearCommandsFirst, iCircleSizeOverride, iTickWaitOverride)
@@ -1189,9 +1185,7 @@ function HoverBombTarget(aiBrain, oBomber, oTarget)
                     IssueMove({oBomber}, tTempTarget)
                     bTriedMovingForwardsAndTurning = true
                     if bDebugMessages == true then LOG(sFunctionRef..': Telling the bomber to move forwards for a while and will then try and get it to turn around in a bit') end
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     WaitSeconds(2.5)
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                     iCurTick = 0
                 end
             elseif GetGameTimeSeconds() - iStartTime >= iReloadTime then
@@ -1475,9 +1469,7 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
                 if not(M27UnitInfo.IsUnitValid(oBomber)) or not(M27UnitInfo.IsUnitValid(oTarget)) then
                     break
                 end
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(1)
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             end
 
 

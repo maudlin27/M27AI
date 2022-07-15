@@ -674,9 +674,14 @@ function HaveLowMass(aiBrain)
     local bHaveLowMass = false
     if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] <= 200 then --i.e. we dont ahve a paragon or crazy amount of SACUs
         local iMassStoredRatio = aiBrain:GetEconomyStoredRatio('MASS')
-        if iMassStoredRatio < 0.05 or ((aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and aiBrain:GetEconomyStored('MASS') <= 350) then bHaveLowMass = true
-        elseif (iMassStoredRatio < 0.15 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.2 then bHaveLowMass = true
-        elseif (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and (iMassStoredRatio < 0.1 or ((iMassStoredRatio < 0.2 or (aiBrain:GetEconomyStored('MASS') < 1000 and iMassStoredRatio < 0.25)) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.3)) then bHaveLowMass = true
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle then
+            if iMassStoredRatio <= 0.175 or aiBrain:GetEconomyStored('MASS') <= 500 then bHaveLowMass = true
+            elseif iMassStoredRatio <= 0.25 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.3 and aiBrain:GetEconomyStored('MASS') <= 1000 then bHaveLowMass = true
+            end
+        else
+            if iMassStoredRatio < 0.05 then bHaveLowMass = true
+            elseif (iMassStoredRatio < 0.15 or aiBrain:GetEconomyStored('MASS') < 250) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0.2 then bHaveLowMass = true
+            end
         end
     end
     return bHaveLowMass
@@ -1310,8 +1315,16 @@ function AreAllChokepointsCoveredByTeam(aiBrain)
         local iChokepoints = table.getsize(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])
         local iCoveredChokepoints = 0
         for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
-            if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
-                iCoveredChokepoints = iCoveredChokepoints + 1
+            if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle then
+                if oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
+                    iCoveredChokepoints = iCoveredChokepoints + 1
+                    --allow 10m for ACU to setup at a chokepoint if ACU is near the chokepoint, and no enemies nearby
+                elseif oBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and GetGameTimeSeconds() <= 600 then
+                    local oAssignedACU = M27Utilities.GetACU(oBrain)
+                    if GetGameTimeSeconds() <= 300 or (M27UnitInfo.IsUnitValid(oAssignedACU) and M27UnitInfo.GetUnitHealthPercent(oAssignedACU) >= 0.99 and M27Utilities.GetDistanceBetweenPositions(oAssignedACU:GetPosition(), oBrain[M27MapInfo.reftChokepointBuildLocation])  <= 40 and (oAssignedACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] or 0) <= 2) then
+                        iCoveredChokepoints = iCoveredChokepoints + 1
+                    end
+                end
             end
         end
         if iCoveredChokepoints >= iChokepoints then bCovered = true end

@@ -156,6 +156,7 @@ subrefChokepointMexesCovered = 'M27ChokepointMexesCovered' --Count of mexes in t
 tiPlannedChokepointsByDistFromStart = 'M27TeamChokepointsPlannedDistFromStart' --subref to tTeamData. [x] is  a count (1, 2, etc.), returns the dist from start for midpoint of line so can reference information from tPotentialChokepointsByDistFromStart
 refiAssignedChokepointCount = 'M27AssignedChokepoint' --Against aiBrain, returns the chokepoint count number
 refiAssignedChokepointFirebaseRef = 'M27AssignedFirebaseRef' --When a firebase is created, if its near the chokepoint then it will be assigned to this
+reftClosestChokepoint = 'M27ChokepointClosest' --Assigned to all M27 brains, so even if arent defending a chokepoint will be able to tell where our closest chokepoitn (covered by a teammate) is
 
 function DetermineMaxTerrainHeightDif()
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -1276,15 +1277,10 @@ function RecordThatWeWantToUpdateReclaimAtLocation(tLocation, iNearbySegmentsToU
 end
 
 function DelayedReclaimRecordAtLocation(tPosition, iNearbySegmentsToUpdate, iWaitInSeconds)
-    local sFunctionRef = 'DelayedReclaimRecordAtLocation'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(iWaitInSeconds)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27Utilities.bM27AIInGame then
         RecordThatWeWantToUpdateReclaimAtLocation(tPosition, iNearbySegmentsToUpdate)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ReclaimManager()
@@ -1442,12 +1438,7 @@ end
 
 function DelayedReclaimUpdateAtLocation(tLocation, iDelay)
     --Call via forkthread
-    local sFunctionRef = 'DelayedReclaimUpdateAtLocation'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(iDelay)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     --LOG('Temp log for debugging, DelayedReclaimUpdateAtLocation: tLocation='..repru((tLocation or {'nil'})))
     return UpdateReclaimDataNearLocation(tLocation, 0, nil)
 end
@@ -3293,13 +3284,8 @@ function SetupNoRushDetails(aiBrain)
 end
 
 function NoRushMonitor()
-    local sFunctionRef = 'NoRushMonitor'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(iNoRushTimer)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     bNoRushActive = false
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordAllPlateaus()
@@ -3614,8 +3600,6 @@ function LogMapTerrainTypes()
     --Outputs to log the terrain types used and how often theyre used
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'LogMapTerrainTypes'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(150)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
@@ -3647,35 +3631,22 @@ function LogMapTerrainTypes()
 end
 
 function DrawAllMapPathing(aiBrain)
-    local sFunctionRef = 'DrawAllMapPathing'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     while bPathfindingComplete == false do
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
     if not(bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeLand] == true) then
         DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeLand, true)
         while bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeLand] == true do
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(10)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(50)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeAmphibious)
         while bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeAmphibious] == true do
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(10)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(50)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeNavy, true)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
@@ -3754,9 +3725,7 @@ function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
             end
             iWaitCount = iWaitCount + 1
             if iWaitCount > 50 then
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(1)
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 iWaitCount = 0
             end
         end
@@ -3778,9 +3747,7 @@ function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
             LOG('iMatches='..iMatches..'; iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; Pathing group='..tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]..'; position='..repru(GetPositionFromPathingSegments(iSegmentX, iSegmentZ)))
             iWaitCount = iWaitCount + 1
             if iWaitCount > 10 then
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(1)
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 iWaitCount = 0
             end
         end
@@ -5030,6 +4997,23 @@ function IdentifyTeamChokepoints(aiBrain)
                                     local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27Utilities.MoveInDirection(oClosestBrain[reftChokepointBuildLocation], M27Utilities.GetAngleFromAToB(oClosestBrain[reftChokepointBuildLocation], tEnemyStart), 110, true))
                                     oClosestBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiNormalScoutingIntervalWanted] = math.min(oClosestBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiNormalScoutingIntervalWanted], aiBrain[M27AirOverseer.refiIntervalChokepoint])
                                 end
+                            end
+                            --Update each team brain to record the closest chokepoint (or the assigned one if it has one assigned)
+                            local iClosestChokepointRef
+                            for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                                iClosestDist = 10000
+                                if not(oBrain[refiAssignedChokepointCount]) then
+                                    for iChokepointCount, tChokepointSubtables in M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
+                                        iCurDist = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[oBrain.M27StartPositionNumber], tChokepointSubtables[reftChokepointBuildLocation])
+                                        if iCurDist < iClosestDist then
+                                            iClosestChokepointRef = iChokepointCount
+                                            iClosestDist = iCurDist
+                                        end
+                                    end
+                                else
+                                    iClosestChokepointRef = oBrain[refiAssignedChokepointCount]
+                                end
+                                oBrain[reftClosestChokepoint] = {M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][1], M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][2], M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][3]}
                             end
                         end
                     end

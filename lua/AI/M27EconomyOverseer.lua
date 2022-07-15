@@ -613,7 +613,6 @@ function TrackHQUpgrade(oUnitUpgradingToHQ)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(10)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     while M27UnitInfo.IsUnitValid(oUnitUpgradingToHQ) do
         if not (oUnitUpgradingToHQ.GetWorkProgress) or oUnitUpgradingToHQ:GetWorkProgress() == 1 then
             if bDebugMessages == true then
@@ -624,11 +623,10 @@ function TrackHQUpgrade(oUnitUpgradingToHQ)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Unit ' .. oUnitUpgradingToHQ.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnitUpgradingToHQ) .. ' hasnt finished upgrade so will continue to monitor.  Work progress=' .. oUnitUpgradingToHQ:GetWorkProgress())
             end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(1)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Remove from table of upgrading HQs
     if bDebugMessages == true then
@@ -3240,7 +3238,6 @@ end
 function UpgradeManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local iCycleWaitTime = 40
     local iReducedWaitTime = 20
@@ -3272,13 +3269,12 @@ function UpgradeManager(aiBrain)
     aiBrain[refiMassNetBaseIncome] = 0.1
 
     --Initial wait:
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(300)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     while (not (aiBrain:IsDefeated())) do
         if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then
             break
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         iCurCycleTime = iCycleWaitTime --default (is shortened if have lots to upgrade)
         ForkThread(UpgradeMainLoop, aiBrain)
         if aiBrain[refbWantToUpgradeMoreBuildings] then
@@ -3297,10 +3293,8 @@ function UpgradeManager(aiBrain)
         ForkThread(ManageEnergyStalls, aiBrain)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(iCycleWaitTime)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': End of loop after waiting ticks')
         end
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

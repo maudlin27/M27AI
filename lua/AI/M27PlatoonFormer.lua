@@ -188,6 +188,7 @@ function CombatPlatoonFormer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CombatPlatoonFormer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if GetGameTimeSeconds() >= 780 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, about to refresh units waiting for assignment') end
 
 
@@ -387,7 +388,7 @@ function CombatPlatoonFormer(aiBrain)
             iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
             aiBrain[refbUsingTanksForPlatoons] = true
             if iStrategy == M27Overseer.refStrategyLandMain then
-                if bDebugMessages == true then LOG(sFunctionRef..'We are using early land strategy, decide what platoon to form') end
+                if bDebugMessages == true then LOG(sFunctionRef..'We are using early land strategy, decide what platoon to form. iCurrentConditionToTry='..iCurrentConditionToTry) end
                 if iCurrentConditionToTry == 1 then --Initial land raiders
                     if aiBrain[M27PlatoonUtilities.refiLifetimePlatoonCount]['M27MexRaiderAI'] < aiBrain[M27Overseer.refiInitialRaiderPlatoonsWanted] then
                         sPlatoonToForm = 'M27MexRaiderAI' end
@@ -433,6 +434,14 @@ function CombatPlatoonFormer(aiBrain)
                     end
                 elseif iCurrentConditionToTry == 10 then
                     if iRaiders < 5 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                elseif iCurrentConditionToTry == 11 then
+                    --If have a chokepoint then form combat patrol
+                    if M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain) then
+                        sPlatoonToForm = 'M27CombatPatrolAI'
+                        aiBrain[refbUsingTanksForPlatoons] = false
+                        if bDebugMessages == true then LOG(sFunctionRef..': No platoons that want to form and have chokepoints covered so will do a combat patrol') end
+                    end
+
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont meet any other conditions so will form attackenarestunit platoon') end
                     sPlatoonToForm = 'M27AttackNearestUnits'
@@ -581,6 +590,7 @@ function CombatPlatoonFormer(aiBrain)
                 end
                 --if not(bAreUsingCombatPatrolUnits) or not(sPlatoonToForm == 'M27CombatPatrolAI') then
                 --if bDebugMessages == true then LOG(sFunctionRef..': Arent using combat patrol units or platoon to form isnt the combat patrol AI') end
+                if bDebugMessages == true then LOG(sFunctionRef..': About to form a platoon if have specified to, sPlatoonToForm='..sPlatoonToForm) end
                 if oPlatoonOrUnitToEscort and oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon] and aiBrain:PlatoonExists(oPlatoonOrUnitToEscort[M27PlatoonUtilities.refoEscortingPlatoon]) then
                     --Add to existing platoon
                     if bDebugMessages == true then LOG(sFunctionRef..': Have a platoon or unit to escort that already has an assigned escort so will assign units to existing escort') end
@@ -1531,17 +1541,12 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
     --if bNoDelay is true then wont do normal waiting for the unit to move away from the factory (nb: should only set this to true if we're not talking about a newly produced unit from a factory as it will bypass the workaround for factory error where factories stop building)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AllocateNewUnitToPlatoonBase'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --DONT USE PROFILER HERE as need solution to the waitticks
     if bDebugMessages == true then LOG(sFunctionRef..': Start') end
 
 
 
-    if iDelayInTicks then
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitTicks(iDelayInTicks)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    end
+    if iDelayInTicks then WaitTicks(iDelayInTicks) end
 
     local iLifetimeCount
     local iUnits = 0
@@ -1627,9 +1632,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                             M27Utilities.ErrorHandler('Waited 10 seconds for unit to leave land factory area and it still hasnt, will proceed with trying to form a platoon with it anyway', true) break
                         end
                         if oNewUnit and not(oNewUnit.Dead) then
-                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             WaitTicks(1)
-                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                             if M27UnitInfo.IsUnitValid(oNewUnit[M27UnitInfo.refoFactoryThatBuildThis]) and M27Logic.IsUnitIdle(oNewUnit[M27UnitInfo.refoFactoryThatBuildThis]) == false then
                                 bProceed = true
                                 break
@@ -1700,6 +1703,7 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                 end
             end
 
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 
             if bProceed == true then
@@ -1926,9 +1930,9 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                     end
                 end
             end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         end
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function AllocateNewUnitsToPlatoonNotFromFactory(tNewUnits, iDelayInTicks)
@@ -2078,13 +2082,10 @@ end
 function PlatoonIdleUnitOverseer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonIdleUnitOverseer'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iCycleCount = 0
 
     --Initial setup - create the idle platoons
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(60)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleScouts)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleMAA)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoAllEngineers)
@@ -2101,9 +2102,6 @@ function PlatoonIdleUnitOverseer(aiBrain)
         iCycleCount = iCycleCount + 1
         ForkThread(PlatoonMainIdleUnitLoop, aiBrain, iCycleCount)
         if iCycleCount == iIdleUnitSearchThreshold then iCycleCount = 0 end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

@@ -249,18 +249,13 @@ end
 
 function ClearAirScoutDeathFromSegmentInFuture(aiBrain, iAirSegmentX, iAirSegmentZ)
     --CALL VIA FORKED THREAD
-    local sFunctionRef = 'ClearAirScoutDeathFromSegmentInFuture'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(200)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Have we failed to reveal the area since this time?
     if GetTimeSinceLastScoutedSegment(aiBrain, iAirSegmentX, iAirSegmentZ) >= 200 then
         if aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiDeadScoutsSinceLastReveal] > 0 then
             aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiDeadScoutsSinceLastReveal] = aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiDeadScoutsSinceLastReveal] - 1
         end
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordAirScoutDyingInNearbySegments(aiBrain, iBaseSegmentX, iBaseSegmentZ)
@@ -549,13 +544,8 @@ end
 
 function ResetBomberEffectiveness(aiBrain, iTechLevel, iDelayInTicks)
     --Call via forkthread
-    local sFunctionRef = 'ResetBomberEffectiveness'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(iDelayInTicks)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     aiBrain[refbBombersAreEffective][iTechLevel] = true
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function UpdateBomberEffectiveness(aiBrain, oBomber, bBomberNotDead)
@@ -637,7 +627,7 @@ function UpdateBomberEffectiveness(aiBrain, oBomber, bBomberNotDead)
                 end
             end
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Bomber died; iBomberMassCost=' .. tNewEntry[refiBomberMassCost] .. '; iMassKilled=' .. tNewEntry[refiBomberMassKilled] .. '; bNoEffectiveBombers=' .. tostring(bNoEffectiveBombers))
+                LOG(sFunctionRef .. ': Bomber died; iBomberMassCost=' .. iBomberMassCost .. '; iMassKilled=' .. iMassKilled .. '; bNoEffectiveBombers=' .. tostring(bNoEffectiveBombers))
             end
 
             --If this was one of our last t3 bombers then reset the flag for effectiveness after a while (for long games we might want to retry bombers again)
@@ -729,7 +719,6 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
     local sFunctionRef = 'CheckForBetterBomberTargets'
     --bOneOff - if true, then only run this once (e.g. in response to bomb being fired); otherwise will create a loop
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
 
     if bDebugMessages == true then
@@ -739,13 +728,12 @@ function CheckForBetterBomberTargets(oBomber, bOneOff)
     local iBomberTechLevel = M27UnitInfo.GetUnitTechLevel(oBomber)
     local aiBrain = oBomber:GetAIBrain()
     if not (bOneOff) then
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitSeconds(1)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Finished waiting 1 second for bomber ' .. oBomber.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBomber))
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tShortlistToPickFrom
     local iShortlistCount
     while M27UnitInfo.IsUnitValid(oBomber) do
@@ -1792,13 +1780,11 @@ end
 function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
     local sFunctionRef = 'DelayedBomberTargetRecheck'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
     --if EntityCategoryContains(categories.TECH3, oBomber.UnitId) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
 
     CheckIfTargetHardToHit(oBomber, oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit])
     if bDebugMessages == true then LOG(sFunctionRef..': About to wait '..iDelayInSeconds..' seconds for bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)) end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(iDelayInSeconds)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27UnitInfo.IsUnitValid(oBomber) then
@@ -4027,14 +4013,10 @@ end
 function DebugBomberTracker(oBomber)
     --Used for temporary debugging of a particular bomber
     local sFunctionRef = 'DebugBomberTracker'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     while M27UnitInfo.IsUnitValid(oBomber) do
         LOG(sFunctionRef .. ': Time=' .. math.floor(GetGameTimeSeconds()) .. '; Bomber position=' .. repru(oBomber:GetPosition()) .. '; Terrain height of position=' .. GetTerrainHeight(oBomber:GetPosition()[1], oBomber:GetPosition()[3]))
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DetermineBomberDefenceRange(aiBrain)
@@ -6869,7 +6851,6 @@ end
 function AirLogicOverseer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirLogicOverseer'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bProfiling = false
     local iProfileStartTime = 0
 
@@ -6896,11 +6877,8 @@ function AirLogicOverseer(aiBrain)
         if bProfiling == true then
             iProfileStartTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef .. ': End of loop', iProfileStartTime)
         end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function Initialise()
@@ -6908,7 +6886,6 @@ end --Done so can find air overseer setup more easily
 function SetupAirOverseer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetupAirOverseer'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code')
     end
@@ -7043,11 +7020,8 @@ function SetupAirOverseer(aiBrain)
         LOG(sFunctionRef .. ': air units wanted: aiBrain[refiExtraAirScoutsWanted]=' .. aiBrain[refiExtraAirScoutsWanted] .. '; aiBrain[refiAirStagingWanted]=' .. aiBrain[refiAirStagingWanted] .. '; aiBrain[refiTorpBombersWanted]=' .. aiBrain[refiTorpBombersWanted] .. '; aiBrain[refiAirAANeeded]=' .. aiBrain[refiAirAANeeded])
         LOG(sFunctionRef .. ': End of code pre wait ticks and calling of air logic overseer fork thread')
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(100)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     ForkThread(AirLogicOverseer, aiBrain)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 --Decide on mex targets and update air scouting for these

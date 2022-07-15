@@ -1705,16 +1705,12 @@ end
 function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
     --Will wait iDelay seconds, before clearing engineer's actions if it's guarding a unit and its action is still spare
     local bDebugMessages = false
-    local sFunctionRef = 'DelayedSpareEngineerClearAction'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local sFunctionRef = 'DelayedSpareEngineerClearAction'
     local iOrigAction = oEngineer[refiEngineerCurrentAction]
     if not(oEngineer[refbActiveDelayedTargetRechecker]) then
         oEngineer[refbActiveDelayedTargetRechecker] = true
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitSeconds(iDelaySeconds)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if M27UnitInfo.IsUnitValid(oEngineer) then
             oEngineer[refbActiveDelayedTargetRechecker] = false
             --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
@@ -1726,7 +1722,6 @@ function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
             end
         end
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     --ReassignEngineers(aiBrain, true, {oEngineer})
 end
 
@@ -4779,15 +4774,12 @@ function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpg
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'UpgradeBuildingActionCompleteChecker'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
 
     local bContinue = true
     while bContinue == true do
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitSeconds(1)
         --Check if building has finished upgrading
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         bContinue = false
         if bDebugMessages == true then
             LOG(sFunctionRef..': CHecking if buildingtoupgrade is still building')
@@ -4800,7 +4792,7 @@ function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpg
     if bDebugMessages == true then LOG(sFunctionRef..': About to clear engineer with ref '..GetEngineerUniqueCount(oEngineer)..' actions') end
     IssueClearCommands({oEngineer})
     ClearEngineerActionTrackers(aiBrain, oEngineer, true)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
 end
 
 function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
@@ -5225,9 +5217,7 @@ function ReplaceT2WithT3Monitor(aiBrain, oEngineer, oActionTargetObject)
     if M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), tTargetMex) >= 6 then
         if bDebugMessages == true then LOG(sFunctionRef..': Arent near the target so sending issuemove to it before starting main loop') end
         IssueMove({oEngineer}, tTargetMex)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
 
     --Wait until we are near the target
@@ -5259,9 +5249,7 @@ function ReplaceT2WithT3Monitor(aiBrain, oEngineer, oActionTargetObject)
             IssueClearCommands({oEngineer})
             BuildStructureAtLocation(aiBrain, oEngineer, M27UnitInfo.refCategoryT3Mex, 1, nil, tTargetMex, true, false)
             M27Utilities.DelayChangeVariable(oEngineer, rebToldToStartBuildingT3Mex, true, 20)
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(10) --Backup logic
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             if M27UnitInfo.IsUnitValid(oEngineer) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Finished waiting for engineer UC'..GetEngineerUniqueCount(oEngineer)..'; About to tell engineer to build T3 mex at the location. tTargetMex='..repru(tTargetMex)) end
                 --M27Utilities.DelayChangeVariable(oEngineer, rebToldToStartBuildingT3Mex, true, 8)
@@ -9129,27 +9117,40 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     local iSearchRange
                                     local iThreatRatio
                                     local iMassKilledToCost = aiBrain[refiMassKilledByPD] / aiBrain[refiMassSpentOnPD]
-                                    if iMassKilledToCost >= 2 then
-                                        iThreatRatio = 0.25
-                                        iSearchRange = math.max(aiBrain[M27AirOverseer.refiBomberDefenceModDistance] * 0.75, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.425, 210))
-                                    elseif iMassKilledToCost >= 1 or aiBrain[refiMassSpentOnPD] <= 470 then --Havent built 1 T2 PD yet
-                                        iThreatRatio = 0.45
-                                        iSearchRange = math.max(aiBrain[M27AirOverseer.refiBomberDefenceModDistance] * 0.675, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4, 190))
-                                    elseif iMassKilledToCost >= 0.6 or aiBrain[refiMassSpentOnPD] <= 950 then --have built less than 2 T2 PD
-                                        iThreatRatio = 0.6
-                                        iSearchRange = math.max(aiBrain[M27AirOverseer.refiBomberDefenceModDistance] * 0.625, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.375, 170))
-                                    else
-                                        iThreatRatio = 0.8
-                                        iSearchRange = math.max(aiBrain[M27AirOverseer.refiBomberDefenceModDistance] * 0.6, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35, 160))
-                                    end
-
                                     local iMinPDWanted = math.max(188, aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] * 0.1)
 
-                                    --Increase search range if we lack air control
-                                    if aiBrain[M27AirOverseer.refiAirAANeeded] >= 1 and aiBrain[M27AirOverseer.refiPreviousAvailableBombers] == 0 then
-                                        iSearchRange = math.min( iSearchRange + 60, math.max(iSearchRange, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45, 175))
-                                        iMinPDWanted = math.max(iMinPDWanted, aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] * 0.15)
+                                    --Do we have a teammate with a chokepoint?
+                                    if M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain) then
+                                        bDebugMessages = true
+                                        --Teammate has a chokepoint so build far less PD
+                                        iSearchRange = aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]
+                                        iThreatRatio = 0.8
+                                        if iMassKilledToCost >= 2 then
+                                            iSearchRange = math.min(aiBrain[M27AirOverseer.refiBomberDefenceModDistance] * 0.625, aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance] * 1.5)
+                                            iThreatRatio = 0.55
+                                        end
+                                    else
+                                        if iMassKilledToCost >= 2 then
+                                            iThreatRatio = 0.25
+                                            iSearchRange = math.max(aiBrain[M27AirOverseer.refiBomberDefenceModDistance] * 0.75, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.425, 210))
+                                        elseif iMassKilledToCost >= 1 or aiBrain[refiMassSpentOnPD] <= 470 then --Havent built 1 T2 PD yet
+                                            iThreatRatio = 0.45
+                                            iSearchRange = math.max(aiBrain[M27AirOverseer.refiBomberDefenceModDistance] * 0.675, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4, 190))
+                                        elseif iMassKilledToCost >= 0.6 or aiBrain[refiMassSpentOnPD] <= 950 then --have built less than 2 T2 PD
+                                            iThreatRatio = 0.6
+                                            iSearchRange = math.max(aiBrain[M27AirOverseer.refiBomberDefenceModDistance] * 0.625, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.375, 170))
+                                        else
+                                            iThreatRatio = 0.8
+                                            iSearchRange = math.max(aiBrain[M27AirOverseer.refiBomberDefenceModDistance] * 0.6, math.min(aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.35, 160))
+                                        end
+
+                                        --Increase search range if we lack air control and dont have a chokepoint
+                                        if aiBrain[M27AirOverseer.refiAirAANeeded] >= 1 and aiBrain[M27AirOverseer.refiPreviousAvailableBombers] == 0 then
+                                            iSearchRange = math.min( iSearchRange + 60, math.max(iSearchRange, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45, 175))
+                                            iMinPDWanted = math.max(iMinPDWanted, aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] * 0.15)
+                                        end
                                     end
+
 
                                     --Increase % if enemy has significant mobile threat, and we lack air control
                                     if aiBrain[M27AirOverseer.refiAirAANeeded] >= 1 and aiBrain[M27AirOverseer.refiPreviousAvailableBombers] == 0 and aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 2500 then
@@ -9158,7 +9159,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                                     if iSearchRange >= 80 then iSearchRange = math.min(iSearchRange, aiBrain[M27Overseer.refiMaxDefenceCoverageWanted] * aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
 
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Can path by land to closest enemy. Mod distance from start of threat='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; SearchRange='..iSearchRange..'; iThreatRatio='..iThreatRatio) end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Can path by land to closest enemy. Mod distance from start of threat='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; SearchRange='..iSearchRange..'; iThreatRatio='..iThreatRatio..'; aiBrain[M27AirOverseer.refiBomberDefenceModDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceModDistance]..'; aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]..'; iMinPDWanted='..iMinPDWanted..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) end
 
                                     if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iSearchRange then
                                         --Rect: Small X-Z; Large X-Z
@@ -9167,7 +9168,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                                         local iThreatOfPD = 0
                                         local iExistingPD = 0
-                                        if bDebugMessages == true then LOG(sFunctionRef..': rRect to search for PD='..repru(rRect)..'; is tUnitsOfInterest empty='..tostring(M27Utilities.IsTableEmpty(tUnitsOfInterest))) end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': rRect to search for PD='..repru(rRect)..'; is tUnitsOfInterest empty='..tostring(M27Utilities.IsTableEmpty(tUnitsOfInterest))..'; M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)='..tostring(M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain))) end
                                         if M27Utilities.IsTableEmpty(tUnitsOfInterest) == false then
                                             tUnitsOfInterest = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, tUnitsOfInterest)
                                             if M27Utilities.IsTableEmpty(tUnitsOfInterest) == false then
@@ -9197,7 +9198,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                                 iThreatRatio = math.min(iThreatRatio, 0.45)
                                             end
                                             if bDebugMessages == true then LOG(sFunctionRef..': iThreatOfPD='..iThreatOfPD..'; iEnemyThreat='..iEnemyThreat..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; iThreatRatio='..iThreatRatio..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]) end
-                                            if iThreatOfPD + 188 < iEnemyThreat / iThreatRatio or (iThreatOfPD <= 400 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7) then
+                                            if iEnemyThreat > 15 and (iThreatOfPD + 188 < iEnemyThreat / iThreatRatio or (iThreatOfPD <= 400 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7)) then
                                                 if iHighestFactoryOrEngineerTechAvailable >= 2 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.INDIRECTFIRE, tEnemyMobileGround)) then
                                                     iActionToAssign = refActionBuildEmergencyPD
                                                     iMaxEngisWanted = math.min(math.ceil(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]), 6)
@@ -9222,6 +9223,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         if iActionToAssign and bHaveLowPower and aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.9 and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildPower]) then
                             iMaxEngisWanted = math.min(iMaxEngisWanted, 3)
                         end
+                        bDebugMessages = false
                     elseif iCurrentConditionToTry == 5 then
                         if not(iActionToAssign) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 5 then
                             local bEnemyHasFatboy = false
@@ -11616,8 +11618,8 @@ end
 
 function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
     local sFunctionRef = 'DelayedEngiReassignment'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tRevisedEngisToReassign = {}
     local iRevisedEngisToReassign = 0
     --Below is redundancy to help protect from recursive loop that had happen once (hopefully cause was fixed but want this as backup since it crashes the game within 30s)
@@ -11628,9 +11630,7 @@ function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassig
             tRevisedEngisToReassign[iRevisedEngisToReassign] = oEngi
         end
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(1)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         if bDebugMessages == true then
             LOG(sFunctionRef..': Reassigning '..table.getn(tEngineersToReassign)..'engineers')
@@ -11641,7 +11641,6 @@ function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassig
         end
         ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function CheckAllEngineerLocations(aiBrain)
@@ -11974,7 +11973,6 @@ function EngineerInitialisation() end --Done to help find where we declare our v
 function EngineerManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'EngineerManager'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iLongLoopCount = 0
     local iLongLoopThreshold = 120
 
@@ -12038,12 +12036,9 @@ function EngineerManager(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': About to wait 10 ticks') end
         --TEMPTEST(aiBrain, sFunctionRef..': Pre wait 10 ticks')
         --]]
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then LOG(sFunctionRef..': End of cycle after waiting 10 ticks') end
         --TEMPTEST(aiBrain, sFunctionRef..': Post wait 10 ticks')
 
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

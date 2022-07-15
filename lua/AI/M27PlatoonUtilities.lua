@@ -1662,7 +1662,7 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
-    --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
+    if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and oPlatoon:GetBrain():GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -2233,7 +2233,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 7 then bDebugMessages = true end
-    --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
+    if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
     --if sPlatoonName == 'M27MobileStealth' then bDebugMessages = true end
@@ -6544,7 +6544,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
-            --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
+            if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = false end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
@@ -8407,8 +8407,6 @@ function HoldAndReenableFire(tUnitsToSynchronise, iMaxTimeToHold, iTimeToSpreadO
     --Hold fire to ensure are aligned
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'HoldAndReenableFire'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
     local iHoldFireState = 1
     local iReturnFireState = 0
 
@@ -8439,9 +8437,7 @@ function HoldAndReenableFire(tUnitsToSynchronise, iMaxTimeToHold, iTimeToSpreadO
     local iCount = 0
     while not(bAllReadyToFire) do
         iCount = iCount + 1 if iCount > 100 then M27Utilities.ErrorHandler('Infinite loop') break end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitSeconds(iInterval)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         iCurSecondsWaited = iCurSecondsWaited + iInterval
         --Check if all units can fire yet
         bAllReadyToFire = true
@@ -8480,18 +8476,11 @@ function HoldAndReenableFire(tUnitsToSynchronise, iMaxTimeToHold, iTimeToSpreadO
             if not(oUnit.Dead) then
                 oUnit:SetFireState(iReturnFireState)
                 if iUnit == 1 then
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     WaitSeconds(iDelayAfterFirstShot)
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                else
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                    WaitSeconds(iDelayBetweenUnit)
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                end
+                else WaitSeconds(iDelayBetweenUnit) end
             end
         end
     end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 
@@ -9802,6 +9791,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
+            if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
             --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
@@ -10855,6 +10845,7 @@ function ProcessPlatoonAction(oPlatoon)
                     if oPlatoon[refiCurrentAction] == refActionReissueMovementPath then ReissueMovementPath(oPlatoon, bDontClearActions) end
 
                 elseif oPlatoon[refiCurrentAction] == refActionUseAttackAI  then
+                    if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..oPlatoon[refiPlatoonCount]..' Army Index='..aiBrain:GetArmyIndex()..': will switch to using attackAI. Gametime='..GetGameTimeSeconds()) end
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionuseAttackAI') end
                     oPlatoon:SetAIPlan('M27AttackNearestUnits')
                 elseif oPlatoon[refiCurrentAction] == refActionDisband then
@@ -10934,9 +10925,7 @@ function ProcessPlatoonAction(oPlatoon)
                             end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Will now wait 1 tick and then disband platoon with ref='..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         WaitTicks(1)
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
                         if oPlatoon and aiBrain:PlatoonExists(oPlatoon) then
                             local tRemainingUnits = oPlatoon:GetPlatoonUnits()
@@ -11768,7 +11757,6 @@ function PlatoonInitialSetup(oPlatoon)
     --Updates platoon name and number of times its been called, then ensures segment pathing and mexes within the pathing group exist
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonInitialSetup'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --PROFILER NOTE - is included lower down due to waitticks
     local aiBrain = oPlatoon:GetBrain()
     local sPlatoonName = oPlatoon:GetPlan()
@@ -11798,9 +11786,7 @@ function PlatoonInitialSetup(oPlatoon)
         oPlatoon[refiCurrentAction] = refActionDisband
         if sPlatoonName == nil then sPlatoonName = 'NilName' end
         if bDebugMessages == true then LOG('WARNING - Platoon setup but no units in platoon so will disband in 1s if still the case. Platoon name='..sPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')) end
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then LOG('Finished waiting 10 ticks for '..sPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')) end
         tCurrentUnits = oPlatoon:GetPlatoonUnits()
         if M27Utilities.IsTableEmpty(tCurrentUnits) == true then
@@ -11812,6 +11798,7 @@ function PlatoonInitialSetup(oPlatoon)
             if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')..': Now have units after waiting 1s, so will proceed') end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if not(bAbort) then
         if bDebugMessages == true then LOG(sFunctionRef..': '..sPlatoonName..': Platoon has units so proceeding with intialisation; platoon front position='..repru(GetPlatoonFrontPosition(oPlatoon))) end
@@ -12038,7 +12025,6 @@ end
 function PlatoonCycler(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonCycler'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local aiBrain = oPlatoon:GetBrain()
     local sOrigPlatoonName = oPlatoon:GetPlan()
 
@@ -12055,9 +12041,7 @@ function PlatoonCycler(oPlatoon)
             while aiBrain:PlatoonExists(oPlatoon) and not(aiBrain.M27IsDefeated) do
                 if bDebugMessages == true then LOG(sFunctionRef..': About to run a platoon cycle for platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..'-'..oPlatoon[refiPlatoonUniqueCount]..'; GameTime='..GetGameTimeSeconds()) end
                 ForkThread(RunPlatoonSingleCycle, oPlatoon)
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitSeconds(1)
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 if bDebugMessages == true then LOG(sFunctionRef..': Waited 1s after running cycle, checking if platoon still valid; GameTime='..GetGameTimeSeconds()) end
                 if oPlatoon and oPlatoon.GetPlan and aiBrain then
                     if bDebugMessages == true then LOG(sFunctionRef..': Platoon still appears to be valid') end

@@ -557,9 +557,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
                                             end
                                         else
                                             function Unpause(oUnit, iWait)
-                                                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                                                 WaitSeconds(iWait)
-                                                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                                                 if M27UnitInfo.IsUnitValid(oUnit) then
                                                     oUnit:SetPaused(false)
                                                     oUnit[M27UnitInfo.refbPaused] = false
