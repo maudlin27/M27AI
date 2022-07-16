@@ -273,6 +273,11 @@ function DebugPrintACUPlatoon(aiBrain, bReturnPlanOnly)
     LOG('DebugPrintACUPlatoon: ACU platoon ref=' .. sPlan .. iCount .. ': Action=' .. iAction .. '; UnitState=' .. M27Logic.GetUnitState(oACUUnit))
 end
 
+function GetDistanceFromChokepointStartAdjustedForDistanceFromMid(aiBrain, tTarget)
+    --Done in case struggle to locate later - just use the map info function
+    return M27MapInfo.GetModChokepointDistance(aiBrain, tTarget)
+end
+
 function GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tTarget, bUseEnemyStartInstead)
     local sFunctionRef = 'GetDistanceFromStartAdjustedForDistanceFromMid'
     local bDebugMessages = false
@@ -6058,7 +6063,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
+    --if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
     --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
     local iBigThreatSearchRange = 10000
 
@@ -8378,7 +8383,14 @@ function OverseerManager(aiBrain)
     --ForkThread(M27MiscProfiling.LocalVariableImpact)
 
     --Log of basic info to help with debugging any replays we are sent (want this enabled/running as standard)
-    LOG('M27Brain overseer logic is active. Nickname=' .. aiBrain.Nickname .. '; ArmyIndex=' .. aiBrain:GetArmyIndex() .. '; Start position number=' .. aiBrain.M27StartPositionNumber .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; Nearest enemy brain details: Name=' .. tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain)].Nickname .. '; ArmyIndex=' .. M27Logic.GetNearestEnemyIndex(aiBrain) .. '; Start position=' .. M27Logic.GetNearestEnemyStartNumber(aiBrain) .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]))
+    local sBrainInfo = 'M27Brain overseer logic is active. Nickname=' .. aiBrain.Nickname .. '; ArmyIndex=' .. aiBrain:GetArmyIndex() .. '; Start position number=' .. aiBrain.M27StartPositionNumber .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; Nearest enemy brain details: Name=' .. tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain)].Nickname .. '; ArmyIndex=' .. M27Logic.GetNearestEnemyIndex(aiBrain) .. '; Start position=' .. M27Logic.GetNearestEnemyStartNumber(aiBrain) .. '; Start position=' .. repru(M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)])
+    if aiBrain.CheatEnabled then
+        sBrainInfo = sBrainInfo..' Cheating AI with modifier '..(ScenarioInfo.Options.CheatMult or 1)..'; HasMapOmni='..tostring(ScenarioInfo.Options.OmniCheat == 'on')
+    else
+        sBrainInfo = sBrainInfo..' Non-cheating AI'
+    end
+    LOG(sBrainInfo)
+
 
     --ForkThread(TempCreateReclaim, aiBrain)
 
@@ -8396,7 +8408,7 @@ function OverseerManager(aiBrain)
     while (not (aiBrain:IsDefeated())) do
         --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
-        if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
+        --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
         if aiBrain.M27IsDefeated then
             break
         end

@@ -1939,16 +1939,41 @@ function AllocateNewUnitsToPlatoonNotFromFactory(tNewUnits, iDelayInTicks)
     ForkThread(AllocateNewUnitToPlatoonBase, tNewUnits, true, iDelayInTicks)
 end
 
-
 function AllocateNewUnitToPlatoonFromFactory(oNewUnit, oFactory)
+    local sFunctionRef = 'AllocateNewUnitToPlatoonFromFactory'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if oNewUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewUnit) == 'drl02042' or oNewUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewUnit) == 'url010735' then bDebugMessages = true end
+
     if bDebugMessages == true then LOG('AllocateNewUnitToPlatoonFromFactory About to fork thread') end
     if not(oNewUnit.Dead) and not(oNewUnit.GetUnitId) then M27Utilities.ErrorHandler('oNewUnit doesnt have a unit ID so likely isnt a unit')
     elseif bDebugMessages == true then LOG('AllocateNewUnitToPlatoonFromFactory: oNewUnit='..oNewUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewUnit)) end
     oNewUnit[M27UnitInfo.refoFactoryThatBuildThis] = oFactory
     oNewUnit[M27Transport.refiAssignedPlateau] = oFactory[M27Transport.refiAssignedPlateau]
+
+    --Record location built from factory for pathfinding purposes for platoon logic
+    if not(oNewUnit[M27UnitInfo.refsPathing]) then
+        oNewUnit[M27UnitInfo.refsPathing] = M27UnitInfo.GetUnitPathingType(oNewUnit)
+        oNewUnit[M27UnitInfo.reftPathingGroupCount] = {}
+
+        local iCurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(oNewUnit[M27UnitInfo.refsPathing], oNewUnit:GetPosition())
+
+        oNewUnit[M27UnitInfo.reftLastLocationOfPathingGroup] = {}
+        oNewUnit[M27UnitInfo.reftLastLocationOfPathingGroup][1], oNewUnit[M27UnitInfo.reftLastLocationOfPathingGroup][2], oNewUnit[M27UnitInfo.reftLastLocationOfPathingGroup][3] = oNewUnit:GetPositionXYZ()
+        oNewUnit[M27UnitInfo.refiLastPathingGroup] =  iCurPathingGroup
+        oNewUnit[M27UnitInfo.reftPathingGroupCount][iCurPathingGroup] = (oNewUnit[M27UnitInfo.reftPathingGroupCount][iCurPathingGroup] or 0) + 5
+
+        if bDebugMessages == true then LOG(sFunctionRef..': oNewUnit='..oNewUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewUnit)..'; iCurPathingGroup='..iCurPathingGroup..'; count of pathing groups='..repru(oNewUnit[M27UnitInfo.reftPathingGroupCount])) end
+
+    end
+
+
     ForkThread(AllocateNewUnitToPlatoonBase, {oNewUnit}, false)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
+
+
 
 function AssignIdlePlatoonUnitsToPlatoons(aiBrain)
     local sFunctionRef = 'AssignIdlePlatoonUnitsToPlatoons'

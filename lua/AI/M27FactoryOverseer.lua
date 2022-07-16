@@ -370,7 +370,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
     local sFunctionRef = 'DetermineWhatToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory, oFactory.UnitId) and GetGameTimeSeconds() >= 300 and aiBrain:GetArmyIndex() == 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) >= 50 then bDebugMessages = true end
+    --if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory, oFactory.UnitId) and GetGameTimeSeconds() >= 300 and aiBrain:GetArmyIndex() == 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) >= 50 then bDebugMessages = true end
 
     --if oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory) == 'uab01017' then bDebugMessages = true end
 

@@ -9121,7 +9121,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                                     --Do we have a teammate with a chokepoint?
                                     if M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain) then
-                                        bDebugMessages = true
                                         --Teammate has a chokepoint so build far less PD
                                         iSearchRange = aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]
                                         iThreatRatio = 0.8
@@ -9223,7 +9222,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         if iActionToAssign and bHaveLowPower and aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.9 and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildPower]) then
                             iMaxEngisWanted = math.min(iMaxEngisWanted, 3)
                         end
-                        bDebugMessages = false
                     elseif iCurrentConditionToTry == 5 then
                         if not(iActionToAssign) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 5 then
                             local bEnemyHasFatboy = false

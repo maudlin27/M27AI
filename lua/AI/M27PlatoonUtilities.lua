@@ -1662,7 +1662,7 @@ function UpdatePlatoonActionIfStuck(oPlatoon)
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
-    if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and oPlatoon:GetBrain():GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
+    --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and oPlatoon:GetBrain():GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -2233,7 +2233,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 7 then bDebugMessages = true end
-    if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
+    --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
     --if sPlatoonName == 'M27MobileStealth' then bDebugMessages = true end
@@ -4829,7 +4829,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                 local iCurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], oPlatoon[refoFrontUnit]:GetPosition())
                 if not(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][iCurPathingGroup]) and M27Utilities.IsTableEmpty(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount]) == false then
                     --Likely pathing error unless the platoon has no other values
-                    if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..': Likely pathing error, will check pathing, cur segment group='..iCurPathingGroup..'; Front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])..'; Prev segment group counts for unit='..repru(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount])) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..': Likely pathing error, will check pathing, cur segment group='..iCurPathingGroup..'; Front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])..'; Prev segment group counts for unit='..repru((oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount] or {'nil'}))..';  FrontUnit[M27Transport.refiAssignedPlateau]='.. oPlatoon[refoFrontUnit][M27Transport.refiAssignedPlateau]..'; Segment group of start position='..M27MapInfo.GetSegmentGroupOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
                     if oPlatoon[refoFrontUnit][M27UnitInfo.refiLastPathingGroup] and oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][oPlatoon[refoFrontUnit][M27UnitInfo.refiLastPathingGroup]] >= 2 then
                         if M27MapInfo.RecheckPathingOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], oPlatoon[refoFrontUnit], oPlatoon[refoFrontUnit]:GetPosition(), oPlatoon[refoFrontUnit][M27UnitInfo.reftLastLocationOfPathingGroup], false) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Pathing has changed') end
@@ -4844,7 +4844,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                     oPlatoon[refoFrontUnit][M27UnitInfo.reftLastLocationOfPathingGroup][1], oPlatoon[refoFrontUnit][M27UnitInfo.reftLastLocationOfPathingGroup][2], oPlatoon[refoFrontUnit][M27UnitInfo.reftLastLocationOfPathingGroup][3] = oPlatoon[refoFrontUnit]:GetPositionXYZ()
                     oPlatoon[refoFrontUnit][M27UnitInfo.refiLastPathingGroup] =  iCurPathingGroup
                 end
-                oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][iCurPathingGroup] = (oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][iCurPathingGroup] or 0) + 1
+                oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][iCurPathingGroup] = (oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][iCurPathingGroup] or 0) + 1 --NOTE: AllocateNewUnitToPlatoonFromFactory will increase by 5 when a unit is first created to give a revised starting point
 
             else
                 if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Platoon has no valid front unit so will record our start position as the front position') end
@@ -6544,7 +6544,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
-            if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
+            --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = false end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
@@ -9791,7 +9791,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
-            if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
+            --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
             --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
