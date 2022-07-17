@@ -9243,7 +9243,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                             if bDebugMessages == true then LOG(sFunctionRef..': Contains mobile or direct or indirect fire') end
                                             break
 
-                                        elseif not(oUnit.IsCivilian) and not(M27Logic.IsCivilianBrain(oUnit:GetAIBrain())) then
+                                        elseif not(oUnit.IsCivilian) and (not(M27Logic.IsCivilianBrain(oUnit:GetAIBrain())) or aiBrain[M27Overseer.refbNoEnemies]) then
                                             bAllNoDamageCivlian = false
                                             if bDebugMessages == true then LOG(sFunctionRef..': Isnt civilian brain') end
                                             break

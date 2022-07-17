@@ -204,7 +204,7 @@ function GetAirSegmentFromPosition(tPosition)
 
     local sFunctionRef = 'GetAirSegmentFromPosition'
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Start of code')
+        LOG(sFunctionRef .. ': Start of code. iAirSegmentSize='..(iAirSegmentSize or 'nil')..'; tPosition='..repru(tPosition)..'; rPlayableArea='..repru(M27MapInfo.rMapPlayableArea))
     end
     local rPlayableArea = M27MapInfo.rMapPlayableArea
     local iSegmentX = math.ceil((tPosition[1] - rPlayableArea[1]) / iAirSegmentSize)
@@ -3056,6 +3056,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
         end
 
         --Update enemy base to lower of its current value and the value for an enemy base (as the primary enemy base location may be different to the start position)
+        if bDebugMessages == true then LOG(sFunctionRef..': Primary enemy base location='..repru((M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain) or {'nil'}))..'; Air segment='..(GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) or 'nil')) end
         local iEnemyBaseX, iEnemyBaseZ = GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
         aiBrain[reftAirSegmentTracker][iEnemyBaseX][iEnemyBaseZ][refiNormalScoutingIntervalWanted] = math.min(aiBrain[reftAirSegmentTracker][iEnemyBaseX][iEnemyBaseZ][refiNormalScoutingIntervalWanted], aiBrain[refiIntervalEnemyBase])
     end

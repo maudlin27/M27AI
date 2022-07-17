@@ -371,6 +371,7 @@ function RecordPlayerStartLocations()
     local sFunctionRef = 'RecordPlayerStartLocations'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMarkerType = 3
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. bUsingArmyIndexForStartPosition='..tostring((bUsingArmyIndexForStartPosition or false))) end
     if not(bUsingArmyIndexForStartPosition) then
         for i = 1, 16 do
             local tempPos = ScenarioUtils.GetMarker('ARMY_'..i).position
@@ -394,6 +395,7 @@ function RecordPlayerStartLocations()
             if bDebugMessages == true then LOG(sFunctionRef..': Brain name='..oBrain.Name..'; iBrain='..iBrain..'; Start position='..repru(PlayerStartPoints[oBrain:GetArmyIndex()])) end
         end
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, PlayerStartPoints='..repru(PlayerStartPoints)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -4241,6 +4243,13 @@ function IsEnemyStartPositionValid(aiBrain, tEnemyBase)
     return true
 end
 
+function GetOppositeLocation(tLocation)
+    --Returns a point on the opposite side of the map to tLocation
+    local tOpposite = {rMapPlayableArea[3] - tLocation[1] + rMapPlayableArea[1], 0, rMapPlayableArea[4] - tLocation[3] + rMapPlayableArea[2]}
+    tOpposite[2] = GetSurfaceHeight(tOpposite[1], tOpposite[3])
+    return tOpposite
+end
+
 function UpdateNewPrimaryBaseLocation(aiBrain)
     --Updates reftPrimaryEnemyBaseLocation to the nearest enemy start position (unless there are no structures there in which case it searches for a better start position)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -4250,59 +4259,96 @@ function UpdateNewPrimaryBaseLocation(aiBrain)
     --local refiTimeOfLastUpdate = 'M27RefTimeOfLastLocationUpdate'
     --LOG('UpdateNewPrimaryBaseLocation: aiBrain='..aiBrain:GetArmyIndex()..'; Start position='..(aiBrain.M27StartPositionNumber or 'nil'))
     if not(M27Logic.IsCivilianBrain(aiBrain)) and not(aiBrain.M27IsDefeated) and not(aiBrain:IsDefeated()) then
-        local tEnemyBase = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
         local tPrevPosition
         if aiBrain[reftPrimaryEnemyBaseLocation] then tPrevPosition = {aiBrain[reftPrimaryEnemyBaseLocation][1], aiBrain[reftPrimaryEnemyBaseLocation][2], aiBrain[reftPrimaryEnemyBaseLocation][3]} end
-        --Is this different from the current location we are using?
-        if not(tEnemyBase[1] == aiBrain[reftPrimaryEnemyBaseLocation][1]) or not(tEnemyBase[3] == aiBrain[reftPrimaryEnemyBaseLocation][3]) then aiBrain[refiLastTimeCheckedEnemyBaseLocation] = -1000 end
-        aiBrain[reftPrimaryEnemyBaseLocation] = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]} --Default
-        if aiBrain.M27AI then
-            --Consider if we want to check for alternative locations to the actual enemy start:
-            --Have we recently checked for a base location; --Do we have at least T2 (as a basic guide that this isn't the start of the game), has at least 3m of gametime elapsed, and have scouted the enemy base location recently, and have built at least 1 air scout this game?
-            if GetGameTimeSeconds() - (aiBrain[refiLastTimeCheckedEnemyBaseLocation] or -1000) >= 10 and GetGameTimeSeconds() >= 180 then
-                --(below includes alternative condition just in case there are strange unit restrictions)
-                if (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout, 2))) or (M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) == false and GetGameTimeSeconds() >= 600) then
-                    if not(IsEnemyStartPositionValid(aiBrain, tEnemyBase)) then
-                        aiBrain[reftPrimaryEnemyBaseLocation] = nil
-                        local iNearestEnemyBase = 10000
-                        local tNearestEnemyBase
-                        --Cycle through every valid enemy brain and pick the nearest one, if there is one
-                        if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through each brain to identify nearest enemy base') end
-                        for iCurBrain, brain in ArmyBrains do
-                            if not(brain == aiBrain) and not(M27Logic.IsCivilianBrain(brain)) and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()) and (not(brain:IsDefeated()) or not(ScenarioInfo.Options.Victory == "demoralization")) then
-                                if M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber]) < iNearestEnemyBase then
-                                    if IsEnemyStartPositionValid(aiBrain, PlayerStartPoints[brain.M27StartPositionNumber]) then
-                                        iNearestEnemyBase = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                        tNearestEnemyBase = {PlayerStartPoints[brain.M27StartPositionNumber][1], PlayerStartPoints[brain.M27StartPositionNumber][2], PlayerStartPoints[brain.M27StartPositionNumber][3]}
-                                    end
-                                end
-                            end
-                        end
-                        aiBrain[reftPrimaryEnemyBaseLocation] = tNearestEnemyBase
-                        if not(aiBrain[reftPrimaryEnemyBaseLocation]) then
-                            local tiCategoriesToConsider = {M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryAirFactory + M27UnitInfo.refCategoryLandFactory}
-                            local tEnemyUnits
-                            tNearestEnemyBase = nil
-                            for iRef, iCategory in tiCategoriesToConsider do
-                                tEnemyUnits = aiBrain:GetUnitsAroundPoint(iCategory, PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
-                                if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
-                                    tNearestEnemyBase = M27Utilities.GetNearestUnit(tEnemyUnits, PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, nil, nil):GetPosition()
-                                    break
-                                end
-                            end
-                            if tNearestEnemyBase then aiBrain[reftPrimaryEnemyBaseLocation] = tNearestEnemyBase
-                            else
-                                --Cant find anywhere so just pick the furthest away enemy start location
-                                iNearestEnemyBase = 10000
-                                for iCurBrain, brain in ArmyBrains do
-                                    if not(brain == aiBrain) and not(M27Logic.IsCivilianBrain(brain)) and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()) then
-                                        if M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber]) < iNearestEnemyBase then
+
+        if aiBrain[M27Overseer.refbNoEnemies] then
+            local tFriendlyBrainStartPoints = {}
+            local iFriendlyBrainCount = 1
+            tFriendlyBrainStartPoints[iFriendlyBrainCount] = {PlayerStartPoints[aiBrain.M27StartPositionNumber][1], PlayerStartPoints[aiBrain.M27StartPositionNumber][2], PlayerStartPoints[aiBrain.M27StartPositionNumber][3]}
+            if bDebugMessages == true then LOG(sFunctionRef..': Have no enemies, so will get average of friendly brain start points provided not the centre of the map. Is table of ally brains empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]))) end
+
+            local bUseOurStart = false
+
+
+
+            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+                for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering ally brain index='..oBrain:GetArmyIndex()..'; Nickname='..(oBrain.Nickname or 'nil')..'; Start point='..repru((PlayerStartPoints[oBrain.M27StartPositionNumber] or {'nil'}))) end
+                    if not(oBrain == aiBrain) then
+                        iFriendlyBrainCount = iFriendlyBrainCount + 1
+                        tFriendlyBrainStartPoints[iFriendlyBrainCount] = {PlayerStartPoints[oBrain.M27StartPositionNumber][1], PlayerStartPoints[oBrain.M27StartPositionNumber][2], PlayerStartPoints[oBrain.M27StartPositionNumber][3]}
+                    end
+                end
+                local tAverageTeamPosition = M27Utilities.GetAverageOfLocations(tFriendlyBrainStartPoints)
+                if bDebugMessages == true then LOG(sFunctionRef..': iFriendlyBrainCount='..iFriendlyBrainCount..'; Friendly brain start points='..repru((tFriendlyBrainStartPoints or {'nil'}))..'; tAverageTeamPosition='..repru(tAverageTeamPosition)..'; rMapPlayableArea='..repru(rMapPlayableArea)) end
+
+                if M27Utilities.GetDistanceBetweenPositions(tAverageTeamPosition, {rMapPlayableArea[1] + (rMapPlayableArea[3] - rMapPlayableArea[1])*0.5, 0, rMapPlayableArea[2] + (rMapPlayableArea[4] - rMapPlayableArea[2])*0.5}) <= 50 then
+                    --Average is really close to middle of the map, so just  assume enemy base is in the opposite direction to us
+                    aiBrain[reftPrimaryEnemyBaseLocation] = GetOppositeLocation(tAverageTeamPosition)
+                else
+                    --Average isnt really close to mid of map, so assume enemy base is in opposite directino to average
+                    bUseOurStart = true
+                end
+            else
+                bUseOurStart = true
+            end
+            if bUseOurStart then
+                aiBrain[reftPrimaryEnemyBaseLocation] = GetOppositeLocation(PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            end
+        else
+            local tEnemyBase = PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]
+            --Is this different from the current location we are using?
+            if not(tEnemyBase[1] == aiBrain[reftPrimaryEnemyBaseLocation][1]) or not(tEnemyBase[3] == aiBrain[reftPrimaryEnemyBaseLocation][3]) then aiBrain[refiLastTimeCheckedEnemyBaseLocation] = -1000 end
+            aiBrain[reftPrimaryEnemyBaseLocation] = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]} --Default
+            if aiBrain.M27AI then
+                --Consider if we want to check for alternative locations to the actual enemy start:
+                --Have we recently checked for a base location; --Do we have at least T2 (as a basic guide that this isn't the start of the game), has at least 3m of gametime elapsed, and have scouted the enemy base location recently, and have built at least 1 air scout this game?
+                if GetGameTimeSeconds() - (aiBrain[refiLastTimeCheckedEnemyBaseLocation] or -1000) >= 10 and GetGameTimeSeconds() >= 180 then
+                    --(below includes alternative condition just in case there are strange unit restrictions)
+                    if (aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] >= 2 and not(M27Conditions.LifetimeBuildCountLessThan(aiBrain, M27UnitInfo.refCategoryAirScout, 2))) or (M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) == false and GetGameTimeSeconds() >= 600) then
+                        if not(IsEnemyStartPositionValid(aiBrain, tEnemyBase)) then
+                            aiBrain[reftPrimaryEnemyBaseLocation] = nil
+                            local iNearestEnemyBase = 10000
+                            local tNearestEnemyBase
+                            --Cycle through every valid enemy brain and pick the nearest one, if there is one
+                            if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through each brain to identify nearest enemy base') end
+                            for iCurBrain, brain in ArmyBrains do
+                                if not(brain == aiBrain) and not(M27Logic.IsCivilianBrain(brain)) and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()) and (not(brain:IsDefeated()) or not(ScenarioInfo.Options.Victory == "demoralization")) then
+                                    if M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber]) < iNearestEnemyBase then
+                                        if IsEnemyStartPositionValid(aiBrain, PlayerStartPoints[brain.M27StartPositionNumber]) then
                                             iNearestEnemyBase = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                             tNearestEnemyBase = {PlayerStartPoints[brain.M27StartPositionNumber][1], PlayerStartPoints[brain.M27StartPositionNumber][2], PlayerStartPoints[brain.M27StartPositionNumber][3]}
                                         end
                                     end
                                 end
-                                aiBrain[reftPrimaryEnemyBaseLocation] = tNearestEnemyBase
+                            end
+                            aiBrain[reftPrimaryEnemyBaseLocation] = tNearestEnemyBase
+                            if not(aiBrain[reftPrimaryEnemyBaseLocation]) then
+                                local tiCategoriesToConsider = {M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryT3Mex, M27UnitInfo.refCategoryT2Mex, M27UnitInfo.refCategoryAirFactory + M27UnitInfo.refCategoryLandFactory}
+                                local tEnemyUnits
+                                tNearestEnemyBase = nil
+                                for iRef, iCategory in tiCategoriesToConsider do
+                                    tEnemyUnits = aiBrain:GetUnitsAroundPoint(iCategory, PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
+                                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                                        tNearestEnemyBase = M27Utilities.GetNearestUnit(tEnemyUnits, PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, nil, nil):GetPosition()
+                                        break
+                                    end
+                                end
+                                if tNearestEnemyBase then aiBrain[reftPrimaryEnemyBaseLocation] = tNearestEnemyBase
+                                else
+                                    --Cant find anywhere so just pick the furthest away enemy start location
+                                    iNearestEnemyBase = 10000
+                                    for iCurBrain, brain in ArmyBrains do
+                                        if not(brain == aiBrain) and not(M27Logic.IsCivilianBrain(brain)) and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()) then
+                                            if M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber]) < iNearestEnemyBase then
+                                                iNearestEnemyBase = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                                tNearestEnemyBase = {PlayerStartPoints[brain.M27StartPositionNumber][1], PlayerStartPoints[brain.M27StartPositionNumber][2], PlayerStartPoints[brain.M27StartPositionNumber][3]}
+                                            end
+                                        end
+                                    end
+                                    aiBrain[reftPrimaryEnemyBaseLocation] = tNearestEnemyBase
+                                end
                             end
                         end
                     end
@@ -4317,6 +4363,7 @@ function UpdateNewPrimaryBaseLocation(aiBrain)
         end
     elseif bDebugMessages == true then LOG(sFunctionRef..': Dealing with a civilian brain')
     end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code, primary enemy base location='..repru(aiBrain[reftPrimaryEnemyBaseLocation])) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -4665,7 +4712,7 @@ function IdentifyTeamChokepoints(aiBrain)
             --Get all friendly M27AI (including htis one) who are in the same land pathing group and on a similar part of the map
             for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
                 if not(oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering oBrain with index='..oBrain:GetArmyIndex()..'; .M27AI='..tostring(oBrain.M27AI or false)..'; pathing group='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber])) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering oBrain with index='..oBrain:GetArmyIndex()..'; .M27AI='..tostring(oBrain.M27AI or false)..'; pathing group='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber])..'; land pathing group='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber])..'; iLandPathingGroupWanted='..iLandPathingGroupWanted) end
                     if bPlayersAreGroupedTogether and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber]) == iLandPathingGroupWanted then
                         iAngleToNearestEnemy = M27Utilities.GetAngleFromAToB(PlayerStartPoints[oBrain.M27StartPositionNumber], GetPrimaryEnemyBaseLocation(oBrain))
                         if bDebugMessages == true then LOG(sFunctionRef..': iAngleToNearestEnemy='..iAngleToNearestEnemy..'; iOurAngleToNearestEnemy='..iOurAngleToNearestEnemy) end
@@ -4701,10 +4748,35 @@ function IdentifyTeamChokepoints(aiBrain)
             if bPlayersAreGroupedTogether then
 
                 for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Considering brain '..oBrain.Name..' with index='..oBrain:GetArmyIndex()..'; Start position number='..(oBrain.M27StartPositionNumber or 'nil')..'; Start point='..repru(PlayerStartPoints[oBrain.M27StartPositionNumber])..'; pathing group='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber])..'; land pathing group='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber])..'; iLandPathingGroupWanted='..iLandPathingGroupWanted)
+                        if aiBrain[M27Overseer.refbNoEnemies] then
+                            LOG(sFunctionRef..': No enemies so will draw the brain start point in Cyan')
+                            M27Utilities.DrawLocation(PlayerStartPoints[oBrain.M27StartPositionNumber], nil, 6, 1000)
+                        end
+                    end
                     --Include all enemies who are in the same land pathing group
                     if GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber]) == iLandPathingGroupWanted then
                         iEnemyCount = iEnemyCount + 1
                         tAllEnemyStartPoints[iEnemyCount] = {PlayerStartPoints[oBrain.M27StartPositionNumber][1], PlayerStartPoints[oBrain.M27StartPositionNumber][2], PlayerStartPoints[oBrain.M27StartPositionNumber][3]}
+                        --Special logic for where no enemies and are fighting against a civilian - check points around the start position to see if any of these are in the same pathing group
+                    elseif aiBrain[M27Overseer.refbNoEnemies] then
+                        local tAdjustedStartPosition
+                        for iAngle = 0, 360, 45 do
+                            tAdjustedStartPosition = M27Utilities.MoveInDirection(PlayerStartPoints[oBrain.M27StartPositionNumber], iAngle, 30, true)
+                            if GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, tAdjustedStartPosition) == iLandPathingGroupWanted then
+                                iEnemyCount = iEnemyCount + 1
+                                tAllEnemyStartPoints[iEnemyCount] = {tAdjustedStartPosition[1], tAdjustedStartPosition[2], tAdjustedStartPosition[3]}
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef..': Found valid alternative start point='..repru(tAdjustedStartPosition)..'; will draw in white')
+                                    M27Utilities.DrawLocation(PlayerStartPoints[oBrain.M27StartPositionNumber], nil, 7, 1000)
+                                    break
+                                end
+                            elseif bDebugMessages == true then
+                                LOG(sFunctionRef..': tAdjustedStartPosition isnt in the same pathing group either, position='..repru(tAdjustedStartPosition)..'; will draw in red')
+                                M27Utilities.DrawLocation(PlayerStartPoints[oBrain.M27StartPositionNumber], nil, 2, 1000)
+                            end
+                        end
                     end
                 end
 
@@ -5045,7 +5117,6 @@ function IdentifyTeamChokepoints(aiBrain)
                         if not(iBestChokepointDistFromStart) or M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart]) then
                             bAbort = true
                         else
-                            bDebugMessages = true
                             --------------------->>>>>>>>>>>>>>>>Decide on build locations for chokepoints and then assign to M27 AI<<<<<<<<<<<<<----------------------
                             for iChokepointCount, tChokepointSubtables in M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
                                 M27Overseer.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart][iChokepointCount] = iBestChokepointDistFromStart

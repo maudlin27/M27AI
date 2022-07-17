@@ -758,7 +758,7 @@ function GetAIBrainArmyNumber(aiBrain)
         --if bDebugMessages == true then LOG('GetAIBrainArmyNumber: aiBrain.Name='..aiBrain.Name..'; string.sub5='..string.sub(aiBrain.Name, (string.len(aiBrain.Name)-5))..'; string.sub7='..string.sub(aiBrain.Name, (string.len(aiBrain.Name)-7))..'; string.sub custom='..string.sub(aiBrain.Name, 6, string.len(aiBrain.Name) - 6)..'string.sub custom2='..string.sub(aiBrain.Name, 6, 1)..'; sub custom3='..string.sub(aiBrain.Name, 6, 2)..'; tostring'..string.sub(tostring(aiBrain.Name), 3, 2)..'; gsub='..string.gsub(aiBrain.Name, 'ARMY_', '')) end
 
         local sArmyNumber = string.gsub(aiBrain.Name, 'ARMY_', '')
-        if bDebugMessages == true then LOG('GetAIBrainArmyNumber: sArmyNumber='..sArmyNumber..'; M27MapInfo.bUsingArmyIndexForStartPosition='..tostring(M27MapInfo.bUsingArmyIndexForStartPosition)) end
+        if bDebugMessages == true then LOG('GetAIBrainArmyNumber: Start of code. sArmyNumber='..sArmyNumber..'; M27MapInfo.bUsingArmyIndexForStartPosition='..tostring(M27MapInfo.bUsingArmyIndexForStartPosition)) end
         if not(M27MapInfo.bUsingArmyIndexForStartPosition) then
             if string.len(sArmyNumber) <= 2 then
                 if M27MapInfo.bUsingArmyIndexForStartPosition then
@@ -772,8 +772,8 @@ function GetAIBrainArmyNumber(aiBrain)
         end
         if not(M27MapInfo.bUsingArmyIndexForStartPosition) then
             --Is this a non-civilian brain?
-            if not(M27Logic.IsCivilianBrain(aiBrain)) then
-                ErrorHandler('Army reference for '..aiBrain.Name..' doesnt use numbers, so will overwrite all brains start position number to be the army index number and hten use armyindex going forwards', true)
+            if not(M27Logic.IsCivilianBrain(aiBrain)) or aiBrain[M27Overseer.refbNoEnemies] then
+                ErrorHandler('Army reference for '..aiBrain.Name..' doesnt use numbers (or we have no enemies and are considering civilians), so will overwrite all brains start position number to be the army index number and hten use armyindex going forwards', true)
                 M27MapInfo.bUsingArmyIndexForStartPosition = true
                 for iBrain, oBrain in ArmyBrains do
                     oBrain.M27StartPositionNumber = oBrain:GetArmyIndex()
@@ -817,8 +817,11 @@ function GetACU(aiBrain)
             end
         end
         if IsTableEmpty(tSubstitutes) then
-            ErrorHandler('Dont have a valid substitute ACU so will treat aiBrain '..aiBrain:GetArmyIndex()..' as being defeated')
-            M27Events.OnPlayerDefeated(aiBrain)
+            if not(M27Logic.IsCivilianBrain(aiBrain)) then
+                --(if dealing with a civilian brian might be because have no enemies, hence only do the below if its a civilian brain)
+                ErrorHandler('Dont have a valid substitute ACU so will treat aiBrain '..aiBrain:GetArmyIndex()..' as being defeated unless it is a civilian brain')
+                M27Events.OnPlayerDefeated(aiBrain)
+            end
         else
             aiBrain[M27Overseer.refoStartingACU] = GetNearestUnit(tSubstitutes, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain)
             if not(aiBrain[M27Overseer.refoStartingACU] and not(aiBrain[M27Overseer.refoStartingACU].Dead)) then
@@ -1076,10 +1079,15 @@ function CanSeeUnit(aiBrain, oUnit, bTrueIfOnlySeeBlip)
         local bCanSeeUnit = false
         local iArmyIndex = aiBrain:GetArmyIndex()
         if not(oUnit.Dead) then
-            local oBlip = oUnit:GetBlip(iArmyIndex)
-            if oBlip then
-                if bTrueIfOnlySeeBlip then return true
-                elseif oBlip:IsSeenEver(iArmyIndex) then return true end
+            if not(oUnit.GetBlip) then
+                ErrorHandler('oUnit with UnitID='..(oUnit.UnitId or 'nil')..' has no blip, will assume can see it')
+                return true
+            else
+                local oBlip = oUnit:GetBlip(iArmyIndex)
+                if oBlip then
+                    if bTrueIfOnlySeeBlip then return true
+                    elseif oBlip:IsSeenEver(iArmyIndex) then return true end
+                end
             end
         end
     end
