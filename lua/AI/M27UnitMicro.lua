@@ -817,41 +817,47 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                     --Check we aren't running before considering whether to target walls or T2 PDs
                     if not(oPlatoon[M27PlatoonUtilities.refbHavePreviouslyRun] == true or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionRun or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionTemporaryRetreat or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionReturnToBase or oPlatoon[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionGoToNearestRallyPoint or (M27Utilities.IsACU(oUnitWithOvercharge) and oUnitWithOvercharge:GetHealth() < aiBrain[M27Overseer.refiACUHealthToRunOn])) then
                         --No decent combat targets; Check for lots of walls that might be blocking our path (dont reduce ACU range given these are structures)
-                        tEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.WALL, tUnitPosition, iACURange, 'Enemy')
-                        if bDebugMessages == true then LOG(sFunctionRef..': iMostMassDamage='..iMostMassDamage..'; so will check for walls and other structure targets; is table of wall units empty='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
-                        if M27Utilities.IsTableEmpty(tEnemyUnits) == false and table.getn(tEnemyUnits) >= 5 then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have at least 5 wall units in range, so potential blockage; size='..table.getn(tEnemyUnits)) end
-                            local bSuspectedPathBlock = false
-                            --If more than 10 then assume blocking our path
-                            if table.getn(tEnemyUnits) >= 10 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': At least 10 wall units so assuming a blockage') end
-                                bSuspectedPathBlock = true
-                            else
-                                local tFirstWall = tEnemyUnits[1]:GetPosition()
-                                for iWall, oWall in tEnemyUnits do
-                                    if iWall > 1 then
-                                        if M27Utilities.GetDistanceBetweenPositions(oWall:GetPosition(), tFirstWall) >= 4 then
-                                            bSuspectedPathBlock = true
-                                            break
+                        --Only consider overcharging walls if no enemies within our combat range + 3
+                        if M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.refiEnemyWalls] >= 9 then
+                            local tAllEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface, tUnitPosition, iACURange + 3, 'Enemy')
+                            if M27Utilities.IsTableEmpty(tAllEnemies) then
+                                tEnemyUnits = aiBrain:GetUnitsAroundPoint(categories.WALL, tUnitPosition, iACURange, 'Enemy')
+                                if bDebugMessages == true then LOG(sFunctionRef..': iMostMassDamage='..iMostMassDamage..'; so will check for walls and other structure targets; is table of wall units empty='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+                                if M27Utilities.IsTableEmpty(tEnemyUnits) == false and table.getn(tEnemyUnits) >= 5 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have at least 5 wall units in range, so potential blockage; size='..table.getn(tEnemyUnits)) end
+                                    local bSuspectedPathBlock = false
+                                    --If more than 10 then assume blocking our path
+                                    if table.getn(tEnemyUnits) >= 10 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': At least 10 wall units so assuming a blockage') end
+                                        bSuspectedPathBlock = true
+                                    else
+                                        local tFirstWall = tEnemyUnits[1]:GetPosition()
+                                        for iWall, oWall in tEnemyUnits do
+                                            if iWall > 1 then
+                                                if M27Utilities.GetDistanceBetweenPositions(oWall:GetPosition(), tFirstWall) >= 4 then
+                                                    bSuspectedPathBlock = true
+                                                    break
+                                                end
+                                            end
                                         end
                                     end
-                                end
-                            end
-                            if bSuspectedPathBlock then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Think enemy has walls in a line so will overcharge them') end
-                                iMostMassDamage = 0
-                                oMostMassDamage = nil
-                                for iWall, oUnit in tEnemyUnits do
-                                    if WillShotHit(oUnitWithOvercharge, oUnit) then
-                                        iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage, true)
-                                        if iCurDamageDealt > iMostMassDamage then
-                                            iMostMassDamage = iCurDamageDealt
-                                            oMostMassDamage = oUnit
+                                    if bSuspectedPathBlock then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Think enemy has walls in a line so will overcharge them') end
+                                        iMostMassDamage = 0
+                                        oMostMassDamage = nil
+                                        for iWall, oUnit in tEnemyUnits do
+                                            if WillShotHit(oUnitWithOvercharge, oUnit) then
+                                                iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage, true)
+                                                if iCurDamageDealt > iMostMassDamage then
+                                                    iMostMassDamage = iCurDamageDealt
+                                                    oMostMassDamage = oUnit
+                                                end
+                                            end
                                         end
+                                        if oMostMassDamage then oOverchargeTarget = oMostMassDamage end
+                                    elseif bDebugMessages == true then LOG(sFunctionRef..': Dont think the walls are in a line so wont try and OC')
                                     end
                                 end
-                                if oMostMassDamage then oOverchargeTarget = oMostMassDamage end
-                            elseif bDebugMessages == true then LOG(sFunctionRef..': Dont think the walls are in a line so wont try and OC')
                             end
                         end
                         if not(oOverchargeTarget) and not(M27Overseer.refbAreBigThreats) then --Is there enemy T2PD nearby (out of our range)?

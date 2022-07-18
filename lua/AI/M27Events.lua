@@ -155,6 +155,26 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         aiBrain[M27Overseer.refiSkirmisherMassKills] = aiBrain[M27Overseer.refiSkirmisherMassKills] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
                     elseif EntityCategoryContains(M27UnitInfo.refCategorySatellite, instigator.UnitId) then
                         ForkThread(M27AirOverseer.NovaxCoreTargetLoop, oKillerBrain, instigator, true)
+                    elseif EntityCategoryContains(M27UnitInfo.refCategoryBomber * categories.TECH1,  instigator.UnitId) and M27UnitInfo.IsUnitValid(instigator) then
+                        if M27UnitInfo.GetUnitLifetimeCount(instigator) == 4 then bDebugMessages = true end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Killer unit='..instigator.UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator)..'; is instigator valid='..tostring(M27UnitInfo.IsUnitValid(instigator))..'; unit killed='..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)) end
+                        if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnitKilled.UnitId) then
+                            --T1 mex just killed by T1 bomber - get bomber to target nearby enemy engineer (if any)
+                            ForkThread(M27AirOverseer.OneOffTargetNearbyEngineer, oKillerBrain, instigator)
+                        else
+                            --if just killed an engineer that were trying to kill then also look to kill another nearby engineer (this wont run if this is an engi hunter bomber, i.e. intended for bombers that targeted an engi in the above logic)
+                            if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnitKilled.UnitId) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to target another engineer as just killed one. Cur target number='..(instigator[M27AirOverseer.refiCurTargetNumber] or 'nil')..'; is target list empty='..tostring(M27Utilities.IsTableEmpty(instigator[M27AirOverseer.reftTargetList]))) end
+                                if instigator[M27AirOverseer.refiCurTargetNumber] and M27Utilities.IsTableEmpty(instigator[M27AirOverseer.reftTargetList]) == false then
+                                    local oBomberTarget = instigator[M27AirOverseer.reftTargetList][instigator[M27AirOverseer.refiCurTargetNumber]][M27AirOverseer.refiShortlistUnit]
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oBomberTarget='..oBomberTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomberTarget)) end
+                                    if oBomberTarget == oUnitKilled then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will look for another nearby engineer to target') end
+                                        ForkThread(M27AirOverseer.OneOffTargetNearbyEngineer, oKillerBrain, instigator)
+                                    end
+                                end
+                            end
+                        end
                     end
                 end
 

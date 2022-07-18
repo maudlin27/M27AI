@@ -34,6 +34,8 @@ tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide in
 reftFriendlyActiveM27Brains = 'M27OverseerTeamFriendlyM27Brains' --Stored against tTeamData[brain.M27Team], returns table of all M27 brains on the same team (including this one), with a key of the army index
 iTotalTeamCount = 0 --Number of teams in the game
 subrefNukeLaunchLocations = 'M27OverseerTeamNukeTargets' --stored against tTeamData[brain.M27Team], [x] is gametimeseconds, returns the location of a nuke target
+refiEnemyWalls = 'M27OverseerTeamEnemyWallCount' --stored against tTeamData[brain.M27Team], returns the ntotal number of enemy wall units; used as threshold to enable engineers to start looking for wall segments to reclaim
+refiTimeOfLastEnemyTeamDataUpdate = 'M27OverseerTeamEnemyLastUpdate' --as above, returns the gametimeseconds of hte last update
 
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
@@ -6057,6 +6059,17 @@ function CheckUnitCap(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function UpdateTeamDataForEnemyUnits(aiBrain)
+    if GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamDataUpdate] or 0) >= 9.9 then
+        tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamDataUpdate] = GetGameTimeSeconds()
+        local iWallCount = 0
+        for iBrain, oBrain in aiBrain[toEnemyBrains] do
+            iWallCount = iWallCount + oBrain:GetCurrentUnits(M27UnitInfo.refCategoryWall)
+        end
+        tTeamData[aiBrain.M27Team][refiEnemyWalls] = iWallCount
+    end
+end
+
 function StrategicOverseer(aiBrain, iCurCycleCount)
     --also features 'state of game' logs
     local bDebugMessages = false
@@ -6301,6 +6314,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 end
             end
         end
+
+        ForkThread(UpdateTeamDataForEnemyUnits, aiBrain) --Currently updates number of wall units but could add other logic to this
 
         --Below should be updated as part of the SetWhetherCanPathToEnemy function in M27MapInfo now
         --[[local iNearestEnemyArmyIndex = M27Logic.GetNearestEnemyIndex(aiBrain)

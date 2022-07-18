@@ -1471,7 +1471,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
         end
 
         function CheckForSelenBuildMexOrder(oEngineer, tMexLocation)
-        --Checks if selen is blocking mex construction and if so does attack-move followed by a new build mex order
+            --Checks if selen is blocking mex construction and if so does attack-move followed by a new build mex order
             local tEnemiesOnTarget = GetUnitsInRect(Rect(tMexLocation[1] - 1.5, tMexLocation[3] - 1.5, tMexLocation[1] + 1.5, tMexLocation[3] + 1.5))
             if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemies at target empty='..tostring(M27Utilities.IsTableEmpty(tEnemiesOnTarget))) end
             if M27Utilities.IsTableEmpty(tEnemiesOnTarget) == false then
@@ -1543,7 +1543,24 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
             end
         end
     end
-    --end
+
+    --Enemy walls in range logic
+    if bDebugMessages == true then LOG(sFunctionRef..': Just before checking for nearby walls. bAreNearbyEnemies='..tostring(bAreNearbyEnemies)..'; Enemy walls total count='..(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.refiEnemyWalls] or 0)) end
+    if not(bAreNearbyEnemies) and (M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.refiEnemyWalls] or 0) >= 9 and not(oEngineer:IsUnitState('Reclaiming')) then
+        --Only consider if engineer is relatively far from base
+        if M27Utilities.GetDistanceBetweenPositions(tEngPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 80 then
+            local iBuildRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
+            local tNearbyWalls = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryWall, tEngPosition, iBuildRange, 'Enemy')
+            if M27Utilities.IsTableEmpty(tNearbyWalls) == false then
+                local oNearestWall = M27Utilities.GetNearestUnit(tNearbyWalls, tEngPosition)
+                if oNearestWall then
+                    IssueClearCommands({oEngineer})
+                    IssueReclaim({oEngineer}, oNearestWall)
+                    ReissueEngineerOldOrders(aiBrain, oEngineer, false)
+                end
+            end
+        end
+    end
 
 
     --oEngineer[refbEngineerHasNearbyEnemies] = bAreNearbyEnemies
