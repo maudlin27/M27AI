@@ -5114,7 +5114,16 @@ function AirBomberManager(aiBrain)
                                     LOG(sFunctionRef .. ': CurPriority=' .. iCurPriority .. '; Considering whether to add enemy ACU to bomber target. Mod distance for enemy ACU=' .. iCurModDistance .. '; aiBrain[refiBomberDefenceModDistance]=' .. aiBrain[refiBomberDefenceModDistance])
                                 end
                                 if iCurModDistance <= aiBrain[refiBomberDefenceModDistance] then
-                                    AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, iCurModDistance)
+                                    if iCurModDistance <= aiBrain[refiBomberDefenceCriticalDistance] or aiBrain[M27Overseer.refiLastNearestACUDistance] <= 150 then
+                                        AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, iCurModDistance)
+                                    else
+                                        --Only add ACU if it has no shield under it and no T3+ AA
+                                        if not (M27Logic.IsTargetUnderShield(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], 0, false, false, true)) then
+                                            if not (IsTargetCoveredByAA(aiBrain[M27Overseer.refoLastNearestACU], tEnemyAAAndCruisers, 3, tStartPoint)) then
+                                                AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, iCurModDistance)
+                                            end
+                                        end
+                                    end
                                 end
                             end
                         end
@@ -5790,6 +5799,7 @@ function AirBomberManager(aiBrain)
                                         elseif (bAssassination and EntityCategoryContains(categories.COMMAND, oUnit.UnitId)) or iStratsNearRallyPoint >= 6 then
                                             iAANearTarget = IsTargetCoveredByAA(oUnit, tEnemyAAAndCruisers, 3, tStartPoint, true)
                                         end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to the list of possible targets by health. iCurStrikeDamage='..(iCurStrikeDamage or 'nil')..'; iTableIndex='..(iTableIndex or 'nil')..'; iPossibleTargets='..(iPossibleTargets or 'nil')..'; iAANearTarget='..(iAANearTarget or 'nil')..'; iStratsNearRallyPoint='..(iStratsNearRallyPoint or 'nil')..'bTargetsContainHighPriorityWithNoAA='..tostring(bTargetsContainHighPriorityWithNoAA)) end
                                         if iAANearTarget == 0 or (not (bTargetsContainHighPriorityWithNoAA) and (bAssassination and EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and (iStratsNearRallyPoint >= 26 and iAANearTarget <= 8) or (iStratsNearRallyPoint < 26 and iStratsNearRallyPoint >= 6 and iAANearTarget <= 4)) or (iStratsNearRallyPoint >= 15 and EntityCategoryContains(categories.EXPERIMENTAL, oUnit.UnitId) and iAANearTarget <= 2)) then
                                             iCurStrikeDamage = GetMaxStrikeDamageWanted(oUnit)
                                             iTableIndex = math.min(math.ceil(iCurStrikeDamage / 10000), 5)
@@ -5799,6 +5809,7 @@ function AirBomberManager(aiBrain)
                                             if iAANearTarget == 0 and not (bTargetsContainHighPriorityWithNoAA) and (aiBrain[refiAirAAWanted] == 0 or aiBrain[refiHighestEnemyAirThreat] <= 2000) and EntityCategoryContains(categories.COMMAND + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryExperimentalArti + M27UnitInfo.refCategorySML, oUnit.UnitId) then
                                                 bTargetsContainHighPriorityWithNoAA = true
                                             end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Have decided to add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to the list of possible targets by health') end
                                         end
                                     end
                                 end
