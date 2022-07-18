@@ -1944,7 +1944,7 @@ function AllocateNewUnitToPlatoonFromFactory(oNewUnit, oFactory)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if oNewUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewUnit) == 'drl02042' or oNewUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewUnit) == 'url010735' then bDebugMessages = true end
+    --if oNewUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewUnit) == 'drl02042' or oNewUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNewUnit) == 'url010735' then bDebugMessages = true end
 
     if bDebugMessages == true then LOG('AllocateNewUnitToPlatoonFromFactory About to fork thread') end
     if not(oNewUnit.Dead) and not(oNewUnit.GetUnitId) then M27Utilities.ErrorHandler('oNewUnit doesnt have a unit ID so likely isnt a unit')

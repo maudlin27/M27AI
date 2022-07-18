@@ -8175,7 +8175,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                     if bDisbandAsNoUnits == false and oPlatoon[refbACUInPlatoon] == false then
                         --Backup in case we dont have any high priority mexes yet
                         if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftHighPriorityMexes]) then
-                            if GetGameTimeSeconds() >= 15 then M27Utilities.ErrorHandler('Dont have any high priority mexes recorded, so platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' cant get a target') end
+                            if GetGameTimeSeconds() >= 15 and not(aiBrain[M27Overseer.refbNoEnemies]) then M27Utilities.ErrorHandler('Dont have any high priority mexes recorded, so platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' cant get a target and will move towards enemy base instead') end
                             --Just move towards the enemy by 20
 
                             local tBackupLocation = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)), 20 + oPlatoon[refiCurrentUnits], true)

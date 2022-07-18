@@ -204,7 +204,7 @@ function GetAirSegmentFromPosition(tPosition)
 
     local sFunctionRef = 'GetAirSegmentFromPosition'
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Start of code')
+        LOG(sFunctionRef .. ': Start of code. iAirSegmentSize='..(iAirSegmentSize or 'nil')..'; tPosition='..repru(tPosition)..'; rPlayableArea='..repru(M27MapInfo.rMapPlayableArea))
     end
     local rPlayableArea = M27MapInfo.rMapPlayableArea
     local iSegmentX = math.ceil((tPosition[1] - rPlayableArea[1]) / iAirSegmentSize)
@@ -3056,6 +3056,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
         end
 
         --Update enemy base to lower of its current value and the value for an enemy base (as the primary enemy base location may be different to the start position)
+        if bDebugMessages == true then LOG(sFunctionRef..': Primary enemy base location='..repru((M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain) or {'nil'}))..'; Air segment='..(GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) or 'nil')) end
         local iEnemyBaseX, iEnemyBaseZ = GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
         aiBrain[reftAirSegmentTracker][iEnemyBaseX][iEnemyBaseZ][refiNormalScoutingIntervalWanted] = math.min(aiBrain[reftAirSegmentTracker][iEnemyBaseX][iEnemyBaseZ][refiNormalScoutingIntervalWanted], aiBrain[refiIntervalEnemyBase])
     end
@@ -7140,7 +7141,7 @@ function UpdateMexScoutingPriorities(aiBrain)
 end
 
 function GetNovaxTarget(aiBrain, oNovax)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNovaxTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -7239,6 +7240,8 @@ function GetNovaxTarget(aiBrain, oNovax)
                 tPositionToSearchFrom = oNovax:GetPosition()
                 iSearchRange = iRange
 
+
+                --HOW BELOW WORKS: all units are treated as euqal priority, the only differencees are thes earch range for these 'high priority' units, and the mass mod value to apply
                 if iCurTargetType == 1 then
                     --Nearby low shields
                     iCategoriesToSearch = M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryMobileLandShield
@@ -7261,18 +7264,27 @@ function GetNovaxTarget(aiBrain, oNovax)
                     iMassFactor = 1.5
                 elseif iCurTargetType == 6 then
                     --Use default values for all of these
-                    iCategoriesToSearch = M27UnitInfo.refCategoryLandExperimental + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryRadar
+                    iCategoriesToSearch = M27UnitInfo.refCategoryLandExperimental + M27UnitInfo.refCategorySMD + M27UnitInfo.refCategorySML + M27UnitInfo.refCategoryExperimentalStructure + M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryRadar + M27UnitInfo.refCategoryMAA
                 elseif iCurTargetType == 7 then
                     iCategoriesToSearch = M27UnitInfo.refCategoryEngineer - categories.TECH1
-                    iSearchRange = 60
+                    iSearchRange = math.max(50, iRange)
                 elseif iCurTargetType == 8 then
                     iCategoriesToSearch = M27UnitInfo.refCategoryIndirectT2Plus + M27UnitInfo.refCategoryFixedT2Arti
-                    iSearchRange = 120
+                    iSearchRange = math.max(60, iRange)
                 elseif iCurTargetType == 9 then
                     iCategoriesToSearch = categories.COMMAND
+                    iSearchRange = iRange + 10
+                    if ScenarioInfo.Options.Victory == "demoralization" then
+                        iSearchRange = iSearchRange + 100
+                        iMassFactor = 2
+                    end
                 elseif iCurTargetType == 10 then
                     iCategoriesToSearch = categories.VOLATILE * categories.STRUCTURE + categories.VOLATILE * categories.LAND
                     iMassFactor = 2
+                    iSearchRange = iRange + 5
+                elseif iCurTargetType == 11 then --Nearby mexes - not valued as much as mexes within range
+                    iCategoriesToSearch = M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex
+                    iSearchRange = iRange + 60
                 else
                     bConsideredAllHighValueTargets = true
                     break
@@ -7286,7 +7298,9 @@ function GetNovaxTarget(aiBrain, oNovax)
                     end
                     for iUnit, oUnit in tEnemyUnits do
                         --Is the unit mobile and attached to another and is <=T3?
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Unit state='..M27Logic.GetUnitState(oUnit)..'; Does it contain mobile category='..tostring(EntityCategoryContains(categories.MOBILE, oUnit.UnitId))..'; is it underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))..'; Is it under shield='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 2000, false, false, false))) end
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Considering enemy unit ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; Unit state=' .. M27Logic.GetUnitState(oUnit) .. '; Does it contain mobile category=' .. tostring(EntityCategoryContains(categories.MOBILE, oUnit.UnitId)) .. '; is it underwater=' .. tostring(M27UnitInfo.IsUnitUnderwater(oUnit)) .. '; Is it under shield=' .. tostring(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 2000, false, false, false)))
+                        end
                         if not (oUnit:IsUnitState('Attached') and EntityCategoryContains(categories.MOBILE, oUnit.UnitId)) then
                             --Is the unit underwater or shielded?
                             if not (M27UnitInfo.IsUnitUnderwater(oUnit)) and not (M27Logic.IsTargetUnderShield(aiBrain, oUnit, 2000, false, false, false)) then
@@ -7400,25 +7414,68 @@ function GetNovaxTarget(aiBrain, oNovax)
 
             if not (oTarget) then
                 --Get low priority target
-                --Nearest surface naval unit
-                tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, tPositionToSearchFrom, 1000, 'Enemy')
-                if bDebugMessages == true then LOG(sFunctionRef..': No high priority targets, will search for lower priority, first with surface naval units. Is table empty='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+                tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2Mex + M27UnitInfo.refCategoryT3Mex, oNovax:GetPosition(), 200, 'Enemy')
                 if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
-                    oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, tPositionToSearchFrom, aiBrain)
-                else
-                    --Target nearest T3+ mobile land unit; if are none, then just get the nearest mobile land unit:
-                    tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand, tPositionToSearchFrom, 1000, 'Enemy')
-                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
-                        if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, tEnemyUnits)) then
-                            oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, tPositionToSearchFrom, aiBrain)
-                        else
-                            oTarget = M27Utilities.GetNearestUnit(EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, tEnemyUnits), tPositionToSearchFrom, aiBrain)
+                    local iClosestTarget = 10000
+                    local iCurDist
+                    for iUnit, oUnit in tEnemyUnits do
+                        if oUnit:GetFractionComplete() == 1 and not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 0, false, false, true, false)) then
+                            iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oNovax:GetPosition())
+                            if iCurDist < iClosestTarget then
+                                iClosestTarget = iCurDist
+                                oTarget = oUnit
+                            end
                         end
+                    end
+                end
+
+                if not(oTarget) then
+                    --Nearest surface naval unit
+                    tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface, tPositionToSearchFrom, 1000, 'Enemy')
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': No high priority targets, will search for lower priority, first with surface naval units. Is table empty=' .. tostring(M27Utilities.IsTableEmpty(tEnemyUnits)))
+                    end
+                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                        oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, tPositionToSearchFrom, aiBrain)
                     else
-                        --Get the nearest non-wall structure
-                        tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure, tPositionToSearchFrom, 1000, 'Enemy')
+                        --Target nearest unshielded T3+ mobile land unit or T2 structure; if are none, then just get the nearest mobile land unit:
+                        tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure, tPositionToSearchFrom, 1000, 'Enemy')
                         if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
-                            oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, tPositionToSearchFrom, aiBrain)
+                            local iCurDist
+                            local iClosestUnshieldedDist = 10000
+                            local iClosestShieldedDist = 10000
+                            local oClosestShieldedUnit
+                            local oClosestUnshieldedUnit
+                            local tNovaxPosition = oNovax:GetPosition()
+                            for iUnit, oUnit in tEnemyUnits do
+                                iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tNovaxPosition)
+                                if iCurDist < math.max(iClosestUnshieldedDist, iClosestShieldedDist) then
+                                    if iCurDist < iClosestShieldedDist then
+                                        oClosestShieldedUnit = oUnit
+                                        iClosestShieldedDist = iCurDist
+                                    end
+                                    if iCurDist < iClosestUnshieldedDist and iCurDist <= math.max(250, iClosestShieldedDist) then
+                                        if not(M27Logic.IsTargetUnderShield(aiBrain, oUnit, 10000, false, true, true, false)) then
+                                            oClosestUnshieldedUnit = oUnit
+                                            iClosestUnshieldedDist = iCurDist
+                                        end
+                                    end
+                                end
+                            end
+
+                            if oClosestUnshieldedUnit and iClosestUnshieldedDist <= math.max(250, iClosestShieldedDist + 60) then
+                                oTarget = oClosestUnshieldedUnit
+                            elseif oClosestShieldedUnit then oTarget = oUnit
+                            else
+                                oTarget = aiBrain[M27Overseer.refoLastNearestACU]
+                            end
+
+
+                            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL + M27UnitInfo.refCategoryMAA, tEnemyUnits)) then
+                                oTarget = M27Utilities.GetNearestUnit(tEnemyUnits, tPositionToSearchFrom, aiBrain)
+                            else
+                                oTarget = M27Utilities.GetNearestUnit(EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, tEnemyUnits), tPositionToSearchFrom, aiBrain)
+                            end
                         end
                     end
                 end
@@ -7429,9 +7486,9 @@ function GetNovaxTarget(aiBrain, oNovax)
     return oTarget
 end
 
-function NovaxCoreTargetLoop(aiBrain, oNovax)
+function NovaxCoreTargetLoop(aiBrain, oNovax, bCalledFromUnitDeath)
     --Used so can do forkthread of this in case come across errors    
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'NovaxCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetGameTimeSeconds() >= 1980 then bDebugMessages = true end
@@ -7459,12 +7516,12 @@ function NovaxCoreTargetLoop(aiBrain, oNovax)
 
         if iOrderType == refOrderMove then
             --Has the order changed from before?
-            if bDebugMessages == true then LOG(sFunctionRef..': Target out of range so want to move to it.  Position of target='..repru(oTarget:GetPosition())..'; Position of last order location='..repru(oNovax[reftLastIssuedOrderLocation])..' Dist between them='..M27Utilities.GetDistanceBetweenPositions(oNovax[reftLastIssuedOrderLocation], oTarget:GetPosition())) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Target out of range so want to move to it.  Position of target='..repru(oTarget:GetPosition())..'; Position of last order location='..repru(oNovax[reftLastIssuedOrderLocation])..' Dist between them='..M27Utilities.GetDistanceBetweenPositions((oNovax[reftLastIssuedOrderLocation] or {0,0,0}), oTarget:GetPosition())) end
             if not (iOrderType == oNovax[refiLastIssuedOrderType] and oNovax[reftLastIssuedOrderLocation] and M27Utilities.GetDistanceBetweenPositions(oNovax[reftLastIssuedOrderLocation], oTarget:GetPosition()) <= 8) then
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Issuing new order to novax, telling it to move to ' .. repru(oNovax[reftLastIssuedOrderLocation]))
                 end
-                IssueClearCommands({ oNovax })
+                if not(bCalledFromUnitDeath) or (oNovax.GetNavigator and oNovax:GetNavigator()) then IssueClearCommands({ oNovax }) end
                 oNovax[reftLastIssuedOrderLocation] = {oTarget:GetPosition()[1], oTarget:GetPosition()[2], oTarget:GetPosition()[3]}
                 IssueMove({ oNovax }, oNovax[reftLastIssuedOrderLocation])
                 oNovax[refiLastIssuedOrderType] = iOrderType
@@ -7476,7 +7533,7 @@ function NovaxCoreTargetLoop(aiBrain, oNovax)
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Issuing new order to novax, telling it to attack target=' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget))
                 end
-                IssueClearCommands({ oNovax })
+                if not(bCalledFromUnitDeath) or (oNovax.GetNavigator and oNovax:GetNavigator()) then IssueClearCommands({ oNovax }) end
                 IssueAttack({ oNovax }, oTarget)
                 oNovax[refiLastIssuedOrderType] = iOrderType
                 oNovax[refoLastIssuedOrderUnit] = oTarget

@@ -497,7 +497,7 @@ function GetACUShieldRegenRate(oUnit)
     return iRegenRate
 end
 
-function GetCurrentAndMaximumShield(oUnit)
+function GetCurrentAndMaximumShield(oUnit, bIgnoreIfShieldFailedFromLowPower)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCurrentAndMaximumShield'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -513,8 +513,10 @@ function GetCurrentAndMaximumShield(oUnit)
         end
     end
     if iCurShield > 0 then
-        --GetHealth doesnt look like it factors in power stall
-        if oUnit:GetAIBrain():GetEconomyStored('ENERGY') == 0 then iCurShield = 0 end
+        if not(bIgnoreIfShieldFailedFromLowPower) then
+            --GetHealth doesnt look like it factors in power stall
+            if not(oUnit.MyShield.Enabled) or oUnit.MyShield.DepletedByEnergy or (oUnit:GetAIBrain():GetEconomyStored('ENERGY') == 0) then iCurShield = 0 end
+        end
     end
     if bDebugMessages == true then
         LOG(sFunctionRef..': iCurShield='..iCurShield..'; iMaxShield='..iMaxShield..'; ShieldRatio False='..oUnit:GetShieldRatio(false)..'; ShieldRatio true='..oUnit:GetShieldRatio(true)..' iCurShield='..iCurShield)

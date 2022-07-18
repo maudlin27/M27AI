@@ -37,7 +37,8 @@ subrefNukeLaunchLocations = 'M27OverseerTeamNukeTargets' --stored against tTeamD
 
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
-toAllyBrains = 'M27OverseerAllyBrains'
+toAllyBrains = 'M27OverseerAllyBrains' --Against aiBrain
+refbNoEnemies = 'M27OverseerNoEnemyBrains' --against aiBrain, true if no enemy brains detected
 iACUDeathCount = 0
 iACUAlternativeFailureCount = 0
 iDistanceFromBaseToBeSafe = 55 --If ACU wants to run (<50% health) then will think its safe once its this close to our base
@@ -6123,7 +6124,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         if M27Utilities.IsTableEmpty(tCurCategoryUnits) == false then
             for iUnit, oUnit in tCurCategoryUnits do
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; .IsCivilian='..tostring(oUnit.IsCivilian or false)..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, false))..'; iPathingGroupWanted='..iPathingGroupWanted..'; unit pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())..'; Is civilian brain='..tostring(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))..'; is unit mobile land='..tostring(EntityCategoryContains(categories.MOBILE * categories.LAND, oUnit.UnitId))) end
-                if not(oUnit.IsCivilian) and M27Utilities.CanSeeUnit(aiBrain, oUnit, false) == true and
+                if (not(oUnit.IsCivilian) or aiBrain[refbNoEnemies]) and M27Utilities.CanSeeUnit(aiBrain, oUnit, false) == true and
                         (not(EntityCategoryContains(categories.MOBILE * categories.LAND, oUnit.UnitId)) or iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())) and
                         not(oUnit.UnitId == 'xab1401' and M27Logic.IsCivilianBrain(oUnit:GetAIBrain())) then
 
@@ -7162,29 +7163,31 @@ function RecordAllEnemiesAndAllies(aiBrain)
 
     tAllActiveM27Brains = {}
     if M27Utilities.IsTableEmpty(ArmyBrains) == false then
+        if bDebugMessages == true then LOG(sFunctionRef..': Army brains isnt empty so will cycle through all of these brains') end
         aiBrain[toEnemyBrains] = {}
         aiBrain[toAllyBrains] = {}
+
         for iCurBrain, oBrain in ArmyBrains do
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Considering whether brain with armyindex =' .. oBrain:GetArmyIndex() .. ' is defeated and is enemy or ally')
+                LOG(sFunctionRef .. ': Considering whether brain with armyindex =' .. oBrain:GetArmyIndex() .. ' is defeated and is enemy or ally.')
             end
             if not (oBrain:IsDefeated()) then
                 --if not(oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Brain isnt defeated')
+                    LOG(sFunctionRef .. ': Brain isnt defeated. IsEnemy='..tostring(IsEnemy(iOurIndex, oBrain:GetArmyIndex()))..'; IsCivilian='..tostring(M27Logic.IsCivilianBrain(oBrain))..'; NoEnemies='..tostring((aiBrain[refbNoEnemies] or false)))
                 end
                 iArmyIndex = oBrain:GetArmyIndex()
                 tAllAIBrainsByArmyIndex[iArmyIndex] = oBrain
                 if oBrain.M27AI then
                     tAllActiveM27Brains[iArmyIndex] = oBrain
                 end
-                if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) and not (M27Logic.IsCivilianBrain(oBrain)) then
+                if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) and (not (M27Logic.IsCivilianBrain(oBrain)) or aiBrain[refbNoEnemies]) then
                     iEnemyCount = iEnemyCount + 1
                     aiBrain[toEnemyBrains][iArmyIndex] = oBrain
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': aiBrain Index=' .. aiBrain:GetArmyIndex() .. '; enemy index=' .. iArmyIndex .. '; recording as an enemy; start position number=' .. oBrain.M27StartPositionNumber .. '; start position=' .. repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]))
                     end
-                elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not (oBrain == aiBrain) then
+                elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not (oBrain == aiBrain) and not(M27Logic.IsCivilianBrain(oBrain)) then
                     iAllyCount = iAllyCount + 1
                     aiBrain[toAllyBrains][iArmyIndex] = oBrain
                     if bDebugMessages == true then
@@ -7200,6 +7203,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
         end
         iPlayersAtGameStart = iAllyCount + iEnemyCount
     else
+        if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through tAllAIBrainsByArmyIndex brains') end
         for iCurBrain, oBrain in tAllAIBrainsByArmyIndex do
             if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
                 iEnemyCount = iEnemyCount + 1
@@ -7365,7 +7369,9 @@ function RecordAllEnemiesAndAllies(aiBrain)
     if aiBrain.M27AI and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) then
         if GetGameTimeSeconds() <= 10 then
             --REDUNDANCY (code in overseer initialisation triggers first)
-            M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI will not function.', 0, 10)
+            M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI may not function as expected', 0, 10)
+            aiBrain[refbNoEnemies] = true
+            if bDebugMessages == true then LOG(sFunctionRef..': Rdundancy as no enemybrains, Setting no enemies to be true') end
         end
     else
         --Assign enemies to a team if not already
@@ -7395,6 +7401,12 @@ function RecordAllEnemiesAndAllies(aiBrain)
 
     --Update chokepoints (note for now this will only call once per game)
     ForkThread(M27MapInfo.IdentifyTeamChokepoints, aiBrain)
+
+    --Reset nearest base if no enemies, since the logic for nearest enemy runs before identifying all allies (but needs details of all allies to work)
+    if aiBrain[refbNoEnemies] and GetGameTimeSeconds() <= 10 then
+        aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation] = nil
+        M27MapInfo.UpdateNewPrimaryBaseLocation(aiBrain)
+    end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -7570,8 +7582,14 @@ function OverseerInitialisation(aiBrain)
     aiBrain[toEnemyBrains] = {}
     aiBrain[toAllyBrains] = {}
     local iNearestEnemyIndex = M27Logic.GetNearestEnemyIndex(aiBrain, false)
-    if not(iNearestEnemyIndex) and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) then
-        M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI will not function.', 0, 10)
+    if (not(iNearestEnemyIndex) and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains])) or aiBrain[refbNoEnemies] then
+        M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI may not function as expected.', 0, 10)
+        aiBrain[refbNoEnemies] = true
+        if bDebugMessages == true then LOG(sFunctionRef..': No enemies detected for the brain so sent compatibility message, Setting no enemies to be true') end
+        local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+        aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyBase)
+        aiBrain[reftLastNearestACU] = tEnemyBase
+        aiBrain[refoLastNearestACU] = nil
     else
         aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyIndex)])
         aiBrain[reftLastNearestACU] = M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyIndex)]

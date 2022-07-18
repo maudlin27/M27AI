@@ -27,6 +27,7 @@ function SendSuicideMessage(aiBrain)
             sTauntChatCode = tTauntsByFaction[iFactionIndex][iTauntTableRef]
         end
 
+        LOG(sFunctionRef..': Sent chat message '..sTauntChatCode) --Log so in replays can see if this triggers since chat doesnt show properly
         SUtils.AISendChat('all', aiBrain.Nickname, '/'..sTauntChatCode) --QAI I cannot be defeated.
         tiM27VoiceTauntByType[sFunctionRef] = GetGameTimeSeconds()
     end
@@ -64,6 +65,7 @@ function SendGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts
         end
         if bDebugMessages == true then LOG(sFunctionRef..': Will send chat with taunt code '..sTauntChatCode) end
 
+        LOG(sFunctionRef..': Sent chat message '..sTauntChatCode) --Log so in replays can see if this triggers since chat doesnt show properly
         SUtils.AISendChat('all', aiBrain.Nickname, '/'..sTauntChatCode)
 
         tiM27VoiceTauntByType[sFunctionRef] = GetGameTimeSeconds()
@@ -84,6 +86,7 @@ function SendGameCompatibilityWarning(aiBrain, sMessage, iOptionalDelay, iOption
     if bDebugMessages == true then LOG(sFunctionRef..': iOptionalTimeBetweenTaunts='..(iOptionalTimeBetweenTaunts or 'nil')..'; tiM27VoiceTauntByType[sFunctionRef]='..(tiM27VoiceTauntByType[sFunctionRef] or 'nil')..'; Cur game time='..GetGameTimeSeconds()) end
 
     if GetGameTimeSeconds() - (tiM27VoiceTauntByType[sFunctionRef] or -10000) > (iOptionalTimeBetweenTaunts or 60) then
+        LOG(sFunctionRef..': Sent chat message '..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
         SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
         tiM27VoiceTauntByType[sFunctionRef] = GetGameTimeSeconds()
     end

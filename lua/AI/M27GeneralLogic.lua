@@ -384,76 +384,124 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return aiBrain[refiNearestEnemyIndex]
     else
-        if not(aiBrain.M27IsDefeated) and not(aiBrain:IsDefeated()) then
-            local iPlayerArmyIndex = aiBrain:GetArmyIndex()
-            local iDistToCurEnemy
-            local iMinDistToEnemy = 10000000
-            local iNearestEnemyIndex
-            local iEnemyStartPos
+        if not (aiBrain.M27IsDefeated) and not (aiBrain:IsDefeated()) then
             if bDebugMessages == true then
-                LOG(sFunctionRef..': Start before looping through brains; aiBrain personality='..ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality..'; brain.Name='..aiBrain.Name..'; aiBrain[refiNearestEnemyIndex]='..(aiBrain[refiNearestEnemyIndex] or 'nil'))
-                if M27Utilities.IsTableEmpty(M27Overseer.tAllAIBrainsByArmyIndex) == false then
-                    LOG('M27Overseer.tAllAIBrainsByArmyIndex has a value; [aiBrain[refiNearestEnemyIndex]].M27IsDefeated='..tostring((M27Overseer.tAllAIBrainsByArmyIndex[aiBrain[refiNearestEnemyIndex]].M27IsDefeated or false)))
-                end
+                LOG(sFunctionRef .. ': Considering brain index=' .. aiBrain:GetArmyIndex() .. '; aiBrain[M27Overseer.refbNoEnemies]=' .. tostring((aiBrain[M27Overseer.refbNoEnemies] or false)))
             end
-            --local tBrainsToSearch = ArmyBrains
-            --if M27Utilities.IsTableEmpty(ArmyBrains) == true then tBrainsToSearch = M27Overseer.tAllAIBrainsByArmyIndex end
-
-            for iCurBrain, brain in ArmyBrains do
-                if bDebugMessages == true then
-                    LOG(sFunctionRef..': Start of brain loop, iCurBrain='..iCurBrain..'; brain personality='..ScenarioInfo.ArmySetup[brain.Name].AIPersonality..'; brain.Name='..brain.Name..'; Brain index='..brain:GetArmyIndex()..'; if brain isnt equal to our AI brain then will get its start position etc')
-                    --M27Utilities.DebugArray(brain) --Enable this if want more details of the brain we're dealing with
-                end
-                if not(brain == aiBrain) and not(IsCivilianBrain(brain)) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Brain is dif to aiBrain so will record its start position number if it doesnt have one already') end
-                    iEnemyStartPos = brain.M27StartPositionNumber
-                    if iEnemyStartPos == nil then
-                        if bDebugMessages == true then LOG(sFunctionRef..': brain doesnt have an M27StartPositionNumber set so will set it now') end
-                        iEnemyStartPos = M27Utilities.GetAIBrainArmyNumber(brain)
-                        brain.M27StartPositionNumber = iEnemyStartPos
+            local iNearestEnemyIndex
+            local iPlayerArmyIndex = aiBrain:GetArmyIndex()
+            if aiBrain[M27Overseer.refbNoEnemies] then
+                local iCivilianBrain
+                for iCurBrain, oBrain in ArmyBrains do
+                    if IsEnemy(oBrain:GetArmyIndex(), aiBrain:GetArmyIndex()) then
+                        iNearestEnemyIndex = iCurBrain
+                        break
+                    elseif IsCivilianBrain(oBrain) then
+                        iCivilianBrain = iCurBrain
                     end
-                    if IsEnemy(brain:GetArmyIndex(), iPlayerArmyIndex) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': brain is an enemy of us') end
-                        if not(brain:IsDefeated()) and not(brain.M27IsDefeated) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': brain with index'..brain:GetArmyIndex()..' is not defeated') end
+                end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': iNearestEnemyIndex=' .. (iNearestEnemyIndex or 0) .. '; iCivilianBrain=' .. (iCivilianBrain or 'nil'))
+                end
+                if not (iNearestEnemyIndex) then
+                    iNearestEnemyIndex = iCivilianBrain
+                end
+            else
+                local iDistToCurEnemy
+                local iMinDistToEnemy = 10000000
 
-                            --Strange bug where still returns true for empty slot - below line to avoid this:
-                            if brain:GetCurrentUnits(categories.ALLUNITS) > 0 then
-                                if bDebugMessages == true then LOG(sFunctionRef..': brain has some units') end
-                                if not (M27MapInfo.PlayerStartPoints[iEnemyStartPos] == nil) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': iEnemyStartPos='..iEnemyStartPos..'; iPlayerArmyIndex='..iPlayerArmyIndex) end
-                                    if bDebugMessages == true then LOG(sFunctionRef..': PlayerStartPoints[aiBrain.M27StartPositionNumber][1]='..M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1]..'; M27MapInfo.PlayerStartPoints[iEnemyStartPos][1]='..M27MapInfo.PlayerStartPoints[iEnemyStartPos][1]) end
-                                    iDistToCurEnemy = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[iEnemyStartPos])
-                                    if iDistToCurEnemy < iMinDistToEnemy then
-                                        iMinDistToEnemy = iDistToCurEnemy
-                                        iNearestEnemyIndex = brain:GetArmyIndex()
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Current nearest enemy index='..iNearestEnemyIndex..'; startp osition of this enemy='..repru(M27MapInfo.PlayerStartPoints[iEnemyStartPos])) end
+                local iEnemyStartPos
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Start before looping through brains; aiBrain personality=' .. ScenarioInfo.ArmySetup[aiBrain.Name].AIPersonality .. '; brain.Name=' .. aiBrain.Name .. '; aiBrain[refiNearestEnemyIndex]=' .. (aiBrain[refiNearestEnemyIndex] or 'nil'))
+                    if M27Utilities.IsTableEmpty(M27Overseer.tAllAIBrainsByArmyIndex) == false then
+                        LOG('M27Overseer.tAllAIBrainsByArmyIndex has a value; [aiBrain[refiNearestEnemyIndex]].M27IsDefeated=' .. tostring((M27Overseer.tAllAIBrainsByArmyIndex[aiBrain[refiNearestEnemyIndex]].M27IsDefeated or false)))
+                    end
+                end
+                --local tBrainsToSearch = ArmyBrains
+                --if M27Utilities.IsTableEmpty(ArmyBrains) == true then tBrainsToSearch = M27Overseer.tAllAIBrainsByArmyIndex end
+
+                for iCurBrain, brain in ArmyBrains do
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Start of brain loop, iCurBrain=' .. iCurBrain .. '; brain personality=' .. ScenarioInfo.ArmySetup[brain.Name].AIPersonality .. '; brain.Name=' .. brain.Name .. '; Brain index=' .. brain:GetArmyIndex() .. '; if brain isnt equal to our AI brain then will get its start position etc. IsCivilian='..tostring(IsCivilianBrain(brain))..'; IsEnemy='..tostring(IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()))..'; aiBrain[M27Overseer.refbNoEnemies]='..tostring((aiBrain[M27Overseer.refbNoEnemies] or false)))
+                    --M27Utilities.DebugArray(brain) --Enable this if want more details of the brain we're dealing with
+                    end
+                    if not (brain == aiBrain) and (not (IsCivilianBrain(brain)) or (aiBrain[M27Overseer.refbNoEnemies] and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()))) then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Brain is dif to aiBrain so will record its start position number if it doesnt have one already')
+                        end
+                        iEnemyStartPos = brain.M27StartPositionNumber
+                        if iEnemyStartPos == nil then
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': brain doesnt have an M27StartPositionNumber set so will set it now')
+                            end
+                            iEnemyStartPos = M27Utilities.GetAIBrainArmyNumber(brain)
+                            brain.M27StartPositionNumber = iEnemyStartPos
+                        end
+                        if IsEnemy(brain:GetArmyIndex(), iPlayerArmyIndex) then
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': brain is an enemy of us')
+                            end
+                            if not (brain:IsDefeated()) and not (brain.M27IsDefeated) then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': brain with index' .. brain:GetArmyIndex() .. ' is not defeated')
+                                end
+
+                                --Strange bug where still returns true for empty slot - below line to avoid this:
+                                if brain:GetCurrentUnits(categories.ALLUNITS) > 0 then
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': brain has some units')
+                                    end
+                                    if not (M27MapInfo.PlayerStartPoints[iEnemyStartPos] == nil) then
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': iEnemyStartPos=' .. iEnemyStartPos .. '; iPlayerArmyIndex=' .. iPlayerArmyIndex)
+                                        end
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': PlayerStartPoints[aiBrain.M27StartPositionNumber][1]=' .. M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1] .. '; M27MapInfo.PlayerStartPoints[iEnemyStartPos][1]=' .. M27MapInfo.PlayerStartPoints[iEnemyStartPos][1])
+                                        end
+                                        iDistToCurEnemy = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[iEnemyStartPos])
+                                        if iDistToCurEnemy < iMinDistToEnemy then
+                                            iMinDistToEnemy = iDistToCurEnemy
+                                            iNearestEnemyIndex = brain:GetArmyIndex()
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': Current nearest enemy index=' .. iNearestEnemyIndex .. '; startp osition of this enemy=' .. repru(M27MapInfo.PlayerStartPoints[iEnemyStartPos]))
+                                            end
+                                        end
+                                    else
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Map info doesnt have a start point for iEnemyStartPos=' .. iEnemyStartPos)
+                                        end
                                     end
                                 else
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Map info doesnt have a start point for iEnemyStartPos='..iEnemyStartPos) end
+                                    --Can have some cases where have an aibrain but no units, e.g. map Africa has ARMY_9 aibrain name, with no personality, that has no units
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': WARNING: brain isnt defeated but has no units; brain:ArmyIndex=' .. brain:GetArmyIndex())
+                                    end
                                 end
-                            else
-                                --Can have some cases where have an aibrain but no units, e.g. map Africa has ARMY_9 aibrain name, with no personality, that has no units
-                                if bDebugMessages == true then LOG(sFunctionRef..': WARNING: brain isnt defeated but has no units; brain:ArmyIndex='..brain:GetArmyIndex()) end
+                            end
+                        else
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': iPlayerArmyIndex=' .. iPlayerArmyIndex .. '; iEnemyArmyIndex=' .. brain:GetArmyIndex() .. '; IsEnemy isnt true for this')
                             end
                         end
-                    else
-                        if bDebugMessages == true then LOG(sFunctionRef..': iPlayerArmyIndex='..iPlayerArmyIndex..'; iEnemyArmyIndex='..brain:GetArmyIndex()..'; IsEnemy isnt true for this') end
                     end
                 end
             end
-            if iNearestEnemyIndex == nil and not(bForceDebug) then
-                if not(aiBrain[refbNearestEnemyBugDisplayed]) then
+            if iNearestEnemyIndex == nil and not (bForceDebug) then
+                if not (aiBrain[refbNearestEnemyBugDisplayed]) then
                     --Are all enemies defeated?
                     local bAllDefeated = true
                     local bHaveBrains = false
-                    for iEnemy, oEnemyBrain in aiBrain[M27Overseer.toEnemyBrains] do
-                        bHaveBrains = true
-                        if not(oEnemyBrain:IsDefeated()) and not(oEnemyBrain.M27IsDefeated) then
-                            bAllDefeated = false break end
+                    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]) == false then
+                        for iEnemy, oEnemyBrain in aiBrain[M27Overseer.toEnemyBrains] do
+                            bHaveBrains = true
+                            if not (oEnemyBrain:IsDefeated()) and not (oEnemyBrain.M27IsDefeated) then
+                                bAllDefeated = false
+                                break
+                            end
+                        end
                     end
                     if bHaveBrains and bAllDefeated == true then
-                        LOG('All enemies defeated, ACU death count='..M27Overseer.iACUDeathCount..'; will ignore errors with nearest enemy index and wait 1 second1')
+                        LOG('All enemies defeated, ACU death count=' .. M27Overseer.iACUDeathCount .. '; will ignore errors with nearest enemy index and wait 1 second1')
                         if M27Overseer.iACUDeathCount == 0 then
                             if GetGameTimeSeconds() - iTimeOfLastBrainAllDefeated >= 5 then
                                 M27Utilities.ErrorHandler('All brains are showing as dead but we havent recorded any ACU deaths.  Assuming all enemies are dead and aborting all code; will show this message every 5s')
@@ -465,25 +513,40 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                         WaitSeconds(1)
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                     elseif bHaveBrains then
-                        M27Utilities.ErrorHandler('iNearestEnemyIndex is nil so will wait 1 sec and then repeat function with logs enabled')
+                        M27Utilities.ErrorHandler('iNearestEnemyIndex is nil so will wait 1 sec and then repeat function with logs enabled; if gametime is <=10s then will also flag that the aiBrain has no enemies')
+                        if GetGameTimeSeconds() <= 10 then
+                            aiBrain[M27Overseer.refbNoEnemies] = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': Setting no enemies to be true') end
+                        end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         WaitSeconds(1)
                         return GetNearestEnemyIndex(aiBrain, true)
                     else
-                        M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will wait 1 second then call again')
+                        --No brains - could be game mode doesnt have enemy player brains
+                        M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will call again with logs enabled. if gametime is <=10s then will also flag that the aiBrain has no enemies and update start positions accordingly')
+                        if GetGameTimeSeconds() <= 10 then
+                            aiBrain[M27Overseer.refbNoEnemies] = true
+                            M27MapInfo.bUsingArmyIndexForStartPosition = true
+                            M27MapInfo.RecordPlayerStartLocations()
+                            if bDebugMessages == true then LOG(sFunctionRef..': No enemy brains identified, Setting no enemies to be true') end
+                        end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        WaitSeconds(1)
+                        --WaitSeconds(1)
                         return GetNearestEnemyIndex(aiBrain, true)
                     end
                 else
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                    return aiBrain[refiNearestEnemyIndex] end
+                    return aiBrain[refiNearestEnemyIndex]
+                end
             else
-                if iNearestEnemyIndex == nil then --e.g. force debug is true
-                    if not(aiBrain[refbNearestEnemyBugDisplayed]) then
+                if iNearestEnemyIndex == nil then
+                    --e.g. force debug is true
+                    if not (aiBrain[refbNearestEnemyBugDisplayed]) then
                         local iLastValue = aiBrain[refiNearestEnemyIndex]
-                        if iLastValue == nil then iLastValue = -1 end --so error message wont return nil value
-                        M27Utilities.ErrorHandler('iNearestEnemyIndex is nil; bForceDebug='..tostring(bForceDebug)..'; relying on last valid value='..iLastValue..'; all future error messages re this will be suppressed; iPlayerArmyIndex='..iPlayerArmyIndex)
+                        if iLastValue == nil then
+                            iLastValue = -1
+                        end --so error message wont return nil value
+                        M27Utilities.ErrorHandler('iNearestEnemyIndex is nil; bForceDebug=' .. tostring(bForceDebug) .. '; relying on last valid value=' .. iLastValue .. '; all future error messages re this will be suppressed; iPlayerArmyIndex=' ..iPlayerArmyIndex)
                         aiBrain[refbNearestEnemyBugDisplayed] = true
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         return aiBrain[refiNearestEnemyIndex]
@@ -1513,7 +1576,7 @@ function GetVisibleUnitsOnly(aiBrain, tUnits)
     local tVisibleUnits = {}
     local iVisibleCount = 0
     for iUnit, oUnit in tUnits do
-        if not(oUnit.Dead) then
+        if not(oUnit.Dead) and oUnit.GetBlip then
             oBlip = oUnit:GetBlip(iArmyIndex)
             if oBlip then
                 if not(oBlip:IsKnownFake(iArmyIndex)) then
@@ -1612,7 +1675,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                     bCalcActualThreat = true
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and owned by dif ai brain, seeing if we have a blip for it') end
-                    if bMustBeVisibleToIntelOrSight == true then
+                    if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip then
                         oBlip = oUnit:GetBlip(iArmyIndex)
                         if oBlip then
                             if not(oBlip:IsKnownFake(iArmyIndex)) then
@@ -1855,7 +1918,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                     bCalcActualThreat = true
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and owned by dif ai brain, seeing if we have a blip for it') end
-                    if bMustBeVisibleToIntelOrSight == true then
+                    if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip then
                         oBlip = oUnit:GetBlip(iArmyIndex)
                         if oBlip then
                             if not(oBlip:IsKnownFake(iArmyIndex)) then
@@ -3674,6 +3737,10 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Determines if target is under a shield
     --bCumulativeShieldHealth - if true, then will treat as being under a shield if all shields combined have health of at least iIgnoreShieldsWithLessThanThisHealth
+    if oTarget.UnitId == 'urb4206' then bDebugMessages = true end
+    if bDebugMessages == true and EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oTarget.UnitId) then
+        LOG(sFunctionRef..': oTarget is a shield='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Shield ratio='..oTarget:GetShieldRatio(false)..'; Shield ratio true='..oTarget:GetShieldRatio(true)..'; Shield health='..oTarget.MyShield:GetHealth()..'; SHield max health='..oTarget.MyShield:GetMaxHealth()..'; Active consumption='..tostring(oTarget.ActiveConsumption)..'; reprs of shield='..reprs(oTarget.MyShield))
+    end
     if iIgnoreShieldsWithLessThanThisHealth == nil then iIgnoreShieldsWithLessThanThisHealth = 0 end
     local bUnderShield = false
     local iShieldSearchRange = 46 --T3 sera shield is 46; bulwark is 120; will go with sera t3 for now; if changing here then also change reference in getmaxstrikedamage

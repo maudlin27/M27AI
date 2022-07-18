@@ -153,6 +153,8 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, instigator.UnitId) then
                         local aiBrain = instigator:GetAIBrain()
                         aiBrain[M27Overseer.refiSkirmisherMassKills] = aiBrain[M27Overseer.refiSkirmisherMassKills] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
+                    elseif EntityCategoryContains(M27UnitInfo.refCategorySatellite, instigator.UnitId) then
+                        ForkThread(M27AirOverseer.NovaxCoreTargetLoop, oKillerBrain, instigator, true)
                     end
                 end
 
