@@ -3737,7 +3737,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Determines if target is under a shield
     --bCumulativeShieldHealth - if true, then will treat as being under a shield if all shields combined have health of at least iIgnoreShieldsWithLessThanThisHealth
-    if oTarget.UnitId == 'urb4206' then bDebugMessages = true end
+    --if oTarget.UnitId == 'urb4206' then bDebugMessages = true end
     if bDebugMessages == true and EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oTarget.UnitId) then
         LOG(sFunctionRef..': oTarget is a shield='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Shield ratio='..oTarget:GetShieldRatio(false)..'; Shield ratio true='..oTarget:GetShieldRatio(true)..'; Shield health='..oTarget.MyShield:GetHealth()..'; SHield max health='..oTarget.MyShield:GetMaxHealth()..'; Active consumption='..tostring(oTarget.ActiveConsumption)..'; reprs of shield='..reprs(oTarget.MyShield))
     end

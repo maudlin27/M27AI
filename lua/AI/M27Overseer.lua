@@ -36,6 +36,7 @@ iTotalTeamCount = 0 --Number of teams in the game
 subrefNukeLaunchLocations = 'M27OverseerTeamNukeTargets' --stored against tTeamData[brain.M27Team], [x] is gametimeseconds, returns the location of a nuke target
 refiEnemyWalls = 'M27OverseerTeamEnemyWallCount' --stored against tTeamData[brain.M27Team], returns the ntotal number of enemy wall units; used as threshold to enable engineers to start looking for wall segments to reclaim
 refiTimeOfLastEnemyTeamDataUpdate = 'M27OverseerTeamEnemyLastUpdate' --as above, returns the gametimeseconds of hte last update
+reftEnemyArtiToAvoid = 'M27OverseerTeamEnemyArtiToAvoid' --against tTeamData[aiBrain.M27Team], [x] is a count (so table.getn works), returns T2 arti units that has got enough mass kills to want to avoid
 
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
@@ -5704,6 +5705,11 @@ function SetMaximumFactoryLevels(aiBrain)
             LOG(sFunctionRef .. ': iAirUnitsWanted=' .. iAirUnitsWanted .. '; aiBrain[reftiMaxFactoryByType][refFactoryTypeAir]=' .. aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] .. '; aiBrain[reftiMaxFactoryByType][refFactoryTypeLand]=' .. aiBrain[reftiMaxFactoryByType][refFactoryTypeLand])
         end
 
+        --Increase air factories wanted if enemy has significant land threat and we have the economy to support more air factories (so we can better respond if enemy tries to attack us) providing we arent saving eco to get t3 arti
+        if (aiBrain[refiTotalEnemyShortRangeThreat] >= 20000 or aiBrain[refiTotalEnemyLongRangeThreat] >= 20000) and aiBrain[M27AirOverseer.refiPreviousAvailableBombers] <= 80 and not(aiBrain[refbDefendAgainstArti]) then
+            aiBrain[reftiMaxFactoryByType][refFactoryTypeAir] = math.max(aiBrain[reftiMaxFactoryByType][refFactoryTypeAir], math.min(15, (aiBrain[refiTotalEnemyShortRangeThreat] + aiBrain[refiTotalEnemyLongRangeThreat]) / 5000, aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] / 2))
+        end
+
         if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill or aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
             --aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
             if aiBrain:GetEconomyStoredRatio('MASS') > 0.1 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 1 then
@@ -6061,12 +6067,35 @@ end
 
 function UpdateTeamDataForEnemyUnits(aiBrain)
     if GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamDataUpdate] or 0) >= 9.9 then
+        --Record number of wall segments
         tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamDataUpdate] = GetGameTimeSeconds()
         local iWallCount = 0
         for iBrain, oBrain in aiBrain[toEnemyBrains] do
             iWallCount = iWallCount + oBrain:GetCurrentUnits(M27UnitInfo.refCategoryWall)
         end
         tTeamData[aiBrain.M27Team][refiEnemyWalls] = iWallCount
+
+
+        --Update T2 arti for those that are no longer valid
+        if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftEnemyArtiToAvoid]) == false then
+            local bUpdatedTable = true
+            local iCycleCount = 0
+            while bUpdatedTable do
+                iCycleCount = iCycleCount + 1
+                if iCycleCount >= 20 then
+                    M27Utilities.ErrorHandler('Possible infinite loop for T2 arti checker')
+                    break
+                end
+                bUpdatedTable = false
+                for iUnit, oUnit in tTeamData[aiBrain.M27Team][reftEnemyArtiToAvoid] do
+                    if not(M27UnitInfo.IsUnitValid(oUnit)) then
+                        table.remove(tTeamData[aiBrain.M27Team][reftEnemyArtiToAvoid], iUnit)
+                        bUpdatedTable = true
+                        break
+                    end
+                end
+            end
+        end
     end
 end
 
@@ -6335,6 +6364,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         ForkThread(M27MapInfo.UpdateNewPrimaryBaseLocation, aiBrain)
 
         ForkThread(CheckUnitCap, aiBrain)
+
+
 
         --STATE OF GAME LOG BELOW------------------
 
@@ -7245,6 +7276,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
         tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains] = {}
         tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains][aiBrain:GetArmyIndex()] = aiBrain
         tTeamData[aiBrain.M27Team][subrefNukeLaunchLocations] = {}
+        tTeamData[aiBrain.M27Team][reftEnemyArtiToAvoid] = {}
         for iCurBrain, oBrain in aiBrain[toAllyBrains] do
             oBrain.M27Team = iTotalTeamCount
             if oBrain.M27AI then

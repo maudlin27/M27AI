@@ -22,7 +22,7 @@ refbUsedByThreatDefender = 'M27PlatoonUsedByThreatDefender' --Overseer's threat 
 refbOnlyUseByIndirectDefender = 'M27PlatoonUsedByIndirectDefender' --manually set to true if want a particular platoon to be made available for indirect threat defence (e.g. shield disruptor)
 refbWantsShieldEscort = 'M27PlatoonWantsShieldEscort' --true if should be considered when assigning mobile shields
 refbWantsStealthEscort = 'M27PlatoonWantsStealthEscort' --true if should consider when assigning mobile stealth; will be nil (or false) otherwise
-refbSkirmisherRetreatLogic = 'M27PlatoonSkirmisherRetreatLogic' --true if will retreat when lacking intel coverage or if any enemy within firing range
+refbSkirmisherRetreatLogic = 'M27PlatoonSkirmisherRetreatLogic' --true if will retreat when lacking intel coverage or if any enemy within firing range; will alos use this flag to decide whether to run from t2 arti
 refiAirAttackRange = 'M27PlatoonAirAttackRange' --If this is not nil, then will check if the platoon has any MAA in it, and if so will search for enemy air units within this value + the MAA range; if any are detected, the platoon will move towards these air units (assuming there aren't ground units nearby that they're running from)
 
 --AI global idle platoon references (i.e. only have 1 of these per aibrain):

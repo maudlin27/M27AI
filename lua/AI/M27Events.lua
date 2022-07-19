@@ -79,6 +79,42 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     end
                     if oKillerUnit and oKillerUnit.GetAIBrain then
                         M27AirOverseer.CheckForUnseenKiller(oKilledBrain, oUnitKilled, oKillerUnit)
+                        if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit.UnitId) then
+                            if oKillerUnit.Sync.totalMassKilled >= 250 then
+                                --Is this already in the table?
+                                local bIncludeInTable = true
+                                if M27Utilities.IsTableEmpty(M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid]) == false then
+                                    for iArti, oArti in M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid] do
+                                        if oArti == oKillerUnit then
+                                            bIncludeInTable = false
+                                        end
+                                    end
+                                end
+                                if bIncludeInTable then
+                                    table.insert(M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid], oKillerUnit)
+                                    --Also check for any nearby t2 arti that are closer to the killed unit's base
+                                    local tNearbyT2Arti = oKillerUnit:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit:GetPosition(), 30, 'Ally')
+                                    local iDistToBase = M27Utilities.GetDistanceBetweenPositions(oKillerUnit:GetPosition(), M27MapInfo.PlayerStartPoints[oKilledBrain.M27StartPositionNumber])
+                                    if M27Utilities.IsTableEmpty(tNearbyT2Arti) == false then
+                                        for iUnit, oUnit in tNearbyT2Arti do
+                                            if not(oUnit == oKillerUnit) then
+                                                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[oKilledBrain.M27StartPositionNumber]) < iDistToBase then
+                                                    bIncludeInTable = true
+                                                    for iArti, oArti in M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid] do
+                                                        if oUnit == oArti then
+                                                            bIncludeInTable = false
+                                                        end
+                                                    end
+                                                    if bIncludeInTable then
+                                                        table.insert(M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid], oKillerUnit)
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
                     end
                 end
 
@@ -156,7 +192,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     elseif EntityCategoryContains(M27UnitInfo.refCategorySatellite, instigator.UnitId) then
                         ForkThread(M27AirOverseer.NovaxCoreTargetLoop, oKillerBrain, instigator, true)
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryBomber * categories.TECH1,  instigator.UnitId) and M27UnitInfo.IsUnitValid(instigator) then
-                        if M27UnitInfo.GetUnitLifetimeCount(instigator) == 4 then bDebugMessages = true end
+                        --if M27UnitInfo.GetUnitLifetimeCount(instigator) == 4 then bDebugMessages = true end
                         if bDebugMessages == true then LOG(sFunctionRef..': Killer unit='..instigator.UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator)..'; is instigator valid='..tostring(M27UnitInfo.IsUnitValid(instigator))..'; unit killed='..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)) end
                         if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnitKilled.UnitId) then
                             --T1 mex just killed by T1 bomber - get bomber to target nearby enemy engineer (if any)

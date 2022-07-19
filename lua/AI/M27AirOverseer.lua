@@ -1212,7 +1212,7 @@ function IssueNewAttackToBomber(oBomber, oTarget, iPriority, bAreHoverBombing)
 end
 
 function OneOffTargetNearbyEngineer(aiBrain, oBomber)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'OneOffTargetNearbyEngineer'
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1826,7 +1826,7 @@ function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
     local sFunctionRef = 'DelayedBomberTargetRecheck'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     --if M27UnitInfo.GetUnitTechLevel(oBomber) == 4 then bDebugMessages = true end
-    if EntityCategoryContains(categories.TECH1, oBomber.UnitId) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 4 then bDebugMessages = true end
+    --if EntityCategoryContains(categories.TECH1, oBomber.UnitId) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 4 then bDebugMessages = true end
 
     CheckIfTargetHardToHit(oBomber, oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit])
     if bDebugMessages == true then LOG(sFunctionRef..': About to wait '..iDelayInSeconds..' seconds for bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)) end
@@ -7215,7 +7215,7 @@ function UpdateMexScoutingPriorities(aiBrain)
 end
 
 function GetNovaxTarget(aiBrain, oNovax)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetNovaxTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -7562,7 +7562,7 @@ end
 
 function NovaxCoreTargetLoop(aiBrain, oNovax, bCalledFromUnitDeath)
     --Used so can do forkthread of this in case come across errors    
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'NovaxCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetGameTimeSeconds() >= 1980 then bDebugMessages = true end
