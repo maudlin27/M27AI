@@ -8133,6 +8133,12 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+
+    --Spawn an experimental
+    local tPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    CreateUnit('url0402', M27Utilities.GetACU(aiBrain).Army, tPos[1], tPos[2], tPos[3], 0, 0, 0, 0, 'Air')
+
+
     --LOG('Log of ScenarioInfo='..repru(ScenarioInfo))
     --[[
     --Test new GetUnitMaxGroundRange function
@@ -8471,6 +8477,7 @@ function OverseerManager(aiBrain)
 
     local bSetHook = false
     while (not (aiBrain:IsDefeated())) do
+        --if GetGameTimeSeconds() == 395 then TestCustom(aiBrain) end
         --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
