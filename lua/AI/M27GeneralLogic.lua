@@ -2010,7 +2010,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                     if EntityCategoryContains(categories.ANTIAIR * categories.AIR, sCurUnitBP) == true then
                                         iMassMod = 1
                                         if EntityCategoryContains(categories.BOMBER, sCurUnitBP) or EntityCategoryContains(categories.GROUNDATTACK, sCurUnitBP) then
-                                            iMassMod = 0.05
+                                            iMassMod = 0.75 --e.g. t2 bombers
                                             --Manual adjustments for units with good AA that also have direct fire
                                             if sCurUnitBP == 'xaa0305' then iMassMod = 0.8 --Restorer
                                             elseif sCurUnitBP == 'xea0306' then iMassMod = 0.7 --Continental
@@ -2019,6 +2019,8 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                             end
                                         end
                                         if bDebugMessages == true then LOG(sFunctionRef..': sCurUnitBP='..sCurUnitBP..': Mass mod after checking AirAA value='..iMassMod) end
+                                    elseif EntityCategoryContains(categories.OVERLAYANTIAIR * categories.AIR, sCurUnitBP) then
+                                        iMassMod = 0.05
                                     end
                                 end
                             end

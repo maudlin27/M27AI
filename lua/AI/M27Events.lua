@@ -667,7 +667,9 @@ function OnBombFired(oWeapon, projectile)
             if EntityCategoryContains(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, sUnitID) then
                 --Dont bother trying to dodge an experimental bomb
                 if not(EntityCategoryContains(categories.EXPERIMENTAL, sUnitID)) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will try and dodge the bomb fired by unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                     M27UnitMicro.DodgeBomb(oUnit, oWeapon, projectile)
+
                 end
                 if oUnit.GetAIBrain and oUnit:GetAIBrain().M27AI then
                     if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repru(projectile:GetPosition())) end
@@ -699,6 +701,18 @@ function OnWeaponFired(oWeapon)
         --if oWeapon.GetBlueprint then LOG('OnWeaponFired hook for blueprint='..repru(oWeapon:GetBlueprint())) end
         local oUnit = oWeapon.unit
         if oUnit and oUnit.GetUnitId then
+            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' Just fired weapon, reprs of weapon='..reprs(oWeapon)) end
+
+            if EntityCategoryContains(M27UnitInfo.refCategoryBomber, oUnit.UnitId) and oWeapon.Label == 'GroundMissile' then
+                --Corsairs dont trigger the onbombfired event normally
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Weapon fired by corsair, unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+                    if oWeapon:GetCurrentTarget().GetPosition then LOG(sFunctionRef..': Target of weapon='..repru(oWeapon:GetCurrentTarget():GetPosition())) end
+                end
+
+                ForkThread(M27UnitMicro.DodgeBomb, oUnit, oWeapon, nil)
+            end
+
             --Overcharge
             if oWeapon.GetBlueprint and oWeapon:GetBlueprint().Overcharge then
                 oUnit[M27UnitInfo.refbOverchargeOrderGiven] = false

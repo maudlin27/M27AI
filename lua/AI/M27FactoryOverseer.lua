@@ -1564,9 +1564,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         iTotalWanted = 10
                                     end
                                 elseif iCurrentConditionToTry == 5 then
-                                    --Emergency AA needed, or 1-off intie if enemy has air and we dont
+                                    --Emergency AA needed, or AirAA due to ACU air snipe concern, or 1-off intie if enemy has air and we dont
                                     if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refbEmergencyMAANeeded]='..tostring(aiBrain[M27Overseer.refbEmergencyMAANeeded])..'; aiBrain[M27AirOverseer.refiAirAANeeded]='..aiBrain[M27AirOverseer.refiAirAANeeded]..'; iFactoryTechLevel='..iFactoryTechLevel..'; aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]='..aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]) end
-                                    if (aiBrain[M27Overseer.refbEmergencyMAANeeded] and aiBrain[M27AirOverseer.refiAirAANeeded] > 0) or (iFactoryTechLevel == 1 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 and M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryAirAA) <= 1) then
+                                    if (aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] and not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiOurMassInAirAA] <= 2000) or (aiBrain[M27Overseer.refbEmergencyMAANeeded] and aiBrain[M27AirOverseer.refiAirAANeeded] > 0) or (iFactoryTechLevel == 1 and aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] == 1 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 and M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryAirAA) <= 1) then
                                         iCategoryToBuild = refCategoryAirAA
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Need emergency AA so will build some')

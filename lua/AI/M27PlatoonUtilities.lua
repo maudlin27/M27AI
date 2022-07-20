@@ -51,6 +51,7 @@ refActionKitingRetreat = 24 --For use where we think we can kite the enemy, so i
 refActionSuicide = 25 --ctrl-K units in platoon
 refActionGoToRandomLocationForAWhile = 26 --Used when units have been stuck for a long time - will force this action until this has been the action for 10s
 refActionBuildStructure = 27 --Uses refiStructureCategoryToBuild
+refActionGoToRallyPointNearAir = 28 --similar to gotonearestrallypoint, but looks for rally point near the air rally point
 
 --Extra actions (i.e. performed in addition to main action)
 refiExtraAction = 'M27ExtraActionRef'
@@ -2232,7 +2233,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
@@ -2426,38 +2427,61 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                 end
                             else
 
-                                --Are we close to the nearest rally point?
-                                local tNearestRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Not at emergency health yet, will see if have reached the nearest rally point yet; distance to it=' .. M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon)))
-                                end
-                                if M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon)) > 5 then
-
-                                    --Are we close to the nearest rally point, with >=75% health, and close to our base? then dont set an action to run (as it may be e.g. we are just running to be prudent due to high eco)
-                                    local iDistToBase = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Will go to nearest rally point unless we are close to base with decent health, checking if want to overcharge. M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain))=' .. M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) .. '; Dist to base=' .. M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; Dist wanted=' .. math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) .. '; Dist to rally=' .. M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]))..'; iDistToBase='..iDistToBase)
-                                    end
-
-                                    if M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) >= 0.8 and (iDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tNearestRallyPoint) <= 20) then
-                                        --Do nothing - proceed with normal logic
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Have decent health, are near rally point and base, so will ignore the order to retreat and carry on with normal logic')
-                                        end
-                                    elseif iDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Are near base so will proceed with normal logic') end
+                                --Are we close to the nearest rally point?  If facing air threat then want to retreat to base though
+                                local tNearestRallyPoint
+                                if bDebugMessages == true then LOG(sFunctionRef..': If are vulnerable to an air snipe and are more than 150 from base, will look for rally point nearest air rally point.  Dist to air rally point='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27AirOverseer.GetAirRallyPoint(aiBrain))..'; Dist to base='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; aiBrain[M27Overseer.refbACUVulnerableToAirSnipe]='..tostring(aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] or false)) end
+                                if aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 150 then
+                                    if aiBrain[M27AirOverseer.refbHaveAirControl] then
+                                        oPlatoon[refiCurrentAction] = refActionGoToRallyPointNearAir
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Basing rally point on the one nearest the air rally point') end
                                     else
-                                        oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                                        oPlatoon[refiCurrentAction] = refActionReturnToBase
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will return to base') end
+                                    end
+                                    bProceed = false
+
+                                    if oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] > 0 then
                                         --Consider adding overcharge
                                         if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then
                                             M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1])
                                         end
-                                        bProceed = false
                                     end
+
                                 else
-                                    --Proceed with normal logic
+                                    tNearestRallyPoint = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
+
+
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Are close to rally point so hopefully a bit safer now so will proceed with normal nearby enemy logic rather tahn running')
+                                        LOG(sFunctionRef .. ': Not at emergency health yet, will see if have reached the nearest rally point yet; distance to it=' .. M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon)))
+                                    end
+                                    if M27Utilities.GetDistanceBetweenPositions(tNearestRallyPoint, GetPlatoonFrontPosition(oPlatoon)) > 5 then
+
+                                        --Are we close to the nearest rally point, with >=75% health, and close to our base? then dont set an action to run (as it may be e.g. we are just running to be prudent due to high eco)
+                                        local iDistToBase = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Will go to nearest rally point unless we are close to base with decent health, checking if want to overcharge. M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain))=' .. M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) .. '; Dist to base=' .. M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; Dist wanted=' .. math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) .. '; Dist to rally=' .. M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]))..'; iDistToBase='..iDistToBase)
+                                        end
+
+                                        if M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) >= 0.8 and (iDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tNearestRallyPoint) <= 20) then
+                                            --Do nothing - proceed with normal logic
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': Have decent health, are near rally point and base, so will ignore the order to retreat and carry on with normal logic')
+                                            end
+                                        elseif iDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Are near base so will proceed with normal logic') end
+                                        else
+                                            oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                                            --Consider adding overcharge
+                                            if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then
+                                                M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1])
+                                            end
+                                            bProceed = false
+                                        end
+                                    else
+                                        --Proceed with normal logic
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Are close to rally point so hopefully a bit safer now so will proceed with normal nearby enemy logic rather tahn running')
+                                        end
                                     end
                                 end
                             end
@@ -9880,7 +9904,7 @@ function ProcessPlatoonAction(oPlatoon)
             local sPlatoonName = oPlatoon:GetPlan()
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
+            if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 480 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 13 and GetGameTimeSeconds() >= 1340 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
@@ -10955,13 +10979,25 @@ function ProcessPlatoonAction(oPlatoon)
                         end
                     end
                     if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': End of refActionRun; platoon movement path='..repru(oPlatoon[reftMovementPath])) end
-                elseif oPlatoon[refiCurrentAction] == refActionGoToNearestRallyPoint then
+                elseif oPlatoon[refiCurrentAction] == refActionGoToNearestRallyPoint or oPlatoon[refiCurrentAction] == refActionGoToRallyPointNearAir then
                     if bDontClearActions == false then
                         if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Clearing commands; Gametime='..GetGameTimeSeconds()) end
                         IssueClearCommands(tCurrentUnits)
                     end
                     oPlatoon[reftMovementPath] = {}
-                    oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
+                    if oPlatoon[refiCurrentAction] == refActionGoToNearestRallyPoint then
+                        oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
+                    else
+
+                        --Want rally point near air rally point, assuming air rally point is closer to our base than the nearest rally point
+                        local tAirRallyPoint = M27AirOverseer.GetAirRallyPoint(aiBrain)
+                        if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tAirRallyPoint, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                            oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
+                        else
+                            oPlatoon[reftMovementPath][1] = M27Logic.GetNearestRallyPoint(aiBrain, tAirRallyPoint, oPlatoon[refoFrontUnit])
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Going to nearest rally point near air rally point. Movement path now='..repru(oPlatoon[reftMovementPath][1])..'; air rally point='..repru(tAirRallyPoint)..'; Cur position='..repru(GetPlatoonFrontPosition(oPlatoon))..'; Dist to air rally point='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tAirRallyPoint)..'; Dist to movement destination='..M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][1], GetPlatoonFrontPosition(oPlatoon))..'; Distance from platoon to base='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+                    end
                     oPlatoon[refiCurrentPathTarget] = 1
                     PlatoonMove(oPlatoon, oPlatoon[reftMovementPath][1])
                     oPlatoon[refiThreatWhenRetreatToRallyOrBase] = math.max(M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]), (oPlatoon[refiThreatWhenRetreatToRallyOrBase] or 0))
@@ -11186,22 +11222,30 @@ function ProcessPlatoonAction(oPlatoon)
                     --if bPlatoonNameDisplay == true then UpdatePlatoonName(oPlatoon, sPlatoonName..oPlatoon[refiPlatoonCount]..': refActionReturnToBase') end
                     --ReturnToBaseOrRally(oPlatoon, tLocationToReturnTo, iOnlyGoThisFarTowardsBase, bDontClearActions, bUseTemporaryMoveLocation)
                     local tBasePositionToUse
-                    if oPlatoon[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup] then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will determine if are a plateau platoon or not. oPlatoon[M27Transport.refiAssignedPlateau]='..(oPlatoon[M27Transport.refiAssignedPlateau] or 'nil')..'; aiBrain[M27MapInfo.refiOurBasePlateauGroup]='..aiBrain[M27MapInfo.refiOurBasePlateauGroup]..'; Segment group of current position of front unit='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition(oPlatoon))) end
+                    if oPlatoon[M27Transport.refiAssignedPlateau] == aiBrain[M27MapInfo.refiOurBasePlateauGroup] or not(oPlatoon[M27Transport.refiAssignedPlateau]) or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition(oPlatoon)) == aiBrain[M27MapInfo.refiOurBasePlateauGroup] then
                         if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
                             local tNearestFirebase = M27Logic.GetNearestFirebase(aiBrain, GetPlatoonFrontPosition(oPlatoon), true)
                             if M27Utilities.GetDistanceBetweenPositions(tNearestFirebase, GetPlatoonFrontPosition(oPlatoon)) <= math.max(50, M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) then
                                 tBasePositionToUse = {tNearestFirebase[1], tNearestFirebase[2], tNearestFirebase[3]}
-                                if M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then tBasePositionToUse = M27Utilities.MoveInDirection(tBasePositionToUse, M27Utilities.GetAngleFromAToB(tBasePositionToUse, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), 25, true) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will use nearest firebase') end
+                                if M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then
+                                    tBasePositionToUse = M27Utilities.MoveInDirection(tBasePositionToUse, M27Utilities.GetAngleFromAToB(tBasePositionToUse, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), 25, true)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Big threat so will move slightly from firebase towards own base') end
+                                end
                             else
                                 tBasePositionToUse = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                                if bDebugMessages == true then LOG(sFunctionRef..': Dont have a firebase so will use start position') end
                             end
                         else
                             tBasePositionToUse = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have any firebase so will use start position') end
                         end
 
                     else
                         --Dealing with a plateau platoon
                         tBasePositionToUse = M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])
+                        if bDebugMessages == true then LOG(sFunctionRef..': Dealing with a plateau platoon so will get nearest rally point. oPlatoon[M27Transport.refiAssignedPlateau]='..oPlatoon[M27Transport.refiAssignedPlateau]..'; aiBrain[M27MapInfo.refiOurBasePlateauGroup]='..aiBrain[M27MapInfo.refiOurBasePlateauGroup]..'; M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition(oPlatoon))='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, GetPlatoonFrontPosition(oPlatoon))) end
                     end
 
                     --Do we have a shield near here?
@@ -11222,11 +11266,14 @@ function ProcessPlatoonAction(oPlatoon)
                             end
                             if oNearestShield then
                                 tBasePositionToUse = oNearestShield:GetPosition()
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have a shield near the base position so will go there instead') end
                             end
                         end
                     end
 
                     oPlatoon[refiThreatWhenRetreatToRallyOrBase] = math.max(M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]), (oPlatoon[refiThreatWhenRetreatToRallyOrBase] or 0))
+
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to give order to return to base or ally. tBasePositionToUse='..repru(tBasePositionToUse)..'; Actual base start position='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Platoon cur pos='..repru(GetPlatoonFrontPosition(oPlatoon))) end
 
                     ReturnToBaseOrRally(oPlatoon, tBasePositionToUse, nil, bDontClearActions)
                 elseif oPlatoon[refiCurrentAction] == refActionReclaimTarget then
