@@ -15,27 +15,131 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
     local sFunctionRef = 'MoveAwayFromTargetTemporarily'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    local bMoveInStages = false --set to true later if hardly have any time to run, but in reality this functionality isn't expected to be used in most cases, left in since took a while to get it to work to a basic level, but turns out it's probably better to just move in a straight line rather than trying multiple move orders
+
+
     local tUnitPosition = oUnit:GetPosition()
-    local iUnitSpeed = oUnit:GetBlueprint().Physics.MaxSpeed
+    local oBP = oUnit:GetBlueprint()
+    local iUnitSpeed = oBP.Physics.MaxSpeed
     local iDistanceToMove = (iTimeToRun + 1) * iUnitSpeed
-    local tRevisedPositionToRunFrom
+    --local tRevisedPositionToRunFrom
+
+    local iCurFacingDirection = M27UnitInfo.GetUnitFacingAngle(oUnit)
+    local iAngleFromUnitToBomb
     if tUnitPosition[1] == tPositionToRunFrom[1] and tUnitPosition[3] == tPositionToRunFrom[3] then
-        local aiBrain = oUnit:GetAIBrain()
-        tRevisedPositionToRunFrom = M27Utilities.MoveTowardsTarget(tUnitPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 1, 0)
-        if bDebugMessages == true then LOG(sFunctionRef..': Unit position was the same as position to run from, so will run from enemy ase instead, tRevisedPositionToRunFrom='..repru(tRevisedPositionToRunFrom)) end
+        iAngleFromUnitToBomb = iCurFacingDirection - 180
+        if iAngleFromUnitToBomb < 0 then iAngleFromUnitToBomb = iAngleFromUnitToBomb + 360 end
+    else
+        iAngleFromUnitToBomb = M27Utilities.GetAngleFromAToB(oUnit:GetPosition(), tPositionToRunFrom)
+    end
+
+    local iAngleAdjFactor
+    local iFacingAngleWanted = iAngleFromUnitToBomb + 180
+    if iFacingAngleWanted >= 360 then iFacingAngleWanted = iFacingAngleWanted - 360 end
+
+    local iTurnRate = (oBP.Physics.TurnRate or 90)
+    local iTimeToTurn = math.abs(iFacingAngleWanted - iCurFacingDirection) / iTurnRate
+    local iDistToBomb = M27Utilities.GetDistanceBetweenPositions(tPositionToRunFrom, oUnit:GetPosition())
+    if iDistToBomb * 2 / iUnitSpeed <= iTimeToTurn then
+        iFacingAngleWanted = iCurFacingDirection
+        iDistanceToMove = iDistanceToMove + iDistToBomb
+    end
+    if iTimeToTurn > iTimeToRun then bMoveInStages = true end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..': iTurnRate='..iTurnRate..'; iTimeToTurn='..iTimeToTurn..'; iDistToBomb='..iDistToBomb..'; iFacingAngleWanted='..iFacingAngleWanted..'; iDistanceToMove='..iDistanceToMove) end
+
+    --[[if math.abs(tUnitPosition[1] - tPositionToRunFrom[1]) <= 0.2 and math.abs(tUnitPosition[3] - tPositionToRunFrom[3]) <= 0.2 then
+        --local aiBrain = oUnit:GetAIBrain()
+        --tRevisedPositionToRunFrom = M27Utilities.MoveTowardsTarget(tUnitPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 1, 0)
+        --if bDebugMessages == true then LOG(sFunctionRef..': Unit position was the same as position to run from, so will run from enemy ase instead, tRevisedPositionToRunFrom='..repru(tRevisedPositionToRunFrom)) end
+
+        tRevisedPositionToRunFrom = M27Utilities.MoveInDirection(tUnitPosition, iAngleFromUnitToBomb, 0.1, false)
+        if bDebugMessages == true then LOG(sFunctionRef..': Unit position was almost the same as position to run from, so will run in the direction we are facing') end
+
     else
         if bDebugMessages == true then LOG(sFunctionRef..': Will try to run from '..repru(tPositionToRunFrom)) end
         tRevisedPositionToRunFrom = tPositionToRunFrom
+    end--]]
+
+
+
+
+
+
+    local iCurAngleDif
+
+    local tTempLocationToMove
+
+    oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+    if oUnit.PlatoonHandle then
+        oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+    end
+    M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTimeToRun='..iTimeToRun..'; iCurFacingDirection='..iCurFacingDirection..'; iAngleFromUnitToBomb='..iAngleFromUnitToBomb..'; iFacingAngleWanted='..iFacingAngleWanted..'; tUnitStartPosition='..repru(oUnit:GetPosition())..'; tPositionToRunFrom='..repru(tPositionToRunFrom)) end
+    IssueClearCommands({oUnit})
+    tTempLocationToMove = oUnit:GetPosition()
+    local iDistanceAlreadyMoved = 0
+
+
+    --Turn around while moving away if we're not facing the right direction:
+    if bMoveInStages then
+        local iInitialAngleAdj = 30
+        local iAngleMaxSingleAdj = 45
+        local iTempDistanceAwayToMove = 3
+        local iDistanceIncreasePerCycle = 1.5
+        local iDistanceIncreaseCompoundFactor = 1.5
+        local iLoopCount = 0
+
+        if math.abs(iCurFacingDirection - iFacingAngleWanted) > (iAngleMaxSingleAdj + iInitialAngleAdj) then
+            local iTempAngleDirectionToMove = iCurFacingDirection
+
+            if iCurFacingDirection - iFacingAngleWanted > 0 then
+                if iCurFacingDirection - iFacingAngleWanted > 180 then iAngleAdjFactor = 1 --Clockwise
+                else iAngleAdjFactor = -1 --AntiClockwise
+                end
+
+            elseif iCurFacingDirection - iFacingAngleWanted < -180 then iAngleAdjFactor = -1
+            else iAngleAdjFactor = 1
+            end --Clockwise
+
+
+
+            while iLoopCount < 6 do
+                iLoopCount = iLoopCount + 1
+
+                iTempAngleDirectionToMove = iCurFacingDirection + (iInitialAngleAdj + iLoopCount * iAngleMaxSingleAdj) * iAngleAdjFactor
+                if iTempAngleDirectionToMove > 360 then iTempAngleDirectionToMove = iTempAngleDirectionToMove - 360
+                elseif iTempAngleDirectionToMove < 0 then iTempAngleDirectionToMove = iTempAngleDirectionToMove + 360
+                end
+
+                if bDebugMessages == true then LOG(sFunctionRef..': iLoopCount='..iLoopCount..'; iTempAngleDirectionToMove='..iTempAngleDirectionToMove..'; iInitialAngleAdj='..iInitialAngleAdj..'; iAngleAdjFactor='..iAngleAdjFactor..'; iCurFacingDirection='..iCurFacingDirection..'; iFacingAngleWanted='..iFacingAngleWanted) end
+
+
+                iTempDistanceAwayToMove = iTempDistanceAwayToMove + iDistanceIncreasePerCycle * iDistanceIncreasePerCycle * (iDistanceIncreaseCompoundFactor ^ iLoopCount - 1)
+                tTempLocationToMove = M27Utilities.MoveInDirection(oUnit:GetPosition(), iTempAngleDirectionToMove, iTempDistanceAwayToMove)
+                IssueMove({oUnit}, tTempLocationToMove)
+                if bDebugMessages == true then LOG(sFunctionRef..': Just issued move order to tTempLocationToMove='..repru(tTempLocationToMove)..'; iTempAngleDirectionToMove='..iTempAngleDirectionToMove) end
+                if math.abs(iTempAngleDirectionToMove - iFacingAngleWanted) <= iAngleMaxSingleAdj then break
+                elseif math.abs(iTempAngleDirectionToMove - iFacingAngleWanted) > 360 then
+                    M27Utilities.ErrorHandler('Something has gone wrong with dodge micro, will stop trying to turn around')
+                    break
+                end
+            end
+            iDistanceAlreadyMoved = M27Utilities.GetDistanceBetweenPositions(tTempLocationToMove, tPositionToRunFrom)
+        end
     end
 
+    --Should now be facing close to the right direction, so move further in this direction
 
-    local tNewTargetIgnoringGrouping = M27Utilities.MoveTowardsTarget(tUnitPosition, tRevisedPositionToRunFrom, iDistanceToMove, 180)
-    if bDebugMessages == true then LOG(sFunctionRef..': tNewTargetIgnoringGrouping='..repru(tNewTargetIgnoringGrouping)..'; tUnitPosition='..repru(tUnitPosition)) end
+
+    local tNewTargetIgnoringGrouping = M27Utilities.MoveInDirection(oUnit:GetPosition(), iFacingAngleWanted, math.max(1, iDistanceToMove - iDistanceAlreadyMoved))
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished trying to face the right direction, tNewTargetIgnoringGrouping='..repru(tNewTargetIgnoringGrouping)..'; tUnitPosition='..repru(tUnitPosition)..'; iDistanceToMove='..iDistanceToMove..'; iDistanceAlreadyMoved='..iDistanceAlreadyMoved) end
     --local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionNearTargetInSamePathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, 3, true, false, 0)
     local tNewTargetInSameGroup = M27PlatoonUtilities.GetPositionAtOrNearTargetInPathingGroup(tUnitPosition, tNewTargetIgnoringGrouping, 0, 0, oUnit, true, false)
     if tNewTargetInSameGroup then
         if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tNewTargetInSameGroup='..repru(tNewTargetInSameGroup)) end
-        IssueClearCommands({oUnit})
+        --IssueClearCommands({oUnit})
         IssueMove({oUnit}, tNewTargetInSameGroup)
         oUnit[M27UnitInfo.refbSpecialMicroActive] = true
         if oUnit.PlatoonHandle then
@@ -138,6 +242,7 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
     --More intensive version of MoveAwayFromTargetTemporarily, intended e.g. for ACUs
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ForkedMoveInCircle'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --KEY CONFIG SETTINGS: (these will work sometimes but not always against an aeon strat)
     local iInitialAngleAdj = 15
@@ -210,7 +315,9 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
         if iLoopCount == 1 then iTempDistanceAwayToMove = iDistanceAwayToMove + iInitialDistanceAdj end
         tTempLocationToMove = M27Utilities.MoveInDirection(tUnitStartPosition, iTempAngleDirectionToMove, iTempDistanceAwayToMove)
         IssueMove({oUnit}, tTempLocationToMove)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(iTicksBetweenOrders)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if not(bDontTreatAsMicroAction) and not((oUnit[M27UnitInfo.refiGameTimeMicroStarted] == iStartTime and GetGameTimeSeconds() - iStartTime < iTimeToRun)) then bTimeToStop = true end
     end
 
@@ -228,6 +335,7 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
 
         WaitTicks(iTicksBetweenOrders)
     end --]]
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function MoveInCircleTemporarily(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontClearCommandsFirst, iCircleSizeOverride, iTickWaitOverride)
@@ -329,10 +437,12 @@ function DodgeBomb(oBomber, oWeapon, projectile)
     if tBombTarget then
         local iBombSize = 2.5
         if oWeapon.GetBlueprint then iBombSize = math.max(iBombSize, (oWeapon:GetBlueprint().DamageRadius or iBombSize)) end
-        local iTimeToRun = 0.75 --T1
+        local iTimeToRun = 1.75 --T1
+        if iBombSize > 2.5 then iTimeToRun = math.min(2.6, iTimeToRun + (iBombSize - 2.5) * 0.5) end
         if EntityCategoryContains(categories.TECH2, oBomber.UnitId) then
             iBombSize = 3
-            iTimeToRun = 1.5
+            iTimeToRun = 1.95
+            if iBombSize > 3 then iTimeToRun = math.min(2.6, iTimeToRun + (iBombSize - 3) * 0.5) end
         elseif EntityCategoryContains(categories.TECH3, oBomber.UnitId) then
             iTimeToRun = 2.5
         end --Some t2 bombers do damage in a spread (cybran, uef)
@@ -1199,7 +1309,9 @@ function HoverBombTarget(aiBrain, oBomber, oTarget)
                     IssueMove({oBomber}, tTempTarget)
                     bTriedMovingForwardsAndTurning = true
                     if bDebugMessages == true then LOG(sFunctionRef..': Telling the bomber to move forwards for a while and will then try and get it to turn around in a bit') end
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     WaitSeconds(2.5)
+                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                     iCurTick = 0
                 end
             elseif GetGameTimeSeconds() - iStartTime >= iReloadTime then
@@ -1483,7 +1595,9 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
                 if not(M27UnitInfo.IsUnitValid(oBomber)) or not(M27UnitInfo.IsUnitValid(oTarget)) then
                     break
                 end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(1)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             end
 
 

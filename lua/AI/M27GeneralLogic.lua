@@ -520,6 +520,8 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                         end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         WaitSeconds(1)
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         return GetNearestEnemyIndex(aiBrain, true)
                     else
                         --No brains - could be game mode doesnt have enemy player brains
@@ -531,7 +533,6 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                             if bDebugMessages == true then LOG(sFunctionRef..': No enemy brains identified, Setting no enemies to be true') end
                         end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        --WaitSeconds(1)
                         return GetNearestEnemyIndex(aiBrain, true)
                     end
                 else
@@ -3655,8 +3656,13 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
 end
 
 function IssueDelayMoveBase(tUnits, tTarget, iDelay)
+    local sFunctionRef = 'IssueDelayMoveBase'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(iDelay)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     IssueMove(tUnits, tTarget)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function IssueDelayedMove(tUnits, tTarget, iDelay)
@@ -4437,14 +4443,19 @@ end
 
 function RecheckForTMLMissileTarget(aiBrain, oLauncher)
     --Call via fork thread - called if couldnt find any targets for TML
+    local sFunctionRef = 'RecheckForTMLMissileTarget'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if not(oLauncher[M27UnitInfo.refbActiveMissileChecker]) then
         oLauncher[M27UnitInfo.refbActiveMissileChecker] = true
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitSeconds(30)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if M27UnitInfo.IsUnitValid(oLauncher) then
             ConsiderLaunchingMissile(oLauncher)
             oLauncher[M27UnitInfo.refbActiveMissileChecker] = false
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DecideToLaunchNukeSMLOrTMLMissile()  end --Done only to make it easier to find considerlaunchingmissile
@@ -5217,6 +5228,8 @@ end
 
 function YthothaDeathBallSearchAndSlow(oOwnerBrain, tLikelyPosition)
     --E.g. if become aware of an AI that controls the Ythotha death ball then can call this function to reduce the harmful effects
+    local sFunctionRef = 'YthothaDeathBallSearchAndSlow'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iGameTimeStart = GetGameTimeSeconds()
     local tNearbyDeathBalls
     local iDeathBallCategory = categories.EXPERIMENTAL * categories.UNSELECTABLE * categories.SERAPHIM * categories.MOBILE * categories.LAND * categories.INSIGNIFICANTUNIT * categories.UNTARGETABLE
@@ -5234,6 +5247,9 @@ function YthothaDeathBallSearchAndSlow(oOwnerBrain, tLikelyPosition)
             end
         end
         if bHaveChanged then break end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitSeconds(1)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

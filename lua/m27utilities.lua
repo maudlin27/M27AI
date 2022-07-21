@@ -803,6 +803,8 @@ end
 
 
 function GetACU(aiBrain)
+    local sFunctionRef = 'GetACU'
+    FunctionProfiler(sFunctionRef, refProfilerStart)
     function GetSubstituteACU(aiBrain)
         --Get substitute
         local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
@@ -862,7 +864,10 @@ function GetACU(aiBrain)
         if aiBrain[M27Overseer.refoStartingACU].Dead then
             if GetGameTimeSeconds() <= 10 then
                 LOG('WARNING - GetACU failed to find alive AUC in first 10 seconds of game, will keep trying')
+                FunctionProfiler(sFunctionRef, refProfilerEnd)
                 WaitSeconds(1)
+                FunctionProfiler(sFunctionRef, refProfilerStart)
+                FunctionProfiler(sFunctionRef, refProfilerEnd)
                 return GetACU(aiBrain)
             else
                 --is an error where if return the ACU then causes a hard crash (due to some of hte code that relies on this) - easiest way is to just return nil causing an error message that doesnt cause a hard crash
@@ -888,6 +893,7 @@ function GetACU(aiBrain)
         end
     end
     if aiBrain.M27IsDefeated then aiBrain[M27Overseer.refoStartingACU] = nil end
+    FunctionProfiler(sFunctionRef, refProfilerEnd)
     return aiBrain[M27Overseer.refoStartingACU]
 end
 
@@ -1626,7 +1632,11 @@ end
 
 function ForkedDelayedChangedVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerConditionRef, iMustBeLessThanThisTimeValue, iMustBeMoreThanThisTimeValue, vMustNotEqualThisValue)
     --After waiting iDelayInSeconds, changes the variable to vVariableValue.
+    local sFunctionRef = 'ForkedDelayedChangedVariable'
+    FunctionProfiler(sFunctionRef, refProfilerStart)
+    FunctionProfiler(sFunctionRef, refProfilerEnd)
     WaitSeconds(iDelayInSeconds)
+    FunctionProfiler(sFunctionRef, refProfilerStart)
     if oVariableOwner then
         local bReset = true
         if sOptionalOwnerConditionRef then
@@ -1637,6 +1647,7 @@ function ForkedDelayedChangedVariable(oVariableOwner, sVariableName, vVariableVa
         end
         if bReset then oVariableOwner[sVariableName] = vVariableValue end
     end
+    FunctionProfiler(sFunctionRef, refProfilerEnd)
 end
 
 function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerConditionRef, iMustBeLessThanThisTimeValue, iMustBeMoreThanThisTimeValue, vMustNotEqualThisValue)
@@ -1646,10 +1657,15 @@ function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDel
 end
 
 function ForkedDelayedChangedSubtable(oVariableOwner, sPrimaryRef, vSubtable1Ref, vSubtable2Ref, iVariableChange, iDelayInSeconds)
+    local sFunctionRef = 'ForkedDelayedChangedSubtable'
+    FunctionProfiler(sFunctionRef, refProfilerStart)
+    FunctionProfiler(sFunctionRef, refProfilerEnd)
     WaitSeconds(iDelayInSeconds)
+    FunctionProfiler(sFunctionRef, refProfilerStart)
     if oVariableOwner and oVariableOwner[sPrimaryRef] and oVariableOwner[sPrimaryRef][vSubtable1Ref] then
         oVariableOwner[sPrimaryRef][vSubtable1Ref][vSubtable2Ref] = (oVariableOwner[vSubtable1Ref][vSubtable2Ref] or 0) + iVariableChange
     end
+    FunctionProfiler(sFunctionRef, refProfilerEnd)
 end
 
 function DelayChangeSubtable(oVariableOwner, sPrimaryRef, vSubtable1Ref, vSubtable2Ref, iVariableChange, iDelayInSeconds)

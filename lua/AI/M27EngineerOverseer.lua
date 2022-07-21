@@ -128,6 +128,7 @@ refiExperimentalYolona = 7
 refiExperimentalParagon = 8
 refiAllExperimentals = 9
 refiAllNonNukeExperimentals = 10
+refiExperimentalMegalith = 11 --Used so get the right category
 
 
 refiLastSecondExperimentalRef = 'M27EngineerLastSecondExperimentalCategory' --As above
@@ -1722,12 +1723,16 @@ end
 function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
     --Will wait iDelay seconds, before clearing engineer's actions if it's guarding a unit and its action is still spare
     local bDebugMessages = false
+    local sFunctionRef = 'DelayedSpareEngineerClearAction'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     local sFunctionRef = 'DelayedSpareEngineerClearAction'
     local iOrigAction = oEngineer[refiEngineerCurrentAction]
     if not(oEngineer[refbActiveDelayedTargetRechecker]) then
         oEngineer[refbActiveDelayedTargetRechecker] = true
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitSeconds(iDelaySeconds)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if M27UnitInfo.IsUnitValid(oEngineer) then
             oEngineer[refbActiveDelayedTargetRechecker] = false
             --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
@@ -1739,6 +1744,7 @@ function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     --ReassignEngineers(aiBrain, true, {oEngineer})
 end
 
@@ -4157,6 +4163,8 @@ function ConvertExperimentalRefToCategory(iExperimentalRef)
         iCategory = M27UnitInfo.refCategoryParagon
     elseif iExperimentalRef == refiAllNonNukeExperimentals then
         iCategory = M27UnitInfo.refCategoryExperimentalLevel - M27UnitInfo.refCategorySML * categories.TECH3
+    elseif iExperimentalRef == refiExperimentalMegalith then
+        iCategory = M27UnitInfo.refCategoryMegalith
     else
         M27Utilities.ErrorHandler('No recognised experimental category for iExperimentalRef='..(iExperimentalRef or 'nil')..'; will return land experimental')
         iCategory = M27UnitInfo.refCategoryLandExperimental
@@ -4263,7 +4271,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             iEnemyPDThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyPDThreat, true, nil, nil, false, false)
         end
         local iExistingLandExperimentals = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental)
-        if iActionToAssign == refActionBuildSecondExperimental and aiBrain[refiLastExperimentalReference] == refiExperimentalLand then iExistingLandExperimentals = iExistingLandExperimentals + 1 end
+        if iActionToAssign == refActionBuildSecondExperimental and (aiBrain[refiLastExperimentalReference] == refiExperimentalLand or aiBrain[refiLastExperimentalReference] == refiExperimentalMegalith) then iExistingLandExperimentals = iExistingLandExperimentals + 1 end
 
 
         --is the enemy turtling? If so then ignore normal logic to build land experimental and go straight to Nuke, T3 arti or air experimental
@@ -4436,7 +4444,10 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                 if iFactionIndex == M27UnitInfo.refFactionUEF then
                     if bDebugMessages == true then LOG(sFunctionRef..': Dealing with UEF, consider if want to build novax') end
                     --Do we want to build a novax? Only consider if enemy base relatively far away or it cant be pathed to amphibiously
-                    if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 500 or aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == false or (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 350) then
+                    --Build fatboy if enemy base not that far away and we dont already have a fatboy
+                    if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 500 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and iExistingLandExperimentals == 0 then
+                        iCategoryRef = refiExperimentalLand
+                    else
                         --Does the enemy have enough targets for a novax? Factor in any novaxes our team has that aren't massively far away
                         local iExistingNovax = table.getn(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNovaxCentre, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1500, 'Ally'))
                         local iNovaxTargetValue = 0 --want at least 10k worth of good targets per novax
@@ -4567,11 +4578,21 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                             end
                         end
                         if not(iCategoryRef) then
+
                             --Either enemy land experimental on our side of map and we lack sufficient air to deal with it, or the nearest threat is within 45% of start and is pathable amphibiously
                             if iExistingLandExperimentals <= 2 and iEnemyPDThreat <= 20000 and ((bNearbyLandExperimental or (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]))) and (iLifetimeLandExperimentalCount < 3 or not(aiBrain[M27AirOverseer.refiPreviousAvailableBombers] >= 100 or (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 6 and aiBrain[M27AirOverseer.refiOurMassInAirAA] >= aiBrain[M27AirOverseer.refiAirAAWanted]*0.65)))) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Will build land experimental as nearby experimental or we can path to nearest <=45% threat') end
                                 iCategoryRef = refiExperimentalLand
+                            else
+                                --Do we still want to build an air experimental defensively if we havent built one before?
+                                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and table.getn(aiBrain[M27Overseer.reftEnemyLandExperimentals]) >= 2 and table.getn(aiBrain[M27Overseer.reftEnemyLandExperimentals]) > iExistingLandExperimentals and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure]) and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) == 0 then
+                                    iCategoryRef = refiExperimentalAir
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to build defensive air experimental') end
+                                end
                             end
+
+
+
                             if not(iCategoryRef) and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 750 then
                                 iCategoryRef = refiExperimentalT3Arti
                             end
@@ -4590,8 +4611,10 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
 
         --Game-enders (override for T3 arti, and for if ahve no category ref)
         if bDebugMessages == true then LOG(sFunctionRef..': If are about to build t3 arti or have no category will consider if we want a gameender. iCategoryRef='..(iCategoryRef or 'nil')..'; Gross mass='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; bTargetsForT3Arti='..tostring(bTargetsForT3Arti)..'; Dist to enemy='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
-        if (iCategoryRef == refiExperimentalT3Arti or not(iCategoryRef)) and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 90 or ((aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 55 or (bTargetsForT3Arti == false and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 40)) and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 800)) then
-            if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 700 or iT3ArtiWeOwn >= 1 then
+        if (iCategoryRef == refiExperimentalT3Arti or not(iCategoryRef)) and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 95 or ((aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 55 or (bTargetsForT3Arti == false and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 40)) and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 800)) then
+            if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 750 and iT3ArtiWeOwn < 4 then
+                iCategoryRef = refiExperimentalT3Arti
+            elseif aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 825 and iT3ArtiWeOwn < 1 then
                 iCategoryRef = refiExperimentalT3Arti
             else
                 --Do we already ahve a game-ender and its not a paragon?
@@ -4636,6 +4659,13 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             end
 
             if bDebugMessages == true then LOG(sFunctionRef..': Backup logic for what to build activated. iCategoryRef='..iCategoryRef) end
+        end
+
+
+        --Convert cybran experimental refs to megalith experimental ref
+        if iCategoryRef == refiExperimentalLand and EntityCategoryContains(categories.CYBRAN, M27Utilities.GetACU(aiBrain)) then
+            local iMonkeyLC = M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryMonkeylord)
+            if iMonkeyLC >= 2 or (iMonkeyLC == 1 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMonkeylord) == 0) then iCategoryRef = refiExperimentalMegalith end
         end
     end
 
@@ -4791,12 +4821,15 @@ function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpg
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'UpgradeBuildingActionCompleteChecker'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
 
     local bContinue = true
     while bContinue == true do
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitSeconds(1)
         --Check if building has finished upgrading
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         bContinue = false
         if bDebugMessages == true then
             LOG(sFunctionRef..': CHecking if buildingtoupgrade is still building')
@@ -4809,7 +4842,7 @@ function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpg
     if bDebugMessages == true then LOG(sFunctionRef..': About to clear engineer with ref '..GetEngineerUniqueCount(oEngineer)..' actions') end
     IssueClearCommands({oEngineer})
     ClearEngineerActionTrackers(aiBrain, oEngineer, true)
-
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
@@ -5234,7 +5267,9 @@ function ReplaceT2WithT3Monitor(aiBrain, oEngineer, oActionTargetObject)
     if M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), tTargetMex) >= 6 then
         if bDebugMessages == true then LOG(sFunctionRef..': Arent near the target so sending issuemove to it before starting main loop') end
         IssueMove({oEngineer}, tTargetMex)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
 
     --Wait until we are near the target
@@ -5266,7 +5301,9 @@ function ReplaceT2WithT3Monitor(aiBrain, oEngineer, oActionTargetObject)
             IssueClearCommands({oEngineer})
             BuildStructureAtLocation(aiBrain, oEngineer, M27UnitInfo.refCategoryT3Mex, 1, nil, tTargetMex, true, false)
             M27Utilities.DelayChangeVariable(oEngineer, rebToldToStartBuildingT3Mex, true, 20)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(10) --Backup logic
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             if M27UnitInfo.IsUnitValid(oEngineer) then
                 if bDebugMessages == true then LOG(sFunctionRef..': Finished waiting for engineer UC'..GetEngineerUniqueCount(oEngineer)..'; About to tell engineer to build T3 mex at the location. tTargetMex='..repru(tTargetMex)) end
                 --M27Utilities.DelayChangeVariable(oEngineer, rebToldToStartBuildingT3Mex, true, 8)
@@ -11635,6 +11672,7 @@ function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassig
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
 
     local sFunctionRef = 'DelayedEngiReassignment'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local tRevisedEngisToReassign = {}
     local iRevisedEngisToReassign = 0
     --Below is redundancy to help protect from recursive loop that had happen once (hopefully cause was fixed but want this as backup since it crashes the game within 30s)
@@ -11645,7 +11683,9 @@ function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassig
             tRevisedEngisToReassign[iRevisedEngisToReassign] = oEngi
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(1)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         if bDebugMessages == true then
             LOG(sFunctionRef..': Reassigning '..table.getn(tEngineersToReassign)..'engineers')
@@ -11656,6 +11696,7 @@ function DelayedEngiReassignment(aiBrain, bOnlyReassignIdle, tEngineersToReassig
         end
         ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function CheckAllEngineerLocations(aiBrain)
@@ -11988,6 +12029,7 @@ function EngineerInitialisation() end --Done to help find where we declare our v
 function EngineerManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'EngineerManager'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iLongLoopCount = 0
     local iLongLoopThreshold = 120
 
@@ -12051,9 +12093,12 @@ function EngineerManager(aiBrain)
         if bDebugMessages == true then LOG(sFunctionRef..': About to wait 10 ticks') end
         --TEMPTEST(aiBrain, sFunctionRef..': Pre wait 10 ticks')
         --]]
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then LOG(sFunctionRef..': End of cycle after waiting 10 ticks') end
         --TEMPTEST(aiBrain, sFunctionRef..': Post wait 10 ticks')
 
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

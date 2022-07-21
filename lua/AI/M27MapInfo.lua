@@ -1284,10 +1284,15 @@ function RecordThatWeWantToUpdateReclaimAtLocation(tLocation, iNearbySegmentsToU
 end
 
 function DelayedReclaimRecordAtLocation(tPosition, iNearbySegmentsToUpdate, iWaitInSeconds)
+    local sFunctionRef = 'DelayedReclaimRecordAtLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(iWaitInSeconds)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27Utilities.bM27AIInGame then
         RecordThatWeWantToUpdateReclaimAtLocation(tPosition, iNearbySegmentsToUpdate)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function ReclaimManager()
@@ -1445,7 +1450,12 @@ end
 
 function DelayedReclaimUpdateAtLocation(tLocation, iDelay)
     --Call via forkthread
+    local sFunctionRef = 'DelayedReclaimUpdateAtLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(iDelay)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     --LOG('Temp log for debugging, DelayedReclaimUpdateAtLocation: tLocation='..repru((tLocation or {'nil'})))
     return UpdateReclaimDataNearLocation(tLocation, 0, nil)
 end
@@ -3291,8 +3301,13 @@ function SetupNoRushDetails(aiBrain)
 end
 
 function NoRushMonitor()
+    local sFunctionRef = 'NoRushMonitor'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitSeconds(iNoRushTimer)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     bNoRushActive = false
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function RecordAllPlateaus()
@@ -3607,6 +3622,8 @@ function LogMapTerrainTypes()
     --Outputs to log the terrain types used and how often theyre used
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'LogMapTerrainTypes'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicks(150)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code after waitticks') end
@@ -3638,22 +3655,35 @@ function LogMapTerrainTypes()
 end
 
 function DrawAllMapPathing(aiBrain)
+    local sFunctionRef = 'DrawAllMapPathing'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     while bPathfindingComplete == false do
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
     if not(bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeLand] == true) then
         DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeLand, true)
         while bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeLand] == true do
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(10)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(50)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeAmphibious)
         while bMapDrawingAlreadyCommenced[M27UnitInfo.refPathingTypeAmphibious] == true do
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitTicks(10)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(50)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         DrawMapPathing(aiBrain, M27UnitInfo.refPathingTypeNavy, true)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
@@ -3732,7 +3762,9 @@ function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
             end
             iWaitCount = iWaitCount + 1
             if iWaitCount > 50 then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(1)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 iWaitCount = 0
             end
         end
@@ -3754,7 +3786,9 @@ function DrawMapPathing(aiBrain, sPathing, bDontDrawWaterIfPathingLand)
             LOG('iMatches='..iMatches..'; iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; Pathing group='..tPathingSegmentGroupBySegment[sPathing][iSegmentX][iSegmentZ]..'; position='..repru(GetPositionFromPathingSegments(iSegmentX, iSegmentZ)))
             iWaitCount = iWaitCount + 1
             if iWaitCount > 10 then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                 WaitTicks(1)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                 iWaitCount = 0
             end
         end
@@ -4038,7 +4072,7 @@ function RecordIfSuitableRallyPoint(aiBrain, tPossibleRallyPoint, iCurRallyPoint
                     bAbortDueToIntelOrEnemies = true
                     local iModDistToStart = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tPossibleRallyPoint)
                     if bDebugMessages == true then LOG(sFunctionRef..': iModDistToStart='..iModDistToStart..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] * 0.9='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] * 0.9..'; aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - 50='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - 50) end
-                    if iModDistToStart < aiBrain[M27Overseer.refiModDistFromStartNearestThreat] and iModDistToStart < math.min(aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] * 0.9, aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - 50) then
+                    if iModDistToStart < aiBrain[M27Overseer.refiModDistFromStartNearestThreat] and iModDistToStart < math.min(aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] * 0.9, aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - math.max(50, aiBrain[M27Overseer.refiHighestMobileLandEnemyRange] + 15)) then
                         if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9..'; M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])='..M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
                         if M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber]) / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] < (aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9) then
                             local tNearbyPDAndT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryT2PlusPD, tPossibleRallyPoint, 153, 'Enemy')
