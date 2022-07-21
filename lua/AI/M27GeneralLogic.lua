@@ -1695,7 +1695,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                             if bDebugMessages == true and oUnit.GetBlueprint then LOG('Unit has blueprint with maxpseed='..oUnit:GetBlueprint().Physics.MaxSpeed..';  If dont satisfy speed check, then iSoloBlipMassOverride='..(iSoloBlipMassOverride or 'nil')..'; backup iBlipThreat='..iBlipThreat..'; aiBrain[refiEnemyScoutSpeed]='..(aiBrain[refiEnemyScoutSpeed] or 'nil')) end
                                             if oUnit.GetBlueprint and oBP.Physics.MaxSpeed == 1.9 then
                                                 --Unit is same speed as engineer so more likely tahn not its an engineer
-                                                iCurThreat = 10
+                                                iCurThreat = 5
                                             elseif oUnit.GetBlueprint and oBP.Physics.MaxSpeed == 1.7 then
                                                 --Unit is same speed as ACU so more likely than not its an ACU
                                                 iCurThreat = 800
