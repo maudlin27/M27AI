@@ -6688,7 +6688,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
 
             if bDebugMessages == true then
-                LOG(sFunctionRef..': Start of code; GameTime='..GetGameTimeSeconds())
+                LOG(sFunctionRef..': Start of code; GameTime='..GetGameTimeSeconds()..'; Strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy])
                 --M27EngineerOverseer.TEMPTEST(aiBrain, 'Determine platoon action - start of code')
                 if sPlatoonName == 'M27IndirectDefender' then LOG(sFunctionRef..': Platoon name and count='..sPlatoonName..oPlatoon[refiPlatoonCount]..': refbShouldHaveEscort='..tostring(oPlatoon[refbShouldHaveEscort])) end
             end
@@ -6822,9 +6822,9 @@ function DeterminePlatoonAction(oPlatoon)
                             GetNearbyEnemyData(oPlatoon, iEnemySearchRadius)
                             if bDebugMessages == true then LOG(sFunctionRef..': Finished getting nearby enemy data. iEnemySearchRadius='..iEnemySearchRadius..'; iEnemiesInRange='..oPlatoon[refiEnemiesInRange]) end
 
-                            --SPECIAL MODE - attack ACU - ignore most logic
+                            --SPECIAL MODE - attack ACU - ignore most logic for non-skirmishers
                             local bAttackACULogic = false
-                            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                            if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and not(oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic]) then
                                 if oPlatoon[refbACUInPlatoon] then
                                     if aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then
                                         bAttackACULogic = true

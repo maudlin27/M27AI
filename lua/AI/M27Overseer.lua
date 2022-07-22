@@ -1186,11 +1186,38 @@ function AssignMAAToPreferredPlatoons(aiBrain)
 
     iMAAThreatWanted = math.min(iMaxMAAThreatForACU, math.max(iMinACUMAAThreatWanted, math.floor((aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] or 0) * iAirThreatMAAFactor)))
 
+    --If ACU is near base or chokepoint and we own T2+ fixed AA near it, then reduce MAA threat wanted
+    local oACU = M27Utilities.GetACU(aiBrain)
+
+    if aiBrain[refiOurHighestFactoryTechLevel] >= 2 and M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 then
+        local iAACategory
+        if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 then iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3
+        elseif aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] > 0 then iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryStructureAA * categories.TECH2
+        else iAACategory = M27UnitInfo.refCategoryStructureAA
+        end
+        local tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(iAACategory, oACU:GetPosition(), 60, 'Ally')
+        local iDistToBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        if M27Utilities.IsTableEmpty(tNearbyGroundAA) == false then
+            if iDistToBase <= iDistanceFromBaseToBeSafe + 5 then
+
+                iMAAThreatWanted = math.min(iMinACUMAAThreatWanted, iMAAThreatWanted)
+                iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.4
+            elseif iDistToBase <= 125 then
+                iMAAThreatWanted = math.min(iMAAThreatWanted, iMinACUMAAThreatWanted * 1.2)
+                iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.6
+            else
+                iMAAThreatWanted = math.min(iMAAThreatWanted, iMinACUMAAThreatWanted * 1.5)
+                iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.8
+            end
+        end
+    end
+
+
     local sMAAPlatoonName = 'M27MAAAssister'
     local bNeedMoreMAA = false
     local bACUNeedsMAAHelper = true
     local oNewMAAPlatoon
-    local oExistingMAAPlatoon = M27Utilities.GetACU(aiBrain)[refoUnitsMAAHelper]
+    local oExistingMAAPlatoon = oACU[refoUnitsMAAHelper]
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': About to check if ACU needs MAA; iMAAWanted=' .. iMAAThreatWanted)
     end
@@ -1267,7 +1294,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                 break
             end
 
-            oMAAToGive = GetNearestMAAOrScout(aiBrain, M27Utilities.GetACU(aiBrain):GetPosition(), false, true, false, M27Utilities.GetACU(aiBrain))
+            oMAAToGive = GetNearestMAAOrScout(aiBrain, oACU:GetPosition(), false, true, false, oACU)
             if oMAAToGive == nil or oMAAToGive.Dead then
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': oMAAToGive is nil or dead')
@@ -1282,7 +1309,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': oMAAToGive is valid, will create new platoon (if dont already have one) and assign it if havent already created')
                 end
-                AssignHelperToPlatoonOrUnit(oMAAToGive, M27Utilities.GetACU(aiBrain), false)
+                AssignHelperToPlatoonOrUnit(oMAAToGive, oACU, false)
             end
         end
 
@@ -5057,11 +5084,16 @@ function ACUManager(aiBrain)
                                 end
 
                                 if bAheadOnEco then
-                                    --We are probably ahead on eco
-                                    bAllInAttack = false
-                                    bIncludeACUInAttack = false
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': We are ahead on eco so will abort the all in attack and play safe')
+                                    --We are probably ahead on eco, so only attack if enemy ACU within our ACU range and we have a big advantage
+
+                                    if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) or M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and iLastDistanceToACU <= iACURange and oACU:GetHealth() - 4000 >= aiBrain[refoLastNearstACU]:GetHealth() and (aiBrain[refoLastNearstACU]:GetHealth() <= 500 or M27UnitInfo.GetUnitMaxGroundRange(aiBrain[refoLastNearestACU]) < iACURange or (aiBrain[refoLastNearstACU]:GetHealth() <= 2000 and oACU:GetHealth() >= 9500)) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': We are ahead on eco but still shoudl be able to kill the ACU quickly so wont abort the all in attack with our ACU') end
+                                    else
+                                        bAllInAttack = false
+                                        bIncludeACUInAttack = false
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': We are ahead on eco so will abort the all in attack and play safe')
+                                        end
                                     end
                                 end
                             end
@@ -5075,8 +5107,28 @@ function ACUManager(aiBrain)
                     end
                 end
                 --Override - dont include ACU in attack if we are massively ahead on eco
-                if bIncludeACUInAttack and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 16 and not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
-                    bIncludeACUInAttack = false
+                if bIncludeACUInAttack then
+                    if (iLastDistanceToACU > iACURange or M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75) and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 16 and not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
+                        bIncludeACUInAttack = false
+                        --Dont include ACU in attack if there are nearby enemy T1 PD and not about to kill their ACU
+                    elseif oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemyStructuresInRange] > 0 and aiBrain[refoLastNearestACU]:GetHealth() >= 600 then
+                        local tNearbyT1PD = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH1, oACU.PlatoonHandle[M27PlatoonUtilities.reftEnemyStructuresInRange])
+                        if M27Utilities.IsTableEmpty(tNearbyT1PD) == false then
+                            local iNearestPD = 10000
+                            local iCurDist
+                            for iUnit, oUnit in tNearbyT1PD do
+                                if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetFractionComplete() >= 1 then
+                                    iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oACU:GetPosition())
+                                    if iCurDist < iNearestPD then iNearestPD = iCurDist end
+                                end
+                            end
+                            --T1 PD range is 26 - this hopefully gives enough time to move out of their range most of the time
+                            if iCurDist <= 28 then
+                                bIncludeACUInAttack = false
+                            end
+                        end
+                    end
+
                 end
 
 
@@ -7135,10 +7187,15 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
                 if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                     --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
-                    if not (M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 18 then
+                    if not (M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 26 or aiBrain[refiEnemyHighestTechLevel] >= 4 then
                         aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() + 15000
                     else
-                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                        --Enemy has t3, and we have decent eco; run if we dont have lots of enhancements
+                        if iUpgradeCount < 3 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 then
+                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                        else    --Have 3+ enhancements and dont have at least 200 gross mass income so will allow a bit of health damage
+                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
+                        end
                     end
                 else
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)

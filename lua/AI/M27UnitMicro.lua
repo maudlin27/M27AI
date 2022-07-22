@@ -945,6 +945,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have at least 5 wall units in range, so potential blockage; size='..table.getn(tEnemyUnits)) end
                                     local bSuspectedPathBlock = false
                                     --If more than 10 then assume blocking our path
+
                                     if table.getn(tEnemyUnits) >= 10 then
                                         if bDebugMessages == true then LOG(sFunctionRef..': At least 10 wall units so assuming a blockage') end
                                         bSuspectedPathBlock = true
@@ -960,19 +961,32 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
                                         end
                                     end
                                     if bSuspectedPathBlock then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Think enemy has walls in a line so will overcharge them') end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Think enemy has walls in a line so will overcharge them unless they are all closer to our base than us') end
                                         iMostMassDamage = 0
                                         oMostMassDamage = nil
+                                        bSuspectedPathBlock = false
+
+                                        local iOurDistToBase = M27Utilities.GetDistanceBetweenPositions(tUnitPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                        local iWallDistToBase
                                         for iWall, oUnit in tEnemyUnits do
-                                            if WillShotHit(oUnitWithOvercharge, oUnit) then
-                                                iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage, true)
-                                                if iCurDamageDealt > iMostMassDamage then
-                                                    iMostMassDamage = iCurDamageDealt
-                                                    oMostMassDamage = oUnit
-                                                end
+                                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iOurDistToBase + 4 then
+                                                bSuspectedPathBlock = true
+                                                break
                                             end
                                         end
-                                        if oMostMassDamage then oOverchargeTarget = oMostMassDamage end
+                                        if bSuspectedPathBlock then
+                                            for iWall, oUnit in tEnemyUnits do
+                                                if WillShotHit(oUnitWithOvercharge, oUnit) then
+                                                    iCurDamageDealt = M27Logic.GetDamageFromOvercharge(aiBrain, oUnit, iOverchargeArea, iMaxOverchargeDamage, true)
+                                                    if iCurDamageDealt > iMostMassDamage then
+                                                        iMostMassDamage = iCurDamageDealt
+                                                        oMostMassDamage = oUnit
+                                                    end
+                                                end
+                                            end
+                                            if oMostMassDamage then oOverchargeTarget = oMostMassDamage end
+                                        elseif bDebugMessages == true then LOG(sFunctionRef..': Walls are all closer to our base than we are so probably not blocking us')
+                                        end
                                     elseif bDebugMessages == true then LOG(sFunctionRef..': Dont think the walls are in a line so wont try and OC')
                                     end
                                 end
