@@ -1697,8 +1697,9 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                                 --Unit is same speed as engineer so more likely tahn not its an engineer
                                                 iCurThreat = 5
                                             elseif oUnit.GetBlueprint and oBP.Physics.MaxSpeed == 1.7 then
-                                                --Unit is same speed as ACU so more likely than not its an ACU
+                                                --Unit is same speed as ACU so more likely than not its an ACU; if gametime is >10m then assume will also know if the ACU is upgraded
                                                 iCurThreat = 800
+                                                if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and GetGameTimeSeconds() >= 600 then iCurThreat = GetACUCombatMassRating(oUnit) end
                                             elseif oUnit.GetBlueprint and oBP.Physics.MaxSpeed == aiBrain[refiEnemyScoutSpeed] then
                                                 iCurThreat = 10
                                             else

@@ -37,6 +37,7 @@ subrefNukeLaunchLocations = 'M27OverseerTeamNukeTargets' --stored against tTeamD
 refiEnemyWalls = 'M27OverseerTeamEnemyWallCount' --stored against tTeamData[brain.M27Team], returns the ntotal number of enemy wall units; used as threshold to enable engineers to start looking for wall segments to reclaim
 refiTimeOfLastEnemyTeamDataUpdate = 'M27OverseerTeamEnemyLastUpdate' --as above, returns the gametimeseconds of hte last update
 reftEnemyArtiToAvoid = 'M27OverseerTeamEnemyArtiToAvoid' --against tTeamData[aiBrain.M27Team], [x] is a count (so table.getn works), returns T2 arti units that has got enough mass kills to want to avoid
+refiFriendlyFatboyCount = 'M27OverseerTeamFriendlyFatboys' --against tTeamData[aiBrain.M27Team], returns the number of friendly fatboys on the team
 
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
@@ -6114,6 +6115,17 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
                 end
             end
         end
+
+
+
+        --Update count of friendly team fatboys (so can decide whether to run platoon logic relating to this)
+        local iFatboyCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy)
+        for iBrain, oBrain in aiBrain[toAllyBrains] do
+            if not(oBrain == aiBrain) then --redundancy, dont think this is needed
+                iFatboyCount = iFatboyCount + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy)
+            end
+        end
+        tTeamData[aiBrain.M27Team][refiFriendlyFatboyCount] = iFatboyCount
     end
 end
 
@@ -6382,6 +6394,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         ForkThread(M27MapInfo.UpdateNewPrimaryBaseLocation, aiBrain)
 
         ForkThread(CheckUnitCap, aiBrain)
+
+
 
 
 
@@ -8115,6 +8129,10 @@ function CoordinateLandExperimentals(aiBrain)
             end
         end
         if not (bHaveChokepoint) then
+            local bCoordinateFatboys = false
+            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, aiBrain[reftEnemyLandExperimentals])) == false then
+                bCoordinateFatboys = true
+            end
 
             tTeamData[aiBrain.M27Team][refbActiveLandExperimentalCoordinator] = true
             local tM27LandExperimentals = {}
@@ -8133,7 +8151,7 @@ function CoordinateLandExperimentals(aiBrain)
                 bExperimentalsAreFarApart = false
                 if M27Utilities.IsTableEmpty(tAlliedLandExperimentals) == false and table.getn(tAlliedLandExperimentals) >= 2 then
                     for iUnit, oUnit in tAlliedLandExperimentals do
-                        if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain().M27AI then
+                        if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain().M27AI and (bCoordinateFatboys or not(EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId))) then
                             iM27LandExperimentals = iM27LandExperimentals + 1
                             tM27LandExperimentals[iM27LandExperimentals] = oUnit
                         end

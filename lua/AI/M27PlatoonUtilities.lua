@@ -2631,7 +2631,19 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         LOG('iUnit='..iUnit..'; oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
                                     end
                                 end
-                                iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftFriendlyNearbyCombatUnits], false)
+                                if M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.refiFriendlyFatboyCount] > 0 then
+                                    --Cap threat rating for fatboys to 5k threat
+                                    local tFriendlyFatboys = EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, oPlatoon[reftFriendlyNearbyCombatUnits])
+                                    if M27Utilities.IsTableEmpty(tFriendlyFatboys) then
+                                        iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftFriendlyNearbyCombatUnits], false)
+                                    else
+                                        iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, EntityCategoryFilterDown(categories.ALLUNITS - M27UnitInfo.refCategoryFatboy, oPlatoon[reftFriendlyNearbyCombatUnits]), false)
+                                        iOurThreatRating = iOurThreatRating + 5000 * table.getn(tFriendlyFatboys)
+                                    end
+
+                                else
+                                    iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftFriendlyNearbyCombatUnits], false)
+                                end
                                 local iEnemyThreatRatioToRunOn = 1.1
                                 local iMinPercentOfMexesWanted = (1 / M27Overseer.iPlayersAtGameStart) * 0.7
                                 local iMexesWeHave = aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] - aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup]
@@ -2811,7 +2823,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
             end
             if bExperimentalWithinRange then
                 oPlatoon[refiCurrentAction] = refActionKitingRetreat
-                oPlatoon[refbHavePreviouslyRun] = true
+                --oPlatoon[refbHavePreviouslyRun] = true
             else
                 local iFriendlyExperimental = 0 --friendly combat units will include our own units
                 if M27Utilities.IsTableEmpty(oPlatoon[reftFriendlyNearbyCombatUnits]) == false then
@@ -2891,12 +2903,12 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                             --Do we have friendly experimental? If so do temporary retreat
                             if iFriendlyExperimental > 1 then
                                 oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
-                                oPlatoon[refbHavePreviouslyRun] = true
+                                --oPlatoon[refbHavePreviouslyRun] = true
                             else
                                 --Is this just due to power stall? If so only do temporary retreat
                                 if oPlatoon[refoFrontUnit].MyShield and oPlatoon[refoFrontUnit]:GetHealth() > math.max(iCurShield, iMaxShield*0.2) then
                                     oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
-                                    oPlatoon[refbHavePreviouslyRun] = true
+                                    --oPlatoon[refbHavePreviouslyRun] = true
                                 else
                                     oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
                                     oPlatoon[refbHavePreviouslyRun] = true
@@ -3386,14 +3398,15 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                 tNearestPD = oNearestPD:GetPosition()
                                                 iNearestPDDistance = M27Utilities.GetDistanceBetweenPositions(tNearestPD, tPlatoonPosition)
                                                 iEnemyMaxRange = math.max(iEnemyMaxRange, M27Logic.GetDFAndT1ArtiUnitMinOrMaxRange(tNearbyPD, 2))
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Have nearby PD, iMaxRange after considering this='..iEnemyMaxRange) end
                                             end
                                             if oNearestEnemy then
-                                                iEnemyMaxRange = math.max(iEnemyMaxRange, M27Logic.GetDFAndT1ArtiUnitMinOrMaxRange(tNearbyPD, 2))
+                                                iEnemyMaxRange = math.max(iEnemyMaxRange, M27Logic.GetDFAndT1ArtiUnitMinOrMaxRange(oPlatoon[reftEnemiesInRange], 2))
                                                 tNearestEnemy = oNearestEnemy:GetPosition()
                                                 iNearestEnemyDistance = M27Utilities.GetDistanceBetweenPositions(tNearestEnemy, tPlatoonPosition)
                                                 if bDebugMessages == true then LOG(sFunctionRef..': tNearestEnemy='..repru(tNearestEnemy)..'; tPlatoonPosition='..repru(tPlatoonPosition)..'; oNearestEnemy='..oNearestEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestEnemy)..'; Platoon front position='..repru(GetPlatoonFrontPosition(oPlatoon))..'; Platoon front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])) end
                                             end
-                                            if iNearestPDDistance < iNearestEnemyDistance then
+                                            if oNearestPD and iNearestPDDistance < iNearestEnemyDistance then
                                                 oNearestEnemy = oNearestPD
                                             end
                                             --CanSeeUnit(aiBrain, oUnit, bTrueIfOnlySeeBlip)
