@@ -40,6 +40,7 @@ reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1
 refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
 refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
 refiTimeOfLastCheck = 'M27UnitTimeOfLastCheck' --Currently used for T3 arti adjacency, when first detected enemy SMD, when last checked if shot was blocked, but could be used for other things if want
+refiTimeLastFired = 'M27UnitTimeLastFired' --currently used for sniperbots, but could expand if wanted
 refbLastShotBlocked = 'M27UnitLastShotBlocked' --Used for DF units to indicate if last shot was blocked
 refiTimeOfLastSMDCheck = 'M27UnitTimeOfLastSMDCheck'
 refbLastCoveredBySMD = 'M27UnitCoveredBySMD' --Used to record if unit was last covered by SMD
@@ -49,6 +50,13 @@ refsPathing = 'M27UnitPathing' --Pathing type of the unit
 reftPathingGroupCount = 'M27UnitPathingGroupCount' --Count of the pathing groups the unit has been in
 refiLastPathingGroup = 'M27UnitLastPathingGroup' --Last pathing group of the unit where there was sufficient count (done in platoon utilities)
 reftLastLocationOfPathingGroup = 'M27UnitLastLocationOfPathingGroup' --Unit's position when it last had a pathing group with sufficient count
+
+--Strike damage/coordinated attack (currently used for sniperbots):
+refiDFStrikeDamageAssigned = 'M27UnitDFStrikeDamage' --cumulative value of strike damage assigned to this unit
+reftDFUnitsAttacking = 'M27UnitDFUnitsAttacking' --table of untis that have been told to attack this unit and are having their strike damage tracked
+refoCoordinatedTarget = 'M27UnitCoordinatedTarget' --Unit that are targeting as part of a coordinated attack
+refiStrikeDamage = 'M27UnitStrikeDamage' --Strike damage that have assigned to the coordinatedtarget
+refiTimeOfLastStrikeDamageUpdate = 'M27UnitLastStrikeDamageUpdate' --Time that last updated the strike damage assigned to a unit
 
 --TMD:
 refbTMDChecked = 'M27TMDChecked' --Used against enemy TML to flag if we've already checked for TMD we want when it was first detected
@@ -439,10 +447,12 @@ function GetUnitStrikeDamage(oUnit)
         --Doublecheck strike damage based on if it references a bomb
         local iAOE
         iAOE, iStrikeDamage = GetBomberAOEAndStrikeDamage(oUnit)
+    elseif EntityCategoryContains(refCategorySniperBot * categories.SERAPHIM, sBP) then
+        iStrikeDamage = GetSniperStrikeDamage(oUnit)
     elseif oBP.Weapon and oBP.Weapon[1] then
         iStrikeDamage = oBP.Weapon[1].Damage
     end
-    return iStrikeDamage
+        return iStrikeDamage
 end
 
 function IsUnitUnderwater(oUnit)
@@ -1051,6 +1061,7 @@ function EnableLongRangeSniper(oUnit)
     end
 end
 
+
 function DisableLongRangeSniper(oUnit)
     if oUnit.SetWeaponEnabledByLabel and oUnit[refbSniperRifleEnabled] then
         local bHaveSniperWeapon = true
@@ -1067,6 +1078,109 @@ function DisableLongRangeSniper(oUnit)
             oUnit:OnScriptBitClear(1)
             oUnit[refbSniperRifleEnabled] = false
             --LOG('Disabled long range sniper on unit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit))
+        end
+    end
+end
+
+function GetDFRateOfFire(oUnit)
+    --Intended for sniperbots but in theory could use for other units; returns 1 if no rate of fire found
+
+    local iRateOfFire
+    if oUnit.GetBlueprint then
+        local oBP = oUnit:GetBlueprint()
+        local sWeaponTypeRequired
+        if EntityCategoryContains(refCategorySniperBot, oUnit.UnitId) then
+            if oUnit[refbSniperRifleEnabled] and table.getn(oBP.Weapon) > 1 then sWeaponTypeRequired = 'SniperGun' end
+        end
+
+        if oBP.Weapon then
+            for iWeapon, tWeapon in oBP.Weapon do
+                if tWeapon.WeaponCategory == 'Direct Fire' then
+                    if not(sWeaponTypeRequired) or tWeapon.Label == sWeaponTypeRequired then
+                        if iRateOfFire then iRateOfFire = math.min(iRateOfFire, tWeapon.RateOfFire)
+                        else iRateOfFire = tWeapon.RateOfFire
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if not(iRateOfFire) then iRateOfFire = 1 end
+    return iRateOfFire
+end
+
+function GetSniperStrikeDamage(oUnit)
+    local iStrikeDamage
+    local oBP = oUnit:GetBlueprint()
+    local sWeaponTypeRequired
+    if EntityCategoryContains(refCategorySniperBot * categories.SERAPHIM, oUnit.UnitId) then
+        if oUnit[refbSniperRifleEnabled] and table.getn(oBP.Weapon) > 1 then sWeaponTypeRequired = 'SniperGun' end
+    end
+
+    if oBP.Weapon then
+        for iWeapon, tWeapon in oBP.Weapon do
+            if tWeapon.WeaponCategory == 'Direct Fire' then
+                if not(sWeaponTypeRequired) or tWeapon.Label == sWeaponTypeRequired then
+                    if iStrikeDamage then iStrikeDamage = math.min(iStrikeDamage, tWeapon.Damage)
+                    else iStrikeDamage = tWeapon.Damage
+                    end
+                end
+            end
+        end
+    end
+    if not(iStrikeDamage) then iStrikeDamage = 100 end
+    return iStrikeDamage
+end
+
+
+function AssignUnitDFStrikeDamage(oAttacker, oTarget, iStrikeDamage)
+    local bAlreadyAssigned = false
+    if not(oTarget[reftDFUnitsAttacking]) then oTarget[reftDFUnitsAttacking] = {}
+    else
+        for iUnit, oUnit in oTarget[reftDFUnitsAttacking] do
+            if oUnit == oAttacker then
+                bAlreadyAssigned = true
+                break
+            end
+        end
+    end
+    if not(bAlreadyAssigned) then
+        table.insert(oTarget[reftDFUnitsAttacking], oAttacker)
+        oAttacker[refoCoordinatedTarget] = oTarget
+        oAttacker[refiStrikeDamage] = iStrikeDamage
+        oTarget[refiDFStrikeDamageAssigned] = (oTarget[refiDFStrikeDamageAssigned] or 0) + iStrikeDamage
+    end
+
+end
+
+function RemoveDFStrikeDamageUnitFromTarget(oTarget, oAttacker, iUnitTableRef)
+    --iUnitTableRef should be the key/ref value for oTarget[reftDFUnitsAttacking]
+    oTarget[refiDFStrikeDamageAssigned] = oTarget[refiDFStrikeDamageAssigned] - (oAttacker[refiStrikeDamage] or GetUnitStrikeDamage(oAttacker))
+    oTarget[reftDFUnitsAttacking][iUnitTableRef] = nil
+end
+
+function RefreshUnitDFStrikeDamage(oTarget)
+    --Removes any outdated units assigned to target for strike damage purposes, if we haven't checked recently
+    if GetGameTimeSeconds() - (oTarget[refiTimeOfLastStrikeDamageUpdate] or 0) >= 0.99 then
+        oTarget[refiTimeOfLastStrikeDamageUpdate] = GetGameTimeSeconds()
+        if M27Utilities.IsTableEmpty(oTarget[reftDFUnitsAttacking]) then
+            oTarget[refiDFStrikeDamageAssigned] = 0
+        else
+            if not(oTarget[refiDFStrikeDamageAssigned]) then oTarget[refiDFStrikeDamageAssigned] = 0 end
+            local bRemoveUnit
+            for iUnit, oUnit in oTarget[reftDFUnitsAttacking] do
+                bRemoveUnit = false
+                if not(IsUnitValid(oUnit)) or not(oUnit.PlatoonHandle) or not(oUnit[refoCoordinatedTarget]) or not(oUnit[refoCoordinatedTarget] == oTarget) then
+                    bRemoveUnit = true
+                elseif not(oUnit.PlatoonHandle[M27PlatoonUtilities.refiCurrentAction] == M27PlatoonUtilities.refActionCoordinatedAttack) then
+                    bRemoveUnit = true
+                elseif M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), oUnit:GetPosition()) > 5 + oUnit.PlatoonHandle[M27PlatoonUtilities.refiPlatoonMaxRange] then
+                    bRemoveUnit = true
+                end
+                if bRemoveUnit then
+                    RemoveDFStrikeDamageUnitFromTarget(oTarget, oUnit, iUnit)
+                end
+            end
         end
     end
 end

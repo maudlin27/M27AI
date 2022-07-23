@@ -80,7 +80,9 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     if oKillerUnit and oKillerUnit.GetAIBrain then
                         M27AirOverseer.CheckForUnseenKiller(oKilledBrain, oUnitKilled, oKillerUnit)
                         if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit.UnitId) then
-                            if oKillerUnit.Sync.totalMassKilled >= 250 then
+                            if oKillerUnit.Sync.totalMassKilled >= 250 and IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()) then
+                                bDebugMessages = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to add oKillerUnit='..oKillerUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oKillerUnit)..' to list of T2 arti to avoid') end
                                 --Is this already in the table?
                                 local bIncludeInTable = true
                                 if M27Utilities.IsTableEmpty(M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid]) == false then
@@ -122,6 +124,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                 if EntityCategoryContains(M27UnitInfo.refCategoryFirebaseSuitable, oUnitKilled.UnitId) then
                     oKilledBrain[M27EngineerOverseer.refbPotentialFirebaseBuildingChangedSinceLastFirebaseCheck] = true
                 end
+
 
                 --Hive assistance for fixed shields
                 if EntityCategoryContains(M27UnitInfo.refCategoryHive, oUnitKilled.UnitId) then
@@ -317,7 +320,7 @@ function OnUnitDeath(oUnit)
                 end
                 ForkThread(M27MapInfo.RecordThatWeWantToUpdateReclaimAtLocation, oUnit.CachePosition, 0)
             else
-                --Is the unit owned by M27AI?
+
                 if oUnit.GetAIBrain then
                     --Ythotha deathball avoidance - all M27 units run away regardless of whether it was an M27 or enemy Ythotha
                     --Note -seraphimunits.lua contains SEnergyBallUnit which looks like it is for when the death ball is spawned; ID is XSL0402; SpawnElectroStorm is in the ythotha script
@@ -367,6 +370,7 @@ function OnUnitDeath(oUnit)
                         end
                     end
 
+                    --Is the unit owned by M27AI?
                     if aiBrain.M27AI then
                         --Flag for the platoon count of units to be updated:
                         if oUnit.PlatoonHandle then oUnit.PlatoonHandle[M27PlatoonUtilities.refbUnitHasDiedRecently] = true end
@@ -413,6 +417,16 @@ function OnUnitDeath(oUnit)
                             end
                         elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, sUnitBP) then
                             aiBrain[M27Overseer.refiSkirmisherMassDeathsAll] = aiBrain[M27Overseer.refiSkirmisherMassDeathsAll] + oUnit:GetBlueprint().Economy.BuildCostMass
+                            if EntityCategoryContains(M27UnitInfo.refCategorySniperBot, sUnitBP) then
+                                if M27UnitInfo.IsUnitValid(oUnit[M27UnitInfo.refoCoordinatedTarget]) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.refoCoordinatedTarget][M27UnitInfo.reftDFUnitsAttacking]) == false then
+                                    for iSniper, oSniper in oUnit[M27UnitInfo.refoCoordinatedTarget][M27UnitInfo.reftDFUnitsAttacking] do
+                                        if oSniper == oUnit then
+                                            M27UnitInfo.RemoveDFStrikeDamageUnitFromTarget(oUnit[M27UnitInfo.refoCoordinatedTarget], oUnit, iSniper)
+                                            break
+                                        end
+                                    end
+                                end
+                            end
                         end
 
                         --All non-mex/hydro - if have shield locations that cant build on, then check if this was near any of them
@@ -748,6 +762,9 @@ function OnWeaponFired(oWeapon)
                             --function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerConditionRef, iMustBeLessThanThisTimeValue, iMustBeMoreThanThisTimeValue, vMustNotEqualThisValue)
                             M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbLastShotBlocked, false, 20, M27UnitInfo.refiTimeOfLastCheck, GetGameTimeSeconds() + 0.01)
                         end
+                    end
+                    if EntityCategoryContains(M27UnitInfo.refCategorySniperBot - categories.EXPERIMENTAL, oUnit.UnitId) then
+                        oUnit[M27UnitInfo.refiTimeLastFired] = GetGameTimeSeconds()
                     end
                     --SMD, TML and SML backup to ensure missile is built
                 elseif EntityCategoryContains(categories.SILO * categories.STRUCTURE, oUnit.UnitId) and oUnit.SetAutoMode then
