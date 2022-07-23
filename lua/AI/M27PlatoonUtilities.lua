@@ -1992,7 +1992,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 855 then bDebugMessages = true end
-    --if oPlatoon:GetPlan() == 'M27GroundExperimental' then bDebugMessages = true end
+    if oPlatoon:GetPlan() == 'M27GroundExperimental' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(GetPlatoonFrontPosition(oPlatoon), true)
     local iMaxDistanceForLandSearch = math.max(20, oPlatoon[refiPlatoonMaxRange] * 0.5)
@@ -2235,7 +2235,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
-    --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -2925,73 +2925,76 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
         elseif sPlatoonName == 'M27GroundExperimental' then
             --Non-fatboy land experimental - do we have a low range (<60)? If so then run from large numbers of ravagers and T2 PD
             --Also dont run if have T3+ mobile combat units within our range (or risk being kited to death)
-            if oPlatoon[refiEnemiesInRange] > 0 then
-                local tEnemyT3PlusCombat = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat * categories.TECH3 + M27UnitInfo.refCategoryExperimentalLevel + M27UnitInfo.refCategoryIndirectT3, oPlatoon[reftEnemiesInRange])
-                if M27Utilities.IsTableEmpty(tEnemyT3PlusCombat) == false then
-                    local tNearbyEnemyExperimental = EntityCategoryFilterDown(categories.EXPERIMENTAL, tEnemyT3PlusCombat)
-                    --Enemy experimentals - consider their range, and attack if are in range of them
-                    local iEnemyRange, iEnemyDist
-                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy experimentals in range empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyExperimental))) end
-                    if M27Utilities.IsTableEmpty(tNearbyEnemyExperimental) == false then
-                        for iUnit, oUnit in tNearbyEnemyExperimental do
-                            iEnemyRange = M27Logic.GetUnitMaxGroundRange({oUnit})
-                            iEnemyDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iEnemyRange='..iEnemyRange..'; iEnemyDist='..iEnemyDist..'; Our max range='..oPlatoon[refiPlatoonMaxRange]) end
-                            if iEnemyDist - 4 < math.max(iEnemyRange, oPlatoon[refiPlatoonMaxRange]) then
-                                oPlatoon[refiCurrentAction] = refActionAttack
-                                if bDebugMessages == true then LOG(sFunctionRef..': Too close to enemy experimental so will attack') end
-                                break
-                            end
-                        end
-                    end
-                    if not(oPlatoon[refiCurrentAction]) then
-                        tEnemyT3PlusCombat = EntityCategoryFilterDown(categories.TECH3, tEnemyT3PlusCombat)
-                        if M27Utilities.IsTableEmpty(tEnemyT3PlusCombat) == false then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemy T3, will see if we are in range of the closest one. Dist to T3='..M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tEnemyT3PlusCombat, GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition(), GetPlatoonFrontPosition(oPlatoon))..'; Our range='..oPlatoon[refiPlatoonMaxRange]) end
-                            if M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tEnemyT3PlusCombat, GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= oPlatoon[refiPlatoonMaxRange] then
-                                oPlatoon[refiCurrentAction] = refActionAttack
-                                if bDebugMessages == true then LOG(sFunctionRef..': Are in range so will attack') end
-                            end
-                        end
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemy experimental or T3 unit, action after checking if we are in range='..(oPlatoon[refiCurrentAction] or 'nil')) end
-                end
-            end
-
-            local iFriendlyExperimental = 0
-            if M27Utilities.IsTableEmpty(oPlatoon[reftFriendlyNearbyCombatUnits]) == false then
-                local tFriendlyExperimentals = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandExperimental, oPlatoon[reftFriendlyNearbyCombatUnits])
-                if M27Utilities.IsTableEmpty(tFriendlyExperimentals) == false then
-                    iFriendlyExperimental = iFriendlyExperimental + table.getn(tFriendlyExperimentals)
-                end
-            end
-
-            if oPlatoon[refiEnemyStructuresInRange] > 5 * iFriendlyExperimental then
-                if oPlatoon[refiPlatoonMaxRange] < 60 then
-                    --If we get in range of the nearest enemy PD, how many PD will be able to hit us?
-                    local tEnemyPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, oPlatoon[reftEnemyStructuresInRange])
-                    if M27Utilities.IsTableEmpty(tEnemyPD) == false then
-                        local oNearestPD = M27Utilities.GetNearestUnit(tEnemyPD, GetPlatoonFrontPosition(oPlatoon), aiBrain)
-                        local iDistanceToNearestPD = M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
-                        --Dont run if we are almost in range
-                        if iDistanceToNearestPD > (oPlatoon[refiPlatoonMaxRange] + 5) then
-                            local tExpectedPosition = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), oNearestPD:GetPosition()), iDistanceToNearestPD - oPlatoon[refiPlatoonMaxRange], true)
-                            local tInRangePD = {}
-                            local iInRangePD = 0
-                            local iCurDistance
-                            local iCurRange
-                            for iUnit, oUnit in tEnemyPD do
-                                iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tExpectedPosition)
-                                iCurRange = M27Logic.GetUnitMaxGroundRange({ oUnit})
-                                if iCurDistance <= iCurRange then
-                                    iInRangePD = iInRangePD + 1
-                                    tInRangePD[iInRangePD] = oUnit
+            --Ignore above if we are underwater though
+            if not(M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit])) then
+                if oPlatoon[refiEnemiesInRange] > 0 then
+                    local tEnemyT3PlusCombat = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandCombat * categories.TECH3 + M27UnitInfo.refCategoryExperimentalLevel + M27UnitInfo.refCategoryIndirectT3, oPlatoon[reftEnemiesInRange])
+                    if M27Utilities.IsTableEmpty(tEnemyT3PlusCombat) == false then
+                        local tNearbyEnemyExperimental = EntityCategoryFilterDown(categories.EXPERIMENTAL, tEnemyT3PlusCombat)
+                        --Enemy experimentals - consider their range, and attack if are in range of them
+                        local iEnemyRange, iEnemyDist
+                        if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy experimentals in range empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyExperimental))) end
+                        if M27Utilities.IsTableEmpty(tNearbyEnemyExperimental) == false then
+                            for iUnit, oUnit in tNearbyEnemyExperimental do
+                                iEnemyRange = M27Logic.GetUnitMaxGroundRange({oUnit})
+                                iEnemyDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iEnemyRange='..iEnemyRange..'; iEnemyDist='..iEnemyDist..'; Our max range='..oPlatoon[refiPlatoonMaxRange]) end
+                                if iEnemyDist - 4 < math.max(iEnemyRange, oPlatoon[refiPlatoonMaxRange]) then
+                                    oPlatoon[refiCurrentAction] = refActionAttack
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Too close to enemy experimental so will attack') end
+                                    break
                                 end
                             end
-                            local iThreatOfInRangePD = M27Logic.GetCombatThreatRating(aiBrain, tInRangePD)
-                            if iThreatOfInRangePD * 0.65 / iFriendlyExperimental > M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]) then
-                                oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
-                                oPlatoon[refbHavePreviouslyRun] = true
+                        end
+                        if not(oPlatoon[refiCurrentAction]) then
+                            tEnemyT3PlusCombat = EntityCategoryFilterDown(categories.TECH3, tEnemyT3PlusCombat)
+                            if M27Utilities.IsTableEmpty(tEnemyT3PlusCombat) == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemy T3, will see if we are in range of the closest one. Dist to T3='..M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tEnemyT3PlusCombat, GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition(), GetPlatoonFrontPosition(oPlatoon))..'; Our range='..oPlatoon[refiPlatoonMaxRange]) end
+                                if M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tEnemyT3PlusCombat, GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= oPlatoon[refiPlatoonMaxRange] then
+                                    oPlatoon[refiCurrentAction] = refActionAttack
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Are in range so will attack') end
+                                end
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemy experimental or T3 unit, action after checking if we are in range='..(oPlatoon[refiCurrentAction] or 'nil')) end
+                    end
+                end
+
+                local iFriendlyExperimental = 0
+                if M27Utilities.IsTableEmpty(oPlatoon[reftFriendlyNearbyCombatUnits]) == false then
+                    local tFriendlyExperimentals = EntityCategoryFilterDown(M27UnitInfo.refCategoryLandExperimental, oPlatoon[reftFriendlyNearbyCombatUnits])
+                    if M27Utilities.IsTableEmpty(tFriendlyExperimentals) == false then
+                        iFriendlyExperimental = iFriendlyExperimental + table.getn(tFriendlyExperimentals)
+                    end
+                end
+
+                if oPlatoon[refiEnemyStructuresInRange] > 5 * iFriendlyExperimental then
+                    if oPlatoon[refiPlatoonMaxRange] < 60 then
+                        --If we get in range of the nearest enemy PD, how many PD will be able to hit us?
+                        local tEnemyPD = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD, oPlatoon[reftEnemyStructuresInRange])
+                        if M27Utilities.IsTableEmpty(tEnemyPD) == false then
+                            local oNearestPD = M27Utilities.GetNearestUnit(tEnemyPD, GetPlatoonFrontPosition(oPlatoon), aiBrain)
+                            local iDistanceToNearestPD = M27Utilities.GetDistanceBetweenPositions(oNearestPD:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
+                            --Dont run if we are almost in range
+                            if iDistanceToNearestPD > (oPlatoon[refiPlatoonMaxRange] + 5) then
+                                local tExpectedPosition = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), oNearestPD:GetPosition()), iDistanceToNearestPD - oPlatoon[refiPlatoonMaxRange], true)
+                                local tInRangePD = {}
+                                local iInRangePD = 0
+                                local iCurDistance
+                                local iCurRange
+                                for iUnit, oUnit in tEnemyPD do
+                                    iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tExpectedPosition)
+                                    iCurRange = M27Logic.GetUnitMaxGroundRange({ oUnit})
+                                    if iCurDistance <= iCurRange then
+                                        iInRangePD = iInRangePD + 1
+                                        tInRangePD[iInRangePD] = oUnit
+                                    end
+                                end
+                                local iThreatOfInRangePD = M27Logic.GetCombatThreatRating(aiBrain, tInRangePD)
+                                if iThreatOfInRangePD * 0.65 / iFriendlyExperimental > M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]) then
+                                    oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
+                                    oPlatoon[refbHavePreviouslyRun] = true
+                                end
                             end
                         end
                     end
@@ -9996,7 +9999,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
-            --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
+            if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
