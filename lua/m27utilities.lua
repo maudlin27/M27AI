@@ -305,10 +305,12 @@ function OldDrawTableOfLocations(tableLocations, relativeStart, iColour, iDispla
     end
 end
 
-function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
-    if bSingleLocation then tableLocations = {tableLocations} end
+function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, iCircleSize)
+    --if bSingleLocation then tableLocations = {tableLocations} end
+    LOG('DrawTableOfLocations: tableLocations='..repru(tableLocations))
+    if not(iCircleSize) then iCircleSize = 0.5 end
     for iLocation, tLocation in tableLocations do
-        DrawRectBase(Rect(tLocation[1] - 0.5, tLocation[3] - 0.5, tLocation[1] + 0.5, tLocation[3] + 0.5), iColour, iDisplayCount)
+        DrawRectBase(Rect(tLocation[1] - iCircleSize, tLocation[3] - iCircleSize, tLocation[1] + iCircleSize, tLocation[3] + iCircleSize), iColour, iDisplayCount)
     end
 end
 
@@ -381,8 +383,9 @@ function ConvertLocationToReference(tLocation)
     return ('X'..math.floor(tLocation[1])..'Z'..math.floor(tLocation[3]))
 end
 
-function SteppingStoneForDrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
-    DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+function SteppingStoneForDrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, iCircleSize)
+    LOG('SteppingStoneForDrawLocations: tableLocations='..repru(tableLocations))
+    DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, iCircleSize)
 end
 
 function SteppingStoneForDrawRect(rRect, iColour, iDisplayCount)
@@ -397,19 +400,54 @@ function DrawCircleAtTarget(tLocation, iColour, iDisplayCount, iCircleSize) --Do
     ForkThread(SteppingStoneForDrawCircle, tLocation, iColour, iDisplayCount, iCircleSize)
 end
 
-function DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+function DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize, bCopyTable)
     --fork thread doesnt seem to work - can't see the circle, even though teh code itself is called; using steppingstone seems to fix this
-    --ForkThread(DrawTableOfLocations, tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation)
-    --DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation)
-    --ErrorHandler('Shouldnt be drawing anything')
-    ForkThread(SteppingStoneForDrawLocations, tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+    --ForkThread(DrawTableOfLocations, tableLocations, relativeStart, iColour, iDisplayCount)
+    --DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount)
+    --bCopyTable - want to set this to true if the table sent to this might be changed afterwards due to forkthread meaning the table might become empty
+
+    local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'DrawLocations'
+
+    local tTableOfLocations
+    if not(bCopyTable) then
+        if bSingleLocation then tTableOfLocations = {tableLocations}
+        else
+            tTableOfLocations = tableLocations
+        end
+    else
+
+        tTableOfLocations = {}
+        local iCount = 0
+        for iEntry, tEntry in tableLocations do
+            iCount = iCount + 1
+            tTableOfLocations[iCount] = {}
+            tTableOfLocations[iCount] = {tEntry[1], tEntry[2], tEntry[3]}
+        end
+        if bSingleLocation then tTableOfLocations = {tTableOfLocations} end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished hard copy of table, iCount='..iCount) end
+    end
+
+
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': About to fork threat, bCopyTable='..tostring(bCopyTable)..'; tTableOfLocations='..repru(tTableOfLocations)..'; bSingleLocation='..tostring(bSingleLocation))
+    end
+    if IsTableEmpty(tTableOfLocations) then ErrorHandler('Trying to draw an empty table')
+    else
+        --SteppingStoneForDrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize)
+        ForkThread(SteppingStoneForDrawLocations, tTableOfLocations, relativeStart, iColour, iDisplayCount, iCircleSize)--]]
+    end
+
 end
 
 function DrawLocation(tLocation, relativeStart, iColour, iDisplayCount, iCircleSize)
     --ForkThread(DrawTableOfLocations, tableLocations, relativeStart, iColour, iDisplayCount, true)
     --DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, true)
     --ErrorHandler('Shouldnt be drawing anything')
-    ForkThread(SteppingStoneForDrawLocations, tLocation, relativeStart, iColour, iDisplayCount, true, iCircleSize)
+    if IsTableEmpty(tLocation) then ErrorHandler('tLocation is empty')
+    else
+        ForkThread(SteppingStoneForDrawLocations, {tLocation}, relativeStart, iColour, iDisplayCount, iCircleSize)
+    end
 end
 
 function DrawRectangle(rRect, iColour, iDisplayCount)

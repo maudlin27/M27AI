@@ -520,6 +520,8 @@ function ACUShouldRunFromBigThreat(aiBrain)
         --if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe and not(oACU:HasEnhancement('CloakingGenerator')) then
         if not(oACU:HasEnhancement('CloakingGenerator')) then
             bRun = true
+            local iClosestExperimental = 1000
+            local iCurDist
             --Are we near our base and nearest big threat isnt?
             local iDistToBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             if iDistToBase <= M27Overseer.iDistanceFromBaseWhenVeryLowHealthToBeSafe then
@@ -532,18 +534,17 @@ function ACUShouldRunFromBigThreat(aiBrain)
                     bRun = false
                     for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyLandExperimentals] do
                         if M27UnitInfo.IsUnitValid(oUnit) then
-                            if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oUnit:GetPosition()) <= 110 then
-                                bRun = true
-                                break
-                            end
+                            iCurDist = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oUnit:GetPosition())
+                            if iCurDist < iClosestExperimental then iClosestExperimental = iCurDist end
                         end
                     end
+                    if iClosestExperimental <= 150 then bRun = true end
                 end
             end
 
-            --Are we turtling and have a firebase with significant number of units?
+            --Are we turtling and have a firebase with significant number of units and we are almost in range of the enemy experimental?
             --LOG('ACUShouldRunFromBigThreat: aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; Chokepoint firebase ref='..(aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] or 'nil')..';  Size of firebase units='..table.getsize(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]])..'; ACU dist to chokepoint='..M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation])..'; Is ACU under friendly fixed shield='..tostring(M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, oACU:GetPosition()))..'; ACU position='..repru(oACU:GetPosition())..'; Firebase position='..repru(aiBrain[M27MapInfo.reftChokepointBuildLocation])..'; Is target under shield (unit specific)='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oACU, 4000, false, false, false)))
-            if bRun then
+            if bRun and iClosestExperimental <= 40 then
                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]) == false and table.getsize(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]) >= 8 then
                     local iDistToFirebase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), aiBrain[M27MapInfo.reftChokepointBuildLocation])
                     if iDistToFirebase <= 40 then

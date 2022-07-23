@@ -1058,6 +1058,7 @@ end
 
 function AssignHelperToLocation(aiBrain, oHelperToAssign, tLocation)
     local sFunctionRef = 'AssignHelperToLocation'
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local oNewPlatoon = aiBrain:MakePlatoon('', '')
     aiBrain:AssignUnitsToPlatoon(oNewPlatoon, { oHelperToAssign }, 'Attack', 'GrowthFormation')
@@ -1069,8 +1070,7 @@ end
 function AssignHelperToPlatoonOrUnit(oHelperToAssign, oPlatoonOrUnitNeedingHelp, bScoutNotMAA)
     --Checks if the platoon/unit already has a helper, in which case adds to that, otherwise creates a new helper platoon
     --bScoutNotMAA - true if scout, false if MAA
-    local bDebugMessages = false
-    if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AssignHelperToPlatoonOrUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local aiBrain = oHelperToAssign:GetAIBrain()

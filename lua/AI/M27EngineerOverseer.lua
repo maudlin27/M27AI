@@ -2958,20 +2958,20 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     if bDebugMessages == true then LOG(sFunctionRef..': If only had 1 valid location count will consider nearer options to base; iValidLocationCount='..(iValidLocationCount or 0)) end
     if iValidLocationCount > 0 then --if had more than 1 valid location then will have already been through logic to pick the best one; if only had 1 valid location then more likely was an issue
         --Refine location - see if we can move closer to base/original target if we are far away
-        if M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tStartPosition) >= 50 then
+        if M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tStartPosition) >= 40 then
             if bDebugMessages == true then LOG(sFunctionRef..': Random location is '.. M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tStartPosition)..' away from the position we wanted, will see if we can move closer to base') end
             local iLastSuccessfulInterval = 8
             iValidLocationCount = 0
             local iAngleToStart = M27Utilities.GetAngleFromAToB(tTargetLocation, tStartPosition)
-            local tPossibleLocation
+            local tPossibleLocation = tTargetLocation
             local bBlockingReclaimOrMobileUnits
             local rBuildAreaRect
 
             while iLastSuccessfulInterval > 1 do
                 iValidLocationCount = iValidLocationCount + 1
-                if iValidLocationCount >= 10 then break end
+                if iValidLocationCount >= 15 then break end
 
-                tPossibleLocation = M27Utilities.MoveInDirection(tTargetLocation, iAngleToStart, iLastSuccessfulInterval, false)
+                tPossibleLocation = M27Utilities.MoveInDirection(tPossibleLocation, iAngleToStart, iLastSuccessfulInterval, false)
                 if bDebugMessages == true then LOG(sFunctionRef..': iLastSuccessfulInterval='..iLastSuccessfulInterval..'; New potential location='..repru(tPossibleLocation)..'; Segment group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTargetLocation)..' (vs builder group '..iBuilderPathingGroup..'); Can build here='..tostring(CanBuildAtLocation(aiBrain, sBlueprintToBuild, tPossibleLocation, nil, false, true))) end
                 if M27MapInfo.GetSegmentGroupOfLocation(sPathing, tTargetLocation) == iBuilderPathingGroup then
                     --CHeck no blocking reclaim or mobile units if had more than 1 valid location (as we'd have taken these into account for the valid locations)
@@ -2987,7 +2987,7 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
                         end
                     else bBlockingReclaimOrMobileUnits = false
                     end
-                    if not(bBlockingReclaimOrMobileUnits) and CanBuildAtLocation(aiBrain, sBlueprintToBuild, tPossibleLocation, nil, false, true) then
+                    if CanBuildAtLocation(aiBrain, sBlueprintToBuild, tPossibleLocation, nil, false, true) and not(bBlockingReclaimOrMobileUnits) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Have a location that is closer than before so will choose it') end
                         tTargetLocation = {tPossibleLocation[1], tPossibleLocation[2], tPossibleLocation[3]}
                     end
@@ -3586,8 +3586,12 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                 if bDebugMessages == true then
                     LOG(sFunctionRef..': End of considering this option, bIgnore='..tostring(bIgnore)..'; iPriority='..iPriority)
                     if bIgnore == true or iPriority < 0 then
-                        LOG('WIll draw a red circle as are wanting to ignore or the location has negative priority')
-                        M27Utilities.DrawLocation(CurPosition, nil, 2, 100)
+                        if M27Utilities.IsTableEmpty(CurPosition) == false then
+                            LOG(sFunctionRef..': WIll draw a red circle as are wanting to ignore or the location has negative priority')
+                            M27Utilities.DrawLocation(CurPosition, nil, 2, 100)
+                        else
+                            LOG(sFunctionRef..': CurPosition is empty, will happen if we ignored all results')
+                        end
                     else
                         LOG('WIll draw a white circle as dont want to ignore and priority is 0 or more')
                         M27Utilities.DrawLocation(CurPosition, nil, 7, 100)
@@ -3685,8 +3689,9 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
 
             if bDebugMessages == true then
                 LOG(sFunctionRef..': Returning best possible position; tBestPosition[1]='..tBestPosition[1]..'-'..tBestPosition[2]..'-'..tBestPosition[3]..'; iMaxPriority='..iMaxPriority)
-                LOG(sFunctionRef..': iMaxMapX='..iMaxMapX..'; iMaxMapZ='..iMaxMapZ..'tBestPosition='..repru(tBestPosition)..'; our start position='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
-                M27Utilities.DrawLocations(PossiblePositions, nil, 3, 10)
+                LOG(sFunctionRef..': iMaxMapX='..iMaxMapX..'; iMaxMapZ='..iMaxMapZ..'tBestPosition='..repru(tBestPosition)..'; our start position='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; PossiblePositions='..repru(PossiblePositions)..'; will draw in black with the best location in white')
+                --DrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, bSingleLocation, iCircleSize, bCopyTable)
+                M27Utilities.DrawLocations(PossiblePositions, nil, 3, 10, false, nil, true)
                 M27Utilities.DrawLocation(tBestPosition, nil, 7, 100) --draws best position in white
             end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -6847,48 +6852,65 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
             end
         end
 
-
         if M27Utilities.IsTableEmpty(tAllBuildings) then
-        tAllBuildings = aiBrain:GetListOfUnits(iCategoryToAssist, false, false)
-        if iActionRefToAssign == refActionAssistShield then M27Utilities.ErrorHandler('Couldnt find a priority shield to assist with the normal logic so will just assist the nearest T3 shield') end
+            tAllBuildings = aiBrain:GetListOfUnits(iCategoryToAssist, false, false)
+            if iActionRefToAssign == refActionAssistShield then
+                M27Utilities.ErrorHandler('Couldnt find a priority shield to assist with the normal logic so will just assist the nearest T3 shield')
+            end
         end
         local iNearestUpgradingBuilding = 10000
         local iCurDistanceToStart, tCurPosition
         local tNearbyEnemies
 
-
-        if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through all buildings meeting the category in question to see if we can assist them') end
+        if bDebugMessages == true then
+            LOG(sFunctionRef .. ': About to cycle through all buildings meeting the category in question to see if we can assist them')
+        end
         if M27Utilities.IsTableEmpty(tAllBuildings) == false then
-        for iBuilding, oBuilding in tAllBuildings do
-        if M27UnitInfo.IsUnitValid(oBuilding) then
-        if bDebugMessages == true then LOG(sFunctionRef..': iBuilding='..iBuilding..'; oBuilding Id='..oBuilding.UnitId..'; Unit state='..M27Logic.GetUnitState(oBuilding)) end
-        if not(oBuilding[M27EconomyOverseer.refbWillReclaimUnit]) and (oBuilding:GetFractionComplete() < 1 or bIgnoreUnitState or (oBuilding.IsUnitState and (oBuilding:IsUnitState(sUnitStateWanted) or (sAltUnitStateWanted and oBuilding:IsUnitState(sAltUnitStateWanted))))) then
-        tCurPosition = oBuilding:GetPosition()
-        iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tStartPosition)
-        if bDebugMessages == true then LOG(sFunctionRef..': iBuilding is '..sUnitStateWanted..';  its distance to start='..iCurDistanceToStart) end
-        if iCurDistanceToStart < iNearestUpgradingBuilding then
-        --Check no nearby enemies
-        if iEnemySearchRange > 0 then tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.DIRECTFIRE + categories.LAND * categories.INDIRECTFIRE, tCurPosition, iEnemySearchRange, 'Enemy')
-        else tNearbyEnemies = nil end
-        if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then
-        if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies so will assign this building as target unless we subsequently find ones that are even closer') end
-        iNearestUpgradingBuilding = iCurDistanceToStart
-        oActionObject = oBuilding
-        tActionLocation = oBuilding:GetPosition()
-        else
-        if bDebugMessages == true then LOG(sFunctionRef..': Have nearby enemies so not picking this building') end
-        end
-        end
-        else
-        if bDebugMessages == true then LOG(sFunctionRef..': oBuilding='..oBuilding.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBuilding)..'; Unit state='..M27Logic.GetUnitState(oBuilding)) end
-        end
-        else
-        if bDebugMessages == true then LOG(sFunctionRef..': iBuilding count in tAllBuildings='..iBuilding..'; unit isnt valid. Size of tAllBuildings='..table.getsize(tAllBuildings)) end
-        end
-        end
-        else
-        M27Utilities.ErrorHandler('Couldnt find any buildings for Action '..(iActionRefToAssign or 'nil'))
+            for iBuilding, oBuilding in tAllBuildings do
+                if M27UnitInfo.IsUnitValid(oBuilding) then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': iBuilding=' .. iBuilding .. '; oBuilding Id=' .. oBuilding.UnitId .. '; Unit state=' .. M27Logic.GetUnitState(oBuilding))
+                    end
+                    if not (oBuilding[M27EconomyOverseer.refbWillReclaimUnit]) and (oBuilding:GetFractionComplete() < 1 or bIgnoreUnitState or (oBuilding.IsUnitState and (oBuilding:IsUnitState(sUnitStateWanted) or (sAltUnitStateWanted and oBuilding:IsUnitState(sAltUnitStateWanted))))) then
+                        tCurPosition = oBuilding:GetPosition()
+                        iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tStartPosition)
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': iBuilding is ' .. sUnitStateWanted .. ';  its distance to start=' .. iCurDistanceToStart)
+                        end
+                        if iCurDistanceToStart < iNearestUpgradingBuilding then
+                            --Check no nearby enemies
+                            if iEnemySearchRange > 0 then
+                                tNearbyEnemies = aiBrain:GetUnitsAroundPoint(categories.LAND * categories.DIRECTFIRE + categories.LAND * categories.INDIRECTFIRE, tCurPosition, iEnemySearchRange, 'Enemy')
+                            else
+                                tNearbyEnemies = nil
+                            end
+                            if M27Utilities.IsTableEmpty(tNearbyEnemies) == true then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': No nearby enemies so will assign this building as target unless we subsequently find ones that are even closer')
+                                end
+                                iNearestUpgradingBuilding = iCurDistanceToStart
+                                oActionObject = oBuilding
+                                tActionLocation = oBuilding:GetPosition()
+                            else
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Have nearby enemies so not picking this building')
+                                end
+                            end
+                        end
+                    else
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': oBuilding=' .. oBuilding.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oBuilding) .. '; Unit state=' .. M27Logic.GetUnitState(oBuilding))
+                        end
+                    end
+                else
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': iBuilding count in tAllBuildings=' .. iBuilding .. '; unit isnt valid. Size of tAllBuildings=' .. table.getsize(tAllBuildings))
+                    end
+                end
             end
+        else
+            M27Utilities.ErrorHandler('Couldnt find any buildings for Action ' .. (iActionRefToAssign or 'nil'))
+        end
     elseif iActionRefToAssign == refActionLoadOnTransport then
         for iUnit, oUnit in aiBrain[M27Transport.reftTransportsWaitingForEngi] do
             if M27UnitInfo.IsUnitValid(oUnit) then

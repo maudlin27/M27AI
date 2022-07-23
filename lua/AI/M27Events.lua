@@ -81,7 +81,6 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         M27AirOverseer.CheckForUnseenKiller(oKilledBrain, oUnitKilled, oKillerUnit)
                         if EntityCategoryContains(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit.UnitId) then
                             if oKillerUnit.Sync.totalMassKilled >= 250 and IsEnemy(oKilledBrain:GetArmyIndex(), oKillerUnit:GetAIBrain():GetArmyIndex()) then
-                                bDebugMessages = true
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to add oKillerUnit='..oKillerUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oKillerUnit)..' to list of T2 arti to avoid') end
                                 --Is this already in the table?
                                 local bIncludeInTable = true

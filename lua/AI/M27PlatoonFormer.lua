@@ -1172,11 +1172,11 @@ function MAAPlatoonFormer(aiBrain, tMAA)
     if aiBrain[refoMAABasePatrolPlatoon] == nil or (aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] or 0) == 0 then
         oPlatoonToAddTo = CreatePlatoon(aiBrain, 'M27MAAPatrol', tMAA)
         oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard] = aiBrain[M27MapInfo.reftRallyPoints][1]
-        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the base MAA platoon and set location to guard='..repru(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the base MAA platoon and set location to guard='..repru(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])..'; all rally points='..repru(aiBrain[M27MapInfo.reftRallyPoints])) end
     elseif aiBrain[refoMAARallyPatrolPlatoon] == nil or (aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiCurrentUnits] or 0) == 0 then
         oPlatoonToAddTo = CreatePlatoon(aiBrain, 'M27MAAPatrol', tMAA)
         oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard] = M27MapInfo.GetNearestRallyPoint(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the rally point MAA platoon and set location to guard='..repru(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Created new MAA patrol platoon for the rally point MAA platoon and set location to guard='..repru(oPlatoonToAddTo[M27PlatoonUtilities.reftLocationToGuard])..'; all rally points='..repru(aiBrain[M27MapInfo.reftRallyPoints])) end
     else
         --Which platoon needs more MAA if we want 60:40 ratio for base:rally point?
         if aiBrain[refoMAABasePatrolPlatoon][M27PlatoonUtilities.refiPlatoonThreatValue] * 0.6 < aiBrain[refoMAARallyPatrolPlatoon][M27PlatoonUtilities.refiPlatoonThreatValue] * 0.4 then
