@@ -2628,6 +2628,10 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
             if bDebugMessages == true then LOG(sFunctionRef..': Want to turtle so will go to the firebase. tHighestValueLocation='..repru(tHighestValueLocation)) end
         else
             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] or M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]) > math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25) then
+                local iMaxDistFromBase = 600
+                if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 550 then iMaxDistFromBase = math.max(math.min(500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.8), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.65) end
+
+
                 --First calculate the value for the enemy start position
                 local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit])
                 if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
@@ -2642,14 +2646,18 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
                     M27Utilities.ErrorHandler('Have no mexes in iSegmentGroup='..iSegmentGroup..'; sPathing='..sPathing..'; will use segemtn group of our base instead which is '..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
                     iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 end
-                local iHighestValueLocation = GetLocationValue(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
+                local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                local iHighestValueLocation = GetLocationValue(aiBrain, tEnemyBase, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
+
+                tHighestValueLocation = { tEnemyBase[1], tEnemyBase[2], tEnemyBase[3] }
+                if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > iMaxDistFromBase then iHighestValueLocation = 1 end --very low value so if nowhere else viable we will still choose here
                 local iCurValueLocation
 
                 if bDebugMessages == true then LOG(sFunctionRef..': Value of enemy start location='..iHighestValueLocation..'; will consider if any mexes have a better value') end
                 --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
                 if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup]) == false then
                     for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
-                        if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 then
+                        if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 and M27Utilities.GetDistanceBetweenPositions(tMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iMaxDistFromBase then
                             --Check not tried going here here lots before
                             if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
                                 iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
