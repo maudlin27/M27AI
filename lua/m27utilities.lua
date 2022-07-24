@@ -918,7 +918,7 @@ function GetACU(aiBrain)
                     ErrorHandler('ACU is dead for brain'..aiBrain:GetArmyIndex()..', will return nil as are in assassination; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
                     M27Events.OnPlayerDefeated(aiBrain)
                 elseif aiBrain:IsDefeated() then
-                    ErrorHandler('AI brain '..aiBrain:GetArmyIndex()..' is showing as defeated; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount)
+                    ErrorHandler('AI brain '..aiBrain:GetArmyIndex()..' is showing as defeated; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount..'; Brain.M27IsDefeated='..tostring(aiBrain.M27IsDefeated or false))
                     M27Events.OnPlayerDefeated(aiBrain)
                 else
                     ErrorHandler('ACU is dead for brain'..aiBrain:GetArmyIndex()..', so will try and get a substitute as arent in assassination; M27Overseer.iACUAlternativeFailureCount='..M27Overseer.iACUAlternativeFailureCount, true)
@@ -926,7 +926,7 @@ function GetACU(aiBrain)
                 end
             end
         elseif aiBrain[M27Overseer.refoStartingACU]['M27ACUSubstitute'] and aiBrain:IsDefeated() then
-            ErrorHandler('aiBrain '..aiBrain:GetArmyIndex()..' is showing as having been defeated')
+            ErrorHandler('aiBrain '..aiBrain:GetArmyIndex()..' is showing as having been defeated. .M27isDefeated='..tostring(aiBrain.M27IsDefeated or false))
             M27Events.OnPlayerDefeated(aiBrain)
         end
     end

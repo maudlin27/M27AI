@@ -1992,7 +1992,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 855 then bDebugMessages = true end
-    if oPlatoon:GetPlan() == 'M27GroundExperimental' then bDebugMessages = true end
+    --if oPlatoon:GetPlan() == 'M27GroundExperimental' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(GetPlatoonFrontPosition(oPlatoon), true)
     local iMaxDistanceForLandSearch = math.max(20, oPlatoon[refiPlatoonMaxRange] * 0.5)
@@ -2235,7 +2235,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
-    if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -4005,7 +4005,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                             else
                                                 --Normal logic - dont want to include friendly ACU in threat rating unless it is attacking
                                                 iOurThreatRating = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftFriendlyNearbyCombatUnits], false)
-                                                if not(oPlatoon[refbACUInPlatoon]) then
+                                                if not(oPlatoon[refbACUInPlatoon]) and M27Utilities.IsTableEmpty(oPlatoon[reftFriendlyNearbyCombatUnits]) == false then
                                                     local tNearbyFriendlyACU = EntityCategoryFilterDown(categories.COMMAND, oPlatoon[reftFriendlyNearbyCombatUnits])
                                                     if M27Utilities.IsTableEmpty(tNearbyFriendlyACU) == false then
                                                         if M27Utilities.GetDistanceBetweenPositions(tNearbyFriendlyACU[1]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
@@ -9999,7 +9999,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
-            if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end

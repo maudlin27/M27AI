@@ -608,7 +608,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
 
 
                                                 --Is the unit that damaged us within our range?
-                                                local iOurRange = GetUnitMaxGroundRange({ self })
+                                                local iOurRange = M27UnitInfo.GetUnitMaxGroundRange({ self })
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Taken indirect fire, consider cancelling upgrade as onl yat '..self:GetWorkProgress()..'; iOurRange='..iOurRange) end
                                                 if iOurRange < M27Utilities.GetDistanceBetweenPositions(self:GetPosition(), oUnitCausingDamage:GetPosition()) then
                                                     --Do we have nearby friendly units?

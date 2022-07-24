@@ -6316,7 +6316,8 @@ function AirAAManager(aiBrain)
                 local tAllyACUPos
                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
                     for iAllyBrain, aiAllyBrain in aiBrain[M27Overseer.toAllyBrains] do
-                        if not (aiAllyBrain:IsDefeated()) then
+
+                        if not (aiAllyBrain:IsDefeated()) and not(aiBrain.M27IsDefeated) then
                             --redundancy in case issue with toallybrains being updated
                             if M27Utilities.GetACU(aiAllyBrain) then
                                 tAllyACUPos = M27Utilities.GetACU(aiAllyBrain):GetPosition()
@@ -6940,7 +6941,7 @@ function AirLogicOverseer(aiBrain)
         iProfileStartTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef .. ': Pre start of while loop', iProfileStartTime)
     end
 
-    while (not (aiBrain:IsDefeated())) do
+    while (not (aiBrain:IsDefeated()) and not(aiBrain.M27IsDefeated)) do
         if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then
             break
         end

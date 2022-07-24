@@ -4381,7 +4381,7 @@ function UpdateNewPrimaryBaseLocation(aiBrain)
                             --Cycle through every valid enemy brain and pick the nearest one, if there is one
                             if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through each brain to identify nearest enemy base') end
                             for iCurBrain, brain in ArmyBrains do
-                                if not(brain == aiBrain) and not(M27Logic.IsCivilianBrain(brain)) and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()) and (not(brain:IsDefeated()) or not(ScenarioInfo.Options.Victory == "demoralization")) then
+                                if not(brain == aiBrain) and not(M27Logic.IsCivilianBrain(brain)) and IsEnemy(brain:GetArmyIndex(), aiBrain:GetArmyIndex()) and (not(brain:IsDefeated() and not(brain.M27IsDefeated)) or not(ScenarioInfo.Options.Victory == "demoralization")) then
                                     if M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber]) < iNearestEnemyBase then
                                         if IsEnemyStartPositionValid(aiBrain, PlayerStartPoints[brain.M27StartPositionNumber]) then
                                             iNearestEnemyBase = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[brain.M27StartPositionNumber], PlayerStartPoints[aiBrain.M27StartPositionNumber])

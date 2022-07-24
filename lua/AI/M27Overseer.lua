@@ -7390,7 +7390,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Considering whether brain with armyindex =' .. oBrain:GetArmyIndex() .. ' is defeated and is enemy or ally.')
             end
-            if not (oBrain:IsDefeated()) then
+            if not (oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
                 --if not(oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Brain isnt defeated. IsEnemy='..tostring(IsEnemy(iOurIndex, oBrain:GetArmyIndex()))..'; IsCivilian='..tostring(M27Logic.IsCivilianBrain(oBrain))..'; NoEnemies='..tostring((aiBrain[refbNoEnemies] or false)))
@@ -7493,7 +7493,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
     local tOurBase = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
     local tBrainsNeedingAGroup = {}
     for iEnemy, oBrain in aiBrain[toEnemyBrains] do
-        if not (oBrain:IsDefeated()) then
+        if not (oBrain:IsDefeated()) and not(aiBrain.M27IsDefeated) then
             tBrainsNeedingAGroup[iEnemy] = oBrain
 
         end
@@ -7849,12 +7849,18 @@ function OverseerInitialisation(aiBrain)
     InitiateLandFactoryConstructionManager(aiBrain)
 
     ForkThread(InitiateEngineerManager, aiBrain)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicksSpecial(aiBrain, 1)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     InitiateUpgradeManager(aiBrain)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicksSpecial(aiBrain, 1)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     ForkThread(M27PlatoonFormer.PlatoonIdleUnitOverseer, aiBrain)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     WaitTicksSpecial(aiBrain, 1)
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     ForkThread(SwitchSoMexesAreNeverIgnored, aiBrain, 210) --e.g. on theta passage around the 3m mark raiders might still be coming across engis, so this gives extra 30s of engi hunting time
 
@@ -8502,7 +8508,7 @@ end
 function ConstantBomberLocation(aiBrain)
     local sFunctionRef = 'ConstantBomberLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    while not (aiBrain:IsDefeated()) do
+    while not (aiBrain:IsDefeated()) and not(aiBrain.M27IsDefeated) do
         ForkThread(TempBomberLocation, aiBrain)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(1)
@@ -8694,6 +8700,9 @@ function OverseerManager(aiBrain)
 
     local bSetHook = false
     while (not (aiBrain:IsDefeated())) do
+        --M27IsDefeated check is below
+
+
         --if GetGameTimeSeconds() == 395 then TestCustom(aiBrain) end
         --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
@@ -8737,9 +8746,13 @@ function OverseerManager(aiBrain)
             --ArmyPoolContainsLandFacTest(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if not (WaitTicksSpecial(aiBrain, 1)) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             break
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
         ForkThread(AssignMAAToPreferredPlatoons, aiBrain) --No point running logic for MAA helpers if havent created any scouts
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': pre threat assessment. GameTime=' .. GetGameTimeSeconds())
@@ -8748,9 +8761,12 @@ function OverseerManager(aiBrain)
             DebugPrintACUPlatoon(aiBrain)
         end
 
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if not (WaitTicksSpecial(aiBrain, 1)) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             break
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         ForkThread(ThreatAssessAndRespond, aiBrain)
         --if bDebugMessages == true then ArmyPoolContainsLandFacTest(aiBrain) end
 
@@ -8760,9 +8776,12 @@ function OverseerManager(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
         end
 
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if not (WaitTicksSpecial(aiBrain, 1)) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             break
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         ForkThread(ACUManager, aiBrain)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': post ACU manager, pre wait 10 ticks. GameTime=' .. GetGameTimeSeconds())
@@ -8778,9 +8797,12 @@ function OverseerManager(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
         end
 
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if not (WaitTicksSpecial(aiBrain, 1)) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             break
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         iSlowerCycleCount = iSlowerCycleCount - 1
         ForkThread(StrategicOverseer, aiBrain, iSlowerCycleCount)
         if bDebugMessages == true then
@@ -8795,10 +8817,12 @@ function OverseerManager(aiBrain)
                 --M27EngineerOverseer.TEMPTEST(aiBrain)
             end
         end
-
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if not (WaitTicksSpecial(aiBrain, 1)) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             break
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Just waited 1 tick, about to call refresheconomydata.  GetGameTimeSeconds()=' .. GetGameTimeSeconds())
         end
@@ -8812,9 +8836,12 @@ function OverseerManager(aiBrain)
 
         --NOTE: We dont have the number of ticks below as 'available' for use, since on initialisation we're waiting ticks as well when initialising things such as the engineer and upgrade overseers which work off their own loops
         --therefore the actual available tick count will be the below number less the number of ticks we're already waiting
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         if not (WaitTicksSpecial(aiBrain, 4)) then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             break
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Just waited 4 ticks. GetGameTimeSeconds()=' .. GetGameTimeSeconds())
         end

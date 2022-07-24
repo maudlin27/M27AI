@@ -12090,7 +12090,7 @@ function EngineerManager(aiBrain)
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
-    while(not(aiBrain:IsDefeated())) do
+    while(not(aiBrain:IsDefeated()) and not(aiBrain.M27IsDefeated)) do
         if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
 
         ForkThread(ReassignEngineers, aiBrain, true)

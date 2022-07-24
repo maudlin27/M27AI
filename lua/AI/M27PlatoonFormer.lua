@@ -2130,7 +2130,7 @@ function PlatoonIdleUnitOverseer(aiBrain)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleAir)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleOther)
 
-    while(not(aiBrain:IsDefeated())) do
+    while(not(aiBrain:IsDefeated()) and not(aiBrain.M27IsDefeated)) do
         if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
         if bDebugMessages == true then LOG(sFunctionRef..': About to fork thread function to assign idle platoon units to platoons') end
         iCycleCount = iCycleCount + 1
