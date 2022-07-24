@@ -84,8 +84,8 @@ end
 function TeamResourceSharingMonitor(iTeam)
     --Monitors resources for AI in the team and shares resources
     local tTeamSubtable = tTeamData[iTeam]
-    if not(tTeamSubtable[M27Team.refbActiveResourceMonitor]) and M27Utilities.IsTableEmpty(tTeamSubtable[M27Team.reftFriendlyActiveM27Brains]) == false then
-        tTeamSubtable[M27Team.refbActiveResourceMonitor] = true
+    if not(tTeamSubtable[refbActiveResourceMonitor]) and M27Utilities.IsTableEmpty(tTeamSubtable[reftFriendlyActiveM27Brains]) == false then
+        tTeamSubtable[refbActiveResourceMonitor] = true
         while M27Utilities.IsTableEmpty(tTeamData[reftFriendlyActiveM27Brains]) == false do
             break
         end
