@@ -5183,7 +5183,7 @@ function ACUManager(aiBrain)
                                 local iTurtleFurtherAdjust = 1
                                 if aiBrain[refiDefaultStrategy] == refStrategyTurtle and M27UnitInfo.GetNumberOfUpgradesObtained(oACU) == 0 then
                                     iHealthReduction = iHealthReduction - 2000
-                                    iTurtleFurtherAdjust = 0.9
+                                    iTurtleFurtherAdjust = 0.75
                                 end --If are turtling then really important we get the upgrade, will also get a health boost from T2
                                 if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 125 then
                                     iHealthReduction = math.max(0, iHealthReduction * 0.5)
@@ -5195,7 +5195,7 @@ function ACUManager(aiBrain)
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': We will be really low health if we finish the upgrade; consider if we are near base/if expect we might be able to reduce the damage taken where the upgrade is at least 50% done. % done=' .. oACU[reftACURecentUpgradeProgress][iCurTime] .. '; Dist to base=' .. M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; oACU[reftACURecentHealth][iCurTime] * 1.1=' .. oACU[reftACURecentHealth][iCurTime] * 1.1 .. '; iTimeToComplete * iHealthLossPerSec=' .. iTimeToComplete * iHealthLossPerSec .. '; iHealthReduction=' .. iHealthReduction .. '; ACU Max health=' .. oACU:GetMaxHealth())
                                     end
-                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.25 * iTurtleFurtherAdjust and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(200, math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.333)) / iTurtleFurtherAdjust then
+                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.225 * iTurtleFurtherAdjust (iTurtleAdjust < 1 or M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(200, math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.333))) then
                                         if iTimeToComplete * iHealthLossPerSec < oACU[reftACURecentHealth][iCurTime] * 1.1 - iHealthReduction then
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Will try and finish upgrade and hope units can save us')
