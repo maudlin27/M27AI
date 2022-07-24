@@ -12,6 +12,7 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 
 refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -1546,8 +1547,8 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     end
 
     --Enemy walls in range logic
-    if bDebugMessages == true then LOG(sFunctionRef..': Just before checking for nearby walls. bAreNearbyEnemies='..tostring(bAreNearbyEnemies)..'; Enemy walls total count='..(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.refiEnemyWalls] or 0)) end
-    if not(bAreNearbyEnemies) and (M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.refiEnemyWalls] or 0) >= 9 and not(oEngineer:IsUnitState('Reclaiming')) then
+    if bDebugMessages == true then LOG(sFunctionRef..': Just before checking for nearby walls. bAreNearbyEnemies='..tostring(bAreNearbyEnemies)..'; Enemy walls total count='..(M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyWalls] or 0)) end
+    if not(bAreNearbyEnemies) and (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyWalls] or 0) >= 9 and not(oEngineer:IsUnitState('Reclaiming')) then
         --Only consider if engineer is relatively far from base
         if M27Utilities.GetDistanceBetweenPositions(tEngPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 80 then
             local iBuildRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
@@ -4356,8 +4357,8 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             end
 
             local bTeamHasChokepoint = false
-            if not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
-                for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+            if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+                for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                     if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle then
                         bTeamHasChokepoint = true
                         break
@@ -7183,8 +7184,8 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                         local tNearestChokepoint
                         local iNearestChokepointDistance = aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 25
                         local iCurChokepointDistance
-                        if not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
-                            for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                        if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+                            for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                                 if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
                                     iCurChokepointDistance = M27Utilities.GetDistanceBetweenPositions(oBrain[M27MapInfo.reftChokepointBuildLocation], tStartPosition)
                                     if iCurChokepointDistance < iNearestChokepointDistance then

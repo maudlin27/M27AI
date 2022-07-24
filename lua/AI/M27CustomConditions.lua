@@ -7,6 +7,7 @@ local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 --NOTE: Below are replaced by GameSettingWarningsAndChecks if sim mods are detected that expand the acu enhancement list
 tGunUpgrades = { 'HeavyAntiMatterCannon',
@@ -1312,10 +1313,10 @@ end
 function AreAllChokepointsCoveredByTeam(aiBrain)
     --Returns true if every chokepoint on map has an aiBrain assigned whose strategy is to defend it
     local bCovered = false
-    if not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
-        local iChokepoints = table.getsize(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])
+    if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+        local iChokepoints = table.getsize(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])
         local iCoveredChokepoints = 0
-        for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
             if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle then
                 if oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
                     iCoveredChokepoints = iCoveredChokepoints + 1

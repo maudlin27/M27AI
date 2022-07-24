@@ -11,6 +11,7 @@ local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
 refiNearestEnemyIndex = 'M27NearestEnemyIndex'
@@ -4649,8 +4650,8 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         LOG(sFunctionRef..': Breakdown of Weapon blueprint proj ID='..reprs(__blueprints[oWeapon.Blueprint.ProjectileId]))
                     end--]]
 
-                    if M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations]) == false then
-                        for iTime, tLocation in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations] do
+                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations]) == false then
+                        for iTime, tLocation in M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations] do
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering iTime='..iTime..'; tLocation='..repru(tLocation)..'; GameTime='..GetGameTimeSeconds()) end
                             if GetGameTimeSeconds() - iTime < 60 then --Testing with Aeon SML on setons it takes 60s to go from one corner to another roughly
                                 table.insert(tRecentlyNuked, tLocation)
@@ -4770,8 +4771,8 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         oLauncher:SetPaused(false)
                     else
                         IssueNuke({oLauncher}, tTarget)
-                        M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations][GetGameTimeSeconds()] = tTarget
-                        if bDebugMessages == true then LOG(sFunctionRef..': Launching nuke at tTarget='..repru(tTarget)..'; M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations]='..repru(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations])) end
+                        M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations][GetGameTimeSeconds()] = tTarget
+                        if bDebugMessages == true then LOG(sFunctionRef..': Launching nuke at tTarget='..repru(tTarget)..'; M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations]='..repru(M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations])) end
                         --Restart SMD monitor after giving time for missile to fire
                         if oLauncher then oLauncher[M27UnitInfo.refbActiveSMDChecker] = false end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

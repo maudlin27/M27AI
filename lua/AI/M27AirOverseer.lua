@@ -11,6 +11,7 @@ local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27UnitMicro = import('/mods/M27AI/lua/AI/M27UnitMicro.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 --General air scouting values
 iAirSegmentSize = 1 --Updated/set in initialisation
@@ -2143,7 +2144,7 @@ function AirThreatChecker(aiBrain)
     local tAirAAUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirAA, false, true)
     local tiAirAAThreatByTech = { 50, 235, 350 }
     local iFriendlyM27AirAA = 0
-    for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+    for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
         if not(oBrain:GetArmyIndex() == aiBrain:GetArmyIndex()) then
             iFriendlyM27AirAA = iFriendlyM27AirAA + (oBrain[refiOurMassInAirAA] or 0)
         end
@@ -3720,7 +3721,7 @@ function QuantumOpticsManager(aiBrain, oUnit)
                     --Scout the area
                     M27UnitInfo.ScryTarget(oUnit, tAreaToScout)
                     --Update segments to show we have visual of the target
-                    for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                    for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                         UpdateSegmentsForLocationVision(oBrain, oUnit:GetPosition(), iIntelRange, GetGameTimeSeconds())
                     end
                 end
@@ -6366,12 +6367,12 @@ function AirAAManager(aiBrain)
 
             local iCloseToBaseRange = math.max(100, math.min(130, aiBrain[refiBomberDefenceCriticalThreatDistance] - 10))
             --Adjust close to base range for chokepoints
-            if not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+            if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
                 local iCurChokepointDistance
                 local iFurthestChokepointDistance = 0
                 local iClosestChokepointDistance = 10000
 
-                for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                     if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
                         iCurChokepointDistance = M27Utilities.GetDistanceBetweenPositions(oBrain[M27MapInfo.reftChokepointBuildLocation], tStartPosition)
                         if iCurChokepointDistance > iFurthestChokepointDistance then

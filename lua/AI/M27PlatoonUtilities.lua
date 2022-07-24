@@ -16,6 +16,7 @@ local M27UnitMicro = import('/mods/M27AI/lua/AI/M27UnitMicro.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 --    Platoon variables and constants:
 --1) Action related
@@ -1537,7 +1538,7 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
         oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures] = math.max(aiBrain[M27Overseer.refiSearchRangeForEnemyStructures], iEnemySearchRadius)
 
         --Skirmisher, combat patrol and ACU specific - increase search range to include T2 arti
-        if M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid]) then
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) then
             if oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] or sPlatoonName == 'M27CombatPatrolAI' or oPlatoon[refbACUInPlatoon] then
                 oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures] = math.max(oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures], 135)
             end
@@ -2632,7 +2633,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         LOG('iUnit='..iUnit..'; oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
                                     end
                                 end
-                                if M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.refiFriendlyFatboyCount] > 0 then
+                                if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiFriendlyFatboyCount] > 0 then
                                     --Cap threat rating for fatboys to 5k threat
                                     local tFriendlyFatboys = EntityCategoryFilterDown(M27UnitInfo.refCategoryFatboy, oPlatoon[reftFriendlyNearbyCombatUnits])
                                     if M27Utilities.IsTableEmpty(tFriendlyFatboys) then
@@ -3024,12 +3025,12 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
         if bProceed then
             --T2 arti avoidance logic for specified platoons - for now will just try with skirmishers, combat patrol and ACU
             --NOTE: If expanding platoons that this applies to, then also update logic for recording enemies, as it has code to increase the search range if T2 arti are identified
-            if (oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] or sPlatoonName == 'M27CombatPatrolAI' or oPlatoon[refbACUInPlatoon]) and M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid]) == false then
+            if (oPlatoon[M27PlatoonTemplates.refbSkirmisherRetreatLogic] or sPlatoonName == 'M27CombatPatrolAI' or oPlatoon[refbACUInPlatoon]) and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) == false then
                 --if oPlatoon[refbACUInPlatoon] then bDebugMessages = true end
                 local bRunFromArti = false
                 local oNearbyArti
 
-                for iArti, oArti in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid] do
+                for iArti, oArti in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
                     if bDebugMessages == true and M27UnitInfo.IsUnitValid(oArti) then LOG(sFunctionRef..': Considering oArti='..oArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oArti)..'; Distance to platoon='..M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), GetPlatoonFrontPosition(oPlatoon))) end
                     if M27UnitInfo.IsUnitValid(oArti) and M27Utilities.GetDistanceBetweenPositions(oArti:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= 145 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..'Has nearby t2 arti so want to retreat') end
@@ -7981,10 +7982,10 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
                     oPlatoon[reftMovementPath] = {}
                     --Do we have a chokepoint on our team? If so then defend the nearest one if the enemy has a certain level of mobile threat
                     local tChokepointToDefend
-                    if (aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 21000 or aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] >= 21000 or oPlatoon[refbHavePreviouslyRun]) and not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+                    if (aiBrain[M27Overseer.refiTotalEnemyShortRangeThreat] >= 21000 or aiBrain[M27Overseer.refiTotalEnemyLongRangeThreat] >= 21000 or oPlatoon[refbHavePreviouslyRun]) and not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
                         local iNearestChokepointDist = 10000
                         local iCurDist
-                        for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                             if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle then
                                 iCurDist = M27Utilities.GetDistanceBetweenPositions(oBrain[M27MapInfo.reftChokepointBuildLocation], GetPlatoonFrontPosition(oPlatoon))
                                 if bDebugMessages == true then LOG(sFunctionRef..': oBrain index '..oBrain:GetArmyIndex()..'; name='..oBrain.Nickname..'; Chokepoint='..repru(oBrain[M27MapInfo.reftChokepointBuildLocation] or {'nil'})..'; Dist to chokepoint='..iCurDist..'; iNearestChokepointDist='..iNearestChokepointDist) end

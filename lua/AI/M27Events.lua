@@ -19,6 +19,7 @@ local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -29,7 +30,7 @@ function OnPlayerDefeated(aiBrain)
 
     --Was it an M27AI assigned to a chokepoint? If so then have any teammates no longer adopt a turtle strategy
     if aiBrain.M27AI and aiBrain[M27MapInfo.refiAssignedChokepointCount] then
-        for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
             if not(oBrain == aiBrain) then
                 oBrain[aiBrain[M27MapInfo.refiAssignedChokepointCount]] = nil
                 oBrain[M27Overseer.refiDefaultStrategy] = oBrain[M27Overseer.refStrategyLandMain]
@@ -84,15 +85,15 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to add oKillerUnit='..oKillerUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oKillerUnit)..' to list of T2 arti to avoid') end
                                 --Is this already in the table?
                                 local bIncludeInTable = true
-                                if M27Utilities.IsTableEmpty(M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid]) == false then
-                                    for iArti, oArti in M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid] do
+                                if M27Utilities.IsTableEmpty(M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid]) == false then
+                                    for iArti, oArti in M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
                                         if oArti == oKillerUnit then
                                             bIncludeInTable = false
                                         end
                                     end
                                 end
                                 if bIncludeInTable then
-                                    table.insert(M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid], oKillerUnit)
+                                    table.insert(M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid], oKillerUnit)
                                     --Also check for any nearby t2 arti that are closer to the killed unit's base
                                     local tNearbyT2Arti = oKillerUnit:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti, oKillerUnit:GetPosition(), 30, 'Ally')
                                     local iDistToBase = M27Utilities.GetDistanceBetweenPositions(oKillerUnit:GetPosition(), M27MapInfo.PlayerStartPoints[oKilledBrain.M27StartPositionNumber])
@@ -101,13 +102,13 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                                             if not(oUnit == oKillerUnit) then
                                                 if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[oKilledBrain.M27StartPositionNumber]) < iDistToBase then
                                                     bIncludeInTable = true
-                                                    for iArti, oArti in M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid] do
+                                                    for iArti, oArti in M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid] do
                                                         if oUnit == oArti then
                                                             bIncludeInTable = false
                                                         end
                                                     end
                                                     if bIncludeInTable then
-                                                        table.insert(M27Overseer.tTeamData[oKilledBrain.M27Team][M27Overseer.reftEnemyArtiToAvoid], oKillerUnit)
+                                                        table.insert(M27Team.tTeamData[oKilledBrain.M27Team][M27Team.reftEnemyArtiToAvoid], oKillerUnit)
                                                     end
                                                 end
                                             end

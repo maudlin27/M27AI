@@ -11,6 +11,7 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 bUsingArmyIndexForStartPosition = false --by default will assume armies are ARMY_1 etc.; this will be changed to true if any exceptions are found
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
@@ -4753,8 +4754,8 @@ end
 
 function GetModChokepointDistance(aiBrain, tTarget)
     --Returns the position along the line from team start to enemy start that was used for chokepoints based on a right angle intersection from this line to tTarget
-    local tStartPos = M27Overseer.tTeamData[aiBrain.M27Team][reftChokepointTeamStart]
-    return math.floor(math.cos(math.abs(M27Utilities.ConvertAngleToRadians(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Overseer.tTeamData[aiBrain.M27Team][reftAngleFromTeamStartToEnemy]))) * M27Utilities.GetDistanceBetweenPositions(tStartPos, tTarget))
+    local tStartPos = M27Team.tTeamData[aiBrain.M27Team][reftChokepointTeamStart]
+    return math.floor(math.cos(math.abs(M27Utilities.ConvertAngleToRadians(M27Utilities.GetAngleFromAToB(tStartPos, tTarget) - M27Team.tTeamData[aiBrain.M27Team][reftAngleFromTeamStartToEnemy]))) * M27Utilities.GetDistanceBetweenPositions(tStartPos, tTarget))
 end
 
 function IdentifyTeamChokepoints(aiBrain)
@@ -4762,10 +4763,10 @@ function IdentifyTeamChokepoints(aiBrain)
     local sFunctionRef = 'IdentifyTeamChokepoints'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if not(M27Overseer.tTeamData[aiBrain.M27Team][refbConsideredChokepointsForTeam]) then
-        if bDebugMessages == true then LOG(sFunctionRef..': Considering chokepoints for aiBrain army index='..aiBrain:GetArmyIndex()..' with M27Team='..(aiBrain.M27Team or 'nil')..'; Total team count='..(M27Overseer.iTotalTeamCount or 'nil')..'; can path to enemy base ='..tostring(aiBrain[refbCanPathToEnemyBaseWithLand] or false)..'; Starting segment group for land ='..(aiBrain[refiStartingSegmentGroup][M27UnitInfo.refPathingTypeLand] or 'nil')..'; starting segment if recalculate='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
-        M27Overseer.tTeamData[aiBrain.M27Team][refbConsideredChokepointsForTeam] = true
-        if M27Overseer.iTotalTeamCount == 2 and aiBrain[refbCanPathToEnemyBaseWithLand] then --Dont want to try turtling up if have 3+ teams as gets too complicated to try and identify a chokepoint that protects from all enemies
+    if not(M27Team.tTeamData[aiBrain.M27Team][refbConsideredChokepointsForTeam]) then
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering chokepoints for aiBrain army index='..aiBrain:GetArmyIndex()..' with M27Team='..(aiBrain.M27Team or 'nil')..'; Total team count='..(M27Team.iTotalTeamCount or 'nil')..'; can path to enemy base ='..tostring(aiBrain[refbCanPathToEnemyBaseWithLand] or false)..'; Starting segment group for land ='..(aiBrain[refiStartingSegmentGroup][M27UnitInfo.refPathingTypeLand] or 'nil')..'; starting segment if recalculate='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+        M27Team.tTeamData[aiBrain.M27Team][refbConsideredChokepointsForTeam] = true
+        if M27Team.iTotalTeamCount == 2 and aiBrain[refbCanPathToEnemyBaseWithLand] then --Dont want to try turtling up if have 3+ teams as gets too complicated to try and identify a chokepoint that protects from all enemies
             local tAllM27TeamStartPoints = {}
             local tAllEnemyStartPoints = {}
             local iFriendlyM27AI = 0
@@ -4777,7 +4778,7 @@ function IdentifyTeamChokepoints(aiBrain)
             local iCurBrainAngleToEnemy
 
             --Get all friendly M27AI (including htis one) who are in the same land pathing group and on a similar part of the map
-            for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+            for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                 if not(oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering oBrain with index='..oBrain:GetArmyIndex()..'; .M27AI='..tostring(oBrain.M27AI or false)..'; pathing group='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber])..'; land pathing group='..GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber])..'; iLandPathingGroupWanted='..iLandPathingGroupWanted) end
                     if bPlayersAreGroupedTogether and GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[oBrain.M27StartPositionNumber]) == iLandPathingGroupWanted then
@@ -4806,7 +4807,7 @@ function IdentifyTeamChokepoints(aiBrain)
                         end
                     end
                 else
-                    M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains][iBrain] = nil
+                    M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][iBrain] = nil
                 end
             end
 
@@ -4851,15 +4852,15 @@ function IdentifyTeamChokepoints(aiBrain)
                     M27Utilities.ErrorHandler('tAllM27TeamStartPoints or tAllEnemyStartPoints is empty or no friendly M27AI so will abort trying to find a chokepoint. Is tAllM27TeamStartPoitns empty='..tostring(M27Utilities.IsTableEmpty(tAllM27TeamStartPoints))..'; is allenemystartpoints empty='..tostring(M27Utilities.IsTableEmpty(tAllEnemyStartPoints))..'; iFriendlyM27AI='..iFriendlyM27AI)
                 else
                     --Record all valid chokepoints
-                    M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] = {}
+                    M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] = {}
 
 
-                    M27Overseer.tTeamData[aiBrain.M27Team][reftChokepointTeamStart] = M27Utilities.GetAverageOfLocations(tAllM27TeamStartPoints)
-                    M27Overseer.tTeamData[aiBrain.M27Team][reftChokepointEnemyStart] = M27Utilities.GetAverageOfLocations(tAllEnemyStartPoints)
+                    M27Team.tTeamData[aiBrain.M27Team][reftChokepointTeamStart] = M27Utilities.GetAverageOfLocations(tAllM27TeamStartPoints)
+                    M27Team.tTeamData[aiBrain.M27Team][reftChokepointEnemyStart] = M27Utilities.GetAverageOfLocations(tAllEnemyStartPoints)
 
-                    local tTeamStart = M27Overseer.tTeamData[aiBrain.M27Team][reftChokepointTeamStart]
-                    local tEnemyStart = M27Overseer.tTeamData[aiBrain.M27Team][reftChokepointEnemyStart]
-                    M27Overseer.tTeamData[aiBrain.M27Team][reftAngleFromTeamStartToEnemy] = M27Utilities.GetAngleFromAToB(tTeamStart, tEnemyStart)
+                    local tTeamStart = M27Team.tTeamData[aiBrain.M27Team][reftChokepointTeamStart]
+                    local tEnemyStart = M27Team.tTeamData[aiBrain.M27Team][reftChokepointEnemyStart]
+                    M27Team.tTeamData[aiBrain.M27Team][reftAngleFromTeamStartToEnemy] = M27Utilities.GetAngleFromAToB(tTeamStart, tEnemyStart)
                     local iMaxChokepointsNeeded = math.min(iFriendlyM27AI, 2)
                     local iAngleFromStartToEnd = M27Utilities.GetAngleFromAToB(tTeamStart, tEnemyStart)
                     local iDistToMidFromTeamStart = M27Utilities.GetDistanceBetweenPositions(tTeamStart, tEnemyStart) * 0.5
@@ -4915,22 +4916,22 @@ function IdentifyTeamChokepoints(aiBrain)
                                 if iCurChokepointSize <= 0 then
                                     iChokepointCount = iChokepointCount + 1
                                     if iChokepointCount == 1 then
-                                        M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart] = {}
+                                        M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart] = {}
                                     end
-                                    M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount] = {}
-                                    M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointStart] = tLineSidepoint
-                                    M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointMexesCovered] = 0
+                                    M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount] = {}
+                                    M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointStart] = tLineSidepoint
+                                    M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointMexesCovered] = 0
                                     if bDebugMessages == true then LOG(sFunctionRef..': Found a new chokepoint, Dist='..iChokepointDistFromStart..'; iChokepointCount='..iChokepointCount..'; iDistAdjust='..iDistAdjust..'; Dist from start='..iChokepointDistFromStart..'; tLineSidepoint='..repru(tLineSidepoint)) end
                                 end
                                 iCurChokepointSize = iCurChokepointSize + iIntervalToUse
                                 if iChokepointCount > iMaxChokepointsNeeded and iCurChokepointSize >= iIntervalToUse * 2 then
                                     --Clear tracking of this chokepoint
-                                    M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart] = nil
+                                    M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart] = nil
                                     if bDebugMessages == true then LOG(sFunctionRef..': iChokepointCount='..iChokepointCount..'; Dist='..iChokepointDistFromStart..'; too many chokepoints so wont try and defend') end
                                     break
                                 elseif iCurChokepointSize >= iMaxChokepointSize then --A T2 PD has a range of 50, so will cover 2 times this
                                     --Clear tracking of this chokepoint
-                                    M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart] = nil
+                                    M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart] = nil
                                     if bDebugMessages == true then LOG(sFunctionRef..': iCurChokepointSize='..iCurChokepointSize..'; Dist='..iChokepointDistFromStart..'; too large so wont try and defend') end
                                     break
                                 end
@@ -4938,16 +4939,16 @@ function IdentifyTeamChokepoints(aiBrain)
                                 if bDebugMessages == true then M27Utilities.DrawLocation(tLineSidepoint, nil, 2, 100) end
                                 if iChokepointCount > 0 then
                                     if iCurChokepointSize > iIntervalToUse then
-                                        M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointEnd] = tLineSidepoint
-                                        M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointSize] = iCurChokepointSize
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Reached end of chokepoint, iChokepointCount='..iChokepointCount..'; tLineSidepoint='..repru(tLineSidepoint)..'; iChokepointDistFromStart='..iChokepointDistFromStart..'; iCurChokepointSize of valid chokepoint='..iCurChokepointSize..'; M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointSize]='..M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointSize]) end
+                                        M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointEnd] = tLineSidepoint
+                                        M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointSize] = iCurChokepointSize
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Reached end of chokepoint, iChokepointCount='..iChokepointCount..'; tLineSidepoint='..repru(tLineSidepoint)..'; iChokepointDistFromStart='..iChokepointDistFromStart..'; iCurChokepointSize of valid chokepoint='..iCurChokepointSize..'; M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointSize]='..M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointSize]) end
                                         iCurChokepointSize = 0
                                     elseif iCurChokepointSize > 0 then
                                         --Very small chokepoint - likely a pathing error, so ignore
                                         if iChokepointCount == 1 then
-                                            M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart] = nil
+                                            M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart] = nil
                                         else
-                                            M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount] = nil
+                                            M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount] = nil
                                         end
                                         if bDebugMessages == true then LOG(sFunctionRef..': Have very small chokepoint size so likely pathing error, will reduce iChokepointCount '..iChokepointCount..' by 1. iCurChokepointSize='..iCurChokepointSize) end
                                         iChokepointCount = iChokepointCount - 1
@@ -4956,16 +4957,16 @@ function IdentifyTeamChokepoints(aiBrain)
                             end
                         end
                         if bDebugMessages == true then
-                            LOG(sFunctionRef..': Finished checking along the line for iDistAdjust='..iDistAdjust..'; iChokepointCount='..iChokepointCount..'; Is team data info for this dist adjust empty='..tostring(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart])))
+                            LOG(sFunctionRef..': Finished checking along the line for iDistAdjust='..iDistAdjust..'; iChokepointCount='..iChokepointCount..'; Is team data info for this dist adjust empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart])))
                         end
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Finished trying all distadjust values. Is the table of choekpoints empty for all distances='..tostring(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]))) end
-                    if M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]) == false then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Finished trying all distadjust values. Is the table of choekpoints empty for all distances='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]))) end
+                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]) == false then
                         --------------------->>>>>>>>>>>>>>>>RECORD RECLAIM<<<<<<<<<<<<<----------------------
                         --Record the closest and furthest chokepoints from team start for later reclaim checks
                         local iClosestChokepointToTeamStart = 10000
                         local iFurthestChokepointToTeamStart = 0
-                        for iChokepointDistFromStart, tChokepointDetails in  M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] do
+                        for iChokepointDistFromStart, tChokepointDetails in  M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] do
                             if iChokepointDistFromStart > iFurthestChokepointToTeamStart then
                                 iFurthestChokepointToTeamStart = iChokepointDistFromStart
                             end
@@ -5027,7 +5028,7 @@ function IdentifyTeamChokepoints(aiBrain)
                             end
                             tRelevantMexDistAlongLine[iMex] = iMexDistAlongLine
 
-                            for iChokepointDistFromStart, tChokepointDetails in  M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] do
+                            for iChokepointDistFromStart, tChokepointDetails in  M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] do
                                 if iChokepointDistFromStart >= iMexDistAlongLine then
                                     for iChokepointCount, tChokepointSubtables in tChokepointDetails do
                                         tChokepointSubtables[subrefChokepointMexesCovered] = tChokepointSubtables[subrefChokepointMexesCovered] + 1
@@ -5037,7 +5038,7 @@ function IdentifyTeamChokepoints(aiBrain)
                         end
                         if bDebugMessages == true then
                             LOG(sFunctionRef..': Finished identifying all chokepoints and how many mexes they cover, will cycle through each chokepoint and list the mexes covered by it, and draw the chokepoint with a large blue circle')
-                            for iChokepointDistFromStart, tChokepointDetails in  M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] do
+                            for iChokepointDistFromStart, tChokepointDetails in  M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] do
                                 for iChokepointCount, tChokepointSubtables in tChokepointDetails do
                                     LOG(sFunctionRef..': iChokepointDistFromStart='..iChokepointDistFromStart..'; iChokepointCount='..iChokepointCount..'; Mexes covered='..tChokepointSubtables[subrefChokepointMexesCovered])
                                     M27Utilities.DrawLocation(M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd] }), nil, nil, 200, tChokepointSubtables[subrefChokepointSize])
@@ -5072,7 +5073,7 @@ function IdentifyTeamChokepoints(aiBrain)
 
                         if bDebugMessages == true then LOG(sFunctionRef..': iTotalActivePlayers='..iTotalActivePlayers..'; iOurShareOfMexesOnMap='..iOurShareOfMexesOnMap..'; iMinMexCoverageNeeded='..iMinMexCoverageNeeded) end
                         local iChokepointCountWeighting = math.random(2, 4) --e.g. on fields of isis, a value of 3 means will just get 1 chokepoint, 4 means will get 2.  I.e. the higher the value the less of a penalty is applied to needing a second chokepoint
-                        for iChokepointDistFromStart, tChokepointDetails in  M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] do
+                        for iChokepointDistFromStart, tChokepointDetails in  M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart] do
                             if tChokepointDetails[1][subrefChokepointMexesCovered] >= iMinMexCoverageNeeded then
                                 iDistToMidFromChokepoint = iDistToMidFromTeamStart - iChokepointDistFromStart
 
@@ -5179,37 +5180,37 @@ function IdentifyTeamChokepoints(aiBrain)
                                 end
                             end
                         end
-                        M27Overseer.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart] = {}
+                        M27Team.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart] = {}
                         local bAbort = false
-                        if not(iBestChokepointDistFromStart) or M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart]) then
+                        if not(iBestChokepointDistFromStart) or M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart]) then
                             bAbort = true
                         else
                             --------------------->>>>>>>>>>>>>>>>Decide on build locations for chokepoints and then assign to M27 AI<<<<<<<<<<<<<----------------------
-                            for iChokepointCount, tChokepointSubtables in M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
-                                M27Overseer.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart][iChokepointCount] = iBestChokepointDistFromStart
+                            for iChokepointCount, tChokepointSubtables in M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
+                                M27Team.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart][iChokepointCount] = iBestChokepointDistFromStart
 
                                 --Set build location (move towards start position slightly):
                                 tChokepointMidpoint = M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd]})
 
-                                --M27Overseer.tTeamData[aiBrain.M27Team][reftAngleFromTeamStartToEnemy] = M27Utilities.GetAngleFromAToB(tTeamStart, tEnemyStart)
+                                --M27Team.tTeamData[aiBrain.M27Team][reftAngleFromTeamStartToEnemy] = M27Utilities.GetAngleFromAToB(tTeamStart, tEnemyStart)
 
-                                local tBuildLocationWanted = M27Utilities.MoveInDirection(tChokepointMidpoint, M27Overseer.tTeamData[aiBrain.M27Team][reftAngleFromTeamStartToEnemy] - 180, iBestChokepointBuildDistModTowardsStart, true)
+                                local tBuildLocationWanted = M27Utilities.MoveInDirection(tChokepointMidpoint, M27Team.tTeamData[aiBrain.M27Team][reftAngleFromTeamStartToEnemy] - 180, iBestChokepointBuildDistModTowardsStart, true)
                                 tBuildLocationWanted = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), tBuildLocationWanted, 'ueb0101', 0, 4, false, 10, false, false)
                                 if not(tBuildLocationWanted) then tBuildLocationWanted = M27EngineerOverseer.FindRandomPlaceToBuild(aiBrain, M27Utilities.GetACU(aiBrain), tChokepointMidpoint, 'ueb0101', 0, 4, false, 10, false, false)
                                     if not(tBuildLocationWanted) then
                                         M27Utilities.ErrorHandler('Couldnt find a valid location for the firebase, so will clear all trackers and abort trying to setup a firebase')
-                                        M27Overseer.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart] = nil
+                                        M27Team.tTeamData[aiBrain.M27Team][tiPlannedChokepointsByDistFromStart] = nil
                                         bAbort = true
                                         break
                                     end
                                 end
-                                M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iChokepointCount][reftChokepointBuildLocation] = tBuildLocationWanted
+                                M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iChokepointCount][reftChokepointBuildLocation] = tBuildLocationWanted
 
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef..': iBestChokepointDistFromStart='..iBestChokepointDistFromStart..'; iChokepointCount='..iChokepointCount..'; tChokepointSubtables[subrefChokepointStart]='..repru(tChokepointSubtables[subrefChokepointStart])..'; tChokepointSubtables[subrefChokepointEnd]='..repru(tChokepointSubtables[subrefChokepointEnd])..'; average='..repru(M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd]}))..'; our base start point='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; tChokepointMidpoint='..repru(tChokepointMidpoint)..'; tBuildLocationWanted='..repru(tBuildLocationWanted)..'; iDistToMidFromTeamStart='..iDistToMidFromTeamStart..'; tChokepointSubtables[subrefChokepointSize]='..tChokepointSubtables[subrefChokepointSize]..'; Will draw chokepoint midpoint in gold, and build location in white. iBestChokepointBuildDistModTowardsStart='..iBestChokepointBuildDistModTowardsStart)
                                     --M27Utilities.DrawLocation(M27Utilities.GetAverageOfLocations({ tChokepointSubtables[subrefChokepointStart], tChokepointSubtables[subrefChokepointEnd] }), nil, 1, 200, tChokepointSubtables[subrefChokepointSize])
                                     M27Utilities.DrawLocation(tChokepointMidpoint, nil, 4, 1000, tChokepointSubtables[subrefChokepointSize])
-                                    M27Utilities.DrawLocation(M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iChokepointCount][reftChokepointBuildLocation], nil, 7, 1000, tChokepointSubtables[subrefChokepointSize])
+                                    M27Utilities.DrawLocation(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iChokepointCount][reftChokepointBuildLocation], nil, 7, 1000, tChokepointSubtables[subrefChokepointSize])
                                 end
                             end
                         end
@@ -5218,9 +5219,9 @@ function IdentifyTeamChokepoints(aiBrain)
                             local iCurDist
                             local iClosestDist = 10000
                             local oClosestBrain
-                            for iChokepointCount, tChokepointSubtables in M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
+                            for iChokepointCount, tChokepointSubtables in M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
                                 iClosestDist = 10000
-                                for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                                for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                                     if not(oBrain[refiAssignedChokepointCount]) and GetSegmentGroupOfLocation(sPathing, PlayerStartPoints[oBrain.M27StartPositionNumber]) == iLandPathingGroupWanted then
                                         iCurDist = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[oBrain.M27StartPositionNumber], tChokepointSubtables[reftChokepointBuildLocation])
                                         if bDebugMessages == true then LOG(sFunctionRef..': Looking for nearest M27 near the chokepoint at position '..repru(tChokepointSubtables[reftChokepointBuildLocation])..'; aiBrain='..aiBrain:GetArmyIndex()..'; iCurDist='..iCurDist..'; iClosestDist='..iClosestDist) end
@@ -5244,10 +5245,10 @@ function IdentifyTeamChokepoints(aiBrain)
                             end
                             --Update each team brain to record the closest chokepoint (or the assigned one if it has one assigned)
                             local iClosestChokepointRef
-                            for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                            for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                                 iClosestDist = 10000
                                 if not(oBrain[refiAssignedChokepointCount]) then
-                                    for iChokepointCount, tChokepointSubtables in M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
+                                    for iChokepointCount, tChokepointSubtables in M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart] do
                                         iCurDist = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[oBrain.M27StartPositionNumber], tChokepointSubtables[reftChokepointBuildLocation])
                                         if iCurDist < iClosestDist then
                                             iClosestChokepointRef = iChokepointCount
@@ -5257,7 +5258,7 @@ function IdentifyTeamChokepoints(aiBrain)
                                 else
                                     iClosestChokepointRef = oBrain[refiAssignedChokepointCount]
                                 end
-                                oBrain[reftClosestChokepoint] = {M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][1], M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][2], M27Overseer.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][3]}
+                                oBrain[reftClosestChokepoint] = {M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][1], M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][2], M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][3]}
                             end
                         end
                     end
