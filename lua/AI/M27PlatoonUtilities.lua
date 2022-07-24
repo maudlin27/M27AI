@@ -4008,12 +4008,15 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                 if not(oPlatoon[refbACUInPlatoon]) and M27Utilities.IsTableEmpty(oPlatoon[reftFriendlyNearbyCombatUnits]) == false then
                                                     local tNearbyFriendlyACU = EntityCategoryFilterDown(categories.COMMAND, oPlatoon[reftFriendlyNearbyCombatUnits])
                                                     if M27Utilities.IsTableEmpty(tNearbyFriendlyACU) == false then
-                                                        if M27Utilities.GetDistanceBetweenPositions(tNearbyFriendlyACU[1]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
-                                                            --Is ACU part of a platoon that is attacking? If so still include its threat
-                                                            local iACUAction = tNearbyFriendlyACU[1].PlatoonHandle[refiCurrentAction]
-                                                            if bDebugMessages == true then LOG(sFunctionRef..': ACU action='..(iACUAction or 'nil')) end
-                                                            if not(iACUAction) or not(iACUAction == refActionAttack or iACUAction == refActionMoveDFToNearestEnemy or iACUAction == refActionMoveJustWithinRangeOfNearestPD or iACUAction == refActionAttackSpecificUnit or iACUAction == refActionKillACU) then
-                                                                iOurThreatRating = iOurThreatRating - M27Logic.GetCombatThreatRating(aiBrain, tNearbyFriendlyACU, false)
+                                                        for iFriendlyACU, oFriendlyACU in tNearbyFriendlyACU do
+                                                            --Is the friendly ACU closer to our start than us? (if not then assume it's already helping the fight)
+                                                            if M27Utilities.GetDistanceBetweenPositions(oFriendlyACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
+                                                                --Is ACU part of a platoon that is attacking? If so still include its threat
+                                                                local iACUAction = oFriendlyACU.PlatoonHandle[refiCurrentAction]
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': ACU action='..(iACUAction or 'nil')) end
+                                                                if not(iACUAction) or not(iACUAction == refActionAttack or iACUAction == refActionMoveDFToNearestEnemy or iACUAction == refActionMoveJustWithinRangeOfNearestPD or iACUAction == refActionAttackSpecificUnit or iACUAction == refActionKillACU) then
+                                                                    iOurThreatRating = iOurThreatRating - M27Logic.GetCombatThreatRating(aiBrain, { oFriendlyACU}, false)
+                                                                end
                                                             end
                                                         end
                                                     end
