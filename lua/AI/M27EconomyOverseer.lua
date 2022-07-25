@@ -3237,6 +3237,20 @@ function ManageEnergyStalls(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function GetEnergyStorageMaximum(aiBrain)
+    if aiBrain:GetEconomyStoredRatio('ENERGY') > 0 then return aiBrain:GetEconomyStored('ENERGY') / aiBrain:GetEconomyStoredRatio('ENERGY')
+    else
+        return aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) * 5000 + aiBrain:GetCurrentUnits(categories.COMMAND) * 3900 + 100
+    end
+end
+
+function GetMassStorageMaximum(aiBrain)
+    if aiBrain:GetEconomyStoredRatio('MASS') > 0 then return aiBrain:GetEconomyStored('MASS') / aiBrain:GetEconomyStoredRatio('MASS')
+    else
+        return aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) * 500 + aiBrain:GetCurrentUnits(categories.COMMAND) * 650 + 150
+    end
+end
+
 function UpgradeManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeManager'

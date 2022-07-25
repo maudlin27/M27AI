@@ -8291,9 +8291,25 @@ end
 
 function TestCustom(aiBrain)
 
+    --Give resources
+    local oBrainToGive
+
+    if not(aiBrain:GetArmyIndex() == 3) then
+        for iBrain, oBrain in aiBrain[toAllyBrains] do
+            if oBrain:GetArmyIndex() == 3 then
+                oBrainToGive = oBrain
+                break
+            end
+        end
+        if aiBrain:GetEconomyStored('MASS') >= 100 then
+            M27Team.GiveResourcesToPlayer(aiBrain, oBrainToGive, 100, 100)
+        end
+    end
+
+
     --Spawn an experimental
-    local tPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    CreateUnit('url0402', M27Utilities.GetACU(aiBrain).Army, tPos[1], tPos[2], tPos[3], 0, 0, 0, 0, 'Air')
+    --local tPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    --CreateUnit('url0402', M27Utilities.GetACU(aiBrain).Army, tPos[1], tPos[2], tPos[3], 0, 0, 0, 0, 'Air')
 
     --M27MiscProfiling.ListAmphibiousUnitsMissingAmphibiousCategory()
     --LOG('Log of ScenarioInfo='..repru(ScenarioInfo))
@@ -8638,6 +8654,15 @@ function OverseerManager(aiBrain)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
 
+    --Start team resource monitor (need to do after overseer initialisation, as need the forked thread recording allies and enemies to have run so we know if we have teammates or not)
+    bDebugMessages = true
+    if bDebugMessages == true then LOG(sFunctionRef..': About to start a forked thread for team resource sharing monitor if we have ally brains. Is table of ally brains empty for brain '..aiBrain.Nickname..'='..tostring(M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]))) end
+    if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
+        ForkThread(M27Team.TeamResourceSharingMonitor, aiBrain.M27Team)
+        if bDebugMessages == true then LOG(sFunctionRef..': Started team resource sharing monitor for team='..aiBrain.M27Team) end
+    end
+    bDebugMessages = false
+
     --ForkThread(ConstantBomberLocation, aiBrain)
     --TestCustom(aiBrain)
 
@@ -8649,7 +8674,7 @@ function OverseerManager(aiBrain)
 
 
         --if GetGameTimeSeconds() == 395 then TestCustom(aiBrain) end
-        --TestCustom(aiBrain)
+        TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
         if aiBrain.M27IsDefeated then

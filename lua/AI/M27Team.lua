@@ -6,6 +6,10 @@
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
+local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
+local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
+local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
+local SimUtils = import('/lua/SimUtils.lua')
 
 
 tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
@@ -37,7 +41,7 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
         --Record number of wall segments
         tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamDataUpdate] = GetGameTimeSeconds()
         local iWallCount = 0
-        for iBrain, oBrain in aiBrain[toEnemyBrains] do
+        for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
             iWallCount = iWallCount + oBrain:GetCurrentUnits(M27UnitInfo.refCategoryWall)
         end
         tTeamData[aiBrain.M27Team][refiEnemyWalls] = iWallCount
@@ -68,7 +72,7 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
 
         --Update count of friendly team fatboys (so can decide whether to run platoon logic relating to this)
         local iFatboyCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy)
-        for iBrain, oBrain in aiBrain[toAllyBrains] do
+        for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
             if not(oBrain == aiBrain) then --redundancy, dont think this is needed
                 iFatboyCount = iFatboyCount + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy)
             end
@@ -77,17 +81,247 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
     end
 end
 
-function AllocateTeamResources(iTeam)
+function GiveResourcesToPlayer(oBrainGiver, oBrainReceiver, iMass, iEnergy)
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GiveResourcesToPlayer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --Failed attempt - simcallback:
+    --[[SimCallback(
+            {
+                Func = "GiveResourcesToPlayer",
+                Args = {
+                    From = oBrainGiver:GetArmyIndex(),
+                    To = oBrainReceiver:GetArmyIndex(),
+                    Mass = iMass,
+                    Energy = iEnergy,
+                }
+            }
+    )--]]
+    --Failed attempt: SimUtils
+    --SimUtils.GiveResourcesToPlayer(oBrainGiver:GetArmyIndex(), oBrainReceiver:GetArmyIndex(), iMass, iEnergy)
+    --Check we have the resources to give:
+    if iMass > 0 and oBrainGiver:GetEconomyStored('MASS') >= iMass then
+        --Check the person receiving has enough capacity
+        if M27EconomyOverseer.GetMassStorageMaximum(oBrainReceiver) - oBrainReceiver:GetEconomyStored('MASS') >= iMass then
+            oBrainReceiver:GiveResource('Mass', iMass)
+            oBrainGiver:TakeResource('Mass', iMass)
+            if bDebugMessages == true then LOG(sFunctionRef..': Given '..iMass..' Mass from '..oBrainGiver.Nickname..' to '..oBrainReceiver.Nickname) end
 
+        end
+    end
+    if iEnergy > 0 and oBrainGiver:GetEconomyStored('ENERGY') >= iEnergy then
+        if M27EconomyOverseer.GetEnergyStorageMaximum(oBrainReceiver) - oBrainReceiver:GetEconomyStored('ENERGY') >= iEnergy then
+            oBrainReceiver:GiveResource('Energy', iEnergy)
+            oBrainGiver:TakeResource('Energy', iEnergy)
+            if bDebugMessages == true then LOG(sFunctionRef..': Given '..iEnergy..' Energy from '..oBrainGiver.Nickname..' to '..oBrainReceiver.Nickname) end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
+end
+
+function AllocateTeamEnergyResources(iTeam, iFirstM27Brain)
+    --Cycles through every team member, and for M27 team members considers giving resources to non-M27 team members
+
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'AllocateTeamEnergyResources'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --Priority for brains wanting resources:
+    --M27 Power stalling (<10% energy stored, or flagged as pwoerstalling with <50% energy stored)
+    --M27 Less than 5k energy stored with at least 5k storage available, with enemies near the ACU
+    --M27 Less than 75% energy stored with enemies near the ACU
+    --Non-M27 powerstalling
+
+    --M27 brains to give energy if
+    --Positive energy, with 90% stored - surrender higher of positive energy * 1.5 and amount that would take us to 80% stored.  Increase to 50% stored if have brains in priority 1/2 scenario and we dont have enemies near our ACU
+    --ACU not in combat, or (if in combat) to only give energy equal to net energy income, and only if have >=95% stored
+
+    local tBrainsWithEnergyAndEnergyAvailable = {}
+    local tBrainsNeedingEnergyByPriority = {}
+    local subrefBrain = 1
+    local subrefEnergyPriority = 2
+    local subrefRemainingEnergyNeeded = 3
+    local subrefEnergyAvailable = 2
+    local subrefRemainingEnergyToGive = 3
+    local tiCountOfBrainsNeedingEnergyByPriority = {} --i.e. a count of the number of brains by priority
+
+    local iEnergyStorageMax
+
+    local iPriority
+
+    for iBrain, oBrain in tTeamData[iTeam][reftFriendlyActiveM27Brains] do
+        iEnergyStorageMax = M27EconomyOverseer.GetEnergyStorageMaximum(oBrain)
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering brain with name='..oBrain.Nickname..'; iEnergyStorageMax='..iEnergyStorageMax..'; Is M27='..tostring(oBrain.M27AI or false)..'; % stored energy='..oBrain:GetEconomyStoredRatio('ENERGY')..'; flagged as stalling energy='..tostring(oBrain[M27EconomyOverseer.refbStallingEnergy] or false)) end
+
+        --Does ACU have enemies nearby and we are capable of overcharging?
+        if M27Utilities.GetACU(oBrain).PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] and iEnergyStorageMax >= 5000 then
+            if oBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or oBrain[M27EconomyOverseer.refbStallingEnergy] then
+                if oBrain:GetEconomyStoredRatio('ENERGY') < 0.8 then
+                    iPriority = 2
+                    table.insert(tBrainsNeedingEnergyByPriority, {[subrefBrain] = oBrain, [subrefEnergyPriority] = iPriority, [subrefRemainingEnergyNeeded] = iEnergyStorageMax * (0.8 - oBrain:GetEconomyStoredRatio('ENERGY'))})
+                    tiCountOfBrainsNeedingEnergyByPriority[iPriority] = (tiCountOfBrainsNeedingEnergyByPriority[iPriority] or 0) + 1
+                    if bDebugMessages == true then LOG(sFunctionRef..': Want energy as priority '..iPriority) end
+                else
+                    --Have lots of energy but flagged as stalling energy so dont want to give any energy or claim any
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont want to give or receive energy') end
+                end
+            elseif oBrain:GetEconomyStoredRatio('ENERGY') >= 0.95 and oBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 0 and not(oBrain[M27EconomyOverseer.refbStallingEnergy]) then
+                table.insert(tBrainsWithEnergyAndEnergyAvailable, {[subrefBrain] = oBrain, [subrefEnergyAvailable] = math.max(oBrain[M27EconomyOverseer.refiEnergyNetBaseIncome], oBrain:GetEconomyStored('ENERGY') * 0.02)})
+                if bDebugMessages == true then LOG(sFunctionRef..': Have energy available to give') end
+            else
+                --Enemies near our ACU, we can overcharge them, and we dont have strong energy, so keep what energy we have for ourself
+            end
+        else
+            --Not in combat, so can make more of our energy available
+            if oBrain:GetEconomyStoredRatio('ENERGY') < 0.25 then
+                if oBrain[M27EconomyOverseer.refbStallingEnergy] or oBrain:GetEconomyStoredRatio('ENERGY') <= 0.05 then
+                    iPriority = 1
+                else
+                    iPriority = 3
+                end
+                table.insert(tBrainsNeedingEnergyByPriority, {[subrefBrain] = oBrain, [subrefEnergyPriority] = iPriority, [subrefRemainingEnergyNeeded] = iEnergyStorageMax * (0.25 - oBrain:GetEconomyStoredRatio('ENERGY'))})
+                tiCountOfBrainsNeedingEnergyByPriority[iPriority] = (tiCountOfBrainsNeedingEnergyByPriority[iPriority] or 0) + 1
+                if bDebugMessages == true then LOG(sFunctionRef..': Not in combat, want energy as priority '..iPriority) end
+            else
+                --Do we have enough to offer some?
+                if oBrain:GetEconomyStoredRatio('ENERGY') > 0.3 and not(oBrain[M27EconomyOverseer.refbStallingEnergy]) then
+                    if oBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('ENERGY') >= 0.98 then
+                        table.insert(tBrainsWithEnergyAndEnergyAvailable, {[subrefBrain] = oBrain, [subrefEnergyAvailable] = oBrain:GetEconomyStored('ENERGY') * 0.02})
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have energy available to give') end
+                    elseif oBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] > 0 then
+                        table.insert(tBrainsWithEnergyAndEnergyAvailable, {[subrefBrain] = oBrain, [subrefEnergyAvailable] = iEnergyStorageMax * (oBrain:GetEconomyStoredRatio('ENERGY') - 0.3)})
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have positive energy income so have energy avialable to give') end
+                    else
+                        --Dont have positive net income, and not got 100% energy, so want to keep our energy for ourself
+                    end
+                end
+            end
+        end
+    end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished going through M27 brains to work out who gan give and receive. Is table of energy givers empty='..tostring(M27Utilities.IsTableEmpty(tBrainsWithEnergyAndEnergyAvailable))..'; is table of brains wanting energy empty='..tostring(M27Utilities.IsTableEmpty(tBrainsNeedingEnergyByPriority))) end
+
+    --Do we have brains capable of surrendering energy?
+    if M27Utilities.IsTableEmpty(tBrainsWithEnergyAndEnergyAvailable) == false then
+        --Are there any non-M27 brains that are power stalling?  Have already checked have toAllyBrains as part of the seharing monitor
+
+        for iBrain, oBrain in tTeamData[iTeam][reftFriendlyActiveM27Brains][iFirstM27Brain][M27Overseer.toAllyBrains] do
+            --Only consider non-M27 since we considered M27 above
+            if not(oBrain.M27AI) then
+                if oBrain:GetEconomyStoredRatio('ENERGY') < 0.1 then
+                    iPriority = 4
+                    table.insert(tBrainsNeedingEnergyByPriority, {[subrefBrain] = oBrain, [subrefEnergyPriority] = iPriority, [subrefRemainingEnergyNeeded] = M27EconomyOverseer.GetEnergyStorageMaximum(oBrain) * (0.15 - oBrain:GetEconomyStoredRatio('ENERGY'))})
+                    tiCountOfBrainsNeedingEnergyByPriority[iPriority] = (tiCountOfBrainsNeedingEnergyByPriority[iPriority] or 0) + 1
+                    if bDebugMessages == true then LOG(sFunctionRef..': Non M27 brain, Want energy as priority '..iPriority) end
+                end
+            end
+        end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished going through non-M27 brains as well to identify those needing energy. Is table of any brains needing energy empty='..tostring(M27Utilities.IsTableEmpty(tBrainsNeedingEnergyByPriority))) end
+
+        --Do we have brains needing energy?
+        if M27Utilities.IsTableEmpty(tBrainsNeedingEnergyByPriority) == false then
+            --Calculate total energy available, and total energy needed
+            local iTotalEnergyAvailable = 0
+            local iTotalEnergyNeeded = 0
+            for iTable, tTable in tBrainsWithEnergyAndEnergyAvailable do
+                iTotalEnergyAvailable = iTotalEnergyAvailable + tTable[subrefEnergyAvailable]
+            end
+            for iTable, tTable in tBrainsNeedingEnergyByPriority do
+                if bDebugMessages == true then LOG(sFunctionRef..': Energy needed for brain '..tTable[subrefBrain].Nickname..'='..tTable[subrefRemainingEnergyNeeded]..'; energy storage % for this brain='..tTable[subrefBrain]:GetEconomyStoredRatio('ENERGY')) end
+                iTotalEnergyNeeded = iTotalEnergyNeeded + tTable[subrefRemainingEnergyNeeded]
+            end
+
+            local iEnergyGiftPercentage --% of energy available that we shoudl gift
+            if iTotalEnergyNeeded < iTotalEnergyAvailable then
+                iEnergyGiftPercentage = iTotalEnergyNeeded / iTotalEnergyAvailable
+            else
+                iEnergyGiftPercentage = 1
+            end
+
+            for iTable, tTable in tBrainsWithEnergyAndEnergyAvailable do
+                tTable[subrefRemainingEnergyToGive] = iEnergyGiftPercentage * tTable[subrefEnergyAvailable]
+            end
+
+            local iEnergyToGive
+
+            if bDebugMessages == true then LOG(sFunctionRef..': iEnergyGiftPercentage='..iEnergyGiftPercentage..'; iTotalEnergyNeeded='..iTotalEnergyNeeded..'; iTotalEnergyAvailable='..iTotalEnergyAvailable) end
+
+
+
+            --Cycle through by priority
+            for iPriority, iCount in tiCountOfBrainsNeedingEnergyByPriority do
+                if iCount > 0 then
+                    for iClaimerTable, tClaimerTable in tBrainsNeedingEnergyByPriority do
+                        if tClaimerTable[subrefRemainingEnergyNeeded] > 0 then
+                            for iGiverTable, tGiverTable in tBrainsWithEnergyAndEnergyAvailable do
+                                if tGiverTable[subrefRemainingEnergyToGive] > 0 then
+                                    iEnergyToGive = math.min(tGiverTable[subrefRemainingEnergyToGive], tClaimerTable[subrefRemainingEnergyNeeded])
+                                    tGiverTable[subrefRemainingEnergyToGive] = tGiverTable[subrefRemainingEnergyToGive] - iEnergyToGive
+                                    tClaimerTable[subrefRemainingEnergyNeeded] = tClaimerTable[subrefRemainingEnergyNeeded] - iEnergyToGive
+                                    GiveResourcesToPlayer(tGiverTable[subrefBrain], tClaimerTable[subrefBrain], 0, iEnergyToGive)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': '..tGiverTable[subrefBrain].Nickname..' has just given '..iEnergyToGive..' energy to '..tClaimerTable[subrefBrain].Nickname) end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function AllocateTeamMassResources(iTeam, iFirstM27Brain)
+    --To add
 end
 
 function TeamResourceSharingMonitor(iTeam)
     --Monitors resources for AI in the team and shares resources
-    local tTeamSubtable = tTeamData[iTeam]
-    if not(tTeamSubtable[refbActiveResourceMonitor]) and M27Utilities.IsTableEmpty(tTeamSubtable[reftFriendlyActiveM27Brains]) == false then
-        tTeamSubtable[refbActiveResourceMonitor] = true
-        while M27Utilities.IsTableEmpty(tTeamData[reftFriendlyActiveM27Brains]) == false do
-            break
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'TeamResourceSharingMonitor'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, checking if already running a monitor for iTeam='..iTeam..': Is resource monitor active='..tostring(tTeamData[iTeam][refbActiveResourceMonitor] or false)..'; Is table of friendl yM27 brains for this team empty='..tostring(M27Utilities.IsTableEmpty(tTeamData[iTeam][reftFriendlyActiveM27Brains]))) end
+
+    if not(tTeamData[iTeam][refbActiveResourceMonitor]) and M27Utilities.IsTableEmpty(tTeamData[iTeam][reftFriendlyActiveM27Brains]) == false then
+        if bDebugMessages == true then LOG(sFunctionRef..': Will flag that we ahve an active resource monitor and wait 3 minutes before starting main loop') end
+        tTeamData[iTeam][refbActiveResourceMonitor] = true
+        WaitSeconds(180) --Dont want to share in the first 3m
+        local oFirstM27Brain
+        local iFirstM27Brain
+        if M27Utilities.IsTableEmpty(tTeamData[iTeam][reftFriendlyActiveM27Brains]) == false then
+            for iBrain, oBrain in tTeamData[iTeam][reftFriendlyActiveM27Brains] do
+                oFirstM27Brain = oBrain
+                iFirstM27Brain = iBrain
+                break
+            end
         end
+
+        while M27Utilities.IsTableEmpty(tTeamData[iTeam][reftFriendlyActiveM27Brains]) == false do
+            if bDebugMessages == true then LOG(sFunctionRef..': Start of main loop, about to call logic to allocate resources if we have active friendly M27 brains. Does our team '..iTeam..'with a first brain with index='..iFirstM27Brain..' have an empty table of M27 brains='..tostring(M27Utilities.IsTableEmpty(tTeamData[iTeam][reftFriendlyActiveM27Brains][iFirstM27Brain][M27Overseer.toAllyBrains]))) end
+
+            if oFirstM27Brain.M27IsDefeated then
+                for iBrain, oBrain in tTeamData[iTeam][reftFriendlyActiveM27Brains] do
+                    oFirstM27Brain = oBrain
+                    iFirstM27Brain = iBrain
+                    break
+                end
+            end
+            
+            --Do we still have teammates?
+            if M27Utilities.IsTableEmpty(tTeamData[iTeam][reftFriendlyActiveM27Brains][iFirstM27Brain][M27Overseer.toAllyBrains]) then
+                break
+            else
+                ForkThread(AllocateTeamEnergyResources, iTeam, iFirstM27Brain)
+                ForkThread(AllocateTeamMassResources, iTeam, iFirstM27Brain)
+                WaitSeconds(1)
+            end            
+
+        end
+        tTeamData[iTeam][refbActiveResourceMonitor] = false
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
