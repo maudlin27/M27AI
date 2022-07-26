@@ -2287,6 +2287,11 @@ function RefreshEconomyData(aiBrain)
         end
     end
 
+    --Give mexes to teammate
+    if iParagonCount > 0 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false and (iT1MexCount + iT2MexCount + iT3MexCount) > 0 then
+        ForkThread(M27Team.GiveResourcesToAllyDueToParagon, aiBrain)
+    end
+
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

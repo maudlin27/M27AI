@@ -475,3 +475,39 @@ function GiveAllResourcesToAllies(aiBrain)
         if iMassToGive + iEnergyToGive < 0 then break end
     end
 end
+
+function GiveResourcesToAllyDueToParagon(aiBrain)
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+        --Prioritise giving to M27 brains since they have auto-resource sharing
+        local oM27Ally
+        local oOtherAlly
+        for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+            if oBrain.M27AI then
+                oM27Ally = oBrain
+            else
+                oOtherAlly = oBrain
+            end
+        end
+        local oBrainToGiveTo
+        if oM27Ally then oBrainToGiveTo = oM27Ally
+        else oBrainToGiveTo = oOtherAlly
+        end
+
+        local tMexesToGive = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMex, false, true)
+        local tPowerToGive = {}
+        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryT2Power) > 1 then
+            for iPower, oPower in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryT2Power, false, true) do
+                if iPower > 1 then
+                    table.insert(tPowerToGive, oPower)
+                end
+            end
+        end
+        if M27Utilities.IsTableEmpty(tMexesToGive) == false then
+            TransferUnitsToPlayer(tMexesToGive, oBrainToGiveTo:GetArmyIndex(), false)
+        end
+        if M27Utilities.IsTableEmpty(tPowerToGive) == false then
+            TransferUnitsToPlayer(tPowerToGive, oBrainToGiveTo:GetArmyIndex(), false)
+        end
+
+    end
+end
