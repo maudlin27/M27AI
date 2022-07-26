@@ -9,7 +9,7 @@ local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
-local SimUtils = import('/lua/SimUtils.lua')
+local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 
 
 tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
@@ -275,7 +275,128 @@ function AllocateTeamEnergyResources(iTeam, iFirstM27Brain)
 end
 
 function AllocateTeamMassResources(iTeam, iFirstM27Brain)
-    --To add
+    --Cycles through every team member, and for M27 team members considers giving resources to non-M27 team members
+
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'AllocateTeamMassResources'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    local tBrainsWithMassAndMassAvailable = {}
+    local tBrainsNeedingMassByPriority = {}
+    local subrefBrain = 1
+    local subrefMassPriority = 2
+    local subrefRemainingMassNeeded = 3
+    local subrefMassAvailable = 2
+    local subrefRemainingMassToGive = 3
+    local tiCountOfBrainsNeedingMassByPriority = {} --i.e. a count of the number of brains by priority
+
+    local iMassStorageMax
+
+    local iPriority
+
+    for iBrain, oBrain in tTeamData[iTeam][reftFriendlyActiveM27Brains] do
+        iMassStorageMax = M27EconomyOverseer.GetMassStorageMaximum(oBrain)
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Considering brain with name='..oBrain.Nickname..'; iMassStorageMax='..iMassStorageMax..'; Is M27='..tostring(oBrain.M27AI or false)..'; % stored Mass='..oBrain:GetEconomyStoredRatio('MASS')..'; flagged as stalling Mass='..tostring(oBrain[M27EconomyOverseer.refbStallingMass] or false)) end
+
+        --Do we have low mass?
+        if oBrain:GetEconomyStoredRatio('MASS') < 0.05 then
+            if oBrain:GetEconomyStoredRatio('MASS') < 0.01 and oBrain:GetEconomyStoredRatio('ENERGY') == 1 then
+                iPriority = 1
+            else
+                iPriority = 2
+            end
+            table.insert(tBrainsNeedingMassByPriority, {[subrefBrain] = oBrain, [subrefMassPriority] = iPriority, [subrefRemainingMassNeeded] = iMassStorageMax * (0.05 - oBrain:GetEconomyStoredRatio('MASS'))})
+            tiCountOfBrainsNeedingMassByPriority[iPriority] = (tiCountOfBrainsNeedingMassByPriority[iPriority] or 0) + 1
+            if bDebugMessages == true then LOG(sFunctionRef..': Not in combat, want Mass as priority '..iPriority) end
+        else
+            --Do we have enough to offer some?
+            if oBrain:GetEconomyStoredRatio('MASS') > 0.25 and not(oBrain[M27EconomyOverseer.refbStallingMass]) and not(M27Conditions.HaveLowMass(oBrain)) then
+                if oBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('MASS') >= 0.3 then
+                    table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = oBrain:GetEconomyStored('MASS') * 0.02})
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have Mass available to give even though have negative mass income') end
+                elseif oBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 then
+                    table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = iMassStorageMax * (oBrain:GetEconomyStoredRatio('MASS') - 0.25)})
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have positive Mass income so have Mass avialable to give') end
+                else
+                    --Dont have positive net income, and not got 100% Mass, so want to keep our Mass for ourself
+                end
+            end
+        end
+    end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Finished going through M27 brains to work out who gan give and receive. Is table of Mass givers empty='..tostring(M27Utilities.IsTableEmpty(tBrainsWithMassAndMassAvailable))..'; is table of brains wanting Mass empty='..tostring(M27Utilities.IsTableEmpty(tBrainsNeedingMassByPriority))) end
+
+    --Do we have brains capable of surrendering Mass?
+    if M27Utilities.IsTableEmpty(tBrainsWithMassAndMassAvailable) == false then
+        --Are there any non-M27 brains that are power stalling?  Have already checked have toAllyBrains as part of the seharing monitor
+
+        for iBrain, oBrain in tTeamData[iTeam][reftFriendlyActiveM27Brains][iFirstM27Brain][M27Overseer.toAllyBrains] do
+            --Only consider non-M27 since we considered M27 above
+            if not(oBrain.M27AI) then
+                if oBrain:GetEconomyStoredRatio('MASS') < 0.01 and oBrain:GetEconomyStoredRatio('ENERGY') == 1 then
+                    iPriority = 3
+                    table.insert(tBrainsNeedingMassByPriority, {[subrefBrain] = oBrain, [subrefMassPriority] = iPriority, [subrefRemainingMassNeeded] = M27EconomyOverseer.GetMassStorageMaximum(oBrain) * (0.01 - oBrain:GetEconomyStoredRatio('MASS'))})
+                    tiCountOfBrainsNeedingMassByPriority[iPriority] = (tiCountOfBrainsNeedingMassByPriority[iPriority] or 0) + 1
+                    if bDebugMessages == true then LOG(sFunctionRef..': Non M27 brain, Want Mass as priority '..iPriority) end
+                end
+            end
+        end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished going through non-M27 brains as well to identify those needing Mass. Is table of any brains needing Mass empty='..tostring(M27Utilities.IsTableEmpty(tBrainsNeedingMassByPriority))) end
+
+        --Do we have brains needing Mass?
+        if M27Utilities.IsTableEmpty(tBrainsNeedingMassByPriority) == false then
+            --Calculate total Mass available, and total Mass needed
+            local iTotalMassAvailable = 0
+            local iTotalMassNeeded = 0
+            for iTable, tTable in tBrainsWithMassAndMassAvailable do
+                iTotalMassAvailable = iTotalMassAvailable + tTable[subrefMassAvailable]
+            end
+            for iTable, tTable in tBrainsNeedingMassByPriority do
+                if bDebugMessages == true then LOG(sFunctionRef..': Mass needed for brain '..tTable[subrefBrain].Nickname..'='..tTable[subrefRemainingMassNeeded]..'; Mass storage % for this brain='..tTable[subrefBrain]:GetEconomyStoredRatio('MASS')) end
+                iTotalMassNeeded = iTotalMassNeeded + tTable[subrefRemainingMassNeeded]
+            end
+
+            local iMassGiftPercentage --% of Mass available that we shoudl gift
+            if iTotalMassNeeded < iTotalMassAvailable then
+                iMassGiftPercentage = iTotalMassNeeded / iTotalMassAvailable
+            else
+                iMassGiftPercentage = 1
+            end
+
+            for iTable, tTable in tBrainsWithMassAndMassAvailable do
+                tTable[subrefRemainingMassToGive] = iMassGiftPercentage * tTable[subrefMassAvailable]
+            end
+
+            local iMassToGive
+
+            if bDebugMessages == true then LOG(sFunctionRef..': iMassGiftPercentage='..iMassGiftPercentage..'; iTotalMassNeeded='..iTotalMassNeeded..'; iTotalMassAvailable='..iTotalMassAvailable) end
+
+
+
+            --Cycle through by priority
+            for iPriority, iCount in tiCountOfBrainsNeedingMassByPriority do
+                if iCount > 0 then
+                    for iClaimerTable, tClaimerTable in tBrainsNeedingMassByPriority do
+                        if tClaimerTable[subrefRemainingMassNeeded] > 0 then
+                            for iGiverTable, tGiverTable in tBrainsWithMassAndMassAvailable do
+                                if tGiverTable[subrefRemainingMassToGive] > 0 then
+                                    iMassToGive = math.min(tGiverTable[subrefRemainingMassToGive], tClaimerTable[subrefRemainingMassNeeded])
+                                    tGiverTable[subrefRemainingMassToGive] = tGiverTable[subrefRemainingMassToGive] - iMassToGive
+                                    tClaimerTable[subrefRemainingMassNeeded] = tClaimerTable[subrefRemainingMassNeeded] - iMassToGive
+                                    GiveResourcesToPlayer(tGiverTable[subrefBrain], tClaimerTable[subrefBrain], iMassToGive, 0)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': '..tGiverTable[subrefBrain].Nickname..' has just given '..iMassToGive..' Mass to '..tClaimerTable[subrefBrain].Nickname) end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function TeamResourceSharingMonitor(iTeam)
@@ -324,4 +445,8 @@ function TeamResourceSharingMonitor(iTeam)
         tTeamData[iTeam][refbActiveResourceMonitor] = false
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function TransferUnitsToPlayer(tUnits, iArmyIndex, bCaptured)
+    import('/lua/SimUtils.lua').TransferUnitsOwnership(tUnits, iArmyIndex, bCaptured)
 end

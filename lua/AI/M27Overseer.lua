@@ -8290,9 +8290,28 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+    local sFunctionRef = 'TestCustom'
+
+
+
+    if aiBrain:GetArmyIndex() == 1 or aiBrain:GetArmyIndex() == 2 then
+        --Spawn a hoplie and gift it to an ally
+        local tPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        local oUnitToSpawn = CreateUnit('drl0204', M27Utilities.GetACU(aiBrain).Army, tPos[1], tPos[2], tPos[3], 0, 0, 0, 0, 'Air')
+
+        if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
+            for iBrain, oBrain in aiBrain[toAllyBrains] do
+                if not(oBrain == aiBrain) and not(iBrain == 1) and not(iBrain == 2) then
+                LOG(sFunctionRef..': About to transfer unit '..oUnitToSpawn.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToSpawn)..' from brain '..aiBrain.Nickname..' to brain '..oBrain.Nickname)
+                M27Team.TransferUnitsToPlayer({ oUnitToSpawn }, oBrain:GetArmyIndex(), false)
+                break
+            end
+            end
+        end
+    end
 
     --Give resources
-    local oBrainToGive
+    --[[local oBrainToGive
 
     if not(aiBrain:GetArmyIndex() == 3) then
         for iBrain, oBrain in aiBrain[toAllyBrains] do
@@ -8304,7 +8323,7 @@ function TestCustom(aiBrain)
         if aiBrain:GetEconomyStored('MASS') >= 100 then
             M27Team.GiveResourcesToPlayer(aiBrain, oBrainToGive, 100, 100)
         end
-    end
+    end--]]
 
 
     --Spawn an experimental
@@ -8324,10 +8343,10 @@ function TestCustom(aiBrain)
 --]]
     --Check if experimental isnt moving
     --[[local tEnemyExperimentals = aiBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL * categories.LAND, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Enemy')
-    LOG('TestCustom table of enemy experimentals empty='..tostring(M27Utilities.IsTableEmpty(tEnemyExperimentals)))
+    LOG(sFunctionRef..': table of enemy experimentals empty='..tostring(M27Utilities.IsTableEmpty(tEnemyExperimentals)))
     if M27Utilities.IsTableEmpty(tEnemyExperimentals) == false then
         for iUnit, oUnit in tEnemyExperimentals do
-            LOG('TestCustom considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; is Civilian based on flag='..tostring(oUnit.IsCivilian or false)..'; brain army index='..oUnit:GetAIBrain():GetArmyIndex()..'; function isCivilian='..tostring(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))..'; Unit state='..M27Logic.GetUnitState(oUnit))
+            LOG(sFunctionRef..': considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; is Civilian based on flag='..tostring(oUnit.IsCivilian or false)..'; brain army index='..oUnit:GetAIBrain():GetArmyIndex()..'; function isCivilian='..tostring(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))..'; Unit state='..M27Logic.GetUnitState(oUnit))
         end
     end--]]
 
@@ -8335,13 +8354,13 @@ function TestCustom(aiBrain)
     --Change a unit's speed
     local oACU = M27Utilities.GetACU(aiBrain)
     if oACU.SetSpeed then
-        LOG('TestCustom: Use SetSpeed')
+        LOG(sFunctionRef..': Use SetSpeed')
     elseif oACU.SetSpeedMult then
-        LOG('TestCustom: UseSetSpeedMult')
+        LOG(sFunctionRef..': UseSetSpeedMult')
     elseif oACU.SetMaxSpeed then
-        LOG('TestCustom: Use SetMaxSpeed')
+        LOG(sFunctionRef..': Use SetMaxSpeed')
     elseif oACU.Speed then
-        LOG('TestCustom: ACU has .speed value=' .. oACU.Speed)
+        LOG(sFunctionRef..': ACU has .speed value=' .. oACU.Speed)
     end
     --Above works for SetSpeedMult but not for the others (even if commenting out setspeedmult)
     oACU:SetSpeedMult(0.1)--]]
@@ -8350,7 +8369,7 @@ function TestCustom(aiBrain)
     --Get the blueprint for a projectile of an SMD
     local oBP = __blueprints['ueb4302']
     local sProjectileBP = oBP.Weapon[1].ProjectileId
-    LOG('TestCustom: ProjectileBP='..sProjectileBP)
+    LOG(sFunctionRef..': ProjectileBP='..sProjectileBP)
     local oProjectileBP = __blueprints[sProjectileBP]
     LOG('ProjectileBP mass cost='..oProjectileBP.Economy.BuildCostMass)
     local iCurUnitEnergyUsage = 0
@@ -8371,7 +8390,7 @@ function TestCustom(aiBrain)
             end
         end
     end
-    LOG('TestCustom: iCurUnitEnergyUsage='..iCurUnitEnergyUsage)
+    LOG(sFunctionRef..': iCurUnitEnergyUsage='..iCurUnitEnergyUsage)
     --]]
 
     --Check GetEdgeOfMapInDirection(tStart, iAngle) works:
@@ -8388,7 +8407,7 @@ function TestCustom(aiBrain)
     local oACU = M27Utilities.GetACU(aiBrain)
     local iACUCategory = M27UnitInfo.GetCategoryConditionFromUnitID(oACU.UnitId)
     local tACUs = aiBrain:GetUnitsAroundPoint(iACUCategory, oACU:GetPosition(), 1000, 'Ally')
-    LOG('TESTCUSTOM - is table of tACUs empty='..tostring(M27Utilities.IsTableEmpty(tACUs)))--]]
+    LOG(sFunctionRef..' - is table of tACUs empty='..tostring(M27Utilities.IsTableEmpty(tACUs)))--]]
 
     --[[
     --EntityCategoryFilterDown test
@@ -8674,7 +8693,7 @@ function OverseerManager(aiBrain)
 
 
         --if GetGameTimeSeconds() == 395 then TestCustom(aiBrain) end
-        TestCustom(aiBrain)
+        --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
         if aiBrain.M27IsDefeated then
