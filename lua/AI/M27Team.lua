@@ -13,7 +13,7 @@ local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 
 
 tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
-reftFriendlyActiveM27Brains = 'M27OTeamFriendlyM27Brains' --Stored against tTeamData[brain.M27Team], returns table of all M27 brains on the same team (including this one), with a key of the army index
+reftFriendlyActiveM27Brains = 'M27TeamFriendlyM27Brains' --Stored against tTeamData[brain.M27Team], returns table of all M27 brains on the same team (including this one), with a key of the army index
 iTotalTeamCount = 0 --Number of teams in the game
 subrefNukeLaunchLocations = 'M27TeamNukeTargets' --stored against tTeamData[brain.M27Team], [x] is gametimeseconds, returns the location of a nuke target
 refiEnemyWalls = 'M27TeamEnemyWallCount' --stored against tTeamData[brain.M27Team], returns the ntotal number of enemy wall units; used as threshold to enable engineers to start looking for wall segments to reclaim
@@ -449,4 +449,29 @@ end
 
 function TransferUnitsToPlayer(tUnits, iArmyIndex, bCaptured)
     import('/lua/SimUtils.lua').TransferUnitsOwnership(tUnits, iArmyIndex, bCaptured)
+end
+
+function GiveAllResourcesToAllies(aiBrain)
+    local iMassToGive = aiBrain:GetEconomyStored('MASS')
+    local iEnergyToGive = aiBrain:GetEconomyStored('ENERGY')
+    local iSpareMassStorage
+    local iSpareEnergyStorage
+    for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+        if not(oBrain.M27IsDefeated) then
+            iSpareMassStorage = 0
+            iSpareEnergyStorage = 0
+            if iMassToGive > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 1 then
+                iSpareMassStorage = M27EconomyOverseer.GetMassStorageMaximum(aiBrain) * (1 -aiBrain:GetEconomyStoredRatio('MASS'))
+            end
+            if iEnergyToGive > 0 and aiBrain:GetEconomyStoredRatio('ENERGY') < 1 then
+                iSpareEnergyStorage = M27EconomyOverseer.GetEnergyStorageMaximum(aiBrain) * (1 -aiBrain:GetEconomyStoredRatio('ENERGY'))
+            end
+
+            if iSpareMassStorage + iSpareEnergyStorage > 0 then
+                GiveResourcesToPlayer(aiBrain, oBrain, math.min(iMassToGive, iSpareMassStorage), math.min(iEnergyToGive, iSpareEnergyStorage))
+            end
+
+        end
+        if iMassToGive + iEnergyToGive < 0 then break end
+    end
 end

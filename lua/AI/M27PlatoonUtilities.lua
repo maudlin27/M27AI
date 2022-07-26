@@ -11449,13 +11449,14 @@ function ProcessPlatoonAction(oPlatoon)
                                     else
                                         --No other suitable reclaim targets so move a bit then try reclaiming
                                         if M27UnitInfo.IsUnitValid(oPlatoon[refoNearbyReclaimTarget]) then
-                                            iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoNearbyReclaimTarget])
+                                            iCurDist = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoNearbyReclaimTarget]:GetPosition())
                                             if iCurDist <= 2 then
                                                 --Move away from the unit
                                                 IssueMove(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(oPlatoon[refoNearbyReclaimTarget]:GetPosition(), GetPlatoonFrontPosition(oPlatoon)), iCurDist + 1, true))
                                             else
                                                 --Move towards the unit
-                                                IssueMove(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), M27Utilities.MoveInDirection(M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoNearbyReclaimTarget]:GetPosition()), iCurDist - 1, true))
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Mre than 2 away from the reclaim target. iCurDist='..(iCurDist or 'nil')..'; will move towards it') end
+                                                IssueMove(GetPlatoonUnitsOrUnitCount(oPlatoon, reftReclaimers, false, true), M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoNearbyReclaimTarget]:GetPosition()), iCurDist - 1, true))
                                             end
                                         end
                                     end
@@ -12184,7 +12185,7 @@ function ProcessPlatoonAction(oPlatoon)
                             M27MapInfo.RecheckPathingOfLocation(sPathing, oPlatoon[refoPathingUnit], tPossibleLocation)
                         end
                         if iCurLoop > iMaxLoop then
-                            M27Utilities.ErrorHandler('Couldnt find random place to move to that we can path to even after rechecking pathing, will head towards our base instead')
+                            M27Utilities.ErrorHandler('Platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' couldnt find random place to move to that we can path to even after rechecking pathing, will head towards our base instead')
                             oPlatoon[reftMovementPath][1] = M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), 60)
                             break
                         end

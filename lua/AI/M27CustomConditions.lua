@@ -1072,29 +1072,32 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
             end
             if bDontHaveResourceStatus then
                 --Check for queued units
-                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have queued something for sLocationRef='..sLocationRef..'; checking if any builders are still alive') end
-                    --Check that any queued engineer is still alive
-                    local oBuilder
-                    local bClearedSomething = false
-                    for iActionRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] do
-                        if M27Utilities.IsTableEmpty(tSubtable) == false then
-                            for iUniqueRef, oBuilder in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
-                                if oBuilder.Dead then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': oBuilder for iAction='..iActionRef..' is dead so clearing its actions') end
-                                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oBuilder)
-                                    bClearedSomething = true
-                                else
-                                    bDontHaveResourceStatus = false
-                                    iAvailabilityType = M27EngineerOverseer.refiStatusQueued
-                                    break
+                for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+                    if M27Utilities.IsTableEmpty(oBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have queued something for sLocationRef='..sLocationRef..'; checking if any builders are still alive') end
+                        --Check that any queued engineer is still alive
+                        local oBuilder
+                        local bClearedSomething = false
+                        for iActionRef, tSubtable in oBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] do
+                            if M27Utilities.IsTableEmpty(tSubtable) == false then
+                                for iUniqueRef, oBuilder in oBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
+                                    if oBuilder.Dead then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': oBuilder for iAction='..iActionRef..' is dead so clearing its actions') end
+                                        M27EngineerOverseer.ClearEngineerActionTrackers(oBrain, oBuilder)
+                                        bClearedSomething = true
+                                    else
+                                        bDontHaveResourceStatus = false
+                                        iAvailabilityType = M27EngineerOverseer.refiStatusQueued
+                                        break
+                                    end
                                 end
                             end
                         end
+                        if bClearedSomething == true and bDontHaveResourceStatus == true then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Resource was claimed but all builders are dead so treating as unclaimed') end
+                        end
                     end
-                    if bClearedSomething == true and bDontHaveResourceStatus == true then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Resource was claimed but all builders are dead so treating as unclaimed') end
-                    end
+                    if iAvailabilityType == M27EngineerOverseer.refiStatusQueued then break end
                 end
             end
             --If still not found status then will go with default (i.e. treat it as available)

@@ -28,13 +28,24 @@ local refCategoryAirScout = M27UnitInfo.refCategoryAirScout
 function OnPlayerDefeated(aiBrain)
     aiBrain.M27IsDefeated = true
 
-    --Was it an M27AI assigned to a chokepoint? If so then have any teammates no longer adopt a turtle strategy
-    if aiBrain.M27AI and aiBrain[M27MapInfo.refiAssignedChokepointCount] then
-        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
-            if not(oBrain == aiBrain) then
-                oBrain[aiBrain[M27MapInfo.refiAssignedChokepointCount]] = nil
-                oBrain[M27Overseer.refiDefaultStrategy] = oBrain[M27Overseer.refStrategyLandMain]
-                oBrain[M27Overseer.refiAIBrainCurrentStrategy] = oBrain[M27Overseer.refiDefaultStrategy]
+
+
+
+    --Was it an M27AI?
+    if aiBrain.M27AI then
+        --Give resources to teammates
+        if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+            ForkThread(M27Team.GiveAllResourcesToAllies, aiBrain)
+        end
+
+        --Was it assigned to a chokepoint? If so then have any teammates no longer adopt a turtle strategy
+        if aiBrain[M27MapInfo.refiAssignedChokepointCount] then
+            for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+                if not(oBrain == aiBrain) then
+                    oBrain[aiBrain[M27MapInfo.refiAssignedChokepointCount]] = nil
+                    oBrain[M27Overseer.refiDefaultStrategy] = oBrain[M27Overseer.refStrategyLandMain]
+                    oBrain[M27Overseer.refiAIBrainCurrentStrategy] = oBrain[M27Overseer.refiDefaultStrategy]
+                end
             end
         end
     end

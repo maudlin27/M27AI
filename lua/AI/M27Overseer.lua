@@ -5184,7 +5184,7 @@ function ACUManager(aiBrain)
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': We will be really low health if we finish the upgrade; consider if we are near base/if expect we might be able to reduce the damage taken where the upgrade is at least 50% done. % done=' .. oACU[reftACURecentUpgradeProgress][iCurTime] .. '; Dist to base=' .. M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; oACU[reftACURecentHealth][iCurTime] * 1.1=' .. oACU[reftACURecentHealth][iCurTime] * 1.1 .. '; iTimeToComplete * iHealthLossPerSec=' .. iTimeToComplete * iHealthLossPerSec .. '; iHealthReduction=' .. iHealthReduction .. '; ACU Max health=' .. oACU:GetMaxHealth())
                                     end
-                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.225 * iTurtleFurtherAdjust (iTurtleAdjust < 1 or M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(200, math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.333))) then
+                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.225 or iTurtleFurtherAdjust < 1 or M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(200, math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.333)) then
                                         if iTimeToComplete * iHealthLossPerSec < oACU[reftACURecentHealth][iCurTime] * 1.1 - iHealthReduction then
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Will try and finish upgrade and hope units can save us')
@@ -6696,7 +6696,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
                 --Should we switch to eco?
 
-                local bWantToEco = false
+
                 if M27MapInfo.bNoRushActive and M27MapInfo.iNoRushTimer - GetGameTimeSeconds() >= 60 then
                     aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
                 else
@@ -6704,6 +6704,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                         if aiBrain[refiDefaultStrategy] == refStrategyTurtle then
                             aiBrain[refiAIBrainCurrentStrategy] = refStrategyTurtle
                         else
+                            local bWantToEco = false
                             --Dont eco if nearby naval threat
                             if not(aiBrain[refbT2NavyNearOurBase]) then
 
@@ -6721,10 +6722,25 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
 
+                                --Do we have teammates who are all closer to the nearest enemy than us?
+                                local bAlliesAreCloserToEnemy = false
+                                if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
+                                    local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                                    for iBrain, oBrain in aiBrain[toAllyBrains] do
+                                        if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], tEnemyBase) + 50 < aiBrain[refiDistanceToNearestEnemyBase] then
+                                            bAlliesAreCloserToEnemy = true
+                                            break
+                                        end
+                                    end
+                                end
+
+
 
                                 --Dont eco if enemy ACU near ours as likely will need backup, unless we are on a chokepoint map and our ACU hasnt taken any damage recently (or if it has, it's less than 5 per sec)
                                 if aiBrain[refbEnemyACUNearOurs] == false or (bChokepointsAreProtected and M27Utilities.GetACU(aiBrain):GetHealth() >= 7000 and (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 or (oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or 0) + 50 >= oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]))  then
                                     if bChokepointsAreProtected then
+                                        bWantToEco = true
+                                    elseif bAlliesAreCloserToEnemy then
                                         bWantToEco = true
                                     else
                                         if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
@@ -6781,7 +6797,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     end
                                 end
                                 if bWantToEco == true then
-                                    if not (bChokepointsAreProtected) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
+                                    if not (bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
                                         bWantToEco = false
                                         if bDebugMessages == true then LOG(sFunctionRef..': Chokepoints arent protected, can path to enemy base with land, and dont have friendly units on enemy side of map') end
                                         --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
@@ -6796,7 +6812,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
                                         bWantToEco = false
                                         if bDebugMessages == true then LOG(sFunctionRef..': Our ACU is near enemy base') end
-                                    elseif not(bChokepointsAreProtected) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
+                                    elseif not(bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
                                         --Does the enemy have more mobile threat than us and our allies, and we have < 65% mex control, and have gained income recently
                                         if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo >= 1 then
                                             local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])

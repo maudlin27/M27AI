@@ -884,6 +884,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
         local bWantEscort = false
         if not(oEngineer == M27Utilities.GetACU(aiBrain)) then
             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and (iActionToAssign == refActionBuildMex or iActionToAssign == refActionBuildHydro or iActionToAssign == refActionReclaimArea) then
+
                 --Want an escort for the platoon if the target destination is far enough away and we can path to the enemy base with amphibious units
                 if M27Utilities.IsTableEmpty(tTargetLocation) then
                     M27Utilities.ErrorHandler('No target location for iActionToAssign='..iActionToAssign..'; oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UQ='..GetEngineerUniqueCount(oEngineer))
@@ -892,13 +893,29 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
 
                 local iTargetDistanceFromOurBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 if iTargetDistanceFromOurBase > 100 then bWantEscort = true
-                elseif iTargetDistanceFromOurBase > 50 then
-                    --Are we closer to enemy base than our base is?
-                    local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
-                    local iDistanceBetweenBases = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
-                    local iTargetDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tEnemyStartPosition)
-                    if iTargetDistanceToEnemyBase < iDistanceBetweenBases then bWantEscort = true end
+                elseif iTargetDistanceFromOurBase > 50 and M27UnitInfo.GetUnitLifetimeCount(oEngineer) <= 3 and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 250 then
+                    bWantEscort = true
+                    --[[elseif iTargetDistanceFromOurBase > 50 then
+                        --Are we closer to enemy base than our base is?
+                        local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                        local iDistanceBetweenBases = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
+                        local iTargetDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tEnemyStartPosition)
+                        if iTargetDistanceToEnemyBase < iDistanceBetweenBases then bWantEscort = true end--]]
                 end
+
+                --Ignore if we will be close to a teammate base (within 100, or within 50 if enemy base within 250 of us)
+                if bWantEscort and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+                    local iDistFromAlly
+                    if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 250 then
+                        iDistFromAlly = 50
+                    elseif aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 350 then
+                        iDistFromAlly = 75
+                    else
+                        iDistFromAlly = 100
+                    end
+                end
+                --Ignore for chokepoint maps
+                if not(M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)) then bWantEscort = false end
             end
         end
         if bWantEscort == true then

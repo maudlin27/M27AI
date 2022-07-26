@@ -2263,6 +2263,31 @@ function RefreshEconomyData(aiBrain)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': aiBrain[refiEnergyGrossBaseIncome]=' .. aiBrain[refiEnergyGrossBaseIncome] .. '; aiBrain[refiEnergyNetBaseIncome]=' .. aiBrain[refiEnergyNetBaseIncome] .. '; iT2PowerCount=' .. iT2PowerCount .. '; iEnergyT1Power=' .. iEnergyT1Power .. '; iEnergyUsage=' .. iEnergyUsage)
     end
+
+    --Increase gross and net base income for M27 teammate overflow
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains]) == false then
+        local iSizeOfTeam = 1
+        for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+            iSizeOfTeam = iSizeOfTeam + 1
+        end
+        local iExtraEnergy = 0
+        local iExtraMass = 0
+        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+            if not(oBrain == aiBrain) then
+                if oBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and oBrain[refiEnergyGrossBaseIncome] < iParagonEnergy then iExtraEnergy = oBrain[refiEnergyNetBaseIncome] end
+                if oBrain:GetEconomyStoredRatio('MASS') >= 0.99 and oBrain[refiMassGrossBaseIncome] < iParagonMass then iExtraMass = oBrain[refiMassNetBaseIncome] end
+            end
+        end
+        if iExtraEnergy > 0 then
+            --Assume we will get half of our share of the power overflow (only half since a risk it gets stopped at a moments notice)
+            aiBrain[refiEnergyNetBaseIncome] = aiBrain[refiEnergyNetBaseIncome] + 0.5 * iExtraEnergy / iSizeOfTeam
+        end
+        if iExtraMass > 0 then
+            aiBrain[refiMassNetBaseIncome] = aiBrain[refiMassNetBaseIncome] + 0.5 * iExtraMass / iSizeOfTeam
+        end
+    end
+
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -2684,6 +2709,8 @@ function ManageMassStalls(aiBrain)
                                             bApplyActionToUnit = false
                                             --dont pause t1 mex construction
                                         elseif oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
+                                            bApplyActionToUnit = false
+                                        elseif aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and not(M27Conditions.DoesACUHaveUpgrade(aiBrain, oUnit)) then
                                             bApplyActionToUnit = false
                                         end
                                     end
@@ -3126,6 +3153,8 @@ function ManageEnergyStalls(aiBrain)
                                             bApplyActionToUnit = false
                                             --dont pause t1 mex construction
                                         elseif oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
+                                            bApplyActionToUnit = false
+                                        elseif aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and not(M27Conditions.DoesACUHaveUpgrade(aiBrain, oUnit)) then
                                             bApplyActionToUnit = false
                                         end
                                     end

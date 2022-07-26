@@ -3,9 +3,15 @@ local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
+local M27Events = import('/mods/M27AI/lua/AI/M27Events.lua')
 
 M27AIBrainClass = AIBrain
 AIBrain = Class(M27AIBrainClass) {
+
+    OnDefeat = function(self)
+        ForkThread(M27Events.OnPlayerDefeated, self)
+        M27AIBrainClass.OnDefeat(self)
+    end,
 
     -- Hook m27AI and record it as being used
 
@@ -148,6 +154,8 @@ AIBrain = Class(M27AIBrainClass) {
             end
         end
     end,
+
+
 
 
     --[[PBMCheckBusyFactories = function(self)
