@@ -33,6 +33,7 @@ refiDistanceToNearestEnemyBase = 'M27DistanceToNearestEnemy' --Distance from our
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
 toAllyBrains = 'M27OverseerAllyBrains' --Against aiBrain
+tiDistToPlayerByIndex = 'M27OverseerDistToPlayerByIndex' --Against aiBrain, [x] is the player index, returns the distance to their start position
 refbNoEnemies = 'M27OverseerNoEnemyBrains' --against aiBrain, true if no enemy brains detected
 iACUDeathCount = 0
 iACUAlternativeFailureCount = 0
@@ -7377,6 +7378,22 @@ function RecordAllEnemiesAndAllies(aiBrain)
                 if oBrain.M27StartPositionNumber then
                     M27MapInfo.UpdateNewPrimaryBaseLocation(oBrain)
                 end
+
+                --Update details of each enemy distance to us
+                if oBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) == false then
+                    bDebugMessages = true
+                    oBrain[tiDistToPlayerByIndex] = {}
+                    for iOtherBrain, oOtherBrain in ArmyBrains do
+                        if not(oOtherBrain:IsDefeated()) and not(oOtherBrain.M27IsDefeated) and oOtherBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber]) == false  then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering distance between oBrain '..oBrain:GetArmyIndex()..' and oOtherBrain '..oOtherBrain:GetArmyIndex()..'; oBrain start number='..(oBrain.M27StartPositionNumber or 'nil')..'; oOtherBrain start number='..(oOtherBrain.M27StartPositionNumber or 'nil')..'; oBrain start position='..repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])..'; oOtherBrain start position='..repru(M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber])) end
+                            oBrain[tiDistToPlayerByIndex][oOtherBrain:GetArmyIndex()] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber])
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Finished updating tiDistToPlayerByIndex for brain '..oBrain.Nickname..'; result='..repru(oBrain[tiDistToPlayerByIndex])) end
+                end
+
+
+
             elseif bDebugMessages == true then
                 LOG(sFunctionRef .. ': Brain is defeated')
             end
@@ -8003,7 +8020,7 @@ function GameSettingWarningsAndChecks(aiBrain)
     end
 
     if bIncompatible then
-        M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: " .. sIncompatibleMessage .. ' If issues are encountered, report them to maudlin27 via Discord or the forums, and include the replay ID.', 0, 10)
+        M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: " .. sIncompatibleMessage .. ' If issues are encountered, report them to maudlin27 via Discord or the M27 forum thread, and include the replay ID.', 0, 10)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

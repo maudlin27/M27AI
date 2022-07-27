@@ -483,9 +483,14 @@ function GiveResourcesToAllyDueToParagon(aiBrain)
         local oOtherAlly
         for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
             if oBrain.M27AI then
-                oM27Ally = oBrain
+                --Check we dont have a paragon and arent overflowing mass
+                if oM27Ally[M27EconomyOverseer.refiMassGrossBaseIncome] < 1000 and aiBrain:GetEconomyStoredRatio('MASS') <= 0.8 then
+                    oM27Ally = oBrain
+                end
             else
-                oOtherAlly = oBrain
+                if aiBrain:GetEconomyIncome('MASS') < 1000 and aiBrain:GetEconomyIncome('MASS') <= 0.8 then
+                    oOtherAlly = oBrain
+                end
             end
         end
         local oBrainToGiveTo
@@ -493,21 +498,23 @@ function GiveResourcesToAllyDueToParagon(aiBrain)
         else oBrainToGiveTo = oOtherAlly
         end
 
-        local tMexesToGive = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMex, false, true)
-        local tPowerToGive = {}
-        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryT2Power) > 1 then
-            for iPower, oPower in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryT2Power, false, true) do
-                if iPower > 1 then
-                    table.insert(tPowerToGive, oPower)
+        if oBrainToGiveTo then
+
+            local tMexesToGive = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryMex, false, true)
+            local tPowerToGive = {}
+            if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryT2Power) > 1 then
+                for iPower, oPower in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryT2Power, false, true) do
+                    if iPower > 1 then
+                        table.insert(tPowerToGive, oPower)
+                    end
                 end
             end
+            if M27Utilities.IsTableEmpty(tMexesToGive) == false then
+                TransferUnitsToPlayer(tMexesToGive, oBrainToGiveTo:GetArmyIndex(), false)
+            end
+            if M27Utilities.IsTableEmpty(tPowerToGive) == false then
+                TransferUnitsToPlayer(tPowerToGive, oBrainToGiveTo:GetArmyIndex(), false)
+            end
         end
-        if M27Utilities.IsTableEmpty(tMexesToGive) == false then
-            TransferUnitsToPlayer(tMexesToGive, oBrainToGiveTo:GetArmyIndex(), false)
-        end
-        if M27Utilities.IsTableEmpty(tPowerToGive) == false then
-            TransferUnitsToPlayer(tPowerToGive, oBrainToGiveTo:GetArmyIndex(), false)
-        end
-
     end
 end
