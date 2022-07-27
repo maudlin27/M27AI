@@ -4454,8 +4454,7 @@ function AirBomberManager(aiBrain)
     local sFunctionRef = 'AirBomberManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-
-    local iSystemTimeStart = GetSystemTimeSecondsOnlyForProfileUse()
+    if GetGameTimeSeconds() >= 600 then bDebugMessages = true end
 
     DetermineBomberDefenceRange(aiBrain) --Updates aiBrain[refiBomberDefenceModDistance]
     if bDebugMessages == true then
@@ -4596,8 +4595,8 @@ function AirBomberManager(aiBrain)
                     tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryNavalSurface, tBasePosition, 90, 'Enemy')
                     for iUnit, oUnit in tPotentialTargets do
                         --if not (M27UnitInfo.IsUnitUnderwater(oUnit)) then
-                            iCurModDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBasePosition)
-                            AddUnitToShortlist(oUnit, iTechLevel, iCurModDistance)
+                        iCurModDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tBasePosition)
+                        AddUnitToShortlist(oUnit, iTechLevel, iCurModDistance)
                         --end
                     end
                     --Are we in kill ACU mode? Then target ACU unless its underwater (but allow ahwassa to target if it is underwater)
@@ -6183,7 +6182,7 @@ function AirBomberManager(aiBrain)
             end
         end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': End of code, time taken='..GetSystemTimeSecondsOnlyForProfileUse() - iSystemTimeStart) end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
