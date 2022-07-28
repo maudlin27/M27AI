@@ -4592,7 +4592,7 @@ function AirBomberManager(aiBrain)
                 --Are we in protect ACU mode?
                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and iTechLevel < 4 then
                     bAvoidCruisers = false
-                    tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - refCategoryEngineer + M27UnitInfo.refCategoryNavalSurface, tBasePosition, 90, 'Enemy')
+                    tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand - M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryNavalSurface, tBasePosition, 90, 'Enemy')
                     for iUnit, oUnit in tPotentialTargets do
                         --if not (M27UnitInfo.IsUnitUnderwater(oUnit)) then
                         --Dont add if it's under fixed shield and isnt in range of ACU
