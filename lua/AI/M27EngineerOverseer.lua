@@ -12,6 +12,7 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 
 refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -883,6 +884,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
         local bWantEscort = false
         if not(oEngineer == M27Utilities.GetACU(aiBrain)) then
             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and (iActionToAssign == refActionBuildMex or iActionToAssign == refActionBuildHydro or iActionToAssign == refActionReclaimArea) then
+
                 --Want an escort for the platoon if the target destination is far enough away and we can path to the enemy base with amphibious units
                 if M27Utilities.IsTableEmpty(tTargetLocation) then
                     M27Utilities.ErrorHandler('No target location for iActionToAssign='..iActionToAssign..'; oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UQ='..GetEngineerUniqueCount(oEngineer))
@@ -891,13 +893,29 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
 
                 local iTargetDistanceFromOurBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 if iTargetDistanceFromOurBase > 100 then bWantEscort = true
-                elseif iTargetDistanceFromOurBase > 50 then
-                    --Are we closer to enemy base than our base is?
-                    local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
-                    local iDistanceBetweenBases = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
-                    local iTargetDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tEnemyStartPosition)
-                    if iTargetDistanceToEnemyBase < iDistanceBetweenBases then bWantEscort = true end
+                elseif iTargetDistanceFromOurBase > 50 and M27UnitInfo.GetUnitLifetimeCount(oEngineer) <= 3 and aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 250 then
+                    bWantEscort = true
+                    --[[elseif iTargetDistanceFromOurBase > 50 then
+                        --Are we closer to enemy base than our base is?
+                        local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                        local iDistanceBetweenBases = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]
+                        local iTargetDistanceToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tTargetLocation, tEnemyStartPosition)
+                        if iTargetDistanceToEnemyBase < iDistanceBetweenBases then bWantEscort = true end--]]
                 end
+
+                --Ignore if we will be close to a teammate base (within 100, or within 50 if enemy base within 250 of us)
+                if bWantEscort and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+                    local iDistFromAlly
+                    if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 250 then
+                        iDistFromAlly = 50
+                    elseif aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 350 then
+                        iDistFromAlly = 75
+                    else
+                        iDistFromAlly = 100
+                    end
+                end
+                --Ignore for chokepoint maps
+                if not(M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)) then bWantEscort = false end
             end
         end
         if bWantEscort == true then
@@ -1546,8 +1564,8 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
     end
 
     --Enemy walls in range logic
-    if bDebugMessages == true then LOG(sFunctionRef..': Just before checking for nearby walls. bAreNearbyEnemies='..tostring(bAreNearbyEnemies)..'; Enemy walls total count='..(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.refiEnemyWalls] or 0)) end
-    if not(bAreNearbyEnemies) and (M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.refiEnemyWalls] or 0) >= 9 and not(oEngineer:IsUnitState('Reclaiming')) then
+    if bDebugMessages == true then LOG(sFunctionRef..': Just before checking for nearby walls. bAreNearbyEnemies='..tostring(bAreNearbyEnemies)..'; Enemy walls total count='..(M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyWalls] or 0)) end
+    if not(bAreNearbyEnemies) and (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyWalls] or 0) >= 9 and not(oEngineer:IsUnitState('Reclaiming')) then
         --Only consider if engineer is relatively far from base
         if M27Utilities.GetDistanceBetweenPositions(tEngPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 80 then
             local iBuildRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
@@ -4356,8 +4374,8 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
             end
 
             local bTeamHasChokepoint = false
-            if not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
-                for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+            if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+                for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                     if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle then
                         bTeamHasChokepoint = true
                         break
@@ -7183,8 +7201,8 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                         local tNearestChokepoint
                         local iNearestChokepointDistance = aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 25
                         local iCurChokepointDistance
-                        if not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
-                            for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                        if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+                            for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                                 if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
                                     iCurChokepointDistance = M27Utilities.GetDistanceBetweenPositions(oBrain[M27MapInfo.reftChokepointBuildLocation], tStartPosition)
                                     if iCurChokepointDistance < iNearestChokepointDistance then

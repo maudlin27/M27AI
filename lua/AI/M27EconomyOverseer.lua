@@ -11,6 +11,7 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27PlatoonFormer = import('/mods/M27AI/lua/AI/M27PlatoonFormer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 
 --Tracking variables:
@@ -130,31 +131,96 @@ function GetUnitReclaimTargets(aiBrain)
 
         --Add any old power to the table - T1 and T2 if we have lots of power and T3
         local iT3Power = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Power)
-        if iT3Power >= 1 and aiBrain[refiEnergyGrossBaseIncome] >= 500 then
+        if iT3Power >= 1 and aiBrain[refiEnergyGrossBaseIncome] >= 500 and aiBrain[refiEnergyNetBaseIncome] >= 50 then
+            local oTeammateWantingPower
+            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+                for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+                    if not(oBrain == aiBrain) then
+                        if oBrain.M27AI then
+                            if oBrain[refiEnergyGrossBaseIncome] <= 250 then
+                                oTeammateWantingPower = oBrain
+                                break
+                            end
+                        elseif oBrain:GetEconomyIncome('ENERGY') <= 250 then
+                            oTeammateWantingPower = oBrain
+                            break
+                        end
+                    end
+                end
+            end
+            local iCurTransferCount = 0
+
+
             --Add all t2 power (unless using it for T3 arti)
             for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2Power, false, true) do
                 if not (oUnit[refbWantForAdjacency]) then
                     oUnit[refbWantForAdjacency] = M27Conditions.IsBuildingWantedForAdjacency(oUnit)
                     if not (oUnit[refbWantForAdjacency]) then
-                        table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+                        if oTeammateWantingPower and oUnit:GetFractionComplete() == 1 then
+                            if not(oUnit[M27UnitInfo.refoOriginalBrainOwner]) then oUnit[M27UnitInfo.refoOriginalBrainOwner] = aiBrain end
+                            M27Team.TransferUnitsToPlayer({oUnit}, oTeammateWantingPower:GetArmyIndex(), false)
+                            iCurTransferCount = iCurTransferCount + 1
+                            if iCurTransferCount >= 1 then break end --Only transfer 1 T2 PGen at a time
+                        else
+                            if oUnit[M27UnitInfo.refoOriginalBrainOwner] and not(oUnit[M27UnitInfo.refoOriginalBrainOwner] == aiBrain) then
+                                M27Team.TransferUnitsToPlayer({oUnit}, oUnit[M27UnitInfo.refoOriginalBrainOwner]:GetArmyIndex(), false)
+                                break --Dont want to transfer more than 1 at at time due to risk of power stalling
+                            else
+                                table.insert(aiBrain[reftUnitsToReclaim], oUnit)
+                            end
+                        end
                     end
                 end
             end
         end
 
-        --Reclaim T1 power if we have T2+ power and enough gross income, unless we also have T2 arti
-        if (iT3Power >= 1 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power) >= 2) and aiBrain[refiEnergyGrossBaseIncome] >= 110 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) <= 0 then
+        --Reclaim T1 power if we have T2+ power and enough gross income
+
+        --v44 - removed some of the tests so only considers if flagged that its wanted for adjacency (i.e. for T3 arti)
+        if (iT3Power >= 1 or aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT2Power) >= 2) and aiBrain[refiEnergyGrossBaseIncome] >= 110 and aiBrain[refiEnergyNetBaseIncome] > 10 then --and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFixedT2Arti) <= 0 then
+            --Do we have a teammate who needs more energy?
+            local oTeammateWantingPower
+            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+                for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+                    if not(oBrain == aiBrain) then
+                        --Is it an M27 brain with <=75 energy and <2 T2/<1 T3?
+                        if oBrain.M27AI then
+                            if oBrain[refiEnergyGrossBaseIncome] <= 75 then
+                                oTeammateWantingPower = oBrain
+                                break
+                            end
+                        elseif oBrain:GetEconomyIncome('ENERGY') <= 75 then
+                            oTeammateWantingPower = oBrain
+                            break
+                        end
+                    end
+                end
+            end
+            local iCurTransferCount = 0
+
             --All T1 power
             for iUnit, oUnit in aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT1Power, false, true) do
                 --Check not near to an air factory - will do slightly larger than actual radius needed to be prudent
-                tNearbyAdjacencyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, oUnit:GetPosition(), 6, 'Ally')
-                if M27Utilities.IsTableEmpty(tNearbyAdjacencyUnits) == true then
-                    if not (oUnit[refbWantForAdjacency]) then
-                        oUnit[refbWantForAdjacency] = M27Conditions.IsBuildingWantedForAdjacency(oUnit)
-                        if not (oUnit[refbWantForAdjacency]) then
+                --tNearbyAdjacencyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, oUnit:GetPosition(), 6, 'Ally')
+                --if M27Utilities.IsTableEmpty(tNearbyAdjacencyUnits) == true then
+                --if not (oUnit[refbWantForAdjacency]) then
+                oUnit[refbWantForAdjacency] = M27Conditions.IsBuildingWantedForAdjacency(oUnit)
+                if not (oUnit[refbWantForAdjacency]) then
+                    if oTeammateWantingPower and oUnit:GetFractionComplete() == 1 then
+                        if not(oUnit[M27UnitInfo.refoOriginalBrainOwner]) then oUnit[M27UnitInfo.refoOriginalBrainOwner] = aiBrain end
+                        M27Team.TransferUnitsToPlayer({oUnit}, oTeammateWantingPower:GetArmyIndex(), false)
+                        iCurTransferCount = iCurTransferCount + 1
+                        if iCurTransferCount >= 3 then break end
+                    else
+                        if oUnit[M27UnitInfo.refoOriginalBrainOwner] and not(oUnit[M27UnitInfo.refoOriginalBrainOwner] == aiBrain) then
+                            M27Team.TransferUnitsToPlayer({oUnit}, oUnit[M27UnitInfo.refoOriginalBrainOwner]:GetArmyIndex(), false)
+                            break --Dont want to transfer more than 1 at at time due to risk of power stalling
+                        else
                             table.insert(aiBrain[reftUnitsToReclaim], oUnit)
                         end
                     end
+                    --end
+                    --end
                 end
             end
         end
@@ -2197,6 +2263,36 @@ function RefreshEconomyData(aiBrain)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': aiBrain[refiEnergyGrossBaseIncome]=' .. aiBrain[refiEnergyGrossBaseIncome] .. '; aiBrain[refiEnergyNetBaseIncome]=' .. aiBrain[refiEnergyNetBaseIncome] .. '; iT2PowerCount=' .. iT2PowerCount .. '; iEnergyT1Power=' .. iEnergyT1Power .. '; iEnergyUsage=' .. iEnergyUsage)
     end
+
+    --Increase gross and net base income for M27 teammate overflow
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains]) == false then
+        local iSizeOfTeam = 1
+        for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+            iSizeOfTeam = iSizeOfTeam + 1
+        end
+        local iExtraEnergy = 0
+        local iExtraMass = 0
+        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+            if not(oBrain == aiBrain) then
+                if oBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 and oBrain[refiEnergyGrossBaseIncome] < iParagonEnergy then iExtraEnergy = oBrain[refiEnergyNetBaseIncome] end
+                if oBrain:GetEconomyStoredRatio('MASS') >= 0.99 and oBrain[refiMassGrossBaseIncome] < iParagonMass then iExtraMass = oBrain[refiMassNetBaseIncome] end
+            end
+        end
+        if iExtraEnergy > 0 then
+            --Assume we will get half of our share of the power overflow (only half since a risk it gets stopped at a moments notice)
+            aiBrain[refiEnergyNetBaseIncome] = aiBrain[refiEnergyNetBaseIncome] + 0.5 * iExtraEnergy / iSizeOfTeam
+        end
+        if iExtraMass > 0 then
+            aiBrain[refiMassNetBaseIncome] = aiBrain[refiMassNetBaseIncome] + 0.5 * iExtraMass / iSizeOfTeam
+        end
+    end
+
+    --Give mexes to teammate
+    if iParagonCount > 0 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false and (iT1MexCount + iT2MexCount + iT3MexCount) > 0 then
+        ForkThread(M27Team.GiveResourcesToAllyDueToParagon, aiBrain)
+    end
+
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -2618,6 +2714,8 @@ function ManageMassStalls(aiBrain)
                                             bApplyActionToUnit = false
                                             --dont pause t1 mex construction
                                         elseif oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
+                                            bApplyActionToUnit = false
+                                        elseif aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and not(M27Conditions.DoesACUHaveUpgrade(aiBrain, oUnit)) then
                                             bApplyActionToUnit = false
                                         end
                                     end
@@ -3061,6 +3159,8 @@ function ManageEnergyStalls(aiBrain)
                                             --dont pause t1 mex construction
                                         elseif oUnit.GetFocusUnit and oUnit:GetFocusUnit() and oUnit:GetFocusUnit().UnitId and EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnit:GetFocusUnit().UnitId) then
                                             bApplyActionToUnit = false
+                                        elseif aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and not(M27Conditions.DoesACUHaveUpgrade(aiBrain, oUnit)) then
+                                            bApplyActionToUnit = false
                                         end
                                     end
                                 end
@@ -3235,6 +3335,20 @@ function ManageEnergyStalls(aiBrain)
         ForkThread(ManageMassStalls, aiBrain)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function GetEnergyStorageMaximum(aiBrain)
+    if aiBrain:GetEconomyStoredRatio('ENERGY') > 0 then return aiBrain:GetEconomyStored('ENERGY') / aiBrain:GetEconomyStoredRatio('ENERGY')
+    else
+        return aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) * 5000 + aiBrain:GetCurrentUnits(categories.COMMAND) * 3900 + 100
+    end
+end
+
+function GetMassStorageMaximum(aiBrain)
+    if aiBrain:GetEconomyStoredRatio('MASS') > 0 then return aiBrain:GetEconomyStored('MASS') / aiBrain:GetEconomyStoredRatio('MASS')
+    else
+        return aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEnergyStorage) * 500 + aiBrain:GetCurrentUnits(categories.COMMAND) * 650 + 150
+    end
 end
 
 function UpgradeManager(aiBrain)

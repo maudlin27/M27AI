@@ -11,6 +11,7 @@ local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
 refiNearestEnemyIndex = 'M27NearestEnemyIndex'
@@ -1676,7 +1677,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                     bCalcActualThreat = true
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and owned by dif ai brain, seeing if we have a blip for it') end
-                    if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip then
+                    if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip and not(oUnit[M27UnitInfo.refbTreatAsVisible]) then
                         oBlip = oUnit:GetBlip(iArmyIndex)
                         if oBlip then
                             if not(oBlip:IsKnownFake(iArmyIndex)) then
@@ -2628,6 +2629,10 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
             if bDebugMessages == true then LOG(sFunctionRef..': Want to turtle so will go to the firebase. tHighestValueLocation='..repru(tHighestValueLocation)) end
         else
             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] or M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftIntelLinePositions][aiBrain[M27Overseer.refiMaxIntelBasePaths]][1]) > math.min(250, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25) then
+                local iMaxDistFromBase = 600
+                if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] >= 550 then iMaxDistFromBase = math.max(math.min(500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.8), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.65) end
+
+
                 --First calculate the value for the enemy start position
                 local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[M27PlatoonUtilities.refoFrontUnit])
                 if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
@@ -2642,14 +2647,18 @@ function GetPriorityACUDestination(aiBrain, oPlatoon)
                     M27Utilities.ErrorHandler('Have no mexes in iSegmentGroup='..iSegmentGroup..'; sPathing='..sPathing..'; will use segemtn group of our base instead which is '..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
                     iSegmentGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 end
-                local iHighestValueLocation = GetLocationValue(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
+                local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                local iHighestValueLocation = GetLocationValue(aiBrain, tEnemyBase, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
+
+                tHighestValueLocation = { tEnemyBase[1], tEnemyBase[2], tEnemyBase[3] }
+                if aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > iMaxDistFromBase then iHighestValueLocation = 1 end --very low value so if nowhere else viable we will still choose here
                 local iCurValueLocation
 
                 if bDebugMessages == true then LOG(sFunctionRef..': Value of enemy start location='..iHighestValueLocation..'; will consider if any mexes have a better value') end
                 --tMexByPathingAndGrouping = {} --Stores position of each mex based on the segment that it's part of; [a][b][c]: [a] = pathing type ('Land' etc.); [b] = Segment grouping; [c] = Mex position
                 if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup]) == false then
                     for iMex, tMex in M27MapInfo.tMexByPathingAndGrouping[sPathing][iSegmentGroup] do
-                        if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 then
+                        if M27Utilities.GetDistanceBetweenPositions(tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) <= 200 and M27Utilities.GetDistanceBetweenPositions(tMex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= iMaxDistFromBase then
                             --Check not tried going here here lots before
                             if (oPlatoon[M27PlatoonUtilities.reftDestinationCount][M27Utilities.ConvertLocationToReference(tMex)] or 0) <= 3 or M27MapInfo.CanWeMoveInSameGroupInLineToTarget(sPathing, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), tMex) then
                                 iCurValueLocation = GetLocationValue(aiBrain, tMex, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon), sPathing, iSegmentGroup)
@@ -4641,8 +4650,8 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         LOG(sFunctionRef..': Breakdown of Weapon blueprint proj ID='..reprs(__blueprints[oWeapon.Blueprint.ProjectileId]))
                     end--]]
 
-                    if M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations]) == false then
-                        for iTime, tLocation in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations] do
+                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations]) == false then
+                        for iTime, tLocation in M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations] do
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering iTime='..iTime..'; tLocation='..repru(tLocation)..'; GameTime='..GetGameTimeSeconds()) end
                             if GetGameTimeSeconds() - iTime < 60 then --Testing with Aeon SML on setons it takes 60s to go from one corner to another roughly
                                 table.insert(tRecentlyNuked, tLocation)
@@ -4762,8 +4771,8 @@ function ConsiderLaunchingMissile(oLauncher, oWeapon)
                         oLauncher:SetPaused(false)
                     else
                         IssueNuke({oLauncher}, tTarget)
-                        M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations][GetGameTimeSeconds()] = tTarget
-                        if bDebugMessages == true then LOG(sFunctionRef..': Launching nuke at tTarget='..repru(tTarget)..'; M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations]='..repru(M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.subrefNukeLaunchLocations])) end
+                        M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations][GetGameTimeSeconds()] = tTarget
+                        if bDebugMessages == true then LOG(sFunctionRef..': Launching nuke at tTarget='..repru(tTarget)..'; M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations]='..repru(M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations])) end
                         --Restart SMD monitor after giving time for missile to fire
                         if oLauncher then oLauncher[M27UnitInfo.refbActiveSMDChecker] = false end
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

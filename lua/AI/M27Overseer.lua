@@ -18,6 +18,7 @@ local M27Config = import('/mods/M27AI/lua/M27Config.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27Events = import('/mods/M27AI/lua/AI/M27Events.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 
 --Semi-Global for this code:
@@ -29,19 +30,10 @@ tAllAIBrainsByArmyIndex = {} --Stores table of all aiBrains, used as sometimes a
 tAllActiveM27Brains = {} --As per tAllAIBrainsByArmyIndex but just for M27 brains - defined for quick reference when updating reclaim
 refiDistanceToNearestEnemyBase = 'M27DistanceToNearestEnemy' --Distance from our base to the nearest enemy base
 
-
-tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
-reftFriendlyActiveM27Brains = 'M27OverseerTeamFriendlyM27Brains' --Stored against tTeamData[brain.M27Team], returns table of all M27 brains on the same team (including this one), with a key of the army index
-iTotalTeamCount = 0 --Number of teams in the game
-subrefNukeLaunchLocations = 'M27OverseerTeamNukeTargets' --stored against tTeamData[brain.M27Team], [x] is gametimeseconds, returns the location of a nuke target
-refiEnemyWalls = 'M27OverseerTeamEnemyWallCount' --stored against tTeamData[brain.M27Team], returns the ntotal number of enemy wall units; used as threshold to enable engineers to start looking for wall segments to reclaim
-refiTimeOfLastEnemyTeamDataUpdate = 'M27OverseerTeamEnemyLastUpdate' --as above, returns the gametimeseconds of hte last update
-reftEnemyArtiToAvoid = 'M27OverseerTeamEnemyArtiToAvoid' --against tTeamData[aiBrain.M27Team], [x] is a count (so table.getn works), returns T2 arti units that has got enough mass kills to want to avoid
-refiFriendlyFatboyCount = 'M27OverseerTeamFriendlyFatboys' --against tTeamData[aiBrain.M27Team], returns the number of friendly fatboys on the team
-
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
 toAllyBrains = 'M27OverseerAllyBrains' --Against aiBrain
+tiDistToPlayerByIndex = 'M27OverseerDistToPlayerByIndex' --Against aiBrain, [x] is the player index, returns the distance to their start position
 refbNoEnemies = 'M27OverseerNoEnemyBrains' --against aiBrain, true if no enemy brains detected
 iACUDeathCount = 0
 iACUAlternativeFailureCount = 0
@@ -122,8 +114,6 @@ refiNearestT2PlusNavalThreat = 'M27OverseerNearestT2PlusNavalThreat' --against a
 --local bArmyPoolInAvailablePlatoons = false
 sDefenderPlatoonRef = 'M27DefenderAI'
 sIntelPlatoonRef = 'M27IntelPathAI'
-refbActiveLandExperimentalCoordinator = 'M27OverseerExperimentalCoordinator' --Used to decide actions involving multiple experimentals
-refbActiveNovaxCoordinator = 'M27OverseerNovaxCoordinator'
 
 --Build condition related - note that overseer start shoudl set these to false to avoid error messages when build conditions check their status
 refbNeedDefenders = 'M27NeedDefenders'
@@ -5038,7 +5028,7 @@ function ACUManager(aiBrain)
                             else
                                 --Do we have more than our share of mexes?
 
-                                local iOurTeamsShareOfMexesOnMap = aiBrain[refiAllMexesInBasePathingGroup] / iTotalTeamCount
+                                local iOurTeamsShareOfMexesOnMap = aiBrain[refiAllMexesInBasePathingGroup] / M27Team.iTotalTeamCount
                                 local bAheadOnEco = false
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; aiBrain[refiAllMexesInBasePathingGroup] =' .. aiBrain[refiAllMexesInBasePathingGroup] .. '; aiBrain[refiUnclaimedMexesInBasePathingGroup]=' .. aiBrain[refiUnclaimedMexesInBasePathingGroup])
@@ -5183,7 +5173,7 @@ function ACUManager(aiBrain)
                                 local iTurtleFurtherAdjust = 1
                                 if aiBrain[refiDefaultStrategy] == refStrategyTurtle and M27UnitInfo.GetNumberOfUpgradesObtained(oACU) == 0 then
                                     iHealthReduction = iHealthReduction - 2000
-                                    iTurtleFurtherAdjust = 0.9
+                                    iTurtleFurtherAdjust = 0.75
                                 end --If are turtling then really important we get the upgrade, will also get a health boost from T2
                                 if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 125 then
                                     iHealthReduction = math.max(0, iHealthReduction * 0.5)
@@ -5195,7 +5185,7 @@ function ACUManager(aiBrain)
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': We will be really low health if we finish the upgrade; consider if we are near base/if expect we might be able to reduce the damage taken where the upgrade is at least 50% done. % done=' .. oACU[reftACURecentUpgradeProgress][iCurTime] .. '; Dist to base=' .. M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; oACU[reftACURecentHealth][iCurTime] * 1.1=' .. oACU[reftACURecentHealth][iCurTime] * 1.1 .. '; iTimeToComplete * iHealthLossPerSec=' .. iTimeToComplete * iHealthLossPerSec .. '; iHealthReduction=' .. iHealthReduction .. '; ACU Max health=' .. oACU:GetMaxHealth())
                                     end
-                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.25 * iTurtleFurtherAdjust and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(200, math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.333)) / iTurtleFurtherAdjust then
+                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.225 or iTurtleFurtherAdjust < 1 or M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(200, math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.333)) then
                                         if iTimeToComplete * iHealthLossPerSec < oACU[reftACURecentHealth][iCurTime] * 1.1 - iHealthReduction then
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Will try and finish upgrade and hope units can save us')
@@ -6136,50 +6126,6 @@ function CheckUnitCap(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function UpdateTeamDataForEnemyUnits(aiBrain)
-    if GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamDataUpdate] or 0) >= 9.9 then
-        --Record number of wall segments
-        tTeamData[aiBrain.M27Team][refiTimeOfLastEnemyTeamDataUpdate] = GetGameTimeSeconds()
-        local iWallCount = 0
-        for iBrain, oBrain in aiBrain[toEnemyBrains] do
-            iWallCount = iWallCount + oBrain:GetCurrentUnits(M27UnitInfo.refCategoryWall)
-        end
-        tTeamData[aiBrain.M27Team][refiEnemyWalls] = iWallCount
-
-
-        --Update T2 arti for those that are no longer valid
-        if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftEnemyArtiToAvoid]) == false then
-            local bUpdatedTable = true
-            local iCycleCount = 0
-            while bUpdatedTable do
-                iCycleCount = iCycleCount + 1
-                if iCycleCount >= 20 then
-                    M27Utilities.ErrorHandler('Possible infinite loop for T2 arti checker')
-                    break
-                end
-                bUpdatedTable = false
-                for iUnit, oUnit in tTeamData[aiBrain.M27Team][reftEnemyArtiToAvoid] do
-                    if not(M27UnitInfo.IsUnitValid(oUnit)) then
-                        table.remove(tTeamData[aiBrain.M27Team][reftEnemyArtiToAvoid], iUnit)
-                        bUpdatedTable = true
-                        break
-                    end
-                end
-            end
-        end
-
-
-
-        --Update count of friendly team fatboys (so can decide whether to run platoon logic relating to this)
-        local iFatboyCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy)
-        for iBrain, oBrain in aiBrain[toAllyBrains] do
-            if not(oBrain == aiBrain) then --redundancy, dont think this is needed
-                iFatboyCount = iFatboyCount + aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryFatboy)
-            end
-        end
-        tTeamData[aiBrain.M27Team][refiFriendlyFatboyCount] = iFatboyCount
-    end
-end
 
 function StrategicOverseer(aiBrain, iCurCycleCount)
     --also features 'state of game' logs
@@ -6426,7 +6372,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             end
         end
 
-        ForkThread(UpdateTeamDataForEnemyUnits, aiBrain) --Currently updates number of wall units but could add other logic to this
+        ForkThread(M27Team.UpdateTeamDataForEnemyUnits, aiBrain) --Currently updates number of wall units but could add other logic to this
 
         --Below should be updated as part of the SetWhetherCanPathToEnemy function in M27MapInfo now
         --[[local iNearestEnemyArmyIndex = M27Logic.GetNearestEnemyIndex(aiBrain)
@@ -6513,7 +6459,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         aiBrain[refiAllMexesInBasePathingGroup] = iAllMexesInPathingGroup
 
 
-        local iOurTeamsShareOfMexesOnMap = iAllMexesInPathingGroup / iTotalTeamCount
+        local iOurTeamsShareOfMexesOnMap = iAllMexesInPathingGroup / M27Team.iTotalTeamCount
         local iMexesInPathingGroupWeHaveClaimed = iAllMexesInPathingGroup - iAllMexesInPathingGroupWeHaventClaimed
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Pre determining grand strategy, iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed)
@@ -6751,7 +6697,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
                 --Should we switch to eco?
 
-                local bWantToEco = false
+
                 if M27MapInfo.bNoRushActive and M27MapInfo.iNoRushTimer - GetGameTimeSeconds() >= 60 then
                     aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
                 else
@@ -6759,6 +6705,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                         if aiBrain[refiDefaultStrategy] == refStrategyTurtle then
                             aiBrain[refiAIBrainCurrentStrategy] = refStrategyTurtle
                         else
+                            local bWantToEco = false
                             --Dont eco if nearby naval threat
                             if not(aiBrain[refbT2NavyNearOurBase]) then
 
@@ -6776,10 +6723,25 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
 
+                                --Do we have teammates who are all closer to the nearest enemy than us?
+                                local bAlliesAreCloserToEnemy = false
+                                if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
+                                    local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                                    for iBrain, oBrain in aiBrain[toAllyBrains] do
+                                        if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], tEnemyBase) + 50 < aiBrain[refiDistanceToNearestEnemyBase] then
+                                            bAlliesAreCloserToEnemy = true
+                                            break
+                                        end
+                                    end
+                                end
+
+
 
                                 --Dont eco if enemy ACU near ours as likely will need backup, unless we are on a chokepoint map and our ACU hasnt taken any damage recently (or if it has, it's less than 5 per sec)
                                 if aiBrain[refbEnemyACUNearOurs] == false or (bChokepointsAreProtected and M27Utilities.GetACU(aiBrain):GetHealth() >= 7000 and (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 or (oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or 0) + 50 >= oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]))  then
                                     if bChokepointsAreProtected then
+                                        bWantToEco = true
+                                    elseif bAlliesAreCloserToEnemy then
                                         bWantToEco = true
                                     else
                                         if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
@@ -6836,7 +6798,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     end
                                 end
                                 if bWantToEco == true then
-                                    if not (bChokepointsAreProtected) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
+                                    if not (bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
                                         bWantToEco = false
                                         if bDebugMessages == true then LOG(sFunctionRef..': Chokepoints arent protected, can path to enemy base with land, and dont have friendly units on enemy side of map') end
                                         --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
@@ -6851,7 +6813,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
                                         bWantToEco = false
                                         if bDebugMessages == true then LOG(sFunctionRef..': Our ACU is near enemy base') end
-                                    elseif not(bChokepointsAreProtected) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
+                                    elseif not(bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
                                         --Does the enemy have more mobile threat than us and our allies, and we have < 65% mex control, and have gained income recently
                                         if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo >= 1 then
                                             local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])
@@ -7416,6 +7378,21 @@ function RecordAllEnemiesAndAllies(aiBrain)
                 if oBrain.M27StartPositionNumber then
                     M27MapInfo.UpdateNewPrimaryBaseLocation(oBrain)
                 end
+
+                --Update details of each enemy distance to us
+                if oBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) == false then
+                    oBrain[tiDistToPlayerByIndex] = {}
+                    for iOtherBrain, oOtherBrain in ArmyBrains do
+                        if not(oOtherBrain:IsDefeated()) and not(oOtherBrain.M27IsDefeated) and oOtherBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber]) == false  then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering distance between oBrain '..oBrain:GetArmyIndex()..' and oOtherBrain '..oOtherBrain:GetArmyIndex()..'; oBrain start number='..(oBrain.M27StartPositionNumber or 'nil')..'; oOtherBrain start number='..(oOtherBrain.M27StartPositionNumber or 'nil')..'; oBrain start position='..repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])..'; oOtherBrain start position='..repru(M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber])) end
+                            oBrain[tiDistToPlayerByIndex][oOtherBrain:GetArmyIndex()] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber])
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Finished updating tiDistToPlayerByIndex for brain '..oBrain.Nickname..'; result='..repru(oBrain[tiDistToPlayerByIndex])) end
+                end
+
+
+
             elseif bDebugMessages == true then
                 LOG(sFunctionRef .. ': Brain is defeated')
             end
@@ -7441,19 +7418,19 @@ function RecordAllEnemiesAndAllies(aiBrain)
     end
     --Do we have a team set?
     if not (aiBrain.M27Team) then
-        iTotalTeamCount = iTotalTeamCount + 1
-        aiBrain.M27Team = iTotalTeamCount
-        if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team]) then
-            tTeamData[aiBrain.M27Team] = {}
+        M27Team.iTotalTeamCount = M27Team.iTotalTeamCount + 1
+        aiBrain.M27Team = M27Team.iTotalTeamCount
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team]) then
+            M27Team.tTeamData[aiBrain.M27Team] = {}
         end
-        tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains] = {}
-        tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains][aiBrain:GetArmyIndex()] = aiBrain
-        tTeamData[aiBrain.M27Team][subrefNukeLaunchLocations] = {}
-        tTeamData[aiBrain.M27Team][reftEnemyArtiToAvoid] = {}
+        M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] = {}
+        M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][aiBrain:GetArmyIndex()] = aiBrain
+        M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations] = {}
+        M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid] = {}
         for iCurBrain, oBrain in aiBrain[toAllyBrains] do
-            oBrain.M27Team = iTotalTeamCount
+            oBrain.M27Team = M27Team.iTotalTeamCount
             if oBrain.M27AI then
-                tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
+                M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
             end
         end
 
@@ -7598,21 +7575,21 @@ function RecordAllEnemiesAndAllies(aiBrain)
         --Assign enemies to a team if not already
         for iEnemyBrain, oEnemyBrain in aiBrain[toEnemyBrains] do
             if not (oEnemyBrain.M27Team) then
-                iTotalTeamCount = iTotalTeamCount + 1
-                oEnemyBrain.M27Team = iTotalTeamCount
-                if M27Utilities.IsTableEmpty(tTeamData[oEnemyBrain.M27Team]) then
-                    tTeamData[oEnemyBrain.M27Team] = {}
+                M27Team.iTotalTeamCount = M27Team.iTotalTeamCount + 1
+                oEnemyBrain.M27Team = M27Team.iTotalTeamCount
+                if M27Utilities.IsTableEmpty(M27Team.tTeamData[oEnemyBrain.M27Team]) then
+                    M27Team.tTeamData[oEnemyBrain.M27Team] = {}
                 end
-                tTeamData[oEnemyBrain.M27Team][reftFriendlyActiveM27Brains] = {}
+                M27Team.tTeamData[oEnemyBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] = {}
                 if oEnemyBrain.M27AI then
-                    tTeamData[oEnemyBrain.M27Team][reftFriendlyActiveM27Brains][oEnemyBrain:GetArmyIndex()] = oEnemyBrain
+                    M27Team.tTeamData[oEnemyBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][oEnemyBrain:GetArmyIndex()] = oEnemyBrain
                 end
                 for iCurBrain, oBrain in aiBrain[toEnemyBrains] do
                     if not (oBrain.M27Team) and IsAlly(oBrain:GetArmyIndex(), oEnemyBrain:GetArmyIndex()) then
-                        oBrain.M27Team = iTotalTeamCount
+                        oBrain.M27Team = M27Team.iTotalTeamCount
                         if oBrain.M27AI then
                             --redundancy - should have already recorded
-                            tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
+                            M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
                         end
                     end
                 end
@@ -8042,7 +8019,7 @@ function GameSettingWarningsAndChecks(aiBrain)
     end
 
     if bIncompatible then
-        M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: " .. sIncompatibleMessage .. ' If issues are encountered, report them to maudlin27 via Discord or the forums, and include the replay ID.', 0, 10)
+        M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: " .. sIncompatibleMessage .. ' If issues are encountered, report them to maudlin27 via Discord or the M27 forum thread, and include the replay ID.', 0, 10)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -8053,11 +8030,11 @@ function CoordinateNovax(aiBrain)
     local sFunctionRef = 'CoordinateNovax'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Start of code, does our team have an active coordinator=' .. tostring((tTeamData[aiBrain.M27Team][refbActiveNovaxCoordinator] or false)))
+        LOG(sFunctionRef .. ': Start of code, does our team have an active coordinator=' .. tostring((M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] or false)))
     end
 
-    if not (tTeamData[aiBrain.M27Team][refbActiveNovaxCoordinator]) then
-        tTeamData[aiBrain.M27Team][refbActiveNovaxCoordinator] = true
+    if not (M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator]) then
+        M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] = true
         --Do we have any novax to coordinate?
         local bWantToCoordinate = true
         while bWantToCoordinate do
@@ -8164,7 +8141,7 @@ function CoordinateNovax(aiBrain)
             WaitSeconds(10)
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         end
-        tTeamData[aiBrain.M27Team][refbActiveNovaxCoordinator] = false
+        M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] = false
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 end
@@ -8177,14 +8154,14 @@ function CoordinateLandExperimentals(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Start of code, refbActiveLandExperimentalCoordinator=' .. tostring((tTeamData[aiBrain.M27Team][refbActiveLandExperimentalCoordinator] or false)))
+        LOG(sFunctionRef .. ': Start of code, refbActiveLandExperimentalCoordinator=' .. tostring((M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveLandExperimentalCoordinator] or false)))
     end
 
-    if not (tTeamData[aiBrain.M27Team][refbActiveLandExperimentalCoordinator]) then
+    if not (M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveLandExperimentalCoordinator]) then
         --Dont coordinate if we have chokepoints
         local bHaveChokepoint = false
-        if not (M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
-            for iBrain, oBrain in tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains] do
+        if not (M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+            for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                 if oBrain[refiDefaultStrategy] == refStrategyTurtle then
                     bHaveChokepoint = true
                     break
@@ -8197,7 +8174,7 @@ function CoordinateLandExperimentals(aiBrain)
                 bCoordinateFatboys = true
             end
 
-            tTeamData[aiBrain.M27Team][refbActiveLandExperimentalCoordinator] = true
+            M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveLandExperimentalCoordinator] = true
             local tM27LandExperimentals = {}
             local iM27LandExperimentals = 0
             local tAlliedLandExperimentals = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandExperimental, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
@@ -8288,7 +8265,7 @@ function CoordinateLandExperimentals(aiBrain)
                 M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
             end
 
-            tTeamData[aiBrain.M27Team][refbActiveLandExperimentalCoordinator] = false
+            M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveLandExperimentalCoordinator] = false
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -8345,10 +8322,45 @@ function TestNewMovementCommands(aiBrain)
 end
 
 function TestCustom(aiBrain)
+    local sFunctionRef = 'TestCustom'
+
+
+
+    if aiBrain:GetArmyIndex() == 1 or aiBrain:GetArmyIndex() == 2 then
+        --Spawn a hoplie and gift it to an ally
+        local tPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        local oUnitToSpawn = CreateUnit('drl0204', M27Utilities.GetACU(aiBrain).Army, tPos[1], tPos[2], tPos[3], 0, 0, 0, 0, 'Air')
+
+        if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
+            for iBrain, oBrain in aiBrain[toAllyBrains] do
+                if not(oBrain == aiBrain) and not(iBrain == 1) and not(iBrain == 2) then
+                LOG(sFunctionRef..': About to transfer unit '..oUnitToSpawn.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToSpawn)..' from brain '..aiBrain.Nickname..' to brain '..oBrain.Nickname)
+                M27Team.TransferUnitsToPlayer({ oUnitToSpawn }, oBrain:GetArmyIndex(), false)
+                break
+            end
+            end
+        end
+    end
+
+    --Give resources
+    --[[local oBrainToGive
+
+    if not(aiBrain:GetArmyIndex() == 3) then
+        for iBrain, oBrain in aiBrain[toAllyBrains] do
+            if oBrain:GetArmyIndex() == 3 then
+                oBrainToGive = oBrain
+                break
+            end
+        end
+        if aiBrain:GetEconomyStored('MASS') >= 100 then
+            M27Team.GiveResourcesToPlayer(aiBrain, oBrainToGive, 100, 100)
+        end
+    end--]]
+
 
     --Spawn an experimental
-    local tPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    CreateUnit('url0402', M27Utilities.GetACU(aiBrain).Army, tPos[1], tPos[2], tPos[3], 0, 0, 0, 0, 'Air')
+    --local tPos = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+    --CreateUnit('url0402', M27Utilities.GetACU(aiBrain).Army, tPos[1], tPos[2], tPos[3], 0, 0, 0, 0, 'Air')
 
     --M27MiscProfiling.ListAmphibiousUnitsMissingAmphibiousCategory()
     --LOG('Log of ScenarioInfo='..repru(ScenarioInfo))
@@ -8363,10 +8375,10 @@ function TestCustom(aiBrain)
 --]]
     --Check if experimental isnt moving
     --[[local tEnemyExperimentals = aiBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL * categories.LAND, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Enemy')
-    LOG('TestCustom table of enemy experimentals empty='..tostring(M27Utilities.IsTableEmpty(tEnemyExperimentals)))
+    LOG(sFunctionRef..': table of enemy experimentals empty='..tostring(M27Utilities.IsTableEmpty(tEnemyExperimentals)))
     if M27Utilities.IsTableEmpty(tEnemyExperimentals) == false then
         for iUnit, oUnit in tEnemyExperimentals do
-            LOG('TestCustom considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; is Civilian based on flag='..tostring(oUnit.IsCivilian or false)..'; brain army index='..oUnit:GetAIBrain():GetArmyIndex()..'; function isCivilian='..tostring(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))..'; Unit state='..M27Logic.GetUnitState(oUnit))
+            LOG(sFunctionRef..': considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; is Civilian based on flag='..tostring(oUnit.IsCivilian or false)..'; brain army index='..oUnit:GetAIBrain():GetArmyIndex()..'; function isCivilian='..tostring(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))..'; Unit state='..M27Logic.GetUnitState(oUnit))
         end
     end--]]
 
@@ -8374,13 +8386,13 @@ function TestCustom(aiBrain)
     --Change a unit's speed
     local oACU = M27Utilities.GetACU(aiBrain)
     if oACU.SetSpeed then
-        LOG('TestCustom: Use SetSpeed')
+        LOG(sFunctionRef..': Use SetSpeed')
     elseif oACU.SetSpeedMult then
-        LOG('TestCustom: UseSetSpeedMult')
+        LOG(sFunctionRef..': UseSetSpeedMult')
     elseif oACU.SetMaxSpeed then
-        LOG('TestCustom: Use SetMaxSpeed')
+        LOG(sFunctionRef..': Use SetMaxSpeed')
     elseif oACU.Speed then
-        LOG('TestCustom: ACU has .speed value=' .. oACU.Speed)
+        LOG(sFunctionRef..': ACU has .speed value=' .. oACU.Speed)
     end
     --Above works for SetSpeedMult but not for the others (even if commenting out setspeedmult)
     oACU:SetSpeedMult(0.1)--]]
@@ -8389,7 +8401,7 @@ function TestCustom(aiBrain)
     --Get the blueprint for a projectile of an SMD
     local oBP = __blueprints['ueb4302']
     local sProjectileBP = oBP.Weapon[1].ProjectileId
-    LOG('TestCustom: ProjectileBP='..sProjectileBP)
+    LOG(sFunctionRef..': ProjectileBP='..sProjectileBP)
     local oProjectileBP = __blueprints[sProjectileBP]
     LOG('ProjectileBP mass cost='..oProjectileBP.Economy.BuildCostMass)
     local iCurUnitEnergyUsage = 0
@@ -8410,7 +8422,7 @@ function TestCustom(aiBrain)
             end
         end
     end
-    LOG('TestCustom: iCurUnitEnergyUsage='..iCurUnitEnergyUsage)
+    LOG(sFunctionRef..': iCurUnitEnergyUsage='..iCurUnitEnergyUsage)
     --]]
 
     --Check GetEdgeOfMapInDirection(tStart, iAngle) works:
@@ -8427,7 +8439,7 @@ function TestCustom(aiBrain)
     local oACU = M27Utilities.GetACU(aiBrain)
     local iACUCategory = M27UnitInfo.GetCategoryConditionFromUnitID(oACU.UnitId)
     local tACUs = aiBrain:GetUnitsAroundPoint(iACUCategory, oACU:GetPosition(), 1000, 'Ally')
-    LOG('TESTCUSTOM - is table of tACUs empty='..tostring(M27Utilities.IsTableEmpty(tACUs)))--]]
+    LOG(sFunctionRef..' - is table of tACUs empty='..tostring(M27Utilities.IsTableEmpty(tACUs)))--]]
 
     --[[
     --EntityCategoryFilterDown test
@@ -8691,6 +8703,13 @@ function OverseerManager(aiBrain)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(1)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    end
+
+    --Start team resource monitor (need to do after overseer initialisation, as need the forked thread recording allies and enemies to have run so we know if we have teammates or not)
+    if bDebugMessages == true then LOG(sFunctionRef..': About to start a forked thread for team resource sharing monitor if we have ally brains. Is table of ally brains empty for brain '..aiBrain.Nickname..'='..tostring(M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]))) end
+    if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
+        ForkThread(M27Team.TeamResourceSharingMonitor, aiBrain.M27Team)
+        if bDebugMessages == true then LOG(sFunctionRef..': Started team resource sharing monitor for team='..aiBrain.M27Team) end
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)

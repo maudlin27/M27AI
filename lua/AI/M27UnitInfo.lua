@@ -50,6 +50,8 @@ refsPathing = 'M27UnitPathing' --Pathing type of the unit
 reftPathingGroupCount = 'M27UnitPathingGroupCount' --Count of the pathing groups the unit has been in
 refiLastPathingGroup = 'M27UnitLastPathingGroup' --Last pathing group of the unit where there was sufficient count (done in platoon utilities)
 reftLastLocationOfPathingGroup = 'M27UnitLastLocationOfPathingGroup' --Unit's position when it last had a pathing group with sufficient count
+refoOriginalBrainOwner = 'M27UnitOriginalOwner' --used if transfer unit from one player to another, so can transfer it back later
+refbTreatAsVisible = 'M27UnitTreatAsVisible' --used for unseen T2PD that damages us - means we will calculate threat on it
 
 --Strike damage/coordinated attack (currently used for sniperbots):
 refiDFStrikeDamageAssigned = 'M27UnitDFStrikeDamage' --cumulative value of strike damage assigned to this unit

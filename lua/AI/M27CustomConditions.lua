@@ -7,6 +7,7 @@ local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 --NOTE: Below are replaced by GameSettingWarningsAndChecks if sim mods are detected that expand the acu enhancement list
 tGunUpgrades = { 'HeavyAntiMatterCannon',
@@ -1071,29 +1072,32 @@ function IsMexOrHydroUnclaimed(aiBrain, tResourcePosition, bMexNotHydro, bTreatE
             end
             if bDontHaveResourceStatus then
                 --Check for queued units
-                if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have queued something for sLocationRef='..sLocationRef..'; checking if any builders are still alive') end
-                    --Check that any queued engineer is still alive
-                    local oBuilder
-                    local bClearedSomething = false
-                    for iActionRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] do
-                        if M27Utilities.IsTableEmpty(tSubtable) == false then
-                            for iUniqueRef, oBuilder in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
-                                if oBuilder.Dead then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': oBuilder for iAction='..iActionRef..' is dead so clearing its actions') end
-                                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oBuilder)
-                                    bClearedSomething = true
-                                else
-                                    bDontHaveResourceStatus = false
-                                    iAvailabilityType = M27EngineerOverseer.refiStatusQueued
-                                    break
+                for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+                    if M27Utilities.IsTableEmpty(oBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have queued something for sLocationRef='..sLocationRef..'; checking if any builders are still alive') end
+                        --Check that any queued engineer is still alive
+                        local oBuilder
+                        local bClearedSomething = false
+                        for iActionRef, tSubtable in oBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] do
+                            if M27Utilities.IsTableEmpty(tSubtable) == false then
+                                for iUniqueRef, oBuilder in oBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][iActionRef] do
+                                    if oBuilder.Dead then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': oBuilder for iAction='..iActionRef..' is dead so clearing its actions') end
+                                        M27EngineerOverseer.ClearEngineerActionTrackers(oBrain, oBuilder)
+                                        bClearedSomething = true
+                                    else
+                                        bDontHaveResourceStatus = false
+                                        iAvailabilityType = M27EngineerOverseer.refiStatusQueued
+                                        break
+                                    end
                                 end
                             end
                         end
+                        if bClearedSomething == true and bDontHaveResourceStatus == true then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Resource was claimed but all builders are dead so treating as unclaimed') end
+                        end
                     end
-                    if bClearedSomething == true and bDontHaveResourceStatus == true then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Resource was claimed but all builders are dead so treating as unclaimed') end
-                    end
+                    if iAvailabilityType == M27EngineerOverseer.refiStatusQueued then break end
                 end
             end
             --If still not found status then will go with default (i.e. treat it as available)
@@ -1312,10 +1316,10 @@ end
 function AreAllChokepointsCoveredByTeam(aiBrain)
     --Returns true if every chokepoint on map has an aiBrain assigned whose strategy is to defend it
     local bCovered = false
-    if not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
-        local iChokepoints = table.getsize(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])
+    if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+        local iChokepoints = table.getsize(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])
         local iCoveredChokepoints = 0
-        for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
             if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle then
                 if oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
                     iCoveredChokepoints = iCoveredChokepoints + 1

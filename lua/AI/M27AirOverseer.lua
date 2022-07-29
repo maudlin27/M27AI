@@ -11,6 +11,7 @@ local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27UnitMicro = import('/mods/M27AI/lua/AI/M27UnitMicro.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 --General air scouting values
 iAirSegmentSize = 1 --Updated/set in initialisation
@@ -2143,9 +2144,22 @@ function AirThreatChecker(aiBrain)
     local tAirAAUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAirAA, false, true)
     local tiAirAAThreatByTech = { 50, 235, 350 }
     local iFriendlyM27AirAA = 0
-    for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+    local iFriendlyAirFactor
+    local iFriendlyDistThreshold = math.max(500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] + 50)
+    for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+        iFriendlyAirFactor = 1
         if not(oBrain:GetArmyIndex() == aiBrain:GetArmyIndex()) then
-            iFriendlyM27AirAA = iFriendlyM27AirAA + (oBrain[refiOurMassInAirAA] or 0)
+            --Do we want to consider the air power from this ally? Ignore if multiple teams and far away, and treat as much less valuable if only 2 teams but far away
+            if aiBrain[M27Overseer.tiDistToPlayerByIndex][oBrain:GetArmyIndex()] > iFriendlyDistThreshold then
+                if M27Team.iTotalTeamCount > 2 then
+                    iFriendlyAirFactor = 0
+                else
+                    iFriendlyAirFactor = 0.4
+                end
+            end
+            if iFriendlyAirFactor > 0 then
+                iFriendlyM27AirAA = iFriendlyM27AirAA + (oBrain[refiOurMassInAirAA] or 0) * iFriendlyAirFactor
+            end
         end
     end
     aiBrain[refiTeamMassInAirAA] = iFriendlyM27AirAA + (aiBrain[refiOurMassInAirAA] or 0)
@@ -3127,6 +3141,8 @@ function UpdateScoutingSegmentRequirements(aiBrain)
         aiBrain[reftAirSegmentTracker][iEnemyBaseX][iEnemyBaseZ][refiNormalScoutingIntervalWanted] = math.min(aiBrain[reftAirSegmentTracker][iEnemyBaseX][iEnemyBaseZ][refiNormalScoutingIntervalWanted], aiBrain[refiIntervalEnemyBase])
     end
 
+
+
     for iCurAirSegmentX = iScoutMinSegmentX, iScoutMaxSegmentX, 1 do
         for iCurAirSegmentZ = iScoutMinSegmentZ, iScoutMaxSegmentZ, 1 do
             --iLastScoutedTime = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiLastScouted]
@@ -3150,7 +3166,18 @@ function UpdateScoutingSegmentRequirements(aiBrain)
                     end
                     --Check we dont already have assigned scouts and/or too many dead scouts
                     if aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiDeadScoutsSinceLastReveal] < iDeadScoutThreshold then
-                        iCurActiveScoutsAssigned = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned]
+                        --Get all allies that have assigned an air scout here
+                        iCurActiveScoutsAssigned = 0
+                        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+                            for iAdjX = -1, 1, 1 do
+                                for iAdjZ = -1, 1, 1 do
+                                    iCurActiveScoutsAssigned = oBrain[reftAirSegmentTracker][iCurAirSegmentX + iAdjX][iCurAirSegmentZ + iAdjZ][refiAirScoutsAssigned]
+                                    if iCurActiveScoutsAssigned > 0 then break end
+                                end
+                                if iCurActiveScoutsAssigned > 0 then break end
+                            end
+                            if iCurActiveScoutsAssigned > 0 then break end
+                        end
                         if iCurActiveScoutsAssigned == 0 then
                             iScoutTargetCount = iScoutTargetCount + 1
 
@@ -3720,7 +3747,7 @@ function QuantumOpticsManager(aiBrain, oUnit)
                     --Scout the area
                     M27UnitInfo.ScryTarget(oUnit, tAreaToScout)
                     --Update segments to show we have visual of the target
-                    for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                    for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                         UpdateSegmentsForLocationVision(oBrain, oUnit:GetPosition(), iIntelRange, GetGameTimeSeconds())
                     end
                 end
@@ -5119,7 +5146,7 @@ function AirBomberManager(aiBrain)
                                     LOG(sFunctionRef .. ': CurPriority=' .. iCurPriority .. '; Considering whether to add enemy ACU to bomber target. Mod distance for enemy ACU=' .. iCurModDistance .. '; aiBrain[refiBomberDefenceModDistance]=' .. aiBrain[refiBomberDefenceModDistance])
                                 end
                                 if iCurModDistance <= aiBrain[refiBomberDefenceModDistance] then
-                                    if iCurModDistance <= aiBrain[refiBomberDefenceCriticalDistance] or aiBrain[M27Overseer.refiLastNearestACUDistance] <= 150 then
+                                    if iCurModDistance <= aiBrain[refiBomberDefenceCriticalThreatDistance] or aiBrain[M27Overseer.refiLastNearestACUDistance] <= 150 then
                                         AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, iCurModDistance)
                                     else
                                         --Only add ACU if it has no shield under it and no T3+ AA
@@ -6314,6 +6341,7 @@ function AirAAManager(aiBrain)
             if aiBrain[refiNearToACUThreshold] > 0 then
                 iDistanceFromACUToStart = M27Utilities.GetDistanceBetweenPositions(tStartPosition, tACUPos)
                 local tAllyACUPos
+                local iAllyDistFromOurStart
                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
                     for iAllyBrain, aiAllyBrain in aiBrain[M27Overseer.toAllyBrains] do
 
@@ -6324,10 +6352,16 @@ function AirAAManager(aiBrain)
                             else
                                 tAllyACUPos = M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber]
                             end
-                            if M27Utilities.IsTableEmpty(tAllyACUPos) == false and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber]) == false then
-                                iDistanceFromACUToStart = math.max(iDistanceFromACUToStart, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], tAllyACUPos))
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Brain start number=' .. aiAllyBrain.M27StartPositionNumber .. '; distance from enemy air unit to ACU of this player=' .. M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition()))
+
+                            --Only consider teammates ACUs if either 2 teams; or the teammate is nearer to us than the nearest enemy
+                            iAllyDistFromOurStart = M27Utilities.GetDistanceBetweenPositions(tAllyACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                            if M27Team.iTotalTeamCount <= 2 or iAllyDistFromOurStart <= math.max(400, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] + 50) or aiBrain[M27Overseer.tiDistToPlayerByIndex][aiAllyBrain:GetArmyIndex()] <= math.max(500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] + 50) then
+                                if M27Utilities.IsTableEmpty(tAllyACUPos) == false and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber]) == false then
+
+                                    iDistanceFromACUToStart = math.max(iDistanceFromACUToStart, M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], tAllyACUPos))
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': Brain start number=' .. aiAllyBrain.M27StartPositionNumber .. '; distance from enemy air unit to ACU of this player=' .. M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiAllyBrain.M27StartPositionNumber], M27Utilities.GetACU(aiAllyBrain):GetPosition()))
+                                    end
                                 end
                             end
                         end
@@ -6366,12 +6400,12 @@ function AirAAManager(aiBrain)
 
             local iCloseToBaseRange = math.max(100, math.min(130, aiBrain[refiBomberDefenceCriticalThreatDistance] - 10))
             --Adjust close to base range for chokepoints
-            if not(M27Utilities.IsTableEmpty(M27Overseer.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+            if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
                 local iCurChokepointDistance
                 local iFurthestChokepointDistance = 0
                 local iClosestChokepointDistance = 10000
 
-                for iBrain, oBrain in M27Overseer.tTeamData[aiBrain.M27Team][M27Overseer.reftFriendlyActiveM27Brains] do
+                for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
                     if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
                         iCurChokepointDistance = M27Utilities.GetDistanceBetweenPositions(oBrain[M27MapInfo.reftChokepointBuildLocation], tStartPosition)
                         if iCurChokepointDistance > iFurthestChokepointDistance then
