@@ -4019,9 +4019,13 @@ function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondT
 
     local sFunctionRef = 'GetNearestRallyPoint'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
+    --if GetGameTimeSeconds() >= 1065 then bDebugMessages = true end
 
     --Are we in same amphibious pathing group? If not then will want to get alternative position to move to
     local iPlateauGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPosition)
+    if bDebugMessages == true then LOG(sFunctionRef..': Near start of code. iPlateauGroup='..iPlateauGroup..'; BasePlateauGroup='..aiBrain[M27MapInfo.refiOurBasePlateauGroup]) end
     if not(iPlateauGroup == aiBrain[M27MapInfo.refiOurBasePlateauGroup]) then
         --Do we have any land factories in the plateau? If so then go to the nearest of these
         local iNearestDist = 10000
@@ -4077,38 +4081,39 @@ function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondT
         M27MapInfo.RecordAllRallyPoints(aiBrain)
 
         --if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle and aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]) == false and table.getsize(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef][aiBrain[M27MapInfo.refiAssignedChokepointFirebaseRef]]) >= 3 then
-            --M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-            --return {aiBrain[M27MapInfo.reftChokepointBuildLocation][1], aiBrain[M27MapInfo.reftChokepointBuildLocation][2], aiBrain[M27MapInfo.reftChokepointBuildLocation][3]}
+        --M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        --return {aiBrain[M27MapInfo.reftChokepointBuildLocation][1], aiBrain[M27MapInfo.reftChokepointBuildLocation][2], aiBrain[M27MapInfo.reftChokepointBuildLocation][3]}
         --else
-            --Cycle through all rally points and pick the closest to tPosition
-            local iNearestToStart = 10000
-            local iNearestRallyPoint, iCurDistanceToStart
-            if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftRallyPoints]) then
-                if GetGameTimeSeconds() >= 150 then
-                    M27Utilities.ErrorHandler('Dont have any rally point >=2.5m into the game, wouldve expected to have generated intel paths by now; will return base as a rally point', true)
-                end
-                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                return M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-            else
+        --Cycle through all rally points and pick the closest to tPosition
+        local iNearestToStart = 10000
+        local iNearestRallyPoint, iCurDistanceToStart
+        if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftRallyPoints]) then
+            if GetGameTimeSeconds() >= 150 then
+                M27Utilities.ErrorHandler('Dont have any rally point >=2.5m into the game, wouldve expected to have generated intel paths by now; will return base as a rally point', true)
+            end
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            return M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        else
 
 
-                for iRallyPoint, tRallyPoint in aiBrain[M27MapInfo.reftRallyPoints] do
-                    iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tPosition, aiBrain[M27MapInfo.reftRallyPoints][iRallyPoint])
-                    if iCurDistanceToStart < iNearestToStart then
-                        iNearestRallyPoint = iRallyPoint
-                    end
-                end
-
-                --Do we have a firebase near here?
-                local tNearbyFirebase = GetNearestFirebase(aiBrain, aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint], false)
-                if M27Utilities.IsTableEmpty(tNearbyFirebase) == false and (M27Utilities.GetDistanceBetweenPositions(tNearbyFirebase, aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint]) <= 40 or M27Utilities.GetDistanceBetweenPositions(tPosition, tNearbyFirebase) <= (iNearestToStart + 40)) then
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                    return M27Utilities.MoveInDirection(tNearbyFirebase, M27Utilities.GetAngleFromAToB(tNearbyFirebase, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), 12, true)
-                else
-                    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                    return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
+            for iRallyPoint, tRallyPoint in aiBrain[M27MapInfo.reftRallyPoints] do
+                iCurDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tPosition, aiBrain[M27MapInfo.reftRallyPoints][iRallyPoint])
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering iRallyPoint='..iRallyPoint..' at position '..repru(tRallyPoint)..'; Distance to our position='..M27Utilities.GetDistanceBetweenPositions(tPosition, tRallyPoint)) end
+                if iCurDistanceToStart < iNearestToStart then
+                    iNearestRallyPoint = iRallyPoint
                 end
             end
+
+            --Do we have a firebase near here?
+            local tNearbyFirebase = GetNearestFirebase(aiBrain, aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint], false)
+            if M27Utilities.IsTableEmpty(tNearbyFirebase) == false and (M27Utilities.GetDistanceBetweenPositions(tNearbyFirebase, aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint]) <= 40 or M27Utilities.GetDistanceBetweenPositions(tPosition, tNearbyFirebase) <= (iNearestToStart + 40)) then
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return M27Utilities.MoveInDirection(tNearbyFirebase, M27Utilities.GetAngleFromAToB(tNearbyFirebase, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), 12, true)
+            else
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return {aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][1], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][2], aiBrain[M27MapInfo.reftRallyPoints][iNearestRallyPoint][3]}
+            end
+        end
         --end
         --[[ Previous code based on mex patrol locations:
         local tMexPatrolLocations = M27MapInfo.GetMexPatrolLocations(aiBrain)
