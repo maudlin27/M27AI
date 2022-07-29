@@ -21,6 +21,7 @@ refiTimeOfLastEnemyTeamDataUpdate = 'M27TeamEnemyLastUpdate' --as above, returns
 reftEnemyArtiToAvoid = 'M27TeamEnemyArtiToAvoid' --against tTeamData[aiBrain.M27Team], [x] is a count (so table.getn works), returns T2 arti units that has got enough mass kills to want to avoid
 refiFriendlyFatboyCount = 'M27TeamFriendlyFatboys' --against tTeamData[aiBrain.M27Team], returns the number of friendly fatboys on the team
 refbActiveResourceMonitor = 'M27TeamActiveResourceMonitor' --against tTeamData[aiBrain.M27Team], true if the tema has an active resource monitor
+reftUnseenPD = 'M27TeamUnseenPD' --against tTeamData[aiBrain.M27Team], table of T2+ PD objects that have damaged an ally but havent been revealed yet
 
 refbActiveNovaxCoordinator = 'M27TeamNovaxCoordinator'
 refbActiveLandExperimentalCoordinator = 'M27TeamExperimentalCoordinator' --Used to decide actions involving multiple experimentals
@@ -78,6 +79,19 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
             end
         end
         tTeamData[aiBrain.M27Team][refiFriendlyFatboyCount] = iFatboyCount
+
+
+        --Refresh table of unseen PD
+        if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftUnseenPD]) == false then
+            for iUnit, oUnit in tTeamData[aiBrain.M27Team][reftUnseenPD] do
+                if M27UnitInfo.IsUnitValid(oUnit) then
+                    tTeamData[aiBrain.M27Team][reftUnseenPD][iUnit] = nil
+                elseif M27Utilities.CanSeeUnit(aiBrain, oUnit, true) then
+                    tTeamData[aiBrain.M27Team][reftUnseenPD][iUnit] = nil
+                end
+            end
+        end
+
     end
 end
 
@@ -515,6 +529,29 @@ function GiveResourcesToAllyDueToParagon(aiBrain)
             if M27Utilities.IsTableEmpty(tPowerToGive) == false then
                 TransferUnitsToPlayer(tPowerToGive, oBrainToGiveTo:GetArmyIndex(), false)
             end
+        end
+    end
+end
+
+function RecordUnseenPD(oPD, oUnitDamaged)
+    local aiBrain = oUnitDamaged:GetAIBrain()
+    --Do we have M27 brains on this team?
+    if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftFriendlyActiveM27Brains]) == false then
+        --Have we already recorded?
+        local bInsert = true
+        if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftUnseenPD]) then
+            tTeamData[aiBrain.M27Team][reftUnseenPD] = { }
+        else
+            for iUnit, oUnit in tTeamData[aiBrain.M27Team][reftUnseenPD] do
+                if oUnit == oPD then
+                    bInsert = false
+                    break
+                end
+            end
+        end
+        if bInsert then
+            table.insert(tTeamData[aiBrain.M27Team][reftUnseenPD], oPD)
+            oPD[M27UnitInfo.refbTreatAsVisible] = true
         end
     end
 end

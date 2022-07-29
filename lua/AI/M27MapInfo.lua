@@ -4087,8 +4087,21 @@ function RecordIfSuitableRallyPoint(aiBrain, tPossibleRallyPoint, iCurRallyPoint
                         bAbortDueToIntelOrEnemies = false
                         bNearbyEnemyDefences = false
                     elseif iModDistToStart < aiBrain[M27Overseer.refiModDistFromStartNearestThreat] and iModDistToStart < math.min(aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] * 0.9, aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] - math.max(50, aiBrain[M27Overseer.refiHighestMobileLandEnemyRange] + 15)) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9..'; M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])='..M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
-                        if M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber]) / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] < (aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9) then
+                        --Check if unseen PD nearby
+                        local bNearbyUnseenPD = false
+                        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD]) == false then
+                            for iUnit, oUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftUnseenPD] do
+                                if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tPossibleRallyPoint) <= 75 then
+                                    bNearbyUnseenPD = true
+                                    break
+                                end
+                            end
+                        end
+
+
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': bNearbyUnseenPD='..tostring(bNearbyUnseenPD)..'; aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9='..aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9..'; M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])='..M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]='..aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]) end
+                        if not(bNearbyUnseenPD) and M27Utilities.GetDistanceBetweenPositions(tPossibleRallyPoint, PlayerStartPoints[aiBrain.M27StartPositionNumber]) / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] < (aiBrain[M27Overseer.refiPercentageClosestFriendlyFromOurBaseToEnemy] * 0.9) then
                             local tNearbyPDAndT2Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT2Arti + M27UnitInfo.refCategoryT2PlusPD, tPossibleRallyPoint, 153, 'Enemy')
                             if M27Utilities.IsTableEmpty(tNearbyPDAndT2Arti) == false then
                                 --T2 arti nearby?

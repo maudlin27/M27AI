@@ -1677,7 +1677,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                     bCalcActualThreat = true
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and owned by dif ai brain, seeing if we have a blip for it') end
-                    if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip then
+                    if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip and not(oUnit[M27UnitInfo.refbTreatAsVisible]) then
                         oBlip = oUnit:GetBlip(iArmyIndex)
                         if oBlip then
                             if not(oBlip:IsKnownFake(iArmyIndex)) then

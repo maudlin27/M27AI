@@ -7381,7 +7381,6 @@ function RecordAllEnemiesAndAllies(aiBrain)
 
                 --Update details of each enemy distance to us
                 if oBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) == false then
-                    bDebugMessages = true
                     oBrain[tiDistToPlayerByIndex] = {}
                     for iOtherBrain, oOtherBrain in ArmyBrains do
                         if not(oOtherBrain:IsDefeated()) and not(oOtherBrain.M27IsDefeated) and oOtherBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber]) == false  then
@@ -8707,13 +8706,11 @@ function OverseerManager(aiBrain)
     end
 
     --Start team resource monitor (need to do after overseer initialisation, as need the forked thread recording allies and enemies to have run so we know if we have teammates or not)
-    bDebugMessages = true
     if bDebugMessages == true then LOG(sFunctionRef..': About to start a forked thread for team resource sharing monitor if we have ally brains. Is table of ally brains empty for brain '..aiBrain.Nickname..'='..tostring(M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]))) end
     if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
         ForkThread(M27Team.TeamResourceSharingMonitor, aiBrain.M27Team)
         if bDebugMessages == true then LOG(sFunctionRef..': Started team resource sharing monitor for team='..aiBrain.M27Team) end
     end
-    bDebugMessages = false
 
     --ForkThread(ConstantBomberLocation, aiBrain)
     --TestCustom(aiBrain)
