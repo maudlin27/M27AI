@@ -5146,7 +5146,7 @@ function AirBomberManager(aiBrain)
                                     LOG(sFunctionRef .. ': CurPriority=' .. iCurPriority .. '; Considering whether to add enemy ACU to bomber target. Mod distance for enemy ACU=' .. iCurModDistance .. '; aiBrain[refiBomberDefenceModDistance]=' .. aiBrain[refiBomberDefenceModDistance])
                                 end
                                 if iCurModDistance <= aiBrain[refiBomberDefenceModDistance] then
-                                    if iCurModDistance <= aiBrain[refiBomberDefenceCriticalDistance] or aiBrain[M27Overseer.refiLastNearestACUDistance] <= 150 then
+                                    if iCurModDistance <= aiBrain[refiBomberDefenceCriticalThreatDistance] or aiBrain[M27Overseer.refiLastNearestACUDistance] <= 150 then
                                         AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, iCurModDistance)
                                     else
                                         --Only add ACU if it has no shield under it and no T3+ AA
