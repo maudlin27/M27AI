@@ -8917,8 +8917,10 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             --if tiAvailableEngineersByTech[3] > 0 and GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
 
             --if GetGameTimeSeconds() >= 2580 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.75 then bDebugMessages = true end
+
             while iEngineersToConsider >= 0 do --want >= rather than > so get correct calculation of engineers needed
                 --if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end
+                --if iEngineersToConsider > 0 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.6 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true else bDebugMessages = false end
 
                 M27Utilities.FunctionProfiler(sFunctionRef..': EngiConditions', M27Utilities.refProfilerStart)
                 M27Utilities.FunctionProfiler(sFunctionRef..': Condition'..(iCurrentConditionToTry or 'nil')..'Strat'..(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] or 'nil'), M27Utilities.refProfilerStart)
@@ -9570,6 +9572,19 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
                         end
+                        --Always have 1 engi building factory if are overflowing mass and have T3 available
+                        if not(iActionToAssign) and aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 and iHighestFactoryOrEngineerTechAvailable >= 3 then
+                            if (not(bHaveLowPower) or (not(bHaveVeryLowPower) and aiBrain[M27Overseer.refbT2NavyNearOurBase])) and iAirFactories <= aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] and iAirFactories <= iLandFactories + 1 then
+                                iActionToAssign = refActionBuildAirFactory
+                                iMaxEngisWanted = 1
+                            elseif iLandFactories < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeLand] then
+                                iActionToAssign = refActionBuildLandFactory
+                                iMaxEngisWanted = 1
+                            elseif not(bHaveVeryLowPower) and iAirFactories <= aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then
+                                iActionToAssign = refActionBuildAirFactory
+                                iMaxEngisWanted = 1
+                            end
+                        end
                     elseif iCurrentConditionToTry == 10 then --If engi tech level >1 then want to build power if have none >= that tech level
                         if bDebugMessages == true then LOG(sFunctionRef..': About to check if we have any power of current tech level') end
                         if iHighestFactoryOrEngineerTechAvailable > 1 then
@@ -9800,6 +9815,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     iMinEngiTechLevelWanted = 3
                                 end
                                 tExistingLocationsToPickFrom[1] = {aiBrain[M27MapInfo.reftChokepointBuildLocation][1], aiBrain[M27MapInfo.reftChokepointBuildLocation][2], aiBrain[M27MapInfo.reftChokepointBuildLocation][3]}
+                                if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom[1]) == false then iSearchRangeForNearestEngi = math.max(iSearchRangeForNearestEngi, M27Utilities.GetDistanceBetweenPositions(tExistingLocationsToPickFrom[1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
                             end
                         end
                     elseif iCurrentConditionToTry == 17 then --Initial land factories (high priority with low resource conditions)
@@ -10154,6 +10170,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             iMaxEngisWanted = 1
                             iMinEngiTechLevelWanted = 3
                         end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished deciding if we want to build an experimental. iActionToAssign='..(iActionToAssign or 'nil')..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; Is table of engis already assigned to build experimental empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildExperimental]))..'; iMassStoredRatio='..iMassStoredRatio..'; iMaxEngisWanted='..(iMaxEngisWanted or 'nil')) end
                     elseif iCurrentConditionToTry == 27 then --Land factories when are almost overflowing mass, or will about to have a massive income boost from mexes that we are upgrading
                         if iEngineersWantedPreReset >= 5 and not(bHaveVeryLowPower) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] >= 3 and ((aiBrain[M27EconomyOverseer.refiMexesUpgrading] >= 6 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.1) or (not(bHaveLowMass) and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.5)) then
                             local iExistingT3LandFactories = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3)
@@ -10607,6 +10624,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     end
                                 end
 
+                                if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom[1]) == false then iSearchRangeForNearestEngi = math.max(iSearchRangeForNearestEngi, M27Utilities.GetDistanceBetweenPositions(tExistingLocationsToPickFrom[1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+
                             else
                                 local tPD = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryT2PlusPD, false, false)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Not already building firebase so will see if want to. Is table of PD empty='..tostring(M27Utilities.IsTableEmpty(tPD))) end
@@ -10663,6 +10682,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                         iMinEngiTechLevelWanted = 3
                                     elseif not(M27Utilities.DoesCategoryContainCategory(categories.TECH1 + categories.TECH2, aiBrain[refiFirebaseCategoryWanted][aiBrain[refiFirebaseBeingFortified]], false)) then iMinEngiTechLevelWanted = 3
                                     end
+                                    if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom[1]) == false then iSearchRangeForNearestEngi = math.max(iSearchRangeForNearestEngi, M27Utilities.GetDistanceBetweenPositions(tExistingLocationsToPickFrom[1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
                                 end
                             end
                             if iActionToAssign and bHaveLowMass then iMaxEngisWanted = 2 end
@@ -11560,7 +11580,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                                         --Strange issue where somehow will pick an engineer that isn't part of the original idle engineers in the above to try and assign an order, spent a while and couldnt figure out why so will just try and have it only trigger once per cycle
                                         for iTech = iMinEngiTechLevelWanted, 3 do
-                                            tiAvailableEngineersByTech[iTech] = 0
+                                            tiAvailableEngineersByTech[iTech] = tiAvailableEngineersByTech[iTech] - 1
                                         end
                                         iEngineersToConsider = 0
                                         for iTech = 1, 3 do

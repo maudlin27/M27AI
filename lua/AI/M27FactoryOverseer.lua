@@ -369,7 +369,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineWhatToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if oFactory.UnitId == 'ueb0201' then bDebugMessages = true end
+    --if oFactory.UnitId == 'ueb0201' then bDebugMessages = true end
 
     --if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory, oFactory.UnitId) and GetGameTimeSeconds() >= 300 and aiBrain:GetArmyIndex() == 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) >= 50 then bDebugMessages = true end
 
@@ -811,6 +811,11 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             iTotalWanted = 4 - iT2PlusEngis
                                             iCategoryToBuild = refCategoryEngineer * categories.TECH2 --avoids treating a factory building t1 engi as satisfying this
                                         end
+                                    end
+                                    --Want to always be building at least 1 engi if are about to overflow mass, as in some scenarios can end up with all engis assisting air factory and no new engis being built
+                                    if not(iCategoryToBuild) and aiBrain:GetEconomyStoredRatio('MASS') >= 0.5 and (aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 or aiBrain:GetEconomyStoredRatio('MASS') >= 0.75) and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 then
+                                        iCategoryToBuild = refCategoryEngineer
+                                        iTotalWanted = 1
                                     end
                                 elseif iCurrentConditionToTry == 11 then --Emergency amphibious response
                                     if bDebugMessages == true then LOG(sFunctionRef..': Seeing if want amphibious to combat emergency naval threat.  refbT2NavyNearOurBase='..tostring(aiBrain[M27Overseer.refbT2NavyNearOurBase])) end
