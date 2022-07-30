@@ -369,6 +369,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineWhatToBuild'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if oFactory.UnitId == 'ueb0201' then bDebugMessages = true end
 
     --if EntityCategoryContains(M27UnitInfo.refCategoryAirFactory, oFactory.UnitId) and GetGameTimeSeconds() >= 300 and aiBrain:GetArmyIndex() == 2 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber) >= 50 then bDebugMessages = true end
 
@@ -396,10 +397,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
             if oFactory[refbFactoryCanBuildEngis] == true then
                 if iFactoryTechLevel > 2 then
                     if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer * categories.TECH3) == 0 then bNeedEngiOfTechLevel = true end
-                elseif iFactoryTechLevel == 2 then if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer - M27UnitInfo.refCategoryEngineer * categories.TECH1) == 0 then bNeedEngiOfTechLevel = true end
+                elseif iFactoryTechLevel == 2 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dealing with T2 factory. Count of engineers of this tech level='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer - M27UnitInfo.refCategoryEngineer * categories.TECH1)..'; if is 0 then will flag we need engi of this tech level') end
+                    if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryEngineer - M27UnitInfo.refCategoryEngineer * categories.TECH1) == 0 then bNeedEngiOfTechLevel = true end
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': iFactoryTechLevel='..iFactoryTechLevel..'; FactoryID='..sFactoryBP) end
+            if bDebugMessages == true then LOG(sFunctionRef..': iFactoryTechLevel='..iFactoryTechLevel..'; FactoryID='..sFactoryBP..'; bNeedEngiOfTechLevel='..tostring(bNeedEngiOfTechLevel)) end
 
 
             --local iBlueprintFactionNumber = M27UnitInfo.GetFactionFromBP(oFactoryBlueprint)
@@ -706,7 +709,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                 elseif iCurrentConditionToTry == 3 then --High priority engineers
                                     if bNeedEngiOfTechLevel == true then
-                                        iCategoryToBuild = refCategoryEngineer
+                                        iCategoryToBuild = refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(iFactoryTechLevel)
                                         iTotalWanted = 2
                                     elseif iFactoryTechLevel >= 3 and aiBrain:GetEconomyStored('MASS') > 0 and (aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] > 0 or (aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted] > 0 and not(M27Conditions.HaveLowMass(aiBrain)))) and iT3LandFactories >= 3 then
                                         iCategoryToBuild = refCategoryEngineer
@@ -796,12 +799,17 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     end
                                     if iFactoryTechLevel > 2 then
                                         --Do we have any T3 engis already?
-                                        if aiBrain:GetCurrentUnits(refCategoryEngineer * categories.TECH3) == 0 then
-                                            iCategoryToBuild = refCategoryEngineer
-                                            iTotalWanted = 4
-                                        elseif aiBrain:GetCurrentUnits(refCategoryEngineer * categories.TECH2 + refCategoryEngineer * categories.TECH3) == 0 then
-                                            iCategoryToBuild = refCategoryEngineer
-                                            iTotalWanted = 4
+                                        local iCurT3Engis = aiBrain:GetCurrentUnits(refCategoryEngineer * categories.TECH3)
+                                        if iCurT3Engis <= 3 or iCurT3Engis + aiBrain:GetCurrentUnits(refCategoryEngineer * categories.TECH2) <= 5 then
+                                            iCategoryToBuild = refCategoryEngineer * categories.TECH3
+                                            iTotalWanted = math.max(1, 4 - iCurT3Engis)
+                                        end
+                                    elseif iFactoryTechLevel == 2 then
+                                        --Do we have any T2+ engis already?
+                                        local iT2PlusEngis = aiBrain:GetCurrentUnits(refCategoryEngineer - categories.TECH1)
+                                        if iT2PlusEngis <= 3 then
+                                            iTotalWanted = 4 - iT2PlusEngis
+                                            iCategoryToBuild = refCategoryEngineer * categories.TECH2 --avoids treating a factory building t1 engi as satisfying this
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 11 then --Emergency amphibious response
@@ -872,6 +880,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                         end
                                                     end
                                                     if iShieldsWanted > 0 then
+                                                        if bDebugMessages == true then LOG(sFunctionRef..': Have priority units wanting shielding and ACU is on our side of map, so will get mobile shield') end
                                                         iCategoryToBuild = M27UnitInfo.refCategoryMobileLandShield
                                                         iTotalWanted = 1
                                                     end
@@ -2155,7 +2164,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                     --=======================Adjustments/overrides to initail category - engineers, indirect and unit cap
                     --See later section for adjustments based on particular blueprints (which includes unit caps other than engi unit cap)
                     --Engineers - Check this is a factory where we want to build engineers and we're not over the cap
-                    if iCategoryToBuild == refCategoryEngineer then
+                    if iCategoryToBuild == refCategoryEngineer or iCategoryToBuild == refCategoryEngineer * categories.TECH2 or iCategoryToBuild == refCategoryEngineer * categories.TECH3 then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Are trying to build an engineer, will check for factory and tech overrides')
                         end

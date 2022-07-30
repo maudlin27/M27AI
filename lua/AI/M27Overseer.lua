@@ -5078,7 +5078,7 @@ function ACUManager(aiBrain)
                                 if bAheadOnEco then
                                     --We are probably ahead on eco, so only attack if enemy ACU within our ACU range and we have a big advantage
 
-                                    if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) or M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and iLastDistanceToACU <= iACURange and oACU:GetHealth() - 4000 >= aiBrain[refoLastNearstACU]:GetHealth() and (aiBrain[refoLastNearstACU]:GetHealth() <= 500 or M27UnitInfo.GetUnitMaxGroundRange(aiBrain[refoLastNearestACU]) < iACURange or (aiBrain[refoLastNearstACU]:GetHealth() <= 2000 and oACU:GetHealth() >= 9500)) then
+                                    if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) or M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and iLastDistanceToACU <= iACURange and oACU:GetHealth() - 4000 >= aiBrain[refoLastNearestACU]:GetHealth() and (aiBrain[refoLastNearestACU]:GetHealth() <= 500 or M27UnitInfo.GetUnitMaxGroundRange(aiBrain[refoLastNearestACU]) < iACURange or (aiBrain[refoLastNearestACU]:GetHealth() <= 2000 and oACU:GetHealth() >= 9500)) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': We are ahead on eco but still shoudl be able to kill the ACU quickly so wont abort the all in attack with our ACU') end
                                     else
                                         bAllInAttack = false
