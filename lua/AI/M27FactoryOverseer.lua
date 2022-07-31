@@ -867,6 +867,11 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iTotalWanted = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
                                             end
                                         end
+                                        --Also build engineers if are upgrading lots of mexes
+                                        if not(iCategoryToBuild) and aiBrain[M27EconomyOverseer.refiMexesUpgrading] >= 4 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.05 and (aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 or aiBrain:GetEconomyStored('MASS') >= 1500) then
+                                            iCategoryToBuild = refCategoryEngineer
+                                            iTotalWanted = math.min(2, math.max(aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted], 1))
+                                        end
                                     elseif iCurrentConditionToTry == 15 then --Mobile shields if have small number and have priority units near base wanting shielding
                                         if iFactoryTechLevel >= 2 then
                                             if aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] then
