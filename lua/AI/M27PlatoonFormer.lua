@@ -329,6 +329,8 @@ function CombatPlatoonFormer(aiBrain)
 
 
     if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then
+        if GetGameTimeSeconds() >= 450 and table.getn(tUnitsWaiting) >= 3 then bDebugMessages = true end
+
         --Exclude ACU and experimentals - now done above
         --if bDebugMessages == true then LOG(sFunctionRef..': Removing any ACUs and experimentals from the units to form platoons with as backup as these are dealt with separately') end
         --tUnitsWaiting = EntityCategoryFilterDown(categories.ALLUNITS - categories.COMMAND -M27UnitInfo.refCategoryLandExperimental, tUnitsWaiting)
@@ -367,7 +369,7 @@ function CombatPlatoonFormer(aiBrain)
                 for iUnit, oUnit in tUnitsWaiting do
                     local iUniqueID = M27UnitInfo.GetUnitLifetimeCount(oUnit)
                     if iUniqueID == nil then iUniqueID = 0 end
-                    LOG('iUnit='..iUnit..'; Blueprint+UniqueCount='..oUnit.UnitId..iUniqueID)
+                    LOG('iUnit='..iUnit..'; Blueprint+UniqueCount='..oUnit.UnitId..iUniqueID..'; Is unit valid='..tostring(M27UnitInfo.IsUnitValid(oUnit)))
                 end
             end
         end
@@ -402,11 +404,18 @@ function CombatPlatoonFormer(aiBrain)
                         oPlatoonOrUnitToEscort = GetPlatoonOrUnitToEscort(aiBrain)
                         if oPlatoonOrUnitToEscort then sPlatoonToForm = 'M27EscortAI' end
                     end
-                elseif iCurrentConditionToTry == 4 then --1 active raider if can path to enemy base with amphibious
+                elseif iCurrentConditionToTry == 4 then --1 active smaller and larger raider if can path to enemy base with amphibious
                     aiBrain[M27PlatoonUtilities.refbNeedEscortUnits] = false --Have just gone through the escort conditions - if not allocated to it, then suggests we dont need any more units
                     iRaiders = M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexLargerRaiderAI')
-                    if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders) end
-                    if iRaiders < 1 and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                    if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders..'; Active smaller raider count='..M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexRaiderAI')) end
+                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and not(M27MapInfo.bNoRushActive) and iRaiders < 1 then
+                        if M27PlatoonUtilities.GetActivePlatoonCount(aiBrain, 'M27MexRaiderAI') == 0 then
+                            sPlatoonToForm = 'M27MexRaiderAI'
+                        else
+                            if bDebugMessages == true then LOG(sFunctionRef..': iRaiders='..iRaiders) end
+                            if iRaiders < 1 then sPlatoonToForm = 'M27MexLargerRaiderAI' end
+                        end
+                    end
                 elseif iCurrentConditionToTry == 5 then
                     if iDefenceCoverage < 0.4 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])  then sPlatoonToForm = 'M27DefenderAI' end
                 elseif iCurrentConditionToTry == 6 then
@@ -520,9 +529,19 @@ function CombatPlatoonFormer(aiBrain)
 
             if iUnitsWaiting >= iMinSize then
                 if bDebugMessages == true then LOG(sFunctionRef..': Checking whether we have a platoon/unit to escort or not. bAreUsingCombatPatrolUnits='..tostring(bAreUsingCombatPatrolUnits)) end
-                --Are we an escort platoon?
+
+                --Temporarily remove units from those to form a platoon if we will end up assigning too many units to the platoon
                 local tTemporaryUnitsWaitingForAssignment = {}
                 local iTemporaryUnitsWaitingForAssignment = 0
+
+                function TemporarilyRemoveUnitForAssignment(iRefInUnitsWaitingTable)
+                    iTemporaryUnitsWaitingForAssignment = iTemporaryUnitsWaitingForAssignment + 1
+                    tTemporaryUnitsWaitingForAssignment[iTemporaryUnitsWaitingForAssignment] = tUnitsWaiting[iRefInUnitsWaitingTable]
+                    table.remove(tUnitsWaiting, iRefInUnitsWaitingTable)
+                    iUnitsWaiting = iUnitsWaiting - 1
+                end
+
+                --Are we an escort platoon?  If so then only form platoon with enough units to meet the escort requirements
                 if oPlatoonOrUnitToEscort then
                     if bDebugMessages == true then
                         LOG(sFunctionRef..': Have a platoon or unit to escort, will note its ID in a moment')
@@ -565,11 +584,8 @@ function CombatPlatoonFormer(aiBrain)
                                         if iLastTableUnitThreat > iExcessThreat then
                                             break
                                         else
-                                            iTemporaryUnitsWaitingForAssignment = iTemporaryUnitsWaitingForAssignment + 1
-                                            tTemporaryUnitsWaitingForAssignment[iTemporaryUnitsWaitingForAssignment] = tUnitsWaiting[iCurUnitRef]
-                                            table.remove(tUnitsWaiting, iCurUnitRef)
+                                            TemporarilyRemoveUnitForAssignment(iCurUnitRef)
                                             iExcessThreat = iExcessThreat - iLastTableUnitThreat
-                                            iUnitsWaiting = iUnitsWaiting - 1
                                             if bDebugMessages == true then LOG(sFunctionRef..': Removed unit from tUnitsWaiting, iExcessThreat after reducing for this='..iExcessThreat..'; size of tUnitsWaiting='..table.getn(tUnitsWaiting)) end
                                             if M27Utilities.IsTableEmpty(tUnitsWaiting) == true then
                                                 if bDebugMessages == true then LOG(sFunctionRef..': No units left to assign as escort') end
@@ -586,7 +602,72 @@ function CombatPlatoonFormer(aiBrain)
                         end
                     elseif bDebugMessages == true then LOG(sFunctionRef..': Strategy is to protect ACU so dont want to reduce number of units assigned to the escort')
                     end
-                elseif bDebugMessages == true then LOG(sFunctionRef..': Dont have a platoon or unit to escort')
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dont have a platoon or unit to escort. Will see if need to form by groups. iUnitsWaiting='..iUnitsWaiting..'; sPlatoonToForm='..sPlatoonToForm..'; Min size='..(M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize] or 0)) end
+                    --Consider whether to group the units trying to form a platoon in certain scenarios:
+
+                    --Do we have lots of units trying to form a platoon, and we have more than the minimum number wanted to form a platoon? (e.g. one scenario this tries to address is if units have just been disbanded from ACU escort, to avoid spread out units all being part of the same platoon. iUnitsWaiting='..iUnitsWaiting..';
+                    if iUnitsWaiting >= 6 and iUnitsWaiting >= 2 + (M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize] or 0) and not(M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refbRunFromAllEnemies]) and not(M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refbRequiresUnitToFollow]) then
+                        --Are the units spread out?
+                        local bSpreadOut = false
+                        for iUnit, oUnit in tUnitsWaiting do
+                            if iUnit > 1 then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Distance between unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Distance to previous unit='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tUnitsWaiting[iUnit - 1]:GetPosition())) end
+                                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tUnitsWaiting[iUnit - 1]:GetPosition()) > 50 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Units are spread out so will proceed with grouping logic') end
+                                    bSpreadOut = true
+                                    break
+                                end
+                            end
+                        end
+                        if bSpreadOut then
+                            --Only want to make the units furthest from base form a platoon, and then fork a thread to form a platoon for the remaining units
+                            local iCurDistToEnemy
+                            local iClosestDistToEnemy = 100000
+                            local oClosestUnitToEnemy
+                            local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                            for iUnit, oUnit in tUnitsWaiting do
+                                if bDebugMessages == true then LOG(sFunctionRef..': Cycling through each unit in tUnitsWaiting to get teh closest one. oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEnemyBase)) end
+                                iCurDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tEnemyBase)
+                                if iCurDistToEnemy < iClosestDistToEnemy then
+                                    iClosestDistToEnemy = iCurDistToEnemy
+                                    oClosestUnitToEnemy = oUnit
+                                end
+                            end
+                            local tFrontUnitPosition = oClosestUnitToEnemy:GetPosition()
+                            local bCallFunctionAgain = false
+                            if bDebugMessages == true then LOG(sFunctionRef..': Nearest unit to enemy base is '..oClosestUnitToEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestUnitToEnemy)..' which is '..M27Utilities.GetDistanceBetweenPositions(oClosestUnitToEnemy:GetPosition(), tEnemyBase)..' away from enemy base. iUnitsWaiting before removing units='..iUnitsWaiting) end
+                            local oUnit
+                            local iRef
+                            local iRemovedCount = 0
+                            local iOriginalUnitsWaiting = iUnitsWaiting
+                            for iUnitRef = 1, iOriginalUnitsWaiting do
+                            --for iUnit, oUnit in tUnitsWaiting do
+                                iRef = iUnitRef - iRemovedCount
+                                oUnit = tUnitsWaiting[iRef]
+
+                                if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tFrontUnitPosition) > 50 then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is '..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tFrontUnitPosition)..' away from front unit '..oClosestUnitToEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestUnitToEnemy)..' so wont form a platoon with it yet. iRef='..iRef..'; iRemovedCount='..iRemovedCount) end
+                                    TemporarilyRemoveUnitForAssignment(iRef)
+                                    iRemovedCount = iRemovedCount + 1
+                                    bCallFunctionAgain = true
+                                elseif bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is '..M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tFrontUnitPosition)..' away from front unit '..oClosestUnitToEnemy.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestUnitToEnemy)..' so want to form a platoon with it now')
+                                end
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Finished removing far away units. iUnitsWaiting='..iUnitsWaiting) end
+
+                            if iUnitsWaiting < (M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize] or 0) then
+                                --Dont have enough units for what we wanted, so just form a raider platoon
+                                if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough units for '..sPlatoonToForm..' so will for mmexraider instead') end
+                                sPlatoonToForm = 'M27MexRaiderAI'
+                            end
+
+                            if bCallFunctionAgain and iUnitsWaiting > 0 and sPlatoonToForm then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will call fork thread for platoon former in a moment') end
+                                ForkThread(CombatPlatoonFormer, aiBrain)
+                            end
+                        end
+                    end
                 end
                 --if not(bAreUsingCombatPatrolUnits) or not(sPlatoonToForm == 'M27CombatPatrolAI') then
                 --if bDebugMessages == true then LOG(sFunctionRef..': Arent using combat patrol units or platoon to form isnt the combat patrol AI') end

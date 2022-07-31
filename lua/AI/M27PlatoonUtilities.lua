@@ -1530,7 +1530,7 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
     end
     --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
-    --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
+    if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
@@ -1594,7 +1594,12 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
                 end
             end
         end
-        tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - categories.BENIGN, tCurPos, oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures], 'Enemy')
+        local iBuildingSearchRange = math.max(oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures], oPlatoon[refiPlatoonMaxRange] + 18)
+        if (sPlatoonName == 'M27MexRaiderAI' or sPlatoonName == 'M27MexLargerRaiderAI') and iBuildingSearchRange < 60 and oPlatoon[refiPlatoonMaxRange] >= 18 then iBuildingSearchRange = 60 end
+
+        tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructure - categories.BENIGN, tCurPos, math.max(oPlatoon[M27Overseer.refiSearchRangeForEnemyStructures], iBuildingSearchRange), 'Enemy')
+        if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..' just searched for enemy buildings with a range of '..iBuildingSearchRange..'; is table empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemies))) end
+
 
         if M27Utilities.IsTableEmpty(tNearbyEnemies) then
             oPlatoon[refiEnemyStructuresInRange] = 0
@@ -2266,7 +2271,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
-    --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
+    if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 21 then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
@@ -4163,7 +4168,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                         if oPlatoon[refiCurrentUnits] >= 10 then
                                                             if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': UpdateActionForNearbyEnemies - Large attack AI - we have at least 10 units') end
                                                             if oPlatoon[refiEnemyStructuresInRange] == 0 then
-                                                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': UpdateActionForNearbyEnemies - Large attack AI - no structures in range') end
+                                                                if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': UpdateActionForNearbyEnemies - Large attack AI - no structures in range. aiBrain[refiSearchRangeForEnemyStructures]='..aiBrain[M27Overseer.refiSearchRangeForEnemyStructures]) end
                                                                 if oPlatoon[refiEnemiesInRange] <= 3 then
                                                                     if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': UpdateActionForNearbyEnemies - Large attack AI - <=3 enemy units') end
                                                                     --Only 3 mobile enemies and no structures in range, and we have a large attack force; check if we're faster
@@ -6782,7 +6787,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
             --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
-            --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
+            if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
             --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = false end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
@@ -7949,6 +7954,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
         --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
         --if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
         --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 26 then bDebugMessages = true end
+        if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
         --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
         --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
 
@@ -10071,7 +10077,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
-            --if sPlatoonName == 'M27MexLargerRaiderAI' then bDebugMessages = true end
+            if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
             --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
             --if sPlatoonName == 'M27MobileShield' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MobileStealth' then bDebugMessages = true end
