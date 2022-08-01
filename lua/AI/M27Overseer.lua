@@ -5030,10 +5030,24 @@ function ACUManager(aiBrain)
                             else
                                 --Do we have more than our share of mexes?
 
-                                local iOurTeamsShareOfMexesOnMap = aiBrain[refiAllMexesInBasePathingGroup] / M27Team.iTotalTeamCount
+                                local tiTeamsWithSamePathingGroup = {}
+                                for iBrain, oBrain in tAllAIBrainsByArmyIndex do
+                                    if oBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] then
+                                        tiTeamsWithSamePathingGroup[oBrain.M27Team] = true
+                                    end
+                                end
+                                local iTeamsWithSamePathingGroup = 0
+                                for iEntry, bEntry in tiTeamsWithSamePathingGroup do
+                                    if bEntry then
+                                        iTeamsWithSamePathingGroup = iTeamsWithSamePathingGroup + 1
+                                    end
+                                end
+
+
+                                local iOurTeamsShareOfMexesOnMap = aiBrain[refiAllMexesInBasePathingGroup] / iTeamsWithSamePathingGroup
                                 local bAheadOnEco = false
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; aiBrain[refiAllMexesInBasePathingGroup] =' .. aiBrain[refiAllMexesInBasePathingGroup] .. '; aiBrain[refiUnclaimedMexesInBasePathingGroup]=' .. aiBrain[refiUnclaimedMexesInBasePathingGroup])
+                                    LOG(sFunctionRef .. ': iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; aiBrain[refiAllMexesInBasePathingGroup] =' .. aiBrain[refiAllMexesInBasePathingGroup] .. '; aiBrain[refiUnclaimedMexesInBasePathingGroup]=' .. aiBrain[refiUnclaimedMexesInBasePathingGroup]..'; iTeamsWithSamePathingGroup='..iTeamsWithSamePathingGroup..'; Total team count='..M27Team.iTotalTeamCount)
                                 end
                                 --refiUnclaimedMexesInBasePathingGroup doesn't include mexes claimed by teammates, i.e. below looks at things overall on a team basis rather than us individually
                                 if (aiBrain[refiAllMexesInBasePathingGroup] - aiBrain[refiUnclaimedMexesInBasePathingGroup]) > iOurTeamsShareOfMexesOnMap then
@@ -6461,8 +6475,21 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         aiBrain[refiUnclaimedMexesInBasePathingGroup] = iAllMexesInPathingGroupWeHaventClaimed
         aiBrain[refiAllMexesInBasePathingGroup] = iAllMexesInPathingGroup
 
+        local tiTeamsWithSamePathingGroup = {}
+        for iBrain, oBrain in tAllAIBrainsByArmyIndex do
+            if oBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] then
+                tiTeamsWithSamePathingGroup[oBrain.M27Team] = true
+            end
+        end
+        local iTeamsWithSamePathingGroup = 0
+        for iEntry, bEntry in tiTeamsWithSamePathingGroup do
+            if bEntry then
+                iTeamsWithSamePathingGroup = iTeamsWithSamePathingGroup + 1
+            end
+        end
 
-        local iOurTeamsShareOfMexesOnMap = iAllMexesInPathingGroup / M27Team.iTotalTeamCount
+
+        local iOurTeamsShareOfMexesOnMap = iAllMexesInPathingGroup / iTeamsWithSamePathingGroup
         local iMexesInPathingGroupWeHaveClaimed = iAllMexesInPathingGroup - iAllMexesInPathingGroupWeHaventClaimed
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Pre determining grand strategy, iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed)
@@ -7850,7 +7877,7 @@ function OverseerInitialisation(aiBrain)
 
     ForkThread(M27AirOverseer.SetupAirOverseer, aiBrain)
 
-    ForkThread(M27MapInfo.RecordStartingPathingGroups, aiBrain)
+    --ForkThread(M27MapInfo.RecordStartingPathingGroups, aiBrain)
 
     --Record base plateau pathing gropu
     aiBrain[M27MapInfo.refiOurBasePlateauGroup] = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])

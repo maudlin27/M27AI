@@ -251,21 +251,35 @@ function TransportManager(aiBrain)
 
     if bDebugMessages == true then LOG(sFunctionRef..': iAvailableTransports='..iAvailableTransports..'; iTransportsWaitingForEngis='..iTransportsWaitingForEngis..'; Is table of plateaus of interest empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]))) end
     if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false then
+    
+        --Decide on the plateau to expand to - factor in both distance and number of mexes
+        
+        
         --Get the closest plateau to our base
-        local iClosestPlateauGroup
-        local iClosestPlateauDistance = 100000
+        local iBestPlateauGroup
+        --local iClosestPlateauDistance = 100000
         local iCurDist
+        local iCurPriority
+        local iBestPriority = -1000
+
+        local iDistToMid = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.5
+        local iDistancePriorityFactor = -3 / iDistToMid
+
+
         for iPathingGroup, tNearestMex in aiBrain[M27MapInfo.reftPlateausOfInterest] do
             iPlateauCount = iPlateauCount + 1
             iCurDist = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tNearestMex)
-            if iCurDist < iClosestPlateauDistance then
-                iClosestPlateauGroup = iPathingGroup
-                iClosestPlateauDistance = iCurDist
+            iCurPriority = M27MapInfo.tAllPlateausWithMexes[iPathingGroup][M27MapInfo.subrefPlateauTotalMexCount] - iCurDist * iDistancePriorityFactor
+            if M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tNearestMex, false) <= iDistToMid then iCurPriority = iCurPriority + 3 end
+
+            if iCurPriority > iBestPriority then
+                iBestPlateauGroup = iPathingGroup
+                iBestPriority = iCurPriority
             end
         end
-        iMaxEngisWantedForPlateau = math.min(6,math.max(1, M27MapInfo.tAllPlateausWithMexes[iClosestPlateauGroup][M27MapInfo.subrefPlateauTotalMexCount] - 1))
+        iMaxEngisWantedForPlateau = math.min(6,math.max(1, M27MapInfo.tAllPlateausWithMexes[iBestPlateauGroup][M27MapInfo.subrefPlateauTotalMexCount] - 1))
 
-        if bDebugMessages == true then LOG(sFunctionRef..': iClosestPlateauDistance='..iClosestPlateauDistance..'; iClosestPlateauGroup='..iClosestPlateauGroup..'; iMaxEngisWantedForPlateau='..iMaxEngisWantedForPlateau) end
+        if bDebugMessages == true then LOG(sFunctionRef..': iBestPriority='..iBestPriority..'; iBestPlateauGroup='..iBestPlateauGroup..'; iMaxEngisWantedForPlateau='..iMaxEngisWantedForPlateau) end
 
         --Assign transport to go to this plateau - find the one closest to our base
         if iAvailableTransports > 0 then
@@ -280,8 +294,8 @@ function TransportManager(aiBrain)
             end
 
             --Assign transport to this plateau
-            if bDebugMessages == true then LOG(sFunctionRef..': Assigning transport '..oTransportToAssign.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransportToAssign)..' to the plateau group '..iClosestPlateauGroup) end
-            AssignTransportToPlateau(aiBrain, oTransportToAssign, iClosestPlateauGroup, iMaxEngisWantedForPlateau)
+            if bDebugMessages == true then LOG(sFunctionRef..': Assigning transport '..oTransportToAssign.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransportToAssign)..' to the plateau group '..iBestPlateauGroup) end
+            AssignTransportToPlateau(aiBrain, oTransportToAssign, iBestPlateauGroup, iMaxEngisWantedForPlateau)
         end
     end
 
