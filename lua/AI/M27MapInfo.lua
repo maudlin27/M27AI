@@ -4726,7 +4726,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                                             if not (bNearbyEnemyLand) then
                                                 --Have we tried targeting this mex recently?
                                                 sLocationRef = M27Utilities.ConvertLocationToStringRef(tClosestMex)
-                                                if GetGameTimeSeconds() - (aiBrain[M27Transport.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300) >= 300 then
+                                                if GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300) >= 300 then
                                                     --Add to shortlist of locations to try and expand to
                                                     aiBrain[reftPlateausOfInterest][iPlateauGroup] = tClosestMex
                                                 end

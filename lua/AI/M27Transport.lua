@@ -5,9 +5,10 @@ local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 
-reftTimeOfTransportLastLocationAttempt = 'M27TransportPrevTargetTime' --[x] = Location ref of previous target, returns gametime that we attempted it as a target
+--reftTimeOfTransportLastLocationAttempt = 'M27TransportPrevTargetTime' --[x] = Location ref of previous target, returns gametime that we attempted it as a target
 reftTransportsWaitingForEngi = 'M27TransportsWaitingForENgi' --each entry is a transport unit
 refiEngineersWantedForTransports = 'M27TransportsEngineersWanted'
 reftTransportsAssignedByPlateauGroup = 'M27TransportAssignedByPlateauGroup' --[x] = plateau segment group; [y] = cycles through each entry, returns transport unit assigned
@@ -191,7 +192,7 @@ function SendTransportToPlateau(aiBrain, oTransport)
     oTransport[M27AirOverseer.refbOnAssignment] = true
 
     IssueTransportUnload({oTransport}, oTransport[reftPlateauNearestMex])
-    aiBrain[reftTimeOfTransportLastLocationAttempt][M27Utilities.ConvertLocationToReference(oTransport[reftPlateauNearestMex])] = GetGameTimeSeconds()
+    M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][M27Utilities.ConvertLocationToReference(oTransport[reftPlateauNearestMex])] = GetGameTimeSeconds()
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -418,7 +419,7 @@ end
 
 function TransportInitialisation(aiBrain)
     aiBrain[reftTransportsWaitingForEngi] = {}
-    aiBrain[reftTimeOfTransportLastLocationAttempt] = {}
+    --aiBrain[reftTimeOfTransportLastLocationAttempt] = {}
     aiBrain[reftTransportsAssignedByPlateauGroup] = {}
     aiBrain[reftEngineersWaitingForTransport] = {}
 end

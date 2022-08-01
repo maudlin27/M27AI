@@ -25,6 +25,8 @@ refbActiveResourceMonitor = 'M27TeamActiveResourceMonitor' --against tTeamData[a
 reftUnseenPD = 'M27TeamUnseenPD' --against tTeamData[aiBrain.M27Team], table of T2+ PD objects that have damaged an ally but havent been revealed yet
 refbEnemyTeamHasUpgrade = 'M27TeamEnemeyHasUpgrade' --against tTeamData[aiBrain.M27Team], true if enemy has started ACU upgrade or has ACU upgrade
 
+reftTimeOfTransportLastLocationAttempt = 'M27TeamTimeOfLastTransportAttempt' --against tTeamData[aiBrain.M27Team], returns a table with [x] being the string location ref, and the value being the game time in seconds that we last tried to land a transport there
+
 refbActiveNovaxCoordinator = 'M27TeamNovaxCoordinator'
 refbActiveLandExperimentalCoordinator = 'M27TeamExperimentalCoordinator' --Used to decide actions involving multiple experimentals
 
@@ -572,4 +574,11 @@ function RecordUnseenPD(oPD, oUnitDamaged)
             oPD[M27UnitInfo.refbTreatAsVisible] = true
         end
     end
+end
+
+function TeamInitialisation(iTeamRef)
+    --Should have already specified friendly M27 brains and recorded an empty table for tTeamData as part of RecordAllEnemiesAndAllies
+    tTeamData[iTeamRef][subrefNukeLaunchLocations] = {}
+    tTeamData[iTeamRef][reftEnemyArtiToAvoid] = {}
+    tTeamData[iTeamRef][reftTimeOfTransportLastLocationAttempt] = {}
 end

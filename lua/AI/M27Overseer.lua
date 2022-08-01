@@ -7428,8 +7428,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
         end
         M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] = {}
         M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][aiBrain:GetArmyIndex()] = aiBrain
-        M27Team.tTeamData[aiBrain.M27Team][M27Team.subrefNukeLaunchLocations] = {}
-        M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyArtiToAvoid] = {}
+
         for iCurBrain, oBrain in aiBrain[toAllyBrains] do
             oBrain.M27Team = M27Team.iTotalTeamCount
             if oBrain.M27AI then
@@ -7437,6 +7436,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
             end
         end
 
+        M27Team.TeamInitialisation(M27Team.iTotalTeamCount)
     end
 
 
