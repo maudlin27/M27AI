@@ -132,6 +132,10 @@ function AssignTransportToPlateau(aiBrain, oTransport, iPlateauGroup, iMaxEngisW
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --if aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code for ai '..aiBrain.Nickname..', assigning transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..' to iPlateauGroup '..iPlateauGroup..'; iMaxEngisWanted='..iMaxEngisWanted) end
+
     if iMaxEngisWanted > 0 then
         aiBrain[reftTransportsWaitingForEngi][oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)] = oTransport
     end
@@ -148,15 +152,16 @@ function ClearTransportTrackers(aiBrain, oTransport)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --if aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
+
     if aiBrain[reftTransportsAssignedByPlateauGroup][oTransport[refiAssignedPlateau]] then
+        if bDebugMessages == true then LOG(sFunctionRef..': ai='..aiBrain.Nickname..'; About to clear any tracking for the transport '..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)) end
         aiBrain[reftTransportsAssignedByPlateauGroup][oTransport[refiAssignedPlateau]][oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)] = nil
     end
     aiBrain[reftTransportsWaitingForEngi][oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)] = nil
     oTransport[refiAssignedPlateau] = nil
     oTransport[refiMaxEngisWanted] = 0
 
-    local sFunctionRef = 'AssignTransportToPlateau'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
