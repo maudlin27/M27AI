@@ -2259,7 +2259,7 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
     else return tMexByPathingAndGrouping[sPathing][iUnitPathGroup][iNearestMexFromUnit] end
 end
 
-function IsUnderwater(tPosition, bReturnSurfaceHeightInstead)
+function IsUnderwater(tPosition, bReturnSurfaceHeightInstead, iOptionalAmountToBeUnderwater)
     --Returns true if tPosition underwater, otherwise returns false
     --bReturnSurfaceHeightInstead:: Return the actual height at which underwater, instead of true/false
     if bReturnSurfaceHeightInstead then return iMapWaterHeight
@@ -2267,7 +2267,7 @@ function IsUnderwater(tPosition, bReturnSurfaceHeightInstead)
         if M27Utilities.IsTableEmpty(tPosition) == true then
             M27Utilities.ErrorHandler('tPosition is empty')
         else
-            if iMapWaterHeight > tPosition[2] then
+            if iMapWaterHeight > tPosition[2] + (iOptionalAmountToBeUnderwater or 0) then
                 --Check we're not just under an arch but are actually underwater
                 if not(GetTerrainHeight(tPosition[1], tPosition[3]) == iMapWaterHeight) then
                     return true

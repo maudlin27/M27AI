@@ -2533,6 +2533,65 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have more threat than when we last had to retreat to rally/base so will do a temporary retreat') end
                 end
             end
+
+            --Retreat underwater if are in trouble
+            if bProceed == false and oPlatoon[refbNeedToHeal] and (oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionGoToNearestRallyPoint or oPlatoon[refiCurrentAction] == refActionGoToRallyPointNearAir or oPlatoon[refiCurrentAction] == refActionReturnToBase) then
+                if oPlatoon[refiEnemiesInRange] > 0 and aiBrain:GetMapWaterRatio() >= 0.02 and M27UnitInfo.GetUnitHealthPercent(oPlatoon[reftBuilders][1]) <= 0.75 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 100 then
+                    --ACU wants to run, doesnt have great health, and has mobile enemies in range, while map has water on it - consider if want to retreat to water instead
+                    if GetGameTimeSeconds() >= 780 then bDebugMessages = true end
+
+                    --Have we taken torp damage recently?
+                    if not(oPlatoon[reftBuilders][1][M27Overseer.refoUnitDealingUnseenDamage]) or not(EntityCategoryContains(categories.ANTINAVY + categories.OVERLAYANTINAVY,oPlatoon[reftBuilders][1][M27Overseer.refoUnitDealingUnseenDamage].UnitId)) then
+                        --Is there water near us that we can path to without obstruction, when considering locations that wont take us further from our base?
+
+                        local iWaterSearchInterval = 8
+                        local iMaxWaterSearchRange = iWaterSearchInterval * 6 --48
+                        local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
+                        local iBaseAngle = M27Utilities.GetAngleFromAToB(tPlatoonPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                        local tPossibleLocation
+                        local iAmountToBeUnderwater = oPlatoon[reftBuilders][1]:GetBlueprint().SizeY
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will see if we have any water nearby that we can retreat to') end
+                        local bFoundUnderwaterPosition = false
+                        local iSegmentGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPlatoonPosition)
+
+
+                        for iSearchDistance = iMaxWaterSearchRange, iWaterSearchInterval, -iWaterSearchInterval do
+                            for iAngleAdjust = 0, 70, 35 do
+                                for iAngleFactor = -1, 1, 1 do
+                                    tPossibleLocation = M27Utilities.MoveInDirection(tPlatoonPosition, iBaseAngle + iAngleAdjust * iAngleFactor, iSearchDistance, true)
+                                    tPossibleLocation[2] = GetTerrainHeight(tPossibleLocation[1], tPossibleLocation[3])
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef..': Will draw location in red, terrain height='..GetTerrainHeight(tPossibleLocation[1], tPossibleLocation[3])..'; surface height='..GetSurfaceHeight(tPossibleLocation[1], tPossibleLocation[3]))
+                                        M27Utilities.DrawLocation(tPossibleLocation, false, 2, 250, nil)
+                                    end
+                                    if M27MapInfo.IsUnderwater(tPossibleLocation, false, iAmountToBeUnderwater) then
+                                        --Have somewhere to move to that is underwater, check if we can path there without obstruction
+                                        bFoundUnderwaterPosition = true
+                                        for iDistToWater = 2, math.floor(iSearchDistance / 2) * 2, 2 do
+                                            if not(iSegmentGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27Utilities.MoveInDirection(tPlatoonPosition, iBaseAngle + iAngleAdjust * iAngleFactor, iDistToWater, true))) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': We cant path in a straight line there so will abort') end
+                                                bFoundUnderwaterPosition = false
+                                                break
+                                            end
+                                        end
+                                        if bFoundUnderwaterPosition then
+                                            oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
+                                            oPlatoon[reftTemporaryMoveTarget] = {tPossibleLocation[1], tPossibleLocation[2], tPossibleLocation[3]}
+                                            oPlatoon[refbHavePreviouslyRun] = true
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Will send ACU to temporary location that is underwater instead of retreating') end
+                                        end
+                                    end
+                                    if iAngleAdjust == 0 then break end
+                                    if bFoundUnderwaterPosition then break end
+                                end
+                                if bFoundUnderwaterPosition then break end
+                            end
+                            if bFoundUnderwaterPosition then break end
+                        end
+                    end
+                end
+            end
+
             if bDebugMessages == true then LOG(sFunctionRef..': iACUHealth='..oPlatoon[refoFrontUnit]:GetHealth()..'; finished checking if should run due to low health, bProceed='..tostring(bProceed)) end
             if bProceed == true then
                 local bACUNeedsToRun = false

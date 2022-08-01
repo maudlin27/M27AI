@@ -461,7 +461,6 @@ function DodgeBomb(oBomber, oWeapon, projectile)
         if bDebugMessages == true then LOG(sFunctionRef..': Is table of units in rectangle around bomb radius empty='..tostring(M27Utilities.IsTableEmpty(tAllUnitsInArea))) end
         if M27Utilities.IsTableEmpty(tAllUnitsInArea) == false then
             local tMobileLandInArea = EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileLand - categories.EXPERIMENTAL, tAllUnitsInArea)
-            local bDontActuallyDodge
             if bDebugMessages == true then LOG(sFunctionRef..': Is table of mobile land units in rectangle around bomb radius empty='..tostring(M27Utilities.IsTableEmpty(tMobileLandInArea))) end
             if M27Utilities.IsTableEmpty(tMobileLandInArea) == false then
                 local oCurBrain
@@ -477,21 +476,21 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                                     --Dont dodge in case we can no longer attack ACU
                                 else
                                     --If ACU is upgrading might not want to cancel
-                                    local bIgnoreAsUpgrading = false
+                                    local bDontTryAndDodge = false
                                     if oUnit:IsUnitState('Upgrading') then
                                         --Are we facing a T1 bomb?
                                         if EntityCategoryContains(categories.TECH1, oBomber.UnitId) then
-                                            bIgnoreAsUpgrading = true
+                                            bDontTryAndDodge = true
                                         else
                                             --Facing T2+ bomb, so greater risk if we dont try and dodge; dont dodge if are almost complete
                                             if oUnit:GetWorkProgress() >= 0.9 then
-                                                bIgnoreAsUpgrading = true
+                                                bDontTryAndDodge = true
                                             else
                                                 --Is it a T2 bomber, and there arent many bombers nearby?
                                                 if EntityCategoryContains(categories.TECH2, oBomber.UnitId) then
                                                     local tNearbyBombers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryGunship, oUnit:GetPosition(), 100, 'Enemy')
                                                     if M27Utilities.IsTableEmpty(tNearbyBombers) == true then
-                                                        bIgnoreAsUpgrading = true
+                                                        bDontTryAndDodge = true
                                                     else
                                                         local iEnemyBomberCount = 0
                                                         for iEnemy, oEnemy in tNearbyBombers do
@@ -500,15 +499,24 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                                                                 if iEnemyBomberCount >= 4 then break end
                                                             end
                                                         end
-                                                        if iEnemyBomberCount < 4 then bIgnoreAsUpgrading = true end
+                                                        if iEnemyBomberCount < 4 then bDontTryAndDodge = true end
 
                                                     end
                                                 end
                                             end
                                         end
                                     end
-                                    if bDebugMessages == true then LOG(sFunctionRef..': bIgnoreAsUpgrading='..tostring(bIgnoreAsUpgrading)) end
-                                    if not(bIgnoreAsUpgrading) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': bDontTryAndDodge after checking if upgrading='..tostring(bDontTryAndDodge)) end
+                                    if not(bDontTryAndDodge) then
+                                        --Are we running and have significant nearby land threats and are against a T1 bomber?
+                                        if oUnit.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0 and oUnit.PlatoonHandle[M27PlatoonUtilities.refbHavePreviouslyRun] and EntityCategoryContains(categories.TECH1, oBomber.UnitId) then
+                                            if M27Logic.GetCombatThreatRating(aiBrain, oUnit.PlatoonHandle[M27PlatoonUtilities.reftEnemiesInRange]) >= 250 then
+                                                bDontTryAndDodge = true
+                                            end
+                                        end
+                                    end
+
+                                    if not(bDontTryAndDodge) then
                                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] then iTimeToRun = math.max(iTimeToRun, 2) end
                                         if oUnit[M27UnitInfo.refbSpecialMicroActive] then
                                             if bDebugMessages == true then LOG(sFunctionRef..': Will move in a circle as micro is already active') end
