@@ -329,7 +329,7 @@ function CombatPlatoonFormer(aiBrain)
 
 
     if M27Utilities.IsTableEmpty(tUnitsWaiting) == false then
-        if GetGameTimeSeconds() >= 450 and table.getn(tUnitsWaiting) >= 3 then bDebugMessages = true end
+        --if GetGameTimeSeconds() >= 450 and table.getn(tUnitsWaiting) >= 3 then bDebugMessages = true end
 
         --Exclude ACU and experimentals - now done above
         --if bDebugMessages == true then LOG(sFunctionRef..': Removing any ACUs and experimentals from the units to form platoons with as backup as these are dealt with separately') end

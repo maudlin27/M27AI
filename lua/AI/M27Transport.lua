@@ -30,7 +30,7 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     local sFunctionRef = 'UpdateTransportForLoadedUnit'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
+    --if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': oUnitJustLoaded='..oUnitJustLoaded.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitJustLoaded)..'; Is unit valid='..tostring(M27UnitInfo.IsUnitValid(oUnitJustLoaded))) end
 
     oUnitJustLoaded[refoTransportToLoadOnto] = nil
@@ -97,7 +97,7 @@ function RecordUnitLoadingOntoTransport(oUnit, oTransport)
     local sFunctionRef = 'RecordUnitLoadingOntoTransport'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
+    --if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
     oUnit[refoTransportToLoadOnto] = oTransport
     if M27Utilities.IsTableEmpty(oTransport[reftUnitsToldToLoadOntoTransport]) then oTransport[reftUnitsToldToLoadOntoTransport] = {} end
     oTransport[reftUnitsToldToLoadOntoTransport][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
@@ -109,7 +109,7 @@ function LoadEngineerOnTransport(aiBrain, oEngineer, oTransport)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'LoadEngineerOnTransport'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
+    --if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': Engineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; Unit state='..M27Logic.GetUnitState(oEngineer)..'; Transport='..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)..'; Unit state='..M27Logic.GetUnitState(oTransport)..'; oTransport[M27UnitInfo.refbSpecialMicroActive]='..tostring(oTransport[M27UnitInfo.refbSpecialMicroActive] or false)) end
 
@@ -164,7 +164,7 @@ function SendTransportToPlateau(aiBrain, oTransport)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SendTransportToPlateau'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
+    --if oTransport:GetAIBrain():GetArmyIndex() == 2 then bDebugMessages = true end
     --Check if target still safe and if not switches to an alternative target if there's a better one
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, will update plateaus that we want to expand to. oTransport='..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)) end
     M27MapInfo.UpdatePlateausToExpandTo(aiBrain, true)
@@ -204,7 +204,7 @@ function TransportManager(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'TransportManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
+    --if aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
 
     --Called via forkthread from airoverseer after identifying available transports
 

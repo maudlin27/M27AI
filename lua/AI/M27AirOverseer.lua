@@ -3516,6 +3516,44 @@ function CreateMovementPathFromDestination(aiBrain, tEndDestination, oScout)
     return tMovementPath
 end
 
+function RecordThatCanSeeSegment(aiBrain, iAirSegmentX, iAirSegmentZ, iTimeStamp)
+    for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+        oBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiLastScouted] = iTimeStamp
+        oBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiDeadScoutsSinceLastReveal] = 0
+        oBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiCurrentScoutingInterval] = oBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiNormalScoutingIntervalWanted]
+    end
+end
+
+function UpdateSegmentsForLocationVision(aiBrain, tUnitPosition, iVisionRange, iTimeStamp)
+    local sFunctionRef = 'UpdateSegmentsForLocationVision'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    local iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tUnitPosition)
+
+    --Next update +/-1 (but not corners)
+    local iBoxSize
+    if iVisionRange <= iAirSegmentSize then
+        iBoxSize = 0
+    elseif iVisionRange <= iSegmentVisualThresholdBoxSize1 then
+        iBoxSize = 1
+    elseif iVisionRange <= iSegmentVisualThresholdBoxSize2 then
+        iBoxSize = 2
+    else
+        iBoxSize = math.ceil((iVisionRange / iAirSegmentSize) - 1)
+    end
+
+    local iFirstX = math.max(iCurAirSegmentX - iBoxSize, 1)
+    local iLastX = math.min(iCurAirSegmentX + iBoxSize, iMapMaxSegmentX)
+    local iFirstZ = math.max(iCurAirSegmentZ - iBoxSize, 1)
+    local iLastZ = math.min(iCurAirSegmentZ + iBoxSize, iMapMaxSegmentZ)
+
+    for iX = iFirstX, iLastX, 1 do
+        for iZ = iFirstZ, iLastZ, 1 do
+            RecordThatCanSeeSegment(aiBrain, iX, iZ, iTimeStamp)
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
 function DedicatedScoutManager(aiBrain, oScout, oAssistTarget)
     oScout[refbOnAssignment] = true
     IssueClearCommands({ oScout })
@@ -3661,12 +3699,6 @@ function AirScoutManager(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function RecordThatCanSeeSegment(aiBrain, iAirSegmentX, iAirSegmentZ, iTimeStamp)
-    aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiLastScouted] = iTimeStamp
-    aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiDeadScoutsSinceLastReveal] = 0
-    aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiCurrentScoutingInterval] = aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiNormalScoutingIntervalWanted]
-end
-
 function QuantumOpticsManager(aiBrain, oUnit)
     --Call via forkthread
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -3763,36 +3795,6 @@ function QuantumOpticsManager(aiBrain, oUnit)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function UpdateSegmentsForLocationVision(aiBrain, tUnitPosition, iVisionRange, iTimeStamp)
-    local sFunctionRef = 'UpdateSegmentsForLocationVision'
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local iCurAirSegmentX, iCurAirSegmentZ = GetAirSegmentFromPosition(tUnitPosition)
-
-    --Next update +/-1 (but not corners)
-    local iBoxSize
-    if iVisionRange <= iAirSegmentSize then
-        iBoxSize = 0
-    elseif iVisionRange <= iSegmentVisualThresholdBoxSize1 then
-        iBoxSize = 1
-    elseif iVisionRange <= iSegmentVisualThresholdBoxSize2 then
-        iBoxSize = 2
-    else
-        iBoxSize = math.ceil((iVisionRange / iAirSegmentSize) - 1)
-    end
-
-    local iFirstX = math.max(iCurAirSegmentX - iBoxSize, 1)
-    local iLastX = math.min(iCurAirSegmentX + iBoxSize, iMapMaxSegmentX)
-    local iFirstZ = math.max(iCurAirSegmentZ - iBoxSize, 1)
-    local iLastZ = math.min(iCurAirSegmentZ + iBoxSize, iMapMaxSegmentZ)
-
-    for iX = iFirstX, iLastX, 1 do
-        for iZ = iFirstZ, iLastZ, 1 do
-            RecordThatCanSeeSegment(aiBrain, iX, iZ, iTimeStamp)
-        end
-    end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-end
-
 function RecordSegmentsThatHaveVisualOf(aiBrain)
     --NOTE: If just want to get the last time we had visual range of a segment, refer to the function RecordThatCanSeeSegment, in particular:
     -- aiBrain[reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][refiLastScouted] = iTimeStamp
@@ -3806,32 +3808,35 @@ function RecordSegmentsThatHaveVisualOf(aiBrain)
         LOG(sFunctionRef .. ': Start of code')
     end
     if not(aiBrain[refbHaveOmniVision]) then
-        local iTimeStamp = GetGameTimeSeconds()
+        if GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastVisualUpdate] or -1) >= 0.99 then
+            local iTimeStamp = GetGameTimeSeconds()
+            M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastVisualUpdate] = iTimeStamp
 
-        local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-        local tAirScouts = aiBrain:GetUnitsAroundPoint(refCategoryAirScout * categories.TECH1, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
-        local iAirVision = 42
-        for iUnit, oUnit in tAirScouts do
-            if not (oUnit.Dead) then
-                UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+            local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+            local tAirScouts = aiBrain:GetUnitsAroundPoint(refCategoryAirScout * categories.TECH1, tStartPosition, 10000, 'Ally')
+            local iAirVision = 42
+            for iUnit, oUnit in tAirScouts do
+                if not (oUnit.Dead) then
+                    UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+                end
             end
-        end
-        local tSpyPlanes = aiBrain:GetUnitsAroundPoint(refCategoryAirScout * categories.TECH3, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
-        iAirVision = 64
-        for iUnit, oUnit in tSpyPlanes do
-            if not (oUnit.Dead) then
-                UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+            local tSpyPlanes = aiBrain:GetUnitsAroundPoint(refCategoryAirScout * categories.TECH3, tStartPosition, 10000, 'Ally')
+            iAirVision = 64
+            for iUnit, oUnit in tSpyPlanes do
+                if not (oUnit.Dead) then
+                    UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+                end
             end
-        end
 
-        local tAllOtherUnits = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - refCategoryAirScout - M27UnitInfo.refCategoryMex - M27UnitInfo.refCategoryHydro, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
-        local oCurBP, iCurVision
-        for iUnit, oUnit in tAllOtherUnits do
-            if not (oUnit.Dead) and oUnit.GetBlueprint then
-                oCurBP = oUnit:GetBlueprint()
-                iCurVision = oCurBP.Intel.VisionRadius
-                if iCurVision and iCurVision >= iAirSegmentSize then
-                    UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iCurVision, iTimeStamp)
+            local tAllOtherUnits = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - refCategoryAirScout - M27UnitInfo.refCategoryMex - M27UnitInfo.refCategoryHydro, tStartPosition, 10000, 'Ally')
+            local oCurBP, iCurVision
+            for iUnit, oUnit in tAllOtherUnits do
+                if not (oUnit.Dead) and oUnit.GetBlueprint then
+                    oCurBP = oUnit:GetBlueprint()
+                    iCurVision = oCurBP.Intel.VisionRadius
+                    if iCurVision and iCurVision >= iAirSegmentSize then
+                        UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iCurVision, iTimeStamp)
+                    end
                 end
             end
         end

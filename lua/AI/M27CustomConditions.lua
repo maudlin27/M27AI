@@ -140,7 +140,7 @@ function SafeToGetACUUpgrade(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SafeToGetACUUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 700 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 700 then bDebugMessages = true end
 
     local bIsSafe = false
     local iSearchRange = 33
@@ -397,7 +397,7 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
     local sFunctionRef = 'WantToGetFirstACUUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Returns true if meet all the conditions that mean will want gun upgrade
-    if GetGameTimeSeconds() >= 700 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 700 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     if bIgnoreEnemies == nil then bIgnoreEnemies = false end
     local bWantToGetGun = true

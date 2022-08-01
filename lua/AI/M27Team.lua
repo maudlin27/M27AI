@@ -11,11 +11,12 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
+local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 
 
 tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
 reftFriendlyActiveM27Brains = 'M27TeamFriendlyM27Brains' --Stored against tTeamData[brain.M27Team], returns table of all M27 brains on the same team (including this one), with a key of the army index
-iTotalTeamCount = 0 --Number of teams in the game
+iTotalTeamCount = 0 --Number o teams in the game
 subrefNukeLaunchLocations = 'M27TeamNukeTargets' --stored against tTeamData[brain.M27Team], [x] is gametimeseconds, returns the location of a nuke target
 refiEnemyWalls = 'M27TeamEnemyWallCount' --stored against tTeamData[brain.M27Team], returns the ntotal number of enemy wall units; used as threshold to enable engineers to start looking for wall segments to reclaim
 refiTimeOfLastEnemyTeamDataUpdate = 'M27TeamEnemyLastUpdate' --as above, returns the gametimeseconds of hte last update
@@ -26,9 +27,12 @@ reftUnseenPD = 'M27TeamUnseenPD' --against tTeamData[aiBrain.M27Team], table of 
 refbEnemyTeamHasUpgrade = 'M27TeamEnemeyHasUpgrade' --against tTeamData[aiBrain.M27Team], true if enemy has started ACU upgrade or has ACU upgrade
 
 reftTimeOfTransportLastLocationAttempt = 'M27TeamTimeOfLastTransportAttempt' --against tTeamData[aiBrain.M27Team], returns a table with [x] being the string location ref, and the value being the game time in seconds that we last tried to land a transport there
+tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --tTeamData[aiBrain.M27Team][this]: returns a table, with key [sLocationRef], that returns a scout object, e.g. [X1Z1] = oScout; only returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
 
 refbActiveNovaxCoordinator = 'M27TeamNovaxCoordinator'
 refbActiveLandExperimentalCoordinator = 'M27TeamExperimentalCoordinator' --Used to decide actions involving multiple experimentals
+
+refiTimeOfLastVisualUpdate = 'M27TeamLastVisualUpdate' --against tTeamData, Similar to refiTimeOfLastEnemyTeamDataUpdate
 
 
 --Variables recorded elsewhere relating to team data:
@@ -116,7 +120,7 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
 end
 
 function GiveResourcesToPlayer(oBrainGiver, oBrainReceiver, iMass, iEnergy)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GiveResourcesToPlayer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --Failed attempt - simcallback:
@@ -157,7 +161,7 @@ end
 function AllocateTeamEnergyResources(iTeam, iFirstM27Brain)
     --Cycles through every team member, and for M27 team members considers giving resources to non-M27 team members
 
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AllocateTeamEnergyResources'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -311,7 +315,7 @@ end
 function AllocateTeamMassResources(iTeam, iFirstM27Brain)
     --Cycles through every team member, and for M27 team members considers giving resources to non-M27 team members
 
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AllocateTeamMassResources'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -435,7 +439,7 @@ end
 
 function TeamResourceSharingMonitor(iTeam)
     --Monitors resources for AI in the team and shares resources
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'TeamResourceSharingMonitor'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -576,9 +580,44 @@ function RecordUnseenPD(oPD, oUnitDamaged)
     end
 end
 
+function RecordSegmentsThatTeamHasVisualOf(aiBrain)
+    if GetGameTimeSeconds() - (tTeamData[aiBrain.M27Team][refiTimeOfLastVisualUpdate] or -1) >= 0.99 then
+        local iTimeStamp = GetGameTimeSeconds()
+
+        local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        local tAirScouts = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirScout * categories.TECH1, tStartPosition, 10000, 'Ally')
+        local iAirVision = 42
+        for iUnit, oUnit in tAirScouts do
+            if not (oUnit.Dead) then
+                M27AirOverseer.UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+            end
+        end
+        local tSpyPlanes = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirScout * categories.TECH3, tStartPosition, 10000, 'Ally')
+        iAirVision = 64
+        for iUnit, oUnit in tSpyPlanes do
+            if not (oUnit.Dead) then
+                M27AirOverseer.UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iAirVision, iTimeStamp)
+            end
+        end
+
+        local tAllOtherUnits = aiBrain:GetUnitsAroundPoint(categories.ALLUNITS - refCategoryAirScout - M27UnitInfo.refCategoryMex - M27UnitInfo.refCategoryHydro, tStartPosition, aiBrain[refiMaxScoutRadius], 'Ally')
+        local oCurBP, iCurVision
+        for iUnit, oUnit in tAllOtherUnits do
+            if not (oUnit.Dead) and oUnit.GetBlueprint then
+                oCurBP = oUnit:GetBlueprint()
+                iCurVision = oCurBP.Intel.VisionRadius
+                if iCurVision and iCurVision >= iAirSegmentSize then
+                    M27AirOverseer.UpdateSegmentsForLocationVision(aiBrain, oUnit:GetPosition(), iCurVision, iTimeStamp)
+                end
+            end
+        end
+    end
+end
+
 function TeamInitialisation(iTeamRef)
     --Should have already specified friendly M27 brains and recorded an empty table for tTeamData as part of RecordAllEnemiesAndAllies
     tTeamData[iTeamRef][subrefNukeLaunchLocations] = {}
     tTeamData[iTeamRef][reftEnemyArtiToAvoid] = {}
     tTeamData[iTeamRef][reftTimeOfTransportLastLocationAttempt] = {}
+    tTeamData[iTeamRef][tScoutAssignedToMexLocation] = {}
 end

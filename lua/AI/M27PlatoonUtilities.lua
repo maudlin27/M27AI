@@ -1530,7 +1530,7 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
     end
     --if oPlatoon[refbACUInPlatoon] == true and oPlatoon:GetBrain():GetArmyIndex() == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
-    if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
+    --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
@@ -2261,7 +2261,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 540 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -2271,7 +2271,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
-    if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
+    --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 21 then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
@@ -2551,7 +2551,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
             if bProceed == false and oPlatoon[refbNeedToHeal] and (oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionGoToNearestRallyPoint or oPlatoon[refiCurrentAction] == refActionGoToRallyPointNearAir or oPlatoon[refiCurrentAction] == refActionReturnToBase) then
                 if oPlatoon[refiEnemiesInRange] > 0 and aiBrain:GetMapWaterRatio() >= 0.02 and M27UnitInfo.GetUnitHealthPercent(oPlatoon[reftBuilders][1]) <= 0.75 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 100 then
                     --ACU wants to run, doesnt have great health, and has mobile enemies in range, while map has water on it - consider if want to retreat to water instead
-                    if GetGameTimeSeconds() >= 780 then bDebugMessages = true end
+                    --if GetGameTimeSeconds() >= 780 then bDebugMessages = true end
 
                     --Have we taken torp damage recently?
                     if not(oPlatoon[reftBuilders][1][M27Overseer.refoUnitDealingUnseenDamage]) or not(EntityCategoryContains(categories.ANTINAVY + categories.OVERLAYANTINAVY,oPlatoon[reftBuilders][1][M27Overseer.refoUnitDealingUnseenDamage].UnitId)) then
@@ -5838,7 +5838,7 @@ function DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local oACU = M27Utilities.GetACU(aiBrain)
-    if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
     if not(oACU[M27UnitInfo.refbFullyUpgraded]) then
         if bDebugMessages == true then LOG(sFunctionRef..': ACU not fully upgraded; does ACU have enhancement blastattack='..tostring(M27Utilities.GetACU(aiBrain):HasEnhancement('BlastAttack'))) end
         if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and not(oACU:HasEnhancement('AdvancedEngineering')) and not(oACU:HasEnhancement('T3Engineering')) and M27Conditions.DoesACUHaveGun(aiBrain, true) == false and not(oACU[M27Overseer.refbACUCantPathAwayFromBase]) then
@@ -6848,7 +6848,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -8026,7 +8026,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
         --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
         --if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
         --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 26 then bDebugMessages = true end
-        if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
+        --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
         --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
         --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end
 
@@ -10133,7 +10133,7 @@ function ProcessPlatoonAction(oPlatoon)
             local sPlatoonName = oPlatoon:GetPlan()
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
-            if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end

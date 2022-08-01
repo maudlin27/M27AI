@@ -165,7 +165,7 @@ local refiCyclesThatACUInArmyPool = 'M27ACUCyclesInArmyPool'
 --Intel related
 --local sIntelPlatoonRef = 'M27IntelPathAI' - included above
 refiInitialRaiderPlatoonsWanted = 'M27InitialRaidersWanted'
-tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --[sLocationRef] - returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
+--tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --[sLocationRef] - returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
 --refiInitialEngineersWanted = 'M27InitialEngineersWanted' --This is in FactoryOverseer
 
 refbConfirmedInitialRaidersHaveScouts = 'M27InitialRaidersHaveScouts'
@@ -2383,14 +2383,14 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                             end
                             sLocationRef = iMex --M27Utilities.ConvertLocationToReference(tMex)
                             --Do we have a scout assigned that is still alive?
-                            oCurScout = aiBrain[tScoutAssignedToMexLocation][sLocationRef]
+                            oCurScout = M27Team.tTeamData[aiBrain.M27Team][M27Team.tScoutAssignedToMexLocation][sLocationRef]
                             if oCurScout and not (oCurScout.Dead) and oCurScout.GetUnitId then
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Already have a scout assigned to the mex')
                                 end
                                 --Do nothing
                             else
-                                aiBrain[tScoutAssignedToMexLocation][sLocationRef] = nil
+                                M27Team.tTeamData[aiBrain.M27Team][M27Team.tScoutAssignedToMexLocation][sLocationRef] = nil
                                 --Do we have omni coverage?
                                 bCurPositionInOmniRange = false
                                 if bConsiderOmni then
@@ -2418,7 +2418,7 @@ function AssignScoutsToPreferredPlatoons(aiBrain)
                                         oCurScout = nil
                                     end
                                     if oCurScout then
-                                        aiBrain[tScoutAssignedToMexLocation][sLocationRef] = oCurScout
+                                        M27Team.tTeamData[aiBrain.M27Team][M27Team.tScoutAssignedToMexLocation][sLocationRef] = oCurScout
                                         local iAngleToEnemyBase = M27Utilities.GetAngleFromAToB(tMex, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                                         local tPositionToGuard = M27Utilities.MoveInDirection(tMex, iAngleToEnemyBase, 6) --dont want to block mex or storage, and want to get slight advance warning of enemies
                                         AssignHelperToLocation(aiBrain, oCurScout, tPositionToGuard)
@@ -7741,7 +7741,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[refiMinLandFactoryBeforeOtherTypes] = 2
 
     --Scout related - other
-    aiBrain[tScoutAssignedToMexLocation] = {}
+    --aiBrain[tScoutAssignedToMexLocation] = {} --now handled by m27team
 
     --Skirmisher
     aiBrain[refiSkirmisherMassDeathsFromLand] = 0
