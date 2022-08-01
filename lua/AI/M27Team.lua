@@ -10,6 +10,7 @@ local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
+local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 
 
 tTeamData = {} --[x] is the aiBrain.M27Team number - stores certain team-wide information
@@ -22,6 +23,7 @@ reftEnemyArtiToAvoid = 'M27TeamEnemyArtiToAvoid' --against tTeamData[aiBrain.M27
 refiFriendlyFatboyCount = 'M27TeamFriendlyFatboys' --against tTeamData[aiBrain.M27Team], returns the number of friendly fatboys on the team
 refbActiveResourceMonitor = 'M27TeamActiveResourceMonitor' --against tTeamData[aiBrain.M27Team], true if the tema has an active resource monitor
 reftUnseenPD = 'M27TeamUnseenPD' --against tTeamData[aiBrain.M27Team], table of T2+ PD objects that have damaged an ally but havent been revealed yet
+refbEnemyTeamHasUpgrade = 'M27TeamEnemeyHasUpgrade' --against tTeamData[aiBrain.M27Team], true if enemy has started ACU upgrade or has ACU upgrade
 
 refbActiveNovaxCoordinator = 'M27TeamNovaxCoordinator'
 refbActiveLandExperimentalCoordinator = 'M27TeamExperimentalCoordinator' --Used to decide actions involving multiple experimentals
@@ -90,6 +92,22 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
                     tTeamData[aiBrain.M27Team][reftUnseenPD][iUnit] = nil
                 end
             end
+        end
+
+        --Record if enemy has upgraded ACU
+        if not(tTeamData[aiBrain.M27Team][refbEnemyTeamHasUpgrade]) then
+            local tEnemyVisibleACU = aiBrain:GetUnitsAroundPoint(categories.COMMAND, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
+            if M27Utilities.IsTableEmpty(tEnemyVisibleACU) == false then
+                for iUnit, oUnit in tEnemyVisibleACU do
+                    if oUnit:IsUnitState('Upgrading') then
+                        tTeamData[aiBrain.M27Team][refbEnemyTeamHasUpgrade] = true
+                        break
+                    elseif M27UnitInfo.GetNumberOfUpgradesObtained(oUnit) > 0 then
+                        tTeamData[aiBrain.M27Team][refbEnemyTeamHasUpgrade] = true
+                    end
+                end
+            end
+
         end
 
     end

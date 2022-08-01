@@ -2522,6 +2522,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     end
                 end
             end
+
+            --Always run if in protect ACU mode
             if bProceed == true then
                 if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU then
                     bProceed = false
@@ -2534,7 +2536,18 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 end
             end
 
-            --Retreat underwater if are in trouble
+            --If not in ACU kill mode, and enemy ACU has upgrade, then prioritise getting an upgrade on our ACU
+            if bProceed and M27Team.tTeamData[aiBrain.M27Team][M27Team.refbEnemyTeamHasUpgrade] and M27UnitInfo.GetNumberOfUpgradesObtained(oPlatoon[reftBuilders][1]) == 0 then
+                bProceed = false
+                DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
+                if bDebugMessages == true then LOG(sFunctionRef..': Enemy upgrading or has upgrade so want to get one, action after checking whether to get ACU upgrade as earlier action='..(oPlatoon[refiCurrentAction] or 'nil')..'; if no action then will retreat to nearest rally point') end
+                if not(oPlatoon[refiCurrentAction]) then oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint end
+            end
+
+
+
+
+            --If have decided to run, retreat underwater if is water nearby on the way towards our base
             if bProceed == false and oPlatoon[refbNeedToHeal] and (oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionGoToNearestRallyPoint or oPlatoon[refiCurrentAction] == refActionGoToRallyPointNearAir or oPlatoon[refiCurrentAction] == refActionReturnToBase) then
                 if oPlatoon[refiEnemiesInRange] > 0 and aiBrain:GetMapWaterRatio() >= 0.02 and M27UnitInfo.GetUnitHealthPercent(oPlatoon[reftBuilders][1]) <= 0.75 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 100 then
                     --ACU wants to run, doesnt have great health, and has mobile enemies in range, while map has water on it - consider if want to retreat to water instead
