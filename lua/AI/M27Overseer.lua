@@ -214,6 +214,8 @@ refoLastNearestACU = 'M27OverseerLastACUObject'
 reftLastNearestACU = 'M27OverseerLastACUPosition' --Position of the last ACU we saw
 refiLastNearestACUDistance = 'M27OverseerLastNearestACUDistance'
 refbEnemyACUNearOurs = 'M27OverseerACUNearOurs'
+refoACUKillTarget = 'M27OverseerACUKillTarget'
+reftACUKillTarget = 'M27OverseerACUKillPosition'
 
 reftiMexIncomePrevCheck = 'M27OverseerMexIncome3mAgo' --x = prev check number; returns gross mass income
 refiTimeOfLastMexIncomeCheck = 'M27OverseerTimeOfLastMexIncomeCheck'
@@ -4153,7 +4155,7 @@ function ThreatAssessAndRespond(aiBrain)
                                 LOG(sFunctionRef .. ': Number of available torp bombers=' .. table.getn(aiBrain[M27AirOverseer.reftAvailableTorpBombers]))
                             end
                             --Determine closest available torpedo bombers (unless we should only target ACU)
-                            if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[refoLastNearestACU]) == true then
+                            if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[refoACUKillTarget]) == true then
                                 --Do nothing (logic is in air overseer)
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Enemy ACU is underwater and we are trying to kill it, so wont use normal torp defence logic (as we handle ACU kill elsewhere)')
@@ -4478,6 +4480,8 @@ function ACUManager(aiBrain)
             local bAllInAttack
             local bACUAirSnipe
 
+            local oEnemyACUToConsiderAttacking
+
             --ACU platoon and idle overrides
             if M27Utilities.IsACU(oACU) then
 
@@ -4789,6 +4793,8 @@ function ACUManager(aiBrain)
                     iLastDistanceToACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], tACUPos)
                 end
 
+
+
                 if M27Utilities.IsTableEmpty(tEnemyACUs) == false then
                     local oNearestACU = M27Utilities.GetNearestUnit(tEnemyACUs, tACUPos, aiBrain, false, false)
                     local tNearestACU = oNearestACU:GetPosition()
@@ -4820,7 +4826,43 @@ function ACUManager(aiBrain)
                 --Are we near the last ACU's known position?
                 aiBrain[refbEnemyACUNearOurs] = false
                 local iACURange = M27Logic.GetUnitMaxGroundRange({ oACU })
-                if iLastDistanceToACU <= iEnemyACUSearchRange and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
+
+
+                for iEnemyACU, oEnemyACU in tEnemyACUs do
+                    if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oEnemyACU:GetPosition()) <= iEnemyACUSearchRange then
+                        aiBrain[refbEnemyACUNearOurs] = true
+                        bWantEscort = true
+                    end
+                end
+
+                --Set the ACU that will consider when deciding whether to launch an all-out attack - normally will be the closest enemy ACU, but in some cases will consider a different ACU
+                if M27UnitInfo.IsUnitValid(aiBrain[refoACUKillTarget]) then
+                    --Is there an enemy ACU near to this one that has more than 50% health and is closer to us? If so then only consider the original target if it's really low health
+                    if not(aiBrain[refoLastNearestACU] == aiBrain[refoACUKillTarget]) then
+                        local iHealthThreshold = 6000
+                        --Decrease threshold if enemy ACUs near the actual target
+                        for iEnemyACU, oEnemyACU in tEnemyACUs do
+                            if not(oEnemyACU == aiBrain[refoACUKillTarget]) then
+                                if M27Utilities.GetDistanceBetweenPositions(oEnemyACU:GetPosition(), aiBrain[refoACUKillTarget]:GetPosition()) <= iEnemyACUSearchRange then
+                                    iHealthThreshold = 2500
+                                    if oACU:GetHealth() <= 6000 then iHealthThreshold = 2000 end
+                                    break
+                                end
+                            end
+                        end
+                        if aiBrain[refoACUKillTarget]:GetHealth() <= iHealthThreshold then
+                            oEnemyACUToConsiderAttacking = aiBrain[refoACUKillTarget]
+                        end
+                    else
+                        --No dif between nearest ACU and ACU kill target
+                        oEnemyACUToConsiderAttacking = aiBrain[refoACUKillTarget]
+                    end
+                end
+                if not(oEnemyACUToConsiderAttacking) then oEnemyACUToConsiderAttacking = aiBrain[refoLastNearestACU] end
+                iLastDistanceToACU = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oEnemyACUToConsiderAttacking:GetPosition())
+
+                --If the ACU is near to us consider attacking with our ACU and/or doing all-out attack
+                if iLastDistanceToACU <= iEnemyACUSearchRange and M27UnitInfo.IsUnitValid(oEnemyACUToConsiderAttacking) then
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Are near last ACU known position, iLastDistanceToACU=' .. iLastDistanceToACU .. '; iEnemyACUSearchRange=' .. iEnemyACUSearchRange)
                     end
@@ -4840,7 +4882,7 @@ function ACUManager(aiBrain)
                         bIncludeACUInAttack = true
                     else
                         --Attack if we're close to ACU and have a notable health advantage, and are on our side of the map or are already in attack mode
-                        if iLastDistanceToACU <= (iACURange + 15) and M27UnitInfo.GetUnitHealthPercent(aiBrain[refoLastNearestACU]) < (0.5 + iHealthThresholdAdjIfAlreadyAllIn) and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck + 2500 < (oACU:GetHealth() + iHealthAbsoluteThresholdIfAlreadyAllIn) and (M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(aiBrain[reftLastNearestACU], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) or aiBrain[refbIncludeACUInAllOutAttack] == true) then
+                        if iLastDistanceToACU <= (iACURange + 15) and M27UnitInfo.GetUnitHealthPercent(oEnemyACUToConsiderAttacking) < (0.5 + iHealthThresholdAdjIfAlreadyAllIn) and oEnemyACUToConsiderAttacking:GetHealth() + iExtraHealthCheck + 2500 < (oACU:GetHealth() + iHealthAbsoluteThresholdIfAlreadyAllIn) and (M27Utilities.GetDistanceBetweenPositions(oEnemyACUToConsiderAttacking:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(oEnemyACUToConsiderAttacking:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) or aiBrain[refbIncludeACUInAllOutAttack] == true) then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Enemy ACU is almost in range of us and is on low health so will do all out attack')
                             end
@@ -4848,7 +4890,7 @@ function ACUManager(aiBrain)
                             bIncludeACUInAttack = true
                             bCheckThreatBeforeCommitting = true
                             --Attack if enemy ACU is in range and could die to an explosion (so we either win or draw)
-                        elseif iLastDistanceToACU <= iACURange and aiBrain[refoLastNearestACU]:GetHealth() < (1800 + iHealthAbsoluteThresholdIfAlreadyAllIn) then
+                        elseif iLastDistanceToACU <= iACURange and oEnemyACUToConsiderAttacking:GetHealth() < (1800 + iHealthAbsoluteThresholdIfAlreadyAllIn) then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Enemy ACU will die to explaosion so want to stay close to ensure draw or win')
                             end
@@ -4856,7 +4898,7 @@ function ACUManager(aiBrain)
                             bIncludeACUInAttack = true
                             --Attack if we have gun and enemy ACU doesnt, and we have at least as much health (or more health if are on enemy side of map)
                             --DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
-                        elseif M27Conditions.DoesACUHaveGun(aiBrain, false, aiBrain[refoLastNearestACU]) == false and M27Conditions.DoesACUHaveGun(aiBrain, false, oACU) == true and aiBrain[refoLastNearestACU]:GetHealth() + iExtraHealthCheck < oACU:GetHealth() then
+                        elseif M27Conditions.DoesACUHaveGun(aiBrain, false, oEnemyACUToConsiderAttacking) == false and M27Conditions.DoesACUHaveGun(aiBrain, false, oACU) == true and oEnemyACUToConsiderAttacking:GetHealth() + iExtraHealthCheck < oACU:GetHealth() then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': We have gun, enemy ACU doesnt, and we haver more health')
                             end
@@ -4895,7 +4937,7 @@ function ACUManager(aiBrain)
                         --Do we need to request emergency help?
                         local iHealthModForGun = 0
                         local iHealthPercentModForGun = 0
-                        if M27Conditions.DoesACUHaveGun(aiBrain, false, aiBrain[refoLastNearestACU]) then
+                        if M27Conditions.DoesACUHaveGun(aiBrain, false, oEnemyACUToConsiderAttacking) then
                             if not (M27Conditions.DoesACUHaveGun(aiBrain, false, oACU)) then
                                 iHealthModForGun = -6000
                                 iHealthPercentModForGun = 0.2
@@ -4907,7 +4949,7 @@ function ACUManager(aiBrain)
                             end
                         end
 
-                        if aiBrain[refoLastNearestACU]:GetHealth() > (oACU:GetHealth() + iHealthModForGun) and aiBrain[refoLastNearestACU]:GetHealth() > 2500 and M27UnitInfo.GetUnitHealthPercent(oACU) < (0.75 + iHealthPercentModForGun) then
+                        if oEnemyACUToConsiderAttacking:GetHealth() > (oACU:GetHealth() + iHealthModForGun) and oEnemyACUToConsiderAttacking:GetHealth() > 2500 and M27UnitInfo.GetUnitHealthPercent(oACU) < (0.75 + iHealthPercentModForGun) then
                             bWantEscort = true
                             bEmergencyRequisition = true
 
@@ -4927,23 +4969,23 @@ function ACUManager(aiBrain)
                         end
                     end
                 end
-                if bAllInAttack == false and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
+                if bAllInAttack == false and M27UnitInfo.IsUnitValid(oEnemyACUToConsiderAttacking) then
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Will consider if want all out attack even if our ACU isnt in much stronger position')
                     end
-                    if M27UnitInfo.GetUnitHealthPercent(aiBrain[refoLastNearestACU]) < (0.1 + iHealthThresholdAdjIfAlreadyAllIn) then
+                    if M27UnitInfo.GetUnitHealthPercent(oEnemyACUToConsiderAttacking) < (0.1 + iHealthThresholdAdjIfAlreadyAllIn) then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Enemy ACU is almost dead')
                         end
                         bAllInAttack = true
-                    elseif M27UnitInfo.GetUnitHealthPercent(aiBrain[refoLastNearestACU]) < (0.75 + iHealthThresholdAdjIfAlreadyAllIn) then
+                    elseif M27UnitInfo.GetUnitHealthPercent(oEnemyACUToConsiderAttacking) < (0.75 + iHealthThresholdAdjIfAlreadyAllIn) then
                         --Do we have more threat near the ACU than the ACU has?
-                        tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Ally')
+                        tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, oEnemyACUToConsiderAttacking:GetPosition(), iNearbyThreatSearchRange, 'Ally')
 
                         if M27Utilities.IsTableEmpty(tAlliedUnitsNearEnemy) == false then
-                            tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Enemy')
+                            tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, oEnemyACUToConsiderAttacking:GetPosition(), iNearbyThreatSearchRange, 'Enemy')
                             iThreatFactor = 2.5
-                            if M27UnitInfo.GetUnitHealthPercent(aiBrain[refoLastNearestACU]) < (0.4 + iHealthThresholdAdjIfAlreadyAllIn) then
+                            if M27UnitInfo.GetUnitHealthPercent(oEnemyACUToConsiderAttacking) < (0.4 + iHealthThresholdAdjIfAlreadyAllIn) then
                                 iThreatFactor = 1.25
                             end
                             if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then
@@ -4960,9 +5002,9 @@ function ACUManager(aiBrain)
                         end
                         if not(bAllInAttack) then
                             --Is ACU low enough health that we might kill it with bombers alone?
-                            if aiBrain[refoLastNearestACU]:GetHealth() <= 6000 and aiBrain[M27AirOverseer.refbHaveAirControl] then
+                            if oEnemyACUToConsiderAttacking:GetHealth() <= 6000 and aiBrain[M27AirOverseer.refbHaveAirControl] then
                                 --If enemy ACU not shielded, and doesnt have AA nearby, then consider switching just to kill it with bombers, if we have close to enough strike damage already
-                                if not (M27Logic.IsTargetUnderShield(aiBrain, aiBrain[refoLastNearestACU], 0, false, false, true)) then
+                                if not (M27Logic.IsTargetUnderShield(aiBrain, oEnemyACUToConsiderAttacking, 0, false, false, true)) then
                                     local iBomberStrikeDamage = 0
                                     local iCurAOE, iCurStrike
                                     local tOurBombers = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryBomber, false, true)
@@ -4975,7 +5017,7 @@ function ACUManager(aiBrain)
                                     local iHealthPercentWanted = 0.5
                                     if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill then iHealthPercentWanted = 0.4 end
                                     if bDebugMessages == true then LOG(sFunctionRef..': Considering if we have enough strike damage to just kill the enemy ACU with air. iBomberStrikeDamage='..iBomberStrikeDamage..'; iHealthPercentWanted='..iHealthPercentWanted..'; Enemy ACU health='..aiBrain[refoLastNearestACU]:GetHealth()) end
-                                    if iBomberStrikeDamage >= aiBrain[refoLastNearestACU]:GetHealth() * iHealthPercentWanted then
+                                    if iBomberStrikeDamage >= oEnemyACUToConsiderAttacking:GetHealth() * iHealthPercentWanted then
                                         bIncludeACUInAttack = false
                                         bCheckThreatBeforeCommitting = false
                                         bAllInAttack = true
@@ -5007,22 +5049,22 @@ function ACUManager(aiBrain)
                         iThreatFactor = 0.9
                     end
                     if not (iAlliedThreat) then
-                        tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Ally')
+                        tAlliedUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandCombat, oEnemyACUToConsiderAttacking:GetPosition(), iNearbyThreatSearchRange, 'Ally')
                         iAlliedThreat = M27Logic.GetCombatThreatRating(aiBrain, tAlliedUnitsNearEnemy, false, nil, nil, false, false)
                     end
 
                     if not (iEnemyThreat) then
-                        tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, aiBrain[reftLastNearestACU], iNearbyThreatSearchRange, 'Enemy')
+                        tEnemyUnitsNearEnemy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryDangerousToLand, oEnemyACUToConsiderAttacking:GetPosition(), iNearbyThreatSearchRange, 'Enemy')
                         iEnemyThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyUnitsNearEnemy, false, nil, nil, false, false)
                     end
                     if iAlliedThreat < (iEnemyThreat * iThreatFactor) then
                         --Do we want to abort, or press ahead even if it means a likely draw?
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': We are outnumbered, will decide whether to abort the attack. Enemy ACU health=' .. aiBrain[refoLastNearestACU]:GetHealth() .. '; Distance between ACUs=' .. iLastDistanceToACU .. '; iACURange=' .. iACURange)
+                            LOG(sFunctionRef .. ': We are outnumbered, will decide whether to abort the attack. Enemy ACU health=' .. oEnemyACUToConsiderAttacking:GetHealth() .. '; Distance between ACUs=' .. iLastDistanceToACU .. '; iACURange=' .. iACURange)
                         end
-                        if aiBrain[refoLastNearestACU]:GetHealth() <= 2500 and iLastDistanceToACU < (iACURange - 1) then
+                        if oEnemyACUToConsiderAttacking:GetHealth() <= 2500 and iLastDistanceToACU < (iACURange - 1) then
                             --Our ACU is in range of theirs, and theirs will die to ACU explosion; if are far ahead on eco then want to play safe though
-                            if aiBrain[refoLastNearestACU]:GetHealth() <= 300 then
+                            if oEnemyACUToConsiderAttacking:GetHealth() <= 300 then
                                 --Their ACU is about to die so press attack and just hope we live
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': THeir ACU is about to die so will proceed with attack')
@@ -5092,7 +5134,7 @@ function ACUManager(aiBrain)
                                 if bAheadOnEco then
                                     --We are probably ahead on eco, so only attack if enemy ACU within our ACU range and we have a big advantage
 
-                                    if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) or M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and iLastDistanceToACU <= iACURange and oACU:GetHealth() - 4000 >= aiBrain[refoLastNearestACU]:GetHealth() and (aiBrain[refoLastNearestACU]:GetHealth() <= 500 or M27UnitInfo.GetUnitMaxGroundRange(aiBrain[refoLastNearestACU]) < iACURange or (aiBrain[refoLastNearestACU]:GetHealth() <= 2000 and oACU:GetHealth() >= 9500)) then
+                                    if M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) or M27UnitInfo.IsUnitValid(oEnemyACUToConsiderAttacking) and iLastDistanceToACU <= iACURange and oACU:GetHealth() - 4000 >= oEnemyACUToConsiderAttacking:GetHealth() and (oEnemyACUToConsiderAttacking:GetHealth() <= 500 or M27UnitInfo.GetUnitMaxGroundRange(oEnemyACUToConsiderAttacking) < iACURange or (oEnemyACUToConsiderAttacking:GetHealth() <= 2000 and oACU:GetHealth() >= 9500)) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': We are ahead on eco but still shoudl be able to kill the ACU quickly so wont abort the all in attack with our ACU') end
                                     else
                                         bAllInAttack = false
@@ -5105,7 +5147,7 @@ function ACUManager(aiBrain)
                             end
                         else
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': iAlliedThreat=' .. iAlliedThreat .. '; iEnemyThreat=' .. iEnemyThreat .. '; iThreatFactor=' .. iThreatFactor .. '; Enemy ACU health >=2.5k at ' .. aiBrain[refoLastNearestACU]:GetHealth() .. ', so therefore aborting All in attack')
+                                LOG(sFunctionRef .. ': iAlliedThreat=' .. iAlliedThreat .. '; iEnemyThreat=' .. iEnemyThreat .. '; iThreatFactor=' .. iThreatFactor .. '; Enemy ACU health >=2.5k at ' .. oEnemyACUToConsiderAttacking:GetHealth() .. ', so therefore aborting All in attack')
                             end
                             bAllInAttack = false
                             bIncludeACUInAttack = false
@@ -5117,7 +5159,7 @@ function ACUManager(aiBrain)
                     if (iLastDistanceToACU > iACURange or M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75) and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 16 and not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                         bIncludeACUInAttack = false
                         --Dont include ACU in attack if there are nearby enemy T1 PD and not about to kill their ACU
-                    elseif oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemyStructuresInRange] > 0 and aiBrain[refoLastNearestACU]:GetHealth() >= 600 then
+                    elseif oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemyStructuresInRange] > 0 and oEnemyACUToConsiderAttacking:GetHealth() >= 600 then
                         local tNearbyT1PD = EntityCategoryFilterDown(M27UnitInfo.refCategoryPD * categories.TECH1, oACU.PlatoonHandle[M27PlatoonUtilities.reftEnemyStructuresInRange])
                         if M27Utilities.IsTableEmpty(tNearbyT1PD) == false then
                             local iNearestPD = 10000
@@ -5480,7 +5522,7 @@ function ACUManager(aiBrain)
             end
 
             --Dont do all in attack if enemy ACU underwater and we dont have T2 air
-            if bAllInAttack and aiBrain[refiOurHighestAirFactoryTech] == 1 and M27UnitInfo.IsUnitUnderwater(aiBrain[refoLastNearestACU]) then
+            if bAllInAttack and aiBrain[refiOurHighestAirFactoryTech] == 1 and M27UnitInfo.IsUnitUnderwater(oEnemyACUToConsiderAttacking) then
                 bAllInAttack = false
             end
 
@@ -5488,15 +5530,20 @@ function ACUManager(aiBrain)
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Are doing all in attack, will consider if want to suicide our ACU')
                 end
+                if not(oEnemyACUToConsiderAttacking) then oEnemyACUToConsiderAttacking = aiBrain[refoLastNearestACU] end
+
+                aiBrain[refoACUKillTarget] = oEnemyACUToConsiderAttacking
+                aiBrain[reftACUKillTarget] = oEnemyACUToConsiderAttacking:GetPosition()
+
                 aiBrain[refiAIBrainCurrentStrategy] = refStrategyACUKill
                 aiBrain[refbStopACUKillStrategy] = false
                 aiBrain[refbIncludeACUInAllOutAttack] = bIncludeACUInAttack
                 --Consider Ctrl-K of ACU
                 local bSuicide = false
-                if oACU:GetHealth() <= 275 and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) then
-                    local iEnemyACUHealth = aiBrain[refoLastNearestACU]:GetHealth()
+                if oACU:GetHealth() <= 275 and M27UnitInfo.IsUnitValid(oEnemyACUToConsiderAttacking) then
+                    local iEnemyACUHealth = oEnemyACUToConsiderAttacking:GetHealth()
                     if iEnemyACUHealth <= 2000 then
-                        local iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(tACUPos, aiBrain[refoLastNearestACU]:GetPosition())
+                        local iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(tACUPos, oEnemyACUToConsiderAttacking:GetPosition())
                         if iDistanceToEnemyACU <= 30 then
                             bSuicide = true
                         elseif iDistanceToEnemyACU <= 40 and iEnemyACUHealth <= 500 then
@@ -5505,7 +5552,7 @@ function ACUManager(aiBrain)
                     end
                 end
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': bSuicide=' .. tostring(bSuicide) .. '; ACU Health=' .. oACU:GetHealth() .. '; LastACUHealth=' .. aiBrain[refoLastNearestACU]:GetHealth() .. '; distance between ACUs=' .. M27Utilities.GetDistanceBetweenPositions(tACUPos, aiBrain[refoLastNearestACU]:GetPosition()))
+                    LOG(sFunctionRef .. ': bSuicide=' .. tostring(bSuicide) .. '; ACU Health=' .. oACU:GetHealth() .. '; LastACUHealth=' .. oEnemyACUToConsiderAttacking:GetHealth() .. '; distance between ACUs=' .. M27Utilities.GetDistanceBetweenPositions(tACUPos, oEnemyACUToConsiderAttacking:GetPosition()))
                 end
                 if bSuicide then
                     M27Chat.SendSuicideMessage(aiBrain)
@@ -5517,6 +5564,8 @@ function ACUManager(aiBrain)
             else
                 aiBrain[refbIncludeACUInAllOutAttack] = false
                 aiBrain[refbStopACUKillStrategy] = true
+                aiBrain[refoACUKillTarget] = nil
+                aiBrain[reftACUKillTarget] = nil
                 if oACU.PlatoonHandle then
                     oACU.PlatoonHandle[M27PlatoonUtilities.reftPlatoonDFTargettingCategories] = M27UnitInfo.refWeaponPriorityNormal
                 end

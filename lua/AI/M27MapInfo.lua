@@ -4985,7 +4985,10 @@ function IdentifyTeamChokepoints(aiBrain)
                                     M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount] = {}
                                     M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointStart] = tLineSidepoint
                                     M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointMexesCovered] = 0
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Found a new chokepoint, Dist='..iChokepointDistFromStart..'; iChokepointCount='..iChokepointCount..'; iDistAdjust='..iDistAdjust..'; Dist from start='..iChokepointDistFromStart..'; tLineSidepoint='..repru(tLineSidepoint)) end
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef..': Found a new chokepoint, Dist='..iChokepointDistFromStart..'; iChokepointCount='..iChokepointCount..'; iDistAdjust='..iDistAdjust..'; Dist from start='..iChokepointDistFromStart..'; tLineSidepoint='..repru(tLineSidepoint)..'; will draw this point in white')
+                                        M27Utilities.DrawLocation(tLineSidepoint, false, 7)
+                                    end
                                 end
                                 iCurChokepointSize = iCurChokepointSize + iIntervalToUse
                                 if iChokepointCount > iMaxChokepointsNeeded and iCurChokepointSize >= iIntervalToUse * 2 then
@@ -5014,8 +5017,9 @@ function IdentifyTeamChokepoints(aiBrain)
                                         else
                                             M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount] = nil
                                         end
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Have very small chokepoint size so likely pathing error, will reduce iChokepointCount '..iChokepointCount..' by 1. iCurChokepointSize='..iCurChokepointSize) end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have very small chokepoint size '..iCurChokepointSize..'; iIntervalToUse='..iIntervalToUse..'; so likely pathing error, will reduce iChokepointCount '..iChokepointCount..' by 1. iCurChokepointSize='..iCurChokepointSize) end
                                         iChokepointCount = iChokepointCount - 1
+                                        iCurChokepointSize = 0
                                     end
                                 end
                             end
@@ -5024,6 +5028,7 @@ function IdentifyTeamChokepoints(aiBrain)
                             LOG(sFunctionRef..': Finished checking along the line for iDistAdjust='..iDistAdjust..'; iChokepointCount='..iChokepointCount..'; Is team data info for this dist adjust empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart])))
                         end
                     end
+
                     if bDebugMessages == true then LOG(sFunctionRef..': Finished trying all distadjust values. Is the table of choekpoints empty for all distances='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]))) end
                     if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]) == false then
                         --------------------->>>>>>>>>>>>>>>>RECORD RECLAIM<<<<<<<<<<<<<----------------------

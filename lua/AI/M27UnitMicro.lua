@@ -472,7 +472,7 @@ function DodgeBomb(oBomber, oWeapon, projectile)
                             --ACU specific
                             if M27Utilities.IsACU(oUnit) then
                                 local aiBrain = oCurBrain
-                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) > (M27Logic.GetUnitMaxGroundRange({oUnit}) - 10) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLastNearestACU]) < 32 and (M27UnitInfo.GetUnitTechLevel(oBomber) == 1 or M27UnitInfo.GetUnitHealthPercent(oUnit) > 0.3) then
+                                if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()) > (M27Logic.GetUnitMaxGroundRange({oUnit}) - 10) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()) < 32 and (M27UnitInfo.GetUnitTechLevel(oBomber) == 1 or M27UnitInfo.GetUnitHealthPercent(oUnit) > 0.3) then
                                     --Dont dodge in case we can no longer attack ACU
                                 else
                                     --If ACU is upgrading might not want to cancel
@@ -888,8 +888,8 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
             if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
                 local iDistanceToEnemyACU
                 --Target enemy ACU if its low health as a top priority unless it's about to move out of our range
-                if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) then
-                    oEnemyACU = aiBrain[M27Overseer.refoLastNearestACU]
+                if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoACUKillTarget], true) then
+                    oEnemyACU = aiBrain[M27Overseer.refoACUKillTarget]
                     if aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() < 1400 then
                         if bDebugMessages == true then LOG(sFunctionRef..': Enemy ACU is almost dead so want to target it, and not target anything else if we cant hit it') end
                         iDistanceToEnemyACU = M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], tUnitPosition)

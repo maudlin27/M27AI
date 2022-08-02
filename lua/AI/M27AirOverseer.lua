@@ -1486,7 +1486,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
 
                     local bTargetACU = false
                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
-                        local bACUUnderwater = M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])
+                        local bACUUnderwater = M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])
                         if bIsTorpBomber and bACUUnderwater then
                             bTargetACU = true
                         elseif not (bIsTorpBomber) and not (bACUUnderwater) then
@@ -1564,7 +1564,7 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                             --Dont use isunitvalid as that checks if its completed and we may want to target part-complete buildings
                             if oBomberCurTarget == nil or oBomberCurTarget.Dead or not (oBomberCurTarget.GetPosition) then
                                 bRemoveCurTarget = true
-                            elseif bTargetACU == true and not (oBomberCurTarget == aiBrain[M27Overseer.refoLastNearestACU]) then
+                            elseif bTargetACU == true and not (oBomberCurTarget == aiBrain[M27Overseer.refoLastNearestACU]) and not(oBomberCurTarget == aiBrain[M27Overseer.refoACUKillTarget]) then
                                 bRemoveCurTarget = true
                             elseif bRemoveIfOnLand then
                                 tTargetPos = oBomberCurTarget:GetPosition()
@@ -4636,13 +4636,13 @@ function AirBomberManager(aiBrain)
                         --end
                     end
                     --Are we in kill ACU mode? Then target ACU unless its underwater (but allow ahwassa to target if it is underwater)
-                elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and (M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) or (iTechLevel == 4 and not (M27MapInfo.IsUnderwater({ aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[1], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[2] + 18, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[3] }, false)))) then
+                elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and (M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget]) or (iTechLevel == 4 and not (M27MapInfo.IsUnderwater({ aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()[1], aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()[2] + 18, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()[3] }, false)))) then
                     --Add any nearby AA structures if enemy ACU has relatively highi health and are dealing with T2 or lower
                     iCurPriority = 1
                     local bTargetDownAA = false
-                    if bDebugMessages == true then LOG(sFunctionRef..': In ACU kill mode.  iTechLevel='..iTechLevel..'; Enemy ACU health='..aiBrain[M27Overseer.refoLastNearestACU]:GetHealth()) end
-                    if iTechLevel <= 2 and aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() >= 2500 then
-                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), 60, 'Enemy')
+                    if bDebugMessages == true then LOG(sFunctionRef..': In ACU kill mode.  iTechLevel='..iTechLevel..'; Enemy ACU health='..aiBrain[M27Overseer.refoACUKillTarget]:GetHealth()) end
+                    if iTechLevel <= 2 and aiBrain[M27Overseer.refoACUKillTarget]:GetHealth() >= 2500 then
+                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition(), 60, 'Enemy')
                         if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy AA structures around ACU empty='..tostring(M27Utilities.IsTableEmpty(tPotentialTargets))) end
 
                         if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
@@ -4659,7 +4659,7 @@ function AirBomberManager(aiBrain)
                             end
                             if bTargetDownAA then
                                 for iUnit, oUnit in tPotentialTargets do
-                                    AddUnitToShortlist(aiBrain[M27Overseer.refoLastNearestACU], iTechLevel, 0)
+                                    AddUnitToShortlist(aiBrain[M27Overseer.refoACUKillTarget], iTechLevel, 0)
                                 end
                             end
                         end
@@ -7325,8 +7325,8 @@ function GetNovaxTarget(aiBrain, oNovax)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Want to kill enemy ACU so will target the ACU if we can see it')
             end
-            if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], true) and not (M27MapInfo.IsUnderwater(aiBrain[M27Overseer.reftLastNearestACU])) then
-                oTarget = aiBrain[M27Overseer.refoLastNearestACU]
+            if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27Utilities.CanSeeUnit(aiBrain, aiBrain[M27Overseer.refoACUKillTarget], true) and not (M27MapInfo.IsUnderwater(aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())) then
+                oTarget = aiBrain[M27Overseer.refoACUKillTarget]
             else
                 tEnemyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalSurface + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryMobileLand, aiBrain[M27Overseer.reftLastNearestACU], iMaxRange * 0.5, 'Enemy')
                 if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
@@ -7884,7 +7884,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     else
         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
             bUpdateLocationAttemptCount = false
-            tLocationToMoveTo = aiBrain[M27Overseer.reftLastNearestACU]
+            tLocationToMoveTo = aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': In ACUKill mode so going to enemy ACU')
             end

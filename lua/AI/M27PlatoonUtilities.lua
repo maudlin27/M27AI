@@ -2385,7 +2385,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     bProceed = false
                 else
                     --Run back to base if low health (unless are already near our base); reset movement path if regained health
-                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then
+                    if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Are trying to kill enemy ACU with our ACU so want to attack and ignore normal retreat logic') end
                         oPlatoon[refiCurrentAction] = refActionKillACU
                         bProceed = false

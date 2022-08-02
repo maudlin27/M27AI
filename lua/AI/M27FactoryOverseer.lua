@@ -1249,8 +1249,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and aiBrain[M27Overseer.refiMAAShortfallACUCore] > 0 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, M27Utilities.GetACU(aiBrain):GetPosition(), 100, 'Enemy')) == false then
                                         --want MAA for ACU
                                         --Can we path to ACU with amphib but not land? If so then only build MAA if it is amphibious
-                                        local iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
-                                        local iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+                                        local iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())
+                                        local iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())
                                         local iACUAmphibGroup, iACULandGroup
                                         iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27Utilities.GetACU(aiBrain):GetPosition())
                                         iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27Utilities.GetACU(aiBrain):GetPosition())
@@ -1263,7 +1263,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 3 then --Antinavy because enemy ACU/our ACU is underwater
-                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
+                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
                                         iCategoryToBuild = M27UnitInfo.refCategoryAntiNavy
                                         iTotalWanted = 1000
                                     end
@@ -1274,13 +1274,17 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     else
                                         --Can we path to ACU with amphib but not with land?
                                         --GetSegmentGroupOfLocation(sPathing, tLocation)
-                                        local iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
-                                        local iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+                                        local iOurBaseAmphibGroup, iOurBaseLandGroup
+
                                         local iACUAmphibGroup, iACULandGroup
                                         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
-                                            iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
-                                            iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+                                            iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
+                                            iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
+                                            iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
+                                            iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
                                         else
+                                            iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())
+                                            iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())
                                             iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27Utilities.GetACU(aiBrain):GetPosition())
                                             iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27Utilities.GetACU(aiBrain):GetPosition())
                                         end
@@ -1377,7 +1381,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     iCategoryToBuild = M27UnitInfo.refCategoryAirAA
                                 else
                                     bReachedLastOption = true
-                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
+                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': ACU is underwater so will get torp bombers') end
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                     else

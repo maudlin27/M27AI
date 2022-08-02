@@ -1099,7 +1099,7 @@ function DecideWhatToUpgrade(aiBrain, iMaxToBeUpgrading)
         end
 
         --Special logic for if trying to snipe ACU
-        if iAirFactoryAvailable > 0 and iT1AirFactories > 0 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) and (iT2AirFactories + iT3AirFactories) == 0 then
+        if iAirFactoryAvailable > 0 and iT1AirFactories > 0 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget]) and (iT2AirFactories + iT3AirFactories) == 0 then
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Will upgrade air factory. iAirFactoryAvailable=' .. iAirFactoryAvailable .. '; strategy is to kill ACU and enemy aCU is underwater and we dont ahve T2 or T3 air factory yet')
             end
@@ -1816,7 +1816,7 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
         bNormalLogic = false
         --Pause upgrades unlessd ACU is underwater and we dont ahve T2+ air
-        if M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU]) and aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH2 + refCategoryAirFactory * categories.TECH3) == 0 then
+        if M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget]) and aiBrain:GetCurrentUnits(refCategoryAirFactory * categories.TECH2 + refCategoryAirFactory * categories.TECH3) == 0 then
             bWantMoreFactories = true
             iMaxToUpgrade = 2
         elseif aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] == true then

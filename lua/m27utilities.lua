@@ -307,7 +307,7 @@ end
 
 function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, iCircleSize)
     --if bSingleLocation then tableLocations = {tableLocations} end
-    LOG('DrawTableOfLocations: tableLocations='..repru(tableLocations))
+    --LOG('DrawTableOfLocations: tableLocations='..repru(tableLocations))
     if not(iCircleSize) then iCircleSize = 0.5 end
     for iLocation, tLocation in tableLocations do
         DrawRectBase(Rect(tLocation[1] - iCircleSize, tLocation[3] - iCircleSize, tLocation[1] + iCircleSize, tLocation[3] + iCircleSize), iColour, iDisplayCount)
@@ -384,7 +384,7 @@ function ConvertLocationToReference(tLocation)
 end
 
 function SteppingStoneForDrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, iCircleSize)
-    LOG('SteppingStoneForDrawLocations: tableLocations='..repru(tableLocations))
+    --LOG('SteppingStoneForDrawLocations: tableLocations='..repru(tableLocations))
     DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, iCircleSize)
 end
 
