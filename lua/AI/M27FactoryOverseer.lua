@@ -1277,7 +1277,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         local iOurBaseAmphibGroup, iOurBaseLandGroup
 
                                         local iACUAmphibGroup, iACULandGroup
-                                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) then
                                             iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
                                             iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
                                             iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
@@ -1958,7 +1958,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 end
 
                                                 iCategoryToBuild = M27UnitInfo.refCategoryTransport
-                                                iTotalWanted = iCurTransports - iTransportsWanted
+                                                iTotalWanted = iTransportsWanted - iCurTransports
                                             end
                                         end
                                     end
