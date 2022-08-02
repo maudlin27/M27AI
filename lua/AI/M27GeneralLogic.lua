@@ -115,6 +115,51 @@ function ReturnUnitsInTargetSegmentGroup(tUnits, iTargetGroup)
     return tMatchingUnits
 end
 
+function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ReturnUnitsInTargetSegmentGroup'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iSegmentSearchRange = math.ceil(50 / M27MapInfo.iReclaimSegmentSizeX)
+    local iBaseReclaimSegmentX, iBaseReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tStartPosition)
+
+    local iCurLevel = -1
+    local iCurSublevel = 0
+    local tiAdjustFactor = {{1,0}, {1,1},{0,1},{-1,1},{-1,0},{-1,-1},{0,-1}, {1,-1}}
+
+    local iReclaimSegmentX
+    local iReclaimSegmentZ
+    local bFoundEnergyReclaim = false
+
+    --Find nearest segment to engineer containing energy reclaim
+    while iCurLevel < math.min(iSegmentSearchRange, 10000) do
+        iCurLevel = iCurLevel + 1
+        iCurSublevel = iCurSublevel + 1
+        if iCurSublevel > 4 then iCurSublevel = 1 end
+        for iCurFactor, tCurFactor in tiAdjustFactor do
+            iReclaimSegmentX = iBaseReclaimSegmentX + iCurLevel * tCurFactor[1]
+
+            if M27MapInfo.tReclaimAreas[iReclaimSegmentX] then
+                iReclaimSegmentZ = iBaseReclaimSegmentZ + iCurLevel * tCurFactor[2]
+                if M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ] then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking for energy reclaim in segment '..iReclaimSegmentX..'-'..iReclaimSegmentZ..'; Dist to the base segment='..M27Utilities.GetDistanceBetweenPositions(tStartPosition, M27MapInfo.GetReclaimLocationFromSegment(iReclaimSegmentX, iReclaimSegmentZ))) end
+                    if M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimTotalEnergy] >= iMinEnergyReclaim then
+                        bFoundEnergyReclaim = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': Found sufficient reclaim') end
+                        break
+                    end
+                end
+
+            end
+            if iCurLevel == 0 then break end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    if bFoundEnergyReclaim then return iReclaimSegmentX, iReclaimSegmentZ
+    else return nil, nil
+    end
+end
+
 function ChooseReclaimTarget(oEngineer, bWantEnergy)
     --Returns a table containing the target position to attack move to based on reclaimsegments
     --If are no reclaim positions then returns the current segment
@@ -135,6 +180,25 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
     local tEngiPosition = oEngineer:GetPosition()
 
     if bWantEnergy then
+        local iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(tEngiPosition, 20)
+
+
+        if not(iEnergySegmentX) then
+            iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 20)
+            if bDebugMessages == true then LOG(sFunctionRef..': Energy segment X and Z after checking near base='..(iEnergySegmentX or 'nil')..'-'..(iEnergySegmentZ or 'nil')) end
+            if not(iEnergySegmentX) then
+                M27Utilities.ErrorHandler(sFunctionRef..': Couldnt find any segments containing energy near to engineer or start so will just return engineer current segment')
+                iEnergySegmentX, iEnergySegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tEngiPosition)
+            end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': Energy segment X and Z after checking near engi='..(iEnergySegmentX or 'nil')..'-'..(iEnergySegmentZ or 'nil')..'; Dist between here and engi='..M27Utilities.GetDistanceBetweenPositions(tEngiPosition, M27MapInfo.GetReclaimLocationFromSegment(iEnergySegmentX, iEnergySegmentZ)))
+        end
+
+
+        return M27MapInfo.GetReclaimLocationFromSegment(iEnergySegmentX, iEnergySegmentZ)
+
+        --[[
+        bDebugMessages = true
+        if bDebugMessages == true then LOG(sFunctionRef..': Want to find energy; engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' action='..(oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
         --Want the nearest location that has a decent amount of power - manually calculate as fairly rare that want this info
         local rCurRect
         local tNearbyReclaim
@@ -178,7 +242,7 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                 end
                 break
             end
-        end
+        end--]]
     else --Can refer to the shortlist of reclaim areas
         for iCurPriority = 1, 3 do --priority 4 is for ACU only
             if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftReclaimAreasOfInterest][iCurPriority]) == false then

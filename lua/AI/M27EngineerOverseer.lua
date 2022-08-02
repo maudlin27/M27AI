@@ -9015,7 +9015,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             if iNearbyEnergy >= 100 then
                                 iActionToAssign = refActionReclaimTrees
                                 iMaxEngisWanted = math.max(3, math.min(aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] / 10, iNearbyEnergy / 90, 10))
-                                if bDebugMessages == true then LOG(sFunctionRef..': Want engineers to reclaim energy, iMaxEngisWanted='..iMaxEngisWanted) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Want engineers to reclaim energy, iMaxEngisWanted='..iMaxEngisWanted..'; iNearbyEnergy='..iNearbyEnergy) end
                             end
 
                         end

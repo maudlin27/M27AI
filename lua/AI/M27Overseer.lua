@@ -4437,7 +4437,7 @@ function ACUManager(aiBrain)
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if GetGameTimeSeconds() >= 420 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 420 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
 
     if not (aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)
@@ -7671,7 +7671,6 @@ function RecordAllEnemiesAndAllies(aiBrain)
     end
     for iBrain, oBrain in tAllAIBrainsByArmyIndex do
         if IsBrainInSamePathingGroup(oBrain) then
-            bDebugMessages = true
             if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..' with index '..oBrain:GetArmyIndex()..'; Brain team='..(oBrain.M27Team or 'nil')) end
             tiTeamsWithSamePathingGroup[oBrain.M27Team] = true
         end
