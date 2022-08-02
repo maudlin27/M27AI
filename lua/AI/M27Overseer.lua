@@ -226,6 +226,7 @@ refiIgnoreMexesUntilThisManyUnits = 'M27ThresholdToAttackMexes'
 --Other
 bUnitNameUpdateActive = false --true if are cycling through every unit and updating the name
 refbCloseToUnitCap = 'M27OverseerCloseToUnitCap' --True if are about to hit unit cap
+refiTeamsWithSameAmphibiousPathingGroup = 'M27OverseerTeamsWithSameAmphibiousPathingGroup' --Against aiBrain, number of teams including our own one that have this amphibious pathing group
 
 
 
@@ -5072,24 +5073,10 @@ function ACUManager(aiBrain)
                             else
                                 --Do we have more than our share of mexes?
 
-                                local tiTeamsWithSamePathingGroup = {}
-                                for iBrain, oBrain in tAllAIBrainsByArmyIndex do
-                                    if oBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] then
-                                        tiTeamsWithSamePathingGroup[oBrain.M27Team] = true
-                                    end
-                                end
-                                local iTeamsWithSamePathingGroup = 0
-                                for iEntry, bEntry in tiTeamsWithSamePathingGroup do
-                                    if bEntry then
-                                        iTeamsWithSamePathingGroup = iTeamsWithSamePathingGroup + 1
-                                    end
-                                end
-
-
-                                local iOurTeamsShareOfMexesOnMap = aiBrain[refiAllMexesInBasePathingGroup] / iTeamsWithSamePathingGroup
+                                local iOurTeamsShareOfMexesOnMap = aiBrain[refiAllMexesInBasePathingGroup] / aiBrain[refiTeamsWithSameAmphibiousPathingGroup]
                                 local bAheadOnEco = false
                                 if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; aiBrain[refiAllMexesInBasePathingGroup] =' .. aiBrain[refiAllMexesInBasePathingGroup] .. '; aiBrain[refiUnclaimedMexesInBasePathingGroup]=' .. aiBrain[refiUnclaimedMexesInBasePathingGroup]..'; iTeamsWithSamePathingGroup='..iTeamsWithSamePathingGroup..'; Total team count='..M27Team.iTotalTeamCount)
+                                    LOG(sFunctionRef .. ': iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; aiBrain[refiAllMexesInBasePathingGroup] =' .. aiBrain[refiAllMexesInBasePathingGroup] .. '; aiBrain[refiUnclaimedMexesInBasePathingGroup]=' .. aiBrain[refiUnclaimedMexesInBasePathingGroup]..'; iTeamsWithSamePathingGroup='..aiBrain[refiTeamsWithSameAmphibiousPathingGroup]..'; Total team count='..M27Team.iTotalTeamCount)
                                 end
                                 --refiUnclaimedMexesInBasePathingGroup doesn't include mexes claimed by teammates, i.e. below looks at things overall on a team basis rather than us individually
                                 if (aiBrain[refiAllMexesInBasePathingGroup] - aiBrain[refiUnclaimedMexesInBasePathingGroup]) > iOurTeamsShareOfMexesOnMap then
@@ -6524,21 +6511,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         aiBrain[refiUnclaimedMexesInBasePathingGroup] = iAllMexesInPathingGroupWeHaventClaimed
         aiBrain[refiAllMexesInBasePathingGroup] = iAllMexesInPathingGroup
 
-        local tiTeamsWithSamePathingGroup = {}
-        for iBrain, oBrain in tAllAIBrainsByArmyIndex do
-            if oBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] then
-                tiTeamsWithSamePathingGroup[oBrain.M27Team] = true
-            end
-        end
-        local iTeamsWithSamePathingGroup = 0
-        for iEntry, bEntry in tiTeamsWithSamePathingGroup do
-            if bEntry then
-                iTeamsWithSamePathingGroup = iTeamsWithSamePathingGroup + 1
-            end
-        end
 
-
-        local iOurTeamsShareOfMexesOnMap = iAllMexesInPathingGroup / iTeamsWithSamePathingGroup
+        local iOurTeamsShareOfMexesOnMap = iAllMexesInPathingGroup / aiBrain[refiTeamsWithSameAmphibiousPathingGroup]
         local iMexesInPathingGroupWeHaveClaimed = iAllMexesInPathingGroup - iAllMexesInPathingGroupWeHaventClaimed
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Pre determining grand strategy, iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed)
@@ -7684,6 +7658,37 @@ function RecordAllEnemiesAndAllies(aiBrain)
         aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation] = nil
         M27MapInfo.UpdateNewPrimaryBaseLocation(aiBrain)
     end
+
+    --Record teams that share our pathing group
+    local tiTeamsWithSamePathingGroup = {}
+    function IsBrainInSamePathingGroup(oBrain)
+        if not(M27Logic.IsCivilianBrain(oBrain)) and oBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] then
+            return true
+        else
+            return false
+        end
+
+    end
+    for iBrain, oBrain in tAllAIBrainsByArmyIndex do
+        if IsBrainInSamePathingGroup(oBrain) then
+            bDebugMessages = true
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..' with index '..oBrain:GetArmyIndex()..'; Brain team='..(oBrain.M27Team or 'nil')) end
+            tiTeamsWithSamePathingGroup[oBrain.M27Team] = true
+        end
+    end
+    local iCountOfTeamsWithSamePathingGroup = 0
+    for iEntry, bEntry in tiTeamsWithSamePathingGroup do
+        if bEntry then
+            iCountOfTeamsWithSamePathingGroup = iCountOfTeamsWithSamePathingGroup + 1
+        end
+    end
+    for iBrain, oBrain in tAllAIBrainsByArmyIndex do
+        if IsBrainInSamePathingGroup(oBrain) then
+            oBrain[refiTeamsWithSameAmphibiousPathingGroup] = iCountOfTeamsWithSamePathingGroup
+        end
+    end
+
+
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
