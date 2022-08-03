@@ -3058,6 +3058,9 @@ function ThreatAssessAndRespond(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ThreatAssessAndRespond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if GetGameTimeSeconds() >= 245 then bDebugMessages = true end
+
     --Key config variables:
     --v14 and earlier values:
     --local iLandThreatGroupDistance = 20 --Units this close to each other get included in the same threat group
@@ -3516,13 +3519,14 @@ function ThreatAssessAndRespond(aiBrain)
                                     if oPlatoon[M27PlatoonUtilities.refiPlatoonCount] == nil then
                                         oPlatoon[M27PlatoonUtilities.refiPlatoonCount] = 0
                                     end
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Considering available platoons; iPlatoon=' .. iPlatoon .. '; sPlatoonRef=' .. sPlatoonRef .. '; iEnemyGroup=' .. iEnemyGroup)
-                                    end
+
                                     --if sPlan == sDefenderPlatoonRef or sPlan == 'M27AttackNearestUnits' or sPlan == M27PlatoonTemplates.refoIdleIndirect or sPlan == 'M27IndirectSpareAttacker' or sPlan == 'M27IndirectDefender' or sPlan == 'M27CombatPatrolAI' then
                                     tCurPos = M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)
                                     iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tCurPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                    if iDistToOurBase <= tEnemyThreatGroup[refiDistanceFromOurBase] then
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': Considering available platoons; iPlatoon=' .. iPlatoon .. '; sPlatoonRef=' .. sPlatoonRef .. '; iEnemyGroup=' .. iEnemyGroup..'; dist from our platoon to base='..iDistToOurBase..'; dist of enemy threat group to our base='..tEnemyThreatGroup[refiDistanceFromOurBase])
+                                    end
+                                    if iDistToOurBase <= oPlatoon[M27PlatoonUtilities.refiPlatoonMaxRange] + tEnemyThreatGroup[refiDistanceFromOurBase] then
                                         if oPlatoon[refsEnemyThreatGroup] == nil then
                                             bPlatoonIsAvailable = true
                                             if bDebugMessages == true then
@@ -3709,10 +3713,11 @@ function ThreatAssessAndRespond(aiBrain)
                         --Now that have all available units, decide on action based on enemy threat
                         --First update trackers - want to base on whether we have all the units we want to respond to the threat (rather than whether we have just enough units to attack)
                         if iAvailableThreat < iThreatWanted then
-                            local iCurModDistToEnemyBase = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tEnemyThreatGroup[reftFrontPosition], true)
+                            --local iCurModDistToEnemyBase = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tEnemyThreatGroup[reftFrontPosition], true)
                             --M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftFrontPosition], M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                             aiBrain[refiModDistFromStartNearestOutstandingThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart]
-                            aiBrain[refiPercentageOutstandingThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart] / (tEnemyThreatGroup[refiModDistanceFromOurStart] + iCurModDistToEnemyBase)
+                            aiBrain[refiPercentageOutstandingThreat] = tEnemyThreatGroup[refiModDistanceFromOurStart] / aiBrain[refiDistanceToNearestEnemyBase]
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have enough available threat to defeat the platoon. mod dist to our start='..tEnemyThreatGroup[refiModDistanceFromOurStart]..'; Dist to enemy base='..aiBrain[refiDistanceToNearestEnemyBase]..'; Outstanding threat %='..aiBrain[refiPercentageOutstandingThreat]..'; refiDistanceFromOurBase='..tEnemyThreatGroup[refiDistanceFromOurBase]..'; actual dist to our base='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyThreatGroup[reftFrontPosition])..'; Dist to enemy base='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), tEnemyThreatGroup[reftFrontPosition])..'; angle from our base to threat='..M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyThreatGroup[reftFrontPosition])) end
                             aiBrain[refiMinIndirectTechLevel] = 1 --default
                             if bIndirectThreatOnly then
                                 aiBrain[refbNeedIndirect] = true
@@ -3746,6 +3751,7 @@ function ThreatAssessAndRespond(aiBrain)
                                 tRallyPoint[1] = (tEnemyThreatGroup[reftFrontPosition][1] + M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1]) / 2
                                 tRallyPoint[3] = (tEnemyThreatGroup[reftFrontPosition][3] + M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]) / 2
                                 tRallyPoint[2] = GetTerrainHeight(tRallyPoint[1], tRallyPoint[3])
+                                if bDebugMessages == true then LOG(sFunctionRef..': Rally point is half way between our start and the enemy threat='..repru(tRallyPoint)..'; Dist to rally point from our base='..M27Utilities.GetDistanceBetweenPositions(tRallyPoint, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; Dist to platoon='..M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyThreatGroup[reftFrontPosition])..'; our base='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; threat group pos='..repru(tEnemyThreatGroup[reftFrontPosition])) end
                             else
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef .. ': Enemy is clsoe to our base, so rally point is our base')

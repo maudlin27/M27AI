@@ -357,6 +357,7 @@ function PlatoonMove(oPlatoon, tLocation)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'PlatoonMove'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if oPlatoon:GetPlan() == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] and GetGameTimeSeconds() >= 900 then bDebugMessages = true end
 
@@ -6845,6 +6846,7 @@ function DeterminePlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
+            if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
@@ -7172,6 +7174,21 @@ function DeterminePlatoonAction(oPlatoon)
                                                                 local iOriginalAction = oPlatoon[refiCurrentAction]
                                                                 if not(M27MapInfo.bNoRushActive) then UpdatePlatoonActionForNearbyEnemies(oPlatoon, true) end
                                                                 if oPlatoon[refiCurrentAction] == nil then oPlatoon[refiCurrentAction] = iOriginalAction end
+                                                            else
+                                                                --Check if last move order was far from current destination
+                                                                local tCurMovementTarget
+                                                                if oPlatoon[refoFrontUnit] and oPlatoon[refoFrontUnit].GetNavigator then
+                                                                    local oNavigator = oPlatoon[refoFrontUnit]:GetNavigator()
+                                                                    if oNavigator and oNavigator.GetCurrentTargetPos then
+                                                                        tCurMovementTarget = oNavigator:GetCurrentTargetPos()
+                                                                    end
+                                                                end
+
+                                                                if bDebugMessages == true then LOG(sFunctionRef .. ': Dist between platoon front unit navigation target and movement path=' .. M27Utilities.GetDistanceBetweenPositions(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]], (tCurMovementTarget or {0,0,0}))) end
+                                                                if not(tCurMovementTarget) or M27Utilities.GetDistanceBetweenPositions(tCurMovementTarget, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]) >= 20 then
+                                                                    oPlatoon[refbForceActionRefresh] = true
+                                                                    if bDebugMessages == true then LOG(sFunctionRef..': Will force a refresh on the platoon as its movement path is far away from the current navigation target') end
+                                                                end
                                                             end
                                                         end
                                                         oPlatoon[refiOverseerAction] = nil
@@ -10131,6 +10148,7 @@ function ProcessPlatoonAction(oPlatoon)
         if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
 
             local sPlatoonName = oPlatoon:GetPlan()
+            if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
             --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end

@@ -1795,12 +1795,14 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                     if not(bIndirectFireThreatOnly) then
                         if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then
                             if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit.UnitId) then
-                                iMassMod = 0.6 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
+                                iMassMod = 0.55 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
                             elseif EntityCategoryContains(M27UnitInfo.refCategoryCruiserCarrier, oUnit.UnitId) then
                                 if EntityCategoryContains(categories.CYBRAN * categories.TECH2, oUnit.UnitId) then iMassMod = 0.45
                                 else
                                     iMassMod = 0.2
                                 end
+                            elseif EntityCategoryContains(M27UnitInfo.refCategoryAttackBot * categories.TECH1, oUnit.UnitId) then
+                                iMassMod = 0.85
                             else iMassMod = 1
                             end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) then

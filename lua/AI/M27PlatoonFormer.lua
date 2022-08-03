@@ -188,7 +188,7 @@ function CombatPlatoonFormer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CombatPlatoonFormer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if GetGameTimeSeconds() >= 780 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
+    if GetGameTimeSeconds() >= 240 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, about to refresh units waiting for assignment') end
 
 
@@ -607,7 +607,7 @@ function CombatPlatoonFormer(aiBrain)
                     --Consider whether to group the units trying to form a platoon in certain scenarios:
 
                     --Do we have lots of units trying to form a platoon, and we have more than the minimum number wanted to form a platoon? (e.g. one scenario this tries to address is if units have just been disbanded from ACU escort, to avoid spread out units all being part of the same platoon. iUnitsWaiting='..iUnitsWaiting..';
-                    if iUnitsWaiting >= 6 and iUnitsWaiting >= 2 + (M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize] or 0) and not(M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refbRunFromAllEnemies]) and not(M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refbRequiresUnitToFollow]) then
+                    if iUnitsWaiting >= 3 and iUnitsWaiting >= 2 + (M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refiMinimumPlatoonSize] or 0) and not(M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refbRunFromAllEnemies]) and not(M27PlatoonTemplates.PlatoonTemplate[sPlatoonToForm][M27PlatoonTemplates.refbRequiresUnitToFollow]) then
                         --Are the units spread out?
                         local bSpreadOut = false
                         for iUnit, oUnit in tUnitsWaiting do

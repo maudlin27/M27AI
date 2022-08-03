@@ -6,7 +6,7 @@
 --Manually turn below off prior to release
 M27ShowUnitNames = true --(Overseer will set this to true if game settings are to show platoon names for all as well)
 M27ShowEnemyUnitNames = true --Will rename enemy units to reflect their ID and lifetime count
-M27RunVeryFast = false --Game starts off at +10 speed if set to adjustable
+M27RunVeryFast = true --Game starts off at +10 speed if set to adjustable
 M27StrategicLog = true --Affects the strategic overseer logs which give various stats re the AI's state during the game
 M27ShowPathingGraphically = false --(also turns on log showing map name) - Will draw the pathing for land, amphibious and navy if set to true, but will make things very slow
 M27RunProfiling = false --Records data on how long most functions are taking
