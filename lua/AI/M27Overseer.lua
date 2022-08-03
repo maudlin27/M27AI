@@ -3338,11 +3338,20 @@ function ThreatAssessAndRespond(aiBrain)
                     end
                 else
                     iCurThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyThreatGroup[refoEnemyGroupUnits], true)
+                    --Note: This gets adjusted further below
                 end
 
                 tEnemyThreatGroup[refiTotalThreat] = math.max(10, iCurThreat)
                 --tEnemyThreatGroup[reftFrontPosition] = M27Utilities.GetAveragePosition(tEnemyThreatGroup[refoEnemyGroupUnits])
                 tEnemyThreatGroup[reftFrontPosition] = M27Utilities.GetNearestUnit(tEnemyThreatGroup[refoEnemyGroupUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]):GetPosition()
+
+                --Increase threat for non-navy non-structure groups if we've seen the enemy ACU and think it's near and threat group doesn't include ACU
+                if not(bConsideringNavy) and iCurThreat > 0 and M27Utilities.IsTableEmpty(aiBrain[reftLastNearestACU]) == false and M27UnitInfo.IsUnitValid(aiBrain[refoLastNearestACU]) and EntityCategoryContains(categories.COMMAND + categories.STRUCTURE, aiBrain[refoLastNearestACU].UnitId) and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.COMMAND, tEnemyThreatGroup[refoEnemyGroupUnits])) then
+                    if M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftFrontPosition], aiBrain[reftLastNearestACU]) <= 60 then
+                        iCurThreat = iCurThreat + M27Logic.GetCombatThreatRating(aiBrain, { aiBrain[refoLastNearestACU] }, false)
+                    end
+                end
+
                 tEnemyThreatGroup[refiDistanceFromOurBase] = M27Utilities.GetDistanceBetweenPositions(tEnemyThreatGroup[reftFrontPosition], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 tEnemyThreatGroup[refiModDistanceFromOurStart] = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tEnemyThreatGroup[reftFrontPosition])
                 if tEnemyThreatGroup[refiHighestThreatRecorded] == nil or tEnemyThreatGroup[refiHighestThreatRecorded] < tEnemyThreatGroup[refiTotalThreat] then
@@ -3407,7 +3416,7 @@ function ThreatAssessAndRespond(aiBrain)
                     tNilDefenderPlatoons = {}
                     --bArmyPoolInAvailablePlatoons = false
 
-                    --Ensure enemy engis will have a unit capable of killing them quickly
+                    --Ensure enemy engis will have a unit capable of killing them quickly (e.g. 2 selen equivalents)
                     if tEnemyThreatGroup[refiTotalThreat] < 20 then
                         tEnemyThreatGroup[refiTotalThreat] = 20
                     end
