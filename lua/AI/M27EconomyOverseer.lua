@@ -2707,7 +2707,7 @@ function ManageMassStalls(aiBrain)
                             if iCategoryRef == categories.COMMAND then
                                 --want in addition to above as ACU might have personal shield
                                 if bPauseNotUnpause then
-                                    if not (oUnit:IsUnitState('Upgrading')) then
+                                    if oUnit:IsUnitState('Upgrading') then
                                         bApplyActionToUnit = false
                                     elseif oUnit.GetWorkProgress then
                                         if oUnit:GetWorkProgress() >= 0.85 then

@@ -109,6 +109,8 @@ tPathingSegmentGroupBySegment = {} --[a][b][c]: a = pathing type; b = segment x,
 iMaxBaseSegmentX = 1 --Will be set by pathing, sets the maximum possible base segment X
 iMaxBaseSegmentZ = 1
 
+tCliffsAroundBaseChokepoint = 'M27CliffsAroundBaseChokepoint' --against aiBrain, [x][z] = {position of nearest end of cliff}, where x is the map position x, z is the map position z, and it returns the location of the point of the closest 'break' from the chokepoint (e.g. to the left or right of a cliff formation between the aibrain's base and the nearest enemy base)
+
 iMapWaterHeight = 0 --Surface height of water on the map
 
 --NoRush details
@@ -3267,6 +3269,269 @@ function RecordBaseLevelPathability()
 
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function IdentifyImpathableAreaAroundBase(aiBrain)
+    --Uses similar approach to original pathing, but on the assumption that pathing has already been generated
+    --Is only interested in impathable areas near our base on the way from our base to enemy base
+    --Main reason is for emergency PD placement
+
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IdentifyImpathableAreaAroundBase'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if aiBrain[refbCanPathToEnemyBaseWithAmphibious] and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]) then
+        if bDebugMessages == true then LOG(sFunctionRef..': About to identify cliffs around our base on the way to the nearest enemy') end
+
+        --Identify all cliffs on the way to the enemy base into their own 'groups' based on whether the group is the same amphibious pathing group as the ACU or not
+        local tLineStartPoint
+        local iAngleToEnemy = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], GetPrimaryEnemyBaseLocation(aiBrain))
+        local sPathing = M27UnitInfo.refPathingTypeAmphibious
+        local iSegmentGroupWanted = GetSegmentGroupOfLocation(sPathing, PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local iCurRecursivePosition
+        local tRecursivePosition
+        local bHaveSubsequentPath
+
+        local iCurX, iCurZ
+        local iLowestX = 10000
+        local iHighestX = 0
+        local iLowestZ = 10000
+        local iHighestZ = 0
+
+        local iInterval = 2
+        local iCliffCount = 0
+        local tiCliffBoundaries = {} --[x] = iCliffCount; returns {x1, z1, x2, z2}
+
+        function RecordCliff()
+            if not(aiBrain[tCliffsAroundBaseChokepoint][iCurX]) then
+                aiBrain[tCliffsAroundBaseChokepoint][iCurX] = {}
+                aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ] = {}
+            else
+                aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ] = {}
+            end
+            aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ] = true
+            iLowestX = math.min(iCurX, iLowestX)
+            iLowestZ = math.min(iCurZ, iLowestZ)
+            iHighestX = math.max(iCurX, iHighestX)
+            iHighestZ = math.max(iCurZ, iHighestZ)
+        end
+        aiBrain[tCliffsAroundBaseChokepoint] = {}
+
+        --First record all locations that have cliffs around them
+        for iDistToEnemy = iInterval, math.min(126, math.floor((aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4 / iInterval))*iInterval), iInterval do
+            tLineStartPoint = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy, iDistToEnemy, false)
+            if bDebugMessages == true then LOG(sFunctionRef..': Our start point='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; iAngleToEnemy='..iAngleToEnemy..'; iDistToEnemy='..iDistToEnemy..'; tLineStartPoint='..repru(tLineStartPoint)..'; iSegmentGroupWanted='..iSegmentGroupWanted) end
+            --Check we haven't already recorded this in the cliffs around base
+            iCurX = math.floor(tLineStartPoint[1])
+            iCurZ = math.floor(tLineStartPoint[3])
+
+            if not(aiBrain[tCliffsAroundBaseChokepoint][iCurX]) or not(aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ]) then
+                --Can we path here from main base?
+                if bDebugMessages == true then LOG(sFunctionRef..': Segment group of line start point='..GetSegmentGroupOfLocation(sPathing, tLineStartPoint)) end
+                if not(iSegmentGroupWanted == GetSegmentGroupOfLocation(sPathing, tLineStartPoint)) then
+                    --Record all locations in a different pathing group from this position
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Have a different pathing group, will draw line base in black')
+                        M27Utilities.DrawLocation(tLineStartPoint, false, 3, 250, 1)
+                    end
+                    tRecursivePosition = {}
+                    iCurRecursivePosition = 1
+                    iLowestX = 10000
+                    iHighestX = 0
+                    iLowestZ = 10000
+                    iHighestZ = 0
+                    iCliffCount = iCliffCount + 1
+                    while iCurRecursivePosition > 0 do
+                        if bDebugMessages == true then LOG(sFunctionRef..': iCurRecursivePosition='..iCurRecursivePosition..'; iCurX='..iCurX..'; iCurZ='..iCurZ) end
+                        bHaveSubsequentPath = false
+                        RecordCliff()
+                        local tAllAdjacentPositions = {
+                            {iCurX - iInterval, iCurZ -iInterval},
+                            {iCurX - iInterval, iCurZ},
+                            {iCurX - iInterval, iCurZ +iInterval},
+
+                            {iCurX, iCurZ - iInterval},
+                            {iCurX, iCurZ + iInterval},
+
+                            {iCurX + iInterval, iCurZ - iInterval},
+                            {iCurX + iInterval, iCurZ},
+                            {iCurX + iInterval, iCurZ + iInterval},
+                        }
+
+
+                        --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': About to check if are at edge of map') end
+                        --Dont check if are at map edge (if we really wanted to optimise this then I expect predefined tables of all the options would work but for now I'll leave it at this
+                        if iCurX >= rMapPlayableArea[3] or iCurZ >= rMapPlayableArea[4] or iCurX < iInterval or iCurZ < iInterval then
+                            --if bDebugMessages == true then LOG(sFunctionRef..': Are at map edge so limit the adjacent segments to consider') end
+                            tAllAdjacentPositions = {}
+                            local bCanDecreaseX, bCanIncreaseX, bCanDecreaseZ, bCanIncreaseZ
+                            if iCurX > iInterval then bCanDecreaseX = true end
+                            if iCurX > iInterval then bCanDecreaseZ = true end
+                            if iCurX < rMapPlayableArea[3] then bCanIncreaseX = true end
+                            if iCurZ < rMapPlayableArea[4] then bCanIncreaseZ = true end
+                            if bCanDecreaseX then
+                                if bCanDecreaseZ then table.insert(tAllAdjacentPositions, {iCurX - iInterval, iCurZ -iInterval}) end
+                                if bCanIncreaseZ then table.insert(tAllAdjacentPositions, {iCurX - iInterval, iCurZ +iInterval}) end
+                                table.insert(tAllAdjacentPositions, {iCurX - iInterval, iCurZ})
+                            end
+                            if bCanIncreaseX then
+                                if bCanDecreaseZ then table.insert(tAllAdjacentPositions, {iCurX + iInterval, iCurZ -iInterval}) end
+                                if bCanIncreaseZ then table.insert(tAllAdjacentPositions, {iCurX + iInterval, iCurZ +iInterval}) end
+                                table.insert(tAllAdjacentPositions, {iCurX + iInterval, iCurZ})
+                            end
+                            if bCanDecreaseZ then table.insert(tAllAdjacentPositions, {iCurX, iCurZ -iInterval}) end
+                            if bCanIncreaseZ then table.insert(tAllAdjacentPositions, {iCurX, iCurZ +iInterval}) end
+                        end
+
+
+                        --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': Number of adjacent locations to consider='..table.getn(tAllAdjacentSegments)) end
+                        for iEntry, tAdjacentXZ in tAllAdjacentPositions do
+                            --Have we already considered this location?
+                            if not(aiBrain[tCliffsAroundBaseChokepoint][tAdjacentXZ[1]]) or not(aiBrain[tCliffsAroundBaseChokepoint][tAdjacentXZ[1]][tAdjacentXZ[2]]) then
+
+                                --Is this position also unapthable from main base?
+                                if not(iSegmentGroupWanted == GetSegmentGroupOfLocation(sPathing, {tAdjacentXZ[1], 0, tAdjacentXZ[2] })) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Adjacent segment '..repru(tAdjacentXZ)..' has a pathing group '..GetSegmentGroupOfLocation(sPathing, {tAdjacentXZ[1], 0, tAdjacentXZ[2] })..' so will continue searching') end
+                                    bHaveSubsequentPath = true
+                                    iCurX = tAdjacentXZ[1]
+                                    iCurZ = tAdjacentXZ[2]
+                                    break
+                                end
+                            end
+                        end
+                        if bHaveSubsequentPath == true then
+                            tRecursivePosition[iCurRecursivePosition] = {iCurX, iCurZ}
+                            iCurRecursivePosition = iCurRecursivePosition + 1
+                            --if bDebugMessages == true then LOG(sFunctionRef..': Can path to the new segment so setting cur segment equal to the new segment') end
+                        else
+                            iCurRecursivePosition = iCurRecursivePosition - 1
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have adjacent segment so reducing recursive position to '..iCurRecursivePosition) end
+                            if iCurRecursivePosition <= 0 then break
+                            else
+                                iCurX = tRecursivePosition[iCurRecursivePosition][1]
+                                iCurZ = tRecursivePosition[iCurRecursivePosition][2]
+                                --if bDebugMessages == true then LOG(sFunctionRef..': Have nowhere that can path to that havent already considered, so moving recursive position back one, iCurRecursivePosition='..iCurRecursivePosition..'; New segment X-Z='..repru(tRecursivePosition[iCurRecursivePosition])) end
+                            end
+                        end
+                    end
+                    tiCliffBoundaries[iCliffCount] = {iLowestX, iLowestZ, iHighestX, iHighestZ}
+                end
+            elseif bDebugMessages == true then
+                LOG(sFunctionRef..': Have the same pathing group, will draw line base in white')
+                M27Utilities.DrawLocation(tLineStartPoint, false, 7, 250, 1)
+            end
+        end
+        bDebugMessages = false
+        if bDebugMessages == true then
+            if bDebugMessages == true then LOG(sFunctionRef..': Will draw all cliffs in red') end
+            if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint]) == false then
+                for iX, tSubtable in aiBrain[tCliffsAroundBaseChokepoint] do
+                    for iZ, vResult in aiBrain[tCliffsAroundBaseChokepoint][iX] do
+                        M27Utilities.DrawLocation({ iX, GetTerrainHeight(iX, iZ), iZ }, false, 2, 250, 1)
+                    end
+                end
+            end
+        end
+        bDebugMessages = true
+
+        --Increase min and max sizes for each cliff, and then pick the 2 corner points with the smallest mod distance to our base
+        local tCorner1, tCorner2, tCurCorner
+        local tCornerPositions = {}
+        local tiDistToCorners = {}
+        local iClosestDist = 100000
+        local iSecondClosestDist = 10000
+        local iClosestCorner
+        local iSecondClosestCorner
+        local iCurDist
+
+        for iCliff, tBoundaries in tiCliffBoundaries do
+            iClosestDist = 100000
+            iSecondClosestDist = 10000
+            iClosestCorner = nil
+            iSecondClosestCorner = nil
+
+            tBoundaries[1] = math.max(rMapPlayableArea[1], tBoundaries[1] - 10)
+            tBoundaries[2] = math.max(rMapPlayableArea[2], tBoundaries[2] - 10)
+            tBoundaries[3] = math.min(rMapPlayableArea[3], tBoundaries[3] + 10)
+            tBoundaries[4] = math.min(rMapPlayableArea[4], tBoundaries[4] + 10)
+
+            --Calculate the 2 points we want to build PD at for each cliff:
+            for iCorner = 1, 4 do
+                if iCorner == 1 then tCurCorner = {tBoundaries[1], GetTerrainHeight(tBoundaries[1], tBoundaries[2]), tBoundaries[2]}
+                elseif iCorner == 2 then tCurCorner = {tBoundaries[3], GetTerrainHeight(tBoundaries[3], tBoundaries[2]), tBoundaries[2]}
+                elseif iCorner == 3 then tCurCorner = {tBoundaries[3], GetTerrainHeight(tBoundaries[3], tBoundaries[4]), tBoundaries[4]}
+                else tCurCorner = {tBoundaries[1], GetTerrainHeight(tBoundaries[1], tBoundaries[4]), tBoundaries[4]}
+                end
+                tCornerPositions[iCorner] = {tCurCorner[1], tCurCorner[2], tCurCorner[3]}
+                --tiAngleDifFromBase[iCorner] = iAngleToEnemy - M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner)
+                --if tiAngleDifFromBase[iCorner] < 0 then tiAngleDifFromBase[iCorner] = tiAngleDifFromBase[iCorner] + 360 end
+                iCurDist = math.cos(M27Utilities.ConvertAngleToRadians(math.abs(M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner) - iAngleToEnemy))) * M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner)
+                tiDistToCorners[iCorner] = iCurDist
+                if bDebugMessages == true then LOG(sFunctionRef..': Before updating closest corners: iCurDist='..iCurDist..'; iClosestDist='..iClosestDist..'; iClosestCorner='..(iClosestCorner or 'nil')..'; iSecondClosestDist='..iSecondClosestDist..'; iSecondClosestCorner='..(iSecondClosestCorner or 'nil')) end
+                if iCurDist < iClosestDist then
+                    iSecondClosestDist = iClosestDist
+                    iSecondClosestCorner = iClosestCorner
+                    iClosestDist = iCurDist
+                    iClosestCorner = iCorner
+
+                elseif iCurDist < iSecondClosestDist then
+                    iSecondClosestDist = iCurDist
+                    iSecondClosestCorner = iCorner
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': After updating closest corners: iCurDist='..iCurDist..'; iClosestDist='..iClosestDist..'; iClosestCorner='..(iClosestCorner or 'nil')..'; iSecondClosestDist='..iSecondClosestDist..'; iSecondClosestCorner='..(iSecondClosestCorner or 'nil')) end
+            end
+
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': iCliff='..iCliff..'; tBoundaries='..repru(tBoundaries)..'; will draw in gold, and will draw the corners in blue. iClosestCorner='..iClosestCorner..'; iClosestDist='..iClosestDist..'; iSecondClosestCorner='..iSecondClosestCorner..'; iSecondClosestDist='..iSecondClosestDist..'; table of corners='..repru(tCornerPositions))
+                M27Utilities.DrawRectangle(Rect(tBoundaries[1], tBoundaries[2], tBoundaries[3], tBoundaries[4]), 4, 500)
+                M27Utilities.DrawLocation(tCornerPositions[iClosestCorner], nil, 1, 500)
+                M27Utilities.DrawLocation(tCornerPositions[iSecondClosestCorner], nil, 1, 500)
+            end
+
+            --Cycle through every position in this square, work out the closest of the 2 corners, and record this corner
+            for iX = tBoundaries[1], tBoundaries[3] do
+                if not(aiBrain[tCliffsAroundBaseChokepoint][iX]) then
+                    aiBrain[tCliffsAroundBaseChokepoint][iX] = {}
+                end
+
+                for iZ = tBoundaries[2], tBoundaries[4] do
+                    if bDebugMessages == true and iZ == tBoundaries[2] then LOG(sFunctionRef..': iX='..iX..'; iZ='..iZ..'; Dist to corner1='..M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iClosestCorner])..'; Dist to corner2='..M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iSecondClosestCorner])) end
+                    if M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iClosestCorner]) < M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iSecondClosestCorner]) then
+                        --Closest corner is closest to this position
+                        aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tCornerPositions[iClosestCorner][1], tCornerPositions[iClosestCorner][2], tCornerPositions[iClosestCorner][3]}
+                        if bDebugMessages == true and iZ == tBoundaries[2] then LOG(sFunctionRef..': iX-Z='..iX..'-'..iZ..'; are near the closest corner '..iClosestCorner..'; Corner position='..repru(tCornerPositions[iClosestCorner])..'; aiBrain[tCliffsAroundBaseChokepoint][iX][iZ]='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ])) end
+                    else
+                        --Second closest corner to start is closest to this position
+                        aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tCornerPositions[iSecondClosestCorner][1], tCornerPositions[iSecondClosestCorner][2], tCornerPositions[iSecondClosestCorner][3]}
+                    end
+                end
+            end
+
+            if bDebugMessages == true then
+                LOG(sFunctionRef..': Will give result of the first row of x values at the lowest Z boundary')
+                for iX = tBoundaries[1], tBoundaries[3] do
+                    LOG('Result of table for iX='..iX..'; iZ='..tBoundaries[2]..'='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][tBoundaries[2]]))
+                end
+                LOG(sFunctionRef..': WIll draw all locations using the closest corner in light blue, and all locations using the second closest in red. tBoundaries='..repru(tBoundaries))
+                local iColour
+                for iX = tBoundaries[1], tBoundaries[3] do
+                    for iZ = tBoundaries[2], tBoundaries[4] do
+                        if aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tCornerPositions[iClosestCorner][1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tCornerPositions[iClosestCorner][3] then
+                            iColour = 5 --light blue
+                        else iColour = 2 --red
+                        end
+                        if iZ == tBoundaries[2] then LOG(sFunctionRef..': About to draw location '..repru({iX, GetTerrainHeight(iX, iZ), iZ})..' in colour '..iColour..'; corner recorded as closest='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ])..'; closest corner position='..repru(tCornerPositions[iClosestCorner])) end
+                        M27Utilities.DrawLocation({iX, GetTerrainHeight(iX, iZ), iZ}, false, iColour, 500)
+                    end
+                end
+            end
+
+        end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
+
 end
 
 function SetupNoRushDetails(aiBrain)

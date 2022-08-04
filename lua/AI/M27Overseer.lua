@@ -7668,6 +7668,9 @@ function RecordAllEnemiesAndAllies(aiBrain)
     --Update chokepoints (note for now this will only call once per game)
     ForkThread(M27MapInfo.IdentifyTeamChokepoints, aiBrain)
 
+    --Record impathable area around base if no chokepoint
+    ForkThread(M27MapInfo.IdentifyImpathableAreaAroundBase, aiBrain)
+
     --Reset nearest base if no enemies, since the logic for nearest enemy runs before identifying all allies (but needs details of all allies to work)
     if aiBrain[refbNoEnemies] and GetGameTimeSeconds() <= 10 then
         aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation] = nil
