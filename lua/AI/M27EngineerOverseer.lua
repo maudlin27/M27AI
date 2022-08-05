@@ -6913,8 +6913,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
     local sFunctionRef = 'GetActionTargetAndObject'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if aiBrain:GetArmyIndex() == 5 and GetGameTimeSeconds() >= 2160 and (iActionRefToAssign == refActionBuildShield or iActionRefToAssign == refActionBuildSecondShield) then bDebugMessages = true end
-
+    --if GetGameTimeSeconds() >= 1560 and iActionRefToAssign == refActionBuildSecondShield then bDebugMessages = true end
     --if iActionRefToAssign == refActionBuildHive then bDebugMessages = true end
 
 
@@ -7137,6 +7136,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                 --First check if we are already building anything under this action (in which case want to assist it instead of building a new one)
                 if bDebugMessages == true then LOG(sFunctionRef..': Dont have a predefined location and are doing a normal action so will see if anyone is already building for this action and if so if there is a building we can assist') end
                 if aiBrain[reftEngineerAssignmentsByActionRef] then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of engineers with this action empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionRefToAssign]))) end
                     if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionRefToAssign]) == false or (iActionRefToAssign == refActionBuildExperimental and not(M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildSecondExperimental]))) then
                         oFirstConstructingEngineer = nil
                         local oAlternativeEngineer
@@ -7250,6 +7250,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                         local iSearchRangeForPartBuilt = math.max(iSearchRangeForNearestEngi, 30)
                         if iActionRefToAssign == refActionBuildExperimental then iSearchRangeForPartBuilt = math.max(iSearchRangeForPartBuilt, 250) end
                         local oNearestPartBuilt = GetNearestPartBuiltUnit(aiBrain, iCategoryToBuild, tStartPosition, iSearchRangeForPartBuilt)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Searching for part build units of this category, iSearchRangeForPartBuilt='..iSearchRangeForPartBuilt..'; do we have a valid unit='..tostring(M27UnitInfo.IsUnitValid(oNearestPartBuilt))) end
                         if oNearestPartBuilt then
                             if bDebugMessages == true then LOG(sFunctionRef..': Are assisting part built building') end
                             bAssistBuildingOrEngineer = true
@@ -7267,17 +7268,20 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
 
                     if (iActionRefToAssign == refActionBuildShield or iActionRefToAssign == refActionBuildSecondShield) then
                         --Pick the closest unit that wants a shield that isnt at a failed location; if are building a second shield then make sure we dont have the first shield build location near here
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want to build a shield. Is the table of units wanting a fixed shield empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingFixedShield]))) end
                         if M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingFixedShield]) == false then
                             local iClosestDistance = 10000
                             oActionObject = nil
                             local iCurDist
                             local tLocationToAvoid
                             if iActionRefToAssign == refActionBuildSecondShield and M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildShield]) == false then
+
                                 for iEngiRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildShield] do
                                     if M27Utilities.IsTableEmpty(tSubtable[refEngineerAssignmentActualLocation]) == false then
                                         tLocationToAvoid = {tSubtable[refEngineerAssignmentActualLocation][1], tSubtable[refEngineerAssignmentActualLocation][2], tSubtable[refEngineerAssignmentActualLocation][3]}
                                     end
                                 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': We are currently building a shield, and our action is to build a second shield.  Will search through locations already assigned to build a shield to make sure we are not doubling up. Size of reftUnitsWantingFixedShield='..table.getn(aiBrain[reftUnitsWantingFixedShield])..'; location to avoid='..repru(tLocationToAvoid)) end
                             end
                             --First try and shield high priority targets
                             function GetShieldToAssist(tPotentialUnits)
@@ -7311,6 +7315,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                             end
 
                             local tPriorityShields = EntityCategoryFilterDown(M27UnitInfo.refCategoryExperimentalLevel, aiBrain[reftUnitsWantingFixedShield])
+                            if bDebugMessages == true then LOG(sFunctionRef..': Priority units wanting shield set to just experimentals. Is table of priority shields empty='..tostring(M27Utilities.IsTableEmpty(tPriorityShields))) end
                             if M27Utilities.IsTableEmpty(tPriorityShields) == false then
                                 GetShieldToAssist(tPriorityShields)
                             end
@@ -7318,6 +7323,7 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                                 if M27Utilities.IsTableEmpty(tPriorityShields) then tPriorityShields = aiBrain[reftUnitsWantingFixedShield]
                                 else tPriorityShields = EntityCategoryFilterDown(categories.ALLUNITS - M27UnitInfo.refCategoryExperimentalLevel, aiBrain[reftUnitsWantingFixedShield])
                                 end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Priority units wanting shield now set to all other units. Is table of priority shields empty='..tostring(M27Utilities.IsTableEmpty(tPriorityShields))) end
                                 if M27Utilities.IsTableEmpty(tPriorityShields) == false then
                                     GetShieldToAssist(tPriorityShields)
                                 end
@@ -10173,10 +10179,12 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 iActionToAssign = refActionBuildShield --default
                                 if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildShield]) == false and aiBrain:GetEconomyStored('MASS') > 0 and not(bHaveLowPower) then
                                     local iEngisAssigned = table.getsize(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildShield])
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Already have engineers active building a shield, iEngisAssigned='..iEngisAssigned..'; iMaxEngisWanted='..iMaxEngisWanted..'; If already have max engis doing buildshield then will build second shield') end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Already have engineers active building a shield, iEngisAssigned='..iEngisAssigned..'; iMaxEngisWanted='..iMaxEngisWanted..'; If already have max engis doing buildshield then will build second shield if enoughy targets wanting shielding') end
                                     if iEngisAssigned >= iMaxEngisWanted then
-                                        iActionToAssign = refActionBuildSecondShield
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Will set action to build second shield') end
+                                        if M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingFixedShield]) == false and table.getn(aiBrain[reftUnitsWantingFixedShield]) > 1 then
+                                            iActionToAssign = refActionBuildSecondShield
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Will set action to build second shield') end
+                                        end
                                     end
                                 end
                             end
@@ -11601,7 +11609,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                         end
                                     end
                                 end
-                                if bDebugMessages == true then LOG(sFunctionRef..': iMinEngiTechLevelWanted='..iMinEngiTechLevelWanted..'; bHaveEngisOfCurrentOrHigherTech='..tostring(bHaveEngisOfCurrentOrHigherTech)..'; tiAvailableEngineersByTech='..repru(tiAvailableEngineersByTech)) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iMinEngiTechLevelWanted='..iMinEngiTechLevelWanted..'; bHaveEngisOfCurrentOrHigherTech='..tostring(bHaveEngisOfCurrentOrHigherTech)..'; tiAvailableEngineersByTech='..repru(tiAvailableEngineersByTech)..'; iActionToAssign='..(iActionToAssign or 'nil')) end
                                 tActionTargetLocation = nil
                                 oActionTargetObject = nil
                                 if bHaveEngisOfCurrentOrHigherTech then
@@ -11620,7 +11628,9 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                                 --GetNearestEngineerWithLowerPriority(aiBrain, tEngineers, iCurrentActionPriority, tCurrentActionTarget, iActionRefToGetExistingCount, tsUnitStatesToIgnore)
                                 if M27Utilities.IsTableEmpty(tActionTargetLocation) == true and oActionTargetObject == nil then
-                                    if bHaveEngisOfCurrentOrHigherTech and not(iActionToAssign == refActionReclaimUnit) then M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review if this happens repeatedly for unexpected actions (examples where this triggers in line with expectations are if want to assist a building but all of them have nearby enemies (or are factories that are idle), or if try to reclaim a unit that no longer has a position (this warning is hidden if the action was to reclaim a unit as a result though). iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry, true) end
+                                    if bHaveEngisOfCurrentOrHigherTech and not(iActionToAssign == refActionReclaimUnit) then
+                                        M27Utilities.ErrorHandler('Couldnt find valid target or object for the action so wont proceed with it, review if this happens repeatedly for unexpected actions (examples where this triggers in line with expectations are if want to assist a building but all of them have nearby enemies (or are factories that are idle), or if try to reclaim a unit that no longer has a position (this warning is hidden if the action was to reclaim a unit as a result though). iActionToAssign='..iActionToAssign..'; iCurrentConditionToTry='..iCurrentConditionToTry, true)
+                                    end
                                     iCurConditionEngiShortfall = iMaxEngisWanted - iExistingEngineersAssigned
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have no action target or object target, so unless anErrormessage has appeared we are just calculating how many engis we want to build; Total available T3 engis='..tiAvailableEngineersByTech[3]..'; repr of table of available engis by tech level='..repru(tiAvailableEngineersByTech)) end
                                 else
