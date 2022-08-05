@@ -3196,6 +3196,121 @@ function GetBuildLocationUnderShieldNearestEnemy(oShield)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function GetEmergencyPDStartLocation(aiBrain)
+    --Returns a location for the starting point for building PD - i.e. hasnt adjusted for things like moving towards base to get a better shot, which is done in AdjustPDBuildLocation
+
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetEmergencyPDStartLocation'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local tActionLocation
+
+
+    --Pick somewhere on the way from our base to the nearest enemy threat
+    --Do we have a choekpoint near here that is assigned to a teammate and which has at least 3 T2 PD? If so then build here
+    local tNearestChokepoint
+    local iNearestChokepointDistance = aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 25
+    local iCurChokepointDistance
+
+    if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
+        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+            if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
+                iCurChokepointDistance = M27Utilities.GetDistanceBetweenPositions(oBrain[M27MapInfo.reftChokepointBuildLocation], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                if iCurChokepointDistance < iNearestChokepointDistance then
+                    tNearestChokepoint = {oBrain[M27MapInfo.reftChokepointBuildLocation][1], oBrain[M27MapInfo.reftChokepointBuildLocation][2], oBrain[M27MapInfo.reftChokepointBuildLocation][3]}
+                    iNearestChokepointDistance = iCurChokepointDistance
+                end
+            end
+        end
+    end
+
+
+
+    --Do we have complete T2 PD between us and the enemy? If so try and fortify here
+    local tNearbyPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(100, aiBrain[M27Overseer.refiModDistFromStartNearestThreat] * 0.6), 'Ally')
+    local iAngleToNearestThreat, toInRangePD
+    local iInRangePD = 0
+    if M27Utilities.IsTableEmpty(tNearbyPD) == false then
+        local iCurAngle
+        toInRangePD = {}
+        iAngleToNearestThreat = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftLocationFromStartNearestThreat])
+        for iPD, oPD in tNearbyPD do
+            if oPD:GetFractionComplete() >= 1 and oPD:GetHealthPercent() >= 0.5 then
+                iCurAngle = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oPD:GetPosition())
+                if math.abs(iCurAngle - iAngleToNearestThreat) <= 45 then
+                    iInRangePD = iInRangePD + 1
+                    toInRangePD[iInRangePD] = oPD
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Just considered oPD='..oPD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPD)..'; Fraction complete='..oPD:GetFractionComplete()..'; Heatlh%='..oPD:GetHealthPercent()..'; Angle from base='..M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oPD:GetPosition())..'; angle from base of nearest threat='..iAngleToNearestThreat..'; iInRangePD='..iInRangePD) end
+        end
+    end
+    if iInRangePD > 0 then
+        if iInRangePD <= 3 then
+            tActionLocation = M27Utilities.GetAveragePosition(toInRangePD)
+        else
+            --Get the 3 PD closest to the enemy
+            local tClosestPDUnits = {}
+            local iClosestPDCount = 0
+            local tPDDistToEnemy = {}
+            for iUnit, oUnit in toInRangePD do
+                tPDDistToEnemy[iUnit] = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLocationFromStartNearestThreat])
+            end
+            for iUnit, iDistance in M27Utilities.SortTableByValue(tPDDistToEnemy, false) do
+                iClosestPDCount = iClosestPDCount + 1
+                tClosestPDUnits[iClosestPDCount] = toInRangePD[iUnit]
+                if iClosestPDCount >= 3 then break end
+            end
+
+            tActionLocation = M27Utilities.GetAveragePosition(tClosestPDUnits)
+        end
+        --Move slightly forwards if we are really close to our base
+        if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tActionLocation) < (math.min(math.min(aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 30, aiBrain[M27Overseer.refiModDistFromStartNearestThreat] * 0.4, 50))) then
+            local iDistToMoveForwards = 5
+            if iInRangePD > 3 then iDistToMoveForwards = 10 end
+            tActionLocation = M27Utilities.MoveInDirection(tActionLocation, M27Utilities.GetAngleFromAToB(tActionLocation, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]), iDistToMoveForwards, true)
+        end
+    else
+        if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 30 then
+            tActionLocation = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        else
+            local iDistTowardsEnemy = math.min(aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 30, aiBrain[M27Overseer.refiModDistFromStartNearestThreat] * 0.4, 50)
+            tActionLocation = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftLocationFromStartNearestThreat]), iDistTowardsEnemy, true)
+
+            --Are we blocked by a cliff on this route?
+            if bDebugMessages == true then LOG(sFunctionRef..': Is the table of cliffs around base empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint]))) end
+            if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint]) == false then
+                local tPointAlongLine, iCurX, iCurZ
+                for iDistMod = -10, 24, 2 do
+                    tPointAlongLine = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27Overseer.reftLocationFromStartNearestThreat]), iDistTowardsEnemy + iDistMod, true)
+                    iCurX = math.floor(tPointAlongLine[1])
+
+                    if  aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX] then
+                        iCurZ = math.floor(tPointAlongLine[3])
+                        if bDebugMessages == true then LOG(sFunctionRef..': iDistMod='..iDistMod..'; iCurX='..iCurX..'; iCurZ='..iCurZ..'; cliff value for this entry='..repru(aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ])) end
+                        if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ]) == false then
+                            tActionLocation = {aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ][1], aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ][2], aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ][3]}
+                            break
+                        end
+                    end
+                end
+            end
+
+        end
+    end
+
+
+
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': tActionLocation for PD before running the adjustPDlocation function='..repru(tActionLocation)..'; will draw in white')
+        M27Utilities.DrawLocation(tActionLocation, nil, 7, 100, nil)
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
+    return tActionLocation
+end
+
 function GetBuildLocationForShield(aiBrain, sShieldBP,  tPositionToCoverWithShield, bBuildAwayFromEnemy)
     --find the first location near tPositionToCoverWithShield that can build on that doesnt have anything queued for either it or nearby locations
     --if bBuildAwayFromEnemy is true then instead will try looking away from enemy in preference
@@ -7196,81 +7311,8 @@ function GetActionTargetAndObject(aiBrain, iActionRefToAssign, tExistingLocation
                             tActionLocation = oActionObject:GetPosition()
                         end
                     elseif iActionRefToAssign == refActionBuildEmergencyPD then
-                        --Pick somewhere on the way from our base to the nearest enemy threat
-                        --Do we have a choekpoint near here that is assigned to a teammate and which has at least 3 T2 PD? If so then build here
-                        local tNearestChokepoint
-                        local iNearestChokepointDistance = aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 25
-                        local iCurChokepointDistance
-                        if not(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27MapInfo.tiPlannedChokepointsByDistFromStart])) then
-                            for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
-                                if oBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle and oBrain[M27MapInfo.refiAssignedChokepointFirebaseRef] then
-                                    iCurChokepointDistance = M27Utilities.GetDistanceBetweenPositions(oBrain[M27MapInfo.reftChokepointBuildLocation], tStartPosition)
-                                    if iCurChokepointDistance < iNearestChokepointDistance then
-                                        tNearestChokepoint = {oBrain[M27MapInfo.reftChokepointBuildLocation][1], oBrain[M27MapInfo.reftChokepointBuildLocation][2], oBrain[M27MapInfo.reftChokepointBuildLocation][3]}
-                                        iNearestChokepointDistance = iCurChokepointDistance
-                                    end
-                                end
-                            end
-                        end
-
-
-
-                        --Do we have complete T2 PD between us and the enemy? If so try and fortify here
-                        local tNearbyPD = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(100, aiBrain[M27Overseer.refiModDistFromStartNearestThreat] * 0.6), 'Ally')
-                        local iAngleToNearestThreat, toInRangePD
-                        local iInRangePD = 0
-                        if M27Utilities.IsTableEmpty(tNearbyPD) == false then
-                            local iCurAngle
-                            toInRangePD = {}
-                            iAngleToNearestThreat = M27Utilities.GetAngleFromAToB(tStartPosition, aiBrain[M27Overseer.reftLocationFromStartNearestThreat])
-                            for iPD, oPD in tNearbyPD do
-                                if oPD:GetFractionComplete() >= 1 and oPD:GetHealthPercent() >= 0.5 then
-                                    iCurAngle = M27Utilities.GetAngleFromAToB(tStartPosition, oPD:GetPosition())
-                                    if math.abs(iCurAngle - iAngleToNearestThreat) <= 45 then
-                                        iInRangePD = iInRangePD + 1
-                                        toInRangePD[iInRangePD] = oPD
-                                    end
-                                end
-                                if bDebugMessages == true then LOG(sFunctionRef..': Just considered oPD='..oPD.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPD)..'; Fraction complete='..oPD:GetFractionComplete()..'; Heatlh%='..oPD:GetHealthPercent()..'; Angle from base='..M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oPD:GetPosition())..'; angle from base of nearest threat='..iAngleToNearestThreat..'; iInRangePD='..iInRangePD) end
-                            end
-                        end
-                        if iInRangePD > 0 then
-                            if iInRangePD <= 3 then
-                                tActionLocation = M27Utilities.GetAveragePosition(toInRangePD)
-                            else
-                                --Get the 3 PD closest to the enemy
-                                local tClosestPDUnits = {}
-                                local iClosestPDCount = 0
-                                local tPDDistToEnemy = {}
-                                for iUnit, oUnit in toInRangePD do
-                                    tPDDistToEnemy[iUnit] = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), aiBrain[M27Overseer.reftLocationFromStartNearestThreat])
-                                end
-                                for iUnit, iDistance in M27Utilities.SortTableByValue(tPDDistToEnemy, false) do
-                                    iClosestPDCount = iClosestPDCount + 1
-                                    tClosestPDUnits[iClosestPDCount] = toInRangePD[iUnit]
-                                    if iClosestPDCount >= 3 then break end
-                                end
-
-                                tActionLocation = M27Utilities.GetAveragePosition(tClosestPDUnits)
-                            end
-                            --Move slightly forwards if we are really close to our base
-                            if M27Utilities.GetDistanceBetweenPositions(tStartPosition, tActionLocation) < (math.min(math.min(aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 30, aiBrain[M27Overseer.refiModDistFromStartNearestThreat] * 0.4, 50))) then
-                                local iDistToMoveForwards = 5
-                                if iInRangePD > 3 then iDistToMoveForwards = 10 end
-                                tActionLocation = M27Utilities.MoveInDirection(tActionLocation, M27Utilities.GetAngleFromAToB(tActionLocation, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]), iDistToMoveForwards, true)
-                            end
-                        else
-                            if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 30 then
-                                tActionLocation = tStartPosition
-                            else
-                                local iDistTowardsEnemy = math.min(aiBrain[M27Overseer.refiModDistFromStartNearestThreat] - 30, aiBrain[M27Overseer.refiModDistFromStartNearestThreat] * 0.4, 50)
-                                tActionLocation = M27Utilities.MoveInDirection(tStartPosition, M27Utilities.GetAngleFromAToB(tStartPosition, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]), iDistTowardsEnemy, true)
-                            end
-                        end
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef..': tActionLocation for PD before running the adjustPDlocation function='..repru(tActionLocation)..'; will draw in white')
-                            M27Utilities.DrawLocation(tActionLocation, nil, 7, 100, nil)
-                        end
+                        --Below is redundancy - as of v45 shoudl already ahve calculated this when assigning the action
+                        tActionLocation = GetEmergencyPDStartLocation(aiBrain)
                     else
                         tActionLocation = tStartPosition
                     end
@@ -9257,8 +9299,10 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Can path by land to closest enemy. Mod distance from start of threat='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; SearchRange='..iSearchRange..'; iThreatRatio='..iThreatRatio..'; aiBrain[M27AirOverseer.refiBomberDefenceModDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceModDistance]..'; aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]..'; iMinPDWanted='..iMinPDWanted..'; aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) end
 
                                     if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= iSearchRange then
+                                        tExistingLocationsToPickFrom = {}
+                                        tExistingLocationsToPickFrom[1] = GetEmergencyPDStartLocation(aiBrain)
                                         --Rect: Small X-Z; Large X-Z
-                                        local rRect = Rect(math.min(aiBrain[M27Overseer.reftLocationFromStartNearestThreat][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1]) - 15, math.min(aiBrain[M27Overseer.reftLocationFromStartNearestThreat][3], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]) - 15, math.max(aiBrain[M27Overseer.reftLocationFromStartNearestThreat][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1]) + 15, math.max(aiBrain[M27Overseer.reftLocationFromStartNearestThreat][3], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]) + 15)
+                                        local rRect = Rect(math.min(aiBrain[M27Overseer.reftLocationFromStartNearestThreat][1], tExistingLocationsToPickFrom[1][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1]) - 15, math.min(aiBrain[M27Overseer.reftLocationFromStartNearestThreat][3], tExistingLocationsToPickFrom[1][3], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]) - 15, math.max(aiBrain[M27Overseer.reftLocationFromStartNearestThreat][1], tExistingLocationsToPickFrom[1][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1]) + 15, math.max(aiBrain[M27Overseer.reftLocationFromStartNearestThreat][3], tExistingLocationsToPickFrom[1][3], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]) + 15)
                                         local tUnitsOfInterest = GetUnitsInRect(rRect)
 
                                         local iThreatOfPD = 0

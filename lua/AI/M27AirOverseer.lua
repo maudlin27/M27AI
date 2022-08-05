@@ -4486,6 +4486,8 @@ function AirBomberManager(aiBrain)
     local sFunctionRef = 'AirBomberManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --if aiBrain[refiPreviousAvailableBombers] >= 10 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and GetGameTimeSeconds() >= 780 then bDebugMessages = true end
+
     --if GetGameTimeSeconds() >= 600 then bDebugMessages = true end
 
     DetermineBomberDefenceRange(aiBrain) --Updates aiBrain[refiBomberDefenceModDistance]
@@ -4636,18 +4638,24 @@ function AirBomberManager(aiBrain)
                         --end
                     end
                     --Are we in kill ACU mode? Then target ACU unless its underwater (but allow ahwassa to target if it is underwater)
-                elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and (M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget]) or (iTechLevel == 4 and not (M27MapInfo.IsUnderwater({ aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()[1], aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()[2] + 18, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()[3] }, false)))) then
+                elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and (not(M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])) or (iTechLevel == 4 and not (M27MapInfo.IsUnderwater({ aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()[1], aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()[2] + 18, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition()[3] }, false)))) then
                     --Add any nearby AA structures if enemy ACU has relatively highi health and are dealing with T2 or lower
                     iCurPriority = 1
                     local bTargetDownAA = false
                     if bDebugMessages == true then LOG(sFunctionRef..': In ACU kill mode.  iTechLevel='..iTechLevel..'; Enemy ACU health='..aiBrain[M27Overseer.refoACUKillTarget]:GetHealth()) end
                     if iTechLevel <= 2 and aiBrain[M27Overseer.refoACUKillTarget]:GetHealth() >= 2500 then
-                        tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition(), 60, 'Enemy')
+                        --Target only structureAA if have <=4 t1 bombers, and all AA if have >=5 bombers
+                        if iAvailableBombers <= 5 then
+                            tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition(), 60, 'Enemy')
+                        else
+                            tPotentialTargets = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryStructureAA + M27UnitInfo.refCategoryMAA, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition(), 60, 'Enemy')
+                        end
                         if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy AA structures around ACU empty='..tostring(M27Utilities.IsTableEmpty(tPotentialTargets))) end
+
 
                         if M27Utilities.IsTableEmpty(tPotentialTargets) == false then
                             bTargetDownAA = true
-                            if table.getn(tPotentialTargets) >= 2 then --If only 1 AA structure we can probably take it down with bombers
+                            if table.getn(tPotentialTargets) >= 2 or iAvailableBombers > 5 then --If only 1 AA structure we can probably take it down with bombers
                                 for iUnit, oUnit in tPotentialTargets do
                                     if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; fraction complete='..oUnit:GetFractionComplete()..'; Health percent='..M27UnitInfo.GetUnitHealthPercent(oUnit)) end
                                     if oUnit:GetFractionComplete() >= 1 and M27UnitInfo.GetUnitHealthPercent(oUnit) >= 0.5 then

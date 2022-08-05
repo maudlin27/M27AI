@@ -3421,7 +3421,6 @@ function IdentifyImpathableAreaAroundBase(aiBrain)
                 M27Utilities.DrawLocation(tLineStartPoint, false, 7, 250, 1)
             end
         end
-        bDebugMessages = false
         if bDebugMessages == true then
             if bDebugMessages == true then LOG(sFunctionRef..': Will draw all cliffs in red') end
             if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint]) == false then
@@ -3432,7 +3431,6 @@ function IdentifyImpathableAreaAroundBase(aiBrain)
                 end
             end
         end
-        bDebugMessages = true
 
         --Increase min and max sizes for each cliff, and then pick the 2 corner points with the smallest mod distance to our base
         local tCorner1, tCorner2, tCurCorner

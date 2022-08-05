@@ -3059,7 +3059,7 @@ function ThreatAssessAndRespond(aiBrain)
     local sFunctionRef = 'ThreatAssessAndRespond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if GetGameTimeSeconds() >= 245 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 245 then bDebugMessages = true end
 
     --Key config variables:
     --v14 and earlier values:

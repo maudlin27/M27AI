@@ -188,7 +188,7 @@ function CombatPlatoonFormer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CombatPlatoonFormer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 240 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 240 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, about to refresh units waiting for assignment') end
 
 
