@@ -2264,13 +2264,13 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 540 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
-    --if sPlatoonName == 'M27IndirectSpareAttacker' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
+    --if sPlatoonName == 'M27IndirectSpareAttacker' and EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[reftCurrentUnits][1].UnitId) then bDebugMessages = true end
     --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 21 then bDebugMessages = true end
@@ -2530,7 +2530,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     bProceed = false
                     oPlatoon[refiCurrentAction] = refActionRun
                     if bDebugMessages == true then LOG(sFunctionRef..': Are in protect ACU mode so will run') end
-                elseif M27UnitInfo.GetUnitHealthPercent(oPlatoon[reftBuilders][1]) <= 0.8 and oPlatoon[refiThreatWhenRetreatToRallyOrBase] >= M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]) then
+                elseif M27UnitInfo.GetUnitHealthPercent(oPlatoon[reftBuilders][1]) <= 0.8 and oPlatoon[refiThreatWhenRetreatToRallyOrBase] >= M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]) and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
                     bProceed = false
                     oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have more threat than when we last had to retreat to rally/base so will do a temporary retreat') end
@@ -3985,7 +3985,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                     --Do we have intel coverage?  If not then retreat MMLs (but dont worry for T1 arti or T3 non-Aeon Arti)
                                                     local bRetreatNotAttack = false
 
-                                                    if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), math.min(40, iFrontUnitRange), false)) and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirect * categories.TECH2 + M27UnitInfo.refCategoryT3MobileArtillery * categories.AEON, oPlatoon[reftIndirectUnits])) == false and (oPlatoon[refiEnemyStructuresInRange] == 0 or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition()) > oPlatoon[refiPlatoonMaxRange] + 10) then
+                                                    if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, GetPlatoonFrontPosition(oPlatoon), math.min(40, iFrontUnitRange), false)) and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryIndirect * categories.TECH2 + M27UnitInfo.refCategoryT3MobileArtillery * categories.AEON + M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[reftIndirectUnits])) == false and (oPlatoon[refiEnemyStructuresInRange] == 0 or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition()) > oPlatoon[refiPlatoonMaxRange] + 10) then
                                                         if bDebugMessages == true then LOG(sFunctionRef..': Have some T2 indirect units so will retreat from enemies as either dont have sufficient escort, or dont have intel coverage, and nearest structure isnt close') end
                                                         bRetreatNotAttack = true
                                                     else
@@ -5837,9 +5837,10 @@ function DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
     local sFunctionRef = 'DecideWhetherToGetACUUpgrade'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local oACU = M27Utilities.GetACU(aiBrain)
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
     if not(oACU[M27UnitInfo.refbFullyUpgraded]) then
         if bDebugMessages == true then LOG(sFunctionRef..': ACU not fully upgraded; does ACU have enhancement blastattack='..tostring(M27Utilities.GetACU(aiBrain):HasEnhancement('BlastAttack'))) end
         if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and not(oACU:HasEnhancement('AdvancedEngineering')) and not(oACU:HasEnhancement('T3Engineering')) and M27Conditions.DoesACUHaveGun(aiBrain, true) == false and not(oACU[M27Overseer.refbACUCantPathAwayFromBase]) then
@@ -6850,7 +6851,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -10151,7 +10152,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
