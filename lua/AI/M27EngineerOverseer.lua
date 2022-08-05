@@ -3290,6 +3290,11 @@ function GetEmergencyPDStartLocation(aiBrain)
                         if bDebugMessages == true then LOG(sFunctionRef..': iDistMod='..iDistMod..'; iCurX='..iCurX..'; iCurZ='..iCurZ..'; cliff value for this entry='..repru(aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ])) end
                         if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ]) == false then
                             tActionLocation = {aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ][1], aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ][2], aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][iCurX][iCurZ][3]}
+                            --Adjust action location if the nearest threat is close to it
+                            if M27Utilities.GetDistanceBetweenPositions(tActionLocation, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]) < M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tActionLocation) + 10 then
+                                tActionLocation = M27Utilities.MoveInDirection(tActionLocation, M27Utilities.GetAngleFromAToB(tActionLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), 15, true)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy is close to the normal cliff corner position, so will move towards our base slightly') end
+                            end
                             break
                         end
                     end

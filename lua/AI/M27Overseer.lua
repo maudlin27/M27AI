@@ -4873,6 +4873,24 @@ function ACUManager(aiBrain)
                         --No dif between nearest ACU and ACU kill target
                         oEnemyACUToConsiderAttacking = aiBrain[refoACUKillTarget]
                     end
+                else
+                    --Do we have a teammate in ACU kill mode and teh ACU is within 400 of our base? If so then consider that ACU provided the nearest ACU to our base is more than max(100, ACU kill target's dist to our base + 30)
+                    if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false and not(aiBrain[refbEnemyACUNearOurs]) and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance] then
+                        local iOtherACUDistToOurBase
+                        local iClosestACUDistToOurBase = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[reftLastNearestACU])
+                        for iBrain, oBrain in aiBrain[toAllyBrains] do
+                            if oBrain.M27AI and oBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and M27UnitInfo.IsUnitValid(oBrain[refoACUKillTarget]) then
+                                iOtherACUDistToOurBase = M27Utilities.GetDistanceBetweenPositions(oBrain[refoACUKillTarget]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                if bDebugMessages == true then LOG(sFunctionRef..': Deciding whether to target an ACU target of an allied M27. AI ally='..oBrain.Nickname..'; iOtherACUDistToOurBase='..iOtherACUDistToOurBase..'; iClosestACUDistToOurBase='..iClosestACUDistToOurBase..'; 65% towards enemy base='..aiBrain[refiDistanceToNearestEnemyBase]*0.65) end
+                                if iClosestACUDistToOurBase > math.max(100, iOtherACUDistToOurBase - 20) and iOtherACUDistToOurBase <= math.max(400, aiBrain[refiDistanceToNearestEnemyBase] * 0.65) then
+                                    oEnemyACUToConsiderAttacking = oBrain[refoACUKillTarget]
+                                    break
+                                end
+                            end
+                        end
+                    end
+
+
                 end
                 if not(oEnemyACUToConsiderAttacking) then oEnemyACUToConsiderAttacking = aiBrain[refoLastNearestACU] end
                 iLastDistanceToACU = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oEnemyACUToConsiderAttacking:GetPosition())

@@ -3276,7 +3276,7 @@ function IdentifyImpathableAreaAroundBase(aiBrain)
     --Is only interested in impathable areas near our base on the way from our base to enemy base
     --Main reason is for emergency PD placement
 
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IdentifyImpathableAreaAroundBase'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
