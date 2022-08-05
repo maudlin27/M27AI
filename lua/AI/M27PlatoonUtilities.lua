@@ -2541,10 +2541,10 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
             --If not in ACU kill mode, and enemy ACU has upgrade, then prioritise getting an upgrade on our ACU unelss we're really close to enemy mexes that we can kill
             if bProceed and M27Team.tTeamData[aiBrain.M27Team][M27Team.refbEnemyTeamHasUpgrade] and M27UnitInfo.GetNumberOfUpgradesObtained(oACU) == 0 then
                 local bNearbyEnemyMex = false
-                local tNearbyEnemymexes
+                local tNearbyEnemyMexes
                 if oPlatoon[refiEnemyStructuresInRange] > 0 then
-                    tNearbyEnemymexes = EntityCategoryFilterDown(M27UnitInfo.refCategoryMex, oPlatoon[reftEnemyStructuresInRange])
-                    if M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tNearbyEnemymexes, GetPlatoonFrontPosition(oPlatoon))) <= 30 then
+                    tNearbyEnemyMexes = EntityCategoryFilterDown(M27UnitInfo.refCategoryMex, oPlatoon[reftEnemyStructuresInRange])
+                    if M27Utilities.IsTableEmpty(tNearbyEnemyMexes) == false and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tNearbyEnemyMexes, GetPlatoonFrontPosition(oPlatoon))) <= 30 then
                         bNearbyEnemyMex = true
                     end
                 end
