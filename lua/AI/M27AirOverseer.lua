@@ -154,6 +154,7 @@ refiEnemyAirAAThreat = 'M27HighestEnemyAirAAThreat'
 refiHighestEverEnemyAirAAThreat = 'M27HighestEverAirAAThreat'
 refiEnemyAirToGroundThreat = 'M27HighestEnemyAirToGroundThreat'
 refiEnemyMassInGroundAA = 'M27HighestEnemyGroundAAThreat'
+refbEnemyHasHadCruisersOrT3AA = 'M27EnemyHadCruisersOrT3AA' --True if enemy had cruisers or T3 AA - used to decide if should switch to air domination mode
 refbHaveAirControl = 'M27AirHaveAirControl' --Against aiBrain, true if our team has air control (Considering only M27 airAA)
 refiOurMassInMAA = 'M27OurMassInMAA'
 refiOurMAAUnitCount = 'M27OurMAAUnitCount'
@@ -444,7 +445,10 @@ function ClearAirUnitAssignmentTrackers(aiBrain, oAirUnit, bDontIssueCommands)
                 if M27UnitInfo.GetUnitHealthPercent(oAirUnit) < iLowHealthPercent or oAirUnit:GetFuelRatio() < iLowFuelPercent then
                     --Do we have any air staging units?
                     if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirStaging) > 0 or EntityCategoryContains(categories.EXPERIMENTAL, oAirUnit.UnitId) then
-                        bMicroTurn = true
+                        --DOnt use micro if have a strat bomber and enemy doesnt have T3 AA (since risk dying to T1/T2 AA if slow down even if cant see it at the moment)
+                        if aiBrain[refbEnemyHasHadCruisersOrT3AA] or not(EntityCategoryContains(categories.TECH3, oAirUnit.UnitId)) then
+                            bMicroTurn = true
+                        end
                     end
                 end
             end
@@ -1936,13 +1940,18 @@ function DelayedBomberTargetRecheck(oBomber, iDelayInSeconds)
                         end
                         --Dont hover-bomb if enemy flak detected (as hover-bombing means our bombersa re likely to die) unless are targeting enemy ACU or very high priority structure threat
                         if bHoverBomb and not(EntityCategoryContains(categories.COMMAND + categories.STRUCTURE * M27UnitInfo.refCategoryExperimentalLevel, oTarget.UnitId)) then
-                            local tNearbyFlak = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH2 + M27UnitInfo.refCategoryStructureAA * categories.TECH2, oBomber:GetPosition(), 70, 'Enemy')
+                            if not(aiBrain[refbEnemyHasHadCruisersOrT3AA]) then
+                                --DOnt hover-bomb if enemey has no T3 ground AA, since risk they have inties chasing us or T1/T2 groundAA that can hit us
+                                bHoverBomb = false
+                            else
+                                local tNearbyFlak = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA * categories.TECH2 + M27UnitInfo.refCategoryStructureAA * categories.TECH2, oBomber:GetPosition(), 70, 'Enemy')
 
-                            if M27Utilities.IsTableEmpty(tNearbyFlak) == false then
-                                local iNearbyFlak = table.getn(tNearbyFlak)
-                                --Ignore if only 1 T2 mobile flak, otherwise dont hover-bomb
-                                if iNearbyFlak > 1 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.STRUCTURE, tNearbyFlak)) == false then
-                                    bHoverBomb = false
+                                if M27Utilities.IsTableEmpty(tNearbyFlak) == false then
+                                    local iNearbyFlak = table.getn(tNearbyFlak)
+                                    --Ignore if only 1 T2 mobile flak, otherwise dont hover-bomb
+                                    if iNearbyFlak > 1 or M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.STRUCTURE, tNearbyFlak)) == false then
+                                        bHoverBomb = false
+                                    end
                                 end
                             end
                         end
@@ -4517,6 +4526,7 @@ function AirBomberManager(aiBrain)
         local bAvoidCruisers = false
         local tEnemyCruisers = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiserCarrier, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iMaxPossibleRange, 'Enemy')
         if M27Utilities.IsTableEmpty(tEnemyCruisers) == false then
+            aiBrain[refbEnemyHasHadCruisersOrT3AA] = true
             for iUnit, oUnit in tEnemyCruisers do
                 iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit:GetPosition())
                 if iCurModDistance <= iNearestCruiserModDistance then
@@ -4596,7 +4606,10 @@ function AirBomberManager(aiBrain)
         if M27Utilities.IsTableEmpty(tAllEnemyAA) == false then
             local iT3AAAndCruisersCat = M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser --(aircraft carriers already included in groundAA)
             tEnemyAAAndCruisers = EntityCategoryFilterDown(iT3AAAndCruisersCat, tAllEnemyAA)
-            if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false then tEnemySAMsAndCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser, tEnemyAAAndCruisers) end
+            if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false then
+                tEnemySAMsAndCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser, tEnemyAAAndCruisers)
+                aiBrain[refbEnemyHasHadCruisersOrT3AA] = true
+            end
         end
 
         for iTechLevel = 1, 4 do

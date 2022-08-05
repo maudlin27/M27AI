@@ -5120,19 +5120,7 @@ function UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDo
                     LOG(sFunctionRef..': Have drawn rectangle that the engineer is in, iCurX='..iCurX..'; iCurZ='..iCurZ..'; IsReclaimNearby='..tostring(M27Conditions.IsReclaimNearby(tCurPos, 1, iMinReclaimIndividualValue)))
                 end
 
-                local bGetEnergy = true
-                local bGetMass = true
-
-                if aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.95 then
-                    bGetEnergy = false
-                else
-                    if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.25 then
-                        bGetMass = false
-                    end
-                end
-                if bGetMass and aiBrain:GetEconomyStoredRatio('MASS') >= 0.85 then
-                    bGetMass = false
-                end
+                local bGetEnergy, bGetMass = M27Conditions.WantEnergyOrMassReclaim(aiBrain)
 
                 if bDebugMessages == true then LOG(sFunctionRef..': bGetEnergy='..tostring(bGetEnergy)..'; bGetMass='..tostring(bGetMass)) end
 

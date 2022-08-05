@@ -2262,7 +2262,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 540 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -2271,7 +2271,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectSpareAttacker' and EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[reftCurrentUnits][1].UnitId) then bDebugMessages = true end
-    if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
+    --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 21 then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
@@ -2538,12 +2538,23 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 end
             end
 
-            --If not in ACU kill mode, and enemy ACU has upgrade, then prioritise getting an upgrade on our ACU
+            --If not in ACU kill mode, and enemy ACU has upgrade, then prioritise getting an upgrade on our ACU unelss we're really close to enemy mexes that we can kill
             if bProceed and M27Team.tTeamData[aiBrain.M27Team][M27Team.refbEnemyTeamHasUpgrade] and M27UnitInfo.GetNumberOfUpgradesObtained(oACU) == 0 then
-                bProceed = false
-                DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
-                if bDebugMessages == true then LOG(sFunctionRef..': Enemy upgrading or has upgrade so want to get one, action after checking whether to get ACU upgrade as earlier action='..(oPlatoon[refiCurrentAction] or 'nil')..'; if no action then will retreat to nearest rally point') end
-                if not(oPlatoon[refiCurrentAction]) then oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint end
+                local bNearbyEnemyMex = false
+                local tNearbyEnemymexes
+                if oPlatoon[refiEnemyStructuresInRange] > 0 then
+                    tNearbyEnemymexes = EntityCategoryFilterDown(M27UnitInfo.refCategoryMex, oPlatoon[reftEnemyStructuresInRange])
+                    if M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tNearbyEnemymexes, GetPlatoonFrontPosition(oPlatoon))) <= 30 then
+                        bNearbyEnemyMex = true
+                    end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': Enemy upgrading, do we have nearby enemy mex='..tostring(bNearbyEnemyMex)) end
+                if not(bNearbyEnemyMex) then
+                    bProceed = false
+                    DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy upgrading or has upgrade so want to get one, action after checking whether to get ACU upgrade as earlier action='..(oPlatoon[refiCurrentAction] or 'nil')..'; if no action then will retreat to nearest rally point') end
+                    if not(oPlatoon[refiCurrentAction]) then oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint end
+                end
             end
 
 
@@ -5723,6 +5734,16 @@ function DetermineActionForNearbyReclaim(oPlatoon, bIgnoreNearbyEnemies)
                         --New approach for v14
                         --Are we in a segment with reclaim or near a segment with reclaim?
                         --IsReclaimNearby(tLocation, iAdjacentSegmentSize, iMinTotal, iMinIndividual)
+                        local iMinIndividualReclaim = 4
+                        --Will we be wanting more reclaim than this?
+
+                        if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 46 then
+                            local bWantEnergy, bWantMass = M27Conditions.WantEnergyOrMassReclaim(aiBrain)
+                            --Dont want ACU to be trying to get individual trees if already ahve high energy income as better uses for its time
+                            if bWantEnergy then iMinIndividualReclaim = 50 end
+                        end
+
+
                         if M27Conditions.IsReclaimNearby(GetPlatoonFrontPosition(oPlatoon), 1, 15, 4) then
                             --check we have reclaim in range of the ACU itself
                             local iMaxRange = oFirstReclaimer:GetBlueprint().Economy.MaxBuildDistance + oFirstReclaimer:GetBlueprint().SizeX - 0.1
@@ -6851,11 +6872,11 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 540 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
-            if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
+            --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
             --if sPlatoonName == M27Overseer.sIntelPlatoonRef then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -10152,14 +10173,14 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 540 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
-            if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
+            --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == M27Overseer.sIntelPlatoonRef then bDebugMessages = true end
@@ -11646,8 +11667,14 @@ function ProcessPlatoonAction(oPlatoon)
                         for iEngineer, oEngineer in tAvailableReclaimers do
                             oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] = oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]
                             if bDebugMessages == true then LOG(sFunctionRef..': Have set engineer '..oEngineer.UnitId..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' to have a current target of '..repru(oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]] or {'nil'})..'; oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget]='..repru(oEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] or {'nil'})) end
+                            local iMinIndividualReclaim = 5
+                            if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 46 then
+                                local bWantEnergy, bWantMass = M27Conditions.WantEnergyOrMassReclaim(aiBrain)
+                                --Dont want ACU to be trying to get individual trees if already ahve high energy income as better uses for its time
+                                if bWantEnergy then iMinIndividualReclaim = 50 end
+                            end
                             --UpdateActionForNearbyReclaim(oEngineer, iMinReclaimIndividualValue, bDontIssueMoveAfter)
-                            M27EngineerOverseer.UpdateActionForNearbyReclaim(oEngineer, 5, true)
+                            M27EngineerOverseer.UpdateActionForNearbyReclaim(oEngineer, iMinIndividualReclaim, true)
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': About to reissue movement path after updating action for nearby reclaim, unless we are near destination in which case will get new movement path') end
                         if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]]) <= 3 then

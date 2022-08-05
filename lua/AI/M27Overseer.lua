@@ -6620,6 +6620,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 iBaseScoutingTime = aiBrain[M27AirOverseer.refiIntervalEnemyBase] + 60
                 iEnemyGroundAAFactor = 0.2
             end
+            --Tripple groundAA needed if we have strats and enemy doesnt have AirAA
+            if not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA]) and aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 2 then
+                iEnemyGroundAAFactor = iEnemyGroundAAFactor * 2
+            end
             --local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
             local bEnemyHasEnoughAA = false
             if bDebugMessages == true then
@@ -6652,9 +6656,9 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                         end
                     else
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Enemy air threat=' .. aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] .. '; our air threat=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA])
+                            LOG(sFunctionRef .. ': Enemy ever air AA threat=' .. aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat]..'; Cur airaa threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat] .. '; our air threat=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl]))
                         end
-                        if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA] then
+                        if aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA] and not(aiBrain[M27AirOverseer.refbHaveAirControl] and aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] <= 3000 and aiBrain[M27AirOverseer.refiEnemyAirAAThreat] / 0.7 < aiBrain[M27AirOverseer.refiOurMassInAirAA]) then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Dont want to go for air dominance due to enemy highest ever air threat being >75% of ours')
                             end
@@ -6693,7 +6697,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Is table of T3PlusBombers empty=' .. tostring(M27Utilities.IsTableEmpty(tT3PlusBombers)) .. '; refiPreviousAvailableBombers=' .. aiBrain[M27AirOverseer.refiPreviousAvailableBombers] .. '; Availalbe bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers])))
                                     end
-                                    if M27Utilities.IsTableEmpty(tT3PlusBombers) == false and table.getn(tT3PlusBombers) >= 3 and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, aiBrain[M27AirOverseer.reftAvailableBombers])) == false then
+                                    if M27Utilities.IsTableEmpty(tT3PlusBombers) == false and table.getn(tT3PlusBombers) >= 2 then
                                         local tEnemyT3PlusAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiserCarrier + M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiDistanceToNearestEnemyBase] + 40, 'Enemy')
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Is table of Enemy T3PlusAA empty=' .. tostring(M27Utilities.IsTableEmpty(tEnemyT3PlusAA)))
@@ -7605,35 +7609,41 @@ function RecordAllEnemiesAndAllies(aiBrain)
             end
         end
         local tNearestEnemyBase = M27MapInfo.PlayerStartPoints[tBrainsNeedingAGroup[iNearestBrainRef].M27StartPositionNumber]
-        aiBrain[reftoNearestEnemyBrainByGroup][iLastGroup] = tBrainsNeedingAGroup[iNearestBrainRef]
-        if bDebugMessages == true then
-            LOG(sFunctionRef .. ': Nearest enemy brain for group ' .. iLastGroup .. '=' .. tBrainsNeedingAGroup[iNearestBrainRef]:GetArmyIndex())
-        end
-        --Calc angle to nearest enemy and if any remaining enemies outside this
-        iNearestAngle = M27Utilities.GetAngleFromAToB(tOurBase, tNearestEnemyBase)
-        for iEnemy, oBrain in tBrainsNeedingAGroup do
-            iCurAngle = M27Utilities.GetAngleFromAToB(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
-            if math.abs(iNearestAngle - iCurAngle) > 45 then
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': oBrain with index ' .. oBrain:GetArmyIndex() .. ' has iCurAngle=' .. iCurAngle .. '; iNearestAngle=' .. iNearestAngle .. '; >45 so need another group after this one.  Cur group=' .. iLastGroup)
-                end
-                if iCurGroup == iLastGroup then
-                    iCurGroup = iCurGroup + 1
-                end
-            else
-                --Dont need to keep looking for this brain
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Dont need to keep looking for brain ' .. oBrain:GetArmyIndex() .. ' as it is close to this group so removing it from list of brains needing a group')
-                end
-                tBrainsNeedingAGroup[iEnemy] = nil
+        if M27Utilities.IsTableEmpty(tNearestEnemyBase) then
+            M27Utilities.ErrorHandler('Dont have a nearby enemy base set, will abort')
+            break
+        else
+
+            aiBrain[reftoNearestEnemyBrainByGroup][iLastGroup] = tBrainsNeedingAGroup[iNearestBrainRef]
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': Nearest enemy brain for group ' .. iLastGroup .. '=' .. tBrainsNeedingAGroup[iNearestBrainRef]:GetArmyIndex())
             end
-        end
-        if bDebugMessages == true then
-            local iRemainingBrains = 0
-            if M27Utilities.IsTableEmpty(tBrainsNeedingAGroup) == false then
-                for iBrain, oBrain in tBrainsNeedingAGroup do
-                    iRemainingBrains = iRemainingBrains + 1
-                    LOG(sFunctionRef .. ': Remaining brain: iBrain=' .. iBrain .. '; ArmyIndex=' .. oBrain:GetArmyIndex() .. '; total remaining brains so far=' .. iRemainingBrains)
+            --Calc angle to nearest enemy and if any remaining enemies outside this
+            iNearestAngle = M27Utilities.GetAngleFromAToB(tOurBase, tNearestEnemyBase)
+            for iEnemy, oBrain in tBrainsNeedingAGroup do
+                iCurAngle = M27Utilities.GetAngleFromAToB(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
+                if math.abs(iNearestAngle - iCurAngle) > 45 then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': oBrain with index ' .. oBrain:GetArmyIndex() .. ' has iCurAngle=' .. iCurAngle .. '; iNearestAngle=' .. iNearestAngle .. '; >45 so need another group after this one.  Cur group=' .. iLastGroup)
+                    end
+                    if iCurGroup == iLastGroup then
+                        iCurGroup = iCurGroup + 1
+                    end
+                else
+                    --Dont need to keep looking for this brain
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Dont need to keep looking for brain ' .. oBrain:GetArmyIndex() .. ' as it is close to this group so removing it from list of brains needing a group')
+                    end
+                    tBrainsNeedingAGroup[iEnemy] = nil
+                end
+            end
+            if bDebugMessages == true then
+                local iRemainingBrains = 0
+                if M27Utilities.IsTableEmpty(tBrainsNeedingAGroup) == false then
+                    for iBrain, oBrain in tBrainsNeedingAGroup do
+                        iRemainingBrains = iRemainingBrains + 1
+                        LOG(sFunctionRef .. ': Remaining brain: iBrain=' .. iBrain .. '; ArmyIndex=' .. oBrain:GetArmyIndex() .. '; total remaining brains so far=' .. iRemainingBrains)
+                    end
                 end
             end
         end

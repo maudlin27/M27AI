@@ -1715,12 +1715,16 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 11 then --2nd strat bomber if first not died yet and dont have any idle bombers
-                                    if iFactoryTechLevel >= 3 and iAvailableT3Bombers == 0 and (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3]) or M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1]) or M27UnitInfo.IsUnitValid(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1][M27AirOverseer.subrefoBomber])) then
-                                        --1st Bomber still alive - check have lifetime build count <=2
-                                        if M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryBomber * categories.TECH3) <= 1 then
-                                            iCategoryToBuild = refCategoryBomber
-                                            iTotalWanted = 1
+                                elseif iCurrentConditionToTry == 11 then --2nd strat bomber if first not died yet and dont have any idle bombers; also build 2nd/3rd strat if have more AA than enemy and they lack T3 AA
+                                    if iFactoryTechLevel >= 3 and (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3]) or M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1]) or M27UnitInfo.IsUnitValid(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1][M27AirOverseer.subrefoBomber])) then
+                                        if iAvailableT3Bombers == 0 or (iAvailableT3Bombers <= 2 and aiBrain[M27AirOverseer.refbHaveAirControl] and not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA])) then
+                                    --1st Bomber still alive - check have lifetime build count <=2
+                                        local iLifetimeStratBuildCount = M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryBomber * categories.TECH3)
+
+                                            if iLifetimeStratBuildCount <= 1 or (iLifetimeStratBuildCount <= 4 and not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA])) then
+                                                iCategoryToBuild = refCategoryBomber
+                                                iTotalWanted = 1
+                                            end
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 12 then

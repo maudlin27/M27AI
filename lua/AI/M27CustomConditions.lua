@@ -135,6 +135,25 @@ function HaveNearbyMobileShield(oPlatoon)
     return bHaveNearbyShield
 end
 
+function WantEnergyOrMassReclaim(aiBrain)
+    --Returns 2 variables, 1st: true/flse for if want energy; 2nd: true/false for if want mass
+    local bGetEnergy = true
+    local bGetMass = true
+
+    if aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.95 then
+        bGetEnergy = false
+    else
+        if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.25 then
+            bGetMass = false
+        end
+    end
+    if bGetMass and aiBrain:GetEconomyStoredRatio('MASS') >= 0.85 then
+        bGetMass = false
+    end
+
+    return bGetEnergy, bGetMass
+end
+
 function SafeToGetACUUpgrade(aiBrain)
     --Determines if its safe for the ACU to get an upgrade - considers ACU health and whether ACU is in a platoon set to heal
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
