@@ -3078,6 +3078,14 @@ function AdjustPDBuildLocation(aiBrain, tBasePosition, sUnitID)
     local sFunctionRef = 'AdjustPDBuildLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --T1 PD - need to adjust if using rounded value as otherwise walls wont place properly (as if use precise coordinates, then will be off by 0.5 to where can actually build when the engine applies 'snap to grid' logic, meaning walls built around the PD dont actually get built)
+    if EntityCategoryContains(categories.TECH1, sUnitID) then
+        if math.floor(tBasePosition[1]) == tBasePosition[1] then tBasePosition[1] = tBasePosition[1] + 0.01 end
+        if math.floor(tBasePosition[3]) == tBasePosition[3] then tBasePosition[3] = tBasePosition[3] + 0.01 end
+        tBasePosition[2] = GetTerrainHeight(tBasePosition[1], tBasePosition[3])
+    end
+
+
     if M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, tBasePosition) then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return tBasePosition
@@ -3114,6 +3122,7 @@ function AdjustPDBuildLocation(aiBrain, tBasePosition, sUnitID)
         local iAbortDistance = iMaxRange * 5.7 --Most shots arent blocked so little value in doing detailed calculation
         if bDebugMessages == true then LOG(sFunctionRef..': sUnitID='..sUnitID..'; tBasePosition='..repru(tBasePosition)..'; iTotalDistanceNotBlocked from base='..iTotalDistanceNotBlocked..'; iAbortDistance='..iAbortDistance) end
         if iHighestDistanceNotBlocked >= iAbortDistance then
+            if bDebugMessages == true then LOG(sFunctionRef..': About to return base position. Terrain height at this point='..GetTerrainHeight(tBasePosition[1], tBasePosition[3])) end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return tBasePosition
         else
@@ -3162,7 +3171,7 @@ function AdjustPDBuildLocation(aiBrain, tBasePosition, sUnitID)
                     end
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': End of code, tBestBuildLocation='..repru(tBestBuildLocation)..'; iTotalDistanceNotBlocked='..iTotalDistanceNotBlocked) end
+            if bDebugMessages == true then LOG(sFunctionRef..': End of code, tBestBuildLocation='..repru(tBestBuildLocation)..'; iTotalDistanceNotBlocked='..iTotalDistanceNotBlocked..'; terrain height at this position='..GetTerrainHeight(tBestBuildLocation[1], tBestBuildLocation[3])) end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return tBestBuildLocation
         end
@@ -3295,6 +3304,7 @@ function GetEmergencyPDStartLocation(aiBrain)
                                 tActionLocation = M27Utilities.MoveInDirection(tActionLocation, M27Utilities.GetAngleFromAToB(tActionLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), 15, true)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Enemy is close to the normal cliff corner position, so will move towards our base slightly') end
                             end
+
                             break
                         end
                     end
@@ -3305,9 +3315,8 @@ function GetEmergencyPDStartLocation(aiBrain)
     end
 
 
-
     if bDebugMessages == true then
-        LOG(sFunctionRef..': tActionLocation for PD before running the adjustPDlocation function='..repru(tActionLocation)..'; will draw in white')
+        LOG(sFunctionRef..': tActionLocation for PD before running the adjustPDlocation function='..repru(tActionLocation)..'; will draw in white. Terrain height at this position='..GetTerrainHeight(tActionLocation[1], tActionLocation[3]))
         M27Utilities.DrawLocation(tActionLocation, nil, 7, 100, nil)
     end
 
@@ -4201,7 +4210,9 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
             if bDebugMessages == true then LOG(sFunctionRef..': Not aborting function so will try to move near construction if we have a valid location') end
             if M27Utilities.IsTableEmpty(tTargetLocation) == false and sBlueprintToBuild then
                 --Adjust Target location if building PD
-                if EntityCategoryContains(M27UnitInfo.refCategoryPD, sBlueprintToBuild) then tTargetLocation = AdjustPDBuildLocation(aiBrain, tTargetLocation, sBlueprintToBuild) end
+                if EntityCategoryContains(M27UnitInfo.refCategoryPD, sBlueprintToBuild) then
+                    tTargetLocation = AdjustPDBuildLocation(aiBrain, tTargetLocation, sBlueprintToBuild)
+                end
 
                 M27PlatoonUtilities.MoveNearConstruction(aiBrain, oEngineer, tTargetLocation, sBlueprintToBuild, 0, false, false, false)
                 if oPartCompleteBuilding then
@@ -4215,7 +4226,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
 
                     --MAIN ISSUEBUILDMOBILE FOR CONSTRUCTION (i.e. other issuebuilds here are for specific actions)
                     IssueBuildMobile({oEngineer}, tTargetLocation, sBlueprintToBuild, {})
-                    if bDebugMessages == true then LOG(sFunctionRef..': 4 - Have sent issuebuildmobile order to engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UC='..GetEngineerUniqueCount(oEngineer)..' to build blueprint '..sBlueprintToBuild..' at location '..repru(tTargetLocation)) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': 4 - Have sent issuebuildmobile order to engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UC='..GetEngineerUniqueCount(oEngineer)..' to build blueprint '..sBlueprintToBuild..' at location '..repru(tTargetLocation)..' with terrain height='..GetTerrainHeight(tTargetLocation[1], tTargetLocation[3])) end
                 end
             end
         else

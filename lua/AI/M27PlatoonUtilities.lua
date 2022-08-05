@@ -2262,7 +2262,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 700 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -2271,7 +2271,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectDefender' then bDebugMessages = true end
     --if sPlatoonName == 'M27IndirectSpareAttacker' and EntityCategoryContains(M27UnitInfo.refCategoryShieldDisruptor, oPlatoon[reftCurrentUnits][1].UnitId) then bDebugMessages = true end
-    --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
+    if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
     --if sPlatoonName == 'M27MexLargerRaiderAI' and oPlatoon[refiPlatoonCount] == 5 and GetGameTimeSeconds() >= 465 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' and oPlatoon[refiPlatoonCount] == 21 then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' and oPlatoon[refiPlatoonCount] == 4 and aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 720 then bDebugMessages = true end
@@ -2366,13 +2366,14 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
         --ACU RunAway logic (highest priority):
         if oPlatoon[refbACUInPlatoon] == true then
+            local oACU = oPlatoon[reftBuilders][1]
             if bDebugMessages == true then LOG(sFunctionRef..': ACU in platoon, will consider if should run. Strategy='..(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] or 'nil')..'; Include ACU in all out attack='..tostring(aiBrain[M27Overseer.refbIncludeACUInAllOutAttack] or false)) end
 
             if M27Conditions.ACUShouldRunFromBigThreat(aiBrain) then
                 if bDebugMessages == true then LOG(sFunctionRef..': ACU should run from a big threat') end
                 oPlatoon[refiCurrentAction] = refActionReturnToBase
-                if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then
-                    M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1])
+                if oACU and M27Conditions.CanUnitUseOvercharge(aiBrain, oACU) == true then
+                    M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oACU)
                 end
                 bProceed = false
             else
@@ -2392,16 +2393,16 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         bProceed = false
                     else
                         local iHealthToRunOn = aiBrain[M27Overseer.refiACUHealthToRunOn] or 5250
-                        local iCurrentHealth = M27Utilities.GetACU(aiBrain):GetHealth()
+                        local iCurrentHealth = oACU:GetHealth()
                         --If have mobile shield coverage treat health as being 2k more than it is
                         if M27Conditions.HaveNearbyMobileShield(oPlatoon) then
                             iCurrentHealth = iCurrentHealth + 2000
                         end
                         if oPlatoon[refbNeedToHeal] == true then
-                            iHealthToRunOn = math.max(6250, iHealthToRunOn + 750)
+                            iHealthToRunOn = math.max(6250, math.min(iHealthToRunOn + 750, oACU:GetMaxHealth() * 0.98))
                         end
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Checking if ACU health is low enough that it should run.  refbNeedToHeal=' .. tostring(oPlatoon[refbNeedToHeal]) .. '; iHealthToRunOn=' .. iHealthToRunOn .. '; iCurrentHealth=' .. iCurrentHealth .. '; M27Overseer.iACUEmergencyHealthPercentThreshold=' .. M27Overseer.iACUEmergencyHealthPercentThreshold .. '; ACU health %=' .. M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)))
+                            LOG(sFunctionRef .. ': Checking if ACU health is low enough that it should run.  refbNeedToHeal=' .. tostring(oPlatoon[refbNeedToHeal]) .. '; iHealthToRunOn=' .. iHealthToRunOn .. '; iCurrentHealth=' .. iCurrentHealth .. '; M27Overseer.iACUEmergencyHealthPercentThreshold=' .. M27Overseer.iACUEmergencyHealthPercentThreshold .. '; ACU health %=' .. M27UnitInfo.GetUnitHealthPercent(oACU))
                         end
                         if iCurrentHealth <= iHealthToRunOn then
                             if bDebugMessages == true then
@@ -2409,7 +2410,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                             end
                             oPlatoon[refbNeedToHeal] = true
                             --If very low health run back to base, otherwise run back to nearest rally point
-                            if M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) <= M27Overseer.iACUEmergencyHealthPercentThreshold then
+                            if M27UnitInfo.GetUnitHealthPercent(oACU) <= M27Overseer.iACUEmergencyHealthPercentThreshold then
 
                                 --Are we either within close dist to base, or close to a firebase?
                                 local iDistToFirebase
@@ -2424,8 +2425,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                     end
                                     oPlatoon[refiCurrentAction] = refActionReturnToBase
                                     --Consider adding overcharge
-                                    if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then
-                                        M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1])
+                                    if oACU and M27Conditions.CanUnitUseOvercharge(aiBrain, oACU) == true then
+                                        M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oACU)
                                     end
                                     bProceed = false
                                 else
@@ -2473,8 +2474,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
                                     if oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] > 0 then
                                         --Consider adding overcharge
-                                        if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then
-                                            M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1])
+                                        if oACU and M27Conditions.CanUnitUseOvercharge(aiBrain, oACU) == true then
+                                            M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oACU)
                                         end
                                     end
 
@@ -2490,10 +2491,10 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         --Are we close to the nearest rally point, with >=75% health, and close to our base? then dont set an action to run (as it may be e.g. we are just running to be prudent due to high eco)
                                         local iDistToBase = M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                                         if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Will go to nearest rally point unless we are close to base with decent health, checking if want to overcharge. M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain))=' .. M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) .. '; Dist to base=' .. M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; Dist wanted=' .. math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) .. '; Dist to rally=' .. M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]))..'; iDistToBase='..iDistToBase)
+                                            LOG(sFunctionRef .. ': Will go to nearest rally point unless we are close to base with decent health, checking if want to overcharge. M27UnitInfo.GetUnitHealthPercent(oACU)=' .. M27UnitInfo.GetUnitHealthPercent(oACU) .. '; Dist to base=' .. M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; Dist wanted=' .. math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) .. '; Dist to rally=' .. M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]))..'; iDistToBase='..iDistToBase)
                                         end
 
-                                        if M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) >= 0.8 and (iDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tNearestRallyPoint) <= 20) then
+                                        if M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 and (iDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)) or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), tNearestRallyPoint) <= 20) then
                                             --Do nothing - proceed with normal logic
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Have decent health, are near rally point and base, so will ignore the order to retreat and carry on with normal logic')
@@ -2503,8 +2504,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         else
                                             oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
                                             --Consider adding overcharge
-                                            if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then
-                                                M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1])
+                                            if oACU and M27Conditions.CanUnitUseOvercharge(aiBrain, oACU) == true then
+                                                M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oACU)
                                             end
                                             bProceed = false
                                         end
@@ -2530,7 +2531,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     bProceed = false
                     oPlatoon[refiCurrentAction] = refActionRun
                     if bDebugMessages == true then LOG(sFunctionRef..': Are in protect ACU mode so will run') end
-                elseif M27UnitInfo.GetUnitHealthPercent(oPlatoon[reftBuilders][1]) <= 0.8 and oPlatoon[refiThreatWhenRetreatToRallyOrBase] >= M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]) and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
+                elseif M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.8 and oPlatoon[refiThreatWhenRetreatToRallyOrBase] >= M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits]) and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > M27Overseer.iDistanceFromBaseToBeSafe then
                     bProceed = false
                     oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
                     if bDebugMessages == true then LOG(sFunctionRef..': Dont have more threat than when we last had to retreat to rally/base so will do a temporary retreat') end
@@ -2538,7 +2539,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
             end
 
             --If not in ACU kill mode, and enemy ACU has upgrade, then prioritise getting an upgrade on our ACU
-            if bProceed and M27Team.tTeamData[aiBrain.M27Team][M27Team.refbEnemyTeamHasUpgrade] and M27UnitInfo.GetNumberOfUpgradesObtained(oPlatoon[reftBuilders][1]) == 0 then
+            if bProceed and M27Team.tTeamData[aiBrain.M27Team][M27Team.refbEnemyTeamHasUpgrade] and M27UnitInfo.GetNumberOfUpgradesObtained(oACU) == 0 then
                 bProceed = false
                 DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
                 if bDebugMessages == true then LOG(sFunctionRef..': Enemy upgrading or has upgrade so want to get one, action after checking whether to get ACU upgrade as earlier action='..(oPlatoon[refiCurrentAction] or 'nil')..'; if no action then will retreat to nearest rally point') end
@@ -2550,12 +2551,12 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
             --If have decided to run, retreat underwater if is water nearby on the way towards our base
             if bProceed == false and oPlatoon[refbNeedToHeal] and (oPlatoon[refiCurrentAction] == refActionRun or oPlatoon[refiCurrentAction] == refActionGoToNearestRallyPoint or oPlatoon[refiCurrentAction] == refActionGoToRallyPointNearAir or oPlatoon[refiCurrentAction] == refActionReturnToBase) then
-                if oPlatoon[refiEnemiesInRange] > 0 and aiBrain:GetMapWaterRatio() >= 0.02 and M27UnitInfo.GetUnitHealthPercent(oPlatoon[reftBuilders][1]) <= 0.75 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 100 then
+                if oPlatoon[refiEnemiesInRange] > 0 and aiBrain:GetMapWaterRatio() >= 0.02 and M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75 and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 100 then
                     --ACU wants to run, doesnt have great health, and has mobile enemies in range, while map has water on it - consider if want to retreat to water instead
                     --if GetGameTimeSeconds() >= 780 then bDebugMessages = true end
 
                     --Have we taken torp damage recently?
-                    if not(oPlatoon[reftBuilders][1][M27Overseer.refoUnitDealingUnseenDamage]) or not(EntityCategoryContains(categories.ANTINAVY + categories.OVERLAYANTINAVY,oPlatoon[reftBuilders][1][M27Overseer.refoUnitDealingUnseenDamage].UnitId)) then
+                    if not(oACU[M27Overseer.refoUnitDealingUnseenDamage]) or not(EntityCategoryContains(categories.ANTINAVY + categories.OVERLAYANTINAVY,oACU[M27Overseer.refoUnitDealingUnseenDamage].UnitId)) then
                         --Is there water near us that we can path to without obstruction, when considering locations that wont take us further from our base?
 
                         local iWaterSearchInterval = 8
@@ -2563,7 +2564,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         local tPlatoonPosition = GetPlatoonFrontPosition(oPlatoon)
                         local iBaseAngle = M27Utilities.GetAngleFromAToB(tPlatoonPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                         local tPossibleLocation
-                        local iAmountToBeUnderwater = oPlatoon[reftBuilders][1]:GetBlueprint().SizeY
+                        local iAmountToBeUnderwater = oACU:GetBlueprint().SizeY
                         if bDebugMessages == true then LOG(sFunctionRef..': Will see if we have any water nearby that we can retreat to') end
                         local bFoundUnderwaterPosition = false
                         local iSegmentGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, tPlatoonPosition)
@@ -2610,7 +2611,6 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
             if bProceed == true then
                 local bACUNeedsToRun = false
                 --Have we recently taken damage from an unseen source?
-                local oACU = M27Utilities.GetACU(aiBrain)
                 if bDebugMessages == true then
                     local iLastTimeTakenDamage = oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]
                     if iLastTimeTakenDamage == nil then iLastTimeTakenDamage = 0 end
@@ -2704,7 +2704,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         bACUNeedsToRun = true
                                         if bDebugMessages == true then LOG(sFunctionRef..': ACU against too many PD htat would be in range of it; iPDInRange='..iPDInRange..'; iPDThreshold='..iPDThreshold..'; tEnemyT2PlusPD size='..table.getn(tEnemyT2PlusPD)) end
                                         --Are we cloaked and enemy has no omni and no spy planes, and we are still at least 10 away from the nearest PD?
-                                        if M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') then
+                                        if oACU:HasEnhancement('CloakingGenerator') then
                                             --Are we already close to the nearest PD and there are fewer than 8?
                                             local bEnemyHasOmni = false
                                             local tPotentialOmniUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryUnitsWithOmni, GetPlatoonFrontPosition(oPlatoon), 225, 'Enemy')
@@ -2866,12 +2866,12 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
 
 
                 --Override - if ACU has stealth+high health, or cloak, and not in enemy omni range, then ignore need to run
-                if bACUNeedsToRun and not(oPlatoon[refbNeedToHeal]) and (M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') or (M27Utilities.GetACU(aiBrain):HasEnhancement('StealthGenerator') and M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) >= 0.95 and not(aiBrain[M27AirOverseer.refbMercySightedRecently]))) then
+                if bACUNeedsToRun and not(oPlatoon[refbNeedToHeal]) and (oACU:HasEnhancement('CloakingGenerator') or (oACU:HasEnhancement('StealthGenerator') and M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.95 and not(aiBrain[M27AirOverseer.refbMercySightedRecently]))) then
                     if bDebugMessages == true then LOG(sFunctionRef..': ACU has stealth or cloak so considering whether it should ignore the call to run') end
                     if not(M27Conditions.IsLocationNearEnemyOmniRange(aiBrain, GetPlatoonFrontPosition(oPlatoon), 20)) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Not in enemy omni range so wont run') end
                         bACUNeedsToRun = false
-                    elseif M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') then
+                    elseif oACU:HasEnhancement('CloakingGenerator') then
                         --Are we already close to the nearest PD?
                         if oPlatoon[refiEnemyStructuresInRange] > 0 and M27Utilities.IsTableEmpty(tEnemyT2PlusPD) == false and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Utilities.GetNearestUnit(tEnemyT2PlusPD, GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition()) <= 40 then
                             --Almost in range of the PD so dont run now
@@ -2880,8 +2880,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     end
                     if not(bACUNeedsToRun) and oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] > 0 then
                         --Are either cloaked, or have no mobile enemies within 20 of us
-                        if M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') or oPlatoon[refiEnemiesInRange] == 0 or M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(oPlatoon[reftEnemiesInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition(), GetPlatoonFrontPosition(oPlatoon)) > 20 and not(M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit])) then
-                            if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
+                        if oACU:HasEnhancement('CloakingGenerator') or oPlatoon[refiEnemiesInRange] == 0 or M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(oPlatoon[reftEnemiesInRange], GetPlatoonFrontPosition(oPlatoon), aiBrain):GetPosition(), GetPlatoonFrontPosition(oPlatoon)) > 20 and not(M27UnitInfo.IsUnitUnderwater(oPlatoon[refoFrontUnit])) then
+                            if oACU and M27Conditions.CanUnitUseOvercharge(aiBrain, oACU) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oACU) end
                             bProceed = false
                             --Are we underwater?
                             GetUnderwaterActionForLandUnit(oPlatoon)
@@ -2896,13 +2896,13 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 if bDebugMessages == true then LOG(sFunctionRef..': Finished considering if too many PD or enemy threat nearby, bACUNeedsToRun='..tostring(bACUNeedsToRun)) end
                 if bACUNeedsToRun == true then
                     --If have stealth or cloak, and no big enemy threats, do a temporary retreat
-                    if (M27Utilities.GetACU(aiBrain):HasEnhancement('CloakingGenerator') or M27Utilities.GetACU(aiBrain):HasEnhancement('StealthGenerator')) and M27Utilities.GetDistanceBetweenPositions(M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]) > 50 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) then
+                    if (oACU:HasEnhancement('CloakingGenerator') or oACU:HasEnhancement('StealthGenerator')) and M27Utilities.GetDistanceBetweenPositions(M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon)), GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit]) > 50 and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Have cloak or stealth so want to do temporary retreat') end
                         oPlatoon[refiCurrentAction] = refActionTemporaryRetreat
                         oPlatoon[refbHavePreviouslyRun] = true
                     else
                         --Are we close to the nearest rally point, with >=75% health, and close to our base? then dont set an action to run (as it may be e.g. we are just running to be prudent due to high eco)
-                        if M27UnitInfo.GetUnitHealthPercent(M27Utilities.GetACU(aiBrain)) >= 0.75 and (M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25)) or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])) <= 30) then
+                        if M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 and (M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25)) or M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27Logic.GetNearestRallyPoint(aiBrain, GetPlatoonFrontPosition(oPlatoon), oPlatoon[refoFrontUnit])) <= 30) then
                             --Do nothing
                         else
                             oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
@@ -2910,7 +2910,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                         end
                     end
                     --Add in overcharge
-                    if oPlatoon[reftBuilders][1] and M27Conditions.CanUnitUseOvercharge(aiBrain, oPlatoon[reftBuilders][1]) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oPlatoon[reftBuilders][1]) end
+                    if oACU and M27Conditions.CanUnitUseOvercharge(aiBrain, oACU) == true then M27UnitMicro.GetOverchargeExtraAction(aiBrain, oPlatoon, oACU) end
                     bProceed = false
                 else
                     --If taken damage from unseen T1/T2 DF unit recently and dont want to run, and that unit is within 2 of our range, then move closer to the unit
@@ -6851,11 +6851,11 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
-            --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
+            if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
             --if sPlatoonName == M27Overseer.sIntelPlatoonRef then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
@@ -10152,14 +10152,14 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1200 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
-            --if sPlatoonName == 'M27MexRaiderAI' then bDebugMessages = true end
+            if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == M27Overseer.sIntelPlatoonRef then bDebugMessages = true end

@@ -7180,10 +7180,12 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
         -------->>>>>>>>>>>>Set ACU health to run on<<<<<<<<<<<----------------
 
+
         aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
         --Play safe with ACU if we have almost half or more of mexes
         local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
         local iKeyUpgradesWanted = 1
+        if bDebugMessages == true then LOG(sFunctionRef..': About to determine adjustments to the ACU health to run on. iUpgradeCount='..iUpgradeCount..'; ACU max health='..oACU:GetMaxHealth()) end
 
         if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.9 then
             if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.1 then
@@ -7230,20 +7232,25 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         end
 
         --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
-        if aiBrain[refiEnemyHighestTechLevel] >= 3 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
+        if aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
             if bDebugMessages == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
             if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
                 if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                     --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
                     if not (M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 26 or aiBrain[refiEnemyHighestTechLevel] >= 4 then
                         aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() + 15000
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T4 or we dont have gun or have lots of mass so will force ACU to run') end
                     else
                         --Enemy has t3, and we have decent eco; run if we dont have lots of enhancements
                         if iUpgradeCount < 3 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 then
                             aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have high mass income and not many upgrades so will force ACU to run') end
+
                         else    --Have 3+ enhancements and dont have at least 200 gross mass income so will allow a bit of health damage
                             aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have at least 3 upgrades so will only retreat if ACU not at full health') end
                         end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iUpgradeCount='..iUpgradeCount..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; health to run on after adjusting for this='..aiBrain[refiACUHealthToRunOn]) end
                     end
                 else
                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
