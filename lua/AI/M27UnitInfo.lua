@@ -803,6 +803,17 @@ function GetBomberRange(oUnit)
     return iRange
 end
 
+function GetBomberSpeedAndTimeToReload(oBomber)
+    local oBP = oBomber:GetBlueprint()
+    local iTimeToReload = 5
+    for iWeapon, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' then
+            if tWeapon.RateOfFire > 0 then iTimeToReload = 1 / tWeapon.RateOfFire end
+        end
+    end
+    return oBP.Air.MaxAirspeed, iTimeToReload
+end
+
 function BomberMultiAttackMuzzle(oUnit)
     --Done to help with searching
     return DoesBomberFireSalvo(oUnit)

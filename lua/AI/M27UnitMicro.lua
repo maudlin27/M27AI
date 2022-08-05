@@ -1215,7 +1215,7 @@ function HoverBombTargetOldBase(aiBrain, oBomber, oTarget)
             M27AirOverseer.IssueNewAttackToBomber(oBomber, oTarget, 1, true)
         else
             IssueClearCommands({oBomber})
-            ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber, 0)
+            ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber)
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -1375,7 +1375,7 @@ function HoverBombTarget(aiBrain, oBomber, oTarget)
                 end
             else
                 IssueClearCommands({oBomber})
-                ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber, 0)
+                ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber)
             end
         end
     end
@@ -1712,7 +1712,7 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
                         end
                     else
                         IssueClearCommands({oBomber})
-                        ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber, 0)
+                        ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber)
                     end
                 end
             end
