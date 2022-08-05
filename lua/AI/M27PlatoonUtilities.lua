@@ -2544,7 +2544,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                 local tNearbyEnemyMexes
                 if oPlatoon[refiEnemyStructuresInRange] > 0 then
                     tNearbyEnemyMexes = EntityCategoryFilterDown(M27UnitInfo.refCategoryMex, oPlatoon[reftEnemyStructuresInRange])
-                    if M27Utilities.IsTableEmpty(tNearbyEnemyMexes) == false and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tNearbyEnemyMexes, GetPlatoonFrontPosition(oPlatoon))) <= 30 then
+                    if M27Utilities.IsTableEmpty(tNearbyEnemyMexes) == false and M27Utilities.GetDistanceBetweenPositions(M27Utilities.GetNearestUnit(tNearbyEnemyMexes, GetPlatoonFrontPosition(oPlatoon)):GetPosition(), GetPlatoonFrontPosition(oPlatoon)) <= 30 then
                         bNearbyEnemyMex = true
                     end
                 end
