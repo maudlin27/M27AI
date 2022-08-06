@@ -121,6 +121,30 @@ function SafeToUpgradeUnit(oUnit)
     return bSafeToGetUpgrade
 end
 
+function DoWeWantPriorityT2LandFactoryHQ(aiBrain, iOptionalLandFactoryCount)
+    if not(iOptionalLandFactoryCount) then iOptionalLandFactoryCount = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory) end
+    local bGetT2FactoryEvenWithLowMass = false
+    if iOptionalLandFactoryCount >= 4 and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandMain and aiBrain[M27Overseer.refiOurHighestLandFactoryTech] == 1 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] > 1 then
+        local bAlreadyGettingT2LandFacOrT2Air = false
+        if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false then
+            --Are we upgrading a T2 air fac to T3 (rather than T1 to T2), or a land fac?
+            for iUpgrading, oUpgrading in aiBrain[M27EconomyOverseer.reftActiveHQUpgrades] do
+                if EntityCategoryContains(M27UnitInfo.refCategoryLandFactory + categories.TECH1, oUpgrading.UnitId) then
+                    bAlreadyGettingT2LandFacOrT2Air = true
+                    break
+                end
+            end
+        end
+        if not(bAlreadyGettingT2LandFacOrT2Air) then
+            local iCurrentCombatUnits = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandCombat)
+            if iCurrentCombatUnits >= 40 or (iCurrentCombatUnits >= 30 and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 5 or aiBrain:GetEconomyStored('MASS') >= 1000)) then
+                bGetT2FactoryEvenWithLowMass = true
+            end
+        end
+    end
+    return bGetT2FactoryEvenWithLowMass
+end
+
 function HaveNearbyMobileShield(oPlatoon)
     local bHaveNearbyShield = false
     local sFunctionRef = 'HaveNearbyMobileShield'

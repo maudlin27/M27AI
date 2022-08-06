@@ -10041,8 +10041,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 end
                             end
 
-                            --Reduce max engis if enemy doesnt actually have nukes
-                            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and not(aiBrain[M27Overseer.refbEnemyFiredNuke]) then iMaxEngisWanted = 3 end
+                            --Reduce max engis if enemy doesnt actually have nukes; 1 T3 engi uses 16 mass/s, while SMD itself when built uses 15 mass/s, so just do 2 t3 engis building for now, as that way wont have a delay if need to switch to building it urgently
+                            if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) and not(aiBrain[M27Overseer.refbEnemyFiredNuke]) then iMaxEngisWanted = 2 end
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Finsihed considering if want to build or assist SMD. iActionToAssign='..(iActionToAssign or 'nil')) end
                     elseif iCurrentConditionToTry == 19 then --Emergency AA when non-air threat near our base and we have no AA
