@@ -7712,7 +7712,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
         ForkThread(M27MapInfo.IdentifyTeamChokepoints, aiBrain)
 
         --Record impathable area around base if no chokepoint
-        ForkThread(M27MapInfo.IdentifyImpathableAreaAroundBase, aiBrain)
+        ForkThread(M27MapInfo.IdentifyCliffsAroundBase, aiBrain)
 
         --Reset nearest base if no enemies, since the logic for nearest enemy runs before identifying all allies (but needs details of all allies to work)
         if aiBrain[refbNoEnemies] and GetGameTimeSeconds() <= 10 then
