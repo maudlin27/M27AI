@@ -155,7 +155,7 @@ refFactoryTypeNavy = 3
 
 --Other ACU related
 refiACULastTakenUnseenOrTorpedoDamage = 'M27OverseerACULastTakenUnseenDamage' --Used to determine if ACU should run or not
-refoUnitDealingUnseenDamage = 'M27OverseerACUUnitDealingUnseenDamage' --so can see if it was a T2+ PD that should run away from
+refoUnitDealingUnseenDamage = 'M27OverseerACUUnitDealingUnseenDamage' --Against oUnit; so can see if it was a T2+ PD that should run away from
 refoLastUnitDealingDamage = 'M27OverseerLastUnitDealingDamage' --oUnit[], returns unit that last dealt damage - currently just used for ACU
 refbACUWasDefending = 'M27ACUWasDefending'
 iACUMaxTravelToNearbyMex = 35 --ACU will go up to this distance out of its current position to build a mex (i.e. add 10 to this for actual range)
@@ -4044,7 +4044,7 @@ function ThreatAssessAndRespond(aiBrain)
                                         end
                                         if M27Utilities.IsTableEmpty(oBasePlatoon[M27PlatoonUtilities.reftPrevAction]) == false then
                                             local iPrevAction = oBasePlatoon[M27PlatoonUtilities.reftPrevAction][1]
-                                            if iPrevAction == M27PlatoonUtilities.refActionRun or iPrevAction == M27PlatoonUtilities.refActionTemporaryRetreat or iPrevAction == M27PlatoonUtilities.refActionAttack then
+                                            if iPrevAction == M27PlatoonUtilities.refActionRun or iPrevAction == M27PlatoonUtilities.refActionTemporaryRetreat or iPrevAction == M27PlatoonUtilities.refActionAttack or iPrevAction == M27PlatoonUtilities.refActionKitingRetreat or iPrevAction == M27PlatoonUtilities.refActionMoveDFToNearestEnemy then
                                                 bRefreshPlatoonAction = false
                                             elseif oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] and oBasePlatoon[M27PlatoonUtilities.refiLastPrevActionOverride] <= iOverseerRefreshCountThreshold then
                                                 bRefreshPlatoonAction = false
@@ -4079,6 +4079,8 @@ function ThreatAssessAndRespond(aiBrain)
                                                 M27PlatoonUtilities.ForceActionRefresh(oBasePlatoon)
                                                 oBasePlatoon[M27PlatoonUtilities.refiOverseerAction] = M27PlatoonUtilities.refActionReissueMovementPath
                                             end
+                                        else
+                                            --oBasePlatoon[M27PlatoonUtilities.refbOverseerAction] = false --Got wierd results when put this tofalse with aeon (v45 WIP - e.g. combat patrol platoons would stop and start and barely move) so would need to spend more time looking into if did decide to change
                                         end
                                         --IssueClearCommands(oBasePlatoon:GetPlatoonUnits())
                                         oBasePlatoon[M27PlatoonUtilities.reftMovementPath] = {}

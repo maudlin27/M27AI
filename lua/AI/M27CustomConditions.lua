@@ -288,10 +288,15 @@ function SafeToGetACUUpgrade(aiBrain)
                                 end
                             end
                             if bIsSafe == false then --Check if we have mobile shields nearby and are on our side of the map
+                                if bDebugMessages == true then LOG(sFunctionRef..': Not safe under normal checks, but if underwater and not vulnerable to navy then may still be save. bAreUnderwater='..tostring(bAreUnderwater)..'; aiBrain[M27AirOverseer.refiTorpBombersWanted]='..(aiBrain[M27AirOverseer.refiTorpBombersWanted] or 0)..'; Time since last took unseen damage='..(GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]) >= 30) end
                                 if oACU.PlatoonHandle and HaveNearbyMobileShield(oACU.PlatoonHandle) and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) and M27UnitInfo.GetUnitHealthPercent(oACU) <= M27Overseer.iACUEmergencyHealthPercentThreshold * 0.8 then
                                     bIsSafe = true
-                                elseif bAreUnderwater and aiBrain[M27AirOverseer.refiTorpBombersWanted] < 3 and (bFirstUpgrade or (aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] + aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3]) == 0) and (GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]) >= 30 then
-                                    bIsSafe = true
+                                elseif bAreUnderwater and aiBrain[M27AirOverseer.refiTorpBombersWanted] < 3 and (bFirstUpgrade or (aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] + aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3]) == 0) then
+                                    local iTimeSinceTookUnseenDamage = (GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage])
+                                    if iTimeSinceTookUnseenDamage >= 30 or (iTimeSinceTookUnseenDamage >= 10 and aiBrain[M27AirOverseer.refiTorpBombersWanted] <= 0 and (not(M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoUnitDealingUnseenDamage])) or not(EntityCategoryContains(categories.ANTINAVY, oACU[M27Overseer.refoUnitDealingUnseenDamage].UnitId)))) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Underwater and been a while since took damage so will treat as being safe') end
+                                        bIsSafe = true
+                                    end
                                 end
                             end
                             if bIsSafe == true then --Check are either underwater, near base, or our shots wont be blocked if we upgrade
@@ -552,7 +557,7 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
                     end
                 end
             end
-            if bDebugMessages == true then LOG(sFunctionRef..'; bWantToGetGun='..tostring(bWantToGetGun)) end
+            if bDebugMessages == true then LOG(sFunctionRef..'; Finished main checks, bWantToGetGun='..tostring(bWantToGetGun)) end
         end
     end
     --Adjust based on what strategy we are using
@@ -560,9 +565,11 @@ function WantToGetFirstACUUpgrade(aiBrain, bIgnoreEnemies)
         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyAirDominance then
             if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 then bWantToGetGun = false end
         elseif aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
-            if aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 or aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 75 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Are ecoing so check we have enough power both now and if we start building a t2 pgen. Energy ratio='..aiBrain:GetEconomyStoredRatio('ENERGY')..'; Net energy income='..aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome]..'; Gross energy income='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]) end
+            if (aiBrain:GetEconomyStoredRatio('ENERGY') <= 0.8 and aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] <= 22.5) or (aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] < 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 125) or aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] < 75 then
                 --Are we about to start on a T2 PGen? If so then hold off on upgrade
                 if M27Utilities.IsTableEmpty(aiBrain[M27EconomyOverseer.reftActiveHQUpgrades]) == false or aiBrain[M27Overseer.refiOurHighestFactoryTechLevel] > 1 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Are ecoing and likely to start building a T2 Pgen so hold off so we dont powerstall') end
                     bWantToGetGun = false
                 end
             end

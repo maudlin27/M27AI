@@ -1936,83 +1936,92 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
             tMassThresholds[6] = { iFullStorageAmount * 0.8, -4 }
             tMassThresholds[7] = { iFullStorageAmount * 0.98, -10 }
         else
-            --If not upgrading anything and have t1 mexes near base then consider upgrading as high priority
-            local iAvailableT1MexesNearBase = 0
-            local tNearbyT1Mexes = aiBrain:GetUnitsAroundPoint(refCategoryT1Mex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 35, 'Ally')
-            for iMex, oMex in tNearbyT1Mexes do
-                if not(oMex:IsUnitState('Upgrading')) then iAvailableT1MexesNearBase = iAvailableT1MexesNearBase + 1 end
-            end
-            --Below threshold for mexes is <=1 so we dont keep pausing the mex just after telling it to upgrade
-            if iAvailableT1MexesNearBase > 0 and aiBrain[refiMexesUpgrading] <= 1 and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) and (iLandFactoryCount + iAirFactoryCount >= 3 or GetGameTimeSeconds() >= 300 or aiBrain[refiMassGrossBaseIncome] >= 2) then
-                --Want to get a t2 mex upgrade so our mass income is always increasing
-                if aiBrain[refiMassGrossBaseIncome] >= 3 then
-                    tMassThresholds[1] = {0, -1}
-                    tMassThresholds[2] = {100, -1.5}
-                    tMassThresholds[3] = {250, -3}
-                    tMassThresholds[4] = {400, -6}
-                elseif aiBrain[refiMassGrossBaseIncome] >= 1.8 then
-                    tMassThresholds[1] = { 0, -0.2}
-                    tMassThresholds[2] = {50, 0.4}
-                    tMassThresholds[3] = {100, 0.3}
-                    tMassThresholds[4] = {150, 0}
-                    tMassThresholds[5] = {200, -0.3}
-                    tMassThresholds[6] = {300, -0.5}
-                    tMassThresholds[7] = {400, -1}
-                    tMassThresholds[8] = {600, -2}
-                else
-                    tMassThresholds[1] = { 0, 0.5}
-                    tMassThresholds[2] = {50, 0.4}
-                    tMassThresholds[3] = {100, 0.3}
-                    tMassThresholds[4] = {150, 0}
-                    tMassThresholds[5] = {200, -0.3}
-                    tMassThresholds[6] = {300, -0.5}
-                    tMassThresholds[7] = {400, -1}
-                    tMassThresholds[8] = {600, -2}
-                end
-
-            elseif aiBrain[refiMassGrossBaseIncome] <= 7 then
-
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Arent ecoing and our mass income is less tahn 70 mass per sec')
-                end
-                tMassThresholds[1] = { 400, 1 }
-                tMassThresholds[2] = { 500, 0.5 }
-                tMassThresholds[3] = { 600, 0.1 }
-                tMassThresholds[4] = { 700, -0.1 }
-                tMassThresholds[5] = { 750, -0.2 }
+            --Not in eco mode, if is early game then dont want to upgrade anything unless significant mass income
+            if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and aiBrain[refiMassGrossBaseIncome] < 2 and GetGameTimeSeconds() <= 360 then
+                tMassThresholds[1] = {500, 0.1}
+                tMassThresholds[2] = {600, 0}
+                tMassThresholds[3] = {750, -0.2}
+                tMassThresholds[4] = {795, -0.5}
             else
-                local iFullStorageAmount = 1000 --Base value for if we have 0% stored ratio
-                if aiBrain:GetEconomyStoredRatio('MASS') > 0 then
-                    iFullStorageAmount = aiBrain:GetEconomyStored('MASS') / aiBrain:GetEconomyStoredRatio('MASS')
-                end
 
-                --Are we not upgrading any mexes?
-                if aiBrain[refiMexesUpgrading] == 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 then
-                    tMassThresholds[1] = {0, -1}
-                    tMassThresholds[2] = { math.min(500, iFullStorageAmount * 0.1), -1.5 }
-                    tMassThresholds[3] = { math.min(1000, iFullStorageAmount * 0.15), -2 }
-                    tMassThresholds[4] = { math.min(1500, iFullStorageAmount * 0.35), -3 }
-                    tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), -7 }
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have no mexes upgrading so using significantly lower thresholds') end
-                else
-                    --Are we already upgrading a T2 mex, and either have recently powerstalled, or dont have much gross mass income (so we probably cant support multiple mex upgrades)
-                    if iT2MexesUpgrading > 0 and (GetGameTimeSeconds() - aiBrain[refiLastEnergyStall] <= 45 or aiBrain[refiMassGrossBaseIncome] <= 7.5) then
-                        tMassThresholds[1] = { math.min(750, iFullStorageAmount * 0.1), 2.4 }
-                        tMassThresholds[2] = { math.min(1500, iFullStorageAmount * 0.15), 1.2 }
-                        tMassThresholds[3] = { math.min(2000, iFullStorageAmount * 0.35), 0.6 }
-                        tMassThresholds[4] = { math.min(2500, iFullStorageAmount * 0.45), 0.2 }
-                        tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), 0 }
-                        tMassThresholds[6] = { iFullStorageAmount * 0.8, -0.2 }
-                        tMassThresholds[7] = { iFullStorageAmount * 0.9, -1.5 }
+                --If not upgrading anything and have t1 mexes near base then consider upgrading as high priority
+                local iAvailableT1MexesNearBase = 0
+                local tNearbyT1Mexes = aiBrain:GetUnitsAroundPoint(refCategoryT1Mex, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 35, 'Ally')
+                for iMex, oMex in tNearbyT1Mexes do
+                    if not(oMex:IsUnitState('Upgrading')) then iAvailableT1MexesNearBase = iAvailableT1MexesNearBase + 1 end
+                end
+                --Below threshold for mexes is <=1 so we dont keep pausing the mex just after telling it to upgrade
+                if iAvailableT1MexesNearBase > 0 and aiBrain[refiMexesUpgrading] <= 1 and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) and (iLandFactoryCount + iAirFactoryCount >= 3 or GetGameTimeSeconds() >= 300 or aiBrain[refiMassGrossBaseIncome] >= 2) then
+                    --Want to get a t2 mex upgrade so our mass income is always increasing
+                    if aiBrain[refiMassGrossBaseIncome] >= 3 then
+                        tMassThresholds[1] = {0, -1}
+                        tMassThresholds[2] = {100, -1.5}
+                        tMassThresholds[3] = {250, -3}
+                        tMassThresholds[4] = {400, -6}
+                    elseif aiBrain[refiMassGrossBaseIncome] >= 1.8 then
+                        tMassThresholds[1] = { 0, -0.2}
+                        tMassThresholds[2] = {50, 0.4}
+                        tMassThresholds[3] = {100, 0.3}
+                        tMassThresholds[4] = {150, 0}
+                        tMassThresholds[5] = {200, -0.3}
+                        tMassThresholds[6] = {300, -0.5}
+                        tMassThresholds[7] = {400, -1}
+                        tMassThresholds[8] = {600, -2}
                     else
-                        --if aiBrain[refiPausedUpgradeCount] > 1 or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
-                        tMassThresholds[1] = { math.min(500, iFullStorageAmount * 0.1), 0.1 }
-                        tMassThresholds[2] = { math.min(1000, iFullStorageAmount * 0.15), 0 }
-                        tMassThresholds[3] = { math.min(1500, iFullStorageAmount * 0.35), -0.5 }
-                        tMassThresholds[4] = { math.min(1750, iFullStorageAmount * 0.45), -1.5 }
-                        tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), -2.5 }
-                        tMassThresholds[6] = { iFullStorageAmount * 0.8, -4 }
-                        tMassThresholds[7] = { iFullStorageAmount * 0.98, -10 }
+                        tMassThresholds[1] = { 0, 0.5}
+                        tMassThresholds[2] = {50, 0.4}
+                        tMassThresholds[3] = {100, 0.3}
+                        tMassThresholds[4] = {150, 0}
+                        tMassThresholds[5] = {200, -0.3}
+                        tMassThresholds[6] = {300, -0.5}
+                        tMassThresholds[7] = {400, -1}
+                        tMassThresholds[8] = {600, -2}
+                    end
+
+                elseif aiBrain[refiMassGrossBaseIncome] <= 7 then
+
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Arent ecoing and our mass income is less tahn 70 mass per sec')
+                    end
+                    tMassThresholds[1] = { 400, 1 }
+                    tMassThresholds[2] = { 500, 0.5 }
+                    tMassThresholds[3] = { 600, 0.1 }
+                    tMassThresholds[4] = { 700, -0.1 }
+                    tMassThresholds[5] = { 750, -0.2 }
+                else
+                    local iFullStorageAmount = 1000 --Base value for if we have 0% stored ratio
+                    if aiBrain:GetEconomyStoredRatio('MASS') > 0 then
+                        iFullStorageAmount = aiBrain:GetEconomyStored('MASS') / aiBrain:GetEconomyStoredRatio('MASS')
+                    end
+
+                    --Are we not upgrading any mexes?
+                    if aiBrain[refiMexesUpgrading] == 0 and aiBrain[refiMexesAvailableForUpgrade] > 0 then
+                        tMassThresholds[1] = {0, -1}
+                        tMassThresholds[2] = { math.min(500, iFullStorageAmount * 0.1), -1.5 }
+                        tMassThresholds[3] = { math.min(1000, iFullStorageAmount * 0.15), -2 }
+                        tMassThresholds[4] = { math.min(1500, iFullStorageAmount * 0.35), -3 }
+                        tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), -7 }
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have no mexes upgrading so using significantly lower thresholds') end
+                    else
+                        --Are we already upgrading a T2 mex, and either have recently powerstalled, or dont have much gross mass income (so we probably cant support multiple mex upgrades)
+                        if iT2MexesUpgrading > 0 and (GetGameTimeSeconds() - aiBrain[refiLastEnergyStall] <= 45 or aiBrain[refiMassGrossBaseIncome] <= 7.5) then
+                            tMassThresholds[1] = { math.min(750, iFullStorageAmount * 0.1), 2.4 }
+                            tMassThresholds[2] = { math.min(1500, iFullStorageAmount * 0.15), 1.2 }
+                            tMassThresholds[3] = { math.min(2000, iFullStorageAmount * 0.35), 0.6 }
+                            tMassThresholds[4] = { math.min(2500, iFullStorageAmount * 0.45), 0.2 }
+                            tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), 0 }
+                            tMassThresholds[6] = { iFullStorageAmount * 0.8, -0.2 }
+                            tMassThresholds[7] = { iFullStorageAmount * 0.9, -1.5 }
+                        else
+                            --if aiBrain[refiPausedUpgradeCount] > 1 or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech then
+                            tMassThresholds[1] = { math.min(500, iFullStorageAmount * 0.1), 0.1 }
+                            tMassThresholds[2] = { math.min(1000, iFullStorageAmount * 0.15), 0 }
+                            tMassThresholds[3] = { math.min(1500, iFullStorageAmount * 0.35), -0.5 }
+                            tMassThresholds[4] = { math.min(1750, iFullStorageAmount * 0.45), -1.5 }
+                            tMassThresholds[5] = { math.min(3000, iFullStorageAmount * 0.55), -2.5 }
+                            tMassThresholds[6] = { iFullStorageAmount * 0.8, -4 }
+                            tMassThresholds[7] = { iFullStorageAmount * 0.98, -10 }
+                        end
                     end
                 end
             end
