@@ -3864,28 +3864,30 @@ function SetWhetherCanPathToEnemy(aiBrain)
 
     local sFunctionRef = 'SetWhetherCanPathToEnemy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
-    local tOurBase = PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    local sPathing = M27UnitInfo.refPathingTypeLand
-    local iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
-    local iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
-    if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithLand] = true
-    else aiBrain[refbCanPathToEnemyBaseWithLand] = false end
-    sPathing = M27UnitInfo.refPathingTypeAmphibious
-    iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
-    iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
-    if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithAmphibious] = true
-    else aiBrain[refbCanPathToEnemyBaseWithAmphibious] = false end
+    if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
+        local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
+        local tOurBase = PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        local sPathing = M27UnitInfo.refPathingTypeLand
+        local iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
+        local iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
+        if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithLand] = true
+        else aiBrain[refbCanPathToEnemyBaseWithLand] = false end
+        sPathing = M27UnitInfo.refPathingTypeAmphibious
+        iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
+        iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
+        if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithAmphibious] = true
+        else aiBrain[refbCanPathToEnemyBaseWithAmphibious] = false end
 
-    aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[reftPrimaryEnemyBaseLocation])
-    aiBrain[M27AirOverseer.refiMaxScoutRadius] = math.max(1500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.5)
+        aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[reftPrimaryEnemyBaseLocation])
+        aiBrain[M27AirOverseer.refiMaxScoutRadius] = math.max(1500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.5)
 
-    if aiBrain[refbCanPathToEnemyBaseWithAmphibious] then
-        aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5
-    else aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 0 end
+        if aiBrain[refbCanPathToEnemyBaseWithAmphibious] then
+            aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5
+        else aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 0 end
 
-    --Record mitpoint between base (makes it easier to calc mod distance
-    aiBrain[reftMidpointToPrimaryEnemyBase] = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyStartPosition), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], false)
+        --Record mitpoint between base (makes it easier to calc mod distance
+        aiBrain[reftMidpointToPrimaryEnemyBase] = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyStartPosition), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], false)
+    end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

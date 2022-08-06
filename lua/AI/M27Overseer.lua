@@ -6220,1169 +6220,1172 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     --local bDebugMessages = M27Config.M27StrategicLog
     local sFunctionRef = 'StrategicOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
-    --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
-    local iBigThreatSearchRange = 10000
 
-    local tEnemyBigThreatCategories = { M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryMissileNavy, M27UnitInfo.refCategorySMD }
-    local tCurCategoryUnits
-    local tReferenceTable, bRemovedUnit
-    local sUnitUniqueRef
-    local bWantACUToReturnToBase = false --Affects whether ACU will run or not
-    local bAlreadyInTable
-    local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+    if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
+        --if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
+        --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
+        local iBigThreatSearchRange = 10000
 
-    for _, iCategory in tEnemyBigThreatCategories do
-        bWantACUToReturnToBase = false
-        tCurCategoryUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
-        if iCategory == M27UnitInfo.refCategoryExperimentalStructure or iCategory == M27UnitInfo.refCategoryFixedT3Arti then
-            tReferenceTable = aiBrain[reftEnemyArtiAndExpStructure]
-        elseif iCategory == M27UnitInfo.refCategorySML then
-            tReferenceTable = aiBrain[reftEnemyNukeLaunchers]
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Looking for enemy nukes')
-            end
-            bWantACUToReturnToBase = true
-        elseif iCategory == M27UnitInfo.refCategoryTML or iCategory == M27UnitInfo.refCategoryMissileNavy then
-            tReferenceTable = aiBrain[reftEnemyTML]
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Looking for enemy TML')
-            end
-        elseif iCategory == M27UnitInfo.refCategoryLandExperimental then
-            tReferenceTable = aiBrain[reftEnemyLandExperimentals]
-            bWantACUToReturnToBase = true
-        elseif iCategory == M27UnitInfo.refCategoryFixedT3Arti or iCategory == M27UnitInfo.refCategoryExperimentalStructure then
-            tReferenceTable = aiBrain[reftEnemyArtiAndExpStructure]
-        elseif iCategory == M27UnitInfo.refCategorySMD then
-            tReferenceTable = aiBrain[reftEnemySMD]
-        else
-            M27Utilities.ErrorHandler('Unrecognised enemy super threat category, wont be recorded')
-            break
-        end
-        --Update the table in case any existing entries have been killed, and to remove civilians
-        if M27Utilities.IsTableEmpty(tReferenceTable) == false then
-            bRemovedUnit = true
-            while bRemovedUnit == true do
-                bRemovedUnit = false
-                for iUnit, oUnit in tReferenceTable do
-                    if not (oUnit.GetUnitId) or oUnit.Dead or oUnit.IsCivilian then
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': iUnit=' .. iUnit .. ': No longer alive or has unit ID so removing from the reference table')
-                        end
-                        table.remove(tReferenceTable, iUnit)
-                        bRemovedUnit = true
-                        break
-                    end
+        local tEnemyBigThreatCategories = { M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryMissileNavy, M27UnitInfo.refCategorySMD }
+        local tCurCategoryUnits
+        local tReferenceTable, bRemovedUnit
+        local sUnitUniqueRef
+        local bWantACUToReturnToBase = false --Affects whether ACU will run or not
+        local bAlreadyInTable
+        local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+
+        for _, iCategory in tEnemyBigThreatCategories do
+            bWantACUToReturnToBase = false
+            tCurCategoryUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
+            if iCategory == M27UnitInfo.refCategoryExperimentalStructure or iCategory == M27UnitInfo.refCategoryFixedT3Arti then
+                tReferenceTable = aiBrain[reftEnemyArtiAndExpStructure]
+            elseif iCategory == M27UnitInfo.refCategorySML then
+                tReferenceTable = aiBrain[reftEnemyNukeLaunchers]
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Looking for enemy nukes')
                 end
+                bWantACUToReturnToBase = true
+            elseif iCategory == M27UnitInfo.refCategoryTML or iCategory == M27UnitInfo.refCategoryMissileNavy then
+                tReferenceTable = aiBrain[reftEnemyTML]
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Looking for enemy TML')
+                end
+            elseif iCategory == M27UnitInfo.refCategoryLandExperimental then
+                tReferenceTable = aiBrain[reftEnemyLandExperimentals]
+                bWantACUToReturnToBase = true
+            elseif iCategory == M27UnitInfo.refCategoryFixedT3Arti or iCategory == M27UnitInfo.refCategoryExperimentalStructure then
+                tReferenceTable = aiBrain[reftEnemyArtiAndExpStructure]
+            elseif iCategory == M27UnitInfo.refCategorySMD then
+                tReferenceTable = aiBrain[reftEnemySMD]
+            else
+                M27Utilities.ErrorHandler('Unrecognised enemy super threat category, wont be recorded')
+                break
             end
-        end
-
-        if M27Utilities.IsTableEmpty(tCurCategoryUnits) == false then
-            for iUnit, oUnit in tCurCategoryUnits do
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; .IsCivilian='..tostring(oUnit.IsCivilian or false)..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, false))..'; iPathingGroupWanted='..iPathingGroupWanted..'; unit pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())..'; Is civilian brain='..tostring(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))..'; is unit mobile land='..tostring(EntityCategoryContains(categories.MOBILE * categories.LAND, oUnit.UnitId))) end
-                if (not(oUnit.IsCivilian) or aiBrain[refbNoEnemies]) and M27Utilities.CanSeeUnit(aiBrain, oUnit, false) == true and
-                        (not(EntityCategoryContains(categories.MOBILE * categories.LAND, oUnit.UnitId)) or iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())) and
-                        not(oUnit.UnitId == 'xab1401' and M27Logic.IsCivilianBrain(oUnit:GetAIBrain())) then
-
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have a non-civilian enemy experimental level threat, unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
-                    --Check unit not already in reference table
-                    bAlreadyInTable = false
-                    for iExistingUnit, oExistingUnit in tReferenceTable do
-                        if oExistingUnit == oUnit then
-                            bAlreadyInTable = true
+            --Update the table in case any existing entries have been killed, and to remove civilians
+            if M27Utilities.IsTableEmpty(tReferenceTable) == false then
+                bRemovedUnit = true
+                while bRemovedUnit == true do
+                    bRemovedUnit = false
+                    for iUnit, oUnit in tReferenceTable do
+                        if not (oUnit.GetUnitId) or oUnit.Dead or oUnit.IsCivilian then
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': iUnit=' .. iUnit .. ': No longer alive or has unit ID so removing from the reference table')
+                            end
+                            table.remove(tReferenceTable, iUnit)
+                            bRemovedUnit = true
                             break
                         end
                     end
-                    if not(bAlreadyInTable) then
-                        table.insert(tReferenceTable, oUnit)
+                end
+            end
+
+            if M27Utilities.IsTableEmpty(tCurCategoryUnits) == false then
+                for iUnit, oUnit in tCurCategoryUnits do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; .IsCivilian='..tostring(oUnit.IsCivilian or false)..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, false))..'; iPathingGroupWanted='..iPathingGroupWanted..'; unit pathing group='..M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())..'; Is civilian brain='..tostring(M27Logic.IsCivilianBrain(oUnit:GetAIBrain()))..'; is unit mobile land='..tostring(EntityCategoryContains(categories.MOBILE * categories.LAND, oUnit.UnitId))) end
+                    if (not(oUnit.IsCivilian) or aiBrain[refbNoEnemies]) and M27Utilities.CanSeeUnit(aiBrain, oUnit, false) == true and
+                            (not(EntityCategoryContains(categories.MOBILE * categories.LAND, oUnit.UnitId)) or iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oUnit:GetPosition())) and
+                            not(oUnit.UnitId == 'xab1401' and M27Logic.IsCivilianBrain(oUnit:GetAIBrain())) then
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a non-civilian enemy experimental level threat, unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                        --Check unit not already in reference table
+                        bAlreadyInTable = false
+                        for iExistingUnit, oExistingUnit in tReferenceTable do
+                            if oExistingUnit == oUnit then
+                                bAlreadyInTable = true
+                                break
+                            end
+                        end
+                        if not(bAlreadyInTable) then
+                            table.insert(tReferenceTable, oUnit)
+                        end
+                        --[[sUnitUniqueRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
+                        if tReferenceTable[sUnitUniqueRef] == nil then
+                            tReferenceTable[sUnitUniqueRef] = oUnit
+                            if bDebugMessages == true then LOG(sFunctionRef..': Added Unit with uniqueref='..sUnitUniqueRef..' to the threat table') end
+                        end--]]
                     end
-                    --[[sUnitUniqueRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
-                    if tReferenceTable[sUnitUniqueRef] == nil then
-                        tReferenceTable[sUnitUniqueRef] = oUnit
-                        if bDebugMessages == true then LOG(sFunctionRef..': Added Unit with uniqueref='..sUnitUniqueRef..' to the threat table') end
-                    end--]]
+                end
+                if bWantACUToReturnToBase and M27Utilities.IsTableEmpty(tReferenceTable) == false then
+                    aiBrain[refbAreBigThreats] = true
+                end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Have some units for experimental threat category _=' .. _ .. '; is tReferenceTableEmpty after considering if civilian or pathable to us='..tostring(M27Utilities.IsTableEmpty(tReferenceTable))..'; aiBrain[refbAreBigThreats]='..tostring(aiBrain[refbAreBigThreats]))
                 end
             end
-            if bWantACUToReturnToBase and M27Utilities.IsTableEmpty(tReferenceTable) == false then
-                aiBrain[refbAreBigThreats] = true
-            end
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Have some units for experimental threat category _=' .. _ .. '; is tReferenceTableEmpty after considering if civilian or pathable to us='..tostring(M27Utilities.IsTableEmpty(tReferenceTable))..'; aiBrain[refbAreBigThreats]='..tostring(aiBrain[refbAreBigThreats]))
-            end
+
         end
 
-    end
-
-    --TML - also update ACUs and SACUs with TML upgrade
-    local tEnemyACUAndSACUs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryUnitsWithTMLUpgrade, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
-    if M27Utilities.IsTableEmpty(tEnemyACUAndSACUs) == false then
-        for iUnit, oUnit in tEnemyACUAndSACUs do
-            for iUpgrade, sUpgrade in M27Conditions.tTMLUpgrades do
-                if oUnit:HasEnhancement(sUpgrade) then
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Enemy has an ACU or SACU with TML upgrade, unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; sUpgrade=' .. sUpgrade)
-                    end
-                    table.insert(aiBrain[reftEnemyTML], oUnit)
-                    --aiBrain[reftEnemyTML][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
-                    break
-                end
-            end
-        end
-    end
-
-    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false then
-        for iUnit, oUnit in aiBrain[reftEnemyTML] do
-            if not (oUnit[M27UnitInfo.refbTMDChecked]) or (EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oUnit[M27UnitInfo.reftPositionWhenTMDChecked]) > 50) then
-                oUnit[M27UnitInfo.refbTMDChecked] = true
-                oUnit[M27UnitInfo.reftPositionWhenTMDChecked] = {}
-                oUnit[M27UnitInfo.reftPositionWhenTMDChecked][1], oUnit[M27UnitInfo.reftPositionWhenTMDChecked][2], oUnit[M27UnitInfo.reftPositionWhenTMDChecked][3] = oUnit:GetPositionXYZ()
-                ForkThread(M27Logic.DetermineTMDWantedForTML, aiBrain, oUnit)
-            end
-        end
-
-
-        --Mobile shield to protect temporarily:
-        if aiBrain[refbEnemyTMLSightedBefore] == false then
-            aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
-            aiBrain[refbEnemyTMLSightedBefore] = true
-        end
-    else
-        --No TML - remove the flag that we need TMD from units
-        aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] = {}
-    end
-
-    --Record when we have first had sight of SMD (so can factor in if we decide to fire a nuke)
-    if M27Utilities.IsTableEmpty(aiBrain[reftEnemySMD]) == false then
-        for iUnit, oUnit in aiBrain[reftEnemySMD] do
-            if not (oUnit[M27UnitInfo.refiTimeOfLastCheck]) and oUnit:GetFractionComplete() == 1 then
-                oUnit[M27UnitInfo.refiTimeOfLastCheck] = GetGameTimeSeconds()
-            end
-        end
-
-    end
-
-    --Does enemy have a large air threat?
-    if not (aiBrain[refbAreBigThreats]) and (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 30000 or (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 15000 and (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * 0.8 > aiBrain[M27AirOverseer.refiOurMassInAirAA] or aiBrain[M27AirOverseer.refiAirAANeeded] >= 10))) then
-        aiBrain[refbAreBigThreats] = true
-    end
-
-    --are there any cloaked ACUs or SACUs? (will also check for cloacked ACUs in the acu manager for the nearest ACU)
-    if not (aiBrain[refbCloakedEnemyACU]) then
-        local tCybranSACUs = aiBrain:GetUnitsAroundPoint(categories.COMMAND * categories.CYBRAN + categories.SUBCOMMANDER * categories.CYBRAN, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
-        if M27Utilities.IsTableEmpty(tCybranSACUs) == false then
-            for iSACU, oSACU in tCybranSACUs do
-                if oSACU:HasEnhancement('CloakingGenerator') then
-                    aiBrain[refbCloakedEnemyACU] = true
-                    break
-                end
-            end
-        end
-    end
-    if aiBrain[refbCloakedEnemyACU] then
-        aiBrain[refbAreBigThreats] = true
-    elseif aiBrain[refbEnemyFiredNuke] then
-        aiBrain[refbAreBigThreats] = true
-    end
-
-    --Coordinate friendly experimentals if enemy has land experimentals
-    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false then
-        local bEnemyHasLandExperimental = false
-        for iUnit, oUnit in aiBrain[reftEnemyLandExperimentals] do
-            if oUnit:GetFractionComplete() >= 0.9 then
-                bEnemyHasLandExperimental = true
-                break
-            end
-        end
-        if bEnemyHasLandExperimental then
-            ForkThread(CoordinateLandExperimentals, aiBrain)
-        end
-    end
-    --Coordinate novax
-    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then
-        local bEnemyHasAlmostCompleteArti = false
-        for iUnit, oUnit in aiBrain[reftEnemyArtiAndExpStructure] do
-            if oUnit:GetFractionComplete() >= 0.5 then
-                bEnemyHasAlmostCompleteArti = true
-            end
-        end
-        if bEnemyHasAlmostCompleteArti then
-            ForkThread(CoordinateNovax, aiBrain)
-        end
-
-        --Protect against arti - 1-off event to udpate shielding, and then flag going forwards to keep shields updated
-        if not (aiBrain[refbDefendAgainstArti]) then
-            local bWantToDefend = false
-            for iUnit, oUnit in aiBrain[reftEnemyArtiAndExpStructure] do
-                if oUnit:GetFractionComplete() >= 0.2 then
-                    --Check it isnt a paragon or mavor (since no point shielding against either of these)
-                    if not (EntityCategoryContains(categories.EXPERIMENTAL * categories.MASSFABRICATION + categories.ARTILLERY * categories.STRUCTURE * categories.UEF * categories.EXPERIMENTAL, oUnit.UnitId)) then
-                        bWantToDefend = true
+        --TML - also update ACUs and SACUs with TML upgrade
+        local tEnemyACUAndSACUs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryUnitsWithTMLUpgrade, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
+        if M27Utilities.IsTableEmpty(tEnemyACUAndSACUs) == false then
+            for iUnit, oUnit in tEnemyACUAndSACUs do
+                for iUpgrade, sUpgrade in M27Conditions.tTMLUpgrades do
+                    if oUnit:HasEnhancement(sUpgrade) then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Enemy has an ACU or SACU with TML upgrade, unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; sUpgrade=' .. sUpgrade)
+                        end
+                        table.insert(aiBrain[reftEnemyTML], oUnit)
+                        --aiBrain[reftEnemyTML][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
                         break
                     end
                 end
             end
-            if bWantToDefend then
-                aiBrain[refbDefendAgainstArti] = true
-                ForkThread(M27EngineerOverseer.UpdateShieldingToDefendAgainstArti, aiBrain)
-            end
         end
-    end
-    if bDebugMessages == true then LOG(sFunctionRef..': Finished considering potential big threats. aiBrain[refbAreBigThreats]='..tostring(aiBrain[refbAreBigThreats])) end
 
-
-
-    --[[bDebugMessages = true
-    if bDebugMessages == true then LOG(repru(ScenarioInfo)) end bDebugMessages = false--]]
-
-
-
-    if iCurCycleCount <= 0 then --runs once every 10 cycles (seconds)
-        --Update list of nearby enemies if any are dead
-        local bCheckBrains = true
-        local iCurCount = 0
-        local iMaxCount = 20
-
-        while bCheckBrains == true do
-            iCurCount = iCurCount + 1
-            if iCurCount > iMaxCount then
-                M27Utilities.ErrorHandler('Infinite loop')
-                break
+        if M27Utilities.IsTableEmpty(aiBrain[reftEnemyTML]) == false then
+            for iUnit, oUnit in aiBrain[reftEnemyTML] do
+                if not (oUnit[M27UnitInfo.refbTMDChecked]) or (EntityCategoryContains(categories.MOBILE, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oUnit[M27UnitInfo.reftPositionWhenTMDChecked]) > 50) then
+                    oUnit[M27UnitInfo.refbTMDChecked] = true
+                    oUnit[M27UnitInfo.reftPositionWhenTMDChecked] = {}
+                    oUnit[M27UnitInfo.reftPositionWhenTMDChecked][1], oUnit[M27UnitInfo.reftPositionWhenTMDChecked][2], oUnit[M27UnitInfo.reftPositionWhenTMDChecked][3] = oUnit:GetPositionXYZ()
+                    ForkThread(M27Logic.DetermineTMDWantedForTML, aiBrain, oUnit)
+                end
             end
-            bCheckBrains = false
-            for iArmyIndex, oBrain in tAllAIBrainsByArmyIndex do
-                if oBrain:IsDefeated() or oBrain.M27IsDefeated then
-                    tAllAIBrainsByArmyIndex[iArmyIndex] = nil
-                    bCheckBrains = true
-                    break
+
+
+            --Mobile shield to protect temporarily:
+            if aiBrain[refbEnemyTMLSightedBefore] == false then
+                aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
+                aiBrain[refbEnemyTMLSightedBefore] = true
+            end
+        else
+            --No TML - remove the flag that we need TMD from units
+            aiBrain[M27EngineerOverseer.reftUnitsWantingTMD] = {}
+        end
+
+        --Record when we have first had sight of SMD (so can factor in if we decide to fire a nuke)
+        if M27Utilities.IsTableEmpty(aiBrain[reftEnemySMD]) == false then
+            for iUnit, oUnit in aiBrain[reftEnemySMD] do
+                if not (oUnit[M27UnitInfo.refiTimeOfLastCheck]) and oUnit:GetFractionComplete() == 1 then
+                    oUnit[M27UnitInfo.refiTimeOfLastCheck] = GetGameTimeSeconds()
+                end
+            end
+
+        end
+
+        --Does enemy have a large air threat?
+        if not (aiBrain[refbAreBigThreats]) and (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 30000 or (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 15000 and (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * 0.8 > aiBrain[M27AirOverseer.refiOurMassInAirAA] or aiBrain[M27AirOverseer.refiAirAANeeded] >= 10))) then
+            aiBrain[refbAreBigThreats] = true
+        end
+
+        --are there any cloaked ACUs or SACUs? (will also check for cloacked ACUs in the acu manager for the nearest ACU)
+        if not (aiBrain[refbCloakedEnemyACU]) then
+            local tCybranSACUs = aiBrain:GetUnitsAroundPoint(categories.COMMAND * categories.CYBRAN + categories.SUBCOMMANDER * categories.CYBRAN, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
+            if M27Utilities.IsTableEmpty(tCybranSACUs) == false then
+                for iSACU, oSACU in tCybranSACUs do
+                    if oSACU:HasEnhancement('CloakingGenerator') then
+                        aiBrain[refbCloakedEnemyACU] = true
+                        break
+                    end
                 end
             end
         end
-
-        ForkThread(M27Team.UpdateTeamDataForEnemyUnits, aiBrain) --Currently updates number of wall units but could add other logic to this
-
-        --Below should be updated as part of the SetWhetherCanPathToEnemy function in M27MapInfo now
-        --[[local iNearestEnemyArmyIndex = M27Logic.GetNearestEnemyIndex(aiBrain)
-        if not(iNearestEnemyArmyIndex == iPreviousNearestEnemyIndex) then
-            aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyArmyIndex)])
-            ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain)
-        end
-        iPreviousNearestEnemyIndex = iNearestEnemyArmyIndex--]]
-
-        ForkThread(M27MapInfo.UpdateReclaimMarkers)
-
-        ForkThread(M27AirOverseer.UpdateMexScoutingPriorities, aiBrain)
-
-        SetMaximumFactoryLevels(aiBrain)
-
-        --Consider if should update enemy start location
-        ForkThread(M27MapInfo.UpdateNewPrimaryBaseLocation, aiBrain)
-
-        ForkThread(CheckUnitCap, aiBrain)
-
-
-
-
-
-        --STATE OF GAME LOG BELOW------------------
-
-        --Check if we need to refresh our mass income
-        local bTimeForLongRefresh = false
-        local iCurTime = math.floor(GetGameTimeSeconds())
-        --if iCurTime >= 913 then M27Utilities.bGlobalDebugOverride = true end --use this if e.g. come across a hard crash and want to figure out what's causing it; will cause every log to be enabled so will take a long time to just run 1s of game time
-        if aiBrain[refiTimeOfLastMexIncomeCheck] == nil then
-            bTimeForLongRefresh = true
-        elseif iCurTime - aiBrain[refiTimeOfLastMexIncomeCheck] >= iLongTermMassIncomeChangeInterval then
-            bTimeForLongRefresh = true
-        end
-        local iMassAtLeast3mAgo = aiBrain[reftiMexIncomePrevCheck][2]
-        if iMassAtLeast3mAgo == nil then
-            iMassAtLeast3mAgo = 0
-        end
-        if bTimeForLongRefresh == true then
-            table.insert(aiBrain[reftiMexIncomePrevCheck], 1, aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome])
-            aiBrain[refiTimeOfLastMexIncomeCheck] = iCurTime
+        if aiBrain[refbCloakedEnemyACU] then
+            aiBrain[refbAreBigThreats] = true
+        elseif aiBrain[refbEnemyFiredNuke] then
+            aiBrain[refbAreBigThreats] = true
         end
 
-
-        --Values which want to know even if logs not enabled
-        --Get unclaimed mex figures
-        local oACU = M27Utilities.GetACU(aiBrain)
-        local sPathing = M27UnitInfo.refPathingTypeAmphibious
-        local iFaction = aiBrain:GetFactionIndex()
-
-        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[refiOurHighestLandFactoryTech] == 1 and not (iFaction == M27UnitInfo.refFactionSeraphim or iFaction == M27UnitInfo.refFactionAeon) then
-            sPathing = M27UnitInfo.refPathingTypeLand
-        end
-
-
-        --GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
-        local iPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-        local iAllMexesInPathingGroup = 0
-        if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iPathingGroup]) == false then
-            iAllMexesInPathingGroup = table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iPathingGroup])
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': iAllMexesInPathingGroup=' .. iAllMexesInPathingGroup .. '; full list of mexes for all pathing=' .. repru(M27MapInfo.tMexByPathingAndGrouping))
+        --Coordinate friendly experimentals if enemy has land experimentals
+        if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false then
+            local bEnemyHasLandExperimental = false
+            for iUnit, oUnit in aiBrain[reftEnemyLandExperimentals] do
+                if oUnit:GetFractionComplete() >= 0.9 then
+                    bEnemyHasLandExperimental = true
+                    break
+                end
             end
-        elseif bDebugMessages == true then
-            M27Utilities.ErrorHandler('No mexes in our starting pathing group detected. iPathingGroup=' .. iPathingGroup .. '; sPathing=' .. sPathing)
+            if bEnemyHasLandExperimental then
+                ForkThread(CoordinateLandExperimentals, aiBrain)
+            end
         end
-        local iAllUnclaimedMexesInPathingGroup = 0
+        --Coordinate novax
+        if M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then
+            local bEnemyHasAlmostCompleteArti = false
+            for iUnit, oUnit in aiBrain[reftEnemyArtiAndExpStructure] do
+                if oUnit:GetFractionComplete() >= 0.5 then
+                    bEnemyHasAlmostCompleteArti = true
+                end
+            end
+            if bEnemyHasAlmostCompleteArti then
+                ForkThread(CoordinateNovax, aiBrain)
+            end
 
-        local tAllUnclaimedMexesInPathingGroup = M27EngineerOverseer.GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, false, false, true)
-        if M27Utilities.IsTableEmpty(tAllUnclaimedMexesInPathingGroup) == false then
-            iAllUnclaimedMexesInPathingGroup = table.getn(tAllUnclaimedMexesInPathingGroup)
+            --Protect against arti - 1-off event to udpate shielding, and then flag going forwards to keep shields updated
+            if not (aiBrain[refbDefendAgainstArti]) then
+                local bWantToDefend = false
+                for iUnit, oUnit in aiBrain[reftEnemyArtiAndExpStructure] do
+                    if oUnit:GetFractionComplete() >= 0.2 then
+                        --Check it isnt a paragon or mavor (since no point shielding against either of these)
+                        if not (EntityCategoryContains(categories.EXPERIMENTAL * categories.MASSFABRICATION + categories.ARTILLERY * categories.STRUCTURE * categories.UEF * categories.EXPERIMENTAL, oUnit.UnitId)) then
+                            bWantToDefend = true
+                            break
+                        end
+                    end
+                end
+                if bWantToDefend then
+                    aiBrain[refbDefendAgainstArti] = true
+                    ForkThread(M27EngineerOverseer.UpdateShieldingToDefendAgainstArti, aiBrain)
+                end
+            end
         end
-        if bDebugMessages == true then
-            LOG(sFunctionRef .. ': About to get all mexes in pathing group that we havent claimed. iPathingGroup=' .. iPathingGroup)
-        end
-        --GetUnclaimedMexes(aiBrain, oPathingUnitBackup, sPathing, iPathingGroup, bTreatEnemyMexAsUnclaimed, bTreatOurOrAllyMexAsUnclaimed, bTreatQueuedBuildingAsUnclaimed)
-        local tAllMexesInPathingGroupWeHaventClaimed = M27EngineerOverseer.GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, true, false, true)
-        local iAllMexesInPathingGroupWeHaventClaimed = 0
-        if M27Utilities.IsTableEmpty(tAllMexesInPathingGroupWeHaventClaimed) == false then
-            iAllMexesInPathingGroupWeHaventClaimed = table.getn(tAllMexesInPathingGroupWeHaventClaimed)
-        end
-        aiBrain[refiUnclaimedMexesInBasePathingGroup] = iAllMexesInPathingGroupWeHaventClaimed
-        aiBrain[refiAllMexesInBasePathingGroup] = iAllMexesInPathingGroup
-
-
-        local iOurTeamsShareOfMexesOnMap = iAllMexesInPathingGroup / aiBrain[refiTeamsWithSameAmphibiousPathingGroup]
-        local iMexesInPathingGroupWeHaveClaimed = iAllMexesInPathingGroup - iAllMexesInPathingGroupWeHaventClaimed
-        if bDebugMessages == true then
-            LOG(sFunctionRef .. ': Pre determining grand strategy, iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed)
-        end
-
-        local tLandCombatUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandCombat, false, true)
-        local iLandCombatUnits = 0
-        if M27Utilities.IsTableEmpty(tLandCombatUnits) == false then
-            iLandCombatUnits = table.getn(tLandCombatUnits)
-        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished considering potential big threats. aiBrain[refbAreBigThreats]='..tostring(aiBrain[refbAreBigThreats])) end
 
 
 
-        --Our highest tech level
-        UpdateHighestFactoryTechTracker(aiBrain)
+        --[[bDebugMessages = true
+        if bDebugMessages == true then LOG(repru(ScenarioInfo)) end bDebugMessages = false--]]
 
-        --Want below variables for both the game state table and to decide whether to eco:
-        local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
-        local iT3Mexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex)
-        --=========DECIDE ON GRAND STRATEGY
-        --Get details on how close friendly units are to enemy
-        --(Want to run below regardless as we use the distance to base for other logic)
 
-        local tFriendlyLandCombat = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandCombat, false, true)
-        --M27Utilities.GetNearestUnit(tUnits, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
-        local oNearestFriendlyUnitToEnemyBase = M27Utilities.GetNearestUnit(tFriendlyLandCombat, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
-        local tFurthestFriendlyPosition = { 'nil' }
-        local iFurthestFriendlyDistToOurBase = 0
-        local iFurthestFriendlyDistToEnemyBase = 0
-        aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = 0.5
-        aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy] = 0.5
-        local tFriendlyLand = aiBrain:GetListOfUnits(categories.LAND + M27UnitInfo.refCategoryStructure - categories.BENIGN, false, true)
-        if oNearestFriendlyUnitToEnemyBase then
-            tFurthestFriendlyPosition = oNearestFriendlyUnitToEnemyBase:GetPosition()
-            iFurthestFriendlyDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-            iFurthestFriendlyDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-            aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
-        end
-        if M27Utilities.IsTableEmpty(tFriendlyLand) == false then
-            oNearestFriendlyUnitToEnemyBase = M27Utilities.GetNearestUnit(tFriendlyLand, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
+
+        if iCurCycleCount <= 0 then --runs once every 10 cycles (seconds)
+            --Update list of nearby enemies if any are dead
+            local bCheckBrains = true
+            local iCurCount = 0
+            local iMaxCount = 20
+
+            while bCheckBrains == true do
+                iCurCount = iCurCount + 1
+                if iCurCount > iMaxCount then
+                    M27Utilities.ErrorHandler('Infinite loop')
+                    break
+                end
+                bCheckBrains = false
+                for iArmyIndex, oBrain in tAllAIBrainsByArmyIndex do
+                    if oBrain:IsDefeated() or oBrain.M27IsDefeated then
+                        tAllAIBrainsByArmyIndex[iArmyIndex] = nil
+                        bCheckBrains = true
+                        break
+                    end
+                end
+            end
+
+            ForkThread(M27Team.UpdateTeamDataForEnemyUnits, aiBrain) --Currently updates number of wall units but could add other logic to this
+
+            --Below should be updated as part of the SetWhetherCanPathToEnemy function in M27MapInfo now
+            --[[local iNearestEnemyArmyIndex = M27Logic.GetNearestEnemyIndex(aiBrain)
+            if not(iNearestEnemyArmyIndex == iPreviousNearestEnemyIndex) then
+                aiBrain[refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(iNearestEnemyArmyIndex)])
+                ForkThread(M27Logic.DetermineEnemyScoutSpeed, aiBrain)
+            end
+            iPreviousNearestEnemyIndex = iNearestEnemyArmyIndex--]]
+
+            ForkThread(M27MapInfo.UpdateReclaimMarkers)
+
+            ForkThread(M27AirOverseer.UpdateMexScoutingPriorities, aiBrain)
+
+            SetMaximumFactoryLevels(aiBrain)
+
+            --Consider if should update enemy start location
+            ForkThread(M27MapInfo.UpdateNewPrimaryBaseLocation, aiBrain)
+
+            ForkThread(CheckUnitCap, aiBrain)
+
+
+
+
+
+            --STATE OF GAME LOG BELOW------------------
+
+            --Check if we need to refresh our mass income
+            local bTimeForLongRefresh = false
+            local iCurTime = math.floor(GetGameTimeSeconds())
+            --if iCurTime >= 913 then M27Utilities.bGlobalDebugOverride = true end --use this if e.g. come across a hard crash and want to figure out what's causing it; will cause every log to be enabled so will take a long time to just run 1s of game time
+            if aiBrain[refiTimeOfLastMexIncomeCheck] == nil then
+                bTimeForLongRefresh = true
+            elseif iCurTime - aiBrain[refiTimeOfLastMexIncomeCheck] >= iLongTermMassIncomeChangeInterval then
+                bTimeForLongRefresh = true
+            end
+            local iMassAtLeast3mAgo = aiBrain[reftiMexIncomePrevCheck][2]
+            if iMassAtLeast3mAgo == nil then
+                iMassAtLeast3mAgo = 0
+            end
+            if bTimeForLongRefresh == true then
+                table.insert(aiBrain[reftiMexIncomePrevCheck], 1, aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome])
+                aiBrain[refiTimeOfLastMexIncomeCheck] = iCurTime
+            end
+
+
+            --Values which want to know even if logs not enabled
+            --Get unclaimed mex figures
+            local oACU = M27Utilities.GetACU(aiBrain)
+            local sPathing = M27UnitInfo.refPathingTypeAmphibious
+            local iFaction = aiBrain:GetFactionIndex()
+
+            if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false and aiBrain[refiOurHighestLandFactoryTech] == 1 and not (iFaction == M27UnitInfo.refFactionSeraphim or iFaction == M27UnitInfo.refFactionAeon) then
+                sPathing = M27UnitInfo.refPathingTypeLand
+            end
+
+
+            --GetSegmentGroupOfTarget(sPathing, iTargetSegmentX, iTargetSegmentZ)
+            local iPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            local iAllMexesInPathingGroup = 0
+            if M27Utilities.IsTableEmpty(M27MapInfo.tMexByPathingAndGrouping[sPathing][iPathingGroup]) == false then
+                iAllMexesInPathingGroup = table.getn(M27MapInfo.tMexByPathingAndGrouping[sPathing][iPathingGroup])
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': iAllMexesInPathingGroup=' .. iAllMexesInPathingGroup .. '; full list of mexes for all pathing=' .. repru(M27MapInfo.tMexByPathingAndGrouping))
+                end
+            elseif bDebugMessages == true then
+                M27Utilities.ErrorHandler('No mexes in our starting pathing group detected. iPathingGroup=' .. iPathingGroup .. '; sPathing=' .. sPathing)
+            end
+            local iAllUnclaimedMexesInPathingGroup = 0
+
+            local tAllUnclaimedMexesInPathingGroup = M27EngineerOverseer.GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, false, false, true)
+            if M27Utilities.IsTableEmpty(tAllUnclaimedMexesInPathingGroup) == false then
+                iAllUnclaimedMexesInPathingGroup = table.getn(tAllUnclaimedMexesInPathingGroup)
+            end
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': About to get all mexes in pathing group that we havent claimed. iPathingGroup=' .. iPathingGroup)
+            end
+            --GetUnclaimedMexes(aiBrain, oPathingUnitBackup, sPathing, iPathingGroup, bTreatEnemyMexAsUnclaimed, bTreatOurOrAllyMexAsUnclaimed, bTreatQueuedBuildingAsUnclaimed)
+            local tAllMexesInPathingGroupWeHaventClaimed = M27EngineerOverseer.GetUnclaimedMexes(aiBrain, sPathing, iPathingGroup, true, false, true)
+            local iAllMexesInPathingGroupWeHaventClaimed = 0
+            if M27Utilities.IsTableEmpty(tAllMexesInPathingGroupWeHaventClaimed) == false then
+                iAllMexesInPathingGroupWeHaventClaimed = table.getn(tAllMexesInPathingGroupWeHaventClaimed)
+            end
+            aiBrain[refiUnclaimedMexesInBasePathingGroup] = iAllMexesInPathingGroupWeHaventClaimed
+            aiBrain[refiAllMexesInBasePathingGroup] = iAllMexesInPathingGroup
+
+
+            local iOurTeamsShareOfMexesOnMap = iAllMexesInPathingGroup / aiBrain[refiTeamsWithSameAmphibiousPathingGroup]
+            local iMexesInPathingGroupWeHaveClaimed = iAllMexesInPathingGroup - iAllMexesInPathingGroupWeHaventClaimed
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': Pre determining grand strategy, iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed)
+            end
+
+            local tLandCombatUnits = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandCombat, false, true)
+            local iLandCombatUnits = 0
+            if M27Utilities.IsTableEmpty(tLandCombatUnits) == false then
+                iLandCombatUnits = table.getn(tLandCombatUnits)
+            end
+
+
+
+            --Our highest tech level
+            UpdateHighestFactoryTechTracker(aiBrain)
+
+            --Want below variables for both the game state table and to decide whether to eco:
+            local iMexesNearStart = table.getn(M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1])
+            local iT3Mexes = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryT3Mex)
+            --=========DECIDE ON GRAND STRATEGY
+            --Get details on how close friendly units are to enemy
+            --(Want to run below regardless as we use the distance to base for other logic)
+
+            local tFriendlyLandCombat = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandCombat, false, true)
+            --M27Utilities.GetNearestUnit(tUnits, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
+            local oNearestFriendlyUnitToEnemyBase = M27Utilities.GetNearestUnit(tFriendlyLandCombat, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
+            local tFurthestFriendlyPosition = { 'nil' }
+            local iFurthestFriendlyDistToOurBase = 0
+            local iFurthestFriendlyDistToEnemyBase = 0
+            aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = 0.5
+            aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy] = 0.5
+            local tFriendlyLand = aiBrain:GetListOfUnits(categories.LAND + M27UnitInfo.refCategoryStructure - categories.BENIGN, false, true)
             if oNearestFriendlyUnitToEnemyBase then
                 tFurthestFriendlyPosition = oNearestFriendlyUnitToEnemyBase:GetPosition()
                 iFurthestFriendlyDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 iFurthestFriendlyDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
+                aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
             end
-        end
-        local iPrevStrategy = aiBrain[refiAIBrainCurrentStrategy]
-        local bChokepointsAreProtected = M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)
-        --Are we in ACU kill mode and want to stay in it (determined b y ACU manager)?
-        if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and not (aiBrain[refbStopACUKillStrategy]) then
-            --set as part of ACU manager
-            --Stick with this strategy
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Are in ACU kill mode and dont want to stop so wont change strategy')
-            end
-        else
-            if iPrevStrategy == refStrategyACUKill then
-                aiBrain[refiAIBrainCurrentStrategy] = aiBrain[refiDefaultStrategy]
-                if M27Utilities.GetACU(aiBrain).PlatoonHandle then
-                    --We were trying to kill their ACU but aren't now - replace ACU's current movement destination with a new one
-                    ForkThread(M27PlatoonUtilities.GetNewMovementPath, M27Utilities.GetACU(aiBrain).PlatoonHandle, true)
+            if M27Utilities.IsTableEmpty(tFriendlyLand) == false then
+                oNearestFriendlyUnitToEnemyBase = M27Utilities.GetNearestUnit(tFriendlyLand, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain, false)
+                if oNearestFriendlyUnitToEnemyBase then
+                    tFurthestFriendlyPosition = oNearestFriendlyUnitToEnemyBase:GetPosition()
+                    iFurthestFriendlyDistToOurBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                    iFurthestFriendlyDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(tFurthestFriendlyPosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                    aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy] = iFurthestFriendlyDistToOurBase / (iFurthestFriendlyDistToOurBase + iFurthestFriendlyDistToEnemyBase)
                 end
             end
+            local iPrevStrategy = aiBrain[refiAIBrainCurrentStrategy]
+            local bChokepointsAreProtected = M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)
+            --Are we in ACU kill mode and want to stay in it (determined b y ACU manager)?
+            if aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill and not (aiBrain[refbStopACUKillStrategy]) then
+                --set as part of ACU manager
+                --Stick with this strategy
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Are in ACU kill mode and dont want to stop so wont change strategy')
+                end
+            else
+                if iPrevStrategy == refStrategyACUKill then
+                    aiBrain[refiAIBrainCurrentStrategy] = aiBrain[refiDefaultStrategy]
+                    if M27Utilities.GetACU(aiBrain).PlatoonHandle then
+                        --We were trying to kill their ACU but aren't now - replace ACU's current movement destination with a new one
+                        ForkThread(M27PlatoonUtilities.GetNewMovementPath, M27Utilities.GetACU(aiBrain).PlatoonHandle, true)
+                    end
+                end
 
-            --Should we be in air dominance mode?
-            local bWantAirDominance = false
-            --Have we recently scouted the enemy base?
-            local iBaseScoutingTime = 30
-            local iEnemyGroundAAFactor = 0.1
-            if aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
-                iBaseScoutingTime = aiBrain[M27AirOverseer.refiIntervalEnemyBase] + 60
-                iEnemyGroundAAFactor = 0.2
-            end
-            --Tripple groundAA needed if we have strats and enemy doesnt have AirAA
-            if not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA]) and aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 2 then
-                iEnemyGroundAAFactor = iEnemyGroundAAFactor * 2
-            end
-            --local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-            local bEnemyHasEnoughAA = false
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': iBaseScoutingTime=' .. iBaseScoutingTime .. '; CurTime=' .. GetGameTimeSeconds() .. '; Time last scouted enemy base=' .. M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)))
-            end
-            if math.max(iBaseScoutingTime + 30 - GetGameTimeSeconds(),0) + M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= iBaseScoutingTime then
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Time since last scouted enemy base=' .. M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) .. '; Scouting interval=' .. iBaseScoutingTime .. '; therefore considering whether to switch to air dominance')
+                --Should we be in air dominance mode?
+                local bWantAirDominance = false
+                --Have we recently scouted the enemy base?
+                local iBaseScoutingTime = 30
+                local iEnemyGroundAAFactor = 0.1
+                if aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
+                    iBaseScoutingTime = aiBrain[M27AirOverseer.refiIntervalEnemyBase] + 60
+                    iEnemyGroundAAFactor = 0.2
                 end
-                --Have we either had no bombers die, or the last bomber was effective?
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Is table of bomber effectiveness empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.refbBombersAreEffective])) .. '; Effectiveness of our highest air factory tech=' .. tostring(aiBrain[M27AirOverseer.refbBombersAreEffective][aiBrain[refiOurHighestAirFactoryTech]] or false))
+                --Tripple groundAA needed if we have strats and enemy doesnt have AirAA
+                if not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA]) and aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 2 then
+                    iEnemyGroundAAFactor = iEnemyGroundAAFactor * 2
                 end
-                if not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.refbBombersAreEffective]) == true or aiBrain[M27AirOverseer.refbBombersAreEffective][aiBrain[refiOurHighestAirFactoryTech]] == false) then
+                --local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                local bEnemyHasEnoughAA = false
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': iBaseScoutingTime=' .. iBaseScoutingTime .. '; CurTime=' .. GetGameTimeSeconds() .. '; Time last scouted enemy base=' .. M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)))
+                end
+                if math.max(iBaseScoutingTime + 30 - GetGameTimeSeconds(),0) + M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) <= iBaseScoutingTime then
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Bombers have been ineffective at our current tech level so wont try air dominance')
+                        LOG(sFunctionRef .. ': Time since last scouted enemy base=' .. M27AirOverseer.GetTimeSinceLastScoutedLocation(aiBrain, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) .. '; Scouting interval=' .. iBaseScoutingTime .. '; therefore considering whether to switch to air dominance')
+                    end
+                    --Have we either had no bombers die, or the last bomber was effective?
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Is table of bomber effectiveness empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.refbBombersAreEffective])) .. '; Effectiveness of our highest air factory tech=' .. tostring(aiBrain[M27AirOverseer.refbBombersAreEffective][aiBrain[refiOurHighestAirFactoryTech]] or false))
+                    end
+                    if not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.refbBombersAreEffective]) == true or aiBrain[M27AirOverseer.refbBombersAreEffective][aiBrain[refiOurHighestAirFactoryTech]] == false) then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Bombers have been ineffective at our current tech level so wont try air dominance')
+                        end
+                        bEnemyHasEnoughAA = true
+                    else
+                        if GetGameTimeSeconds() <= 360 then
+                            --first 6m of game - do they have any air at all?
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Enemy highest air threat=' .. (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] or 'nil'))
+                            end
+                            if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Enemy has air units so as early in game dont want air dominance')
+                                end
+                                bEnemyHasEnoughAA = true
+                            end
+                        else
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Enemy ever air AA threat=' .. aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat]..'; Cur airaa threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat] .. '; our air threat=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl]))
+                            end
+                            if aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA] and not(aiBrain[M27AirOverseer.refbHaveAirControl] and aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] <= 3000 and aiBrain[M27AirOverseer.refiEnemyAirAAThreat] / 0.7 < aiBrain[M27AirOverseer.refiOurMassInAirAA]) then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Dont want to go for air dominance due to enemy highest ever air threat being >75% of ours')
+                                end
+                                bEnemyHasEnoughAA = true
+                            elseif not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Dont want air dominance as still need airAA')
+                                end
+                                bEnemyHasEnoughAA = true
+                            end
+                        end
+                        if bEnemyHasEnoughAA == false then
+                            --Do we have bombers?
+                            local tBombers = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryBomber, false, true)
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Enemy doesnt have enough AA, will check we have some bombers alive')
+                            end
+                            if M27Utilities.IsTableEmpty(tBombers) == true then
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': We dont have any bombers, so dont switch to air dominance yet')
+                                end
+                                bEnemyHasEnoughAA = true
+                            else
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Enemy mass in ground AA=' .. (aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] or 'nil') .. '; table size of bombers=' .. table.getn(tBombers) .. '; Threat of bombers=' .. M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false))
+                                end
+                                --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
+                                if aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] > 0 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] * 10 > M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false) then
+                                    --Further override - if have 3+ strats, and enemy has no cruisers or T3+ AA, then do air dom mode
+                                    bEnemyHasEnoughAA = true
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': aiBrain[M27AirOverseer.refiPreviousAvailableBombers=' .. aiBrain[M27AirOverseer.refiPreviousAvailableBombers] .. '; M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers])) .. '; size of tBombers=' .. table.getn(tBombers))
+                                    end
+                                    if aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] <= 6000 and aiBrain[M27AirOverseer.refiPreviousAvailableBombers] >= 3 and M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then
+                                        local tT3PlusBombers = EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, tBombers)
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Is table of T3PlusBombers empty=' .. tostring(M27Utilities.IsTableEmpty(tT3PlusBombers)) .. '; refiPreviousAvailableBombers=' .. aiBrain[M27AirOverseer.refiPreviousAvailableBombers] .. '; Availalbe bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers])))
+                                        end
+                                        if M27Utilities.IsTableEmpty(tT3PlusBombers) == false and table.getn(tT3PlusBombers) >= 2 then
+                                            local tEnemyT3PlusAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiserCarrier + M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiDistanceToNearestEnemyBase] + 40, 'Enemy')
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': Is table of Enemy T3PlusAA empty=' .. tostring(M27Utilities.IsTableEmpty(tEnemyT3PlusAA)))
+                                            end
+                                            if M27Utilities.IsTableEmpty(tEnemyT3PlusAA) then
+                                                bEnemyHasEnoughAA = false
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                else
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Havent scouted enemy base recently so assuming they have some AA there')
                     end
                     bEnemyHasEnoughAA = true
-                else
-                    if GetGameTimeSeconds() <= 360 then
-                        --first 6m of game - do they have any air at all?
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Enemy highest air threat=' .. (aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] or 'nil'))
-                        end
-                        if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 then
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Enemy has air units so as early in game dont want air dominance')
-                            end
-                            bEnemyHasEnoughAA = true
-                        end
-                    else
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Enemy ever air AA threat=' .. aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat]..'; Cur airaa threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat] .. '; our air threat=' .. aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl]))
-                        end
-                        if aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] / 0.7 > aiBrain[M27AirOverseer.refiOurMassInAirAA] and not(aiBrain[M27AirOverseer.refbHaveAirControl] and aiBrain[M27AirOverseer.refiHighestEverEnemyAirAAThreat] <= 3000 and aiBrain[M27AirOverseer.refiEnemyAirAAThreat] / 0.7 < aiBrain[M27AirOverseer.refiOurMassInAirAA]) then
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Dont want to go for air dominance due to enemy highest ever air threat being >75% of ours')
-                            end
-                            bEnemyHasEnoughAA = true
-                        elseif not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Dont want air dominance as still need airAA')
-                            end
-                            bEnemyHasEnoughAA = true
-                        end
-                    end
-                    if bEnemyHasEnoughAA == false then
-                        --Do we have bombers?
-                        local tBombers = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryBomber, false, true)
-                        if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': Enemy doesnt have enough AA, will check we have some bombers alive')
-                        end
-                        if M27Utilities.IsTableEmpty(tBombers) == true then
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': We dont have any bombers, so dont switch to air dominance yet')
-                            end
-                            bEnemyHasEnoughAA = true
-                        else
-                            if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Enemy mass in ground AA=' .. (aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] or 'nil') .. '; table size of bombers=' .. table.getn(tBombers) .. '; Threat of bombers=' .. M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false))
-                            end
-                            --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
-                            if aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] > 0 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] * 10 > M27Logic.GetAirThreatLevel(aiBrain, tBombers, false, false, false, true, false, nil, nil, nil, nil, false) then
-                                --Further override - if have 3+ strats, and enemy has no cruisers or T3+ AA, then do air dom mode
-                                bEnemyHasEnoughAA = true
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': aiBrain[M27AirOverseer.refiPreviousAvailableBombers=' .. aiBrain[M27AirOverseer.refiPreviousAvailableBombers] .. '; M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers])) .. '; size of tBombers=' .. table.getn(tBombers))
-                                end
-                                if aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain[M27AirOverseer.refiEnemyMassInGroundAA] <= 6000 and aiBrain[M27AirOverseer.refiPreviousAvailableBombers] >= 3 and M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then
-                                    local tT3PlusBombers = EntityCategoryFilterDown(categories.TECH3 + categories.EXPERIMENTAL, tBombers)
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Is table of T3PlusBombers empty=' .. tostring(M27Utilities.IsTableEmpty(tT3PlusBombers)) .. '; refiPreviousAvailableBombers=' .. aiBrain[M27AirOverseer.refiPreviousAvailableBombers] .. '; Availalbe bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers])))
-                                    end
-                                    if M27Utilities.IsTableEmpty(tT3PlusBombers) == false and table.getn(tT3PlusBombers) >= 2 then
-                                        local tEnemyT3PlusAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryCruiserCarrier + M27UnitInfo.refCategoryGroundAA * categories.TECH3, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[refiDistanceToNearestEnemyBase] + 40, 'Enemy')
-                                        if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Is table of Enemy T3PlusAA empty=' .. tostring(M27Utilities.IsTableEmpty(tEnemyT3PlusAA)))
-                                        end
-                                        if M27Utilities.IsTableEmpty(tEnemyT3PlusAA) then
-                                            bEnemyHasEnoughAA = false
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
                 end
-            else
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Havent scouted enemy base recently so assuming they have some AA there')
-                end
-                bEnemyHasEnoughAA = true
-            end
 
-            if bEnemyHasEnoughAA == false then
-                --Does enemy have ground AA that is shielded?
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Enemy doesnt have enough AA, checking if they have any AA that is under fixed shields. aiBrain[refiOurHighestAirFactoryTech]=' .. aiBrain[refiOurHighestAirFactoryTech])
-                end
-                local tEnemyFixedShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
-                local bHaveAAUnderShield = false
-                local iAACategoryToSearchFor
-                if aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 2 then
+                if bEnemyHasEnoughAA == false then
+                    --Does enemy have ground AA that is shielded?
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Have at least 2 T3 bombers so will search only for T3 AA and cruisers')
+                        LOG(sFunctionRef .. ': Enemy doesnt have enough AA, checking if they have any AA that is under fixed shields. aiBrain[refiOurHighestAirFactoryTech]=' .. aiBrain[refiOurHighestAirFactoryTech])
                     end
-                    iAACategoryToSearchFor = M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiserCarrier
-                else
-                    iAACategoryToSearchFor = M27UnitInfo.refCategoryGroundAA + M27UnitInfo.refCategoryCruiserCarrier
-                end
-                if M27Utilities.IsTableEmpty(tEnemyFixedShields) == false then
-                    local tNearbyGroundAA, iShieldRadius
-                    for iShield, oShield in tEnemyFixedShields do
-                        if M27UnitInfo.IsUnitValid(oShield) then
-                            tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(iAACategoryToSearchFor, oShield:GetPosition(), oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5 + 1, 'Enemy')
-                            if M27Utilities.IsTableEmpty(tNearbyGroundAA) == false then
-                                for iGroundAA, oGroundAA in tNearbyGroundAA do
-                                    if M27UnitInfo.IsUnitValid(oGroundAA) then
-                                        bHaveAAUnderShield = true
-                                        break
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': bHaveAAUnderShield=' .. tostring(bHaveAAUnderShield))
-                end
-                if bHaveAAUnderShield == false then
-                    bWantAirDominance = true
-                end
-            elseif bDebugMessages == true then
-                LOG(sFunctionRef .. ': Enemy has enough AA or we have too few bombers so wont switch to air dominance')
-            end
-
-            if bWantAirDominance == true then
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Setting strategy as air dominance')
-                end
-                aiBrain[refiAIBrainCurrentStrategy] = refStrategyAirDominance
-            else
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Dont want air dom strategy so will consider alternatives')
-                end
-                --Are we protecting the ACU? If so then stay in this mode unless we think ACU is safe
-                local bKeepProtectingACU = false
-                if aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
-                    bKeepProtectingACU = true
-                    local oACU = M27Utilities.GetACU(aiBrain)
-                    if M27Utilities.IsACU(oACU) == false then
-                        bKeepProtectingACU = false
-                    else
-                        --Stop protecting ACU if it has gun upgrade and ok health, or isnt upgrading and has good health, or is near our base
-                        bKeepProtectingACU = not (M27Conditions.CanWeStopProtectingACU(aiBrain, oACU))
+                    local tEnemyFixedShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
+                    local bHaveAAUnderShield = false
+                    local iAACategoryToSearchFor
+                    if aiBrain[refiOurHighestAirFactoryTech] >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 2 then
                         if bDebugMessages == true then
-                            LOG(sFunctionRef .. ': In protect ACU mode, bKeepProtectingACU=' .. tostring(bKeepProtectingACU))
+                            LOG(sFunctionRef .. ': Have at least 2 T3 bombers so will search only for T3 AA and cruisers')
                         end
+                        iAACategoryToSearchFor = M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiserCarrier
+                    else
+                        iAACategoryToSearchFor = M27UnitInfo.refCategoryGroundAA + M27UnitInfo.refCategoryCruiserCarrier
                     end
-                end
-
-                --Should we switch to eco?
-
-
-                if M27MapInfo.bNoRushActive and M27MapInfo.iNoRushTimer - GetGameTimeSeconds() >= 60 then
-                    aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
-                else
-                    if bKeepProtectingACU == false then
-                        if aiBrain[refiDefaultStrategy] == refStrategyTurtle then
-                            aiBrain[refiAIBrainCurrentStrategy] = refStrategyTurtle
-                        else
-                            local bWantToEco = false
-                            --Dont eco if nearby naval threat
-                            if not(aiBrain[refbT2NavyNearOurBase]) then
-
-
-
-                                --How far away is the enemy?
-                                local bBigEnemyThreat = false
-                                if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then
-                                    bBigEnemyThreat = true
-                                end
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs])..'; ACU health 1s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1]..'; ACU health 11s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]..'; Are all chokepoitns covered='..tostring(M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)))
-                                end
-
-
-
-
-                                --Do we have teammates who are all closer to the nearest enemy than us?
-                                local bAlliesAreCloserToEnemy = false
-                                if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
-                                    local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
-                                    for iBrain, oBrain in aiBrain[toAllyBrains] do
-                                        if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], tEnemyBase) + 50 < aiBrain[refiDistanceToNearestEnemyBase] then
-                                            bAlliesAreCloserToEnemy = true
+                    if M27Utilities.IsTableEmpty(tEnemyFixedShields) == false then
+                        local tNearbyGroundAA, iShieldRadius
+                        for iShield, oShield in tEnemyFixedShields do
+                            if M27UnitInfo.IsUnitValid(oShield) then
+                                tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(iAACategoryToSearchFor, oShield:GetPosition(), oShield:GetBlueprint().Defense.Shield.ShieldSize * 0.5 + 1, 'Enemy')
+                                if M27Utilities.IsTableEmpty(tNearbyGroundAA) == false then
+                                    for iGroundAA, oGroundAA in tNearbyGroundAA do
+                                        if M27UnitInfo.IsUnitValid(oGroundAA) then
+                                            bHaveAAUnderShield = true
                                             break
                                         end
                                     end
                                 end
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': bHaveAAUnderShield=' .. tostring(bHaveAAUnderShield))
+                    end
+                    if bHaveAAUnderShield == false then
+                        bWantAirDominance = true
+                    end
+                elseif bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Enemy has enough AA or we have too few bombers so wont switch to air dominance')
+                end
+
+                if bWantAirDominance == true then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Setting strategy as air dominance')
+                    end
+                    aiBrain[refiAIBrainCurrentStrategy] = refStrategyAirDominance
+                else
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Dont want air dom strategy so will consider alternatives')
+                    end
+                    --Are we protecting the ACU? If so then stay in this mode unless we think ACU is safe
+                    local bKeepProtectingACU = false
+                    if aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU then
+                        bKeepProtectingACU = true
+                        local oACU = M27Utilities.GetACU(aiBrain)
+                        if M27Utilities.IsACU(oACU) == false then
+                            bKeepProtectingACU = false
+                        else
+                            --Stop protecting ACU if it has gun upgrade and ok health, or isnt upgrading and has good health, or is near our base
+                            bKeepProtectingACU = not (M27Conditions.CanWeStopProtectingACU(aiBrain, oACU))
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': In protect ACU mode, bKeepProtectingACU=' .. tostring(bKeepProtectingACU))
+                            end
+                        end
+                    end
+
+                    --Should we switch to eco?
+
+
+                    if M27MapInfo.bNoRushActive and M27MapInfo.iNoRushTimer - GetGameTimeSeconds() >= 60 then
+                        aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
+                    else
+                        if bKeepProtectingACU == false then
+                            if aiBrain[refiDefaultStrategy] == refStrategyTurtle then
+                                aiBrain[refiAIBrainCurrentStrategy] = refStrategyTurtle
+                            else
+                                local bWantToEco = false
+                                --Dont eco if nearby naval threat
+                                if not(aiBrain[refbT2NavyNearOurBase]) then
 
 
 
-                                --Dont eco if enemy ACU near ours as likely will need backup, unless we are on a chokepoint map and our ACU hasnt taken any damage recently (or if it has, it's less than 5 per sec)
-                                if aiBrain[refbEnemyACUNearOurs] == false or (bChokepointsAreProtected and M27Utilities.GetACU(aiBrain):GetHealth() >= 7000 and (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 or (oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or 0) + 50 >= oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]))  then
-                                    if bChokepointsAreProtected then
-                                        bWantToEco = true
-                                    elseif bAlliesAreCloserToEnemy then
-                                        bWantToEco = true
-                                    else
-                                        if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
-                                            if aiBrain[refiPercentageOutstandingThreat] > 0.55 and (bBigEnemyThreat == false or aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.5) and (iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.8 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not (iT3Mexes >= math.min(iMexesNearStart, 7) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': No big enemy threats and good defence and mex coverage so will eco')
-                                                end
-                                                bWantToEco = true
-                                            else
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': Dont want to eco based on initial tests: bBigEnemyThreat=' .. tostring(bBigEnemyThreat) .. '; %threat=' .. aiBrain[refiPercentageOutstandingThreat] .. '; UnclaimedMex%=' .. iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup .. '; EnemyDist=' .. aiBrain[refiDistanceToNearestEnemyBase])
-                                                end
-                                                --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
-                                                if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
+                                    --How far away is the enemy?
+                                    local bBigEnemyThreat = false
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftEnemyLandExperimentals]) == false or M27Utilities.IsTableEmpty(aiBrain[reftEnemyArtiAndExpStructure]) == false then
+                                        bBigEnemyThreat = true
+                                    end
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs])..'; ACU health 1s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1]..'; ACU health 11s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]..'; Are all chokepoitns covered='..tostring(M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)))
+                                    end
+
+
+
+
+                                    --Do we have teammates who are all closer to the nearest enemy than us?
+                                    local bAlliesAreCloserToEnemy = false
+                                    if M27Utilities.IsTableEmpty(aiBrain[toAllyBrains]) == false then
+                                        local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
+                                        for iBrain, oBrain in aiBrain[toAllyBrains] do
+                                            if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], tEnemyBase) + 50 < aiBrain[refiDistanceToNearestEnemyBase] then
+                                                bAlliesAreCloserToEnemy = true
+                                                break
+                                            end
+                                        end
+                                    end
+
+
+
+                                    --Dont eco if enemy ACU near ours as likely will need backup, unless we are on a chokepoint map and our ACU hasnt taken any damage recently (or if it has, it's less than 5 per sec)
+                                    if aiBrain[refbEnemyACUNearOurs] == false or (bChokepointsAreProtected and M27Utilities.GetACU(aiBrain):GetHealth() >= 7000 and (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.8 or (oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or 0) + 50 >= oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]))  then
+                                        if bChokepointsAreProtected then
+                                            bWantToEco = true
+                                        elseif bAlliesAreCloserToEnemy then
+                                            bWantToEco = true
+                                        else
+                                            if aiBrain[M27EconomyOverseer.refiMexesAvailableForUpgrade] > 0 and aiBrain:GetEconomyStoredRatio('MASS') < 0.9 and aiBrain:GetEconomyStoredRatio('MASS') < 12000 then
+                                                if aiBrain[refiPercentageOutstandingThreat] > 0.55 and (bBigEnemyThreat == false or aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.5) and (iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.8 or aiBrain[refiDistanceToNearestEnemyBase] >= iDistanceToEnemyEcoThreshold) and not (iT3Mexes >= math.min(iMexesNearStart, 7) and aiBrain[refiOurHighestFactoryTechLevel] >= 3) then
                                                     if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Ok defence coverage and income not changed in a while so will eco')
+                                                        LOG(sFunctionRef .. ': No big enemy threats and good defence and mex coverage so will eco')
                                                     end
                                                     bWantToEco = true
                                                 else
                                                     if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Checking if we are making use of tanks - if not then will switch to eco if have a decent number of tanks. aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]=' .. tostring(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]))
+                                                        LOG(sFunctionRef .. ': Dont want to eco based on initial tests: bBigEnemyThreat=' .. tostring(bBigEnemyThreat) .. '; %threat=' .. aiBrain[refiPercentageOutstandingThreat] .. '; UnclaimedMex%=' .. iAllMexesInPathingGroupWeHaventClaimed / iAllMexesInPathingGroup .. '; EnemyDist=' .. aiBrain[refiDistanceToNearestEnemyBase])
                                                     end
-                                                    if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
-                                                        --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
-                                                        local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
+                                                    --Has our mass income not changed recently, but we dont appear to be losing significantly on the battlefield?
+                                                    if iCurTime > 100 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo < 1 and aiBrain[refiPercentageOutstandingThreat] > 0.55 and iLandCombatUnits >= 30 then
                                                         if bDebugMessages == true then
-                                                            LOG(sFunctionRef .. ': iMinTanksWanted=' .. iMinTanksWanted .. '; iLandCombatUnits=' .. iLandCombatUnits)
+                                                            LOG(sFunctionRef .. ': Ok defence coverage and income not changed in a while so will eco')
                                                         end
-                                                        if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
+                                                        bWantToEco = true
+                                                    else
+                                                        if bDebugMessages == true then
+                                                            LOG(sFunctionRef .. ': Checking if we are making use of tanks - if not then will switch to eco if have a decent number of tanks. aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]=' .. tostring(aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons]))
+                                                        end
+                                                        if aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] == false then
+                                                            --Are sending tanks into an attacknearest platoon so want to eco if we have a significant number of tanks, unless enemy has a big threat
+                                                            local iMinTanksWanted = math.max(8, 2 * (iAllMexesInPathingGroupWeHaventClaimed - iAllMexesInPathingGroup * 0.6))
                                                             if bDebugMessages == true then
-                                                                LOG(sFunctionRef .. ': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco')
+                                                                LOG(sFunctionRef .. ': iMinTanksWanted=' .. iMinTanksWanted .. '; iLandCombatUnits=' .. iLandCombatUnits)
                                                             end
-                                                            bWantToEco = true
+                                                            if iLandCombatUnits >= iMinTanksWanted and aiBrain[refiOurHighestFactoryTechLevel] <= 2 and aiBrain[refiModDistFromStartNearestThreat] > aiBrain[refiDistanceToNearestEnemyBase] * 0.4 and aiBrain[refiPercentageOutstandingThreat] > 0.5 then
+                                                                if bDebugMessages == true then
+                                                                    LOG(sFunctionRef .. ': Dont have tech 3 and/or have 2 combat land units for each unclaimed mex on our side of the map with no big threats and not making use of land factories so will eco')
+                                                                end
+                                                                bWantToEco = true
+                                                            end
                                                         end
                                                     end
                                                 end
                                             end
                                         end
                                     end
-                                end
-                                --Eco even if enemy has big threats if we cant path to enemy base with amphibious and we have all mexes in our pathing group
-                                if not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and iAllMexesInPathingGroupWeHaventClaimed == 0 and aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.3 then
-                                    if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Want to eco as we cant reach enemy base except by air and we have all mexes in our pathing group')
-                                    end
-                                    bWantToEco = true
-                                end
-
-                                if bChokepointsAreProtected then
-                                    --Eco if chokepoint is fine, unless enemies are nearby
-                                    if bDebugMessages == true then LOG(sFunctionRef..': CHokepoitns are protected, will eco unless mod dist is too close. Mod dist of nearest threat='..aiBrain[refiModDistFromStartNearestThreat]..'; Dist threshold='..math.min(150, aiBrain[refiDistanceToNearestEnemyBase] * 0.35)) end
-                                    if aiBrain[refiModDistFromStartNearestThreat] >= math.min(150, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) then
+                                    --Eco even if enemy has big threats if we cant path to enemy base with amphibious and we have all mexes in our pathing group
+                                    if not (aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious]) and iAllMexesInPathingGroupWeHaventClaimed == 0 and aiBrain[refiModDistFromStartNearestThreat] >= aiBrain[refiDistanceToNearestEnemyBase] * 0.3 then
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Want to eco as we cant reach enemy base except by air and we have all mexes in our pathing group')
+                                        end
                                         bWantToEco = true
                                     end
-                                end
-                                if bWantToEco == true then
-                                    if not (bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
-                                        bWantToEco = false
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Chokepoints arent protected, can path to enemy base with land, and dont have friendly units on enemy side of map') end
-                                        --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
-                                    elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] and (not(bChokepointsAreProtected) or (aiBrain[refiModDistFromStartNearestThreat] <= aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance] and M27UnitInfo.IsUnitValid(aiBrain[refoNearestThreat]) and M27Utilities.GetDistanceBetweenPositions(aiBrain[refoNearestThreat]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(150, aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]))) then
-                                        bWantToEco = false
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Bomber defence restricted by AA so will stop ecoing. aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]..'; Bomber def range='..aiBrain[M27AirOverseer.refiBomberDefenceModDistance]) end
-                                        --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
-                                    elseif M27UnitInfo.GetUnitHealthPercent(oACU) < 0.45 and (M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 125 or oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0) then
-                                        bWantToEco = false
-                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU is low health and has nearby enemies so wont eco') end
-                                        --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
-                                    elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
-                                        bWantToEco = false
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Our ACU is near enemy base') end
-                                    elseif not(bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
-                                        --Does the enemy have more mobile threat than us and our allies, and we have < 65% mex control, and have gained income recently
-                                        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo >= 1 then
-                                            local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])
-                                            local tAllThreatUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryShortRangeMobile, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Ally')
 
-                                            --For performance reasons will just get mass cost total
-                                            local iCurMassTotal = 0
-                                            if M27Utilities.IsTableEmpty(tAllThreatUnits) == false then
-                                                for iUnit, oUnit in tAllThreatUnits do
-                                                    iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
-                                                end
-                                            end
-                                            if iCurMassTotal < aiBrain[refiTotalEnemyShortRangeThreat] then
-                                                bWantToEco = false
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Enemy has significant mobile threat and we are behind on eco and have just gained some eco, so want to try and build more units to regain map control') end
-                                            end
-                                            if bDebugMessages == true then LOG(sFunctionRef..': iCurMassTotal of our and ally shortrange threat='..iCurMassTotal..'; Enemy short range threat='..aiBrain[refiTotalEnemyShortRangeThreat]..'; bWantToEco='..tostring(bWantToEco)) end
+                                    if bChokepointsAreProtected then
+                                        --Eco if chokepoint is fine, unless enemies are nearby
+                                        if bDebugMessages == true then LOG(sFunctionRef..': CHokepoitns are protected, will eco unless mod dist is too close. Mod dist of nearest threat='..aiBrain[refiModDistFromStartNearestThreat]..'; Dist threshold='..math.min(150, aiBrain[refiDistanceToNearestEnemyBase] * 0.35)) end
+                                        if aiBrain[refiModDistFromStartNearestThreat] >= math.min(150, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) then
+                                            bWantToEco = true
                                         end
+                                    end
+                                    if bWantToEco == true then
+                                        if not (bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == true and aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] < 0.4 then
+                                            bWantToEco = false
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Chokepoints arent protected, can path to enemy base with land, and dont have friendly units on enemy side of map') end
+                                            --Dont eco if enemy has AA structure within our bomber emergency range, as will likely want ground units to push them out
+                                        elseif aiBrain[M27AirOverseer.refbBomberDefenceRestrictedByAA] and (not(bChokepointsAreProtected) or (aiBrain[refiModDistFromStartNearestThreat] <= aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance] and M27UnitInfo.IsUnitValid(aiBrain[refoNearestThreat]) and M27Utilities.GetDistanceBetweenPositions(aiBrain[refoNearestThreat]:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.max(150, aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]))) then
+                                            bWantToEco = false
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Bomber defence restricted by AA so will stop ecoing. aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]='..aiBrain[M27AirOverseer.refiBomberDefenceCriticalThreatDistance]..'; Bomber def range='..aiBrain[M27AirOverseer.refiBomberDefenceModDistance]) end
+                                            --Check in case ACU health is low or we dont have any units near enemy (which might be why we think there's no enemy threat)
+                                        elseif M27UnitInfo.GetUnitHealthPercent(oACU) < 0.45 and (M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 125 or oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemiesInRange] > 0) then
+                                            bWantToEco = false
+                                            if bDebugMessages == true then LOG(sFunctionRef..': ACU is low health and has nearby enemies so wont eco') end
+                                            --•	Don’t eco if our ACU is within 60 of the enemy base (on the expectation the game will be over soon if it is), unless the enemy has at least 4 T2 PD and 1 T2 Arti.
+                                        elseif M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[M27Logic.GetNearestEnemyStartNumber(aiBrain)]) <= 80 then
+                                            bWantToEco = false
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Our ACU is near enemy base') end
+                                        elseif not(bChokepointsAreProtected) and not(bAlliesAreCloserToEnemy) and aiBrain[refiTotalEnemyShortRangeThreat] >= 2500 and iMexesInPathingGroupWeHaveClaimed < iOurTeamsShareOfMexesOnMap * 1.3 and not(aiBrain[refbNeedIndirect]) then
+                                            --Does the enemy have more mobile threat than us and our allies, and we have < 65% mex control, and have gained income recently
+                                            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - iMassAtLeast3mAgo >= 1 then
+                                                local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])
+                                                local tAllThreatUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryShortRangeMobile, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Ally')
 
+                                                --For performance reasons will just get mass cost total
+                                                local iCurMassTotal = 0
+                                                if M27Utilities.IsTableEmpty(tAllThreatUnits) == false then
+                                                    for iUnit, oUnit in tAllThreatUnits do
+                                                        iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
+                                                    end
+                                                end
+                                                if iCurMassTotal < aiBrain[refiTotalEnemyShortRangeThreat] then
+                                                    bWantToEco = false
+                                                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy has significant mobile threat and we are behind on eco and have just gained some eco, so want to try and build more units to regain map control') end
+                                                end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': iCurMassTotal of our and ally shortrange threat='..iCurMassTotal..'; Enemy short range threat='..aiBrain[refiTotalEnemyShortRangeThreat]..'; bWantToEco='..tostring(bWantToEco)) end
+                                            end
+
+                                        end
                                     end
                                 end
-                            end
 
-                            if bWantToEco == true then
-                                aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = nil
-                                aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
-                            else
-                                aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryDFTank
-                                if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false then
-                                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then
-                                        aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryAmphibiousCombat
-                                    else
-                                        aiBrain[refiAIBrainCurrentStrategy] = M27UnitInfo.refCategoryEngineer
+                                if bWantToEco == true then
+                                    aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = nil
+                                    aiBrain[refiAIBrainCurrentStrategy] = refStrategyEcoAndTech
+                                else
+                                    aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryDFTank
+                                    if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] == false then
+                                        if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] == true then
+                                            aiBrain[M27FactoryOverseer.refiLastPriorityCategoryToBuild] = M27UnitInfo.refCategoryAmphibiousCombat
+                                        else
+                                            aiBrain[refiAIBrainCurrentStrategy] = M27UnitInfo.refCategoryEngineer
+                                        end
                                     end
+                                    aiBrain[refiAIBrainCurrentStrategy] = aiBrain[refiDefaultStrategy]
                                 end
-                                aiBrain[refiAIBrainCurrentStrategy] = aiBrain[refiDefaultStrategy]
                             end
                         end
                     end
                 end
             end
-        end
 
-        --Are we no longer protecting the ACU? If so then disband any escort it has - decided to take this out and just rely on acu manager's flag for if ACU needs an escort
-        --[[if iPrevStrategy == refStrategyProtectACU and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU) then
-                if oACU.PlatoonHandle then
-                    oACU.PlatoonHandle[M27PlatoonUtilities.refbShouldHaveEscort] = false
-                    if oACU.PlatoonHandle[M27PlatoonUtilities.refoEscortingPlatoon] then oACU.PlatoonHandle[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband end
-                end
-            end--]]
-
-
-        --Max target defence coverage for strategy
-        if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then
-            if bChokepointsAreProtected then
-                aiBrain[refiMaxDefenceCoverageWanted] = math.min(0.65, (30 + GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27MapInfo.reftClosestChokepoint]) / aiBrain[refiDistanceToNearestEnemyBase]))
-                if bDebugMessages == true then LOG(sFunctionRef..': Have chokepoint and are ecoing so will set defence coverage to '..aiBrain[refiMaxDefenceCoverageWanted]) end
-            else
-                aiBrain[refiMaxDefenceCoverageWanted] = 0.65
-            end
-        elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
-            aiBrain[refiMaxDefenceCoverageWanted] = 0.4
-        elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyTurtle then
-            aiBrain[refiMaxDefenceCoverageWanted] = (30 + M27Utilities.GetDistanceBetweenPositions(aiBrain[M27MapInfo.reftChokepointBuildLocation], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) / aiBrain[refiDistanceToNearestEnemyBase]
-        else
-            aiBrain[refiMaxDefenceCoverageWanted] = 0.9
-        end
-
-
-        --Reduce air scouting threshold for enemy base if likely to be considering whether to build a nuke or not
-        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 250 and aiBrain[refiOurHighestFactoryTechLevel] >= 3 and (not (aiBrain[M27EngineerOverseer.refiLastExperimentalReference]) or aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalNuke) then
-            local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-            aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiCurrentScoutingInterval] = math.min(45, aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiCurrentScoutingInterval])
-        end
-
-        --Record highest threat values of certain types of units
-        local tiCategoriesWanted = { [refiTotalEnemyLongRangeThreat] = M27UnitInfo.refCategoryLongRangeMobile, [refiTotalEnemyShortRangeThreat] = M27UnitInfo.refCategoryShortRangeMobile }
-        --local tsThreatVariableRef = {refiTotalEnemyLongRangeThreat, refiTotalEnemyShortRangeThreat}
-        local tAllThreatUnits
-        local iCurMassTotal
-        local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])
-        for sThreatVariableRef, iCategory in tiCategoriesWanted do
-            tAllThreatUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Enemy')
-            --For performance reasons will just get mass cost total
-            iCurMassTotal = 0
-            if M27Utilities.IsTableEmpty(tAllThreatUnits) == false then
-                for iUnit, oUnit in tAllThreatUnits do
-                    if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
-                        iCurMassTotal = iCurMassTotal + M27Logic.GetCombatThreatRating(aiBrain, { oUnit})
-                    else
-                        --NOTE: If updating how calcualte this, then also update events since we reduce mass based on mass cost for experimentals
-                        iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
+            --Are we no longer protecting the ACU? If so then disband any escort it has - decided to take this out and just rely on acu manager's flag for if ACU needs an escort
+            --[[if iPrevStrategy == refStrategyProtectACU and not(aiBrain[refiAIBrainCurrentStrategy] == refStrategyProtectACU) then
+                    if oACU.PlatoonHandle then
+                        oACU.PlatoonHandle[M27PlatoonUtilities.refbShouldHaveEscort] = false
+                        if oACU.PlatoonHandle[M27PlatoonUtilities.refoEscortingPlatoon] then oACU.PlatoonHandle[M27PlatoonUtilities.refoEscortingPlatoon][M27PlatoonUtilities.refiCurrentAction] = M27PlatoonUtilities.refActionDisband end
                     end
-                end
-            end
-            aiBrain[sThreatVariableRef] = math.max(aiBrain[sThreatVariableRef], iCurMassTotal)
-        end
+                end--]]
 
 
-        --TestCustom(aiBrain)
-
-
-
-        --Get key values relating to game state (for now only done if debugmessages, but coudl move some to outside of debugmessages)
-        if M27Config.M27StrategicLog == true or bDebugMessages == true then
-            local tsGameState = {}
-            local tTempUnitList, iTempUnitCount
-
-            --Brain
-            tsGameState['01. aiBrain'] = 'Name=' .. aiBrain.Nickname .. '; Index=' .. aiBrain:GetArmyIndex() .. 'Start=' .. aiBrain.M27StartPositionNumber
-
-            --Time
-            tsGameState['02.CurTimeInSecondsRounded'] = iCurTime
-            tsGameState['02.SystemTimeSinceLastLog'] = GetSystemTimeSecondsOnlyForProfileUse() - (aiBrain[M27Utilities.refiLastSystemTimeRecorded] or 0)
-            aiBrain[M27Utilities.refiLastSystemTimeRecorded] = GetSystemTimeSecondsOnlyForProfileUse()
-            tsGameState['02.SystemTimeTotal'] = aiBrain[M27Utilities.refiLastSystemTimeRecorded]
-
-            --Grand Strategy and enemy base
-            tsGameState['03.' .. refiAIBrainCurrentStrategy] = aiBrain[refiAIBrainCurrentStrategy]
-            tsGameState['03. NearestEnemyStartNumber'] = M27Logic.GetNearestEnemyStartNumber(aiBrain)
-            tsGameState['03. EnemyT2PlusNavyNearBase'] = aiBrain[refbT2NavyNearOurBase]
-
-            --Economy:
-            tsGameState['04.iMassGrossIncome'] = aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]
-            tsGameState['04.iMassNetIncome'] = aiBrain:GetEconomyTrend('MASS')
-            tsGameState['04.iEnergyNetIncome'] = aiBrain:GetEconomyTrend('ENERGY')
-            tsGameState['04.iMassStored'] = aiBrain:GetEconomyStored('MASS')
-            tsGameState['04.iEnergyStored'] = aiBrain:GetEconomyStored('ENERGY')
-            tsGameState['04.PausedUpgrades'] = aiBrain[M27EconomyOverseer.refiPausedUpgradeCount]
-            tsGameState['04.PowerStall active'] = tostring(aiBrain[M27EconomyOverseer.refbStallingEnergy])
-
-            --Get other unclaimed mex details
-            local iUnclaimedMexesOnOurSideOfMap = 0
-            local iUnclaimedMexesWithinDefenceCoverage = 0
-            local iUnclaimedMexesWithinIntelAndDefence = 0
-            if iAllUnclaimedMexesInPathingGroup > 0 then
-
-                local tUnclaimedMexesOnOurSideOfMap = M27EngineerOverseer.FilterLocationsBasedOnDistanceToEnemy(aiBrain, tAllUnclaimedMexesInPathingGroup, 0.5)
-                if M27Utilities.IsTableEmpty(tUnclaimedMexesOnOurSideOfMap) == false then
-                    iUnclaimedMexesOnOurSideOfMap = table.getn(tUnclaimedMexesOnOurSideOfMap)
-                end
-                local tUnclaimedMexesWithinDefenceCoverage = M27EngineerOverseer.FilterLocationsBasedOnDefenceCoverage(aiBrain, tAllUnclaimedMexesInPathingGroup, false)
-                if M27Utilities.IsTableEmpty(tUnclaimedMexesWithinDefenceCoverage) == false then
-                    iUnclaimedMexesWithinDefenceCoverage = table.getn(tUnclaimedMexesWithinDefenceCoverage)
-                end
-                local tUncalimedMexesWithinIntelAndDefence = M27EngineerOverseer.FilterLocationsBasedOnDefenceCoverage(aiBrain, tAllUnclaimedMexesInPathingGroup, true)
-                if M27Utilities.IsTableEmpty(tUncalimedMexesWithinIntelAndDefence) == false then
-                    iUnclaimedMexesWithinIntelAndDefence = table.getn(tUncalimedMexesWithinIntelAndDefence)
-                end
-            end
-
-            tsGameState['04.AllMexesInACUPathingGroup'] = iAllMexesInPathingGroup
-            tsGameState['04.AllMexesInPathingGroupWeHaventClaimed'] = iAllMexesInPathingGroupWeHaventClaimed
-            tsGameState['04.UnclaimedUnqueuedMexesByAnyoneInACUPathingGroup'] = iAllUnclaimedMexesInPathingGroup
-            tsGameState['04.UnclaimedMexesOnOurSideOfMap'] = iUnclaimedMexesOnOurSideOfMap
-            tsGameState['04.UnclaimedMexesWithinDefenceCoverage'] = iUnclaimedMexesWithinDefenceCoverage
-            tsGameState['04.UnclaimedMexesWithinIntelAndDefence'] = iUnclaimedMexesWithinIntelAndDefence
-            tsGameState['04.MexesNearBase'] = iMexesNearStart
-            tsGameState['04.T3MexesOwned'] = iT3Mexes
-            tsGameState['04.MexesUpgrading'] = aiBrain[M27EconomyOverseer.refiMexesUpgrading]
-
-
-            --Key unit counts:
-            tTempUnitList = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandFactory, false, true)
-            iTempUnitCount = 0
-            if M27Utilities.IsTableEmpty(tTempUnitList) == false then
-                iTempUnitCount = table.getn(tTempUnitList)
-            end
-            tsGameState['05.iLandFactories'] = iTempUnitCount
-
-            tsGameState['05.Highest factory tech level'] = aiBrain[refiOurHighestFactoryTechLevel]
-
-            tTempUnitList = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer, false, true)
-            iTempUnitCount = 0
-            if M27Utilities.IsTableEmpty(tTempUnitList) == false then
-                iTempUnitCount = table.getn(tTempUnitList)
-            end
-            tsGameState['05.iEngineers'] = iTempUnitCount
-
-            tsGameState['05.iLandCombatUnits'] = iTempUnitCount
-
-            --Build orders: Engineers wanted
-            tsGameState['05.InitialEngisShortfall'] = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted]
-            tsGameState['05.PreReclaimEngisWanted'] = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
-            tsGameState['05.refiBOPreSpareEngineersWanted'] = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
-            tsGameState['05.SpareEngisByTechLevel'] = aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel]
-
-            --Factories wanted
-            tsGameState['05.WantMoreLandFactories'] = tostring(aiBrain[M27EconomyOverseer.refbWantMoreFactories])
-
-            --MAA wanted:
-            tsGameState['06.MAAShortfallACUPrecaution'] = aiBrain[refiMAAShortfallACUPrecaution]
-            tsGameState['06.MAAShortfallACUCore'] = aiBrain[refiMAAShortfallACUCore]
-            tsGameState['06.MAAShortfallLargePlatoons'] = aiBrain[refiMAAShortfallLargePlatoons]
-            tsGameState['06.MAAShortfallBase'] = aiBrain[refiMAAShortfallBase]
-
-            if aiBrain[M27AirOverseer.refiOurMassInMAA] then
-                tsGameState['06.OurMAAThreat'] = aiBrain[M27AirOverseer.refiOurMassInMAA]
-            end
-            tsGameState['06.EmergencyMAANeeded'] = aiBrain[refbEmergencyMAANeeded]
-
-            --Scouts wanted:
-            tsGameState['07.ScoutShortfallInitialRaider'] = aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher]
-            tsGameState['07.ScoutShortfallACU'] = aiBrain[refiScoutShortfallACU]
-            tsGameState['07.ScoutShortfallIntelLine'] = aiBrain[refiScoutShortfallIntelLine]
-            tsGameState['07.ScoutShortfallLargePlatoons'] = aiBrain[refiScoutShortfallLargePlatoons]
-            tsGameState['07.ScoutShortfallAllPlatoons'] = aiBrain[refiScoutShortfallAllPlatoons]
-
-            --Air:
-            tsGameState['08.BomberEffectiveness'] = aiBrain[M27AirOverseer.refbBombersAreEffective]
-            tsGameState['08.AirAANeeded'] = aiBrain[M27AirOverseer.refiAirAANeeded]
-            tsGameState['08.AirAAWanted'] = aiBrain[M27AirOverseer.refiAirAAWanted]
-            tsGameState['08.OurMassInAirAA'] = aiBrain[M27AirOverseer.refiOurMassInAirAA]
-            if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] then
-                tsGameState['08.EnemyAirThreat'] = aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]
-            end
-            tsGameState['08.EnemyAirAAThreat'] = (aiBrain[M27AirOverseer.refiEnemyAirAAThreat] or 0)
-            tsGameState['08.EnemyAirToGroundThreat'] = (aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0)
-            local iAvailableAirAA = 0
-            if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false then
-                for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableAirAA] do
-                    iAvailableAirAA = iAvailableAirAA + 1
-                end
-            end
-            tsGameState['08.AvailableAirAA'] = iAvailableAirAA
-            tsGameState['08.AvailableBombers'] = 0
-
-            if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then
-                tsGameState['08.AvailableBombers'] = table.getn(aiBrain[M27AirOverseer.reftAvailableBombers])
-            end
-            tsGameState['08.RemainingBomberTargets'] = 0
-            if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberTargetShortlist]) == false then
-                tsGameState['08.RemainingBomberTargets'] = table.getn(aiBrain[M27AirOverseer.reftBomberTargetShortlist])
-            end
-            tsGameState['08.TorpBombersWanted'] = aiBrain[M27AirOverseer.refiTorpBombersWanted]
-            tsGameState['08.HaveAirControl'] = aiBrain[M27AirOverseer.refbHaveAirControl]
-
-            --Mobile shields
-            tsGameState['09.WantMoreMobileShields'] = tostring(aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons])
-
-            --Threat values:
-            --Intel path % to enemy
-            if aiBrain[refiCurIntelLineTarget] then
-                local iIntelPathPosition = aiBrain[refiCurIntelLineTarget]
-                local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-                --reftIntelLinePositions = 'M27IntelLinePositions' --x = line; y = point on that line, returns position
-                local tIntelPathCurBase = aiBrain[reftIntelLinePositions][iIntelPathPosition][1]
-                local iIntelDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tIntelPathCurBase, tStartPosition)
-                local iIntelDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tIntelPathCurBase, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-                tsGameState['10.iIntelPathPosition'] = iIntelPathPosition
-                tsGameState['10.iIntelDistancePercent'] = iIntelDistanceToStart / (iIntelDistanceToStart + iIntelDistanceToEnemy)
-            end
-            tsGameState['10.DistanceToNearestEnemyBase'] = aiBrain[refiDistanceToNearestEnemyBase]
-            if aiBrain[refiModDistFromStartNearestOutstandingThreat] then
-                tsGameState['10.NearestOutstandingThreat'] = aiBrain[refiModDistFromStartNearestOutstandingThreat]
-            end
-            if aiBrain[refiPercentageOutstandingThreat] then
-                tsGameState['10.PercentageOutstandingThreat'] = aiBrain[refiPercentageOutstandingThreat]
-            end
-            if aiBrain[refiModDistFromStartNearestThreat] then
-                tsGameState['10.ModDistNearestThreat'] = aiBrain[refiModDistFromStartNearestThreat]
-            end
-            tsGameState['10.PercentDistOfOurCombatUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] or 'nil')
-            tsGameState['10.PercentDistOfLandUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy] or 'nil')
-            tsGameState['10.NearestEnemyStartPoint'] = aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation]
-            tsGameState['10.LongRangeEnemyMobileThreat'] = aiBrain[refiTotalEnemyLongRangeThreat]
-            tsGameState['10.ShortRangeEnemyMobileThreat'] = aiBrain[refiTotalEnemyShortRangeThreat]
-
-            LOG(repru(tsGameState))
-        end
-
-
-
-        if bDebugMessages == true then
-            LOG(sFunctionRef .. ': iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed..'; iAllMexesInPathingGroup='..iAllMexesInPathingGroup)
-        end
-
-
-        -------->>>>>>>>>>>>Set ACU health to run on<<<<<<<<<<<----------------
-
-
-        aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
-        --Play safe with ACU if we have almost half or more of mexes
-        local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
-        local iKeyUpgradesWanted = 1
-        if bDebugMessages == true then LOG(sFunctionRef..': About to determine adjustments to the ACU health to run on. iUpgradeCount='..iUpgradeCount..'; ACU max health='..oACU:GetMaxHealth()) end
-
-        if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.9 then
-            if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.1 then
-                --We have 55% of mexes on map so shoudl be ahead on eco
-
-
-                if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 or not(M27Conditions.DoesACUHaveGun(aiBrain, false)) then
-                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
+            --Max target defence coverage for strategy
+            if aiBrain[refiAIBrainCurrentStrategy] == refStrategyEcoAndTech then
+                if bChokepointsAreProtected then
+                    aiBrain[refiMaxDefenceCoverageWanted] = math.min(0.65, (30 + GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, aiBrain[M27MapInfo.reftClosestChokepoint]) / aiBrain[refiDistanceToNearestEnemyBase]))
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have chokepoint and are ecoing so will set defence coverage to '..aiBrain[refiMaxDefenceCoverageWanted]) end
                 else
-                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.8
+                    aiBrain[refiMaxDefenceCoverageWanted] = 0.65
                 end
-                if bDebugMessages == true then LOG(sFunctionRef..': Have 10% more than our share of mexes, so setting health to run at 95% of max health') end
-                --if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 then
-                --Set equal to max health (so run) if we dont have a supporting upgrade as we are ahead on eco so can afford to drop back for an upgrade
-
-                if EntityCategoryContains(categories.AEON, oACU.UnitId) then
-                    iKeyUpgradesWanted = 2
-                end
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': iUpgradeCount=' .. iUpgradeCount .. '; iKeyUpgradesWanted=' .. iKeyUpgradesWanted)
-                end
-                if iUpgradeCount < iKeyUpgradesWanted and M27Conditions.HaveEnoughGrossIncomeToForceFirstUpgrade(aiBrain) then
-                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
-                    if bDebugMessages == true then LOG(sFunctionRef..': Want to force an upgrade so will set health to run at max health') end
-                end
-                --end
-
+            elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance then
+                aiBrain[refiMaxDefenceCoverageWanted] = 0.4
+            elseif aiBrain[refiAIBrainCurrentStrategy] == refStrategyTurtle then
+                aiBrain[refiMaxDefenceCoverageWanted] = (30 + M27Utilities.GetDistanceBetweenPositions(aiBrain[M27MapInfo.reftChokepointBuildLocation], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) / aiBrain[refiDistanceToNearestEnemyBase]
             else
-                --We have almost half of the mexes on the map.  Given the delay in claiming mexes it's likely we're at least even with the enemy
-                if M27Conditions.DoesACUHaveGun(aiBrain, false) then
-                    aiBrain[refiACUHealthToRunOn] = math.max(8000, oACU:GetMaxHealth() * 0.7)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have almost half of map mexes, and acu has gun, so setting health to retreat to be 70%') end
-                else
-                    --ACU doesnt have gun so be very careful
-                    aiBrain[refiACUHealthToRunOn] = math.max(9000, oACU:GetMaxHealth() * 0.8)
-                end
+                aiBrain[refiMaxDefenceCoverageWanted] = 0.9
             end
-        elseif iMexesInPathingGroupWeHaveClaimed <= iOurTeamsShareOfMexesOnMap * 0.7 then
-            aiBrain[refiACUHealthToRunOn] = math.max(4250, oACU:GetMaxHealth() * 0.35)
-        end
-        --Do we have a firebase? if so increase health to run on
-        if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
-            aiBrain[refiACUHealthToRunOn] = math.min(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn] + 2000)
-        end
 
-        --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
-        if aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
-            if bDebugMessages == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
-            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
-                if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
-                    --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
-                    if not (M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 26 or aiBrain[refiEnemyHighestTechLevel] >= 4 then
-                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() + 15000
-                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T4 or we dont have gun or have lots of mass so will force ACU to run') end
-                    else
-                        --Enemy has t3, and we have decent eco; run if we dont have lots of enhancements
-                        if iUpgradeCount < 3 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 then
-                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have high mass income and not many upgrades so will force ACU to run') end
 
-                        else    --Have 3+ enhancements and dont have at least 200 gross mass income so will allow a bit of health damage
-                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have at least 3 upgrades so will only retreat if ACU not at full health') end
+            --Reduce air scouting threshold for enemy base if likely to be considering whether to build a nuke or not
+            if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 250 and aiBrain[refiOurHighestFactoryTechLevel] >= 3 and (not (aiBrain[M27EngineerOverseer.refiLastExperimentalReference]) or aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalNuke) then
+                local iAirSegmentX, iAirSegmentZ = M27AirOverseer.GetAirSegmentFromPosition(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiCurrentScoutingInterval] = math.min(45, aiBrain[M27AirOverseer.reftAirSegmentTracker][iAirSegmentX][iAirSegmentZ][M27AirOverseer.refiCurrentScoutingInterval])
+            end
+
+            --Record highest threat values of certain types of units
+            local tiCategoriesWanted = { [refiTotalEnemyLongRangeThreat] = M27UnitInfo.refCategoryLongRangeMobile, [refiTotalEnemyShortRangeThreat] = M27UnitInfo.refCategoryShortRangeMobile }
+            --local tsThreatVariableRef = {refiTotalEnemyLongRangeThreat, refiTotalEnemyShortRangeThreat}
+            local tAllThreatUnits
+            local iCurMassTotal
+            local iSearchRange = math.min(600, aiBrain[refiDistanceToNearestEnemyBase] + 60, aiBrain[M27AirOverseer.refiMaxScoutRadius])
+            for sThreatVariableRef, iCategory in tiCategoriesWanted do
+                tAllThreatUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iSearchRange, 'Enemy')
+                --For performance reasons will just get mass cost total
+                iCurMassTotal = 0
+                if M27Utilities.IsTableEmpty(tAllThreatUnits) == false then
+                    for iUnit, oUnit in tAllThreatUnits do
+                        if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
+                            iCurMassTotal = iCurMassTotal + M27Logic.GetCombatThreatRating(aiBrain, { oUnit})
+                        else
+                            --NOTE: If updating how calcualte this, then also update events since we reduce mass based on mass cost for experimentals
+                            iCurMassTotal = iCurMassTotal + oUnit:GetBlueprint().Economy.BuildCostMass
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': iUpgradeCount='..iUpgradeCount..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; health to run on after adjusting for this='..aiBrain[refiACUHealthToRunOn]) end
                     end
-                else
-                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
                 end
-            else
-                if iUpgradeCount < 1 then
+                aiBrain[sThreatVariableRef] = math.max(aiBrain[sThreatVariableRef], iCurMassTotal)
+            end
+
+
+            --TestCustom(aiBrain)
+
+
+
+            --Get key values relating to game state (for now only done if debugmessages, but coudl move some to outside of debugmessages)
+            if M27Config.M27StrategicLog == true or bDebugMessages == true then
+                local tsGameState = {}
+                local tTempUnitList, iTempUnitCount
+
+                --Brain
+                tsGameState['01. aiBrain'] = 'Name=' .. aiBrain.Nickname .. '; Index=' .. aiBrain:GetArmyIndex() .. 'Start=' .. aiBrain.M27StartPositionNumber
+
+                --Time
+                tsGameState['02.CurTimeInSecondsRounded'] = iCurTime
+                tsGameState['02.SystemTimeSinceLastLog'] = GetSystemTimeSecondsOnlyForProfileUse() - (aiBrain[M27Utilities.refiLastSystemTimeRecorded] or 0)
+                aiBrain[M27Utilities.refiLastSystemTimeRecorded] = GetSystemTimeSecondsOnlyForProfileUse()
+                tsGameState['02.SystemTimeTotal'] = aiBrain[M27Utilities.refiLastSystemTimeRecorded]
+
+                --Grand Strategy and enemy base
+                tsGameState['03.' .. refiAIBrainCurrentStrategy] = aiBrain[refiAIBrainCurrentStrategy]
+                tsGameState['03. NearestEnemyStartNumber'] = M27Logic.GetNearestEnemyStartNumber(aiBrain)
+                tsGameState['03. EnemyT2PlusNavyNearBase'] = aiBrain[refbT2NavyNearOurBase]
+
+                --Economy:
+                tsGameState['04.iMassGrossIncome'] = aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]
+                tsGameState['04.iMassNetIncome'] = aiBrain:GetEconomyTrend('MASS')
+                tsGameState['04.iEnergyNetIncome'] = aiBrain:GetEconomyTrend('ENERGY')
+                tsGameState['04.iMassStored'] = aiBrain:GetEconomyStored('MASS')
+                tsGameState['04.iEnergyStored'] = aiBrain:GetEconomyStored('ENERGY')
+                tsGameState['04.PausedUpgrades'] = aiBrain[M27EconomyOverseer.refiPausedUpgradeCount]
+                tsGameState['04.PowerStall active'] = tostring(aiBrain[M27EconomyOverseer.refbStallingEnergy])
+
+                --Get other unclaimed mex details
+                local iUnclaimedMexesOnOurSideOfMap = 0
+                local iUnclaimedMexesWithinDefenceCoverage = 0
+                local iUnclaimedMexesWithinIntelAndDefence = 0
+                if iAllUnclaimedMexesInPathingGroup > 0 then
+
+                    local tUnclaimedMexesOnOurSideOfMap = M27EngineerOverseer.FilterLocationsBasedOnDistanceToEnemy(aiBrain, tAllUnclaimedMexesInPathingGroup, 0.5)
+                    if M27Utilities.IsTableEmpty(tUnclaimedMexesOnOurSideOfMap) == false then
+                        iUnclaimedMexesOnOurSideOfMap = table.getn(tUnclaimedMexesOnOurSideOfMap)
+                    end
+                    local tUnclaimedMexesWithinDefenceCoverage = M27EngineerOverseer.FilterLocationsBasedOnDefenceCoverage(aiBrain, tAllUnclaimedMexesInPathingGroup, false)
+                    if M27Utilities.IsTableEmpty(tUnclaimedMexesWithinDefenceCoverage) == false then
+                        iUnclaimedMexesWithinDefenceCoverage = table.getn(tUnclaimedMexesWithinDefenceCoverage)
+                    end
+                    local tUncalimedMexesWithinIntelAndDefence = M27EngineerOverseer.FilterLocationsBasedOnDefenceCoverage(aiBrain, tAllUnclaimedMexesInPathingGroup, true)
+                    if M27Utilities.IsTableEmpty(tUncalimedMexesWithinIntelAndDefence) == false then
+                        iUnclaimedMexesWithinIntelAndDefence = table.getn(tUncalimedMexesWithinIntelAndDefence)
+                    end
+                end
+
+                tsGameState['04.AllMexesInACUPathingGroup'] = iAllMexesInPathingGroup
+                tsGameState['04.AllMexesInPathingGroupWeHaventClaimed'] = iAllMexesInPathingGroupWeHaventClaimed
+                tsGameState['04.UnclaimedUnqueuedMexesByAnyoneInACUPathingGroup'] = iAllUnclaimedMexesInPathingGroup
+                tsGameState['04.UnclaimedMexesOnOurSideOfMap'] = iUnclaimedMexesOnOurSideOfMap
+                tsGameState['04.UnclaimedMexesWithinDefenceCoverage'] = iUnclaimedMexesWithinDefenceCoverage
+                tsGameState['04.UnclaimedMexesWithinIntelAndDefence'] = iUnclaimedMexesWithinIntelAndDefence
+                tsGameState['04.MexesNearBase'] = iMexesNearStart
+                tsGameState['04.T3MexesOwned'] = iT3Mexes
+                tsGameState['04.MexesUpgrading'] = aiBrain[M27EconomyOverseer.refiMexesUpgrading]
+
+
+                --Key unit counts:
+                tTempUnitList = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryLandFactory, false, true)
+                iTempUnitCount = 0
+                if M27Utilities.IsTableEmpty(tTempUnitList) == false then
+                    iTempUnitCount = table.getn(tTempUnitList)
+                end
+                tsGameState['05.iLandFactories'] = iTempUnitCount
+
+                tsGameState['05.Highest factory tech level'] = aiBrain[refiOurHighestFactoryTechLevel]
+
+                tTempUnitList = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer, false, true)
+                iTempUnitCount = 0
+                if M27Utilities.IsTableEmpty(tTempUnitList) == false then
+                    iTempUnitCount = table.getn(tTempUnitList)
+                end
+                tsGameState['05.iEngineers'] = iTempUnitCount
+
+                tsGameState['05.iLandCombatUnits'] = iTempUnitCount
+
+                --Build orders: Engineers wanted
+                tsGameState['05.InitialEngisShortfall'] = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted]
+                tsGameState['05.PreReclaimEngisWanted'] = aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
+                tsGameState['05.refiBOPreSpareEngineersWanted'] = aiBrain[M27EngineerOverseer.refiBOPreSpareEngineersWanted]
+                tsGameState['05.SpareEngisByTechLevel'] = aiBrain[M27EngineerOverseer.reftiBOActiveSpareEngineersByTechLevel]
+
+                --Factories wanted
+                tsGameState['05.WantMoreLandFactories'] = tostring(aiBrain[M27EconomyOverseer.refbWantMoreFactories])
+
+                --MAA wanted:
+                tsGameState['06.MAAShortfallACUPrecaution'] = aiBrain[refiMAAShortfallACUPrecaution]
+                tsGameState['06.MAAShortfallACUCore'] = aiBrain[refiMAAShortfallACUCore]
+                tsGameState['06.MAAShortfallLargePlatoons'] = aiBrain[refiMAAShortfallLargePlatoons]
+                tsGameState['06.MAAShortfallBase'] = aiBrain[refiMAAShortfallBase]
+
+                if aiBrain[M27AirOverseer.refiOurMassInMAA] then
+                    tsGameState['06.OurMAAThreat'] = aiBrain[M27AirOverseer.refiOurMassInMAA]
+                end
+                tsGameState['06.EmergencyMAANeeded'] = aiBrain[refbEmergencyMAANeeded]
+
+                --Scouts wanted:
+                tsGameState['07.ScoutShortfallInitialRaider'] = aiBrain[refiScoutShortfallInitialRaiderOrSkirmisher]
+                tsGameState['07.ScoutShortfallACU'] = aiBrain[refiScoutShortfallACU]
+                tsGameState['07.ScoutShortfallIntelLine'] = aiBrain[refiScoutShortfallIntelLine]
+                tsGameState['07.ScoutShortfallLargePlatoons'] = aiBrain[refiScoutShortfallLargePlatoons]
+                tsGameState['07.ScoutShortfallAllPlatoons'] = aiBrain[refiScoutShortfallAllPlatoons]
+
+                --Air:
+                tsGameState['08.BomberEffectiveness'] = aiBrain[M27AirOverseer.refbBombersAreEffective]
+                tsGameState['08.AirAANeeded'] = aiBrain[M27AirOverseer.refiAirAANeeded]
+                tsGameState['08.AirAAWanted'] = aiBrain[M27AirOverseer.refiAirAAWanted]
+                tsGameState['08.OurMassInAirAA'] = aiBrain[M27AirOverseer.refiOurMassInAirAA]
+                if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] then
+                    tsGameState['08.EnemyAirThreat'] = aiBrain[M27AirOverseer.refiHighestEnemyAirThreat]
+                end
+                tsGameState['08.EnemyAirAAThreat'] = (aiBrain[M27AirOverseer.refiEnemyAirAAThreat] or 0)
+                tsGameState['08.EnemyAirToGroundThreat'] = (aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0)
+                local iAvailableAirAA = 0
+                if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false then
+                    for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableAirAA] do
+                        iAvailableAirAA = iAvailableAirAA + 1
+                    end
+                end
+                tsGameState['08.AvailableAirAA'] = iAvailableAirAA
+                tsGameState['08.AvailableBombers'] = 0
+
+                if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableBombers]) == false then
+                    tsGameState['08.AvailableBombers'] = table.getn(aiBrain[M27AirOverseer.reftAvailableBombers])
+                end
+                tsGameState['08.RemainingBomberTargets'] = 0
+                if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberTargetShortlist]) == false then
+                    tsGameState['08.RemainingBomberTargets'] = table.getn(aiBrain[M27AirOverseer.reftBomberTargetShortlist])
+                end
+                tsGameState['08.TorpBombersWanted'] = aiBrain[M27AirOverseer.refiTorpBombersWanted]
+                tsGameState['08.HaveAirControl'] = aiBrain[M27AirOverseer.refbHaveAirControl]
+
+                --Mobile shields
+                tsGameState['09.WantMoreMobileShields'] = tostring(aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons])
+
+                --Threat values:
+                --Intel path % to enemy
+                if aiBrain[refiCurIntelLineTarget] then
+                    local iIntelPathPosition = aiBrain[refiCurIntelLineTarget]
+                    local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                    --reftIntelLinePositions = 'M27IntelLinePositions' --x = line; y = point on that line, returns position
+                    local tIntelPathCurBase = aiBrain[reftIntelLinePositions][iIntelPathPosition][1]
+                    local iIntelDistanceToStart = M27Utilities.GetDistanceBetweenPositions(tIntelPathCurBase, tStartPosition)
+                    local iIntelDistanceToEnemy = M27Utilities.GetDistanceBetweenPositions(tIntelPathCurBase, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+                    tsGameState['10.iIntelPathPosition'] = iIntelPathPosition
+                    tsGameState['10.iIntelDistancePercent'] = iIntelDistanceToStart / (iIntelDistanceToStart + iIntelDistanceToEnemy)
+                end
+                tsGameState['10.DistanceToNearestEnemyBase'] = aiBrain[refiDistanceToNearestEnemyBase]
+                if aiBrain[refiModDistFromStartNearestOutstandingThreat] then
+                    tsGameState['10.NearestOutstandingThreat'] = aiBrain[refiModDistFromStartNearestOutstandingThreat]
+                end
+                if aiBrain[refiPercentageOutstandingThreat] then
+                    tsGameState['10.PercentageOutstandingThreat'] = aiBrain[refiPercentageOutstandingThreat]
+                end
+                if aiBrain[refiModDistFromStartNearestThreat] then
+                    tsGameState['10.ModDistNearestThreat'] = aiBrain[refiModDistFromStartNearestThreat]
+                end
+                tsGameState['10.PercentDistOfOurCombatUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyFromOurBaseToEnemy] or 'nil')
+                tsGameState['10.PercentDistOfLandUnitClosestToEnemyBase'] = (aiBrain[refiPercentageClosestFriendlyLandFromOurBaseToEnemy] or 'nil')
+                tsGameState['10.NearestEnemyStartPoint'] = aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation]
+                tsGameState['10.LongRangeEnemyMobileThreat'] = aiBrain[refiTotalEnemyLongRangeThreat]
+                tsGameState['10.ShortRangeEnemyMobileThreat'] = aiBrain[refiTotalEnemyShortRangeThreat]
+
+                LOG(repru(tsGameState))
+            end
+
+
+
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': iMexesInPathingGroupWeHaveClaimed=' .. iMexesInPathingGroupWeHaveClaimed .. '; iOurTeamsShareOfMexesOnMap=' .. iOurTeamsShareOfMexesOnMap .. '; iAllMexesInPathingGroupWeHaventClaimed=' .. iAllMexesInPathingGroupWeHaventClaimed..'; iAllMexesInPathingGroup='..iAllMexesInPathingGroup)
+            end
+
+
+            -------->>>>>>>>>>>>Set ACU health to run on<<<<<<<<<<<----------------
+
+
+            aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
+            --Play safe with ACU if we have almost half or more of mexes
+            local iUpgradeCount = M27UnitInfo.GetNumberOfUpgradesObtained(oACU)
+            local iKeyUpgradesWanted = 1
+            if bDebugMessages == true then LOG(sFunctionRef..': About to determine adjustments to the ACU health to run on. iUpgradeCount='..iUpgradeCount..'; ACU max health='..oACU:GetMaxHealth()) end
+
+            if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 0.9 then
+                if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.1 then
+                    --We have 55% of mexes on map so shoudl be ahead on eco
+
+
+                    if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 or not(M27Conditions.DoesACUHaveGun(aiBrain, false)) then
+                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
+                    else
+                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.8
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have 10% more than our share of mexes, so setting health to run at 95% of max health') end
+                    --if iMexesInPathingGroupWeHaveClaimed >= iOurTeamsShareOfMexesOnMap * 1.2 then
+                    --Set equal to max health (so run) if we dont have a supporting upgrade as we are ahead on eco so can afford to drop back for an upgrade
+
+                    if EntityCategoryContains(categories.AEON, oACU.UnitId) then
+                        iKeyUpgradesWanted = 2
+                    end
                     if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Dont have any ugprade on ACU yet so want to retreat it')
+                        LOG(sFunctionRef .. ': iUpgradeCount=' .. iUpgradeCount .. '; iKeyUpgradesWanted=' .. iKeyUpgradesWanted)
                     end
-                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() + 5000)
-                elseif iUpgradeCount < iKeyUpgradesWanted then
-                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
-                end
-            end
-        end
-
-        if bDebugMessages == true then LOG(sFunctionRef..': Health to run on before further adjustments='..aiBrain[refiACUHealthToRunOn]) end
-
-        --Increase health to run on if enemy has air nearby and we lack AA
-        if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
-            local bHaveNearbyMAA = false
-            if oACU[refoUnitsMAAHelper] and M27Utilities.IsTableEmpty(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits]) == false then
-                local oNearestMAA = M27Utilities.GetNearestUnit(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits], oACU:GetPosition(), aiBrain)
-                if M27UnitInfo.IsUnitValid(oNearestMAA) then
-                    if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oNearestMAA:GetPosition()) <= 30 then
-                        bHaveNearbyMAA = true
+                    if iUpgradeCount < iKeyUpgradesWanted and M27Conditions.HaveEnoughGrossIncomeToForceFirstUpgrade(aiBrain) then
+                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want to force an upgrade so will set health to run at max health') end
                     end
-                end
-            end
-            if not (bHaveNearbyMAA) then
-                if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 2000 and not(oACU:HasEnhancement('CloakingGenerator')) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Lack air control and enemy has T3 air so setting ACU health to run at ACU max health') end
-                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                    --end
+
                 else
-                    local tEnemyAirThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGunship + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, oACU:GetPosition(), 40, 'Enemy')
-                    if M27Utilities.IsTableEmpty(tEnemyAirThreats) == false then
-                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air threats so setting health to run at 95% of ACU health') end
+                    --We have almost half of the mexes on the map.  Given the delay in claiming mexes it's likely we're at least even with the enemy
+                    if M27Conditions.DoesACUHaveGun(aiBrain, false) then
+                        aiBrain[refiACUHealthToRunOn] = math.max(8000, oACU:GetMaxHealth() * 0.7)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have almost half of map mexes, and acu has gun, so setting health to retreat to be 70%') end
+                    else
+                        --ACU doesnt have gun so be very careful
+                        aiBrain[refiACUHealthToRunOn] = math.max(9000, oACU:GetMaxHealth() * 0.8)
+                    end
+                end
+            elseif iMexesInPathingGroupWeHaveClaimed <= iOurTeamsShareOfMexesOnMap * 0.7 then
+                aiBrain[refiACUHealthToRunOn] = math.max(4250, oACU:GetMaxHealth() * 0.35)
+            end
+            --Do we have a firebase? if so increase health to run on
+            if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFirebaseUnitsByFirebaseRef]) == false then
+                aiBrain[refiACUHealthToRunOn] = math.min(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn] + 2000)
+            end
+
+            --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
+            if aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
+                if bDebugMessages == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
+                if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 13 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 100 then
+                    if not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
+                        --Increase health to run above max health (so even with mobile shields we will run) if dont have gun upgrade or v.high economy
+                        if not (M27Conditions.DoesACUHaveGun(aiBrain, true, oACU)) or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 26 or aiBrain[refiEnemyHighestTechLevel] >= 4 then
+                            aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() + 15000
+                            if bDebugMessages == true then LOG(sFunctionRef..': Enemy has T4 or we dont have gun or have lots of mass so will force ACU to run') end
+                        else
+                            --Enemy has t3, and we have decent eco; run if we dont have lots of enhancements
+                            if iUpgradeCount < 3 or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 20 then
+                                aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have high mass income and not many upgrades so will force ACU to run') end
+
+                            else    --Have 3+ enhancements and dont have at least 200 gross mass income so will allow a bit of health damage
+                                aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth() * 0.95
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have at least 3 upgrades so will only retreat if ACU not at full health') end
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': iUpgradeCount='..iUpgradeCount..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; health to run on after adjusting for this='..aiBrain[refiACUHealthToRunOn]) end
+                        end
+                    else
+                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
+                    end
+                else
+                    if iUpgradeCount < 1 then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Dont have any ugprade on ACU yet so want to retreat it')
+                        end
+                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() + 5000)
+                    elseif iUpgradeCount < iKeyUpgradesWanted then
+                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.95)
                     end
                 end
             end
-        end
 
-        --Increase health to run on if ACU has recently taken torpedo damage
-        if GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100) <= 60 and not(oACU:HasEnhancement('NaniteTorpedoTube')) then
-            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
-            if bDebugMessages == true then LOG(sFunctionRef..': ACU recently taken unseen or torpedo damage so setting health to run to 85% of its health') end
-        end
-        if bDebugMessages == true then
-            LOG(sFunctionRef .. ': Finished setting ACU health to run on. ACU max health=' .. oACU:GetMaxHealth() .. '; ACU health to run on=' .. aiBrain[refiACUHealthToRunOn])
-        end
+            if bDebugMessages == true then LOG(sFunctionRef..': Health to run on before further adjustments='..aiBrain[refiACUHealthToRunOn]) end
 
-        --Increase health to run if we are on enemy side of the map
-        local iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-        local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
-
-
-        --Flag we need AirAA as an emergency and set ACU health to run equal to max health if we fear an air snipe
-        if bDebugMessages == true then LOG(sFunctionRef..': Considering if vulnerable to air snipe. iDistToOurBase='..iDistToOurBase..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; Enemy AirAA threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat]) end
-        if iDistToOurBase >= 200 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500 and not(oACU:HasEnhancement('CloakingGenerator')) then
-            aiBrain[refbACUVulnerableToAirSnipe] = true
-            --Potential air threat; will distinguish between the following scenarios:
-            --High risk of air snipe requiring emergency AA production
-            --Risk of air snipe due to being far away from AirAA support
-
-            if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiOurMassInAirAA] <= math.max(2000, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.5) then
-                --High risk of air snipe.  Set health to run equal to 75% normally, or 100% if we have weak MAA nearby
-
-                aiBrain[refbACUVulnerableToAirSnipe] = true
-                aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.75)
-                local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
-                local iNearbyMAAThreat = 0
-                if M27Utilities.IsTableEmpty(tNearbyMAA) == false then
-                    iNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false, nil, nil, nil, nil, nil)
-                end
-                if iNearbyMAAThreat <= 400 then
-                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU very vulnerable to Air snipe, will retreat even if on full health') end
-                elseif iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 4000 then
-                    if bDebugMessages == true then LOG(sFunctionRef..': ACU vulnerable to air snipe, but not massively, so will just retreat if not quite full health') end
-                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
-                end
-            else
-                --Are we far away from the air rally point, and lack much MAA support? If so then set health to run on between 90-100%
-                if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27AirOverseer.GetAirRallyPoint(aiBrain)) >= 150 then
-                    local iACUShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU, true)
-                    if oACU:GetHealth() + iACUShield < 19000 then
-
-                        local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
-                        local iNearbyMAAThreat = 0
-                        if M27Utilities.IsTableEmpty(tNearbyMAA) == false then
-                            iNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false, nil, nil, nil, nil, nil)
+            --Increase health to run on if enemy has air nearby and we lack AA
+            if aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
+                local bHaveNearbyMAA = false
+                if oACU[refoUnitsMAAHelper] and M27Utilities.IsTableEmpty(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits]) == false then
+                    local oNearestMAA = M27Utilities.GetNearestUnit(oACU[refoUnitsMAAHelper][M27PlatoonUtilities.reftCurrentUnits], oACU:GetPosition(), aiBrain)
+                    if M27UnitInfo.IsUnitValid(oNearestMAA) then
+                        if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oNearestMAA:GetPosition()) <= 30 then
+                            bHaveNearbyMAA = true
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': More than 150 from nearest air rally point. iNearbyMAAThreat='..iNearbyMAAThreat..'; Enemy air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]) end
-                        if iNearbyMAAThreat <= math.min(400, math.max(200, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.1)) then
-                            if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 3000 then
-                                aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby and AirAA is a long way away so will run even if on full health') end
-                            else
-                                local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, oACU:GetPosition(), 70, 'Enemy')
-                                if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby enemy air empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
-                                if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
+                    end
+                end
+                if not (bHaveNearbyMAA) then
+                    if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 and aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] >= 2000 and not(oACU:HasEnhancement('CloakingGenerator')) and not(aiBrain[M27AirOverseer.refbHaveAirControl]) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Lack air control and enemy has T3 air so setting ACU health to run at ACU max health') end
+                        aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                    else
+                        local tEnemyAirThreats = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGunship + M27UnitInfo.refCategoryBomber + M27UnitInfo.refCategoryTorpBomber, oACU:GetPosition(), 40, 'Enemy')
+                        if M27Utilities.IsTableEmpty(tEnemyAirThreats) == false then
+                            aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Nearby enemy air threats so setting health to run at 95% of ACU health') end
+                        end
+                    end
+                end
+            end
+
+            --Increase health to run on if ACU has recently taken torpedo damage
+            if GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100) <= 60 and not(oACU:HasEnhancement('NaniteTorpedoTube')) then
+                aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.85)
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU recently taken unseen or torpedo damage so setting health to run to 85% of its health') end
+            end
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': Finished setting ACU health to run on. ACU max health=' .. oACU:GetMaxHealth() .. '; ACU health to run on=' .. aiBrain[refiACUHealthToRunOn])
+            end
+
+            --Increase health to run if we are on enemy side of the map
+            local iDistToOurBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            local iDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
+
+
+            --Flag we need AirAA as an emergency and set ACU health to run equal to max health if we fear an air snipe
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering if vulnerable to air snipe. iDistToOurBase='..iDistToOurBase..'; have air control='..tostring(aiBrain[M27AirOverseer.refbHaveAirControl])..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]..'; aiBrain[M27AirOverseer.refiOurMassInAirAA]='..aiBrain[M27AirOverseer.refiOurMassInAirAA]..'; Enemy AirAA threat='..aiBrain[M27AirOverseer.refiEnemyAirAAThreat]) end
+            if iDistToOurBase >= 200 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1500 and not(oACU:HasEnhancement('CloakingGenerator')) then
+                aiBrain[refbACUVulnerableToAirSnipe] = true
+                --Potential air threat; will distinguish between the following scenarios:
+                --High risk of air snipe requiring emergency AA production
+                --Risk of air snipe due to being far away from AirAA support
+
+                if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and aiBrain[M27AirOverseer.refiOurMassInAirAA] <= math.max(2000, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.5) then
+                    --High risk of air snipe.  Set health to run equal to 75% normally, or 100% if we have weak MAA nearby
+
+                    aiBrain[refbACUVulnerableToAirSnipe] = true
+                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.75)
+                    local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
+                    local iNearbyMAAThreat = 0
+                    if M27Utilities.IsTableEmpty(tNearbyMAA) == false then
+                        iNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false, nil, nil, nil, nil, nil)
+                    end
+                    if iNearbyMAAThreat <= 400 then
+                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU very vulnerable to Air snipe, will retreat even if on full health') end
+                    elseif iNearbyMAAThreat <= 750 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 4000 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': ACU vulnerable to air snipe, but not massively, so will just retreat if not quite full health') end
+                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
+                    end
+                else
+                    --Are we far away from the air rally point, and lack much MAA support? If so then set health to run on between 90-100%
+                    if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27AirOverseer.GetAirRallyPoint(aiBrain)) >= 150 then
+                        local iACUShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU, true)
+                        if oACU:GetHealth() + iACUShield < 19000 then
+
+                            local tNearbyMAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMAA, oACU:GetPosition(), 60, 'Ally')
+                            local iNearbyMAAThreat = 0
+                            if M27Utilities.IsTableEmpty(tNearbyMAA) == false then
+                                iNearbyMAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyMAA, false, false, true, false, false, nil, nil, nil, nil, nil)
+                            end
+                            if bDebugMessages == true then LOG(sFunctionRef..': More than 150 from nearest air rally point. iNearbyMAAThreat='..iNearbyMAAThreat..'; Enemy air to ground threat='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]) end
+                            if iNearbyMAAThreat <= math.min(400, math.max(200, aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] * 0.1)) then
+                                if aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 3000 then
                                     aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby, enemy has nearby air threats, and AirAA is a long way away so will run even if on full health') end
-                                elseif iNearbyMAAThreat <= 400 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 4000 then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': have some MAA but still not much and enemy has high overall air threat so will run if take much damage') end
-                                    aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby and AirAA is a long way away so will run even if on full health') end
+                                else
+                                    local tNearbyEnemyAir = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, oACU:GetPosition(), 70, 'Enemy')
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of nearby enemy air empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEnemyAir))) end
+                                    if M27Utilities.IsTableEmpty(tNearbyEnemyAir) == false then
+                                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth())
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have little MAA nearby, enemy has nearby air threats, and AirAA is a long way away so will run even if on full health') end
+                                    elseif iNearbyMAAThreat <= 400 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 4000 then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': have some MAA but still not much and enemy has high overall air threat so will run if take much damage') end
+                                        aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], oACU:GetMaxHealth() * 0.9)
+                                    end
                                 end
                             end
                         end
                     end
+
                 end
-
+            else
+                aiBrain[refbACUVulnerableToAirSnipe] = false
             end
-        else
-            aiBrain[refbACUVulnerableToAirSnipe] = false
+
+
+            if iDistToOurBase > iDistToEnemyBase then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.975)) end
+
+            --Increase health to run if we lack basic intel coverage
+            if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oACU:GetPosition(), 30, false)) then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.975)) end
+
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating health for ACU to run on. aiBrain[refiACUHealthToRunOn]='..aiBrain[refiACUHealthToRunOn]..'; refbACUVulnerableToAirSnipe='..tostring(aiBrain[refbACUVulnerableToAirSnipe])) end
+
+
+
         end
-
-
-        if iDistToOurBase > iDistToEnemyBase then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.975)) end
-
-        --Increase health to run if we lack basic intel coverage
-        if not(M27Logic.GetIntelCoverageOfPosition(aiBrain, oACU:GetPosition(), 30, false)) then aiBrain[refiACUHealthToRunOn] = math.max(aiBrain[refiACUHealthToRunOn], math.min(aiBrain[refiACUHealthToRunOn] + oACU:GetMaxHealth() * 0.05, oACU:GetMaxHealth() * 0.975)) end
-
-        if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating health for ACU to run on. aiBrain[refiACUHealthToRunOn]='..aiBrain[refiACUHealthToRunOn]..'; refbACUVulnerableToAirSnipe='..tostring(aiBrain[refbACUVulnerableToAirSnipe])) end
-
-
-
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -7432,311 +7435,315 @@ function RecordAllEnemiesAndAllies(aiBrain)
     WaitSeconds(1) --Note - when waited 4 seconds this would run after the strategic overseer code, which would be checking things like unclaimedm exes and lead to an error
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': Finished waiting 1.5s for brain with armyindex=' .. aiBrain:GetArmyIndex() .. '; will proceed with updating enemy and ally list. GameTime=' .. GetGameTimeSeconds())
+        LOG(sFunctionRef .. ': Finished waiting 1.5s for brain with armyindex=' .. aiBrain:GetArmyIndex() .. '; will proceed with updating enemy and ally list. GameTime=' .. GetGameTimeSeconds()..'; refbAllEnemiesDead='..tostring(aiBrain[M27Logic.refbAllEnemiesDead] or false))
     end
-    local iOurIndex = aiBrain:GetArmyIndex()
-    local iEnemyCount = 0
-    local iAllyCount = 0
-    local iArmyIndex
+    if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
+        local iOurIndex = aiBrain:GetArmyIndex()
+        local iEnemyCount = 0
+        local iAllyCount = 0
+        local iArmyIndex
 
-    tAllActiveM27Brains = {}
-    if M27Utilities.IsTableEmpty(ArmyBrains) == false then
-        if bDebugMessages == true then LOG(sFunctionRef..': Army brains isnt empty so will cycle through all of these brains') end
-        aiBrain[toEnemyBrains] = {}
-        aiBrain[toAllyBrains] = {}
+        tAllActiveM27Brains = {}
+        if M27Utilities.IsTableEmpty(ArmyBrains) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Army brains isnt empty so will cycle through all of these brains') end
+            aiBrain[toEnemyBrains] = {}
+            aiBrain[toAllyBrains] = {}
 
-        for iCurBrain, oBrain in ArmyBrains do
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Considering whether brain with armyindex =' .. oBrain:GetArmyIndex() .. ' is defeated and is enemy or ally.')
-            end
-            if not (oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
-                --if not(oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
+            for iCurBrain, oBrain in ArmyBrains do
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Brain isnt defeated. IsEnemy='..tostring(IsEnemy(iOurIndex, oBrain:GetArmyIndex()))..'; IsCivilian='..tostring(M27Logic.IsCivilianBrain(oBrain))..'; NoEnemies='..tostring((aiBrain[refbNoEnemies] or false)))
+                    LOG(sFunctionRef .. ': Considering whether brain with armyindex =' .. oBrain:GetArmyIndex() .. ' is defeated and is enemy or ally.')
                 end
-                iArmyIndex = oBrain:GetArmyIndex()
-                tAllAIBrainsByArmyIndex[iArmyIndex] = oBrain
-                if oBrain.M27AI then
-                    tAllActiveM27Brains[iArmyIndex] = oBrain
+                if not (oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
+                    --if not(oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Brain isnt defeated. IsEnemy='..tostring(IsEnemy(iOurIndex, oBrain:GetArmyIndex()))..'; IsCivilian='..tostring(M27Logic.IsCivilianBrain(oBrain))..'; NoEnemies='..tostring((aiBrain[refbNoEnemies] or false)))
+                    end
+                    iArmyIndex = oBrain:GetArmyIndex()
+                    tAllAIBrainsByArmyIndex[iArmyIndex] = oBrain
+                    if oBrain.M27AI then
+                        tAllActiveM27Brains[iArmyIndex] = oBrain
+                    end
+                    if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) and (not (M27Logic.IsCivilianBrain(oBrain)) or aiBrain[refbNoEnemies]) then
+                        iEnemyCount = iEnemyCount + 1
+                        aiBrain[toEnemyBrains][iArmyIndex] = oBrain
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': aiBrain Index=' .. aiBrain:GetArmyIndex() .. '; enemy index=' .. iArmyIndex .. '; recording as an enemy; start position number=' .. oBrain.M27StartPositionNumber .. '; start position=' .. repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]))
+                        end
+                    elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not (oBrain == aiBrain) and not(M27Logic.IsCivilianBrain(oBrain)) then
+                        iAllyCount = iAllyCount + 1
+                        aiBrain[toAllyBrains][iArmyIndex] = oBrain
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Added brain with army index=' .. iArmyIndex .. ' as an ally for the brain with an army index ' .. aiBrain:GetArmyIndex())
+                        end
+                    end
+                    if oBrain.M27StartPositionNumber then
+                        M27MapInfo.UpdateNewPrimaryBaseLocation(oBrain)
+                    end
+
+                    --Update details of each enemy distance to us
+                    if oBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) == false then
+                        oBrain[tiDistToPlayerByIndex] = {}
+                        for iOtherBrain, oOtherBrain in ArmyBrains do
+                            if not(oOtherBrain:IsDefeated()) and not(oOtherBrain.M27IsDefeated) and oOtherBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber]) == false  then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering distance between oBrain '..oBrain:GetArmyIndex()..' and oOtherBrain '..oOtherBrain:GetArmyIndex()..'; oBrain start number='..(oBrain.M27StartPositionNumber or 'nil')..'; oOtherBrain start number='..(oOtherBrain.M27StartPositionNumber or 'nil')..'; oBrain start position='..repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])..'; oOtherBrain start position='..repru(M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber])) end
+                                oBrain[tiDistToPlayerByIndex][oOtherBrain:GetArmyIndex()] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber])
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished updating tiDistToPlayerByIndex for brain '..oBrain.Nickname..'; result='..repru(oBrain[tiDistToPlayerByIndex])) end
+                    end
+
+
+
+                elseif bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Brain is defeated')
                 end
-                if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) and (not (M27Logic.IsCivilianBrain(oBrain)) or aiBrain[refbNoEnemies]) then
+            end
+            iPlayersAtGameStart = iAllyCount + iEnemyCount
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through tAllAIBrainsByArmyIndex brains') end
+            for iCurBrain, oBrain in tAllAIBrainsByArmyIndex do
+                if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
                     iEnemyCount = iEnemyCount + 1
-                    aiBrain[toEnemyBrains][iArmyIndex] = oBrain
+                    aiBrain[toEnemyBrains][oBrain:GetArmyIndex()] = oBrain
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': aiBrain Index=' .. aiBrain:GetArmyIndex() .. '; enemy index=' .. iArmyIndex .. '; recording as an enemy; start position number=' .. oBrain.M27StartPositionNumber .. '; start position=' .. repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]))
                     end
-                elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not (oBrain == aiBrain) and not(M27Logic.IsCivilianBrain(oBrain)) then
+                elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not (oBrain == aiBrain) then
                     iAllyCount = iAllyCount + 1
                     aiBrain[toAllyBrains][iArmyIndex] = oBrain
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Added brain with army index=' .. iArmyIndex .. ' as an ally for the brain with an army index ' .. aiBrain:GetArmyIndex())
-                    end
                 end
                 if oBrain.M27StartPositionNumber then
                     M27MapInfo.UpdateNewPrimaryBaseLocation(oBrain)
                 end
-
-                --Update details of each enemy distance to us
-                if oBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) == false then
-                    oBrain[tiDistToPlayerByIndex] = {}
-                    for iOtherBrain, oOtherBrain in ArmyBrains do
-                        if not(oOtherBrain:IsDefeated()) and not(oOtherBrain.M27IsDefeated) and oOtherBrain.M27StartPositionNumber and M27Utilities.IsTableEmpty(M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber]) == false  then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Considering distance between oBrain '..oBrain:GetArmyIndex()..' and oOtherBrain '..oOtherBrain:GetArmyIndex()..'; oBrain start number='..(oBrain.M27StartPositionNumber or 'nil')..'; oOtherBrain start number='..(oOtherBrain.M27StartPositionNumber or 'nil')..'; oBrain start position='..repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])..'; oOtherBrain start position='..repru(M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber])) end
-                            oBrain[tiDistToPlayerByIndex][oOtherBrain:GetArmyIndex()] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[oOtherBrain.M27StartPositionNumber])
-                        end
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Finished updating tiDistToPlayerByIndex for brain '..oBrain.Nickname..'; result='..repru(oBrain[tiDistToPlayerByIndex])) end
-                end
-
-
-
-            elseif bDebugMessages == true then
-                LOG(sFunctionRef .. ': Brain is defeated')
             end
         end
-        iPlayersAtGameStart = iAllyCount + iEnemyCount
-    else
-        if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through tAllAIBrainsByArmyIndex brains') end
-        for iCurBrain, oBrain in tAllAIBrainsByArmyIndex do
-            if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
-                iEnemyCount = iEnemyCount + 1
-                aiBrain[toEnemyBrains][oBrain:GetArmyIndex()] = oBrain
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': aiBrain Index=' .. aiBrain:GetArmyIndex() .. '; enemy index=' .. iArmyIndex .. '; recording as an enemy; start position number=' .. oBrain.M27StartPositionNumber .. '; start position=' .. repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]))
-                end
-            elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not (oBrain == aiBrain) then
-                iAllyCount = iAllyCount + 1
-                aiBrain[toAllyBrains][iArmyIndex] = oBrain
+        --Do we have a team set?
+        if not (aiBrain.M27Team) then
+            M27Team.iTotalTeamCount = M27Team.iTotalTeamCount + 1
+            aiBrain.M27Team = M27Team.iTotalTeamCount
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team]) then
+                M27Team.tTeamData[aiBrain.M27Team] = {}
             end
-            if oBrain.M27StartPositionNumber then
-                M27MapInfo.UpdateNewPrimaryBaseLocation(oBrain)
-            end
-        end
-    end
-    --Do we have a team set?
-    if not (aiBrain.M27Team) then
-        M27Team.iTotalTeamCount = M27Team.iTotalTeamCount + 1
-        aiBrain.M27Team = M27Team.iTotalTeamCount
-        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team]) then
-            M27Team.tTeamData[aiBrain.M27Team] = {}
-        end
-        M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] = {}
-        M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][aiBrain:GetArmyIndex()] = aiBrain
+            M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] = {}
+            M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][aiBrain:GetArmyIndex()] = aiBrain
 
-        for iCurBrain, oBrain in aiBrain[toAllyBrains] do
-            oBrain.M27Team = M27Team.iTotalTeamCount
-            if oBrain.M27AI then
-                M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
-            end
-        end
-
-        M27Team.TeamInitialisation(M27Team.iTotalTeamCount)
-    end
-
-
-    --Record if we have omni vision for every AI in our team; want to do here so this re-runs whenever an AI dies
-    local bHaveOmniVision = false
-    if bDebugMessages == true then LOG(sFunctionRef..': Omni cheat setting='..ScenarioInfo.Options.OmniCheat..'; Does this equal on='..tostring(ScenarioInfo.Options.OmniCheat == 'on')) end
-    if ScenarioInfo.Options.OmniCheat == 'on' then
-        if aiBrain.CheatEnabled then
-            bHaveOmniVision = true
-        else
             for iCurBrain, oBrain in aiBrain[toAllyBrains] do
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering AI '..oBrain.Nickname..'; .CheatEnabled='..tostring( oBrain.CheatEnabled)) end
+                oBrain.M27Team = M27Team.iTotalTeamCount
+                if oBrain.M27AI then
+                    M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
+                end
+            end
+
+            M27Team.TeamInitialisation(M27Team.iTotalTeamCount)
+        end
+
+
+        --Record if we have omni vision for every AI in our team; want to do here so this re-runs whenever an AI dies
+        local bHaveOmniVision = false
+        if bDebugMessages == true then LOG(sFunctionRef..': Omni cheat setting='..ScenarioInfo.Options.OmniCheat..'; Does this equal on='..tostring(ScenarioInfo.Options.OmniCheat == 'on')) end
+        if ScenarioInfo.Options.OmniCheat == 'on' then
+            if aiBrain.CheatEnabled then
+                bHaveOmniVision = true
+            else
+                for iCurBrain, oBrain in aiBrain[toAllyBrains] do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering AI '..oBrain.Nickname..'; .CheatEnabled='..tostring( oBrain.CheatEnabled)) end
+                    if oBrain.CheatEnabled then
+                        bHaveOmniVision = true
+                        break
+                    end
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Do any of our team have omni vision='..tostring(bHaveOmniVision)) end
+            for iCurBrain, oBrain in aiBrain[toAllyBrains] do
+                oBrain[M27AirOverseer.refbHaveOmniVision] = bHaveOmniVision
+            end
+            aiBrain[M27AirOverseer.refbHaveOmniVision] = bHaveOmniVision
+            if bDebugMessages == true then LOG(sFunctionRef..': Brain '..aiBrain.Nickname..': Has Omni Vision='..tostring(aiBrain[M27AirOverseer.refbHaveOmniVision])) end
+        end
+
+        --Group enemies
+        aiBrain[reftoNearestEnemyBrainByGroup] = {}
+        local iCurAngle, iNearestAngle, iCurDistance, iNearestDistance
+        local iLastGroup = 0
+        local iCurGroup = 1
+        local iNearestBrainRef
+        --local tEnemyBrainsByGroup = {}
+        local tOurBase = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        local tBrainsNeedingAGroup = {}
+        for iEnemy, oBrain in aiBrain[toEnemyBrains] do
+            if not (oBrain:IsDefeated()) and not(aiBrain.M27IsDefeated) then
+                tBrainsNeedingAGroup[iEnemy] = oBrain
+
+            end
+        end
+
+        --Determine if any enemy brains have map wide omni vision
+        local bEnemyHaveOmni = false
+        if ScenarioInfo.Options.OmniCheat == 'on' then
+            for iEnemyBrain, oBrain in tBrainsNeedingAGroup do
                 if oBrain.CheatEnabled then
-                    bHaveOmniVision = true
+                    bEnemyHaveOmni = true
                     break
                 end
             end
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': Do any of our team have omni vision='..tostring(bHaveOmniVision)) end
-        for iCurBrain, oBrain in aiBrain[toAllyBrains] do
-            oBrain[M27AirOverseer.refbHaveOmniVision] = bHaveOmniVision
+        for iBrain, oBrain in aiBrain[toAllyBrains] do
+            oBrain[M27AirOverseer.refbEnemyHasOmniVision] = bEnemyHaveOmni
         end
-        aiBrain[M27AirOverseer.refbHaveOmniVision] = bHaveOmniVision
-        if bDebugMessages == true then LOG(sFunctionRef..': Brain '..aiBrain.Nickname..': Has Omni Vision='..tostring(aiBrain[M27AirOverseer.refbHaveOmniVision])) end
-    end
-
-    --Group enemies
-    aiBrain[reftoNearestEnemyBrainByGroup] = {}
-    local iCurAngle, iNearestAngle, iCurDistance, iNearestDistance
-    local iLastGroup = 0
-    local iCurGroup = 1
-    local iNearestBrainRef
-    --local tEnemyBrainsByGroup = {}
-    local tOurBase = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    local tBrainsNeedingAGroup = {}
-    for iEnemy, oBrain in aiBrain[toEnemyBrains] do
-        if not (oBrain:IsDefeated()) and not(aiBrain.M27IsDefeated) then
-            tBrainsNeedingAGroup[iEnemy] = oBrain
-
-        end
-    end
-
-    --Determine if any enemy brains have map wide omni vision
-    local bEnemyHaveOmni = false
-    if ScenarioInfo.Options.OmniCheat == 'on' then
-        for iEnemyBrain, oBrain in tBrainsNeedingAGroup do
-            if oBrain.CheatEnabled then
-                bEnemyHaveOmni = true
-                break
-            end
-        end
-    end
-    for iBrain, oBrain in aiBrain[toAllyBrains] do
-        oBrain[M27AirOverseer.refbEnemyHasOmniVision] = bEnemyHaveOmni
-    end
-    aiBrain[M27AirOverseer.refbEnemyHasOmniVision] = bEnemyHaveOmni
+        aiBrain[M27AirOverseer.refbEnemyHasOmniVision] = bEnemyHaveOmni
 
 
-    while iLastGroup < iCurGroup do
-        --[[if iCurGroup > 1 then
-                for iEnemy, oBrain in tEnemyBrainsByGroup[iLastGroup] do
-                    tBrainsNeedingAGroup[iEnemy] = nil
-                end
-            end--]]
+        while iLastGroup < iCurGroup do
+            --[[if iCurGroup > 1 then
+                    for iEnemy, oBrain in tEnemyBrainsByGroup[iLastGroup] do
+                        tBrainsNeedingAGroup[iEnemy] = nil
+                    end
+                end--]]
 
-        iLastGroup = iCurGroup
-        --tEnemyBrainsByGroup[iCurGroup] = {}
-        iNearestDistance = 10000
-        iNearestBrainRef = nil
-        for iEnemy, oBrain in tBrainsNeedingAGroup do
-            --Get nearest enemy
-            iCurDistance = M27Utilities.GetDistanceBetweenPositions(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
-            if iCurDistance < iNearestDistance then
-                iNearestDistance = iCurDistance
-                iNearestBrainRef = iEnemy
-            end
-        end
-        local tNearestEnemyBase = M27MapInfo.PlayerStartPoints[tBrainsNeedingAGroup[iNearestBrainRef].M27StartPositionNumber]
-        if M27Utilities.IsTableEmpty(tNearestEnemyBase) then
-            M27Utilities.ErrorHandler('Dont have a nearby enemy base set, will abort')
-            break
-        else
-
-            aiBrain[reftoNearestEnemyBrainByGroup][iLastGroup] = tBrainsNeedingAGroup[iNearestBrainRef]
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': Nearest enemy brain for group ' .. iLastGroup .. '=' .. tBrainsNeedingAGroup[iNearestBrainRef]:GetArmyIndex())
-            end
-            --Calc angle to nearest enemy and if any remaining enemies outside this
-            iNearestAngle = M27Utilities.GetAngleFromAToB(tOurBase, tNearestEnemyBase)
+            iLastGroup = iCurGroup
+            --tEnemyBrainsByGroup[iCurGroup] = {}
+            iNearestDistance = 10000
+            iNearestBrainRef = nil
             for iEnemy, oBrain in tBrainsNeedingAGroup do
-                iCurAngle = M27Utilities.GetAngleFromAToB(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
-                if math.abs(iNearestAngle - iCurAngle) > 45 then
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': oBrain with index ' .. oBrain:GetArmyIndex() .. ' has iCurAngle=' .. iCurAngle .. '; iNearestAngle=' .. iNearestAngle .. '; >45 so need another group after this one.  Cur group=' .. iLastGroup)
-                    end
-                    if iCurGroup == iLastGroup then
-                        iCurGroup = iCurGroup + 1
-                    end
-                else
-                    --Dont need to keep looking for this brain
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': Dont need to keep looking for brain ' .. oBrain:GetArmyIndex() .. ' as it is close to this group so removing it from list of brains needing a group')
-                    end
-                    tBrainsNeedingAGroup[iEnemy] = nil
+                --Get nearest enemy
+                iCurDistance = M27Utilities.GetDistanceBetweenPositions(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
+                if iCurDistance < iNearestDistance then
+                    iNearestDistance = iCurDistance
+                    iNearestBrainRef = iEnemy
                 end
             end
-            if bDebugMessages == true then
-                local iRemainingBrains = 0
-                if M27Utilities.IsTableEmpty(tBrainsNeedingAGroup) == false then
-                    for iBrain, oBrain in tBrainsNeedingAGroup do
-                        iRemainingBrains = iRemainingBrains + 1
-                        LOG(sFunctionRef .. ': Remaining brain: iBrain=' .. iBrain .. '; ArmyIndex=' .. oBrain:GetArmyIndex() .. '; total remaining brains so far=' .. iRemainingBrains)
+            local tNearestEnemyBase = M27MapInfo.PlayerStartPoints[tBrainsNeedingAGroup[iNearestBrainRef].M27StartPositionNumber]
+            if M27Utilities.IsTableEmpty(tNearestEnemyBase) then
+                if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
+                    M27Utilities.ErrorHandler('Dont have a nearby enemy base set, will abort')
+                    break
+                end
+            else
+
+                aiBrain[reftoNearestEnemyBrainByGroup][iLastGroup] = tBrainsNeedingAGroup[iNearestBrainRef]
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Nearest enemy brain for group ' .. iLastGroup .. '=' .. tBrainsNeedingAGroup[iNearestBrainRef]:GetArmyIndex())
+                end
+                --Calc angle to nearest enemy and if any remaining enemies outside this
+                iNearestAngle = M27Utilities.GetAngleFromAToB(tOurBase, tNearestEnemyBase)
+                for iEnemy, oBrain in tBrainsNeedingAGroup do
+                    iCurAngle = M27Utilities.GetAngleFromAToB(tOurBase, M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber])
+                    if math.abs(iNearestAngle - iCurAngle) > 45 then
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': oBrain with index ' .. oBrain:GetArmyIndex() .. ' has iCurAngle=' .. iCurAngle .. '; iNearestAngle=' .. iNearestAngle .. '; >45 so need another group after this one.  Cur group=' .. iLastGroup)
+                        end
+                        if iCurGroup == iLastGroup then
+                            iCurGroup = iCurGroup + 1
+                        end
+                    else
+                        --Dont need to keep looking for this brain
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Dont need to keep looking for brain ' .. oBrain:GetArmyIndex() .. ' as it is close to this group so removing it from list of brains needing a group')
+                        end
+                        tBrainsNeedingAGroup[iEnemy] = nil
                     end
                 end
-            end
-        end
-    end
-    if M27Utilities.IsTableEmpty(aiBrain[reftoNearestEnemyBrainByGroup]) then
-        M27Utilities.ErrorHandler('No enemy brains detected for any group')
-    end
-
-
-    --Set mod distance emergency range
-    aiBrain[refiModDistEmergencyRange] = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.4, 150), aiBrain[refiDistanceToNearestEnemyBase] * 0.15)
-
-    --Update nearest ACU
-    aiBrain[reftLastNearestACU] = M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(M27Logic.GetNearestEnemyIndex(aiBrain, false))]
-    aiBrain[refoLastNearestACU] = M27Utilities.GetACU(tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain, false)])
-
-    --Force refresh of plateaus to consider expanding to since those of interest may have changed
-    ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain, true, true)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    WaitTicks(1) --wait 1 tick before checking enemy brains, so any M27brains can run the above function themselves
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
-    --REDUNDANCY (code in overseer initialisation triggers first)
-    if aiBrain.M27AI and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) then
-        if GetGameTimeSeconds() <= 10 then
-            --REDUNDANCY (code in overseer initialisation triggers first)
-            M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI may not function as expected', 0, 10)
-            aiBrain[refbNoEnemies] = true
-            if bDebugMessages == true then LOG(sFunctionRef..': Rdundancy as no enemybrains, Setting no enemies to be true') end
-        end
-    else
-        --Assign enemies to a team if not already
-        for iEnemyBrain, oEnemyBrain in aiBrain[toEnemyBrains] do
-            if not (oEnemyBrain.M27Team) then
-                M27Team.iTotalTeamCount = M27Team.iTotalTeamCount + 1
-                oEnemyBrain.M27Team = M27Team.iTotalTeamCount
-                if M27Utilities.IsTableEmpty(M27Team.tTeamData[oEnemyBrain.M27Team]) then
-                    M27Team.tTeamData[oEnemyBrain.M27Team] = {}
-                end
-                M27Team.tTeamData[oEnemyBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] = {}
-                if oEnemyBrain.M27AI then
-                    M27Team.tTeamData[oEnemyBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][oEnemyBrain:GetArmyIndex()] = oEnemyBrain
-                end
-                for iCurBrain, oBrain in aiBrain[toEnemyBrains] do
-                    if not (oBrain.M27Team) and IsAlly(oBrain:GetArmyIndex(), oEnemyBrain:GetArmyIndex()) then
-                        oBrain.M27Team = M27Team.iTotalTeamCount
-                        if oBrain.M27AI then
-                            --redundancy - should have already recorded
-                            M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
+                if bDebugMessages == true then
+                    local iRemainingBrains = 0
+                    if M27Utilities.IsTableEmpty(tBrainsNeedingAGroup) == false then
+                        for iBrain, oBrain in tBrainsNeedingAGroup do
+                            iRemainingBrains = iRemainingBrains + 1
+                            LOG(sFunctionRef .. ': Remaining brain: iBrain=' .. iBrain .. '; ArmyIndex=' .. oBrain:GetArmyIndex() .. '; total remaining brains so far=' .. iRemainingBrains)
                         end
                     end
                 end
             end
         end
-    end
+        if M27Utilities.IsTableEmpty(aiBrain[reftoNearestEnemyBrainByGroup]) then
+            M27Utilities.ErrorHandler('No enemy brains detected for any group')
+        end
 
-    --Update chokepoints (note for now this will only call once per game)
-    ForkThread(M27MapInfo.IdentifyTeamChokepoints, aiBrain)
 
-    --Record impathable area around base if no chokepoint
-    ForkThread(M27MapInfo.IdentifyImpathableAreaAroundBase, aiBrain)
+        --Set mod distance emergency range
+        aiBrain[refiModDistEmergencyRange] = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.4, 150), aiBrain[refiDistanceToNearestEnemyBase] * 0.15)
 
-    --Reset nearest base if no enemies, since the logic for nearest enemy runs before identifying all allies (but needs details of all allies to work)
-    if aiBrain[refbNoEnemies] and GetGameTimeSeconds() <= 10 then
-        aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation] = nil
-        M27MapInfo.UpdateNewPrimaryBaseLocation(aiBrain)
-    end
+        --Update nearest ACU
+        aiBrain[reftLastNearestACU] = M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(M27Logic.GetNearestEnemyIndex(aiBrain, false))]
+        aiBrain[refoLastNearestACU] = M27Utilities.GetACU(tAllAIBrainsByArmyIndex[M27Logic.GetNearestEnemyIndex(aiBrain, false)])
 
-    --Record teams that share our pathing group
-    local tiTeamsWithSamePathingGroup = {}
-    function IsBrainInSamePathingGroup(oBrain)
-        if not(M27Logic.IsCivilianBrain(oBrain)) and oBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] then
-            return true
+        --Force refresh of plateaus to consider expanding to since those of interest may have changed
+        ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain, true, true)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitTicks(1) --wait 1 tick before checking enemy brains, so any M27brains can run the above function themselves
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+        --REDUNDANCY (code in overseer initialisation triggers first)
+        if aiBrain.M27AI and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) then
+            if GetGameTimeSeconds() <= 10 then
+                --REDUNDANCY (code in overseer initialisation triggers first)
+                M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI may not function as expected', 0, 10)
+                aiBrain[refbNoEnemies] = true
+                if bDebugMessages == true then LOG(sFunctionRef..': Rdundancy as no enemybrains, Setting no enemies to be true') end
+            end
         else
-            return false
+            --Assign enemies to a team if not already
+            for iEnemyBrain, oEnemyBrain in aiBrain[toEnemyBrains] do
+                if not (oEnemyBrain.M27Team) then
+                    M27Team.iTotalTeamCount = M27Team.iTotalTeamCount + 1
+                    oEnemyBrain.M27Team = M27Team.iTotalTeamCount
+                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[oEnemyBrain.M27Team]) then
+                        M27Team.tTeamData[oEnemyBrain.M27Team] = {}
+                    end
+                    M27Team.tTeamData[oEnemyBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] = {}
+                    if oEnemyBrain.M27AI then
+                        M27Team.tTeamData[oEnemyBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][oEnemyBrain:GetArmyIndex()] = oEnemyBrain
+                    end
+                    for iCurBrain, oBrain in aiBrain[toEnemyBrains] do
+                        if not (oBrain.M27Team) and IsAlly(oBrain:GetArmyIndex(), oEnemyBrain:GetArmyIndex()) then
+                            oBrain.M27Team = M27Team.iTotalTeamCount
+                            if oBrain.M27AI then
+                                --redundancy - should have already recorded
+                                M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains][oBrain:GetArmyIndex()] = oBrain
+                            end
+                        end
+                    end
+                end
+            end
         end
 
-    end
-    for iBrain, oBrain in tAllAIBrainsByArmyIndex do
-        if IsBrainInSamePathingGroup(oBrain) then
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..' with index '..oBrain:GetArmyIndex()..'; Brain team='..(oBrain.M27Team or 'nil')) end
-            tiTeamsWithSamePathingGroup[oBrain.M27Team] = true
+        --Update chokepoints (note for now this will only call once per game)
+        ForkThread(M27MapInfo.IdentifyTeamChokepoints, aiBrain)
+
+        --Record impathable area around base if no chokepoint
+        ForkThread(M27MapInfo.IdentifyImpathableAreaAroundBase, aiBrain)
+
+        --Reset nearest base if no enemies, since the logic for nearest enemy runs before identifying all allies (but needs details of all allies to work)
+        if aiBrain[refbNoEnemies] and GetGameTimeSeconds() <= 10 then
+            aiBrain[M27MapInfo.reftPrimaryEnemyBaseLocation] = nil
+            M27MapInfo.UpdateNewPrimaryBaseLocation(aiBrain)
         end
-    end
-    local iCountOfTeamsWithSamePathingGroup = 0
-    for iEntry, bEntry in tiTeamsWithSamePathingGroup do
-        if bEntry then
-            iCountOfTeamsWithSamePathingGroup = iCountOfTeamsWithSamePathingGroup + 1
+
+        --Record teams that share our pathing group
+        local tiTeamsWithSamePathingGroup = {}
+        function IsBrainInSamePathingGroup(oBrain)
+            if not(M27Logic.IsCivilianBrain(oBrain)) and oBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] == aiBrain[M27MapInfo.refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] then
+                return true
+            else
+                return false
+            end
+
         end
-    end
-    for iBrain, oBrain in tAllAIBrainsByArmyIndex do
-        if IsBrainInSamePathingGroup(oBrain) then
-            oBrain[refiTeamsWithSameAmphibiousPathingGroup] = iCountOfTeamsWithSamePathingGroup
+        for iBrain, oBrain in tAllAIBrainsByArmyIndex do
+            if IsBrainInSamePathingGroup(oBrain) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..' with index '..oBrain:GetArmyIndex()..'; Brain team='..(oBrain.M27Team or 'nil')) end
+                tiTeamsWithSamePathingGroup[oBrain.M27Team] = true
+            end
+        end
+        local iCountOfTeamsWithSamePathingGroup = 0
+        for iEntry, bEntry in tiTeamsWithSamePathingGroup do
+            if bEntry then
+                iCountOfTeamsWithSamePathingGroup = iCountOfTeamsWithSamePathingGroup + 1
+            end
+        end
+        for iBrain, oBrain in tAllAIBrainsByArmyIndex do
+            if IsBrainInSamePathingGroup(oBrain) then
+                oBrain[refiTeamsWithSameAmphibiousPathingGroup] = iCountOfTeamsWithSamePathingGroup
+            end
         end
     end
 
