@@ -717,7 +717,7 @@ function OnBombFired(oWeapon, projectile)
                         oUnit[M27AirOverseer.refiBombsDropped] = (oUnit[M27AirOverseer.refiBombsDropped] or 0) + 1
                         oUnit[M27AirOverseer.refoLastBombTarget] = oUnit[M27AirOverseer.reftTargetList][oUnit[M27AirOverseer.refiCurTargetNumber]][M27AirOverseer.refiShortlistUnit]
                     end
-                    ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, iDelay)
+                    ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, projectile)
                 end
             end
         end

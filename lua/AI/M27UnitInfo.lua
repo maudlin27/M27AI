@@ -14,6 +14,9 @@ refPathingTypeLand = 'Land'
 refPathingTypeNone = 'None'
 refPathingTypeAll = {refPathingTypeAmphibious, refPathingTypeNavy, refPathingTypeAir, refPathingTypeLand}
 
+refiPathingCheckCount = 'M27UnitPathingCheckCount' --Increases by 1 each time do a pathing check on a unit
+refiPathingCheckTime = 'M27UnitPathingCheckTime' --Total time taken for any pathing checks on this unit
+
 --Special information
 --[[refiLastTimeGotDistanceToStart = 'M27UnitDistToStartTime'
 refiDistanceToStart = 'M27UnitDistToStartDist'
@@ -711,11 +714,13 @@ end
 function GetUpgradeMassCost(oUnit, sUpgradeRef)
     local oBP = oUnit:GetBlueprint()
     local iUpgradeMass
-    for sUpgradeID, tUpgrade in oBP.Enhancements do
-        if sUpgradeID == sUpgradeRef then
-            iUpgradeMass = tUpgrade.BuildCostMass
-        end
+    if oBP.Enhancements then
+        for sUpgradeID, tUpgrade in oBP.Enhancements do
+            if sUpgradeID == sUpgradeRef then
+                iUpgradeMass = tUpgrade.BuildCostMass
+            end
 
+        end
     end
     if not(iUpgradeMass) then M27Utilities.ErrorHandler('oUnit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeMass
@@ -724,11 +729,13 @@ end
 function GetUpgradeEnergyCost(oUnit, sUpgradeRef)
     local oBP = oUnit:GetBlueprint()
     local iUpgradeEnergy
-    for sUpgradeID, tUpgrade in oBP.Enhancements do
-        if sUpgradeID == sUpgradeRef then
-            iUpgradeEnergy = tUpgrade.BuildCostEnergy
-        end
+    if oBP.Enhancements then
+        for sUpgradeID, tUpgrade in oBP.Enhancements do
+            if sUpgradeID == sUpgradeRef then
+                iUpgradeEnergy = tUpgrade.BuildCostEnergy
+            end
 
+        end
     end
     if not(iUpgradeEnergy) then M27Utilities.ErrorHandler('oUnit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeEnergy
@@ -801,6 +808,17 @@ function GetBomberRange(oUnit)
         end
     end
     return iRange
+end
+
+function GetBomberSpeedAndTimeToReload(oBomber)
+    local oBP = oBomber:GetBlueprint()
+    local iTimeToReload = 5
+    for iWeapon, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' then
+            if tWeapon.RateOfFire > 0 then iTimeToReload = 1 / tWeapon.RateOfFire end
+        end
+    end
+    return oBP.Air.MaxAirspeed, iTimeToReload
 end
 
 function BomberMultiAttackMuzzle(oUnit)

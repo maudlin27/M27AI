@@ -109,6 +109,8 @@ tPathingSegmentGroupBySegment = {} --[a][b][c]: a = pathing type; b = segment x,
 iMaxBaseSegmentX = 1 --Will be set by pathing, sets the maximum possible base segment X
 iMaxBaseSegmentZ = 1
 
+tCliffsAroundBaseChokepoint = 'M27CliffsAroundBaseChokepoint' --against aiBrain, [x][z] = {position of nearest end of cliff}, where x is the map position x, z is the map position z, and it returns the location of the point of the closest 'break' from the chokepoint (e.g. to the left or right of a cliff formation between the aibrain's base and the nearest enemy base)
+
 iMapWaterHeight = 0 --Surface height of water on the map
 
 --NoRush details
@@ -397,6 +399,13 @@ function RecordPlayerStartLocations()
             if bDebugMessages == true then LOG(sFunctionRef..': Brain name='..oBrain.Name..'; iBrain='..iBrain..'; Start position='..repru(PlayerStartPoints[oBrain:GetArmyIndex()])) end
         end
     end
+
+    --Record start groups
+    for iBrain, oBrain in ArmyBrains do
+        if M27Utilities.IsTableEmpty(PlayerStartPoints[oBrain.M27StartPositionNumber]) == false then
+            RecordStartingPathingGroups(oBrain)
+        end
+    end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code, PlayerStartPoints='..repru(PlayerStartPoints)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -624,196 +633,212 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
     local sFunctionRef = 'RecheckPathingOfLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    local bHaveChangedPathing = false
-    if sPathing == M27UnitInfo.refPathingTypeAir then
-        --Do nothing
-    else
-        if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
-
-        if not(tOptionalComparisonKnownCorrectPoint) then
-            --[[if M27Utilities.IsTableEmpty(tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]) == false then
-                tOptionalComparisonKnownCorrectPoint = tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]
-            else--]]
-            tOptionalComparisonKnownCorrectPoint = PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber]
-            --end
+    --Ignore the check if we have had too many slowdowns for this unit
+    if oPathingUnit[M27UnitInfo.refiPathingCheckCount] and oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 2 and ((oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 10 and oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.3) or oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.7) then
+        --Do nothing, dont want to risk constant slowdowns which can happen on larger maps if a unit manages to break out of a plateau
+        if not(oPathingUnit['M27UnitMapPathingCheckAbort']) then
+            oPathingUnit['M27UnitMapPathingCheckAbort'] = true
+            M27Utilities.ErrorHandler('Wont do any more pathing checks for unit '..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..' as it already has had '..oPathingUnit[M27UnitInfo.refiPathingCheckCount]..' pathing checks and want to avoid slowdown', true)
         end
+    else
 
-        local iUnitPathingGroup = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
-        local iTargetPathingGroup = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
-        local iBasePathingGroup = GetSegmentGroupOfLocation(sPathing, tOptionalComparisonKnownCorrectPoint)
+        oPathingUnit[M27UnitInfo.refiPathingCheckCount] = (oPathingUnit[M27UnitInfo.refiPathingCheckCount] or 0) + 1
+        local iCurSystemTime = GetSystemTimeSecondsOnlyForProfileUse()
 
-        local iCurManualCheckDist
-        local sClosestManualCheckRef
+        local bHaveChangedPathing = false
+        if sPathing == M27UnitInfo.refPathingTypeAir then
+            --Do nothing
+        else
+            if sPathing == M27UnitInfo.refPathingTypeNone or sPathing == M27UnitInfo.refPathingTypeAll then sPathing = M27UnitInfo.refPathingTypeLand end
 
-        if bDebugMessages == true then LOG(sFunctionRef..': GameTIMe='..GetGameTimeSeconds()..'; Checking pathing for tTargetLocation='..repru(tTargetLocation)..' using oPathingUnit='..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)) end
+            if not(tOptionalComparisonKnownCorrectPoint) then
+                --[[if M27Utilities.IsTableEmpty(tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]) == false then
+                    tOptionalComparisonKnownCorrectPoint = tResourceNearStart[oPathingUnit:GetAIBrain():GetArmyIndex()][1][1]
+                else--]]
+                tOptionalComparisonKnownCorrectPoint = PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber]
+                --end
+            end
+
+            local iUnitPathingGroup = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
+            local iTargetPathingGroup = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
+            local iBasePathingGroup = GetSegmentGroupOfLocation(sPathing, tOptionalComparisonKnownCorrectPoint)
+
+            local iCurManualCheckDist
+            local sClosestManualCheckRef
+
+            if bDebugMessages == true then LOG(sFunctionRef..': GameTIMe='..GetGameTimeSeconds()..'; Checking pathing for tTargetLocation='..repru(tTargetLocation)..' using oPathingUnit='..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)) end
 
 
-        if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) then
-            local iClosestManualCheck = M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tOptionalComparisonKnownCorrectPoint)
-            if bDebugMessages == true then LOG(sFunctionRef..': iClosestManualCheck='..iClosestManualCheck..'; Unit position='..repru(oPathingUnit:GetPosition())..'; targetposition='..repru(tTargetLocation)) end
-            if iClosestManualCheck > 50 then
-                --Find the closest location where have done a manual check that has the same pathing group as the comparison known correct point
-                if M27Utilities.IsTableEmpty(tManualPathingChecks[sPathing]) == false then
-                    if bDebugMessages == true then LOG(sFunctionRef..'WIll go through every entry in tManualPathingChecks and see how close it is') end
-                    for sLocationRef, tLocationChecked in tManualPathingChecks[sPathing] do
-                        iCurManualCheckDist = M27Utilities.GetDistanceBetweenPositions(tLocationChecked, oPathingUnit:GetPosition())
-                        if bDebugMessages == true then LOG(sFunctionRef..': tLocationChecked='..repru(tLocationChecked)..'; iCurManualCheckDist='..iCurManualCheckDist..'; iClosestManualCheck='..iClosestManualCheck) end
-                        if iCurManualCheckDist < iClosestManualCheck and GetSegmentGroupOfLocation(sPathing, tLocationChecked) == iBasePathingGroup then
-                            sClosestManualCheckRef = sLocationRef
-                            iClosestManualCheck = iCurManualCheckDist
-                            if iClosestManualCheck <= 50 then break end
+            if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) then
+                local iClosestManualCheck = M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tOptionalComparisonKnownCorrectPoint)
+                if bDebugMessages == true then LOG(sFunctionRef..': iClosestManualCheck='..iClosestManualCheck..'; Unit position='..repru(oPathingUnit:GetPosition())..'; targetposition='..repru(tTargetLocation)) end
+                if iClosestManualCheck > 50 then
+                    --Find the closest location where have done a manual check that has the same pathing group as the comparison known correct point
+                    if M27Utilities.IsTableEmpty(tManualPathingChecks[sPathing]) == false then
+                        if bDebugMessages == true then LOG(sFunctionRef..'WIll go through every entry in tManualPathingChecks and see how close it is') end
+                        for sLocationRef, tLocationChecked in tManualPathingChecks[sPathing] do
+                            iCurManualCheckDist = M27Utilities.GetDistanceBetweenPositions(tLocationChecked, oPathingUnit:GetPosition())
+                            if bDebugMessages == true then LOG(sFunctionRef..': tLocationChecked='..repru(tLocationChecked)..'; iCurManualCheckDist='..iCurManualCheckDist..'; iClosestManualCheck='..iClosestManualCheck) end
+                            if iCurManualCheckDist < iClosestManualCheck and GetSegmentGroupOfLocation(sPathing, tLocationChecked) == iBasePathingGroup then
+                                sClosestManualCheckRef = sLocationRef
+                                iClosestManualCheck = iCurManualCheckDist
+                                if iClosestManualCheck <= 50 then break end
+                            end
                         end
                     end
                 end
             end
-        end
-        local tKnownCorrectPoint
-        if sClosestManualCheckRef then
-            tKnownCorrectPoint = tManualPathingChecks[sPathing][sClosestManualCheckRef]
-        else
-            tKnownCorrectPoint = tOptionalComparisonKnownCorrectPoint
-        end
-
-        local bCanPathToTarget = oPathingUnit:CanPathTo(tTargetLocation)
-        local bCanPathToBase = oPathingUnit:CanPathTo(tKnownCorrectPoint)
-        local bExpectedToPathToTarget = false
-        if iUnitPathingGroup == iTargetPathingGroup then bExpectedToPathToTarget = true end
-        local bExpectedToPathToBase = false
-        if iUnitPathingGroup == iBasePathingGroup then bExpectedToPathToBase = true end
-        local bTargetIsBase = false
-        if tTargetLocation[1] == tKnownCorrectPoint[1] and tTargetLocation[3] == tKnownCorrectPoint[3] then bTargetIsBase = true
-        elseif tTargetLocation[1] == PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber][1] and tTargetLocation[3] == PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber][3] then bTargetIsBase = true
-        end
-
-        if bDebugMessages == true then LOG(sFunctionRef..': About to start main checks, oPathingUnit='..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..'; iUnitPathingGroup='..iUnitPathingGroup..'; iTargetPathingGroup='..iTargetPathingGroup..'; iBasePathingGroup='..iBasePathingGroup..'; manual check for engi position='..repru(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())] or { 'nil'})..'; bCanPathToTarget='..tostring(bCanPathToTarget)..'; bCanPathToBase='..tostring(bCanPathToBase)..'; bExpectedToPathToBase='..tostring(bExpectedToPathToBase)..'; bExpectedToPathToTarget='..tostring(bExpectedToPathToTarget)) end
-
-        --Have we not checked the pathing of either the engineer position or the target?
-        if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) or not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tTargetLocation)]) then
-            local iAmphibiousOrigGroupOfTarget
-            local iAmphibiousOrigGroupOfPathingUnit
-            if sPathing == M27UnitInfo.refPathingTypeAmphibious then
-                iAmphibiousOrigGroupOfTarget = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
-                iAmphibiousOrigGroupOfPathingUnit = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
-                if bDebugMessages == true then LOG(sFunctionRef..': sPathing is amphibious so have recorded iAmphibiousOrigGroupOfTarget and iAmphibiousOrigGroupOfPathingUnit as '..iAmphibiousOrigGroupOfTarget..' and '..iAmphibiousOrigGroupOfPathingUnit) end
-            elseif bDebugMessages == true then LOG(sFunctionRef..': Pathing isnt amphibious. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious)
+            local tKnownCorrectPoint
+            if sClosestManualCheckRef then
+                tKnownCorrectPoint = tManualPathingChecks[sPathing][sClosestManualCheckRef]
+            else
+                tKnownCorrectPoint = tOptionalComparisonKnownCorrectPoint
             end
 
-            if bDebugMessages == true then
-                LOG(sFunctionRef..': Will draw the 3 positions in red, with a line. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil'))
-                M27Utilities.DrawLocations({tKnownCorrectPoint, oPathingUnit:GetPosition(), tTargetLocation}, nil, 2, 200)
-                M27Utilities.ErrorHandler('Temp to see history of function call', true)
+            local bCanPathToTarget = oPathingUnit:CanPathTo(tTargetLocation)
+            local bCanPathToBase = oPathingUnit:CanPathTo(tKnownCorrectPoint)
+            local bExpectedToPathToTarget = false
+            if iUnitPathingGroup == iTargetPathingGroup then bExpectedToPathToTarget = true end
+            local bExpectedToPathToBase = false
+            if iUnitPathingGroup == iBasePathingGroup then bExpectedToPathToBase = true end
+            local bTargetIsBase = false
+            if tTargetLocation[1] == tKnownCorrectPoint[1] and tTargetLocation[3] == tKnownCorrectPoint[3] then bTargetIsBase = true
+            elseif tTargetLocation[1] == PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber][1] and tTargetLocation[3] == PlayerStartPoints[oPathingUnit:GetAIBrain().M27StartPositionNumber][3] then bTargetIsBase = true
             end
 
-            if bDebugMessages == true then LOG(sFunctionRef..': First time doing a manual check for this location') end
-            if bCanPathToBase then
-                if not(iUnitPathingGroup == iBasePathingGroup) then
-                    bHaveChangedPathing = true
-                    if bDebugMessages == true then LOG(sFunctionRef..': Can path to base but we didnt think we could, will change unit pathing group to '..iBasePathingGroup) end
-                    FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iBasePathingGroup)
-                    RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, oPathingUnit:GetPosition(), 4)
+            if bDebugMessages == true then LOG(sFunctionRef..': About to start main checks, oPathingUnit='..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..'; iUnitPathingGroup='..iUnitPathingGroup..'; iTargetPathingGroup='..iTargetPathingGroup..'; iBasePathingGroup='..iBasePathingGroup..'; manual check for engi position='..repru(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())] or { 'nil'})..'; bCanPathToTarget='..tostring(bCanPathToTarget)..'; bCanPathToBase='..tostring(bCanPathToBase)..'; bExpectedToPathToBase='..tostring(bExpectedToPathToBase)..'; bExpectedToPathToTarget='..tostring(bExpectedToPathToTarget)) end
 
-                    if not(bTargetIsBase) and bCanPathToTarget and not(iTargetPathingGroup == iBasePathingGroup) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': target location cna path to base but we didnt think it could, will change target pathing group to '..iBasePathingGroup) end
-                        FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
-                        --Check an area around the target (if its not really far away)
-                        RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
-                    end
-                else
-                    --Can path to base, and correctly think we can; can we path to the target?
-                    if not(bTargetIsBase) and bCanPathToTarget then
-                        if not(bExpectedToPathToTarget) then
-                            --can path to target but didnt think we could
-                            if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to the target') end
+            --Have we not checked the pathing of either the engineer position or the target?
+            if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(oPathingUnit:GetPosition())]) or not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tTargetLocation)]) then
+                local iAmphibiousOrigGroupOfTarget
+                local iAmphibiousOrigGroupOfPathingUnit
+                if sPathing == M27UnitInfo.refPathingTypeAmphibious then
+                    iAmphibiousOrigGroupOfTarget = GetSegmentGroupOfLocation(sPathing, tTargetLocation)
+                    iAmphibiousOrigGroupOfPathingUnit = GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())
+                    if bDebugMessages == true then LOG(sFunctionRef..': sPathing is amphibious so have recorded iAmphibiousOrigGroupOfTarget and iAmphibiousOrigGroupOfPathingUnit as '..iAmphibiousOrigGroupOfTarget..' and '..iAmphibiousOrigGroupOfPathingUnit) end
+                elseif bDebugMessages == true then LOG(sFunctionRef..': Pathing isnt amphibious. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious)
+                end
+
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Will draw the 3 positions in red, with a line. sPathing='..sPathing..'; M27UnitInfo.refPathingTypeAmphibious='..M27UnitInfo.refPathingTypeAmphibious..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil'))
+                    M27Utilities.DrawLocations({tKnownCorrectPoint, oPathingUnit:GetPosition(), tTargetLocation}, nil, 2, 200)
+                    M27Utilities.ErrorHandler('Temp to see history of function call', true)
+                end
+
+                if bDebugMessages == true then LOG(sFunctionRef..': First time doing a manual check for this location') end
+                if bCanPathToBase then
+                    if not(iUnitPathingGroup == iBasePathingGroup) then
+                        bHaveChangedPathing = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': Can path to base but we didnt think we could, will change unit pathing group to '..iBasePathingGroup) end
+                        FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iBasePathingGroup)
+                        RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, oPathingUnit:GetPosition(), 4)
+
+                        if not(bTargetIsBase) and bCanPathToTarget and not(iTargetPathingGroup == iBasePathingGroup) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': target location cna path to base but we didnt think it could, will change target pathing group to '..iBasePathingGroup) end
                             FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
+                            --Check an area around the target (if its not really far away)
                             RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
                         end
-                    end
-                end
-            else
-                --Cant path to base - below updates to pathing group arent as accurate so will only update the target not the area around it
-                if bExpectedToPathToBase then
-                    --Incorrectly think we can path to base, so change our pathing group to something else - add 1 to current size
-                    bHaveChangedPathing = true
-                    local iNewPathingGroup = table.getn(tSegmentBySegmentGroup[sPathing]) + 1
-                    if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to base, will set engineer position group to '..iNewPathingGroup) end
-                    FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iNewPathingGroup)
-                    --Is there also an issue with the target?
-                    if not(bTargetIsBase) and bCanPathToTarget and iTargetPathingGroup == iBasePathingGroup then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think the target can path to base, will set target location group to '..iNewPathingGroup) end
-                        FixSegmentPathingGroup(sPathing, tTargetLocation, iNewPathingGroup)
+                    else
+                        --Can path to base, and correctly think we can; can we path to the target?
+                        if not(bTargetIsBase) and bCanPathToTarget then
+                            if not(bExpectedToPathToTarget) then
+                                --can path to target but didnt think we could
+                                if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to the target') end
+                                FixSegmentPathingGroup(sPathing, tTargetLocation, iBasePathingGroup)
+                                RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iBasePathingGroup, tTargetLocation, math.min(6, math.floor(250 / M27Utilities.GetDistanceBetweenPositions(oPathingUnit:GetPosition(), tTargetLocation))))
+                            end
+                        end
                     end
                 else
-                    --cant path to base, and we correctly think we cant path to base; is the target ok?
-                    if not(bTargetIsBase) then
-                        if bCanPathToTarget then
-                            if bExpectedToPathToTarget then
-                                --Correctly think we can path to target so dont need to change anything
+                    --Cant path to base - below updates to pathing group arent as accurate so will only update the target not the area around it
+                    if bExpectedToPathToBase then
+                        --Incorrectly think we can path to base, so change our pathing group to something else - add 1 to current size
+                        bHaveChangedPathing = true
+                        local iNewPathingGroup = table.getn(tSegmentBySegmentGroup[sPathing]) + 1
+                        if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to base, will set engineer position group to '..iNewPathingGroup) end
+                        FixSegmentPathingGroup(sPathing, oPathingUnit:GetPosition(), iNewPathingGroup)
+                        --Is there also an issue with the target?
+                        if not(bTargetIsBase) and bCanPathToTarget and iTargetPathingGroup == iBasePathingGroup then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think the target can path to base, will set target location group to '..iNewPathingGroup) end
+                            FixSegmentPathingGroup(sPathing, tTargetLocation, iNewPathingGroup)
+                        end
+                    else
+                        --cant path to base, and we correctly think we cant path to base; is the target ok?
+                        if not(bTargetIsBase) then
+                            if bCanPathToTarget then
+                                if bExpectedToPathToTarget then
+                                    --Correctly think we can path to target so dont need to change anything
+                                else
+                                    --Can path to target but werent expecting to be able to; Will assume our units pathing group is correct and will update target pathing group to be the engineers pathing group
+                                    bHaveChangedPathing = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to target, will set target location pathing group to '..iUnitPathingGroup) end
+                                    FixSegmentPathingGroup(sPathing, tTargetLocation, iUnitPathingGroup)
+                                end
                             else
-                                --Can path to target but werent expecting to be able to; Will assume our units pathing group is correct and will update target pathing group to be the engineers pathing group
-                                bHaveChangedPathing = true
-                                if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we cant path to target, will set target location pathing group to '..iUnitPathingGroup) end
-                                FixSegmentPathingGroup(sPathing, tTargetLocation, iUnitPathingGroup)
-                            end
-                        else
-                            if bExpectedToPathToTarget then
-                                --Cant path to target but thought we could; increase the targets pathing group
-                                bHaveChangedPathing = true
-                                if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to target, will set target location pathing group to '..(table.getn(tSegmentBySegmentGroup[sPathing]) + 1)) end
-                                FixSegmentPathingGroup(sPathing, tTargetLocation, table.getn(tSegmentBySegmentGroup[sPathing]) + 1)
-                            else
-                                --Dont have enough informatino to say antyhing more, since we cant path to base, or to the target, and we're correctly expecting to not path to either of them
+                                if bExpectedToPathToTarget then
+                                    --Cant path to target but thought we could; increase the targets pathing group
+                                    bHaveChangedPathing = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Incorrectly think we can path to target, will set target location pathing group to '..(table.getn(tSegmentBySegmentGroup[sPathing]) + 1)) end
+                                    FixSegmentPathingGroup(sPathing, tTargetLocation, table.getn(tSegmentBySegmentGroup[sPathing]) + 1)
+                                else
+                                    --Dont have enough informatino to say antyhing more, since we cant path to base, or to the target, and we're correctly expecting to not path to either of them
+                                end
                             end
                         end
                     end
                 end
-            end
-            if bDebugMessages == true then LOG(sFunctionRef..': Seeing if we have changed pathing of a plateau. bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil')) end
-            if bHaveChangedPathing and (iAmphibiousOrigGroupOfTarget or iAmphibiousOrigGroupOfPathingUnit) and not(bPlateauCheckActive) then
-                --Have changed amphibious pathing, will see if this was a plateau that had mexes on it
-                if bDebugMessages == true then LOG(sFunctionRef..': M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]))..'; is table empty based on orig amphib group of pathing unit='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit]))..'; Pathing group of the pathing unit after update='..GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())..'; group of target post update='..GetSegmentGroupOfLocation(sPathing, tTargetLocation)) end
-                local bChangedAnyMex = false
-                local iGroupAlreadyChecked
-                --Has the group of the pathing unit changed, and do we have plateau info recorded for the orig pathing group?
-                if iAmphibiousOrigGroupOfPathingUnit and not(GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition()) == iAmphibiousOrigGroupOfPathingUnit) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes])) then
-                    --Need to revise plateau logic - first check pathing of every mex on the plateau
-                    if bDebugMessages == true then LOG(sFunctionRef..': The group of the pathing unit has changed, and there were mexes in the original pathing group, so will check all mexes in the orig pathing group') end
-                    iGroupAlreadyChecked = iAmphibiousOrigGroupOfPathingUnit
-                    for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes] do
-                        if bDebugMessages == true then LOG(sFunctionRef..': Checking for tMex='..repru(tMex)..'; with mex pathing group='..GetSegmentGroupOfLocation(sPathing, tMex)..'; iAmphibiousOrigGroupOfPathingUnit='..iAmphibiousOrigGroupOfPathingUnit) end
-                        if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfPathingUnit) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repru(tMex)..' or the mex shouldnt be assigned to this plateau') end
-                            bChangedAnyMex = true
+                if bDebugMessages == true then LOG(sFunctionRef..': Seeing if we have changed pathing of a plateau. bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; iAmphibiousOrigGroupOfTarget='..(iAmphibiousOrigGroupOfTarget or 'nil')..'; iAmphibiousOrigGroupOfPathingUnit='..(iAmphibiousOrigGroupOfPathingUnit or 'nil')) end
+                if bHaveChangedPathing and (iAmphibiousOrigGroupOfTarget or iAmphibiousOrigGroupOfPathingUnit) and not(bPlateauCheckActive) then
+                    --Have changed amphibious pathing, will see if this was a plateau that had mexes on it
+                    if bDebugMessages == true then LOG(sFunctionRef..': M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget]))..'; is table empty based on orig amphib group of pathing unit='..tostring(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit]))..'; Pathing group of the pathing unit after update='..GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition())..'; group of target post update='..GetSegmentGroupOfLocation(sPathing, tTargetLocation)) end
+                    local bChangedAnyMex = false
+                    local iGroupAlreadyChecked
+                    --Has the group of the pathing unit changed, and do we have plateau info recorded for the orig pathing group?
+                    if iAmphibiousOrigGroupOfPathingUnit and not(GetSegmentGroupOfLocation(sPathing, oPathingUnit:GetPosition()) == iAmphibiousOrigGroupOfPathingUnit) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes])) then
+                        --Need to revise plateau logic - first check pathing of every mex on the plateau
+                        if bDebugMessages == true then LOG(sFunctionRef..': The group of the pathing unit has changed, and there were mexes in the original pathing group, so will check all mexes in the orig pathing group') end
+                        iGroupAlreadyChecked = iAmphibiousOrigGroupOfPathingUnit
+                        for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfPathingUnit][subrefPlateauMexes] do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Checking for tMex='..repru(tMex)..'; with mex pathing group='..GetSegmentGroupOfLocation(sPathing, tMex)..'; iAmphibiousOrigGroupOfPathingUnit='..iAmphibiousOrigGroupOfPathingUnit) end
+                            if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfPathingUnit) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repru(tMex)..' or the mex shouldnt be assigned to this plateau') end
+                                bChangedAnyMex = true
+                            end
                         end
                     end
-                end
-                --Has the group of the target changed, and do we have plateau info recorded for the orig pathing group?
-                if not(bChangedAnyMex) and iAmphibiousOrigGroupOfTarget and not(iGroupAlreadyChecked == iAmphibiousOrigGroupOfTarget) and not(GetSegmentGroupOfLocation(sPathing, tTargetLocation) == iAmphibiousOrigGroupOfTarget) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes])) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Amphibious group of the target is different to what we originally thought, and the original grouping had mexes in, so will recheck all mexes in the group') end
-                    for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes] do
-                        if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfTarget) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repru(tMex)) end
-                            bChangedAnyMex = true
+                    --Has the group of the target changed, and do we have plateau info recorded for the orig pathing group?
+                    if not(bChangedAnyMex) and iAmphibiousOrigGroupOfTarget and not(iGroupAlreadyChecked == iAmphibiousOrigGroupOfTarget) and not(GetSegmentGroupOfLocation(sPathing, tTargetLocation) == iAmphibiousOrigGroupOfTarget) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget])) and not(M27Utilities.IsTableEmpty(tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes])) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Amphibious group of the target is different to what we originally thought, and the original grouping had mexes in, so will recheck all mexes in the group') end
+                        for iMex, tMex in tAllPlateausWithMexes[iAmphibiousOrigGroupOfTarget][subrefPlateauMexes] do
+                            if RecheckPathingOfLocation(sPathing, oPathingUnit, tMex, tOptionalComparisonKnownCorrectPoint, true) or not(GetSegmentGroupOfLocation(sPathing, tMex) == iAmphibiousOrigGroupOfTarget) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Pathing was dif for iMex='..iMex..'; tMex='..repru(tMex)) end
+                                bChangedAnyMex = true
+                            end
                         end
                     end
-                end
-                if bChangedAnyMex then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have changed pathing of at least one mex, so will re-record all mexes for all pathing groups') end
-                    RecordMexForPathingGroup()
-                    RecordAllPlateaus()
-                    for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
-                        UpdatePlateausToExpandTo(oBrain, true, true)
+                    if bChangedAnyMex then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have changed pathing of at least one mex, so will re-record all mexes for all pathing groups') end
+                        RecordMexForPathingGroup()
+                        RecordAllPlateaus()
+                        for iBrain, oBrain in M27Overseer.tAllActiveM27Brains do
+                            UpdatePlateausToExpandTo(oBrain, true, true)
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished updating details of mexes and plateaus to expand to') end
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Finished updating details of mexes and plateaus to expand to') end
                 end
+            elseif bDebugMessages == true then LOG(sFunctionRef..': Have already done a manual check of this location')
             end
-        elseif bDebugMessages == true then LOG(sFunctionRef..': Have already done a manual check of this location')
         end
-    end
 
-    if bDebugMessages == true then LOG(sFunctionRef..': bHaveChangedPathing='..tostring(bHaveChangedPathing)) end
-    if bDebugMessages == true and bHaveChangedPathing then M27Utilities.ErrorHandler('Have changed pathing', true) end
+        oPathingUnit[M27UnitInfo.refiPathingCheckTime] = (oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
+
+        if bDebugMessages == true then LOG(sFunctionRef..': bHaveChangedPathing='..tostring(bHaveChangedPathing)) end
+        if bDebugMessages == true and bHaveChangedPathing then M27Utilities.ErrorHandler('Have changed pathing', true) end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return bHaveChangedPathing
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return bHaveChangedPathing
 end
 
 function GetReclaimablesMassAndEnergy(tReclaimables, iMinMass, iMinEnergy)
@@ -2259,7 +2284,7 @@ function GetNearestMexToUnit(oBuilder, bCanBeBuiltOnByAlly, bCanBeBuiltOnByEnemy
     else return tMexByPathingAndGrouping[sPathing][iUnitPathGroup][iNearestMexFromUnit] end
 end
 
-function IsUnderwater(tPosition, bReturnSurfaceHeightInstead)
+function IsUnderwater(tPosition, bReturnSurfaceHeightInstead, iOptionalAmountToBeUnderwater)
     --Returns true if tPosition underwater, otherwise returns false
     --bReturnSurfaceHeightInstead:: Return the actual height at which underwater, instead of true/false
     if bReturnSurfaceHeightInstead then return iMapWaterHeight
@@ -2267,7 +2292,7 @@ function IsUnderwater(tPosition, bReturnSurfaceHeightInstead)
         if M27Utilities.IsTableEmpty(tPosition) == true then
             M27Utilities.ErrorHandler('tPosition is empty')
         else
-            if iMapWaterHeight > tPosition[2] then
+            if iMapWaterHeight > tPosition[2] + (iOptionalAmountToBeUnderwater or 0) then
                 --Check we're not just under an arch but are actually underwater
                 if not(GetTerrainHeight(tPosition[1], tPosition[3]) == iMapWaterHeight) then
                     return true
@@ -2586,7 +2611,7 @@ end
 function RecordStartingPathingGroups(aiBrain)
     --For now will just do amphibious and land
     aiBrain[refiStartingSegmentGroup] = {}
-    aiBrain[refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] = GetUnitSegmentGroup(M27Utilities.GetACU(aiBrain))
+    aiBrain[refiStartingSegmentGroup][M27UnitInfo.refPathingTypeAmphibious] = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, PlayerStartPoints[aiBrain.M27StartPositionNumber])
     aiBrain[refiStartingSegmentGroup][M27UnitInfo.refPathingTypeLand] = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, PlayerStartPoints[aiBrain.M27StartPositionNumber])
 end
 
@@ -3262,6 +3287,501 @@ function RecordBaseLevelPathability()
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function IdentifyCliffsAroundBase(aiBrain)
+    --Uses similar approach to original pathing, but on the assumption that pathing has already been generated
+    --Is only interested in impathable areas near our base on the way from our base to enemy base
+    --Main reason is for emergency PD placement
+
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'IdentifyCliffsAroundBase'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if aiBrain[refbCanPathToEnemyBaseWithAmphibious] and M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]) then
+        if bDebugMessages == true then LOG(sFunctionRef..': About to identify cliffs around our base on the way to the nearest enemy') end
+
+        --Identify all cliffs on the way to the enemy base into their own 'groups' based on whether the group is the same amphibious pathing group as the ACU or not
+        local tLineStartPoint
+        local iAngleToEnemy = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], GetPrimaryEnemyBaseLocation(aiBrain))
+        local sPathing = M27UnitInfo.refPathingTypeAmphibious
+        local iSegmentGroupWanted = GetSegmentGroupOfLocation(sPathing, PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local iCurRecursivePosition
+        local tRecursivePosition
+        local bHaveSubsequentPath
+
+        local iCurX, iCurZ
+        local iLowestX = 10000
+        local iHighestX = 0
+        local iLowestZ = 10000
+        local iHighestZ = 0
+
+        local iInterval = 2
+        local iCliffCount = 0
+        local tiCliffBoundaries = {} --[x] = iCliffCount; returns {x1, z1, x2, z2}
+
+        local iMaxSize = 220
+        local bAbortRecordingCliff = false
+
+
+
+        function RecordCliff()
+            if not(aiBrain[tCliffsAroundBaseChokepoint][iCurX]) then
+                aiBrain[tCliffsAroundBaseChokepoint][iCurX] = {}
+                aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ] = {}
+            else
+                aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ] = {}
+            end
+            --May have already recorded a value when going through cliffs earlier, so dont want to overwrite in case we decide to abort recording this specific cliff
+            if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ], true) then aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ] = true end
+            iLowestX = math.min(iCurX, iLowestX)
+            iLowestZ = math.min(iCurZ, iLowestZ)
+            iHighestX = math.max(iCurX, iHighestX)
+            iHighestZ = math.max(iCurZ, iHighestZ)
+        end
+        aiBrain[tCliffsAroundBaseChokepoint] = {}
+
+        --First record all locations that have cliffs around them
+        for iDistToEnemy = iInterval, math.min(126, math.floor((aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4 / iInterval))*iInterval), iInterval do
+            tLineStartPoint = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy, iDistToEnemy, false)
+            if bDebugMessages == true then LOG(sFunctionRef..': Our start point='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; iAngleToEnemy='..iAngleToEnemy..'; iDistToEnemy='..iDistToEnemy..'; tLineStartPoint='..repru(tLineStartPoint)..'; iSegmentGroupWanted='..iSegmentGroupWanted) end
+            --Check we haven't already recorded this in the cliffs around base
+            iCurX = math.floor(tLineStartPoint[1])
+            iCurZ = math.floor(tLineStartPoint[3])
+
+            if not(aiBrain[tCliffsAroundBaseChokepoint][iCurX]) or not(aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ]) then
+                --Can we path here from main base?
+                if bDebugMessages == true then LOG(sFunctionRef..': Segment group of line start point='..GetSegmentGroupOfLocation(sPathing, tLineStartPoint)) end
+                if not(iSegmentGroupWanted == GetSegmentGroupOfLocation(sPathing, tLineStartPoint)) then
+                    --Record all locations in a different pathing group from this position
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef..': Have a different pathing group, will draw line base in black')
+                        M27Utilities.DrawLocation(tLineStartPoint, false, 3, 250, 1)
+                    end
+                    tRecursivePosition = {}
+                    iCurRecursivePosition = 1
+                    iLowestX = 10000
+                    iHighestX = 0
+                    iLowestZ = 10000
+                    iHighestZ = 0
+                    iCliffCount = iCliffCount + 1
+                    while iCurRecursivePosition > 0 do
+                        if bDebugMessages == true then LOG(sFunctionRef..': iCurRecursivePosition='..iCurRecursivePosition..'; iCurX='..iCurX..'; iCurZ='..iCurZ) end
+                        bHaveSubsequentPath = false
+                        RecordCliff()
+                        if iHighestX - iLowestX > iMaxSize or iHighestZ - iLowestZ > iMaxSize then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have too big a range of valeus so will abort recording for this cliff.  iLowestX='..iLowestX..'; iHighestX='..iHighestX..'; iLowestZ='..iLowestZ..'; iHighestZ='..iHighestZ) end
+                            bAbortRecordingCliff = true
+                            break
+                        end
+                        local tAllAdjacentPositions = {
+                            {iCurX - iInterval, iCurZ -iInterval},
+                            {iCurX - iInterval, iCurZ},
+                            {iCurX - iInterval, iCurZ +iInterval},
+
+                            {iCurX, iCurZ - iInterval},
+                            {iCurX, iCurZ + iInterval},
+
+                            {iCurX + iInterval, iCurZ - iInterval},
+                            {iCurX + iInterval, iCurZ},
+                            {iCurX + iInterval, iCurZ + iInterval},
+                        }
+
+
+                        if bDebugMessages == true then LOG(sFunctionRef..': iCurX-Z='..iCurX..'-'..iCurZ..'; iCurRecursivePosition='..iCurRecursivePosition..': About to check if are at edge of map') end
+                        --Dont check if are at map edge (if we really wanted to optimise this then I expect predefined tables of all the options would work but for now I'll leave it at this
+                        if iCurX >= rMapPlayableArea[3] or iCurZ >= rMapPlayableArea[4] or iCurX < iInterval or iCurZ < iInterval then
+                            --if bDebugMessages == true then LOG(sFunctionRef..': Are at map edge so limit the adjacent segments to consider') end
+                            tAllAdjacentPositions = {}
+                            local bCanDecreaseX, bCanIncreaseX, bCanDecreaseZ, bCanIncreaseZ
+                            if iCurX > iInterval then bCanDecreaseX = true end
+                            if iCurZ > iInterval then bCanDecreaseZ = true end
+                            if iCurX < rMapPlayableArea[3] then bCanIncreaseX = true end
+                            if iCurZ < rMapPlayableArea[4] then bCanIncreaseZ = true end
+                            if bCanDecreaseX then
+                                if bCanDecreaseZ then table.insert(tAllAdjacentPositions, {iCurX - iInterval, iCurZ -iInterval}) end
+                                if bCanIncreaseZ then table.insert(tAllAdjacentPositions, {iCurX - iInterval, iCurZ +iInterval}) end
+                                table.insert(tAllAdjacentPositions, {iCurX - iInterval, iCurZ})
+                            end
+                            if bCanIncreaseX then
+                                if bCanDecreaseZ then table.insert(tAllAdjacentPositions, {iCurX + iInterval, iCurZ -iInterval}) end
+                                if bCanIncreaseZ then table.insert(tAllAdjacentPositions, {iCurX + iInterval, iCurZ +iInterval}) end
+                                table.insert(tAllAdjacentPositions, {iCurX + iInterval, iCurZ})
+                            end
+                            if bCanDecreaseZ then table.insert(tAllAdjacentPositions, {iCurX, iCurZ -iInterval}) end
+                            if bCanIncreaseZ then table.insert(tAllAdjacentPositions, {iCurX, iCurZ +iInterval}) end
+                        end
+
+
+                        --if bDebugMessages == true then LOG(sFunctionRef..': iSegmentX-Z='..iSegmentX..'-'..iSegmentZ..'; iCurRecursivePosition='..iCurRecursivePosition..': Number of adjacent locations to consider='..table.getn(tAllAdjacentSegments)) end
+                        for iEntry, tAdjacentXZ in tAllAdjacentPositions do
+                            --Have we already considered this location?
+                            if not(aiBrain[tCliffsAroundBaseChokepoint][tAdjacentXZ[1]]) or not(aiBrain[tCliffsAroundBaseChokepoint][tAdjacentXZ[1]][tAdjacentXZ[2]]) then
+
+                                --Is this position also unapthable from main base?
+                                if not(iSegmentGroupWanted == GetSegmentGroupOfLocation(sPathing, {tAdjacentXZ[1], 0, tAdjacentXZ[2] })) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Adjacent segment '..repru(tAdjacentXZ)..' has a pathing group '..(GetSegmentGroupOfLocation(sPathing, {tAdjacentXZ[1], 0, tAdjacentXZ[2] }) or 'nil')..' so will continue searching') end
+                                    bHaveSubsequentPath = true
+                                    iCurX = tAdjacentXZ[1]
+                                    iCurZ = tAdjacentXZ[2]
+                                    break
+                                end
+                            end
+                        end
+                        if bHaveSubsequentPath == true then
+                            tRecursivePosition[iCurRecursivePosition] = {iCurX, iCurZ}
+                            iCurRecursivePosition = iCurRecursivePosition + 1
+                            --if bDebugMessages == true then LOG(sFunctionRef..': Can path to the new segment so setting cur segment equal to the new segment') end
+                        else
+                            iCurRecursivePosition = iCurRecursivePosition - 1
+                            if bDebugMessages == true then LOG(sFunctionRef..': Dont have adjacent segment so reducing recursive position to '..iCurRecursivePosition) end
+                            if iCurRecursivePosition <= 0 then break
+                            else
+                                iCurX = tRecursivePosition[iCurRecursivePosition][1]
+                                iCurZ = tRecursivePosition[iCurRecursivePosition][2]
+                                --if bDebugMessages == true then LOG(sFunctionRef..': Have nowhere that can path to that havent already considered, so moving recursive position back one, iCurRecursivePosition='..iCurRecursivePosition..'; New segment X-Z='..repru(tRecursivePosition[iCurRecursivePosition])) end
+                            end
+                        end
+                    end
+                    tiCliffBoundaries[iCliffCount] = {iLowestX, iLowestZ, iHighestX, iHighestZ}
+                end
+            elseif bDebugMessages == true then
+                LOG(sFunctionRef..': Have the same pathing group, will draw line base in white')
+                M27Utilities.DrawLocation(tLineStartPoint, false, 7, 250, 1)
+            end
+        end
+        if bDebugMessages == true then
+            if bDebugMessages == true then LOG(sFunctionRef..': Will draw all cliffs in red. tiCliffBoundaries='..repru(tiCliffBoundaries)) end
+            if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint]) == false then
+                for iX, tSubtable in aiBrain[tCliffsAroundBaseChokepoint] do
+                    for iZ, vResult in aiBrain[tCliffsAroundBaseChokepoint][iX] do
+                        M27Utilities.DrawLocation({ iX, GetTerrainHeight(iX, iZ), iZ }, false, 2, 250, 1)
+                    end
+                end
+            end
+        end
+
+        if bAbortRecordingCliff then
+            --Clear any values we just added
+            if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint]) == false then
+                for iX, tSubtable in aiBrain[tCliffsAroundBaseChokepoint] do
+                    if M27Utilities.IsTableEmpty(tSubtable) == false then
+                        for iZ, vResult in aiBrain[tCliffsAroundBaseChokepoint][iX] do
+                            if (aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] == true or aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] == 0) and M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ], true) then
+                                aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = nil
+                            end
+                        end
+                    end
+                end
+            end
+        else
+
+            --Increase min and max sizes for each cliff, and then pick the 2 corner points with the smallest mod distance to our base
+            local tCorner1, tCorner2, tCurCorner
+            local tCornerPositions = {}
+            local tiDistToCorners = {}
+            local iClosestDist = 100000
+            local iSecondClosestDist = 10000
+            local iClosestCorner
+            local iSecondClosestCorner
+            local iCurDist
+
+            local bIntersectsMapEdge
+
+            for iCliff, tBoundaries in tiCliffBoundaries do
+                bIntersectsMapEdge = false
+                iClosestDist = 100000
+                iSecondClosestDist = 10000
+                iClosestCorner = nil
+                iSecondClosestCorner = nil
+
+                if tBoundaries[1] - 4 <= rMapPlayableArea[1] then bIntersectsMapEdge = true
+                elseif tBoundaries[2] - 4 <= rMapPlayableArea[2] then bIntersectsMapEdge = true
+                elseif tBoundaries[3] + 4 >= rMapPlayableArea[3] then bIntersectsMapEdge = true
+                elseif tBoundaries[4] + 4 >= rMapPlayableArea[4] then bIntersectsMapEdge = true
+                end
+
+                local iBoundaryMod = 10
+                if bIntersectsMapEdge then iBoundaryMod = 2 end
+
+
+
+                tBoundaries[1] = math.floor(math.max(rMapPlayableArea[1] + iInterval, tBoundaries[1] - iBoundaryMod))
+                tBoundaries[2] = math.floor(math.max(rMapPlayableArea[2] + iInterval, tBoundaries[2] - iBoundaryMod))
+                tBoundaries[3] = math.floor(math.min(rMapPlayableArea[3] - iInterval, tBoundaries[3] + iBoundaryMod))
+                tBoundaries[4] = math.floor(math.min(rMapPlayableArea[4] - iInterval, tBoundaries[4] + iBoundaryMod))
+
+
+
+                --Calculate the 2 points we want to build PD at for each cliff:
+                for iCorner = 1, 4 do
+                    if iCorner == 1 then tCurCorner = {tBoundaries[1], GetTerrainHeight(tBoundaries[1], tBoundaries[2]), tBoundaries[2]}
+                    elseif iCorner == 2 then tCurCorner = {tBoundaries[3], GetTerrainHeight(tBoundaries[3], tBoundaries[2]), tBoundaries[2]}
+                    elseif iCorner == 3 then tCurCorner = {tBoundaries[3], GetTerrainHeight(tBoundaries[3], tBoundaries[4]), tBoundaries[4]}
+                    else tCurCorner = {tBoundaries[1], GetTerrainHeight(tBoundaries[1], tBoundaries[4]), tBoundaries[4]}
+                    end
+                    tCornerPositions[iCorner] = {tCurCorner[1], tCurCorner[2], tCurCorner[3]}
+                    --tiAngleDifFromBase[iCorner] = iAngleToEnemy - M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner)
+                    --if tiAngleDifFromBase[iCorner] < 0 then tiAngleDifFromBase[iCorner] = tiAngleDifFromBase[iCorner] + 360 end
+                    iCurDist = math.cos(M27Utilities.ConvertAngleToRadians(math.abs(M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner) - iAngleToEnemy))) * M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner)
+                    tiDistToCorners[iCorner] = iCurDist
+                    if bDebugMessages == true then LOG(sFunctionRef..': Before updating closest corners: iCurDist='..iCurDist..'; iClosestDist='..iClosestDist..'; iClosestCorner='..(iClosestCorner or 'nil')..'; iSecondClosestDist='..iSecondClosestDist..'; iSecondClosestCorner='..(iSecondClosestCorner or 'nil')) end
+                    if iCurDist < iClosestDist then
+                        iSecondClosestDist = iClosestDist
+                        iSecondClosestCorner = iClosestCorner
+                        iClosestDist = iCurDist
+                        iClosestCorner = iCorner
+
+                    elseif iCurDist < iSecondClosestDist then
+                        iSecondClosestDist = iCurDist
+                        iSecondClosestCorner = iCorner
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': After updating closest corners: iCurDist='..iCurDist..'; iClosestDist='..iClosestDist..'; iClosestCorner='..(iClosestCorner or 'nil')..'; iSecondClosestDist='..iSecondClosestDist..'; iSecondClosestCorner='..(iSecondClosestCorner or 'nil')) end
+                end
+
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': iCliff='..iCliff..'; tBoundaries='..repru(tBoundaries)..'; will draw in gold, and will draw the corners in blue. iClosestCorner='..iClosestCorner..'; iClosestDist='..iClosestDist..'; iSecondClosestCorner='..iSecondClosestCorner..'; iSecondClosestDist='..iSecondClosestDist..'; table of corners='..repru(tCornerPositions))
+                    M27Utilities.DrawRectangle(Rect(tBoundaries[1], tBoundaries[2], tBoundaries[3], tBoundaries[4]), 4, 500)
+                    M27Utilities.DrawLocation(tCornerPositions[iClosestCorner], nil, 1, 500)
+                    M27Utilities.DrawLocation(tCornerPositions[iSecondClosestCorner], nil, 1, 500)
+                end
+
+                --Adjust if are intersecting a map edge - only need 1 corner point
+                local tSinglePointOverride
+                local iAdjustMax = math.max(1, iInterval * 0.5)
+
+                if bIntersectsMapEdge then
+                    --Fill in all the cliff positions since they're currently only at intervals of 2
+                    for iX = tBoundaries[1], tBoundaries[3] do
+                        if bDebugMessages == true then LOG(sFunctionRef..': repru of tCliffsAroundBaseChokepoint for this iX of '..iX..' before filling in='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX])) end
+                        if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iX]) == false then
+                            for iZ = tBoundaries[2], tBoundaries[4] do
+                                --if bDebugMessages == true then LOG(sFunctionRef..': Updating entries around iX-Z='..iX..'-'..iZ) end
+                                if aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] == true then
+                                    for iAdjustValueX = -iAdjustMax, iAdjustMax, 1 do
+                                        for iAdjustValueZ = -iAdjustMax, iAdjustMax, 1 do
+                                            if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX]) then aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX] = {} end
+                                            if not(aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX][iZ + iAdjustValueZ]) then aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX][iZ + iAdjustValueZ] = 0 end
+                                            --if bDebugMessages == true then LOG(sFunctionRef..': Adjusted X-Z='..iX + iAdjustValueX..'-'..iZ + iAdjustValueZ..'; value of table for this='..tostring(aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX][iZ + iAdjustValueZ])) end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished filling in entries for iX='..iX..' repru of table for this iX='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX])) end
+                    end
+
+
+                    local iMaxDistToCorner = iInterval
+                    for iCorner = 1, 4 do
+                        iMaxDistToCorner = math.max(iMaxDistToCorner, M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iCorner]))
+                    end
+                    iMaxDistToCorner = math.floor(iMaxDistToCorner / iInterval) * iInterval
+                    local iAnglePoints = 8 --Pick a number that results in iangleinterval being an integer, otherwise might need to rework code to reference angle point instead of angle
+                    local iAngleInterval = math.floor(360 / iAnglePoints)
+                    local tiAnglesWithNoCliffs = {}
+                    local tiAngleSquareIntersectPosition = {} --[x] is the angle (45, 90 etc); returns the location where moving at angle interval * angle point we intersect the edge of the cliff box
+                    for iCurAngle = iAngleInterval, 360, iAngleInterval do
+                        tiAnglesWithNoCliffs[iCurAngle] = true
+                    end
+
+                    local tCurPoint, iX, iZ
+
+                    local bAreWithinX = false
+                    local bAreWithinZ = false
+                    if PlayerStartPoints[aiBrain.M27StartPositionNumber][1] > tBoundaries[1] and PlayerStartPoints[aiBrain.M27StartPositionNumber][1] < tBoundaries[3] then bAreWithinX = true end
+                    if PlayerStartPoints[aiBrain.M27StartPositionNumber][3] > tBoundaries[2] and PlayerStartPoints[aiBrain.M27StartPositionNumber][3] < tBoundaries[4] then bAreWithinZ = true end
+
+
+                    for iCurAngle = iAngleInterval, 360, iAngleInterval do
+                        --There's probably a mathematical formula that achieves this, but as this is only run once I'm just going to brute force it...
+                        for iCurDist = iInterval, iMaxDistToCorner, iInterval do
+                            tCurPoint = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iCurAngle, iCurDist, false)
+                            iX = math.floor(tCurPoint[1])
+                            iZ = math.floor(tCurPoint[3])
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if iX-Z='..iX..'-'..iZ..' is intersecting with the box.') end
+                            if aiBrain[tCliffsAroundBaseChokepoint][iX] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] then
+                                tiAnglesWithNoCliffs[iCurAngle] = false
+                                if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 5, 200) end --black
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurAngle='..iCurAngle..'; Interesects box at iX='..iX..'; iZ='..iZ..'; will draw in black') end
+                                break
+                            else
+                                --Have we intersected with X part of the box?
+                                if (bAreWithinX and (iX >= tBoundaries[3] or iX <= tBoundaries[1])) or (not(bAreWithinX) and (iX <= tBoundaries[3] or iX >= tBoundaries[1])) or (bAreWithinZ and (iZ >= tBoundaries[4] or iZ <= tBoundaries[2])) or (not(bAreWithinZ) and (iZ <= tBoundaries[4] or iZ >= tBoundaries[2])) then
+
+                                    --We have reached the edge of the square
+                                    tiAngleSquareIntersectPosition[iCurAngle] = {iX, GetTerrainHeight(iX, iZ), iZ}
+                                    if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 1, 200) end --dark blue
+                                    break
+                                elseif bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 6, 200) --Cyan
+                                end
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Cliff='..iCliff..'; Finished recording angles that dont intersect with the cliff. tiAnglesWithNoCliffs='..repru(tiAnglesWithNoCliffs)..'; tiAngleSquareIntersectPosition='..repru(tiAngleSquareIntersectPosition)) end
+
+                    local iCurDistToEnemy
+                    local iClosestDistToEnemy = 10000
+                    local iClosestAngle
+                    local iDistToClosest
+
+                    if M27Utilities.IsTableEmpty(tiAngleSquareIntersectPosition) == false then
+                        for iAngle, tPosition in tiAngleSquareIntersectPosition do
+                            iCurDistToEnemy = M27Utilities.GetDistanceBetweenPositions(tPosition, GetPrimaryEnemyBaseLocation(aiBrain))
+                            if iCurDistToEnemy < iClosestDistToEnemy then
+                                iClosestDistToEnemy = iCurDistToEnemy
+                                iClosestAngle = iAngle
+                            end
+                        end
+                        --See if have a second closest to enemy within 30 of this
+                        if iClosestAngle then
+                            for iAngle, tPosition in tiAngleSquareIntersectPosition do
+                                if not(iAngle == iClosestAngle) then
+                                    iDistToClosest = M27Utilities.GetDistanceBetweenPositions(tPosition, tiAngleSquareIntersectPosition[iClosestAngle])
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering iAngle='..iAngle..'; Dist to closest='..iDistToClosest..'; iClosestAngle='..iClosestAngle) end
+                                    if iDistToClosest <= 30 then
+                                        tSinglePointOverride = {tPosition[1], tPosition[2], tPosition[3]}
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Setting target position as the second closest, iAngle='..iAngle..'; iClosestAngle='..iClosestAngle..'; Dist to closest='..iDistToClosest) end
+                                        break
+                                    end
+                                end
+                            end
+                            if not(tSinglePointOverride) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find any close angles to the closest so picking the closest') end
+                                tSinglePointOverride = {tiAngleSquareIntersectPosition[iClosestAngle][1], tiAngleSquareIntersectPosition[iClosestAngle][2], tiAngleSquareIntersectPosition[iClosestAngle][3]}
+                            end
+                        end
+                    end
+                end
+
+                --Adjust the corner position to be a midpoint if it's behind the base (e.g. maps like forbidden pass)
+                local bUseSinglePoint = false
+                if M27Utilities.IsTableEmpty(tSinglePointOverride) == false then bUseSinglePoint = true end
+
+                if not(bUseSinglePoint) then
+                    local iCurCorner
+                    local iCurDistToEnemy
+                    local iAngleFromStartToCorner
+                    local iAngleFromOurBaseToEnemy = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], GetPrimaryEnemyBaseLocation(aiBrain))
+                    local iAngleDif
+                    local iClosestUnclaimedCorner
+                    local iClosestDistToUnclaimedCorner = 100000
+                    local iCurDistToUnclaimedCorner
+                    for iCornerOption = 1, 2 do
+                        if iCornerOption == 1 then iCurCorner = iClosestCorner else iCurCorner = iSecondClosestCorner end
+                        --Are we further from enemy base than our base?
+                        iCurDistToEnemy = M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], GetPrimaryEnemyBaseLocation(aiBrain))
+                        if iCurDistToEnemy > aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] then
+                            iAngleFromStartToCorner = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iCurCorner])
+                            iAngleDif = M27Utilities.GetAngleDifference(iAngleFromStartToCorner, iAngleFromOurBaseToEnemy) --Gives value from 0 to 180
+                            if iAngleDif > 90 then
+                                --Move towards the closest other corner
+                                for iCorner = 1, 4 do
+                                    if not(iCorner == iClosestCorner) and not(iCorner == iSecondClosestCorner) then
+                                        iCurDistToUnclaimedCorner = M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], tCornerPositions[iCorner])
+                                        if iCurDistToUnclaimedCorner < iClosestDistToUnclaimedCorner then
+                                            iClosestUnclaimedCorner = iCorner
+                                            iClosestDistToUnclaimedCorner = iCurDistToUnclaimedCorner
+                                        end
+                                    end
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurCorner='..iCurCorner..'; iClosestUnclaiemdCorner='..iClosestUnclaimedCorner..'; Dist to closest unclaimed='..iClosestDistToUnclaimedCorner..'; Corner position of closest unclaimed='..repru(tCornerPositions[iClosestUnclaimedCorner])..'; Corner position before we adjust='..repru(tCornerPositions[iCurCorner])) end
+                                tCornerPositions[iCurCorner] = M27Utilities.MoveTowardsTarget(tCornerPositions[iCurCorner], tCornerPositions[iClosestUnclaimedCorner], math.min(iClosestDistToUnclaimedCorner * 0.5, math.max(50, M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], PlayerStartPoints[aiBrain.M27StartPositionNumber]))), 0)
+                                tCornerPositions[iCurCorner][1] = math.floor(tCornerPositions[iCurCorner][1])
+                                tCornerPositions[iCurCorner][3] = math.floor(tCornerPositions[iCurCorner][3])
+                                tCornerPositions[iCurCorner][2] = GetTerrainHeight(tCornerPositions[iCurCorner][1], tCornerPositions[iCurCorner][3])
+                                if bDebugMessages == true then LOG(sFunctionRef..': Corner position after adjust='..repru(tCornerPositions[iCurCorner])..'; Dist to the unclaimed corner='..M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], tCornerPositions[iClosestUnclaimedCorner])) end
+                            end
+
+                        end
+
+                    end
+                end
+
+                --Are the corners too far from our base? If so then only move part-way towards them
+                local iMaxDistance = math.min(math.max(125, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4), 200)
+
+
+                if bUseSinglePoint then
+                    if M27Utilities.GetDistanceBetweenPositions(tSinglePointOverride, PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iMaxDistance then
+                        tSinglePointOverride = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tSinglePointOverride), iMaxDistance, false)
+                    end
+                else
+                    if M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iClosestCorner], PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iMaxDistance then
+                        tSinglePointOverride = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iClosestCorner]), iMaxDistance, false)
+                    end
+                    if M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iSecondClosestCorner], PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iMaxDistance then
+                        tSinglePointOverride = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iSecondClosestCorner]), iMaxDistance, false)
+                    end
+                end
+
+
+
+                --Cycle through every position in this square, work out the closest of the 2 corners, and record this corner
+
+                for iX = tBoundaries[1], tBoundaries[3] do
+                    if not(aiBrain[tCliffsAroundBaseChokepoint][iX]) then
+                        aiBrain[tCliffsAroundBaseChokepoint][iX] = {}
+                    end
+
+                    for iZ = tBoundaries[2], tBoundaries[4] do
+                        if bDebugMessages == true and iZ == tBoundaries[2] then LOG(sFunctionRef..': iX='..iX..'; iZ='..iZ..'; Dist to corner1='..M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iClosestCorner])..'; Dist to corner2='..M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iSecondClosestCorner])) end
+                        if bUseSinglePoint then aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tSinglePointOverride[1], tSinglePointOverride[2], tSinglePointOverride[3]}
+                        else
+                            if M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iClosestCorner]) < M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iSecondClosestCorner]) then
+                                --Closest corner is closest to this position
+                                aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tCornerPositions[iClosestCorner][1], tCornerPositions[iClosestCorner][2], tCornerPositions[iClosestCorner][3]}
+                                if bDebugMessages == true and iZ == tBoundaries[2] then LOG(sFunctionRef..': iX-Z='..iX..'-'..iZ..'; are near the closest corner '..iClosestCorner..'; Corner position='..repru(tCornerPositions[iClosestCorner])..'; aiBrain[tCliffsAroundBaseChokepoint][iX][iZ]='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ])) end
+                            else
+                                --Second closest corner to start is closest to this position
+                                aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tCornerPositions[iSecondClosestCorner][1], tCornerPositions[iSecondClosestCorner][2], tCornerPositions[iSecondClosestCorner][3]}
+                            end
+                        end
+                    end
+                end
+
+                --bDebugMessages = false
+
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Will give result of the first row of x values at the lowest Z boundary')
+                    for iX = tBoundaries[1], tBoundaries[3] do
+                        LOG('Result of table for iX='..iX..'; iZ='..tBoundaries[2]..'='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][tBoundaries[2]]))
+                    end
+                    LOG(sFunctionRef..': WIll draw all locations using the closest corner in light blue, and all locations using the second closest in red. If using single point will use gold if equals single point, and will use dark blue if dont recognise the location recorded. tBoundaries='..repru(tBoundaries))
+                    local iColour
+                    for iX = tBoundaries[1], tBoundaries[3] do
+                        for iZ = tBoundaries[2], tBoundaries[4] do
+                            if aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tCornerPositions[iClosestCorner][1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tCornerPositions[iClosestCorner][3] then
+                                iColour = 5 --light blue
+                            elseif aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tCornerPositions[iSecondClosestCorner][1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tCornerPositions[iSecondClosestCorner][3] then
+                                iColour = 2 --red
+                            elseif bUseSinglePoint and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tSinglePointOverride[1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tSinglePointOverride[3] then
+                                iColour = 4 --Gold
+                            else
+                                iColour = 1 --Dark blue
+                            end
+                            if iZ == tBoundaries[2] then LOG(sFunctionRef..': About to draw location '..repru({iX, GetTerrainHeight(iX, iZ), iZ})..' in colour '..iColour..'; corner recorded as closest='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ])..'; closest corner position='..repru(tCornerPositions[iClosestCorner])) end
+                            M27Utilities.DrawLocation({iX, GetTerrainHeight(iX, iZ), iZ}, false, iColour, 200)
+                        end
+                    end
+                    --Draw the corners again as larger circles
+                    LOG(sFunctionRef..': WIll now redraw the corners as circles in black')
+                    if bUseSinglePoint then
+                        LOG(sFunctionRef..': Using single point, location='..repru(tSinglePointOverride)..'; Our base location='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+                        M27Utilities.DrawLocation(tSinglePointOverride, false, 3, 500, 5)
+                    else
+                        M27Utilities.DrawLocation(tCornerPositions[iClosestCorner], false, 3, 500, 5)
+                        M27Utilities.DrawLocation(tCornerPositions[iSecondClosestCorner], false, 3, 500, 5)
+                    end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': End of loop for iCliff='..iCliff..'; aiBrain index='..aiBrain:GetArmyIndex()) end
+            end
+        end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+
+
+end
+
 function SetupNoRushDetails(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'SetupNoRushDetails'
@@ -3594,28 +4114,30 @@ function SetWhetherCanPathToEnemy(aiBrain)
 
     local sFunctionRef = 'SetWhetherCanPathToEnemy'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
-    local tOurBase = PlayerStartPoints[aiBrain.M27StartPositionNumber]
-    local sPathing = M27UnitInfo.refPathingTypeLand
-    local iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
-    local iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
-    if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithLand] = true
-    else aiBrain[refbCanPathToEnemyBaseWithLand] = false end
-    sPathing = M27UnitInfo.refPathingTypeAmphibious
-    iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
-    iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
-    if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithAmphibious] = true
-    else aiBrain[refbCanPathToEnemyBaseWithAmphibious] = false end
+    if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
+        local tEnemyStartPosition = GetPrimaryEnemyBaseLocation(aiBrain)
+        local tOurBase = PlayerStartPoints[aiBrain.M27StartPositionNumber]
+        local sPathing = M27UnitInfo.refPathingTypeLand
+        local iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
+        local iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
+        if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithLand] = true
+        else aiBrain[refbCanPathToEnemyBaseWithLand] = false end
+        sPathing = M27UnitInfo.refPathingTypeAmphibious
+        iOurBaseGroup = GetSegmentGroupOfLocation(sPathing, tOurBase)
+        iEnemyBaseGroup = GetSegmentGroupOfLocation(sPathing, tEnemyStartPosition)
+        if iOurBaseGroup == iEnemyBaseGroup then aiBrain[refbCanPathToEnemyBaseWithAmphibious] = true
+        else aiBrain[refbCanPathToEnemyBaseWithAmphibious] = false end
 
-    aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[reftPrimaryEnemyBaseLocation])
-    aiBrain[M27AirOverseer.refiMaxScoutRadius] = math.max(1500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.5)
+        aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] = M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain[reftPrimaryEnemyBaseLocation])
+        aiBrain[M27AirOverseer.refiMaxScoutRadius] = math.max(1500, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 1.5)
 
-    if aiBrain[refbCanPathToEnemyBaseWithAmphibious] then
-        aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5
-    else aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 0 end
+        if aiBrain[refbCanPathToEnemyBaseWithAmphibious] then
+            aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5
+        else aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 0 end
 
-    --Record mitpoint between base (makes it easier to calc mod distance
-    aiBrain[reftMidpointToPrimaryEnemyBase] = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyStartPosition), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], false)
+        --Record mitpoint between base (makes it easier to calc mod distance
+        aiBrain[reftMidpointToPrimaryEnemyBase] = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tEnemyStartPosition), aiBrain[M27Overseer.refiDistanceToNearestEnemyBase], false)
+    end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -4512,7 +5034,7 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
                             sPlatoonSubref = subrefPlateauScoutPlatoons
                         else
                             --Not sure want to add a pathing check due to the risk of an infinite loop/massive slowdown
-                            M27Utilities.ErrorHandler('Couldnt identify a plateau plan for oPlatoon with plan='..sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]..' for plateau '..iPlateauGroup..' so wont record against this plateau. aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup])
+                            M27Utilities.ErrorHandler('Couldnt identify a plateau plan for oPlatoon with plan='..sPlan..' so will ignore from record of plateau units. aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup])
                         end
                     end
                     if sPlatoonSubref then
@@ -4565,6 +5087,8 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
     local sFunctionRef = 'UpdatePlateausToExpandTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    --if bForceRefresh and (aiBrain:GetArmyIndex() == 2 or aiBrain:GetArmyIndex() == 3) then bDebugMessages = true end
+
     --Records table with the amphibious pathing group of plateaus that we are interested in expanding to
     --tAllPlateausWithMexes = 'M27PlateausWithMexes' --[x] = AmphibiousPathingGroup
     --reftPlateausOfInterest = 'M27PlateausOfInterest' --[x] = Amphibious pathing group
@@ -4598,115 +5122,135 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
     if bDebugMessages == true then LOG(sFunctionRef..': bForceRefresh='..tostring((bForceRefresh or false))..'; Time since last updated plateaus of interest='..GetGameTimeSeconds() - (aiBrain[refiLastPlateausUpdate] or -100)..'; Cur gametime='..GetGameTimeSeconds()) end
 
     if bForceRefresh or GetGameTimeSeconds() - (aiBrain[refiLastPlateausUpdate] or -100) > 10 then
-        aiBrain[refiLastPlateausUpdate] = GetGameTimeSeconds()
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains]) == false then
+            aiBrain[refiLastPlateausUpdate] = GetGameTimeSeconds()
 
-        --Cycle through each plateau and check if we already control it, and if not if it is safe
-        aiBrain[reftPlateausOfInterest] = {}
-        if M27Utilities.IsTableEmpty(tAllPlateausWithMexes) == false then
+            --Cycle through each plateau and check if we already control it, and if not if it is safe
+            aiBrain[reftPlateausOfInterest] = {}
+            if M27Utilities.IsTableEmpty(tAllPlateausWithMexes) == false then
+
+                local iCurModDistance
+                local tClosestMex
+                local iCurDist
+                local tStartPos = PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                local iClosestMexRef, iClosestMexDist
+                local iClosestDangerousPlateauDist = aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] --Dont want to try and go to a plateau if further away than nearest enemy if we lack intel of it
+                local iClosestDangerousPlateauRef
+                local tClosestDangerousPlateauMex
+                local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tStartPos, aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
+                local tEnemyGround
+                local bNearbyEnemyLand
+                local sLocationRef
+                local iExistingEngis
+                local iExistingFactories
+                local bAlreadyOwnOrAssignedPlateau
+                local tAlliedUnits
+                local iAlliedMexes
+                local iExistingTransports
+                local bCheckForAlliedUnits = false
+                local sPathing = M27UnitInfo.refPathingTypeAmphibious
+                local bHaveNonM27Allies = false
 
 
-            local iCurModDistance
-            local tClosestMex
-            local iCurDist
-            local tStartPos = PlayerStartPoints[aiBrain.M27StartPositionNumber]
-            local iClosestMexRef, iClosestMexDist
-            local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA, tStartPos, aiBrain[M27AirOverseer.refiMaxScoutRadius], 'Enemy')
-            local tEnemyGround
-            local bNearbyEnemyLand
-            local sLocationRef
-            local iExistingEngis
-            local iExistingFactories
-            local bAlreadyOwnPlateau
-            local tAlliedUnits
-            local iAlliedMexes
-            local bCheckForAlliedUnits = false
-            local sPathing = M27UnitInfo.refPathingTypeAmphibious
+                for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
+                    if not(oBrain == aiBrain) then bCheckForAlliedUnits = true end
+                    if not(oBrain.M27AI) then bHaveNonM27Allies = true end
+                end
 
-            for iBrain, oBrain in aiBrain[M27Overseer.toAllyBrains] do
-                if not(oBrain == aiBrain) then bCheckForAlliedUnits = true break end
-            end
+                if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation]) then
+                    aiBrain[reftOurPlateauInformation] = {}
+                end
 
-            if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation]) then
-                aiBrain[reftOurPlateauInformation] = {}
-            end
+                if bPathingChange then ReRecordUnitsAndPlatoonsInPlateaus(aiBrain) end --This will also reset aiBrain[reftOurPlateauInformation
+                for iPlateauGroup, tSubtable in tAllPlateausWithMexes do
+                    if M27Utilities.IsTableEmpty(tSubtable[subrefPlateauMexes]) == false then
+                        --Ignore plateaus that we already have engies or factories on
 
-            if bPathingChange then ReRecordUnitsAndPlatoonsInPlateaus(aiBrain) end --This will also reset aiBrain[reftOurPlateauInformation
-            for iPlateauGroup, tSubtable in tAllPlateausWithMexes do
-                if M27Utilities.IsTableEmpty(tSubtable[subrefPlateauMexes]) == false then
-                    --Ignore plateaus that we already have engies or factories on
-                    iExistingEngis = 0
-                    iExistingFactories = 0
-                    iAlliedMexes = 0
-                    bAlreadyOwnPlateau = false
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; considering if we have friendly units in the plateau already. IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup])='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]))) end
-                    if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) == false then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Is table of engineers assigned to plateau empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]))) end
-                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]) == false then
-                            for iEngi, oEngi in aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers] do
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering engineer '..oEngi.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngi)..'; is unit valid='..tostring(M27UnitInfo.IsUnitValid(oEngi))) end
-                                if M27UnitInfo.IsUnitValid(oEngi) then iExistingEngis = iExistingEngis + 1 end
+                        iExistingEngis = 0
+                        iExistingFactories = 0
+                        iAlliedMexes = 0
+                        iExistingTransports = 0
+                        bAlreadyOwnOrAssignedPlateau = false
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering plateaugroup='..iPlateauGroup..'; considering if we have friendly units in the plateau already') end
+
+                        for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..'; is its table of plateau info empty for group '..iPlateauGroup..'='..tostring(M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup]))..'; is table of assigned transports empty='..tostring(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup])) end
+
+                            if M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup]) == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Is table of engineers assigned to plateau empty='..tostring(M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]))..'; is table of land factories empty='..tostring(M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories]))..'; is table of transports empty='..tostring(M27Utilities.IsTableEmpty(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup]))) end
+                                if M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers]) == false then
+                                    for iEngi, oEngi in oBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauEngineers] do
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Considering engineer '..oEngi.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngi)..'; is unit valid='..tostring(M27UnitInfo.IsUnitValid(oEngi))) end
+                                        if M27UnitInfo.IsUnitValid(oEngi) then iExistingEngis = iExistingEngis + 1 end
+                                    end
+                                end
+                                if M27Utilities.IsTableEmpty(oBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories]) == false then
+                                    for iFactory, oFactory in oBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories] do
+                                        if M27UnitInfo.IsUnitValid(oFactory) and oFactory:GetFractionComplete() == 1 then iExistingFactories = iExistingFactories + 1 end
+                                    end
+                                end
+                            end
+                            --Do allied M27 brains other than ourselves already have transports assigned to this plateau?
+                            if M27Utilities.IsTableEmpty(oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup]) == false and not(oBrain == aiBrain) then
+                                for iTransport, oTransport in oBrain[M27Transport.reftTransportsAssignedByPlateauGroup][iPlateauGroup] do
+                                    iExistingTransports = iExistingTransports + 1
+                                end
                             end
                         end
-                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories]) == false then
-                            for iFactory, oFactory in aiBrain[reftOurPlateauInformation][iPlateauGroup][subrefPlateauLandFactories] do
-                                if M27UnitInfo.IsUnitValid(oFactory) and oFactory:GetFractionComplete() == 1 then iExistingFactories = iExistingFactories + 1 end
-                            end
+
+                        if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) or iExistingTransports > 0 then
+                            bAlreadyOwnOrAssignedPlateau = true
                         end
-                    end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngis='..iExistingEngis..'; iExistingFactories='..iExistingFactories..'; Mexes on plateau='..tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount]..'; bAlreadyOwnOrAssignedPlateau='..tostring(bAlreadyOwnOrAssignedPlateau)) end
+                        if not(bAlreadyOwnOrAssignedPlateau) then
+                            --Look for non-M27 allied units on the plateau that wont have been picked up from above
 
-                    if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) then
-                        bAlreadyOwnPlateau = true
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': iExistingEngis='..iExistingEngis..'; iExistingFactories='..iExistingFactories..'; Mexes on plateau='..tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount]..'; bAlreadyOwnPlateau='..tostring(bAlreadyOwnPlateau)) end
-                    if not(bAlreadyOwnPlateau) then
-                        --Look for allied units on the plateau
 
-                        if bCheckForAlliedUnits then
-                            tAlliedUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandFactory + M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryMex, tSubtable[subrefPlateauMidpoint], tSubtable[subrefPlateauMaxRadius], 'Ally')
-                            if M27Utilities.IsTableEmpty(tAlliedUnits) == false then
-                                for iUnit, oUnit in tAlliedUnits do
-                                    --Is it an allied unit not our own?
-                                    if oUnit:GetFractionComplete() == 1 and not(oUnit:GetAIBrain() == aiBrain) and GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == iPlateauGroup then
-                                        if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
-                                            iAlliedMexes = iAlliedMexes + 1
-                                        elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oUnit.UnitId) then
-                                            iExistingFactories = iExistingFactories + 1
-                                        else iExistingEngis = iExistingEngis + 1
+                            if bCheckForAlliedUnits and bHaveNonM27Allies then
+                                tAlliedUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryLandFactory + M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryMex, tSubtable[subrefPlateauMidpoint], tSubtable[subrefPlateauMaxRadius], 'Ally')
+                                if M27Utilities.IsTableEmpty(tAlliedUnits) == false then
+                                    for iUnit, oUnit in tAlliedUnits do
+                                        --Is it an allied unit not our own?
+                                        if oUnit:GetFractionComplete() == 1 and not(oUnit:GetAIBrain().M27AI) and GetSegmentGroupOfLocation(sPathing, oUnit:GetPosition()) == iPlateauGroup then
+                                            if EntityCategoryContains(M27UnitInfo.refCategoryMex, oUnit.UnitId) then
+                                                iAlliedMexes = iAlliedMexes + 1
+                                            elseif EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oUnit.UnitId) then
+                                                iExistingFactories = iExistingFactories + 1
+                                            else iExistingEngis = iExistingEngis + 1
+                                            end
                                         end
                                     end
-                                end
-                                if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) or iAlliedMexes >= tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] * 0.75 then
-                                    bAlreadyOwnPlateau = true
-                                end
-                            end
-                        end
-
-                        if bDebugMessages == true then LOG(sFunctionRef..': Finished checking for allied units on the plateau, bAlreadyOwnPlateau='..tostring(bAlreadyOwnPlateau)) end
-
-                        if not(bAlreadyOwnPlateau) then
-                            --Ignore plateaus that contain an enemy base
-                            if bDebugMessages == true then LOG(sFunctionRef..': Will ignore plateaus containing an active start point. tSubtable[subrefPlateauContainsActiveStart]='..tostring(tSubtable[subrefPlateauContainsActiveStart])) end
-                            if not(tSubtable[subrefPlateauContainsActiveStart]) then
-                                --Is the location safe? First check if the nearest mex is closer than the nearest enemy threat
-                                if M27Utilities.IsTableEmpty (aiBrain[reftOurPlateauInformation][iPlateauGroup]) then
-                                    aiBrain[reftOurPlateauInformation][iPlateauGroup] = {}
-                                end
-
-                                iClosestMexDist = 10000
-                                for iMex, tMex in tSubtable[subrefPlateauMexes] do
-                                    iCurDist = M27Utilities.GetDistanceBetweenPositions(tMex, tStartPos)
-                                    if iCurDist < iClosestMexDist then
-                                        iClosestMexDist = iCurDist
-                                        iClosestMexRef = iMex
+                                    if iExistingFactories > 0 or iExistingEngis >= 2 or (iExistingEngis == 1 and tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] <= 4) or iAlliedMexes >= tAllPlateausWithMexes[iPlateauGroup][subrefPlateauTotalMexCount] * 0.75 then
+                                        bAlreadyOwnOrAssignedPlateau = true
                                     end
                                 end
+                            end
+
+                            if bDebugMessages == true then LOG(sFunctionRef..': Finished checking for allied units on the plateau, bAlreadyOwnOrAssignedPlateau='..tostring(bAlreadyOwnOrAssignedPlateau)) end
+
+                            if not(bAlreadyOwnOrAssignedPlateau) then
+                                --Ignore plateaus that contain an enemy base
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will ignore plateaus containing an active start point. tSubtable[subrefPlateauContainsActiveStart]='..tostring(tSubtable[subrefPlateauContainsActiveStart])) end
+                                if not(tSubtable[subrefPlateauContainsActiveStart]) then
+                                    --Is the location safe? First check if the nearest mex is closer than the nearest enemy threat
+                                    if M27Utilities.IsTableEmpty (aiBrain[reftOurPlateauInformation][iPlateauGroup]) then
+                                        aiBrain[reftOurPlateauInformation][iPlateauGroup] = {}
+                                    end
+
+                                    iClosestMexDist = 10000
+                                    for iMex, tMex in tSubtable[subrefPlateauMexes] do
+                                        iCurDist = M27Utilities.GetDistanceBetweenPositions(tMex, tStartPos)
+                                        if iCurDist < iClosestMexDist then
+                                            iClosestMexDist = iCurDist
+                                            iClosestMexRef = iMex
+                                        end
+                                    end
 
 
-                                tClosestMex = tSubtable[subrefPlateauMexes][iClosestMexRef]
+                                    tClosestMex = tSubtable[subrefPlateauMexes][iClosestMexRef]
 
-                                iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tClosestMex, false)
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering if nearest threat is too close to risk sending transport. aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; iCurModDistance='..(iCurModDistance or 'nil')..'; will allow a threshold above this.  Will also allow if have radar coverage of the plateau.  Have radar coverage='..tostring(M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true))) end
-                                if iCurModDistance <= (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] + 60) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true) then
+                                    iCurModDistance = M27Overseer.GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, tClosestMex, false)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if nearest threat is too close to risk sending transport. aiBrain[M27Overseer.refiModDistFromStartNearestThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestThreat]..'; iCurModDistance='..(iCurModDistance or 'nil')..'; will allow a threshold above this.  Will also allow if have radar coverage of the plateau.  Have radar coverage='..tostring(M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true))) end
                                     --Are we outside norush range?
                                     if not(bNoRushActive) or M27Utilities.GetDistanceBetweenPositions(tClosestMex, aiBrain[reftNoRushCentre]) <= iNoRushRange then
 
@@ -4726,25 +5270,38 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                                             if not (bNearbyEnemyLand) then
                                                 --Have we tried targeting this mex recently?
                                                 sLocationRef = M27Utilities.ConvertLocationToStringRef(tClosestMex)
-                                                if GetGameTimeSeconds() - (aiBrain[M27Transport.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300) >= 300 then
-                                                    --Add to shortlist of locations to try and expand to
-                                                    aiBrain[reftPlateausOfInterest][iPlateauGroup] = tClosestMex
+                                                if GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][sLocationRef] or -300) >= 300 then
+                                                    --Add to shortlist of locations to try and expand to; either the 'dangerous' shortlist if no intel and far away mod distance, or both shortlists
+                                                    if iCurModDistance <= (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] + 60) or M27Logic.GetIntelCoverageOfPosition(aiBrain, tClosestMex, nil, true) then
+                                                        aiBrain[reftPlateausOfInterest][iPlateauGroup] = tClosestMex
+                                                    end
+                                                    if iCurModDistance <= iClosestDangerousPlateauDist then
+                                                        iClosestDangerousPlateauDist = iCurModDistance
+                                                        iClosestDangerousPlateauRef = iPlateauGroup
+                                                        tClosestDangerousPlateauMex = {tClosestMex[1], tClosestMex[2], tClosestMex[3]}
+                                                    end
                                                 end
                                             end
                                         elseif bDebugMessages == true then LOG(sFunctionRef..': Enemy AA is covering the closest mex, at position '..repru(tClosestMex)..'; size of tEnemyAA='..table.getn(tEnemyAA))
                                         end
                                     end
+
                                 end
                             end
                         end
                     end
                 end
-            end
-            if bDebugMessages == true then
-                LOG(sFunctionRef..': Finished determining all plateaus of interest.  Will cycle through them and list them out (but not full repr due to units potentially being in here. Is table empty='..tostring(aiBrain[reftPlateausOfInterest]))
-                if M27Utilities.IsTableEmpty(aiBrain[reftPlateausOfInterest]) == false then
-                    for iPlateauGroup, tSubtable in aiBrain[reftPlateausOfInterest] do
-                        LOG(sFunctionRef..': iPlateauGroup='..iPlateauGroup)
+
+                --If plateau table is empty but we have a transport then record the closest dangerous plateau
+                if M27Utilities.IsTableEmpty(aiBrain[reftPlateausOfInterest]) and iClosestDangerousPlateauRef and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryTransport) == 1 then
+                    aiBrain[reftPlateausOfInterest][iClosestDangerousPlateauRef] = tClosestDangerousPlateauMex
+                end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Finished determining all plateaus of interest.  Will cycle through them and list them out (but not full repr due to units potentially being in here. Is table empty='..tostring(aiBrain[reftPlateausOfInterest]))
+                    if M27Utilities.IsTableEmpty(aiBrain[reftPlateausOfInterest]) == false then
+                        for iPlateauGroup, tSubtable in aiBrain[reftPlateausOfInterest] do
+                            LOG(sFunctionRef..': iPlateauGroup='..iPlateauGroup)
+                        end
                     end
                 end
             end
@@ -4943,7 +5500,10 @@ function IdentifyTeamChokepoints(aiBrain)
                                     M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount] = {}
                                     M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointStart] = tLineSidepoint
                                     M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount][subrefChokepointMexesCovered] = 0
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Found a new chokepoint, Dist='..iChokepointDistFromStart..'; iChokepointCount='..iChokepointCount..'; iDistAdjust='..iDistAdjust..'; Dist from start='..iChokepointDistFromStart..'; tLineSidepoint='..repru(tLineSidepoint)) end
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef..': Found a new chokepoint, Dist='..iChokepointDistFromStart..'; iChokepointCount='..iChokepointCount..'; iDistAdjust='..iDistAdjust..'; Dist from start='..iChokepointDistFromStart..'; tLineSidepoint='..repru(tLineSidepoint)..'; will draw this point in white')
+                                        M27Utilities.DrawLocation(tLineSidepoint, false, 7)
+                                    end
                                 end
                                 iCurChokepointSize = iCurChokepointSize + iIntervalToUse
                                 if iChokepointCount > iMaxChokepointsNeeded and iCurChokepointSize >= iIntervalToUse * 2 then
@@ -4972,8 +5532,9 @@ function IdentifyTeamChokepoints(aiBrain)
                                         else
                                             M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart][iChokepointCount] = nil
                                         end
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Have very small chokepoint size so likely pathing error, will reduce iChokepointCount '..iChokepointCount..' by 1. iCurChokepointSize='..iCurChokepointSize) end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have very small chokepoint size '..iCurChokepointSize..'; iIntervalToUse='..iIntervalToUse..'; so likely pathing error, will reduce iChokepointCount '..iChokepointCount..' by 1. iCurChokepointSize='..iCurChokepointSize) end
                                         iChokepointCount = iChokepointCount - 1
+                                        iCurChokepointSize = 0
                                     end
                                 end
                             end
@@ -4982,6 +5543,7 @@ function IdentifyTeamChokepoints(aiBrain)
                             LOG(sFunctionRef..': Finished checking along the line for iDistAdjust='..iDistAdjust..'; iChokepointCount='..iChokepointCount..'; Is team data info for this dist adjust empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iChokepointDistFromStart])))
                         end
                     end
+
                     if bDebugMessages == true then LOG(sFunctionRef..': Finished trying all distadjust values. Is the table of choekpoints empty for all distances='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]))) end
                     if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart]) == false then
                         --------------------->>>>>>>>>>>>>>>>RECORD RECLAIM<<<<<<<<<<<<<----------------------

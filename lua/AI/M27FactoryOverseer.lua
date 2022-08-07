@@ -867,6 +867,11 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iTotalWanted = aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted]
                                             end
                                         end
+                                        --Also build engineers if are upgrading lots of mexes
+                                        if not(iCategoryToBuild) and aiBrain[M27EconomyOverseer.refiMexesUpgrading] >= 4 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.05 and (aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 or aiBrain:GetEconomyStored('MASS') >= 1500) then
+                                            iCategoryToBuild = refCategoryEngineer
+                                            iTotalWanted = math.min(2, math.max(aiBrain[M27EngineerOverseer.refiBOInitialEngineersWanted] + aiBrain[M27EngineerOverseer.refiBOPreReclaimEngineersWanted], 1))
+                                        end
                                     elseif iCurrentConditionToTry == 15 then --Mobile shields if have small number and have priority units near base wanting shielding
                                         if iFactoryTechLevel >= 2 then
                                             if aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] then
@@ -1244,8 +1249,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and aiBrain[M27Overseer.refiMAAShortfallACUCore] > 0 and M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirNonScout, M27Utilities.GetACU(aiBrain):GetPosition(), 100, 'Enemy')) == false then
                                         --want MAA for ACU
                                         --Can we path to ACU with amphib but not land? If so then only build MAA if it is amphibious
-                                        local iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
-                                        local iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+                                        local iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())
+                                        local iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())
                                         local iACUAmphibGroup, iACULandGroup
                                         iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27Utilities.GetACU(aiBrain):GetPosition())
                                         iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27Utilities.GetACU(aiBrain):GetPosition())
@@ -1258,7 +1263,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 3 then --Antinavy because enemy ACU/our ACU is underwater
-                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
+                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
                                         iCategoryToBuild = M27UnitInfo.refCategoryAntiNavy
                                         iTotalWanted = 1000
                                     end
@@ -1269,13 +1274,17 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     else
                                         --Can we path to ACU with amphib but not with land?
                                         --GetSegmentGroupOfLocation(sPathing, tLocation)
-                                        local iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
-                                        local iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+                                        local iOurBaseAmphibGroup, iOurBaseLandGroup
+
                                         local iACUAmphibGroup, iACULandGroup
-                                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
-                                            iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLastNearestACU])
-                                            iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLastNearestACU])
+                                        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoACUKillTarget]) then
+                                            iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
+                                            iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
+                                            iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
+                                            iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.refoACUKillTarget]:GetPosition())
                                         else
+                                            iOurBaseAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())
+                                            iOurBaseLandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition())
                                             iACUAmphibGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27Utilities.GetACU(aiBrain):GetPosition())
                                             iACULandGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27Utilities.GetACU(aiBrain):GetPosition())
                                         end
@@ -1372,7 +1381,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     iCategoryToBuild = M27UnitInfo.refCategoryAirAA
                                 else
                                     bReachedLastOption = true
-                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
+                                    if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoACUKillTarget])) or (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyProtectACU and M27UnitInfo.IsUnitUnderwater(M27Utilities.GetACU(aiBrain))) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': ACU is underwater so will get torp bombers') end
                                         iCategoryToBuild = M27UnitInfo.refCategoryTorpBomber
                                     else
@@ -1706,12 +1715,16 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
                                         end
                                     end
-                                elseif iCurrentConditionToTry == 11 then --2nd strat bomber if first not died yet and dont have any idle bombers
-                                    if iFactoryTechLevel >= 3 and iAvailableT3Bombers == 0 and (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3]) or M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1]) or M27UnitInfo.IsUnitValid(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1][M27AirOverseer.subrefoBomber])) then
-                                        --1st Bomber still alive - check have lifetime build count <=2
-                                        if M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryBomber * categories.TECH3) <= 1 then
-                                            iCategoryToBuild = refCategoryBomber
-                                            iTotalWanted = 1
+                                elseif iCurrentConditionToTry == 11 then --2nd strat bomber if first not died yet and dont have any idle bombers; also build 2nd/3rd strat if have more AA than enemy and they lack T3 AA
+                                    if iFactoryTechLevel >= 3 and (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3]) or M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1]) or M27UnitInfo.IsUnitValid(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1][M27AirOverseer.subrefoBomber])) then
+                                        if iAvailableT3Bombers == 0 or (iAvailableT3Bombers <= 2 and aiBrain[M27AirOverseer.refbHaveAirControl] and not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA])) then
+                                    --1st Bomber still alive - check have lifetime build count <=2
+                                        local iLifetimeStratBuildCount = M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryBomber * categories.TECH3)
+
+                                            if iLifetimeStratBuildCount <= 1 or (iLifetimeStratBuildCount <= 4 and not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA])) then
+                                                iCategoryToBuild = refCategoryBomber
+                                                iTotalWanted = 1
+                                            end
                                         end
                                     end
                                 elseif iCurrentConditionToTry == 12 then
@@ -1949,7 +1962,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 end
 
                                                 iCategoryToBuild = M27UnitInfo.refCategoryTransport
-                                                iTotalWanted = iCurTransports - iTransportsWanted
+                                                iTotalWanted = iTransportsWanted - iCurTransports
                                             end
                                         end
                                     end

@@ -18,13 +18,14 @@ refiNearestEnemyIndex = 'M27NearestEnemyIndex'
 refiNearestEnemyStartPoint = 'M27NearestEnemyStartPoint'
 tPlayerStartPointByIndex = {}
 iTimeOfLastBrainAllDefeated = 0 --Used to avoid massive error spamming if all brains defeated
+refbAllEnemiesDead = 'M27AllEnemiesDead' --true if flagged all brains are dead
 
 refiEnemyScoutSpeed = 'M27LogicEnemyScoutSpeed' --expected speed of the nearest enemy's land scouts
 
 refiIdleCount = 'M27UnitIdleCount' --Used to track how long a unit has been idle with the isunitidle check
 
 function GetUnitState(oUnit)
-    --Returns a string containing oUnit's unit state
+    --Returns a string containing oUnit's unit state. Returns '' if no unit state.
     local sUnitState = ''
     local sAllUnitStates = {'Immobile',
     'Moving',
@@ -115,6 +116,51 @@ function ReturnUnitsInTargetSegmentGroup(tUnits, iTargetGroup)
     return tMatchingUnits
 end
 
+function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ReturnUnitsInTargetSegmentGroup'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iSegmentSearchRange = math.ceil(50 / M27MapInfo.iReclaimSegmentSizeX)
+    local iBaseReclaimSegmentX, iBaseReclaimSegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tStartPosition)
+
+    local iCurLevel = -1
+    local iCurSublevel = 0
+    local tiAdjustFactor = {{1,0}, {1,1},{0,1},{-1,1},{-1,0},{-1,-1},{0,-1}, {1,-1}}
+
+    local iReclaimSegmentX
+    local iReclaimSegmentZ
+    local bFoundEnergyReclaim = false
+
+    --Find nearest segment to engineer containing energy reclaim
+    while iCurLevel < math.min(iSegmentSearchRange, 10000) do
+        iCurLevel = iCurLevel + 1
+        iCurSublevel = iCurSublevel + 1
+        if iCurSublevel > 4 then iCurSublevel = 1 end
+        for iCurFactor, tCurFactor in tiAdjustFactor do
+            iReclaimSegmentX = iBaseReclaimSegmentX + iCurLevel * tCurFactor[1]
+
+            if M27MapInfo.tReclaimAreas[iReclaimSegmentX] then
+                iReclaimSegmentZ = iBaseReclaimSegmentZ + iCurLevel * tCurFactor[2]
+                if M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ] then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Checking for energy reclaim in segment '..iReclaimSegmentX..'-'..iReclaimSegmentZ..'; Dist to the base segment='..M27Utilities.GetDistanceBetweenPositions(tStartPosition, M27MapInfo.GetReclaimLocationFromSegment(iReclaimSegmentX, iReclaimSegmentZ))) end
+                    if M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimTotalEnergy] >= iMinEnergyReclaim then
+                        bFoundEnergyReclaim = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': Found sufficient reclaim') end
+                        break
+                    end
+                end
+
+            end
+            if iCurLevel == 0 then break end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    if bFoundEnergyReclaim then return iReclaimSegmentX, iReclaimSegmentZ
+    else return nil, nil
+    end
+end
+
 function ChooseReclaimTarget(oEngineer, bWantEnergy)
     --Returns a table containing the target position to attack move to based on reclaimsegments
     --If are no reclaim positions then returns the current segment
@@ -135,6 +181,25 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
     local tEngiPosition = oEngineer:GetPosition()
 
     if bWantEnergy then
+        local iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(tEngiPosition, 20)
+
+
+        if not(iEnergySegmentX) then
+            iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 20)
+            if bDebugMessages == true then LOG(sFunctionRef..': Energy segment X and Z after checking near base='..(iEnergySegmentX or 'nil')..'-'..(iEnergySegmentZ or 'nil')) end
+            if not(iEnergySegmentX) then
+                M27Utilities.ErrorHandler(sFunctionRef..': Couldnt find any segments containing energy near to engineer or start so will just return engineer current segment')
+                iEnergySegmentX, iEnergySegmentZ = M27MapInfo.GetReclaimSegmentsFromLocation(tEngiPosition)
+            end
+        elseif bDebugMessages == true then LOG(sFunctionRef..': Energy segment X and Z after checking near engi='..(iEnergySegmentX or 'nil')..'-'..(iEnergySegmentZ or 'nil')..'; Dist between here and engi='..M27Utilities.GetDistanceBetweenPositions(tEngiPosition, M27MapInfo.GetReclaimLocationFromSegment(iEnergySegmentX, iEnergySegmentZ)))
+        end
+
+
+        return M27MapInfo.GetReclaimLocationFromSegment(iEnergySegmentX, iEnergySegmentZ)
+
+        --[[
+        bDebugMessages = true
+        if bDebugMessages == true then LOG(sFunctionRef..': Want to find energy; engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' action='..(oEngineer[M27EngineerOverseer.refiEngineerCurrentAction] or 'nil')) end
         --Want the nearest location that has a decent amount of power - manually calculate as fairly rare that want this info
         local rCurRect
         local tNearbyReclaim
@@ -178,7 +243,7 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
                 end
                 break
             end
-        end
+        end--]]
     else --Can refer to the shortlist of reclaim areas
         for iCurPriority = 1, 3 do --priority 4 is for ACU only
             if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftReclaimAreasOfInterest][iCurPriority]) == false then
@@ -507,13 +572,14 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                             if GetGameTimeSeconds() - iTimeOfLastBrainAllDefeated >= 5 then
                                 M27Utilities.ErrorHandler('All brains are showing as dead but we havent recorded any ACU deaths.  Assuming all enemies are dead and aborting all code; will show this message every 5s')
                                 iTimeOfLastBrainAllDefeated = GetGameTimeSeconds()
+                                aiBrain[refbAllEnemiesDead] = true
                             end
                         end
 
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                         WaitSeconds(1)
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-                    elseif bHaveBrains then
+                    elseif bHaveBrains and not(aiBrain[refbAllEnemiesDead]) then
                         M27Utilities.ErrorHandler('iNearestEnemyIndex is nil so will wait 1 sec and then repeat function with logs enabled; if gametime is <=10s then will also flag that the aiBrain has no enemies')
                         if GetGameTimeSeconds() <= 10 then
                             aiBrain[M27Overseer.refbNoEnemies] = true
@@ -526,15 +592,19 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                         return GetNearestEnemyIndex(aiBrain, true)
                     else
                         --No brains - could be game mode doesnt have enemy player brains
-                        M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will call again with logs enabled. if gametime is <=10s then will also flag that the aiBrain has no enemies and update start positions accordingly')
-                        if GetGameTimeSeconds() <= 10 then
-                            aiBrain[M27Overseer.refbNoEnemies] = true
-                            M27MapInfo.bUsingArmyIndexForStartPosition = true
-                            M27MapInfo.RecordPlayerStartLocations()
-                            if bDebugMessages == true then LOG(sFunctionRef..': No enemy brains identified, Setting no enemies to be true') end
+                        if not(aiBrain[refbAllEnemiesDead]) then
+                            M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will call again with logs enabled. if gametime is <=10s then will also flag that the aiBrain has no enemies and update start positions accordingly')
+                            if GetGameTimeSeconds() <= 10 then
+                                aiBrain[M27Overseer.refbNoEnemies] = true
+                                M27MapInfo.bUsingArmyIndexForStartPosition = true
+                                M27MapInfo.RecordPlayerStartLocations()
+                                if bDebugMessages == true then LOG(sFunctionRef..': No enemy brains identified, Setting no enemies to be true') end
+                            end
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            return GetNearestEnemyIndex(aiBrain, true)
+                        else
+                            return nil
                         end
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        return GetNearestEnemyIndex(aiBrain, true)
                     end
                 else
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -1731,12 +1801,14 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                     if not(bIndirectFireThreatOnly) then
                         if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then
                             if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit.UnitId) then
-                                iMassMod = 0.6 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
+                                iMassMod = 0.55 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
                             elseif EntityCategoryContains(M27UnitInfo.refCategoryCruiserCarrier, oUnit.UnitId) then
                                 if EntityCategoryContains(categories.CYBRAN * categories.TECH2, oUnit.UnitId) then iMassMod = 0.45
                                 else
                                     iMassMod = 0.2
                                 end
+                            elseif EntityCategoryContains(M27UnitInfo.refCategoryAttackBot * categories.TECH1, oUnit.UnitId) then
+                                iMassMod = 0.85
                             else iMassMod = 1
                             end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) then
@@ -3756,78 +3828,80 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     --Determines if target is under a shield
     --bCumulativeShieldHealth - if true, then will treat as being under a shield if all shields combined have health of at least iIgnoreShieldsWithLessThanThisHealth
     --if oTarget.UnitId == 'urb4206' then bDebugMessages = true end
-    if bDebugMessages == true and EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oTarget.UnitId) then
-        LOG(sFunctionRef..': oTarget is a shield='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Shield ratio='..oTarget:GetShieldRatio(false)..'; Shield ratio true='..oTarget:GetShieldRatio(true)..'; Shield health='..oTarget.MyShield:GetHealth()..'; SHield max health='..oTarget.MyShield:GetMaxHealth()..'; Active consumption='..tostring(oTarget.ActiveConsumption)..'; reprs of shield='..reprs(oTarget.MyShield))
-    end
-    if iIgnoreShieldsWithLessThanThisHealth == nil then iIgnoreShieldsWithLessThanThisHealth = 0 end
-    local bUnderShield = false
-    local iShieldSearchRange = 46 --T3 sera shield is 46; bulwark is 120; will go with sera t3 for now; if changing here then also change reference in getmaxstrikedamage
-    --Is the target an enemy?
-    local oTBrain = oTarget:GetAIBrain()
-    local bEnemy
-    if oTBrain == aiBrain then
-        bEnemy = false
-    else
-        local iOurArmyIndex = aiBrain:GetArmyIndex()
-        local iTargetArmyIndex = oTBrain:GetArmyIndex()
-        if iOurArmyIndex and iTargetArmyIndex then
-            bEnemy = IsEnemy(iOurArmyIndex, iTargetArmyIndex)
-        else bEnemy = true
+    if M27UnitInfo.IsUnitValid(oTarget) and oTarget.GetHealth then
+        if bDebugMessages == true and EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oTarget.UnitId) then
+            LOG(sFunctionRef..': oTarget is a shield='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Shield ratio='..oTarget:GetShieldRatio(false)..'; Shield ratio true='..oTarget:GetShieldRatio(true)..'; Shield health='..oTarget.MyShield:GetHealth()..'; SHield max health='..oTarget.MyShield:GetMaxHealth()..'; Active consumption='..tostring(oTarget.ActiveConsumption)..'; reprs of shield='..reprs(oTarget.MyShield))
         end
-    end
-    local sSearchType = 'Ally'
-    if bEnemy then sSearchType = 'Enemy' end
-    local tTargetPos = oTarget:GetPosition()
-    local iShieldCategory = M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryFixedShield
-    if bIgnoreMobileShields then iShieldCategory = M27UnitInfo.refCategoryFixedShield end
-    local tNearbyShields = aiBrain:GetUnitsAroundPoint(iShieldCategory, tTargetPos, iShieldSearchRange, sSearchType)
-    if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repru(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
-    local iShieldCurHealth, iShieldMaxHealth
-    local iTotalShieldCurHealth = 0
-    local iTotalShieldMaxHealth = 0
-    local iMinFractionComplete = 0.95
-    if bTreatPartCompleteAsComplete then iMinFractionComplete = 0 end
-    if M27Utilities.IsTableEmpty(tNearbyShields) == false then
-        if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
-        local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
-        for iUnit, oUnit in tNearbyShields do
-            if not(oUnit.Dead) and oUnit:GetFractionComplete() >= iMinFractionComplete then
-                oCurUnitBP = oUnit:GetBlueprint()
-                iCurShieldRadius = 0
-                if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Target has a shield, will check its shield size and how close that is to the target') end
-                    iCurShieldRadius = oCurUnitBP.Defense.Shield.ShieldSize * 0.5
-                    if iCurShieldRadius > 0 then
-                        iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
-                        if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius..'; shield position='..repru(oUnit:GetPosition())..'; target position='..repru(tTargetPos)) end
-                        if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
-                            if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
-                            iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
-                            iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth
-                            iTotalShieldMaxHealth = iTotalShieldMaxHealth + iShieldMaxHealth
-                            if bTreatPartCompleteAsComplete or (oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1) then iShieldCurHealth = iShieldMaxHealth end
-                            if bDebugMessages == true then LOG(sFunctionRef..': iShieldCurHealth='..iShieldCurHealth..'; iIgnoreShieldsWithLessThanThisHealth='..iIgnoreShieldsWithLessThanThisHealth) end
-                            if (not(bCumulativeShieldHealth) and iShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth) or (bCumulativeShieldHealth and iTotalShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth) then
-                                bUnderShield = true
-                                if bDebugMessages == true then LOG(sFunctionRef..': Shield health more than threshold so unit is under a shield') end
-                                if not(bReturnShieldHealthInstead) then break end
-                            end
-                        end
-                    elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
-                    end
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit.UnitId) end
-                end
-            elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is dead')
+        if iIgnoreShieldsWithLessThanThisHealth == nil then iIgnoreShieldsWithLessThanThisHealth = 0 end
+        local bUnderShield = false
+        local iShieldSearchRange = 46 --T3 sera shield is 46; bulwark is 120; will go with sera t3 for now; if changing here then also change reference in getmaxstrikedamage
+        --Is the target an enemy?
+        local oTBrain = oTarget:GetAIBrain()
+        local bEnemy
+        if oTBrain == aiBrain then
+            bEnemy = false
+        else
+            local iOurArmyIndex = aiBrain:GetArmyIndex()
+            local iTargetArmyIndex = oTBrain:GetArmyIndex()
+            if iOurArmyIndex and iTargetArmyIndex then
+                bEnemy = IsEnemy(iOurArmyIndex, iTargetArmyIndex)
+            else bEnemy = true
             end
         end
-    else
-        if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
-    end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    if bReturnShieldHealthInstead then
-        return iTotalShieldCurHealth, iTotalShieldMaxHealth
-    else return bUnderShield
+        local sSearchType = 'Ally'
+        if bEnemy then sSearchType = 'Enemy' end
+        local tTargetPos = oTarget:GetPosition()
+        local iShieldCategory = M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryFixedShield
+        if bIgnoreMobileShields then iShieldCategory = M27UnitInfo.refCategoryFixedShield end
+        local tNearbyShields = aiBrain:GetUnitsAroundPoint(iShieldCategory, tTargetPos, iShieldSearchRange, sSearchType)
+        if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repru(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
+        local iShieldCurHealth, iShieldMaxHealth
+        local iTotalShieldCurHealth = 0
+        local iTotalShieldMaxHealth = 0
+        local iMinFractionComplete = 0.95
+        if bTreatPartCompleteAsComplete then iMinFractionComplete = 0 end
+        if M27Utilities.IsTableEmpty(tNearbyShields) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
+            local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
+            for iUnit, oUnit in tNearbyShields do
+                if not(oUnit.Dead) and oUnit:GetFractionComplete() >= iMinFractionComplete then
+                    oCurUnitBP = oUnit:GetBlueprint()
+                    iCurShieldRadius = 0
+                    if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Target has a shield, will check its shield size and how close that is to the target') end
+                        iCurShieldRadius = oCurUnitBP.Defense.Shield.ShieldSize * 0.5
+                        if iCurShieldRadius > 0 then
+                            iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
+                            if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius..'; shield position='..repru(oUnit:GetPosition())..'; target position='..repru(tTargetPos)) end
+                            if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
+                                if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
+                                iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                                iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth
+                                iTotalShieldMaxHealth = iTotalShieldMaxHealth + iShieldMaxHealth
+                                if bTreatPartCompleteAsComplete or (oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1) then iShieldCurHealth = iShieldMaxHealth end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iShieldCurHealth='..iShieldCurHealth..'; iIgnoreShieldsWithLessThanThisHealth='..iIgnoreShieldsWithLessThanThisHealth) end
+                                if (not(bCumulativeShieldHealth) and iShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth) or (bCumulativeShieldHealth and iTotalShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth) then
+                                    bUnderShield = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Shield health more than threshold so unit is under a shield') end
+                                    if not(bReturnShieldHealthInstead) then break end
+                                end
+                            end
+                        elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
+                        end
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit.UnitId) end
+                    end
+                elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is dead')
+                end
+            end
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        if bReturnShieldHealthInstead then
+            return iTotalShieldCurHealth, iTotalShieldMaxHealth
+        else return bUnderShield
+        end
     end
 end
 
@@ -4060,11 +4134,11 @@ function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondT
                     else
                         tPotentialLocation = {tPosition[1] + math.random(-10, 10), tPosition[2], tPosition[3] + math.random(-10, 10)}
                         tPotentialLocation[2] = GetTerrainHeight(tPotentialLocation[1], tPotentialLocation[3])
-                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..' so will just return a random position nearby='..math.floor(tPotentialLocation[1])..'-'..math.floor(tPotentialLocation[2])..'-'..math.floor(tPotentialLocation[3]), true)
+                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau so will just return a random position nearby')
                     end
                 else
                     if M27UnitInfo.IsUnitValid(oOptionalPathingUnit) then
-                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..'; already done a check of pathing, and we also have a valid pathing unit='..oOptionalPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOptionalPathingUnit)..'; will just return a random location near the current position', true)
+                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau. already done a check of pathing, and we also have a valid pathing unit; will just return a random location near the current position', true)
                     else
                         --No pathing unit so could be expected - e.g. one cause is a platoon being disbanded will call the nearest rally point - if there is no front unit then it may return an error
                     end

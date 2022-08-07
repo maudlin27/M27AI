@@ -57,14 +57,17 @@ function ErrorHandler(sErrorMessage, bWarningNotError)
     tErrorCountByMessage[sErrorMessage] = iCount
     local iInterval = 1
     local bShowError = true
-    if iCount > 10 then
+    if iCount > 3 then
         bShowError = false
-        if iCount > 2000 then iInterval = 1000
-        elseif iCount > 500 then iInterval = 100
-        elseif iCount > 50 then iInterval = 25
-        else iInterval = 5
+        if iCount > 2187 then iInterval = 2187
+        elseif iCount > 729 then iInterval = 729
+        elseif iCount > 243 then iInterval = 243
+        elseif iCount >= 81 then iInterval = 81
+        elseif iCount >= 27 then iInterval = 27
+        elseif iCount >= 9 then iInterval = 9
+        else iInterval = 3
         end
-        if math.floor(iCount / iInterval) == iCount/iInterval then bShowError = true end
+            if math.floor(iCount / iInterval) == iCount/iInterval then bShowError = true end
     end
     if bShowError then
         local sErrorBase = 'M27ERROR '
@@ -307,7 +310,7 @@ end
 
 function DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, iCircleSize)
     --if bSingleLocation then tableLocations = {tableLocations} end
-    LOG('DrawTableOfLocations: tableLocations='..repru(tableLocations))
+    --LOG('DrawTableOfLocations: tableLocations='..repru(tableLocations))
     if not(iCircleSize) then iCircleSize = 0.5 end
     for iLocation, tLocation in tableLocations do
         DrawRectBase(Rect(tLocation[1] - iCircleSize, tLocation[3] - iCircleSize, tLocation[1] + iCircleSize, tLocation[3] + iCircleSize), iColour, iDisplayCount)
@@ -384,7 +387,7 @@ function ConvertLocationToReference(tLocation)
 end
 
 function SteppingStoneForDrawLocations(tableLocations, relativeStart, iColour, iDisplayCount, iCircleSize)
-    LOG('SteppingStoneForDrawLocations: tableLocations='..repru(tableLocations))
+    --LOG('SteppingStoneForDrawLocations: tableLocations='..repru(tableLocations))
     DrawTableOfLocations(tableLocations, relativeStart, iColour, iDisplayCount, iCircleSize)
 end
 
@@ -588,6 +591,13 @@ function GetAngleDifference(iAngle1, iAngle2)
 end
 function ConvertAngleToRadians(iAngle)
     return iAngle * math.pi / 180
+end
+
+function GetAngleDifference(iAngle1, iAngle2)
+    --returns positive value from 0 to 180 for the difference between two positions (i.e. if turn by the angle closest to there)
+    local iAngleDif = math.abs(iAngle1 - iAngle2)
+    if iAngleDif > 180 then iAngleDif = math.abs(iAngleDif - 360) end
+    return iAngleDif
 end
 
 function GetAngleFromAToB(tLocA, tLocB)
