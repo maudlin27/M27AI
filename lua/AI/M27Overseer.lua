@@ -4454,7 +4454,7 @@ function ACUManager(aiBrain)
     local sFunctionRef = 'ACUManager'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    --if GetGameTimeSeconds() >= 420 and aiBrain:GetArmyIndex() == 2 then bDebugMessages = true end
+    --if GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
 
     if not (aiBrain.M27IsDefeated) and M27Logic.iTimeOfLastBrainAllDefeated < 10 then
         local oACU = M27Utilities.GetACU(aiBrain)

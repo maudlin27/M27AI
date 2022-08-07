@@ -4134,11 +4134,11 @@ function GetNearestRallyPoint(aiBrain, tPosition, oOptionalPathingUnit, bSecondT
                     else
                         tPotentialLocation = {tPosition[1] + math.random(-10, 10), tPosition[2], tPosition[3] + math.random(-10, 10)}
                         tPotentialLocation[2] = GetTerrainHeight(tPotentialLocation[1], tPotentialLocation[3])
-                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..' so will just return a random position nearby='..math.floor(tPotentialLocation[1])..'-'..math.floor(tPotentialLocation[2])..'-'..math.floor(tPotentialLocation[3]), true)
+                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau so will just return a random position nearby')
                     end
                 else
                     if M27UnitInfo.IsUnitValid(oOptionalPathingUnit) then
-                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau '..iPlateauGroup..'; already done a check of pathing, and we also have a valid pathing unit='..oOptionalPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOptionalPathingUnit)..'; will just return a random location near the current position', true)
+                        M27Utilities.ErrorHandler('Couldnt find a mex or land factory on the plateau. already done a check of pathing, and we also have a valid pathing unit; will just return a random location near the current position', true)
                     else
                         --No pathing unit so could be expected - e.g. one cause is a platoon being disbanded will call the nearest rally point - if there is no front unit then it may return an error
                     end

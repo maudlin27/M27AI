@@ -2019,7 +2019,7 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetUnderwaterActionForLandUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and oPlatoon:GetBrain():GetArmyIndex() == 4 then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27GroundExperimental' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27RAS' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
     local iHeightAtWhichConsideredUnderwater = M27MapInfo.IsUnderwater(GetPlatoonFrontPosition(oPlatoon), true)
@@ -2161,7 +2161,65 @@ function GetUnderwaterActionForLandUnit(oPlatoon)
                                     oPlatoon[reftTemporaryMoveTarget] = tNearbyLandPosition
                                     if bDebugMessages == true then LOG(sFunctionRef..': Setting temporary move location to'..repru(oPlatoon[reftTemporaryMoveTarget])) end
                                 else
-                                    if oPlatoon[refiCurrentAction] == nil then oPlatoon[refiCurrentAction] = refActionContinueMovementPath end
+                                    if oPlatoon[refiCurrentAction] == nil then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': No action from main logic; if have nearby enemies and can path to them by land with no blocking cliff, and we have significantly more threat than them, and we arent an experimental platoon, then consider moving to them instead of continuing with movement path') end
+
+                                        if not(oPlatoon:GetPlan() == 'M27GroundExperimental') and (oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange]) > 0 then
+                                            local oNearestEnemyStructure
+                                            local oNearestEnemyMobile
+                                            local oNearestEnemyUnit
+                                            if oPlatoon[refiEnemiesInRange] then oNearestEnemyMobile = M27Utilities.GetNearestUnit(oPlatoon[reftEnemiesInRange], GetPlatoonFrontPosition(oPlatoon)) end
+                                            if oPlatoon[refiEnemyStructuresInRange] then oNearestEnemyStructure = M27Utilities.GetNearestUnit(oPlatoon[reftEnemyStructuresInRange], GetPlatoonFrontPosition(oPlatoon)) end
+                                            if not(oNearestEnemyStructure) then oNearestEnemyUnit = oNearestEnemyMobile
+                                            elseif not(oNearestEnemyMobile) then oNearestEnemyUnit = oNearestEnemyStructure
+                                            else
+                                                if M27Utilities.GetDistanceBetweenPositions(oNearestEnemyStructure:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) < M27Utilities.GetDistanceBetweenPositions(oNearestEnemyMobile:GetPosition(), GetPlatoonFrontPosition(oPlatoon)) then
+                                                    oNearestEnemyUnit = oNearestEnemyStructure
+                                                else
+                                                    oNearestEnemyUnit = oNearestEnemyMobile
+                                                end
+                                            end
+                                            if oNearestEnemyUnit then
+                                                --Is the target in the same amphibious pathing group as us, and on land?
+                                                local sPathing = M27UnitInfo.refPathingTypeAmphibious
+                                                local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(sPathing, GetPlatoonFrontPosition(oPlatoon))
+                                                if iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oNearestEnemyUnit:GetPosition()) then
+                                                    if not(M27UnitInfo.IsUnitUnderwater(oNearestEnemyUnit)) then
+                                                        --If do a line to the enemy are we always in the same pathing group? (also require unit to be at least 2 away, or risk a larger unit than us showing as not underwater while we are; if had time better calculation would be to just see if we would be underwater at their position)
+                                                        local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oNearestEnemyUnit:GetPosition(), GetPlatoonFrontPosition(oPlatoon))
+                                                        if iDistToEnemy >= 2 then
+                                                            local iOurThreat = M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftCurrentUnits])
+                                                            local iEnemyThreat = 0
+                                                            if oPlatoon[refiEnemiesInRange] > 0 then iEnemyThreat = iEnemyThreat + M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemiesInRange]) end
+                                                            if oPlatoon[refiEnemyStructuresInRange] > 0 then iEnemyThreat = iEnemyThreat + M27Logic.GetCombatThreatRating(aiBrain, oPlatoon[reftEnemyStructuresInRange]) end
+                                                            if iOurThreat * 0.85 > iEnemyThreat then
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': We can beat the enemy.  If either our last action was to move DF to nearest enemy, or we can apth in a straight line to them, then move to them if they are on land') end
+                                                                local iAngleToEnemy = M27Utilities.GetAngleFromAToB(GetPlatoonFrontPosition(oPlatoon), oNearestEnemyUnit:GetPosition())
+                                                                local bCanPathInLine = true
+                                                                for iCurDist = 2, math.floor(iDistToEnemy / 2) * 2, 2 do
+                                                                    if not(iPathingGroupWanted == M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27Utilities.MoveInDirection(GetPlatoonFrontPosition(oPlatoon), iAngleToEnemy, iCurDist))) then
+                                                                        bCanPathInLine = false
+                                                                        break
+                                                                    end
+                                                                end
+                                                                if bDebugMessages == true then LOG(sFunctionRef..': bCanPathInLine='..tostring(bCanPathInLine)) end
+                                                                if bCanPathInLine then
+                                                                    if bDebugMessages == true then LOG(sFunctionRef..': WIll move to the enemy unit as can path in a line and have enough threat') end
+                                                                    oPlatoon[refiCurrentAction] = refActionMoveToTemporaryLocation
+                                                                    oPlatoon[reftTemporaryMoveTarget] = oNearestEnemyUnit:GetPosition()
+                                                                end
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+
+                                        if oPlatoon[refiCurrentAction] == nil then
+                                            oPlatoon[refiCurrentAction] = refActionContinueMovementPath
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Will just continue with our movement path') end
+                                        end
+                                    end
                                 end
                             end
                         else
@@ -2263,7 +2321,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -3325,6 +3383,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     if oPlatoon[refbPlatoonHasUnderwaterLand] == true then
                         if bDebugMessages == true then LOG(sFunctionRef..': Have an underwater unit, about to run code to check for underwater action') end
                         GetUnderwaterActionForLandUnit(oPlatoon)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Action after checking for underwater actions='..(oPlatoon[refiCurrentAction] or 'nil')) end
                     end
                     --Soemtimes may already ahve had action (e.g. from override) before running the logic, so this checks if action has changed following underwater logic
                     if not(oPlatoon[refiCurrentAction] == iExistingAction) then bDontConsiderFurtherOrders = true end
@@ -6885,7 +6944,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -10195,7 +10254,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 540 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end

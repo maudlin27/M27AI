@@ -57,14 +57,17 @@ function ErrorHandler(sErrorMessage, bWarningNotError)
     tErrorCountByMessage[sErrorMessage] = iCount
     local iInterval = 1
     local bShowError = true
-    if iCount > 10 then
+    if iCount > 3 then
         bShowError = false
-        if iCount > 2000 then iInterval = 1000
-        elseif iCount > 500 then iInterval = 100
-        elseif iCount > 50 then iInterval = 25
-        else iInterval = 5
+        if iCount > 2187 then iInterval = 2187
+        elseif iCount > 729 then iInterval = 729
+        elseif iCount > 243 then iInterval = 243
+        elseif iCount >= 81 then iInterval = 81
+        elseif iCount >= 27 then iInterval = 27
+        elseif iCount >= 9 then iInterval = 9
+        else iInterval = 3
         end
-        if math.floor(iCount / iInterval) == iCount/iInterval then bShowError = true end
+            if math.floor(iCount / iInterval) == iCount/iInterval then bShowError = true end
     end
     if bShowError then
         local sErrorBase = 'M27ERROR '

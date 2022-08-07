@@ -14,6 +14,9 @@ refPathingTypeLand = 'Land'
 refPathingTypeNone = 'None'
 refPathingTypeAll = {refPathingTypeAmphibious, refPathingTypeNavy, refPathingTypeAir, refPathingTypeLand}
 
+refiPathingCheckCount = 'M27UnitPathingCheckCount' --Increases by 1 each time do a pathing check on a unit
+refiPathingCheckTime = 'M27UnitPathingCheckTime' --Total time taken for any pathing checks on this unit
+
 --Special information
 --[[refiLastTimeGotDistanceToStart = 'M27UnitDistToStartTime'
 refiDistanceToStart = 'M27UnitDistToStartDist'
