@@ -3302,6 +3302,11 @@ function IdentifyCliffsAroundBase(aiBrain)
         local iCliffCount = 0
         local tiCliffBoundaries = {} --[x] = iCliffCount; returns {x1, z1, x2, z2}
 
+        local iMaxSize = 220
+        local bAbortRecordingCliff = false
+
+
+
         function RecordCliff()
             if not(aiBrain[tCliffsAroundBaseChokepoint][iCurX]) then
                 aiBrain[tCliffsAroundBaseChokepoint][iCurX] = {}
@@ -3309,7 +3314,8 @@ function IdentifyCliffsAroundBase(aiBrain)
             else
                 aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ] = {}
             end
-            aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ] = true
+            --May have already recorded a value when going through cliffs earlier, so dont want to overwrite in case we decide to abort recording this specific cliff
+            if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ], true) then aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ] = true end
             iLowestX = math.min(iCurX, iLowestX)
             iLowestZ = math.min(iCurZ, iLowestZ)
             iHighestX = math.max(iCurX, iHighestX)
@@ -3345,6 +3351,11 @@ function IdentifyCliffsAroundBase(aiBrain)
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurRecursivePosition='..iCurRecursivePosition..'; iCurX='..iCurX..'; iCurZ='..iCurZ) end
                         bHaveSubsequentPath = false
                         RecordCliff()
+                        if iHighestX - iLowestX > iMaxSize or iHighestZ - iLowestZ > iMaxSize then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Have too big a range of valeus so will abort recording for this cliff.  iLowestX='..iLowestX..'; iHighestX='..iHighestX..'; iLowestZ='..iLowestZ..'; iHighestZ='..iHighestZ) end
+                            bAbortRecordingCliff = true
+                            break
+                        end
                         local tAllAdjacentPositions = {
                             {iCurX - iInterval, iCurZ -iInterval},
                             {iCurX - iInterval, iCurZ},
@@ -3366,7 +3377,7 @@ function IdentifyCliffsAroundBase(aiBrain)
                             tAllAdjacentPositions = {}
                             local bCanDecreaseX, bCanIncreaseX, bCanDecreaseZ, bCanIncreaseZ
                             if iCurX > iInterval then bCanDecreaseX = true end
-                            if iCurX > iInterval then bCanDecreaseZ = true end
+                            if iCurZ > iInterval then bCanDecreaseZ = true end
                             if iCurX < rMapPlayableArea[3] then bCanIncreaseX = true end
                             if iCurZ < rMapPlayableArea[4] then bCanIncreaseZ = true end
                             if bCanDecreaseX then
@@ -3391,7 +3402,7 @@ function IdentifyCliffsAroundBase(aiBrain)
 
                                 --Is this position also unapthable from main base?
                                 if not(iSegmentGroupWanted == GetSegmentGroupOfLocation(sPathing, {tAdjacentXZ[1], 0, tAdjacentXZ[2] })) then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Adjacent segment '..repru(tAdjacentXZ)..' has a pathing group '..GetSegmentGroupOfLocation(sPathing, {tAdjacentXZ[1], 0, tAdjacentXZ[2] })..' so will continue searching') end
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Adjacent segment '..repru(tAdjacentXZ)..' has a pathing group '..(GetSegmentGroupOfLocation(sPathing, {tAdjacentXZ[1], 0, tAdjacentXZ[2] }) or 'nil')..' so will continue searching') end
                                     bHaveSubsequentPath = true
                                     iCurX = tAdjacentXZ[1]
                                     iCurZ = tAdjacentXZ[2]
@@ -3432,299 +3443,320 @@ function IdentifyCliffsAroundBase(aiBrain)
             end
         end
 
-        --Increase min and max sizes for each cliff, and then pick the 2 corner points with the smallest mod distance to our base
-        local tCorner1, tCorner2, tCurCorner
-        local tCornerPositions = {}
-        local tiDistToCorners = {}
-        local iClosestDist = 100000
-        local iSecondClosestDist = 10000
-        local iClosestCorner
-        local iSecondClosestCorner
-        local iCurDist
-
-        local bIntersectsMapEdge
-
-        for iCliff, tBoundaries in tiCliffBoundaries do
-            bIntersectsMapEdge = false
-            iClosestDist = 100000
-            iSecondClosestDist = 10000
-            iClosestCorner = nil
-            iSecondClosestCorner = nil
-
-            if tBoundaries[1] - 4 <= rMapPlayableArea[1] then bIntersectsMapEdge = true
-            elseif tBoundaries[2] - 4 <= rMapPlayableArea[2] then bIntersectsMapEdge = true
-            elseif tBoundaries[3] + 4 >= rMapPlayableArea[3] then bIntersectsMapEdge = true
-            elseif tBoundaries[4] + 4 >= rMapPlayableArea[4] then bIntersectsMapEdge = true
-            end
-
-            local iBoundaryMod = 10
-            if bIntersectsMapEdge then iBoundaryMod = 2 end
-
-
-
-            tBoundaries[1] = math.floor(math.max(rMapPlayableArea[1], tBoundaries[1] - iBoundaryMod))
-            tBoundaries[2] = math.floor(math.max(rMapPlayableArea[2], tBoundaries[2] - iBoundaryMod))
-            tBoundaries[3] = math.floor(math.min(rMapPlayableArea[3], tBoundaries[3] + iBoundaryMod))
-            tBoundaries[4] = math.floor(math.min(rMapPlayableArea[4], tBoundaries[4] + iBoundaryMod))
-
-
-
-            --Calculate the 2 points we want to build PD at for each cliff:
-            for iCorner = 1, 4 do
-                if iCorner == 1 then tCurCorner = {tBoundaries[1], GetTerrainHeight(tBoundaries[1], tBoundaries[2]), tBoundaries[2]}
-                elseif iCorner == 2 then tCurCorner = {tBoundaries[3], GetTerrainHeight(tBoundaries[3], tBoundaries[2]), tBoundaries[2]}
-                elseif iCorner == 3 then tCurCorner = {tBoundaries[3], GetTerrainHeight(tBoundaries[3], tBoundaries[4]), tBoundaries[4]}
-                else tCurCorner = {tBoundaries[1], GetTerrainHeight(tBoundaries[1], tBoundaries[4]), tBoundaries[4]}
-                end
-                tCornerPositions[iCorner] = {tCurCorner[1], tCurCorner[2], tCurCorner[3]}
-                --tiAngleDifFromBase[iCorner] = iAngleToEnemy - M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner)
-                --if tiAngleDifFromBase[iCorner] < 0 then tiAngleDifFromBase[iCorner] = tiAngleDifFromBase[iCorner] + 360 end
-                iCurDist = math.cos(M27Utilities.ConvertAngleToRadians(math.abs(M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner) - iAngleToEnemy))) * M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner)
-                tiDistToCorners[iCorner] = iCurDist
-                if bDebugMessages == true then LOG(sFunctionRef..': Before updating closest corners: iCurDist='..iCurDist..'; iClosestDist='..iClosestDist..'; iClosestCorner='..(iClosestCorner or 'nil')..'; iSecondClosestDist='..iSecondClosestDist..'; iSecondClosestCorner='..(iSecondClosestCorner or 'nil')) end
-                if iCurDist < iClosestDist then
-                    iSecondClosestDist = iClosestDist
-                    iSecondClosestCorner = iClosestCorner
-                    iClosestDist = iCurDist
-                    iClosestCorner = iCorner
-
-                elseif iCurDist < iSecondClosestDist then
-                    iSecondClosestDist = iCurDist
-                    iSecondClosestCorner = iCorner
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': After updating closest corners: iCurDist='..iCurDist..'; iClosestDist='..iClosestDist..'; iClosestCorner='..(iClosestCorner or 'nil')..'; iSecondClosestDist='..iSecondClosestDist..'; iSecondClosestCorner='..(iSecondClosestCorner or 'nil')) end
-            end
-
-            if bDebugMessages == true then
-                LOG(sFunctionRef..': iCliff='..iCliff..'; tBoundaries='..repru(tBoundaries)..'; will draw in gold, and will draw the corners in blue. iClosestCorner='..iClosestCorner..'; iClosestDist='..iClosestDist..'; iSecondClosestCorner='..iSecondClosestCorner..'; iSecondClosestDist='..iSecondClosestDist..'; table of corners='..repru(tCornerPositions))
-                M27Utilities.DrawRectangle(Rect(tBoundaries[1], tBoundaries[2], tBoundaries[3], tBoundaries[4]), 4, 500)
-                M27Utilities.DrawLocation(tCornerPositions[iClosestCorner], nil, 1, 500)
-                M27Utilities.DrawLocation(tCornerPositions[iSecondClosestCorner], nil, 1, 500)
-            end
-
-            --Adjust if are intersecting a map edge - only need 1 corner point
-            local tSinglePointOverride
-            local iAdjustMax = math.max(1, iInterval * 0.5)
-
-            if bIntersectsMapEdge then
-                --Fill in all the cliff positions since they're currently only at intervals of 2
-                for iX = tBoundaries[1], tBoundaries[3] do
-                    if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iX]) == false then
-                        for iZ = tBoundaries[2], tBoundaries[4] do
-                            if bDebugMessages == true then LOG(sFunctionRef..': Updating entries around iX-Z='..iX..iZ) end
-                            if aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] == true then
-                                for iAdjustValueX = -iAdjustMax, iAdjustMax, 1 do
-                                    for iAdjustValueZ = -iAdjustMax, iAdjustMax, 1 do
-                                        if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX]) then aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX] = {} end
-                                        if not(aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX][iZ + iAdjustValueZ]) then aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX][iZ + iAdjustValueZ] = 0 end
-                                        --if bDebugMessages == true then LOG(sFunctionRef..': Adjusted X-Z='..iX + iAdjustValueX..'-'..iZ + iAdjustValueZ..'; value of table for this='..tostring(aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX][iZ + iAdjustValueZ])) end
-                                    end
-                                end
+        if bAbortRecordingCliff then
+            --Clear any values we just added
+            if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint]) == false then
+                for iX, tSubtable in aiBrain[tCliffsAroundBaseChokepoint] do
+                    if M27Utilities.IsTableEmpty(tSubtable) == false then
+                        for iZ, vResult in aiBrain[tCliffsAroundBaseChokepoint][iX] do
+                            if (aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] == true or aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] == 0) and M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ], true) then
+                                aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = nil
                             end
                         end
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Finished filling in entries for iX='..iX..' repru of table for this iX='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX])) end
+                end
+            end
+        else
+
+            --Increase min and max sizes for each cliff, and then pick the 2 corner points with the smallest mod distance to our base
+            local tCorner1, tCorner2, tCurCorner
+            local tCornerPositions = {}
+            local tiDistToCorners = {}
+            local iClosestDist = 100000
+            local iSecondClosestDist = 10000
+            local iClosestCorner
+            local iSecondClosestCorner
+            local iCurDist
+
+            local bIntersectsMapEdge
+
+            for iCliff, tBoundaries in tiCliffBoundaries do
+                bIntersectsMapEdge = false
+                iClosestDist = 100000
+                iSecondClosestDist = 10000
+                iClosestCorner = nil
+                iSecondClosestCorner = nil
+
+                if tBoundaries[1] - 4 <= rMapPlayableArea[1] then bIntersectsMapEdge = true
+                elseif tBoundaries[2] - 4 <= rMapPlayableArea[2] then bIntersectsMapEdge = true
+                elseif tBoundaries[3] + 4 >= rMapPlayableArea[3] then bIntersectsMapEdge = true
+                elseif tBoundaries[4] + 4 >= rMapPlayableArea[4] then bIntersectsMapEdge = true
                 end
 
+                local iBoundaryMod = 10
+                if bIntersectsMapEdge then iBoundaryMod = 2 end
 
-                local iMaxDistToCorner = iInterval
+
+
+                tBoundaries[1] = math.floor(math.max(rMapPlayableArea[1] + iInterval, tBoundaries[1] - iBoundaryMod))
+                tBoundaries[2] = math.floor(math.max(rMapPlayableArea[2] + iInterval, tBoundaries[2] - iBoundaryMod))
+                tBoundaries[3] = math.floor(math.min(rMapPlayableArea[3] - iInterval, tBoundaries[3] + iBoundaryMod))
+                tBoundaries[4] = math.floor(math.min(rMapPlayableArea[4] - iInterval, tBoundaries[4] + iBoundaryMod))
+
+
+
+                --Calculate the 2 points we want to build PD at for each cliff:
                 for iCorner = 1, 4 do
-                    iMaxDistToCorner = math.max(iMaxDistToCorner, M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iCorner]))
-                end
-                iMaxDistToCorner = math.floor(iMaxDistToCorner / iInterval) * iInterval
-                local iAnglePoints = 8 --Pick a number that results in iangleinterval being an integer, otherwise might need to rework code to reference angle point instead of angle
-                local iAngleInterval = math.floor(360 / iAnglePoints)
-                local tiAnglesWithNoCliffs = {}
-                local tiAngleSquareIntersectPosition = {} --[x] is the angle (45, 90 etc); returns the location where moving at angle interval * angle point we intersect the edge of the cliff box
-                for iCurAngle = iAngleInterval, 360, iAngleInterval do
-                    tiAnglesWithNoCliffs[iCurAngle] = true
-                end
-
-                local tCurPoint, iX, iZ
-
-                local bAreWithinX = false
-                local bAreWithinZ = false
-                if PlayerStartPoints[aiBrain.M27StartPositionNumber][1] > tBoundaries[1] and PlayerStartPoints[aiBrain.M27StartPositionNumber][1] < tBoundaries[3] then bAreWithinX = true end
-                if PlayerStartPoints[aiBrain.M27StartPositionNumber][3] > tBoundaries[2] and PlayerStartPoints[aiBrain.M27StartPositionNumber][3] < tBoundaries[4] then bAreWithinZ = true end
-
-
-                for iCurAngle = iAngleInterval, 360, iAngleInterval do
-                    --There's probably a mathematical formula that achieves this, but as this is only run once I'm just going to brute force it...
-                    for iCurDist = iInterval, iMaxDistToCorner, iInterval do
-                        tCurPoint = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iCurAngle, iCurDist, false)
-                        iX = math.floor(tCurPoint[1])
-                        iZ = math.floor(tCurPoint[3])
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if iX-Z='..iX..'-'..iZ..' is intersecting with the box.') end
-                        if aiBrain[tCliffsAroundBaseChokepoint][iX] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] then
-                            tiAnglesWithNoCliffs[iCurAngle] = false
-                            if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 5, 200) end --black
-                            if bDebugMessages == true then LOG(sFunctionRef..': iCurAngle='..iCurAngle..'; Interesects box at iX='..iX..'; iZ='..iZ..'; will draw in black') end
-                            break
-                        else
-                            --Have we intersected with X part of the box?
-                            if (bAreWithinX and (iX >= tBoundaries[3] or iX <= tBoundaries[1])) or (not(bAreWithinX) and (iX <= tBoundaries[3] or iX >= tBoundaries[1])) or (bAreWithinZ and (iZ >= tBoundaries[4] or iZ <= tBoundaries[2])) or (not(bAreWithinZ) and (iZ <= tBoundaries[4] or iZ >= tBoundaries[2])) then
-
-                                --We have reached the edge of the square
-                                tiAngleSquareIntersectPosition[iCurAngle] = {iX, GetTerrainHeight(iX, iZ), iZ}
-                                if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 1, 200) end --dark blue
-                                break
-                            elseif bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 6, 200) --Cyan
-                            end
-                        end
+                    if iCorner == 1 then tCurCorner = {tBoundaries[1], GetTerrainHeight(tBoundaries[1], tBoundaries[2]), tBoundaries[2]}
+                    elseif iCorner == 2 then tCurCorner = {tBoundaries[3], GetTerrainHeight(tBoundaries[3], tBoundaries[2]), tBoundaries[2]}
+                    elseif iCorner == 3 then tCurCorner = {tBoundaries[3], GetTerrainHeight(tBoundaries[3], tBoundaries[4]), tBoundaries[4]}
+                    else tCurCorner = {tBoundaries[1], GetTerrainHeight(tBoundaries[1], tBoundaries[4]), tBoundaries[4]}
                     end
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': Cliff='..iCliff..'; Finished recording angles that dont intersect with the cliff. tiAnglesWithNoCliffs='..repru(tiAnglesWithNoCliffs)..'; tiAngleSquareIntersectPosition='..repru(tiAngleSquareIntersectPosition)) end
+                    tCornerPositions[iCorner] = {tCurCorner[1], tCurCorner[2], tCurCorner[3]}
+                    --tiAngleDifFromBase[iCorner] = iAngleToEnemy - M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner)
+                    --if tiAngleDifFromBase[iCorner] < 0 then tiAngleDifFromBase[iCorner] = tiAngleDifFromBase[iCorner] + 360 end
+                    iCurDist = math.cos(M27Utilities.ConvertAngleToRadians(math.abs(M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner) - iAngleToEnemy))) * M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCurCorner)
+                    tiDistToCorners[iCorner] = iCurDist
+                    if bDebugMessages == true then LOG(sFunctionRef..': Before updating closest corners: iCurDist='..iCurDist..'; iClosestDist='..iClosestDist..'; iClosestCorner='..(iClosestCorner or 'nil')..'; iSecondClosestDist='..iSecondClosestDist..'; iSecondClosestCorner='..(iSecondClosestCorner or 'nil')) end
+                    if iCurDist < iClosestDist then
+                        iSecondClosestDist = iClosestDist
+                        iSecondClosestCorner = iClosestCorner
+                        iClosestDist = iCurDist
+                        iClosestCorner = iCorner
 
-                local iCurDistToEnemy
-                local iClosestDistToEnemy = 10000
-                local iClosestAngle
-                local iDistToClosest
-
-                if M27Utilities.IsTableEmpty(tiAngleSquareIntersectPosition) == false then
-                    for iAngle, tPosition in tiAngleSquareIntersectPosition do
-                        iCurDistToEnemy = M27Utilities.GetDistanceBetweenPositions(tPosition, GetPrimaryEnemyBaseLocation(aiBrain))
-                        if iCurDistToEnemy < iClosestDistToEnemy then
-                            iClosestDistToEnemy = iCurDistToEnemy
-                            iClosestAngle = iAngle
-                        end
+                    elseif iCurDist < iSecondClosestDist then
+                        iSecondClosestDist = iCurDist
+                        iSecondClosestCorner = iCorner
                     end
-                    --See if have a second closest to enemy within 30 of this
-                    if iClosestAngle then
-                        for iAngle, tPosition in tiAngleSquareIntersectPosition do
-                            if not(iAngle == iClosestAngle) then
-                                iDistToClosest = M27Utilities.GetDistanceBetweenPositions(tPosition, tiAngleSquareIntersectPosition[iClosestAngle])
-                                if bDebugMessages == true then LOG(sFunctionRef..': Considering iAngle='..iAngle..'; Dist to closest='..iDistToClosest..'; iClosestAngle='..iClosestAngle) end
-                                if iDistToClosest <= 30 then
-                                    tSinglePointOverride = {tPosition[1], tPosition[2], tPosition[3]}
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Setting target position as the second closest, iAngle='..iAngle..'; iClosestAngle='..iClosestAngle..'; Dist to closest='..iDistToClosest) end
-                                    break
-                                end
-                            end
-                        end
-                        if not(tSinglePointOverride) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find any close angles to the closest so picking the closest') end
-                            tSinglePointOverride = {tiAngleSquareIntersectPosition[iClosestAngle][1], tiAngleSquareIntersectPosition[iClosestAngle][2], tiAngleSquareIntersectPosition[iClosestAngle][3]}
-                        end
-                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': After updating closest corners: iCurDist='..iCurDist..'; iClosestDist='..iClosestDist..'; iClosestCorner='..(iClosestCorner or 'nil')..'; iSecondClosestDist='..iSecondClosestDist..'; iSecondClosestCorner='..(iSecondClosestCorner or 'nil')) end
                 end
-            end
 
-            --Adjust the corner position to be a midpoint if it's behind the base (e.g. maps like forbidden pass)
-            local bUseSinglePoint = false
-            if M27Utilities.IsTableEmpty(tSinglePointOverride) == false then bUseSinglePoint = true end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': iCliff='..iCliff..'; tBoundaries='..repru(tBoundaries)..'; will draw in gold, and will draw the corners in blue. iClosestCorner='..iClosestCorner..'; iClosestDist='..iClosestDist..'; iSecondClosestCorner='..iSecondClosestCorner..'; iSecondClosestDist='..iSecondClosestDist..'; table of corners='..repru(tCornerPositions))
+                    M27Utilities.DrawRectangle(Rect(tBoundaries[1], tBoundaries[2], tBoundaries[3], tBoundaries[4]), 4, 500)
+                    M27Utilities.DrawLocation(tCornerPositions[iClosestCorner], nil, 1, 500)
+                    M27Utilities.DrawLocation(tCornerPositions[iSecondClosestCorner], nil, 1, 500)
+                end
 
-            if not(bUseSinglePoint) then
-                local iCurCorner
-                local iCurDistToEnemy
-                local iAngleFromStartToCorner
-                local iAngleFromOurBaseToEnemy = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], GetPrimaryEnemyBaseLocation(aiBrain))
-                local iAngleDif
-                local iClosestUnclaimedCorner
-                local iClosestDistToUnclaimedCorner = 100000
-                local iCurDistToUnclaimedCorner
-                for iCornerOption = 1, 2 do
-                    if iCornerOption == 1 then iCurCorner = iClosestCorner else iCurCorner = iSecondClosestCorner end
-                    --Are we further from enemy base than our base?
-                    iCurDistToEnemy = M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], GetPrimaryEnemyBaseLocation(aiBrain))
-                    if iCurDistToEnemy > aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] then
-                        iAngleFromStartToCorner = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iCurCorner])
-                        iAngleDif = M27Utilities.GetAngleDifference(iAngleFromStartToCorner, iAngleFromOurBaseToEnemy) --Gives value from 0 to 180
-                        if iAngleDif > 90 then
-                            --Move towards the closest other corner
-                            for iCorner = 1, 4 do
-                                if not(iCorner == iClosestCorner) and not(iCorner == iSecondClosestCorner) then
-                                    iCurDistToUnclaimedCorner = M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], tCornerPositions[iCorner])
-                                    if iCurDistToUnclaimedCorner < iClosestDistToUnclaimedCorner then
-                                        iClosestUnclaimedCorner = iCorner
-                                        iClosestDistToUnclaimedCorner = iCurDistToUnclaimedCorner
+                --Adjust if are intersecting a map edge - only need 1 corner point
+                local tSinglePointOverride
+                local iAdjustMax = math.max(1, iInterval * 0.5)
+
+                if bIntersectsMapEdge then
+                    --Fill in all the cliff positions since they're currently only at intervals of 2
+                    for iX = tBoundaries[1], tBoundaries[3] do
+                        if bDebugMessages == true then LOG(sFunctionRef..': repru of tCliffsAroundBaseChokepoint for this iX of '..iX..' before filling in='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX])) end
+                        if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iX]) == false then
+                            for iZ = tBoundaries[2], tBoundaries[4] do
+                                --if bDebugMessages == true then LOG(sFunctionRef..': Updating entries around iX-Z='..iX..'-'..iZ) end
+                                if aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] == true then
+                                    for iAdjustValueX = -iAdjustMax, iAdjustMax, 1 do
+                                        for iAdjustValueZ = -iAdjustMax, iAdjustMax, 1 do
+                                            if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX]) then aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX] = {} end
+                                            if not(aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX][iZ + iAdjustValueZ]) then aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX][iZ + iAdjustValueZ] = 0 end
+                                            --if bDebugMessages == true then LOG(sFunctionRef..': Adjusted X-Z='..iX + iAdjustValueX..'-'..iZ + iAdjustValueZ..'; value of table for this='..tostring(aiBrain[tCliffsAroundBaseChokepoint][iX + iAdjustValueX][iZ + iAdjustValueZ])) end
+                                        end
                                     end
                                 end
                             end
-                            if bDebugMessages == true then LOG(sFunctionRef..': iCurCorner='..iCurCorner..'; iClosestUnclaiemdCorner='..iClosestUnclaimedCorner..'; Dist to closest unclaimed='..iClosestDistToUnclaimedCorner..'; Corner position of closest unclaimed='..repru(tCornerPositions[iClosestUnclaimedCorner])..'; Corner position before we adjust='..repru(tCornerPositions[iCurCorner])) end
-                            tCornerPositions[iCurCorner] = M27Utilities.MoveTowardsTarget(tCornerPositions[iCurCorner], tCornerPositions[iClosestUnclaimedCorner], math.min(iClosestDistToUnclaimedCorner * 0.5, math.max(50, M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], PlayerStartPoints[aiBrain.M27StartPositionNumber]))), 0)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Corner position after adjust='..repru(tCornerPositions[iCurCorner])..'; Dist to the unclaimed corner='..M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], tCornerPositions[iClosestUnclaimedCorner])) end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Finished filling in entries for iX='..iX..' repru of table for this iX='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX])) end
+                    end
+
+
+                    local iMaxDistToCorner = iInterval
+                    for iCorner = 1, 4 do
+                        iMaxDistToCorner = math.max(iMaxDistToCorner, M27Utilities.GetDistanceBetweenPositions(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iCorner]))
+                    end
+                    iMaxDistToCorner = math.floor(iMaxDistToCorner / iInterval) * iInterval
+                    local iAnglePoints = 8 --Pick a number that results in iangleinterval being an integer, otherwise might need to rework code to reference angle point instead of angle
+                    local iAngleInterval = math.floor(360 / iAnglePoints)
+                    local tiAnglesWithNoCliffs = {}
+                    local tiAngleSquareIntersectPosition = {} --[x] is the angle (45, 90 etc); returns the location where moving at angle interval * angle point we intersect the edge of the cliff box
+                    for iCurAngle = iAngleInterval, 360, iAngleInterval do
+                        tiAnglesWithNoCliffs[iCurAngle] = true
+                    end
+
+                    local tCurPoint, iX, iZ
+
+                    local bAreWithinX = false
+                    local bAreWithinZ = false
+                    if PlayerStartPoints[aiBrain.M27StartPositionNumber][1] > tBoundaries[1] and PlayerStartPoints[aiBrain.M27StartPositionNumber][1] < tBoundaries[3] then bAreWithinX = true end
+                    if PlayerStartPoints[aiBrain.M27StartPositionNumber][3] > tBoundaries[2] and PlayerStartPoints[aiBrain.M27StartPositionNumber][3] < tBoundaries[4] then bAreWithinZ = true end
+
+
+                    for iCurAngle = iAngleInterval, 360, iAngleInterval do
+                        --There's probably a mathematical formula that achieves this, but as this is only run once I'm just going to brute force it...
+                        for iCurDist = iInterval, iMaxDistToCorner, iInterval do
+                            tCurPoint = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iCurAngle, iCurDist, false)
+                            iX = math.floor(tCurPoint[1])
+                            iZ = math.floor(tCurPoint[3])
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if iX-Z='..iX..'-'..iZ..' is intersecting with the box.') end
+                            if aiBrain[tCliffsAroundBaseChokepoint][iX] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] then
+                                tiAnglesWithNoCliffs[iCurAngle] = false
+                                if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 5, 200) end --black
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurAngle='..iCurAngle..'; Interesects box at iX='..iX..'; iZ='..iZ..'; will draw in black') end
+                                break
+                            else
+                                --Have we intersected with X part of the box?
+                                if (bAreWithinX and (iX >= tBoundaries[3] or iX <= tBoundaries[1])) or (not(bAreWithinX) and (iX <= tBoundaries[3] or iX >= tBoundaries[1])) or (bAreWithinZ and (iZ >= tBoundaries[4] or iZ <= tBoundaries[2])) or (not(bAreWithinZ) and (iZ <= tBoundaries[4] or iZ >= tBoundaries[2])) then
+
+                                    --We have reached the edge of the square
+                                    tiAngleSquareIntersectPosition[iCurAngle] = {iX, GetTerrainHeight(iX, iZ), iZ}
+                                    if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 1, 200) end --dark blue
+                                    break
+                                elseif bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 6, 200) --Cyan
+                                end
+                            end
+                        end
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Cliff='..iCliff..'; Finished recording angles that dont intersect with the cliff. tiAnglesWithNoCliffs='..repru(tiAnglesWithNoCliffs)..'; tiAngleSquareIntersectPosition='..repru(tiAngleSquareIntersectPosition)) end
+
+                    local iCurDistToEnemy
+                    local iClosestDistToEnemy = 10000
+                    local iClosestAngle
+                    local iDistToClosest
+
+                    if M27Utilities.IsTableEmpty(tiAngleSquareIntersectPosition) == false then
+                        for iAngle, tPosition in tiAngleSquareIntersectPosition do
+                            iCurDistToEnemy = M27Utilities.GetDistanceBetweenPositions(tPosition, GetPrimaryEnemyBaseLocation(aiBrain))
+                            if iCurDistToEnemy < iClosestDistToEnemy then
+                                iClosestDistToEnemy = iCurDistToEnemy
+                                iClosestAngle = iAngle
+                            end
+                        end
+                        --See if have a second closest to enemy within 30 of this
+                        if iClosestAngle then
+                            for iAngle, tPosition in tiAngleSquareIntersectPosition do
+                                if not(iAngle == iClosestAngle) then
+                                    iDistToClosest = M27Utilities.GetDistanceBetweenPositions(tPosition, tiAngleSquareIntersectPosition[iClosestAngle])
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Considering iAngle='..iAngle..'; Dist to closest='..iDistToClosest..'; iClosestAngle='..iClosestAngle) end
+                                    if iDistToClosest <= 30 then
+                                        tSinglePointOverride = {tPosition[1], tPosition[2], tPosition[3]}
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Setting target position as the second closest, iAngle='..iAngle..'; iClosestAngle='..iClosestAngle..'; Dist to closest='..iDistToClosest) end
+                                        break
+                                    end
+                                end
+                            end
+                            if not(tSinglePointOverride) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Couldnt find any close angles to the closest so picking the closest') end
+                                tSinglePointOverride = {tiAngleSquareIntersectPosition[iClosestAngle][1], tiAngleSquareIntersectPosition[iClosestAngle][2], tiAngleSquareIntersectPosition[iClosestAngle][3]}
+                            end
+                        end
+                    end
+                end
+
+                --Adjust the corner position to be a midpoint if it's behind the base (e.g. maps like forbidden pass)
+                local bUseSinglePoint = false
+                if M27Utilities.IsTableEmpty(tSinglePointOverride) == false then bUseSinglePoint = true end
+
+                if not(bUseSinglePoint) then
+                    local iCurCorner
+                    local iCurDistToEnemy
+                    local iAngleFromStartToCorner
+                    local iAngleFromOurBaseToEnemy = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], GetPrimaryEnemyBaseLocation(aiBrain))
+                    local iAngleDif
+                    local iClosestUnclaimedCorner
+                    local iClosestDistToUnclaimedCorner = 100000
+                    local iCurDistToUnclaimedCorner
+                    for iCornerOption = 1, 2 do
+                        if iCornerOption == 1 then iCurCorner = iClosestCorner else iCurCorner = iSecondClosestCorner end
+                        --Are we further from enemy base than our base?
+                        iCurDistToEnemy = M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], GetPrimaryEnemyBaseLocation(aiBrain))
+                        if iCurDistToEnemy > aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] then
+                            iAngleFromStartToCorner = M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iCurCorner])
+                            iAngleDif = M27Utilities.GetAngleDifference(iAngleFromStartToCorner, iAngleFromOurBaseToEnemy) --Gives value from 0 to 180
+                            if iAngleDif > 90 then
+                                --Move towards the closest other corner
+                                for iCorner = 1, 4 do
+                                    if not(iCorner == iClosestCorner) and not(iCorner == iSecondClosestCorner) then
+                                        iCurDistToUnclaimedCorner = M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], tCornerPositions[iCorner])
+                                        if iCurDistToUnclaimedCorner < iClosestDistToUnclaimedCorner then
+                                            iClosestUnclaimedCorner = iCorner
+                                            iClosestDistToUnclaimedCorner = iCurDistToUnclaimedCorner
+                                        end
+                                    end
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iCurCorner='..iCurCorner..'; iClosestUnclaiemdCorner='..iClosestUnclaimedCorner..'; Dist to closest unclaimed='..iClosestDistToUnclaimedCorner..'; Corner position of closest unclaimed='..repru(tCornerPositions[iClosestUnclaimedCorner])..'; Corner position before we adjust='..repru(tCornerPositions[iCurCorner])) end
+                                tCornerPositions[iCurCorner] = M27Utilities.MoveTowardsTarget(tCornerPositions[iCurCorner], tCornerPositions[iClosestUnclaimedCorner], math.min(iClosestDistToUnclaimedCorner * 0.5, math.max(50, M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], PlayerStartPoints[aiBrain.M27StartPositionNumber]))), 0)
+                                tCornerPositions[iCurCorner][1] = math.floor(tCornerPositions[iCurCorner][1])
+                                tCornerPositions[iCurCorner][3] = math.floor(tCornerPositions[iCurCorner][3])
+                                tCornerPositions[iCurCorner][2] = GetTerrainHeight(tCornerPositions[iCurCorner][1], tCornerPositions[iCurCorner][3])
+                                if bDebugMessages == true then LOG(sFunctionRef..': Corner position after adjust='..repru(tCornerPositions[iCurCorner])..'; Dist to the unclaimed corner='..M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iCurCorner], tCornerPositions[iClosestUnclaimedCorner])) end
+                            end
+
                         end
 
                     end
-
-                end
-            end
-
-            --Are the corners too far from our base? If so then only move part-way towards them
-            local iMaxDistance = math.min(math.max(125, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4), 200)
-
-
-            if bUseSinglePoint then
-                if M27Utilities.GetDistanceBetweenPositions(tSinglePointOverride, PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iMaxDistance then
-                    tSinglePointOverride = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tSinglePointOverride), iMaxDistance, false)
-                end
-            else
-                if M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iClosestCorner], PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iMaxDistance then
-                    tSinglePointOverride = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iClosestCorner]), iMaxDistance, false)
-                end
-                if M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iSecondClosestCorner], PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iMaxDistance then
-                    tSinglePointOverride = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iSecondClosestCorner]), iMaxDistance, false)
-                end
-            end
-
-
-
-            --Cycle through every position in this square, work out the closest of the 2 corners, and record this corner
-
-            for iX = tBoundaries[1], tBoundaries[3] do
-                if not(aiBrain[tCliffsAroundBaseChokepoint][iX]) then
-                    aiBrain[tCliffsAroundBaseChokepoint][iX] = {}
                 end
 
-                for iZ = tBoundaries[2], tBoundaries[4] do
-                    if bDebugMessages == true and iZ == tBoundaries[2] then LOG(sFunctionRef..': iX='..iX..'; iZ='..iZ..'; Dist to corner1='..M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iClosestCorner])..'; Dist to corner2='..M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iSecondClosestCorner])) end
-                    if bUseSinglePoint then aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tSinglePointOverride[1], tSinglePointOverride[2], tSinglePointOverride[3]}
-                    else
-                        if M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iClosestCorner]) < M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iSecondClosestCorner]) then
-                            --Closest corner is closest to this position
-                            aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tCornerPositions[iClosestCorner][1], tCornerPositions[iClosestCorner][2], tCornerPositions[iClosestCorner][3]}
-                            if bDebugMessages == true and iZ == tBoundaries[2] then LOG(sFunctionRef..': iX-Z='..iX..'-'..iZ..'; are near the closest corner '..iClosestCorner..'; Corner position='..repru(tCornerPositions[iClosestCorner])..'; aiBrain[tCliffsAroundBaseChokepoint][iX][iZ]='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ])) end
-                        else
-                            --Second closest corner to start is closest to this position
-                            aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tCornerPositions[iSecondClosestCorner][1], tCornerPositions[iSecondClosestCorner][2], tCornerPositions[iSecondClosestCorner][3]}
-                        end
-                    end
-                end
-            end
+                --Are the corners too far from our base? If so then only move part-way towards them
+                local iMaxDistance = math.min(math.max(125, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4), 200)
 
-            --bDebugMessages = false
 
-            if bDebugMessages == true then
-                LOG(sFunctionRef..': Will give result of the first row of x values at the lowest Z boundary')
-                for iX = tBoundaries[1], tBoundaries[3] do
-                    LOG('Result of table for iX='..iX..'; iZ='..tBoundaries[2]..'='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][tBoundaries[2]]))
-                end
-                LOG(sFunctionRef..': WIll draw all locations using the closest corner in light blue, and all locations using the second closest in red. If using single point will use gold if equals single point, and will use dark blue if dont recognise the location recorded. tBoundaries='..repru(tBoundaries))
-                local iColour
-                for iX = tBoundaries[1], tBoundaries[3] do
-                    for iZ = tBoundaries[2], tBoundaries[4] do
-                        if aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tCornerPositions[iClosestCorner][1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tCornerPositions[iClosestCorner][3] then
-                            iColour = 5 --light blue
-                        elseif aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tCornerPositions[iSecondClosestCorner][1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tCornerPositions[iSecondClosestCorner][3] then
-                            iColour = 2 --red
-                        elseif bUseSinglePoint and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tSinglePointOverride[1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tSinglePointOverride[3] then
-                            iColour = 4 --Gold
-                        else
-                            iColour = 1 --Dark blue
-                        end
-                        if iZ == tBoundaries[2] then LOG(sFunctionRef..': About to draw location '..repru({iX, GetTerrainHeight(iX, iZ), iZ})..' in colour '..iColour..'; corner recorded as closest='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ])..'; closest corner position='..repru(tCornerPositions[iClosestCorner])) end
-                        M27Utilities.DrawLocation({iX, GetTerrainHeight(iX, iZ), iZ}, false, iColour, 200)
-                    end
-                end
-                --Draw the corners again as larger circles
-                LOG(sFunctionRef..': WIll now redraw the corners as circles in black')
                 if bUseSinglePoint then
-                    LOG(sFunctionRef..': Using single point, location='..repru(tSinglePointOverride)..'; Our base location='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber]))
-                    M27Utilities.DrawLocation(tSinglePointOverride, false, 3, 500, 5)
+                    if M27Utilities.GetDistanceBetweenPositions(tSinglePointOverride, PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iMaxDistance then
+                        tSinglePointOverride = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tSinglePointOverride), iMaxDistance, false)
+                    end
                 else
-                    M27Utilities.DrawLocation(tCornerPositions[iClosestCorner], false, 3, 500, 5)
-                    M27Utilities.DrawLocation(tCornerPositions[iSecondClosestCorner], false, 3, 500, 5)
+                    if M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iClosestCorner], PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iMaxDistance then
+                        tSinglePointOverride = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iClosestCorner]), iMaxDistance, false)
+                    end
+                    if M27Utilities.GetDistanceBetweenPositions(tCornerPositions[iSecondClosestCorner], PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iMaxDistance then
+                        tSinglePointOverride = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(PlayerStartPoints[aiBrain.M27StartPositionNumber], tCornerPositions[iSecondClosestCorner]), iMaxDistance, false)
+                    end
                 end
+
+
+
+                --Cycle through every position in this square, work out the closest of the 2 corners, and record this corner
+
+                for iX = tBoundaries[1], tBoundaries[3] do
+                    if not(aiBrain[tCliffsAroundBaseChokepoint][iX]) then
+                        aiBrain[tCliffsAroundBaseChokepoint][iX] = {}
+                    end
+
+                    for iZ = tBoundaries[2], tBoundaries[4] do
+                        if bDebugMessages == true and iZ == tBoundaries[2] then LOG(sFunctionRef..': iX='..iX..'; iZ='..iZ..'; Dist to corner1='..M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iClosestCorner])..'; Dist to corner2='..M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iSecondClosestCorner])) end
+                        if bUseSinglePoint then aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tSinglePointOverride[1], tSinglePointOverride[2], tSinglePointOverride[3]}
+                        else
+                            if M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iClosestCorner]) < M27Utilities.GetDistanceBetweenPositions({iX, 0, iZ}, tCornerPositions[iSecondClosestCorner]) then
+                                --Closest corner is closest to this position
+                                aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tCornerPositions[iClosestCorner][1], tCornerPositions[iClosestCorner][2], tCornerPositions[iClosestCorner][3]}
+                                if bDebugMessages == true and iZ == tBoundaries[2] then LOG(sFunctionRef..': iX-Z='..iX..'-'..iZ..'; are near the closest corner '..iClosestCorner..'; Corner position='..repru(tCornerPositions[iClosestCorner])..'; aiBrain[tCliffsAroundBaseChokepoint][iX][iZ]='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ])) end
+                            else
+                                --Second closest corner to start is closest to this position
+                                aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] = {tCornerPositions[iSecondClosestCorner][1], tCornerPositions[iSecondClosestCorner][2], tCornerPositions[iSecondClosestCorner][3]}
+                            end
+                        end
+                    end
+                end
+
+                --bDebugMessages = false
+
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Will give result of the first row of x values at the lowest Z boundary')
+                    for iX = tBoundaries[1], tBoundaries[3] do
+                        LOG('Result of table for iX='..iX..'; iZ='..tBoundaries[2]..'='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][tBoundaries[2]]))
+                    end
+                    LOG(sFunctionRef..': WIll draw all locations using the closest corner in light blue, and all locations using the second closest in red. If using single point will use gold if equals single point, and will use dark blue if dont recognise the location recorded. tBoundaries='..repru(tBoundaries))
+                    local iColour
+                    for iX = tBoundaries[1], tBoundaries[3] do
+                        for iZ = tBoundaries[2], tBoundaries[4] do
+                            if aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tCornerPositions[iClosestCorner][1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tCornerPositions[iClosestCorner][3] then
+                                iColour = 5 --light blue
+                            elseif aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tCornerPositions[iSecondClosestCorner][1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tCornerPositions[iSecondClosestCorner][3] then
+                                iColour = 2 --red
+                            elseif bUseSinglePoint and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][1] == tSinglePointOverride[1] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ][3] == tSinglePointOverride[3] then
+                                iColour = 4 --Gold
+                            else
+                                iColour = 1 --Dark blue
+                            end
+                            if iZ == tBoundaries[2] then LOG(sFunctionRef..': About to draw location '..repru({iX, GetTerrainHeight(iX, iZ), iZ})..' in colour '..iColour..'; corner recorded as closest='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][iZ])..'; closest corner position='..repru(tCornerPositions[iClosestCorner])) end
+                            M27Utilities.DrawLocation({iX, GetTerrainHeight(iX, iZ), iZ}, false, iColour, 200)
+                        end
+                    end
+                    --Draw the corners again as larger circles
+                    LOG(sFunctionRef..': WIll now redraw the corners as circles in black')
+                    if bUseSinglePoint then
+                        LOG(sFunctionRef..': Using single point, location='..repru(tSinglePointOverride)..'; Our base location='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber]))
+                        M27Utilities.DrawLocation(tSinglePointOverride, false, 3, 500, 5)
+                    else
+                        M27Utilities.DrawLocation(tCornerPositions[iClosestCorner], false, 3, 500, 5)
+                        M27Utilities.DrawLocation(tCornerPositions[iSecondClosestCorner], false, 3, 500, 5)
+                    end
+                end
+                if bDebugMessages == true then LOG(sFunctionRef..': End of loop for iCliff='..iCliff..'; aiBrain index='..aiBrain:GetArmyIndex()) end
             end
         end
     end

@@ -711,11 +711,13 @@ end
 function GetUpgradeMassCost(oUnit, sUpgradeRef)
     local oBP = oUnit:GetBlueprint()
     local iUpgradeMass
-    for sUpgradeID, tUpgrade in oBP.Enhancements do
-        if sUpgradeID == sUpgradeRef then
-            iUpgradeMass = tUpgrade.BuildCostMass
-        end
+    if oBP.Enhancements then
+        for sUpgradeID, tUpgrade in oBP.Enhancements do
+            if sUpgradeID == sUpgradeRef then
+                iUpgradeMass = tUpgrade.BuildCostMass
+            end
 
+        end
     end
     if not(iUpgradeMass) then M27Utilities.ErrorHandler('oUnit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeMass
@@ -724,11 +726,13 @@ end
 function GetUpgradeEnergyCost(oUnit, sUpgradeRef)
     local oBP = oUnit:GetBlueprint()
     local iUpgradeEnergy
-    for sUpgradeID, tUpgrade in oBP.Enhancements do
-        if sUpgradeID == sUpgradeRef then
-            iUpgradeEnergy = tUpgrade.BuildCostEnergy
-        end
+    if oBP.Enhancements then
+        for sUpgradeID, tUpgrade in oBP.Enhancements do
+            if sUpgradeID == sUpgradeRef then
+                iUpgradeEnergy = tUpgrade.BuildCostEnergy
+            end
 
+        end
     end
     if not(iUpgradeEnergy) then M27Utilities.ErrorHandler('oUnit '..oUnit.UnitId..GetUnitLifetimeCount(oUnit)..' has no upgrade with reference '..sUpgradeRef) end
     return iUpgradeEnergy

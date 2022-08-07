@@ -3828,78 +3828,80 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     --Determines if target is under a shield
     --bCumulativeShieldHealth - if true, then will treat as being under a shield if all shields combined have health of at least iIgnoreShieldsWithLessThanThisHealth
     --if oTarget.UnitId == 'urb4206' then bDebugMessages = true end
-    if bDebugMessages == true and EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oTarget.UnitId) then
-        LOG(sFunctionRef..': oTarget is a shield='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Shield ratio='..oTarget:GetShieldRatio(false)..'; Shield ratio true='..oTarget:GetShieldRatio(true)..'; Shield health='..oTarget.MyShield:GetHealth()..'; SHield max health='..oTarget.MyShield:GetMaxHealth()..'; Active consumption='..tostring(oTarget.ActiveConsumption)..'; reprs of shield='..reprs(oTarget.MyShield))
-    end
-    if iIgnoreShieldsWithLessThanThisHealth == nil then iIgnoreShieldsWithLessThanThisHealth = 0 end
-    local bUnderShield = false
-    local iShieldSearchRange = 46 --T3 sera shield is 46; bulwark is 120; will go with sera t3 for now; if changing here then also change reference in getmaxstrikedamage
-    --Is the target an enemy?
-    local oTBrain = oTarget:GetAIBrain()
-    local bEnemy
-    if oTBrain == aiBrain then
-        bEnemy = false
-    else
-        local iOurArmyIndex = aiBrain:GetArmyIndex()
-        local iTargetArmyIndex = oTBrain:GetArmyIndex()
-        if iOurArmyIndex and iTargetArmyIndex then
-            bEnemy = IsEnemy(iOurArmyIndex, iTargetArmyIndex)
-        else bEnemy = true
+    if M27UnitInfo.IsUnitValid(oTarget) and oTarget.GetHealth then
+        if bDebugMessages == true and EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oTarget.UnitId) then
+            LOG(sFunctionRef..': oTarget is a shield='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Shield ratio='..oTarget:GetShieldRatio(false)..'; Shield ratio true='..oTarget:GetShieldRatio(true)..'; Shield health='..oTarget.MyShield:GetHealth()..'; SHield max health='..oTarget.MyShield:GetMaxHealth()..'; Active consumption='..tostring(oTarget.ActiveConsumption)..'; reprs of shield='..reprs(oTarget.MyShield))
         end
-    end
-    local sSearchType = 'Ally'
-    if bEnemy then sSearchType = 'Enemy' end
-    local tTargetPos = oTarget:GetPosition()
-    local iShieldCategory = M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryFixedShield
-    if bIgnoreMobileShields then iShieldCategory = M27UnitInfo.refCategoryFixedShield end
-    local tNearbyShields = aiBrain:GetUnitsAroundPoint(iShieldCategory, tTargetPos, iShieldSearchRange, sSearchType)
-    if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repru(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
-    local iShieldCurHealth, iShieldMaxHealth
-    local iTotalShieldCurHealth = 0
-    local iTotalShieldMaxHealth = 0
-    local iMinFractionComplete = 0.95
-    if bTreatPartCompleteAsComplete then iMinFractionComplete = 0 end
-    if M27Utilities.IsTableEmpty(tNearbyShields) == false then
-        if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
-        local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
-        for iUnit, oUnit in tNearbyShields do
-            if not(oUnit.Dead) and oUnit:GetFractionComplete() >= iMinFractionComplete then
-                oCurUnitBP = oUnit:GetBlueprint()
-                iCurShieldRadius = 0
-                if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Target has a shield, will check its shield size and how close that is to the target') end
-                    iCurShieldRadius = oCurUnitBP.Defense.Shield.ShieldSize * 0.5
-                    if iCurShieldRadius > 0 then
-                        iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
-                        if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius..'; shield position='..repru(oUnit:GetPosition())..'; target position='..repru(tTargetPos)) end
-                        if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
-                            if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
-                            iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
-                            iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth
-                            iTotalShieldMaxHealth = iTotalShieldMaxHealth + iShieldMaxHealth
-                            if bTreatPartCompleteAsComplete or (oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1) then iShieldCurHealth = iShieldMaxHealth end
-                            if bDebugMessages == true then LOG(sFunctionRef..': iShieldCurHealth='..iShieldCurHealth..'; iIgnoreShieldsWithLessThanThisHealth='..iIgnoreShieldsWithLessThanThisHealth) end
-                            if (not(bCumulativeShieldHealth) and iShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth) or (bCumulativeShieldHealth and iTotalShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth) then
-                                bUnderShield = true
-                                if bDebugMessages == true then LOG(sFunctionRef..': Shield health more than threshold so unit is under a shield') end
-                                if not(bReturnShieldHealthInstead) then break end
-                            end
-                        end
-                    elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
-                    end
-                else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit.UnitId) end
-                end
-            elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is dead')
+        if iIgnoreShieldsWithLessThanThisHealth == nil then iIgnoreShieldsWithLessThanThisHealth = 0 end
+        local bUnderShield = false
+        local iShieldSearchRange = 46 --T3 sera shield is 46; bulwark is 120; will go with sera t3 for now; if changing here then also change reference in getmaxstrikedamage
+        --Is the target an enemy?
+        local oTBrain = oTarget:GetAIBrain()
+        local bEnemy
+        if oTBrain == aiBrain then
+            bEnemy = false
+        else
+            local iOurArmyIndex = aiBrain:GetArmyIndex()
+            local iTargetArmyIndex = oTBrain:GetArmyIndex()
+            if iOurArmyIndex and iTargetArmyIndex then
+                bEnemy = IsEnemy(iOurArmyIndex, iTargetArmyIndex)
+            else bEnemy = true
             end
         end
-    else
-        if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
-    end
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    if bReturnShieldHealthInstead then
-        return iTotalShieldCurHealth, iTotalShieldMaxHealth
-    else return bUnderShield
+        local sSearchType = 'Ally'
+        if bEnemy then sSearchType = 'Enemy' end
+        local tTargetPos = oTarget:GetPosition()
+        local iShieldCategory = M27UnitInfo.refCategoryMobileLandShield + M27UnitInfo.refCategoryFixedShield
+        if bIgnoreMobileShields then iShieldCategory = M27UnitInfo.refCategoryFixedShield end
+        local tNearbyShields = aiBrain:GetUnitsAroundPoint(iShieldCategory, tTargetPos, iShieldSearchRange, sSearchType)
+        if bDebugMessages == true then LOG(sFunctionRef..': Searching for shields around '..repru(tTargetPos)..'; iShieldSearchRange='..iShieldSearchRange..'; sSearchType='..sSearchType) end
+        local iShieldCurHealth, iShieldMaxHealth
+        local iTotalShieldCurHealth = 0
+        local iTotalShieldMaxHealth = 0
+        local iMinFractionComplete = 0.95
+        if bTreatPartCompleteAsComplete then iMinFractionComplete = 0 end
+        if M27Utilities.IsTableEmpty(tNearbyShields) == false then
+            if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
+            local oCurUnitBP, iCurShieldRadius, iCurDistanceFromTarget
+            for iUnit, oUnit in tNearbyShields do
+                if not(oUnit.Dead) and oUnit:GetFractionComplete() >= iMinFractionComplete then
+                    oCurUnitBP = oUnit:GetBlueprint()
+                    iCurShieldRadius = 0
+                    if oCurUnitBP.Defense and oCurUnitBP.Defense.Shield then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Target has a shield, will check its shield size and how close that is to the target') end
+                        iCurShieldRadius = oCurUnitBP.Defense.Shield.ShieldSize * 0.5
+                        if iCurShieldRadius > 0 then
+                            iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
+                            if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius..'; shield position='..repru(oUnit:GetPosition())..'; target position='..repru(tTargetPos)) end
+                            if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
+                                if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
+                                iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
+                                iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth
+                                iTotalShieldMaxHealth = iTotalShieldMaxHealth + iShieldMaxHealth
+                                if bTreatPartCompleteAsComplete or (oUnit:GetFractionComplete() >= 0.95 and oUnit:GetFractionComplete() < 1) then iShieldCurHealth = iShieldMaxHealth end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iShieldCurHealth='..iShieldCurHealth..'; iIgnoreShieldsWithLessThanThisHealth='..iIgnoreShieldsWithLessThanThisHealth) end
+                                if (not(bCumulativeShieldHealth) and iShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth) or (bCumulativeShieldHealth and iTotalShieldCurHealth >= iIgnoreShieldsWithLessThanThisHealth) then
+                                    bUnderShield = true
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Shield health more than threshold so unit is under a shield') end
+                                    if not(bReturnShieldHealthInstead) then break end
+                                end
+                            end
+                        elseif bDebugMessages == true then LOG(sFunctionRef..': Shield radius isnt >0')
+                        end
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Blueprint doesnt have a shield value; UnitID='..oUnit.UnitId) end
+                    end
+                elseif bDebugMessages == true then LOG(sFunctionRef..': Unit is dead')
+                end
+            end
+        else
+            if bDebugMessages == true then LOG(sFunctionRef..': tNearbyShields is empty') end
+        end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        if bReturnShieldHealthInstead then
+            return iTotalShieldCurHealth, iTotalShieldMaxHealth
+        else return bUnderShield
+        end
     end
 end
 

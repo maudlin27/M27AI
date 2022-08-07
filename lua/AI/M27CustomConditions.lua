@@ -292,7 +292,7 @@ function SafeToGetACUUpgrade(aiBrain)
                                 if oACU.PlatoonHandle and HaveNearbyMobileShield(oACU.PlatoonHandle) and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) and M27UnitInfo.GetUnitHealthPercent(oACU) <= M27Overseer.iACUEmergencyHealthPercentThreshold * 0.8 then
                                     bIsSafe = true
                                 elseif bAreUnderwater and aiBrain[M27AirOverseer.refiTorpBombersWanted] < 3 and (bFirstUpgrade or (aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] + aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3]) == 0) then
-                                    local iTimeSinceTookUnseenDamage = (GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage])
+                                    local iTimeSinceTookUnseenDamage = (GetGameTimeSeconds() - (oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] or -1000))
                                     if iTimeSinceTookUnseenDamage >= 30 or (iTimeSinceTookUnseenDamage >= 10 and aiBrain[M27AirOverseer.refiTorpBombersWanted] <= 0 and (not(M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoUnitDealingUnseenDamage])) or not(EntityCategoryContains(categories.ANTINAVY, oACU[M27Overseer.refoUnitDealingUnseenDamage].UnitId)))) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Underwater and been a while since took damage so will treat as being safe') end
                                         bIsSafe = true

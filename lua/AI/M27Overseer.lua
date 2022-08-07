@@ -8102,10 +8102,12 @@ function GameSettingWarningsAndChecks(aiBrain)
         local oBP
         for iBP, sUnitID in tACUBPs do
             oBP = __blueprints[sUnitID]
-            for sEnhancement, tEnhancement in oBP.Enhancements do
-                iACUEnhancementCount = iACUEnhancementCount + 1
-                if bDebugMessages == true then
-                    LOG('oBP=' .. oBP.BlueprintId .. '; sEnhancement=' .. sEnhancement .. '; tEnhancement=' .. repru(tEnhancement))
+            if oBP.Enhancements then
+                for sEnhancement, tEnhancement in oBP.Enhancements do
+                    iACUEnhancementCount = iACUEnhancementCount + 1
+                    if bDebugMessages == true then
+                        LOG('oBP=' .. oBP.BlueprintId .. '; sEnhancement=' .. sEnhancement .. '; tEnhancement=' .. repru(tEnhancement))
+                    end
                 end
             end
         end
@@ -8748,9 +8750,11 @@ function TempListAllEnhancementsForACU()
     local iEnhancementCount = 0
     for iBP, sUnitID in tACUBPs do
         oBP = __blueprints[sUnitID]
-        for sEnhancement, tEnhancement in oBP.Enhancements do
-            iEnhancementCount = iEnhancementCount + 1
-            LOG('oBP=' .. oBP.BlueprintId .. '; sEnhancement=' .. sEnhancement .. '; tEnhancement=' .. repru(tEnhancement))
+        if oBP.Enhancements then
+            for sEnhancement, tEnhancement in oBP.Enhancements do
+                iEnhancementCount = iEnhancementCount + 1
+                LOG('oBP=' .. oBP.BlueprintId .. '; sEnhancement=' .. sEnhancement .. '; tEnhancement=' .. repru(tEnhancement))
+            end
         end
     end
     LOG('TempListAllEnhancementsForACU: iEnhancementCount=' .. iEnhancementCount)
