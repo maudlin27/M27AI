@@ -8873,7 +8873,7 @@ function OverseerManager(aiBrain)
 
         --if GetGameTimeSeconds() == 395 then TestCustom(aiBrain) end
         --TestCustom(aiBrain)
-        --if GetGameTimeSeconds() >= 954 and GetGameTimeSeconds() <= 1000 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
+        --if GetGameTimeSeconds() >= 322 then M27Utilities.bGlobalDebugOverride = true else M27Utilities.bGlobalDebugOverride = false end
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
         if aiBrain.M27IsDefeated then
             break
@@ -8881,12 +8881,12 @@ function OverseerManager(aiBrain)
 
 
         --if GetGameTimeSeconds() >= 1459 then M27Utilities.bGlobalDebugOverride = true end
-        --[[if not(bSetHook) and GetGameTimeSeconds() >= 1459 then
+        --[[if not(bSetHook) and GetGameTimeSeconds() >= 322 then
             bDebugMessages = true
             bSetHook = true
             M27Utilities.bGlobalDebugOverride = true
             --debug.sethook(M27Utilities.AllFunctionHook, "c", 200)
-            debug.sethook(M27Utilities.OutputRecentFunctionCalls, "c", 1)
+            debug.sethook(M27Utilities.OutputRecentFunctionCalls, "c", 200)
         end--]]
 
 
