@@ -590,6 +590,13 @@ function ConvertAngleToRadians(iAngle)
     return iAngle * math.pi / 180
 end
 
+function GetAngleDifference(iAngle1, iAngle2)
+    --returns positive value from 0 to 180 for the difference between two positions (i.e. if turn by the angle closest to there)
+    local iAngleDif = math.abs(iAngle1 - iAngle2)
+    if iAngleDif > 180 then iAngleDif = math.abs(iAngleDif - 360) end
+    return iAngleDif
+end
+
 function GetAngleFromAToB(tLocA, tLocB)
     --Returns an angle 0 = north, 90 = east, etc. based on direction of tLocB from tLocA
     local iTheta = math.atan(math.abs(tLocA[3] - tLocB[3]) / math.abs(tLocA[1] - tLocB[1])) * 180 / math.pi

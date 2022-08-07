@@ -1050,6 +1050,7 @@ function GetModifiedBomberDistanceToTarget(iTimeUntilBomberLoaded, iBomberFacing
     if iDistToTarget < iMinDistToFireShot then
         bWillTurnAround = true
     else
+        --NOTE: Could use the function GetAngleDifference(iAngle1, iAngle2) to calculate iAngleDif, but as this will likely get called a lot have reproduced here
         local iAngleDif = math.abs(iBomberFacingDirection - iAngleToTarget)
         if iAngleDif > 180 then iAngleDif = math.abs(iAngleDif - 360) end
 
