@@ -24,6 +24,9 @@ refiEngisLoaded = 'M27TransportEngisLoaded' --Number of engineers successfully l
 refiMaxEngisWanted = 'M27TransportEngisWanted' --max number of engineers a transport wants
 refiWaitingForEngiCount = 'M27TransportWaitingForEngiCount' --Will increase by 1 for each cycle that transport is near base and engi and waiting to be loaded
 
+refiTimeSinceFirstInactive = 'M27TransportTimeSincFirstInactive' --Against transport; gives gametimeseconds; if unit state suggests not idle then this gets reset
+reftLocationWhenFirstInactive = 'M27TransportLocationWhenFirstInactive' --against transport
+
 function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     --Called when the event for a unit being loaded onto a transport is triggered
     --Updates tracking variables, and if the transport is full then sends it to the target
@@ -90,6 +93,9 @@ function UpdateTransportForLoadedUnit(oUnitJustLoaded, oTransport)
     if bSendTransportToTarget then
         ForkThread(SendTransportToPlateau, aiBrain, oTransport)
     end
+
+    oTransport[reftLocationWhenFirstInactive] = nil
+    oTransport[refiTimeSinceFirstInactive] = nil
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -102,6 +108,8 @@ function RecordUnitLoadingOntoTransport(oUnit, oTransport)
     if M27Utilities.IsTableEmpty(oTransport[reftUnitsToldToLoadOntoTransport]) then oTransport[reftUnitsToldToLoadOntoTransport] = {} end
     oTransport[reftUnitsToldToLoadOntoTransport][oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)] = oUnit
     if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; oTransport='..oTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTransport)) end
+    oTransport[reftLocationWhenFirstInactive] = nil
+    oTransport[refiTimeSinceFirstInactive] = nil
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
@@ -202,6 +210,10 @@ function SendTransportToPlateau(aiBrain, oTransport)
 
     IssueTransportUnload({oTransport}, oTransport[reftPlateauNearestMex])
     M27Team.tTeamData[aiBrain.M27Team][M27Team.reftTimeOfTransportLastLocationAttempt][M27Utilities.ConvertLocationToReference(oTransport[reftPlateauNearestMex])] = GetGameTimeSeconds()
+
+    oTransport[reftLocationWhenFirstInactive] = nil
+    oTransport[refiTimeSinceFirstInactive] = nil
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 

@@ -2470,7 +2470,7 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
             local tStartPosition = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
             local tEnemyStartPosition = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
             local iDistanceFromStartForReset = 20 --If unit is this close to start then will reset it if its not on its first assignment/doesnt have a target thats further away
-            local iFuelPercent, iHealthPercent, iCurTechLevel
+            local iFuelPercent, iCurTechLevel
             for iUnit, oUnit in tAllAirOfType do
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 4 then bDebugMessages = true else bDebugMessages = false end
                 --if M27UnitInfo.GetUnitTechLevel(oUnit) == 3 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true else bDebugMessages = false end
@@ -2797,8 +2797,27 @@ function RecordAvailableAndLowFuelAirUnits(aiBrain)
                             else
                                 if oUnit[M27UnitInfo.refbSpecialMicroActive] then
                                     bUnitIsUnassigned = false
+
+                                    --Transport backup logic for if transport been idle for a minute
+                                    if EntityCategoryContains(M27UnitInfo.refCategoryTransport, oUnit.UnitId) then
+                                        if M27Logic.GetUnitState(oUnit) == '' then
+                                            if M27Utilities.IsTableEmpty(oUnit[M27Transport.reftLocationWhenFirstInactive]) or M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oUnit[M27Transport.reftLocationWhenFirstInactive]) <= 1 then
+                                                --Havent moved since last location when idle
+                                                oUnit[M27Transport.refiTimeSinceFirstInactive] = math.min((oUnit[M27Transport.refiTimeSinceFirstInactive] or GetGameTimeSeconds()), GetGameTimeSeconds())
+                                            end
+                                            if GetGameTimeSeconds() - oUnit[M27Transport.refiTimeSinceFirstInactive] >= 60 then
+                                                M27Utilities.ErrorHandler('Transport has been idle for more than 1m with an active micro flag, will reset the flag')
+                                                oUnit[M27UnitInfo.refbSpecialMicroActive] = false
+                                                M27Transport.ClearTransportTrackers(aiBrain, oUnit)
+                                            end
+                                        else
+                                            oUnit[M27Transport.refiTimeSinceFirstInactive] = nil
+                                            oUnit[M27Transport.reftLocationWhenFirstInactive] = nil
+                                        end
+                                    end
+
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': Special micro is active for the unit so wont treat it as idle')
+                                        LOG(sFunctionRef .. ': Special micro is active for the unit so wont treat it as idle. Unit state='..M27Logic.GetUnitState(oUnit)..'; Is unit state empty='..tostring(M27Logic.GetUnitState(oUnit)==''))
                                     end
                                 else
                                     if bDebugMessages == true then

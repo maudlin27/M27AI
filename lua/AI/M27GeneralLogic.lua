@@ -25,7 +25,7 @@ refiEnemyScoutSpeed = 'M27LogicEnemyScoutSpeed' --expected speed of the nearest 
 refiIdleCount = 'M27UnitIdleCount' --Used to track how long a unit has been idle with the isunitidle check
 
 function GetUnitState(oUnit)
-    --Returns a string containing oUnit's unit state
+    --Returns a string containing oUnit's unit state. Returns '' if no unit state.
     local sUnitState = ''
     local sAllUnitStates = {'Immobile',
     'Moving',

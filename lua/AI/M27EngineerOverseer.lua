@@ -824,6 +824,20 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
     --Update oEngineer trackers
     if not(bDontClearExistingTrackers) then
         if bDebugMessages == true then LOG(sFunctionRef..': Clearing engineer action trackers for engineer with UC='..GetEngineerUniqueCount(oEngineer)..' which has action '..(oEngineer[refiEngineerCurrentAction] or 'nil')) end
+        if oEngineer[refiEngineerCurrentAction] == refActionLoadOnTransport and iActionToAssign == refActionHasNearbyEnemies then
+            if bDebugMessages == true then LOG(sFunctionRef..': Will see if we have a transport object recorded. Is table empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftEngineerActionsByEngineerRef][iUniqueRef][1]))) end
+            if M27Utilities.IsTableEmpty(aiBrain[reftEngineerActionsByEngineerRef][iUniqueRef][1]) == false then
+                local oOriginalTransport = aiBrain[reftEngineerActionsByEngineerRef][iUniqueRef][1][refoObjectTarget]
+
+                if bDebugMessages == true then LOG(sFunctionRef..': Checking if original transport is still valid='..tostring(M27UnitInfo.IsUnitValid(oOriginalTransport))) end
+                if M27UnitInfo.IsUnitValid(oOriginalTransport) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Will clear trackers on original transport='..(oOriginalTransport.UnitId..M27UnitInfo.GetUnitLifetimeCount(oOriginalTransport))) end
+                    oOriginalTransport[M27UnitInfo.refbSpecialMicroActive] = false
+                    M27Transport.ClearTransportTrackers(aiBrain, oOriginalTransport)
+
+                end
+            end
+        end
         ClearEngineerActionTrackers(aiBrain, oEngineer, true)
     else
         if bDebugMessages == true then LOG(sFunctionRef..': Not clearing engineers trackers due to input settings') end
