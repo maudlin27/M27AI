@@ -751,6 +751,7 @@ function GetBomberAOEAndStrikeDamage(oUnit)
             if (tWeapon.DamageRadius or 0) > iAOE then
                 iAOE = tWeapon.DamageRadius
                 iStrikeDamage = tWeapon.Damage * tWeapon.MuzzleSalvoSize
+                if tWeapon.MuzzleSalvoSize > 2 then iStrikeDamage = iStrikeDamage * 0.5 end
                 iFiringRandomness = (tWeapon.FiringRandomness or 0)
             end
         end
@@ -808,6 +809,17 @@ function GetBomberRange(oUnit)
         end
     end
     return iRange
+end
+
+function GetBomberSalvoDelay(oUnit)
+    local oBP = oUnit:GetBlueprint()
+    local iDelay = 0.5 --basic default; in reality should be 0.2 or 0.25 checking zeus, scorcher and janus
+    for sWeaponRef, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' or tWeapon.WeaponCategory == 'Anti Navy' then
+            if tWeapon.MuzzleSalvoDelay then return tWeapon.MuzzleSalvoDelay end
+        end
+    end
+    return iDelay
 end
 
 function GetBomberSpeedAndTimeToReload(oBomber)

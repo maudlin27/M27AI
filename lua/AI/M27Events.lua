@@ -691,7 +691,7 @@ end
 
 function OnBombFired(oWeapon, projectile)
     if M27Utilities.bM27AIInGame then
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'OnBombFired'
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -708,16 +708,19 @@ function OnBombFired(oWeapon, projectile)
 
                 end
                 if oUnit.GetAIBrain and oUnit:GetAIBrain().M27AI then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repru(projectile:GetPosition())) end
                     local iDelay = 0
-                    if M27UnitInfo.DoesBomberFireSalvo(oUnit) then iDelay = 3 end
+                    if M27UnitInfo.DoesBomberFireSalvo(oUnit) then iDelay = 2 end
 
+
+
+                    if bDebugMessages == true then LOG(sFunctionRef..': Projectile position='..repru(projectile:GetPosition())..'; Last fired bomb time='..(oUnit[M27AirOverseer.refiLastFiredBomb] or 0)..'; Cur time='..GetGameTimeSeconds()..'; iDelay='..iDelay) end
                     if not(oUnit[M27AirOverseer.refiLastFiredBomb]) or GetGameTimeSeconds() - oUnit[M27AirOverseer.refiLastFiredBomb] > iDelay then
-                        oUnit[M27AirOverseer.refiLastFiredBomb] = GetGameTimeSeconds()
                         oUnit[M27AirOverseer.refiBombsDropped] = (oUnit[M27AirOverseer.refiBombsDropped] or 0) + 1
                         oUnit[M27AirOverseer.refoLastBombTarget] = oUnit[M27AirOverseer.reftTargetList][oUnit[M27AirOverseer.refiCurTargetNumber]][M27AirOverseer.refiShortlistUnit]
+                        if iDelay == 2 then iDelay = iDelay + 1 end --Increase by 1s since will be tracking when last fired a bomb as an extra check
+                        ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, projectile, iDelay)
                     end
-                    ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oUnit, projectile)
+                    oUnit[M27AirOverseer.refiLastFiredBomb] = GetGameTimeSeconds()
                 end
             end
         end

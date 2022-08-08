@@ -1908,7 +1908,7 @@ end--]]
 
 function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangingTargetOnImpact, bTemporarilyTrackStrikeDamage)
     local sFunctionRef = 'TrackBombImpact'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -1926,21 +1926,35 @@ function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangin
     local iCurCount = 0
     local iTargetHealth
     local iTargetShieldHealth
+    local iOriginalHealth
+    local iOriginalShieldHealth
     if M27UnitInfo.IsUnitValid(oTarget) then
         iTargetHealth = oTarget:GetHealth()
         iTargetShieldHealth = M27UnitInfo.GetCurrentAndMaximumShield(oTarget)
+        iOriginalHealth = iTargetHealth
+        iOriginalShieldHealth = iTargetShieldHealth
     end
     local bFailedAttack = false
     while projectile do
-        --if bDebugMessages == true then LOG(sFunctionRef..': Start of loop, iCurCount='..iCurCount) end
+        if bDebugMessages == true then LOG(sFunctionRef..': Start of loop, iCurCount='..iCurCount) end
         iCurCount = iCurCount + 1
-        if iCurCount > 100 then
-            M27Utilities.ErrorHandler('Has been too long with no impact, something has gone wrong with tracking, will abort. repru of projectile='..repru(projectile))
+        if iCurCount > 20 then --Means have been waiting more than 10s for bomb to land; FAF develop change that has .impacts is only expected in main FAF as of 20 August 2022, so if before this date that coudl be why
+            M27Utilities.ErrorHandler('Has been too long with no impact, something has gone wrong with tracking, will abort. reprs of projectile='..reprs(projectile))
+            if M27UnitInfo.IsUnitValid(oTarget) then
+                if iTargetHealth >= iOriginalHealth then
+                    if iOriginalShieldHealth > 0 then iTargetShieldHealth = M27UnitInfo.GetCurrentAndMaximumShield(oTarget) end
+                    if iTargetShieldHealth >= iOriginalShieldHealth then
+                        bFailedAttack = true
+                    end
+                end
+            end
             break
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(5)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-        if projectile.Impacts and projectile.Impacts > 0 then
+        if projectile.M27Impacted or projectile.Impacts > 0 then
             --Bomb has impacted; has the unit's health changed?
             --if bDebugMessages == true then LOG(sFunctionRef..': Projectile has impacted') end
             if iTargetHealth > 0 and M27UnitInfo.IsUnitValid(oTarget) then
@@ -1975,6 +1989,7 @@ function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangin
         if bFailedAttack then
             oTarget[refiFailedHitCount] = (oTarget[refiFailedHitCount] or 0) + 1
             if oTarget[refiFailedHitCount] > 0 and bConsiderChangingTargetOnImpact then
+                if bDebugMessages == true then LOG(sFunctionRef..': Failed ot damage target so will call update bomber targets') end
                 ForkThread(UpdateBomberTargets, oBomber, false)
             end
         else
@@ -1991,9 +2006,9 @@ function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangin
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function DelayedBomberTargetRecheck(oBomber, projectile)
+function DelayedBomberTargetRecheck(oBomber, projectile, iDelayBeforeTargetChange)
     local sFunctionRef = 'DelayedBomberTargetRecheck'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 
@@ -2002,18 +2017,22 @@ function DelayedBomberTargetRecheck(oBomber, projectile)
     --Do we think our bomb will kill the target? If so then change targets now.  If not, then consider changing as part of the projectile tracking
     local bConsiderChangingTargetOnImpact = false
     local bChangeTargetNow = false
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. Is bomber valid='..tostring(M27UnitInfo.IsUnitValid(oBomber))) end
+
     if M27UnitInfo.IsUnitValid(oBomber) then
         local bReturnToBase = true --only used if are going to clear the target
         if oBomber[refbEngiHunterMode] then bReturnToBase = false end
 
         local aiBrain = oBomber:GetAIBrain()
         local oTarget = oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit]
+        if bDebugMessages == true then LOG(sFunctionRef..': Bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' - is its target valid='..tostring(M27UnitInfo.IsUnitValid(oTarget))) end
         if M27UnitInfo.IsUnitValid(oTarget) then
 
             --Do we expect the bomb to kill the target?
             local iAOE, iBomberStrikeDamage = M27UnitInfo.GetBomberAOEAndStrikeDamage(oBomber)
-            if bDebugMessages == true then LOG(sFunctionRef..': Target still exists; iBomberStrikeDamage='..(iBomberStrikeDamage or 'nil')..'; oTarget[refiMaxStrikeDamageWanted]='..(oTarget[refiMaxStrikeDamageWanted] or 'nil')..'; Target health='..oTarget:GetHealth()..'; is target under shield='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, false))) end
-            if oTarget[refiMaxStrikeDamageWanted] <= iBomberStrikeDamage then
+            if bDebugMessages == true then LOG(sFunctionRef..': Target still exists; iBomberStrikeDamage='..(iBomberStrikeDamage or 'nil')..'; oTarget[refiMaxStrikeDamageWanted]='..(oTarget[refiMaxStrikeDamageWanted] or 'nil')..'; Target health='..oTarget:GetHealth()..'; is target under shield='..tostring(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, false))..'; iAOE='..(iAOE or 'nil')) end
+            if (oTarget[refiMaxStrikeDamageWanted] or 0) <= iBomberStrikeDamage then
                 bChangeTargetNow = true
             else
                 if oTarget:GetHealth() * 1.1 <= iBomberStrikeDamage and not(M27Logic.IsTargetUnderShield(aiBrain, oTarget, 0, false, false, false)) then
@@ -2032,7 +2051,8 @@ function DelayedBomberTargetRecheck(oBomber, projectile)
             end
 
             if not(bChangeTargetNow) then bConsiderChangingTargetOnImpact = true end
-                                        --TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangingTargetOnImpact, bTemporarilyTrackStrikeDamage)
+            --TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangingTargetOnImpact, bTemporarilyTrackStrikeDamage)
+            if bDebugMessages == true then LOG(sFunctionRef..'If have a projectile then will track bomb impact for bomber '..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'. Is t able empty for projectile='..tostring(M27Utilities.IsTableEmpty(projectile, true))) end
             if projectile and M27Utilities.IsTableEmpty(projectile, true) == false then ForkThread(TrackBombImpact, aiBrain, oBomber, oTarget, projectile, bConsiderChangingTargetOnImpact, bChangeTargetNow) end
             --Record that the bomber has fired a bomb for tracking relating to this:
             ForkThread(UpdateBomberEffectiveness, aiBrain, oBomber, true)
@@ -2040,22 +2060,46 @@ function DelayedBomberTargetRecheck(oBomber, projectile)
         else
             bChangeTargetNow = true
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': bChangeTargetNow='..tostring(bChangeTargetNow)..'; iDelayBeforeTargetChange='..(iDelayBeforeTargetChange or 'nil')) end
 
         if bChangeTargetNow then
             --if just fired bomb at an engineer that were trying to kill then also look to kill another nearby engineer (this wont run if this is an engi hunter bomber, i.e. intended for bombers that targeted an engi in the above logic)
             --Will ahve already told bomber to change targets if the engineer died
-            local bTargetEngineer = false
-            if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oTarget.UnitId) then
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to target another engineer as just killed one. Cur target='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)) end
-                if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) or oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit] == oTarget then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Will look for another nearby engineer to target') end
-                    bTargetEngineer = true
+
+            --Bombers that fire a salvo - want to wait until finished firing salvo
+            if iDelayBeforeTargetChange > 0 then
+                local iTimeAtStart = GetGameTimeSeconds()
+                local iSalvoDelay = M27UnitInfo.GetBomberSalvoDelay(oBomber) + 0.1 --1 extra tick for backup
+                while M27UnitInfo.IsUnitValid(oBomber) do
+                    if GetGameTimeSeconds() - oBomber[refiLastFiredBomb] > iSalvoDelay then
+                        break
+                    elseif GetGameTimeSeconds() - iTimeAtStart > iDelayBeforeTargetChange then
+                        break
+                    else
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                        WaitTicks(1)
+                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                    end
                 end
             end
-            ClearAirUnitAssignmentTrackers(aiBrain, oBomber, not(bReturnToBase))
-            if bDebugMessages == true then LOG(sFunctionRef..': have just cleared bomber trackers, are no longer targeting unit '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'. bReturnToBase='..tostring(bReturnToBase)..'; bTargetEngineer='..tostring(bTargetEngineer)) end
-            if bTargetEngineer then
-                ForkThread(OneOffTargetNearbyEngineer, aiBrain, oBomber)
+            if M27UnitInfo.IsUnitValid(oBomber) then
+
+                local bTargetEngineer = false
+                if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oTarget.UnitId) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to target another engineer as just killed one. Cur target='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)) end
+                    if M27Utilities.IsTableEmpty(oBomber[reftTargetList]) or oBomber[reftTargetList][oBomber[refiCurTargetNumber]][refiShortlistUnit] == oTarget then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will look for another nearby engineer to target') end
+                        bTargetEngineer = true
+                    end
+                end
+                ClearAirUnitAssignmentTrackers(aiBrain, oBomber, not(bReturnToBase))
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': have just cleared bomber trackers. bReturnToBase='..tostring(bReturnToBase)..'; bTargetEngineer='..tostring(bTargetEngineer))
+                    if M27UnitInfo.IsUnitValid(oTarget) then LOG(sFunctionRef..': are no longer targeting unit '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)) end
+                end
+                if bTargetEngineer then
+                    ForkThread(OneOffTargetNearbyEngineer, aiBrain, oBomber)
+                end
             end
         else
             if EntityCategoryContains(M27UnitInfo.refCategoryStructureAA * categories.TECH3, oTarget.UnitId) and EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId) then
