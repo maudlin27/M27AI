@@ -2077,7 +2077,7 @@ function DelayedBomberTargetRecheck(oBomber, projectile, iDelayBeforeTargetChang
                         break
                     else
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        WaitTicks(1)
+                        WaitTicks(3)
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                     end
                 end
