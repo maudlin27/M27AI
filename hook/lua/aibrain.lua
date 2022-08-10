@@ -4,6 +4,8 @@ local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Events = import('/mods/M27AI/lua/AI/M27Events.lua')
+local M27Config = import('/mods/M27AI/lua/M27Config.lua')
+local M27MiscProfiling = import('/mods/M27AI/lua/MiscProfiling.lua')
 
 M27AIBrainClass = AIBrain
 AIBrain = Class(M27AIBrainClass) {
@@ -75,6 +77,7 @@ AIBrain = Class(M27AIBrainClass) {
             M27AIBrainClass.OnCreateAI(self, planName)
             ForkThread(M27Overseer.SendWarningIfNoM27, self)
         end
+        if M27Config.M27RunGamePerformanceCheck then ForkThread(M27MiscProfiling.LogGamePerformanceData) end
 
     end,
 

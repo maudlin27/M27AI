@@ -5123,6 +5123,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
 
     if bForceRefresh or GetGameTimeSeconds() - (aiBrain[refiLastPlateausUpdate] or -100) > 10 then
         if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains]) == false then
+            M27Utilities.FunctionProfiler(sFunctionRef..'Main loop', M27Utilities.refProfilerStart)
             aiBrain[refiLastPlateausUpdate] = GetGameTimeSeconds()
 
             --Cycle through each plateau and check if we already control it, and if not if it is safe
@@ -5305,6 +5306,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                     end
                 end
             end
+            M27Utilities.FunctionProfiler(sFunctionRef..'Main loop', M27Utilities.refProfilerEnd)
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

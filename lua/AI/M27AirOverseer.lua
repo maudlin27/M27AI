@@ -7333,6 +7333,8 @@ end
 function AirLogicOverseer(aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AirLogicOverseer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     local bProfiling = false
     local iProfileStartTime = 0
 
@@ -7359,8 +7361,11 @@ function AirLogicOverseer(aiBrain)
         if bProfiling == true then
             iProfileStartTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef .. ': End of loop', iProfileStartTime)
         end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         WaitTicks(10)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function Initialise()

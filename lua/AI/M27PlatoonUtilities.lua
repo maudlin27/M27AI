@@ -173,6 +173,7 @@ reftStructureLocationToBuild = 'M27PlatoonStructureLocationToBuild' --Rough loca
 refiPlatoonMaxRange = 'M27PlatoonMaxRange' --Higher of direct and indirect fire range for the platoon's front unit
 reftSkirmisherPlatoonWantingIntel = 'M27PlatoonSkirmishersWantingIntel' --against aiBrain, [x] is [PlatoonName+Count], returns the platoon
 refiThreatWhenRetreatToRallyOrBase = 'M27PlatoonThreatWhenRetreated' --Against platoon, threat value when told to return to base or nearest rally
+refiTicksSinceLastCycle = 'M27PlatoonTicksSinceLastCycle' --against platoon, number of ticks we waited in the last cycle
 
 --Plateau
 refbPlateauPlatoon = 'M27PlatoonPlateau'
@@ -7762,7 +7763,7 @@ function DeterminePlatoonAction(oPlatoon)
                 if oPlatoon[refiRefreshActionCount] == nil then
                     oPlatoon[refiRefreshActionCount] = 0
                 end
-                oPlatoon[refiRefreshActionCount] = oPlatoon[refiRefreshActionCount] + 1
+                oPlatoon[refiRefreshActionCount] = oPlatoon[refiRefreshActionCount] + (oPlatoon[refiTicksSinceLastCycle] or 1)
             end
 
             if bDebugMessages == true then
@@ -12802,11 +12803,26 @@ function PlatoonCycler(oPlatoon)
                 if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for platoon with orig name '..sOrigPlatoonName..(oPlatoon[refiPlatoonCount] or 'nil')..'; curplan='..oPlatoon:GetPlan()..'; oPlatoon[refiPlatoonUniqueCount]='..oPlatoon[refiPlatoonUniqueCount]) end
                 local iOrigPlatoonCount = oPlatoon[refiPlatoonCount]
 
+                local iTicksToWait
+                local iMaxTicksToWait
+                local iPlatoonCost
+
                 while aiBrain:PlatoonExists(oPlatoon) and not(aiBrain.M27IsDefeated) and not(aiBrain[M27Logic.refbAllEnemiesDead]) do
                     if bDebugMessages == true then LOG(sFunctionRef..': About to run a platoon cycle for platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..'-'..oPlatoon[refiPlatoonUniqueCount]..'; GameTime='..GetGameTimeSeconds()) end
                     ForkThread(RunPlatoonSingleCycle, oPlatoon)
+                    if oPlatoon[refiEnemiesInRange] + oPlatoon[refiEnemyStructuresInRange] > 0 then
+                        iMaxTicksToWait = (oPlatoon[M27PlatoonTemplates.refiMaxTicksBetweenCycleEnemies] or 2)
+                        iPlatoonCost = 0.7
+                    else
+                        iMaxTicksToWait = (oPlatoon[M27PlatoonTemplates.refiMaxTicksBetweenCycleNoEnemies] or 2)
+                        iPlatoonCost = 0.4
+                    end
+
+                    --[refiMaxTicksBetweenCycleEnemies]
+                    iTicksToWait = _G.MyM27Scheduler:WaitTicks(10, iMaxTicksToWait, iPlatoonCost)
+                    oPlatoon[refiTicksSinceLastCycle] = iTicksToWait
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                    WaitSeconds(1)
+                    WaitTicks(iTicksToWait)
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
                     if bDebugMessages == true then LOG(sFunctionRef..': Waited 1s after running cycle, checking if platoon still valid; GameTime='..GetGameTimeSeconds()) end
                     if oPlatoon and oPlatoon.GetPlan and aiBrain then

@@ -193,8 +193,7 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
             end
         elseif bDebugMessages == true then LOG(sFunctionRef..': Energy segment X and Z after checking near engi='..(iEnergySegmentX or 'nil')..'-'..(iEnergySegmentZ or 'nil')..'; Dist between here and engi='..M27Utilities.GetDistanceBetweenPositions(tEngiPosition, M27MapInfo.GetReclaimLocationFromSegment(iEnergySegmentX, iEnergySegmentZ)))
         end
-
-
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return M27MapInfo.GetReclaimLocationFromSegment(iEnergySegmentX, iEnergySegmentZ)
 
         --[[
@@ -406,6 +405,7 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
             end
         end
     end --]]
+
 end
 
 function IsCivilianBrain(aiBrain)
