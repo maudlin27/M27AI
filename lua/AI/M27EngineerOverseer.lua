@@ -8659,6 +8659,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         local sEngineerID
 
         if M27Utilities.IsTableEmpty(tEngineers) == false then
+            local iHighestTechLevel = aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]
             for iEngineer, oEngineer in tEngineers do
                 --if GetEngineerUniqueCount(oEngineer) == 169 and GetGameTimeSeconds() >= 2300 then bDebugMessages = true end
                 --if oEngineer.UnitId == 'xsl0105' and M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 4 and aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 1326 and GetGameTimeSeconds() <= 1327 then bDebugMessages = true else bDebugMessages = false end
@@ -8781,6 +8782,11 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 elseif oEngineer.Dead then
                     if bDebugMessages == true then LOG(sFunctionRef..': Engineer is dead so clearing its actions') end
                     ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+                end
+
+                if iEngineersToConsider >= 20 and (tiAvailableEngineersByTechLevel[iHighestTechLevel] >= 5 or iEngineersToConsider >= 30) then
+                    --Cap on how many engineers to consider at once
+                    break
                 end
             end
         end
@@ -12200,6 +12206,7 @@ function EngineerManager(aiBrain)
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+    local iTicksToWait
     while(not(aiBrain:IsDefeated()) and not(aiBrain.M27IsDefeated)) do
         if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
 
@@ -12226,7 +12233,7 @@ function EngineerManager(aiBrain)
         --TEMPTEST(aiBrain, sFunctionRef..': Pre wait 10 ticks')
         --]]
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitTicks(10)
+        iTicksToWait = _G.MyM27Scheduler:WaitTicks(10, 15, 1.5)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then LOG(sFunctionRef..': End of cycle after waiting 10 ticks') end
         --TEMPTEST(aiBrain, sFunctionRef..': Post wait 10 ticks')

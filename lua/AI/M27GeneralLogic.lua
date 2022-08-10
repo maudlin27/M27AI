@@ -13,6 +13,10 @@ local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
+--Threat values
+tUnitThreatByIDAndType = {} --Calculated at the start of the game
+
+--Other:
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
 refiNearestEnemyIndex = 'M27NearestEnemyIndex'
 refiNearestEnemyStartPoint = 'M27NearestEnemyStartPoint'
@@ -5341,4 +5345,20 @@ function YthothaDeathBallSearchAndSlow(oOwnerBrain, tLikelyPosition)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function CalculateUnitThreatsByType()
+    if M27Utilities.IsTableEmpty(tUnitThreatByIDAndType) then
+        local sUnitId
+        local tiThreatTypes = {}
+        for iBP, oBP in __blueprints do
+            --Updates tUnitThreatByIDAndType
+            sUnitId = oBP.BlueprintId
+            if not(tUnitThreatByIDAndType[sUnitId]) then
+                tUnitThreatByIDAndType[sUnitId] = {}
+
+            end
+        end
+
+    end
 end

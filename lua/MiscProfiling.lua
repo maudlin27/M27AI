@@ -282,10 +282,6 @@ function LocalVariableImpact()
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function BlueprintMethods()
-    local sFunctionRef = 'BlueprintMethods'
-end
-
 function LogGamePerformanceData()
     --Call via forkthread at start of game (duplicate of performance check condition to be extra sure we only run this when intended)
     if M27Config.M27RunGamePerformanceCheck and not(GamePerformanceTrackerIsActive) then

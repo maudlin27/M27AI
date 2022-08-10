@@ -3459,7 +3459,8 @@ function UpgradeManager(aiBrain)
 
         ForkThread(ManageEnergyStalls, aiBrain)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitTicks(iCycleWaitTime)
+        iCurCycleTime = _G.MyM27Scheduler:WaitTicks(iCurCycleTime,iCurCycleTime + 0.5, 0.4)
+        --WaitTicks(iCurCycleTime)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': End of loop after waiting ticks')

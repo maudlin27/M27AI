@@ -1755,8 +1755,8 @@ end
 M27Scheduler = Class({
     Init = function(self)
         -- Edit these two flags as you see fit
-        self.trainingWheels = true
-        self.logging = true
+        self.trainingWheels = false
+        self.logging = false
 
         -- Internal state, be careful when touching.  I highly recommend just using the interface functions.
         self.lastTick = 0

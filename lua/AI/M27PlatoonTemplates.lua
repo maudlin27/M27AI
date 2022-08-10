@@ -47,8 +47,8 @@ iMedPriorityNoEnemy = 40
 iMedPriorityEnemy = 20
 iHighPriorityNoEnemy = 20
 iHighPriorityEnemy = 15
-iVHighPriorityNoEnemy = 10
-iVHighPriorityEnemy = 10
+iVHighPriorityNoEnemy = 12
+iVHighPriorityEnemy = 11
 
 
 PlatoonTemplate = {

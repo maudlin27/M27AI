@@ -1908,7 +1908,7 @@ end--]]
 
 function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangingTargetOnImpact, bTemporarilyTrackStrikeDamage)
     local sFunctionRef = 'TrackBombImpact'
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
@@ -2008,7 +2008,7 @@ end
 
 function DelayedBomberTargetRecheck(oBomber, projectile, iDelayBeforeTargetChange)
     local sFunctionRef = 'DelayedBomberTargetRecheck'
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 
@@ -7344,6 +7344,8 @@ function AirLogicOverseer(aiBrain)
         iProfileStartTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef .. ': Pre start of while loop', iProfileStartTime)
     end
 
+    local iTicksToWait
+
     while (not (aiBrain:IsDefeated()) and not (aiBrain.M27IsDefeated)) do
         if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then
             break
@@ -7362,7 +7364,8 @@ function AirLogicOverseer(aiBrain)
             iProfileStartTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef .. ': End of loop', iProfileStartTime)
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitTicks(10)
+        iTicksToWait = _G.MyM27Scheduler:WaitTicks(10, 15, 0.6)
+        --WaitTicks(iTicksToWait)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
