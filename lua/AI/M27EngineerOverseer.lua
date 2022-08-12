@@ -8784,7 +8784,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                     ClearEngineerActionTrackers(aiBrain, oEngineer, true)
                 end
 
-                if iEngineersToConsider >= 20 and (tiAvailableEngineersByTechLevel[iHighestTechLevel] >= 5 or iEngineersToConsider >= 30) then
+                if iEngineersToConsider >= 20 and (tiAvailableEngineersByTech[iHighestTechLevel] >= 5 or iEngineersToConsider >= 30) then
                     --Cap on how many engineers to consider at once
                     break
                 end

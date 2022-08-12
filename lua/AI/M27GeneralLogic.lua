@@ -15,6 +15,8 @@ local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
 --Threat values
 tUnitThreatByIDAndType = {} --Calculated at the start of the game
+reftBaseThreat = 'M27BaseThreatTable' --Against unit, stores the base threat value for different combinations
+tiThreatRefsCalculated = {} --table of the threat ID references that have done blueprint checks on
 
 --Other:
 refbNearestEnemyBugDisplayed = 'M27NearestEnemyBug' --true if have already given error messages for no nearest enemy
@@ -1692,7 +1694,7 @@ function DetermineEnemyScoutSpeed(aiBrain)
     end
 end
 
-function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
+function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue, bBlueprintThreat)
     --Determines threat rating for tUnits; if bMustBeVisibleToIntelOrSight is true then will assume threat where dont have visual
     --bMustBeVisibleToIntelOrSight - Set to false to get threat information regardless of visibility; automatically done where the unit's owner is equal to aiBrain
     --Threat method: based on mass value * multiplier; 1 if are direct fire, 0.2 if are indirect (0.75 for t1 arti), *2 if are a direct fire structure, *1.5 if are a shield or wall
@@ -1715,24 +1717,31 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
         return 0
     else
         --if table.getn(tUnits) <= 2 then bDebugMessages = true end
-        local iArmyIndex = aiBrain:GetArmyIndex()
-        if bDebugMessages == true then LOG(sFunctionRef..': tUnits has units in it='..table.getn(tUnits)) end
+        local iArmyIndex
+        local iTotalUnits
+        if not(bBlueprintThreat) then
+            iArmyIndex = aiBrain:GetArmyIndex()
+            iTotalUnits = table.getn(tUnits)
+            if bDebugMessages == true then LOG(sFunctionRef..': tUnits has units in it='..table.getn(tUnits)) end
+        end
         local oBlip
         local iCurThreat = 0
         local iMassCost = 0
         local iMassMod
         local iTotalThreat = 0
         local bCalcActualThreat = false
-        local iTotalUnits = table.getn(tUnits)
         local iHealthPercentage, iMaxHealth
         local bOurUnits = false
         local iHealthFactor --if unit has 40% health, then threat reduced by (1-40%)*iHealthFactor
         local iCurShield, iMaxShield
         local oBP
+        local refiMaxHealth = 'M27UnitMaxHealth' --stores max health per blueprint
+
+        local iOtherAdjustFactor = 1
 
         local iBlipThreat = 54
         if iMassValueOfBlipsOverride then iBlipThreat = iMassValueOfBlipsOverride
-        else
+        elseif bMustBeVisibleToIntelOrSight then
             if aiBrain[M27Overseer.refiEnemyHighestTechLevel] == 2 then
                 iBlipThreat = 250
             elseif aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 3 then
@@ -1740,18 +1749,45 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
             end
         end
 
+        local iThreatRef
+        if bIndirectFireThreatOnly then
+            iThreatRef = '110'
+        elseif bJustGetMassValue then
+            iThreatRef = '101'
+        else
+            iThreatRef = '100'
+        end
+
+        if not(tiThreatRefsCalculated[iThreatRef]) then M27Utilities.ErrorHandler('Havent calculated threat values for iThreatRef='..iThreatRef) end
+
+        local iBaseThreat = 0
+
         for iUnit, oUnit in tUnits do
             iCurThreat = 0
+            iBaseThreat = 0
             bCalcActualThreat = false
-            if bDebugMessages == true then LOG(sFunctionRef..': About to check if unit is dead') end
+            --oBP = nil
+
+            --Get the base threat for the unit
             if M27UnitInfo.IsUnitValid(oUnit) then
-                if oUnit:GetAIBrain() == aiBrain then
-                    bOurUnits = true
-                    if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and has same ai brain so will determine actual threat') end
+                if oUnit[reftBaseThreat] and oUnit[reftBaseThreat][iThreatRef] then
+                    iBaseThreat = oUnit[reftBaseThreat][iThreatRef]
+                    if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and not(bBlueprintThreat) then
+                        iBaseThreat = GetACUCombatMassRating(oUnit)
+                    end
                     bCalcActualThreat = true
                 else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and owned by dif ai brain, seeing if we have a blip for it') end
-                    if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip and not(oUnit[M27UnitInfo.refbTreatAsVisible]) then
+                    if bDebugMessages == true then LOG(sFunctionRef..': About to check if unit is dead') end
+
+                    if not(bMustBeVisibleToIntelOrSight) or not(oUnit.GetBlip) or oUnit[M27UnitInfo.refbTreatAsVisible] then
+                        bCalcActualThreat = true
+                    elseif oUnit:GetAIBrain() == aiBrain then
+                        bOurUnits = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and has same ai brain so will determine actual threat') end
+                        bCalcActualThreat = true
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and owned by dif ai brain, and has a GetBlip argument') end
+                        --if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip and not(oUnit[M27UnitInfo.refbTreatAsVisible]) then
                         oBlip = oUnit:GetBlip(iArmyIndex)
                         if oBlip then
                             if not(oBlip:IsKnownFake(iArmyIndex)) then
@@ -1764,23 +1800,23 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                         oBP = oUnit:GetBlueprint()
                                         if EntityCategoryContains(categories.STRUCTURE, oBP.BlueprintId) then
                                             if bDebugMessages == true then LOG('iUnit='..iUnit..'; IsSeenEver is false; have a structure so will be reduced threat.') end
-                                            iCurThreat = 0
+                                            iBaseThreat = 0
                                         else
                                             --Specific speed checks
                                             if bDebugMessages == true and oUnit.GetBlueprint then LOG('Unit has blueprint with maxpseed='..oUnit:GetBlueprint().Physics.MaxSpeed..';  If dont satisfy speed check, then iSoloBlipMassOverride='..(iSoloBlipMassOverride or 'nil')..'; backup iBlipThreat='..iBlipThreat..'; aiBrain[refiEnemyScoutSpeed]='..(aiBrain[refiEnemyScoutSpeed] or 'nil')) end
                                             if oUnit.GetBlueprint and oBP.Physics.MaxSpeed == 1.9 then
                                                 --Unit is same speed as engineer so more likely tahn not its an engineer
-                                                iCurThreat = 5
+                                                iBaseThreat = 5
                                             elseif oUnit.GetBlueprint and oBP.Physics.MaxSpeed == 1.7 then
                                                 --Unit is same speed as ACU so more likely than not its an ACU; if gametime is >10m then assume will also know if the ACU is upgraded
-                                                iCurThreat = 800
-                                                if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and GetGameTimeSeconds() >= 600 then iCurThreat = GetACUCombatMassRating(oUnit) end
+                                                iBaseThreat = 800
+                                                if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and GetGameTimeSeconds() >= 600 then iBaseThreat = GetACUCombatMassRating(oUnit) end
                                             elseif oUnit.GetBlueprint and oBP.Physics.MaxSpeed == aiBrain[refiEnemyScoutSpeed] then
-                                                iCurThreat = 10
+                                                iBaseThreat = 10
                                             else
                                                 if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is false; unit isnt a structure so calculating threat based on whether its on its own or not; will be using blip threat override of '..(iMassValueOfBlipsOverride or 54)..' if more than one blip') end
-                                                if iTotalUnits <= 1 then iCurThreat = (iSoloBlipMassOverride or iBlipThreat)
-                                                else iCurThreat = iBlipThreat end
+                                                if iTotalUnits <= 1 then iBaseThreat = (iSoloBlipMassOverride or iBlipThreat)
+                                                else iBaseThreat = iBlipThreat end
                                             end
                                         end
                                     end
@@ -1789,81 +1825,53 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': oBlip isnt true; iUnit='..iUnit) end
                         end
-                    else
-                        --Not using blip so just get actual values (e.g. if want cheating AI or if running this on own units
-                        bCalcActualThreat = true
+                    end
+                    if bCalcActualThreat then
+                        iBaseThreat = tUnitThreatByIDAndType[oUnit.UnitId][iThreatRef]
+                        if not(oUnit[reftBaseThreat]) then oUnit[reftBaseThreat] = {} end
+                        if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) and not(bBlueprintThreat) then
+                            iBaseThreat = GetACUCombatMassRating(oUnit)
+                        end
+                        oUnit[reftBaseThreat][iThreatRef] = iBaseThreat
                     end
                 end
             end
-            if bCalcActualThreat == true then
-                if bDebugMessages == true then LOG(sFunctionRef..': About to calculate threat using actual unit data; unitID='..oUnit.UnitId) end
-                --get actual threat calc
-                oBP = oUnit:GetBlueprint()
-                if bJustGetMassValue == true then iCurThreat = oBP.Economy.BuildCostMass
-                else
-                    iMassMod = 0
-                    if not(bIndirectFireThreatOnly) then
-                        if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then
-                            if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit.UnitId) then
-                                iMassMod = 0.55 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
-                            elseif EntityCategoryContains(M27UnitInfo.refCategoryCruiserCarrier, oUnit.UnitId) then
-                                if EntityCategoryContains(categories.CYBRAN * categories.TECH2, oUnit.UnitId) then iMassMod = 0.45
-                                else
-                                    iMassMod = 0.2
-                                end
-                            elseif EntityCategoryContains(M27UnitInfo.refCategoryAttackBot * categories.TECH1, oUnit.UnitId) then
-                                iMassMod = 0.85
-                            else iMassMod = 1
-                            end
-                        elseif EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) then
-                            iMassMod = 0.55
-                        elseif EntityCategoryContains(categories.SUBCOMMANDER, oUnit.UnitId) then iMassMod = 1 --SACUs dont have directfire category for some reason (they have subcommander and overlaydirectfire)
-                        elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.STRUCTURE * categories.TECH2, oUnit.UnitId) then iMassMod = 0.1 --Gets doubled as its a structure
-                        elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH1, oUnit.UnitId) then iMassMod = 0.9
-                        elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH3, oUnit.UnitId) then iMassMod = 0.5
-                        elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 0.75 --will be doubled for structures
-                        elseif EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then iMassMod = 1 --Put in just in case - code was working before this, but dont want it to be affected yb more recenlty added engineer category
-                        elseif EntityCategoryContains(categories.ENGINEER,oUnit.UnitId) then iMassMod = 0.1 --Engis can reclaim and capture so can't just e.g. beat with a scout
-                        end
-                    else
-                        if EntityCategoryContains(categories.INDIRECTFIRE, oUnit.UnitId) then
-                            iMassMod = 1
-                            if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then iMassMod = 0.5 end
-                        elseif EntityCategoryContains(categories.ANTIMISSILE, oUnit.UnitId) then iMassMod = 2 --Doubled for structures ontop of this, i.e. want 4xmass of TMD in indirect fire so can overwhelm it
-                        elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 1
-                        elseif EntityCategoryContains(M27UnitInfo.refCategoryLongRangeDFLand, oUnit.UnitId) then iMassMod = 0.5
-                        end
-                    end
-                    if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit.UnitId) then iMassMod = iMassMod * 2 end
-                    iMassCost = oBP.Economy.BuildCostMass
 
 
+            if bCalcActualThreat then
+                --Have got the base threat for this type of unit, now adjust threat for unit health if want to calculate actual threat
+                if iBaseThreat > 0 then
                     iCurShield, iMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                     iMaxHealth = oUnit:GetMaxHealth() + iMaxShield
-                    iHealthPercentage = (oUnit:GetHealth() + iCurShield) / iMaxHealth
+                    if iMaxHealth and iMaxHealth > 0 then
+                        if not(oUnit[refiMaxHealth]) then oUnit[refiMaxHealth] = oUnit:GetBlueprint().Defense.MaxHealth end
+                        --if not(oBP) then oBP = oUnit:GetBlueprint() end
 
-                    if oUnit.Sync.VeteranLevel > 0 then
-                        iHealthPercentage = iHealthPercentage * ((oUnit:GetMaxHealth() + iMaxShield) / (oBP.Defense.MaxHealth + iMaxShield) + oUnit.Sync.VeteranLevel * 0.04)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' veterancy level='..oUnit.Sync.VeteranLevel..'; max health='..iMaxHealth..'; BP max health='..oBP.Defense.MaxHealth..'; Unit max health='..oUnit:GetMaxHealth()..'; iMaxShield='..iMaxShield..'; iHealthPercentage='..iHealthPercentage) end
-                    end
-                    if EntityCategoryContains(M27UnitInfo.refCategoryLandCombat - categories.COMMAND - categories.SUBCOMMANDER, oUnit.UnitId) and iMaxHealth > aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] then aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] = iMaxHealth end
-                    --[[iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
-                    if iMaxShield > 0 and iHealthPercentage > 0 then
-                        iHealthPercentage = (oUnit:GetHealth() + iCurShield) / (oUnit:GetHealth() / M27UnitInfo.GetUnitHealthPercent(oUnit) + iMaxShield)
-                    end--]]
-                    --Reduce threat by health, with the amount depending on if its an ACU and if its an enemy
-                    if iMassMod > 0 then
+                        iOtherAdjustFactor = 1
+
+
+
+                        iHealthPercentage = (oUnit:GetHealth() + iCurShield) / iMaxHealth
+
+                        if oUnit.Sync.VeteranLevel > 0 then
+                            iHealthPercentage = iHealthPercentage * ((iMaxHealth) / (oUnit[refiMaxHealth] + iMaxShield) + oUnit.Sync.VeteranLevel * 0.04)
+                            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' veterancy level='..oUnit.Sync.VeteranLevel..'; max health='..iMaxHealth..'; BP max health='..oBP.Defense.MaxHealth..'; Unit max health='..oUnit:GetMaxHealth()..'; iMaxShield='..iMaxShield..'; iHealthPercentage='..iHealthPercentage) end
+                        end
+
+                        --Calculate max unit health (used elsewhere in code e.g. to calculate energy storage wanted for overcharge)
+                        if iMaxHealth > aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] and EntityCategoryContains(M27UnitInfo.refCategoryLandCombat - categories.COMMAND - categories.SUBCOMMANDER, oUnit.UnitId) then aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] = iMaxHealth end
+
+                        --Reduce threat by health, with the amount depending on if its an ACU and if its an enemy
                         if M27Utilities.IsACU(oUnit) == true then
-
                             iHealthFactor = iHealthPercentage --threat will be mass * iHealthFactor
-                            iMassCost = GetACUCombatMassRating(oUnit)
+                            --iMassCost = GetACUCombatMassRating(oUnit) --have already calculated this earlier
                             if bOurUnits == true then
-                                if aiBrain:GetEconomyStored('ENERGY') >= 6000 then iMassMod = iMassMod * 1.1 end --If we can overcharge then we can take on a greater threat
+                                if aiBrain:GetEconomyStored('ENERGY') >= 6000 then iOtherAdjustFactor = 1.1 end --If we can overcharge then we can take on a greater threat
                                 if iHealthPercentage < 0.5 then iHealthFactor = iHealthPercentage * iHealthPercentage
                                 elseif iHealthPercentage < 0.9 then iHealthFactor = iHealthPercentage * (iHealthPercentage + 0.1) end
 
 
-                            else iMassMod = iMassMod * 1.15 --Want to send 15% more than what expect to need against enemy ACU given it can gain veterancy
+                            else iOtherAdjustFactor = 1.15 --Want to send 15% more than what expect to need against enemy ACU given it can gain veterancy
                             end
                         else
                             if bOurUnits == true then iHealthFactor = iHealthPercentage
@@ -1877,22 +1885,75 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                 else iHealthFactor = 0.25 end
                             end
                         end
-                        iCurThreat = iMassCost * iMassMod * iHealthFactor
+                        if oUnit:GetFractionComplete() <= 0.75 then iOtherAdjustFactor = iOtherAdjustFactor * 0.1 end
                     end
-                    if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'; iHealthPercentage='..iHealthPercentage..'; UnitHealth='..oUnit:GetHealth()..'; UnitMaxHealth='..oBP.Defense.MaxHealth..'; UnitHealth='..oBP.Defense.Health) end
+                    iCurThreat = iBaseThreat * iOtherAdjustFactor * iHealthFactor
+
                 end
-                --Reduce threat if its under construction
-                if oUnit:GetFractionComplete() <= 0.75 then iCurThreat = iCurThreat * 0.1 end
+            else
+
+
+                --Are we calculating blueprint threat (per code at start of game)?
+                if bBlueprintThreat then
+                    oBP = __blueprints[oUnit.UnitId]
+
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering unit with ID='..(oUnit.UnitId or 'nil')) end
+
+                    if bJustGetMassValue == true then iBaseThreat = (oBP.Economy.BuildCostMass or 0)
+                    else
+                        iMassMod = 0
+                        if not(bIndirectFireThreatOnly) then
+                            if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then
+                                if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit.UnitId) then
+                                    iMassMod = 0.55 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
+                                elseif EntityCategoryContains(M27UnitInfo.refCategoryCruiserCarrier, oUnit.UnitId) then
+                                    if EntityCategoryContains(categories.CYBRAN * categories.TECH2, oUnit.UnitId) then iMassMod = 0.45
+                                    else
+                                        iMassMod = 0.2
+                                    end
+                                elseif EntityCategoryContains(M27UnitInfo.refCategoryAttackBot * categories.TECH1, oUnit.UnitId) then
+                                    iMassMod = 0.85
+                                else iMassMod = 1
+                                end
+                            elseif EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) then
+                                iMassMod = 0.55
+                            elseif EntityCategoryContains(categories.SUBCOMMANDER, oUnit.UnitId) then iMassMod = 1 --SACUs dont have directfire category for some reason (they have subcommander and overlaydirectfire)
+                            elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.STRUCTURE * categories.TECH2, oUnit.UnitId) then iMassMod = 0.1 --Gets doubled as its a structure
+                            elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH1, oUnit.UnitId) then iMassMod = 0.9
+                            elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH3, oUnit.UnitId) then iMassMod = 0.5
+                            elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 0.75 --will be doubled for structures
+                            elseif EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then iMassMod = 1 --Put in just in case - code was working before this, but dont want it to be affected yb more recenlty added engineer category
+                            elseif EntityCategoryContains(categories.ENGINEER,oUnit.UnitId) then iMassMod = 0.1 --Engis can reclaim and capture so can't just e.g. beat with a scout
+                            end
+                        else
+                            if EntityCategoryContains(categories.INDIRECTFIRE, oUnit.UnitId) then
+                                iMassMod = 1
+                                if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then iMassMod = 0.5 end
+                            elseif EntityCategoryContains(categories.ANTIMISSILE, oUnit.UnitId) then iMassMod = 2 --Doubled for structures ontop of this, i.e. want 4xmass of TMD in indirect fire so can overwhelm it
+                            elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 1
+                            elseif EntityCategoryContains(M27UnitInfo.refCategoryLongRangeDFLand, oUnit.UnitId) then iMassMod = 0.5
+                            end
+                        end
+                        if EntityCategoryContains(M27UnitInfo.refCategoryStructure, oUnit.UnitId) then iMassMod = iMassMod * 2 end
+                        iMassCost = (oBP.Economy.BuildCostMass or 0)
+                        if bDebugMessages == true then LOG(sFunctionRef..': iMassCost='..(iMassCost or 'nil')..'; iMassMod='..(iMassMod or 'nil')) end
+                        iBaseThreat = iMassCost * iMassMod
+                    end
+                end
+
+                iCurThreat = iBaseThreat
             end
+
             iTotalThreat = iTotalThreat + iCurThreat
         end
         if bDebugMessages == true then LOG(sFunctionRef..': iTotalThreat='..iTotalThreat) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iTotalThreat
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo)
+function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
     --Threat value depends on inputs:
     --bIncludeAntiAir - will include anti-air on ground units
     --bIncludeNonCombatAir - adds threat value for transports and scouts
@@ -1907,44 +1968,53 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     --Decide blip threat values:
 
     --blip values are lower than actual for tech level since unlikely 100% of blips will be the highest tech level unit of that type (and may be a different type altogether)
-    local tiAirAABlipThreats = {50, 100, 300, 300}
-    local tiAirToGroundBlip = {90, 150, 350, 350}
-    local tiMobileGroundAABlip = {28, 75, 200, 200}
-    local tiNavyBlipAABlip = {28, 200, 1000, 1000}
-    if iAirBlipThreatOverride == nil then
-        if bIncludeAirToGround == true then
-            iAirBlipThreatOverride = tiAirToGroundBlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
-        elseif bIncludeAirToAir == true then
+    local tiAirAABlipThreats
+    local tiAirToGroundBlip
+    local tiMobileGroundAABlip
+    local tiNavyBlipAABlip
+    local tBlipThreatByPathingType
 
-            if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 then iAirBlipThreatOverride = tiAirAABlipThreats[3]
-            elseif aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] > 0 then iAirBlipThreatOverride = tiAirAABlipThreats[2]
-            else iAirBlipThreatOverride = tiAirAABlipThreats[1]
+    function UpdateBlipThreatToUse()
+        --No point doing this calculation unless actually have blips that need their threat calculating
+        tiAirAABlipThreats = {50, 100, 300, 300}
+        tiAirToGroundBlip = {90, 150, 350, 350}
+        tiMobileGroundAABlip = {28, 75, 200, 200}
+        tiNavyBlipAABlip = {28, 200, 1000, 1000}
+        if iAirBlipThreatOverride == nil then
+            if bIncludeAirToGround == true then
+                iAirBlipThreatOverride = tiAirToGroundBlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
+            elseif bIncludeAirToAir == true then
+
+                if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 then iAirBlipThreatOverride = tiAirAABlipThreats[3]
+                elseif aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] > 0 then iAirBlipThreatOverride = tiAirAABlipThreats[2]
+                else iAirBlipThreatOverride = tiAirAABlipThreats[1]
+                end
+            elseif bIncludeNonCombatAir == true then
+                iAirBlipThreatOverride = 40 * aiBrain[M27Overseer.refiEnemyHighestTechLevel]
+            else iAirBlipThreatOverride = 0
             end
-        elseif bIncludeNonCombatAir == true then
-            iAirBlipThreatOverride = 40 * aiBrain[M27Overseer.refiEnemyHighestTechLevel]
-        else iAirBlipThreatOverride = 0
         end
-    end
-    if iMobileLandBlipThreatOverride == nil then
-        if bIncludeGroundToAir == true then
-            iMobileLandBlipThreatOverride = tiMobileGroundAABlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
-        else iMobileLandBlipThreatOverride = 0
+        if iMobileLandBlipThreatOverride == nil then
+            if bIncludeGroundToAir == true then
+                iMobileLandBlipThreatOverride = tiMobileGroundAABlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
+            else iMobileLandBlipThreatOverride = 0
+            end
         end
-    end
-    if iNavyBlipThreatOverride == nil then
-        if bIncludeGroundToAir == true then
-            iNavyBlipThreatOverride = tiNavyBlipAABlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
-        else iNavyBlipThreatOverride = 0
+        if iNavyBlipThreatOverride == nil then
+            if bIncludeGroundToAir == true then
+                iNavyBlipThreatOverride = tiNavyBlipAABlip[aiBrain[M27Overseer.refiEnemyHighestTechLevel]]
+            else iNavyBlipThreatOverride = 0
+            end
         end
-    end
-    if iStructureBlipThreatOverride == nil then iStructureBlipThreatOverride = 0 end
+        if iStructureBlipThreatOverride == nil then iStructureBlipThreatOverride = 0 end
 
-    local tBlipThreatByPathingType = {}
-    tBlipThreatByPathingType[M27UnitInfo.refPathingTypeAir] = iAirBlipThreatOverride
-    tBlipThreatByPathingType[M27UnitInfo.refPathingTypeNavy] = iNavyBlipThreatOverride
-    tBlipThreatByPathingType[M27UnitInfo.refPathingTypeLand] = iMobileLandBlipThreatOverride
-    tBlipThreatByPathingType[M27UnitInfo.refPathingTypeAmphibious] = iMobileLandBlipThreatOverride
-    tBlipThreatByPathingType[M27UnitInfo.refPathingTypeNone] = iStructureBlipThreat
+        tBlipThreatByPathingType = {}
+        tBlipThreatByPathingType[M27UnitInfo.refPathingTypeAir] = iAirBlipThreatOverride
+        tBlipThreatByPathingType[M27UnitInfo.refPathingTypeNavy] = iNavyBlipThreatOverride
+        tBlipThreatByPathingType[M27UnitInfo.refPathingTypeLand] = iMobileLandBlipThreatOverride
+        tBlipThreatByPathingType[M27UnitInfo.refPathingTypeAmphibious] = iMobileLandBlipThreatOverride
+        tBlipThreatByPathingType[M27UnitInfo.refPathingTypeNone] = iStructureBlipThreat
+    end
 
     if bDebugMessages == true then LOG(sFunctionRef..': tBlipThreatByPathingType='..repru(tBlipThreatByPathingType)) end
 
@@ -1968,65 +2038,138 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
             tUnits = {tUnits}
             if bDebugMessages == true then LOG(sFunctionRef..': tUnits is a table size 0, so moving it into a table incase its a single unit reference') end
         end
-        local iArmyIndex = aiBrain:GetArmyIndex()
-        if bDebugMessages == true then LOG(sFunctionRef..': tUnits has units in it='..table.getn(tUnits)) end
+        local iArmyIndex
+        if not(bBlueprintThreat) then
+            iArmyIndex = aiBrain:GetArmyIndex()
+            if bDebugMessages == true then LOG(sFunctionRef..': tUnits has units in it='..table.getn(tUnits)) end
+        end
         local oBlip
         local iCurThreat = 0
         local iMassCost = 0
         local iMassMod
         local iTotalThreat = 0
         local bCalcActualThreat = false
-        local iTotalUnits = table.getn(tUnits)
         local iHealthPercentage
+        local iHealthThreatFactor
         local bOurUnits = false
         local sCurUnitPathing
         local oBP
         local sCurUnitBP
         local iGhettoGunshipAdjust = 0
+
+
+
+        local iThreatRef = '2'
+        if bIncludeAirToAir then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef..'0' end
+        if bIncludeGroundToAir then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef..'0' end
+        if bIncludeAirToGround then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef..'0' end
+        if bIncludeNonCombatAir then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef..'0' end
+        if bIncludeAirTorpedo then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef..'0' end
+        if not(tiThreatRefsCalculated[iThreatRef]) then
+            M27Utilities.ErrorHandler('Dont have a thraat ref '..iThreatRef..' So threat calculation likely wrong')
+        end
+
+
+
+        local iBaseThreat = 0
+
         for iUnit, oUnit in tUnits do
             iCurThreat = 0
+            iBaseThreat = 0
             iGhettoGunshipAdjust = 0
             bCalcActualThreat = false
+            sCurUnitPathing = nil
             if bDebugMessages == true then LOG(sFunctionRef..': About to check if unit is dead') end
-            if not(oUnit.Dead) then
-                sCurUnitPathing = M27UnitInfo.GetUnitPathingType(oUnit)
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering threat calculation for oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
-                if oUnit:GetAIBrain() == aiBrain then
-                    bOurUnits = true
-                    if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and has same ai brain so will determine actual threat') end
+
+            if M27UnitInfo.IsUnitValid(oUnit) then
+                --Get the base threat for the unit
+                if oUnit[reftBaseThreat] and oUnit[reftBaseThreat][iThreatRef] then
+                    iBaseThreat = oUnit[reftBaseThreat][iThreatRef]
                     bCalcActualThreat = true
                 else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and owned by dif ai brain, seeing if we have a blip for it') end
-                    if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip then
-                        oBlip = oUnit:GetBlip(iArmyIndex)
-                        if oBlip then
-                            if not(oBlip:IsKnownFake(iArmyIndex)) then
-                                if oBlip:IsOnRadar(iArmyIndex) or oBlip:IsSeenEver(iArmyIndex) then
-                                    if oBlip:IsSeenEver(iArmyIndex) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is true, so calculating actual threat') end
-                                        bCalcActualThreat = true
-                                    else
-                                        iCurThreat = tBlipThreatByPathingType[sCurUnitPathing]
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Setting cur threat equal to blip threat; iCurThreat='..iCurThreat) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering threat calculation for oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                    if oUnit:GetAIBrain() == aiBrain then
+                        bOurUnits = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and has same ai brain so will determine actual threat') end
+                        bCalcActualThreat = true
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Unit is alive and owned by dif ai brain, seeing if we have a blip for it') end
+                        if bMustBeVisibleToIntelOrSight == true and oUnit.GetBlip then
+                            oBlip = oUnit:GetBlip(iArmyIndex)
+                            if oBlip then
+                                if not(oBlip:IsKnownFake(iArmyIndex)) then
+                                    if oBlip:IsOnRadar(iArmyIndex) or oBlip:IsSeenEver(iArmyIndex) then
+                                        if oBlip:IsSeenEver(iArmyIndex) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': iUnit='..iUnit..'; IsSeenEver is true, so calculating actual threat') end
+                                            bCalcActualThreat = true
+                                        else
+                                            sCurUnitPathing = M27UnitInfo.GetUnitPathingType(oUnit)
+                                            if not(tiAirAABlipThreats) then UpdateBlipThreatToUse() end
+                                            iBaseThreat = tBlipThreatByPathingType[sCurUnitPathing]
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Setting cur threat equal to blip threat; iCurThreat='..iCurThreat) end
+                                        end
                                     end
                                 end
+                            else
+                                if bDebugMessages == true then LOG(sFunctionRef..': oBlip isnt true; iUnit='..iUnit) end
                             end
                         else
-                            if bDebugMessages == true then LOG(sFunctionRef..': oBlip isnt true; iUnit='..iUnit) end
+                            --Not using blip so just get actual values (e.g. if want cheating AI or if running this on own units
+                            bCalcActualThreat = true
                         end
-                    else
-                        --Not using blip so just get actual values (e.g. if want cheating AI or if running this on own units
-                        bCalcActualThreat = true
                     end
+                    if bCalcActualThreat then
+                        iBaseThreat = tUnitThreatByIDAndType[oUnit.UnitId][iThreatRef]
+                        if not(oUnit[reftBaseThreat]) then oUnit[reftBaseThreat] = {} end
+                        oUnit[reftBaseThreat][iThreatRef] = iBaseThreat
+                    end
+
                 end
-                if bCalcActualThreat == true then
-                    oBP = oUnit:GetBlueprint()
+            end
+            if bCalcActualThreat == true then
+                --Adjust threat for health
+                if iBaseThreat > 0 then
+                    --Increase for cargo of transports
+                    if bIncludeAirToGround and EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
+                        --Include threat of cargo if cargo are LABs
+                        local tCargo = oUnit:GetCargo()
+                        --Filter to just LABs (note unfortunately it doesnt distinguish between mantis and LABs so matnis get treated as LABs to be prudent)
+                        if tCargo then
+                            tCargo = EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)
+                            if M27Utilities.IsTableEmpty(tCargo) == false then
+                                --Get mass value ignoring health:
+                                --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
+                                iGhettoGunshipAdjust = GetCombatThreatRating(aiBrain, tCargo, true, 35, 35, false, true)
+                                if bDebugMessages == true then LOG(sFunctionRef..': Contains LABs so will increase threat by '..iGhettoGunshipAdjust) end
+                            end
+                        end
+                    end
+
+
+                    --Adjust threat for health
+                    iHealthThreatFactor = 1
+                    if iHealthFactor > 0 then
+                        iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
+                        --Assume low health experimental is has more health than it does - e.g. might heal, or might be under construction
+                        if iHealthPercentage < 1 and EntityCategoryContains(categories.EXPERIMENTAL, oUnit) then iHealthPercentage = math.min(1, math.max(0.4, iHealthPercentage * 1.5)) end
+                        iHealthThreatFactor = (1 - (1-iHealthPercentage) * iHealthFactor) * iHealthThreatFactor
+                    end
+
+                    iCurThreat = iBaseThreat * iHealthThreatFactor + iGhettoGunshipAdjust
+                    if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iBaseThreat='..iBaseThreat..'; iMassMod='..iMassMod..'iCurThreat='..iCurThreat) end
+                end
+            else
+                --Calculate the base threat for hte blueprint (start of game)
+                if bBlueprintThreat then
+                    oBP = __blueprints[oUnit.UnitId]
                     if bDebugMessages == true then LOG(sFunctionRef..': About to calculate threat using actual unit data') end
                     --get actual threat calc
                     iMassMod = 0 --For non-offensive structures
                     --Does the unit contain any of the categories of interest?
                     bUnitFitsDesiredCategory = false
                     --Exclude based on pathing type initially before considering more precisely:
+                    sCurUnitPathing = M27UnitInfo.GetUnitPathingType(oUnit)
                     if sCurUnitPathing == M27UnitInfo.refPathingTypeAir then
                         if bIncludeAirToAir == true then bUnitFitsDesiredCategory = true
                         elseif bIncludeAirToGround == true then bUnitFitsDesiredCategory = true
@@ -2045,40 +2188,11 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                         if sCurUnitPathing == M27UnitInfo.refPathingTypeAir then
                             if bIncludeNonCombatAir == true then
                                 iMassMod = 1
-                                --Increase for cargo of transports
-                                if EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
-                                    --Include threat of cargo if cargo are LABs
-                                    local tCargo = oUnit:GetCargo()
-                                    --Filter to just LABs (note unfortunately it doesnt distinguish between mantis and LABs so matnis get treated as LABs to be prudent)
-                                    if tCargo then
-                                        tCargo = EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)
-                                        if M27Utilities.IsTableEmpty(tCargo) == false then
-                                            --Get mass value ignoring health:
-                                            --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
-                                            iGhettoGunshipAdjust = GetCombatThreatRating(aiBrain, tCargo, true, 35, 35, false, true)
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Contains LABs so will increase threat by '..iGhettoGunshipAdjust) end
-                                        end
-                                    end
-                                end
+
                             else
                                 if bIncludeAirToGround == true then
                                     if EntityCategoryContains(categories.BOMBER + categories.GROUNDATTACK + categories.OVERLAYDIRECTFIRE, sCurUnitBP) == true then iMassMod = 1
-                                    elseif EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) and oUnit.GetCargo then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Have an enemy transport, will get its cargo and see if it contains LABs') end
-                                        --Include threat of cargo if cargo are LABs
-                                        local tCargo = oUnit:GetCargo()
-                                        --Filter to just LABs (note unfortunately it doesnt distinguish between mantis and LABs so matnis get treated as LABs to be prudent)
-                                        if tCargo then
-                                            tCargo = EntityCategoryFilterDown(M27UnitInfo.refCategoryAttackBot, tCargo)
-                                            if M27Utilities.IsTableEmpty(tCargo) == false then
-                                                iMassMod = 1
-                                                --Get mass value ignoring health:
-                                                --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue)
-                                                iGhettoGunshipAdjust = GetCombatThreatRating(aiBrain, tCargo, true, 35, 35, false, true)
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Contains LABs so will increase threat by '..iGhettoGunshipAdjust) end
-                                            end
-                                        end
+                                    elseif EntityCategoryContains(categories.TRANSPORTATION, sCurUnitBP) then iMassMod = 1 --might be a ghetto
                                     end
                                 end
                                 if bIncludeAirTorpedo == true and EntityCategoryContains(categories.ANTINAVY, sCurUnitBP) == true then iMassMod = 1 end
@@ -2117,28 +2231,22 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                 end
                             end
                         end
-                    end
-                    if bDebugMessages == true then LOG(sFunctionRef..': iMassMod='..iMassMod) end
-                    if iMassMod > 0 then
-                        --Onlyantiair - use to weight results when calculating AA threat
-                        if iHealthFactor > 0 then
-                            iHealthPercentage = M27UnitInfo.GetUnitHealthPercent(oUnit)
-                            --Assume low health experimental is has more health than it does - e.g. might heal, or might be under construction
-                            if iHealthPercentage < 1 and EntityCategoryContains(categories.EXPERIMENTAL, oUnit) then iHealthPercentage = math.min(1, math.max(0.4, iHealthPercentage * 1.5)) end
-                            iMassMod = (1 - (1-iHealthPercentage) * iHealthFactor) * iMassMod
-                        end
-                        --Only GroundToAir: Increase structure value by 100%
+                        --Increase AA threat for structures
                         if bIncludeGroundToAir == true and sCurUnitPathing == M27UnitInfo.refPathingTypeNone then iMassMod = iMassMod * 2 end
-                        iMassCost = oUnit:GetBlueprint().Economy.BuildCostMass
-                        iCurThreat = iMassCost * iMassMod + iGhettoGunshipAdjust
-                        if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iMassCost='..iMassCost..'; iMassMod='..iMassMod..'iCurThreat='..iCurThreat) end
                     end
-                end
 
-                iTotalThreat = iTotalThreat + iCurThreat
-                if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurThreat='..iCurThreat..'; iTotalThreat='..iTotalThreat) end
+                    iMassCost = (oBP.Economy.BuildCostMass or 0)
+                    if bDebugMessages == true then LOG(sFunctionRef..': iMassCost='..(iMassCost or 'nil')..'; iMassMod='..(iMassMod or 'nil')) end
+                    iBaseThreat = iMassCost * iMassMod
+                end
+                iCurThreat = iBaseThreat
             end
+
+            iTotalThreat = iTotalThreat + iCurThreat
+            if bDebugMessages == true then LOG(sFunctionRef..': Unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurThreat='..iCurThreat..'; iTotalThreat='..iTotalThreat) end
         end
+
+
         if bDebugMessages == true then LOG(sFunctionRef..': End of code, iTotalThreat='..iTotalThreat) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iTotalThreat
@@ -5348,17 +5456,64 @@ function YthothaDeathBallSearchAndSlow(oOwnerBrain, tLikelyPosition)
 end
 
 function CalculateUnitThreatsByType()
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'CalculateUnitThreatsByType'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     if M27Utilities.IsTableEmpty(tUnitThreatByIDAndType) then
         local sUnitId
-        local tiThreatTypes = {}
+        local tiLandThreatTypes = {
+            ['100'] = { false, false }, --Normal land threat
+            ['101'] = { false, true }, --mass cost
+            ['110'] = { true, false }, --Indirect
+        }
+        local tiAirThreatTypes = {
+            ['200001'] = {false, false, false, false, true,}, --Torpedo bombers
+            ['200100'] = { false, false, true, false, false }, --Air to ground
+            ['200110'] = { false, false, true, true, false }, --Air to gorund and non-combat
+            ['200111'] = { false, false, true, true, true }, --Air to ground and non-combat; note: The code will set TorpBombers to equal the airtoground value if it's nil, hence use of code ending 111
+            ['201000'] = { false, true, false, false, false }, --Ground AA
+            ['210000'] = { true, false, false, false, false }, --Air AA
+            ['210110'] = { true, false, true, true, false }, --Air threat (general)
+            ['210111'] = { true, false, true, true, true }, --Air threat (general)
+        }
+
+        for iRef, tValue in tiLandThreatTypes do
+            tiThreatRefsCalculated[iRef] = true
+        end
+        for iRef, tValue in tiAirThreatTypes do
+            tiThreatRefsCalculated[iRef] = true
+        end
+
+
+
+        function RecordBlueprintThreatValues(oBP, sUnitId)
+
+            tUnitThreatByIDAndType[sUnitId] = {}
+            if bDebugMessages == true then LOG(sFunctionRef..': About to consider different land threat values for unit '..sUnitId..' Name='..(oBP.General.UnitName or 'nil')) end
+            for iRef, tConditions in tiLandThreatTypes do
+                tUnitThreatByIDAndType[sUnitId][iRef] = GetCombatThreatRating(nil, { {['UnitId']=sUnitId }}, nil, nil, nil, tConditions[1], tConditions[2], true)
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating land threat values for '..(oBP.General.UnitName or 'nil')..', result='..reprs(tUnitThreatByIDAndType[sUnitId])) end
+
+            for iRef, tConditions in tiAirThreatTypes do
+                tUnitThreatByIDAndType[sUnitId][iRef] = GetAirThreatLevel(nil, { {['UnitId']=sUnitId }}, nil, tConditions[1], tConditions[2], tConditions[3], tConditions[4], nil, nil, nil, nil, tConditions[5], true)
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating air threat values, result of land and air for '..oBP.General.UnitName..'='..reprs(tUnitThreatByIDAndType[sUnitId])) end
+        end
+
+        local iCount = 0
+
         for iBP, oBP in __blueprints do
             --Updates tUnitThreatByIDAndType
             sUnitId = oBP.BlueprintId
-            if not(tUnitThreatByIDAndType[sUnitId]) then
-                tUnitThreatByIDAndType[sUnitId] = {}
-
+            if not(tUnitThreatByIDAndType[sUnitId]) and oBP.Economy.BuildCostMass and oBP.General.UnitName then
+                --iCount = iCount + 1
+                --if iCount >= 10 then break end
+                ForkThread(RecordBlueprintThreatValues, oBP, sUnitId)
             end
         end
 
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

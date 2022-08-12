@@ -407,6 +407,10 @@ function OnUnitDeath(oUnit)
                             --aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryMex, sUnitBP) then
                             OnMexDeath(oUnit)
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryLandScout, sUnitBP) then
+                            aiBrain[M27Overseer.refbScoutBuiltOrDied] = true
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryMAA, sUnitBP) then
+                            aiBrain[M27Overseer.refbMAABuiltOrDied] = true
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryTMD, sUnitBP) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftTMLDefence]) == false then
                             local tUnitsWantingTMD = {}
                             for iWantingTMD, oWantingTMD in oUnit[M27UnitInfo.reftTMLDefence] do
@@ -442,24 +446,24 @@ function OnUnitDeath(oUnit)
 
                         --All non-mex/hydro - if have shield locations that cant build on, then check if this was near any of them
                         if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFailedShieldLocations]) == false and EntityCategoryContains(categories.STRUCTURE - M27UnitInfo.refCategoryMex - M27UnitInfo.refCategoryHydro, sUnitBP) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have failed shield locations so will check if any buildings need adjusting') end
-                            local iBuildingSize = math.max(1, math.ceil(oUnit:GetBlueprint().Physics.SkirtSizeX))
-                            local tLocation = oUnit:GetPosition()
-                            for iXAdj = -iBuildingSize, iBuildingSize, 1 do
-                                for iZAdj = -iBuildingSize, iBuildingSize, 1 do
-                                    aiBrain[M27EngineerOverseer.reftFailedShieldLocations][M27Utilities.ConvertLocationToReference({tLocation[1] + iXAdj, tLocation[2], tLocation[3] + iZAdj})] = nil
-                                end
-                            end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have failed shield locations so will check if any buildings need adjusting') end
+                        local iBuildingSize = math.max(1, math.ceil(oUnit:GetBlueprint().Physics.SkirtSizeX))
+                        local tLocation = oUnit:GetPosition()
+                        for iXAdj = -iBuildingSize, iBuildingSize, 1 do
+                        for iZAdj = -iBuildingSize, iBuildingSize, 1 do
+                        aiBrain[M27EngineerOverseer.reftFailedShieldLocations][M27Utilities.ConvertLocationToReference({tLocation[1] + iXAdj, tLocation[2], tLocation[3] + iZAdj})] = nil
+                        end
+                        end
                         end
 
                         --Shields - reset tracking of assisting engineers
                         if M27Utilities.IsTableEmpty(oUnit[M27EngineerOverseer.reftAssistingEngineers]) == false then
-                            for iEngi, oEngi in oUnit[M27EngineerOverseer.reftAssistingEngineers] do
-                                if M27UnitInfo.IsUnitValid(oEngi) then
-                                    IssueClearCommands({oEngi})
-                                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
-                                end
-                            end
+                        for iEngi, oEngi in oUnit[M27EngineerOverseer.reftAssistingEngineers] do
+                        if M27UnitInfo.IsUnitValid(oEngi) then
+                        IssueClearCommands({oEngi})
+                        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+                        end
+                        end
                         end
 
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -1072,14 +1076,14 @@ function OnConstructionStarted(oEngineer, oConstruction, sOrder)
     end
 end
 function OnConstructed(oEngineer, oJustBuilt)
-    --WARNING: This doesnt seem to trigger for the ACU
+    --WARNING: This doesnt seem to trigger for the ACU; it does trigger when untis are constructed by a factory
 
     --NOTE: This is called every time an engineer stops building a unit whose fractioncomplete is 100%, so can be called multiple times
     if M27Utilities.bM27AIInGame then
 
         if oJustBuilt:GetAIBrain().M27AI and not(oJustBuilt.M27OnConstructedCalled) then
             local sFunctionRef = 'OnConstructed'
-            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+            local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 
@@ -1165,6 +1169,13 @@ function OnConstructed(oEngineer, oJustBuilt)
             elseif EntityCategoryContains(M27UnitInfo.refCategoryHive, oJustBuilt.UnitId) then
                 ForkThread(M27EngineerOverseer.HiveManager, oJustBuilt)
 
+            --Mobile unit tracking:
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oJustBuilt.UnitId) then
+                aiBrain[M27Overseer.refbScoutBuiltOrDied] = true
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryMAA, oJustBuilt.UnitId) then
+                aiBrain[M27Overseer.refbMAABuiltOrDied] = true
+
+            --Other tracking
             else
                 --Have we just built an experimental unit? If so then tell our ACU to return to base as even if we havent scouted enemy threat they could have an experimental by now
                 if EntityCategoryContains(categories.EXPERIMENTAL, oJustBuilt.UnitId) then

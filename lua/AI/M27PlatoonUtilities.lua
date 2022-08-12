@@ -3253,7 +3253,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                     if M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), oNearbyArti:GetPosition()) < 50 then
                         bIgnoreArti = true
                         if bDebugMessages == true then LOG(sFunctionRef..': Are close to the T2 arti so will ignore it') end
-                    elseif oPlatoon[reftBuilders][1]:HasEnhancement('CloakingGenerator') and (M27UnitInfo.GetUnitHealthPercent(oPlatoon[reftBuilders][1]) >= 0.9 or oPlatoon[reftBuilders][1][M27Overseer.reftACURecentHealth][math.floor(GetGameTimeSeconds() - 1)] >= oPlatoon[reftBuilders][1][M27Overseer.reftACURecentHealth][math.floor(GetGameTimeSeconds() - 21)]) then
+                    elseif oPlatoon[reftBuilders][1]:HasEnhancement('CloakingGenerator') and (M27UnitInfo.GetUnitHealthPercent(oPlatoon[reftBuilders][1]) >= 0.9 or (oPlatoon[reftBuilders][1][M27Overseer.reftACURecentHealth][math.floor(GetGameTimeSeconds() - 1)] or oPlatoon[reftBuilders][1][M27Overseer.reftACURecentHealth][math.floor(GetGameTimeSeconds() - 2)] or oPlatoon[reftBuilders][1][M27Overseer.reftACURecentHealth][math.floor(GetGameTimeSeconds() - 3)]) >= oPlatoon[reftBuilders][1][M27Overseer.reftACURecentHealth][math.floor(GetGameTimeSeconds() - 21)]) then
                         bIgnoreArti = true
                         if bDebugMessages == true then LOG(sFunctionRef..': ACU is cloaked') end
                     else
@@ -3766,7 +3766,6 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                             end
                                             --If attack-moving and have a sniperbot then attackspecific target instead if enemies are in range
                                             if oPlatoon[refiCurrentAction] == refActionAttack and EntityCategoryContains(M27UnitInfo.refCategorySniperBot - categories.EXPERIMENTAL, oPlatoon[refoFrontUnit].UnitId) and not(oPlatoon[refoFrontUnit][M27UnitInfo.refbLastShotBlocked]) and iNearestEnemyDistance <= oPlatoon[refiPlatoonMaxRange] then
-                                                bDebugMessages = true
                                                 oPlatoon[refiCurrentAction] = refActionCoordinatedAttack
                                                 if bDebugMessages == true then LOG(sFunctionRef..': Will use a coordinated attack') end
                                             end
@@ -4259,7 +4258,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                         bRunFromSinglePD = true
                                                     elseif iACUHealthPercent <= 0.98 then
                                                         local iCurTime = math.floor(GetGameTimeSeconds())
-                                                        if oACU[M27Overseer.reftACURecentHealth][iCurTime-1] and oACU[M27Overseer.reftACURecentHealth][iCurTime-20] and oACU[M27Overseer.reftACURecentHealth][iCurTime-1] < oACU[M27Overseer.reftACURecentHealth][iCurTime-20] then
+                                                        if (oACU[M27Overseer.reftACURecentHealth][iCurTime-1] or oACU[M27Overseer.reftACURecentHealth][iCurTime-2] or oACU[M27Overseer.reftACURecentHealth][iCurTime-3]) and oACU[M27Overseer.reftACURecentHealth][iCurTime-20] and (oACU[M27Overseer.reftACURecentHealth][iCurTime-1] or oACU[M27Overseer.reftACURecentHealth][iCurTime-2] or oACU[M27Overseer.reftACURecentHealth][iCurTime-3]) < oACU[M27Overseer.reftACURecentHealth][iCurTime-20] then
                                                             bRunFromSinglePD = true
                                                         end
                                                     end
@@ -4880,8 +4879,12 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
         else
             bAbort = true
         end
-    else sPlatoonName = oPlatoon:GetPlan()
+    else
+        sPlatoonName = oPlatoon:GetPlan()
         aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
+        if oPlatoon[M27PlatoonTemplates.refbSingletonPlatoon] and oPlatoon[refiCurrentUnits] == 1 and oPlatoon[reftCurrentUnits][1].PlatoonHandle == oPlatoon and oPlatoon[refiPrevCurrentUnits] == 1 then
+            bAbort = true --no point refreshing data for ACU platoon or other singleton platoons when they will be the only unit in the platoon
+        end
     end
     if oPlatoon[refiPlatoonCount] == nil then
         if aiBrain[refiLifetimePlatoonCount][sPlatoonName] == nil then aiBrain[refiLifetimePlatoonCount][sPlatoonName] = 1
@@ -5007,10 +5010,13 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
 
                 --Get the front unit in the platoon
                 local oPrevFrontUnit = oPlatoon[refoFrontUnit]
-                oPlatoon[refoFrontUnit] = M27Logic.GetUnitNearestEnemy(aiBrain, oPlatoon[reftCurrentUnits])
-
-
-                oPlatoon[refoRearUnit] = M27Utilities.GetNearestUnit(oPlatoon[reftCurrentUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, false)
+                if oPlatoon[refiCurrentUnits] == 1 then
+                    oPlatoon[refoFrontUnit] = oPlatoon[reftCurrentUnits][1]
+                    oPlatoon[refoRearUnit] = oPlatoon[reftCurrentUnits][1]
+                else
+                    oPlatoon[refoFrontUnit] = M27Logic.GetUnitNearestEnemy(aiBrain, oPlatoon[reftCurrentUnits])
+                    oPlatoon[refoRearUnit] = M27Utilities.GetNearestUnit(oPlatoon[reftCurrentUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, false)
+                end
 
                 --Shield disruptor prioritisation
                 if oPlatoon[refiIndirectUnits] > 0 then
@@ -5179,7 +5185,11 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Refreshing front unit; refiCurrentUnits='..oPlatoon[refiCurrentUnits]) end
                     if oPlatoon[refiCurrentUnits] > 0 then
-                        oPlatoon[refoFrontUnit] = M27Logic.GetUnitNearestEnemy(aiBrain, oPlatoon[reftCurrentUnits])
+                        if oPlatoon[refiCurrentUnits] == 1 then
+                            oPlatoon[refoFrontUnit] = oPlatoon[reftCurrentUnits][1]
+                        else
+                            oPlatoon[refoFrontUnit] = M27Logic.GetUnitNearestEnemy(aiBrain, oPlatoon[reftCurrentUnits])
+                        end
                         oPlatoon[refiFrontUnitRefreshCount] = 0
                     end
                 end
@@ -5190,7 +5200,11 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                 else
                     if bDebugMessages == true then LOG(sFunctionRef..': Refreshing front unit; refiCurrentUnits='..oPlatoon[refiCurrentUnits]) end
                     if oPlatoon[refiCurrentUnits] > 0 then
-                        oPlatoon[refoRearUnit] = M27Utilities.GetNearestUnit(oPlatoon[reftCurrentUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, false)
+                        if oPlatoon[refiCurrentUnits] == 1 then
+                            oPlatoon[refoRearUnit] = oPlatoon[refoFrontUnit]
+                        else
+                            oPlatoon[refoRearUnit] = M27Utilities.GetNearestUnit(oPlatoon[reftCurrentUnits], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], aiBrain, false)
+                        end
                         oPlatoon[refiRearUnitRefreshCount] = 0
                     end
                 end
@@ -6938,8 +6952,8 @@ function DeterminePlatoonAction(oPlatoon)
     --if oPlatoon[refbOverseerAction] == true then bDebugMessages = true end
     if oPlatoon and oPlatoon.GetBrain then
         if bDebugMessages == true then LOG(sFunctionRef..': Start of code, checking if platoon still exists') end
-        local aiBrain = (oPlatoon[refoBrain] or oPlatoon[refoBrain])
-        if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then
+        local aiBrain = oPlatoon[refoBrain]
+        --if aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(oPlatoon) then --Removed this check as we do it already as part of the parent function
 
             local sPlatoonName = oPlatoon:GetPlan()
             --if sPlatoonName == 'M27Defender' and oPlatoon[refiPlatoonCount] == 7 and GetGameTimeSeconds() >= 570 then bDebugMessages = true end
@@ -6974,6 +6988,8 @@ function DeterminePlatoonAction(oPlatoon)
                 if sPlatoonName == 'M27IndirectDefender' then LOG(sFunctionRef..': Platoon name and count='..sPlatoonName..oPlatoon[refiPlatoonCount]..': refbShouldHaveEscort='..tostring(oPlatoon[refbShouldHaveEscort])) end
             end
 
+
+            --Update the record of previous platoon actions
             if not(oPlatoon[reftPrevAction][15]==nil) then table.remove(oPlatoon[reftPrevAction], 15) end
             if not(oPlatoon[refiCurrentAction] == nil) then
                 if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': '..sFunctionRef..': Current action isnt nil') end
@@ -7025,6 +7041,8 @@ function DeterminePlatoonAction(oPlatoon)
             end ]]--
             oPlatoon[refiCurrentAction] = nil
             oPlatoon[refiExtraAction] = nil
+
+
             --Setup:
             if bDebugMessages == true then LOG(sFunctionRef..sPlatoonName..oPlatoon[refiPlatoonCount]..': about to call RecordPlatoonUnitsByType') end
             RecordPlatoonUnitsByType(oPlatoon)
@@ -7781,7 +7799,7 @@ function DeterminePlatoonAction(oPlatoon)
                 end
                 LOG('refbHavePreviouslyRun=' .. tostring(oPlatoon[refbHavePreviouslyRun]))
             end
-        end
+        --end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -12098,7 +12116,6 @@ function ProcessPlatoonAction(oPlatoon)
                         end
                     end
                 elseif oPlatoon[refiCurrentAction] == refActionCoordinatedAttack then
-                    bDebugMessages = true
                     if bDebugMessages == true then LOG(sFunctionRef..': About to process coordinated attack for platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' with current units='..oPlatoon[refiCurrentUnits]) end
 
 

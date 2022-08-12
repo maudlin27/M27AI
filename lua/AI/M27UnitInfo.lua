@@ -308,8 +308,8 @@ end
 
 function GetUnitPathingType(oUnit)
     --Returns Land, Amphibious, Air or Water or None
-    if oUnit and not(oUnit.Dead) and oUnit.GetBlueprint then
-        local mType = oUnit:GetBlueprint().Physics.MotionType
+    --if oUnit and not(oUnit.Dead) and oUnit.GetBlueprint then
+        local mType = __blueprints[oUnit.UnitId].Physics.MotionType
         if (mType == 'RULEUMT_AmphibiousFloating' or mType == 'RULEUMT_Hover' or mType == 'RULEUMT_Amphibious') then
             return refPathingTypeAmphibious
         elseif (mType == 'RULEUMT_Water' or mType == 'RULEUMT_SurfacingSub') then
@@ -320,9 +320,9 @@ function GetUnitPathingType(oUnit)
             return refPathingTypeLand
         else return refPathingTypeNone
         end
-    else
-        M27Utilities.ErrorHandler('oUnit is nil or doesnt have a GetBlueprint function')
-    end
+    --else
+        --M27Utilities.ErrorHandler('oUnit is nil or doesnt have a GetBlueprint function')
+    --end
 end
 
 function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)

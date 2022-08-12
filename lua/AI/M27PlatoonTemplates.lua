@@ -24,6 +24,7 @@ refbWantsShieldEscort = 'M27PlatoonWantsShieldEscort' --true if should be consid
 refbWantsStealthEscort = 'M27PlatoonWantsStealthEscort' --true if should consider when assigning mobile stealth; will be nil (or false) otherwise
 refbSkirmisherRetreatLogic = 'M27PlatoonSkirmisherRetreatLogic' --true if will retreat when lacking intel coverage or if any enemy within firing range; will alos use this flag to decide whether to run from t2 arti
 refiAirAttackRange = 'M27PlatoonAirAttackRange' --If this is not nil, then will check if the platoon has any MAA in it, and if so will search for enemy air units within this value + the MAA range; if any are detected, the platoon will move towards these air units (assuming there aren't ground units nearby that they're running from)
+refbSingletonPlatoon = 'M27PlatoonSingleton' --True for platoons which will only have 1 unit (used to disable some of the refresh logic for performance reasons)
 
 --AI global idle platoon references (i.e. only have 1 of these per aibrain):
 refoIdleScouts = 'M27IdleScouts'
@@ -187,6 +188,7 @@ PlatoonTemplate = {
         [refbWantsStealthEscort] = true,
         [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27DefenderAI'] =
     {
@@ -418,6 +420,7 @@ PlatoonTemplate = {
         [refbWantsShieldEscort] = false,
         [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27LocationAssister'] = --used for scouts to stay near mexes
     {
@@ -454,6 +457,7 @@ PlatoonTemplate = {
         [refbWantsShieldEscort] = false,
         [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27ACUMain'] =
     {
@@ -476,6 +480,7 @@ PlatoonTemplate = {
         [refbWantsStealthEscort] = true,
         [refiMaxTicksBetweenCycleNoEnemies] = iVHighPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iVHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27AssistHydroEngi'] = --Dont think this is used any more
     {
@@ -495,6 +500,7 @@ PlatoonTemplate = {
         [refbWantsShieldEscort] = false,
         [refiMaxTicksBetweenCycleNoEnemies] = iVHighPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iVHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
 
     ['M27MobileShield'] =
@@ -538,6 +544,7 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = false,
         [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
         [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27RetreatingShieldUnits'] =
     {
