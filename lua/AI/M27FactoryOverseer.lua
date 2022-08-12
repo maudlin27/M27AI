@@ -2687,8 +2687,9 @@ function FactoryMainOverseerLoop(aiBrain, tAllFactories, iTicksWaited)
                                             if oFactory[refFactoryIdleCount] > 200 then
                                                 if bDebugMessages == true then
                                                     M27Utilities.DrawLocation(oFactory:GetPosition())
+                                                    LOG(sFunctionRef..': Factory position=' .. repru(oFactory:GetPosition()) .. '; iFactory=' .. iFactory..'; Factory='..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory))
                                                 end
-                                                M27Utilities.ErrorHandler('Factory has gone 200 cycles of being stuck - will reset count. Factory position=' .. repru(oFactory:GetPosition()) .. '; iFactory=' .. iFactory, true)
+                                                M27Utilities.ErrorHandler('Factory has gone 200 cycles of being stuck - will reset count', true)
                                                 oFactory[refFactoryIdleCount] = 1
                                             end
                                         end

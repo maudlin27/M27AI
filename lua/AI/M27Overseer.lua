@@ -5304,9 +5304,18 @@ function ACUManager(aiBrain)
                             oACU[reftACURecentUpgradeProgress] = {}
                         end
                         oACU[reftACURecentUpgradeProgress][iCurTime] = oACU:GetWorkProgress()
+                        if oACU[reftACURecentUpgradeProgress][iCurTime - 10] and not(oACU[reftACURecentUpgradeProgress][iCurTime - 1]) then
+                            for iTimeAdjust = -1, -9, -1 do
+                                if oACU[reftACURecentUpgradeProgress][iCurTime + iTimeAdjust] then
+                                    break
+                                else
+                                    oACU[reftACURecentUpgradeProgress][iCurTime + iTimeAdjust] = oACU[reftACURecentUpgradeProgress][iCurTime]
+                                end
+                            end
+                        end
 
                         --Did we start the upgrade <10s ago but have lost a significant amount of health?
-                        if oACU[reftACURecentUpgradeProgress][iCurTime - 10] == nil and oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime] > 1000 and oACU[reftACURecentUpgradeProgress][iCurTime] < 0.7 then
+                        if oACU[reftACURecentUpgradeProgress][iCurTime - 10] == nil and (oACU[reftACURecentHealth][iCurTime - 10] or oACU[reftACURecentHealth][iCurTime - 11]) - (oACU[reftACURecentHealth][iCurTime] or oACU[reftACURecentHealth][iCurTime-1] or oACU[reftACURecentHealth][iCurTime-2] or oACU[reftACURecentHealth][iCurTime-3]) > 1000 and oACU[reftACURecentUpgradeProgress][iCurTime] < 0.7 then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': ACU has lost a lot of health recently, oACU[reftACURecentHealth][iCurTime - 10]=' .. oACU[reftACURecentHealth][iCurTime - 10] .. '; oACU[reftACURecentHealth][iCurTime]=' .. oACU[reftACURecentHealth][iCurTime] .. '; oACU[reftACURecentUpgradeProgress][iCurTime]=' .. oACU[reftACURecentUpgradeProgress][iCurTime])
                             end
@@ -5322,7 +5331,7 @@ function ACUManager(aiBrain)
                         elseif oACU[reftACURecentUpgradeProgress][iCurTime] < 0.9 then
 
                             --Based on how our health has changed over the last 10s vs the upgrade progress, are we likely to die?
-                            local iHealthLossPerSec = (oACU[reftACURecentHealth][iCurTime - 10] - oACU[reftACURecentHealth][iCurTime]) / 10
+                            local iHealthLossPerSec = ((oACU[reftACURecentHealth][iCurTime - 10] or oACU[reftACURecentHealth][iCurTime - 11]) - (oACU[reftACURecentHealth][iCurTime] or oACU[reftACURecentHealth][iCurTime-1] or oACU[reftACURecentHealth][iCurTime-2])) / 10
                             if iHealthLossPerSec > 50 then
                                 --If changing these values, consider updating the SafeToGetACUUpgrade thresholds
                                 local iTimeToComplete = (1 - (oACU[reftACURecentUpgradeProgress][iCurTime] or 0.01)) / (math.max(((oACU[reftACURecentUpgradeProgress][iCurTime] or 0.01) - (oACU[reftACURecentUpgradeProgress][iCurTime - 10] or 0)), 0.01) / 10)

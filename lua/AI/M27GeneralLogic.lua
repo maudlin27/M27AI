@@ -5293,6 +5293,7 @@ function DetermineTMDWantedForTML(aiBrain, oTML, toOptionalUnitsToProtect)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineTMDWantedForTML'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if GetGameTimeSeconds() >= 1223 then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': oTML='..oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)) end
 
@@ -5391,6 +5392,7 @@ function DetermineTMDWantedForUnits(aiBrain, tUnits)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineTMDWantedForUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if GetGameTimeSeconds() >= 1223 then bDebugMessages = true end
 
     --First remove tUnits from the list of units wanting TMD (will re-add them per the below if we still want TMD)
     if bDebugMessages == true then
