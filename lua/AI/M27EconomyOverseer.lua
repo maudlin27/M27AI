@@ -54,6 +54,8 @@ refiLastEnergyStall = 'M27EconomyLastEnergyStall' --Game time in seconds of last
 reftPausedUnits = 'M27EconomyPausedUnits'
 iSpecialHQCategory = 'M27EconomyFactoryHQ' --Used as a way of choosing to pause HQ
 
+refiMexPointsNearBase = 'M27EconomyMexPointsNearBase'
+
 
 --Other variables:
 local refCategoryLandFactory = M27UnitInfo.refCategoryLandFactory
@@ -1812,7 +1814,8 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
     end
 
     local bHaveLotsOfFactories = false
-    local iMexCount = aiBrain:GetCurrentUnits(refCategoryMex)
+    local iT3MexCount = aiBrain:GetCurrentUnits(refCategoryMex * categories.TECH3)
+    local iT2MexCount = aiBrain:GetCurrentUnits(refCategoryMex * categories.TECH2)
     local iMexesOnOurSideOfMap = GetMexCountOnOurSideOfMap(aiBrain)
     local iLandFactoryCount = aiBrain:GetCurrentUnits(refCategoryLandFactory)
     local iAirFactoryCount = aiBrain:GetCurrentUnits(refCategoryAirFactory)
@@ -1899,15 +1902,33 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
 
         local bGetT2FactoryEvenWithLowMass = M27Conditions.DoWeWantPriorityT2LandFactoryHQ(aiBrain, iLandFactoryCount)
 
-
-
+        --Does enemy have T2/T3? If so then want to upgrade core mexes in land attack mode (will already be doing this if in eco or turtle mode)
+        local bNeedToUpgradeMexesByBase = false
+        if not(aiBrain[refiMexPointsNearBase]) then
+            aiBrain[refiMexPointsNearBase] = 0
+            for iMex, tMex in M27MapInfo.tResourceNearStart[aiBrain:GetArmyIndex()][1] do
+                aiBrain[refiMexPointsNearBase] = aiBrain[refiMexPointsNearBase] + 1
+            end
+        end
+        if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandMain and aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 2 then
+            if aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 3 then
+                if iT3MexCount < math.min(aiBrain[refiMexPointsNearBase], 3) then
+                    bNeedToUpgradeMexesByBase = true
+                end
+            elseif aiBrain[M27Overseer.refiEnemyHighestTechLevel] == 2 then
+                if iT3MexCount + iT2MexCount < math.min(aiBrain[refiMexPointsNearBase], 3) then
+                    bNeedToUpgradeMexesByBase = true
+                end
+            end
+        end
 
 
         --Ecoing strategy - want to have a mex ugprading at all times regardless of mass income if we have mexes available to upgrade and arent getting an HQ upgrade and have at least 6 T1 mexes
         --Meanwhile if in land attack and have lots of t1 tanks then even if mass stalling want to start getting t2 land HQ
-        if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and aiBrain[refiMassGrossBaseIncome] >= 1.4 and aiBrain[refiMexesUpgrading] - iPausedMexes <= 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) and (aiBrain[refiMexesAvailableForUpgrade] > 0 or iPausedMexes > 0) and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) then
+
+        if (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyEcoAndTech or aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle or bNeedToUpgradeMexesByBase) and aiBrain[refiMassGrossBaseIncome] >= 1.4 and aiBrain[refiMexesUpgrading] - iPausedMexes <= 0 and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildT3MexOverT2]) and (aiBrain[refiMexesAvailableForUpgrade] > 0 or iPausedMexes > 0) and M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) then
             tMassThresholds[1] = { 0, -10 }
-            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; aiBrain[refiMassGrossBaseIncome]='..aiBrain[refiMassGrossBaseIncome]..'; aiBrain[refiMexesUpgrading]='..aiBrain[refiMexesUpgrading]..'; iPausedMexes='..iPausedMexes..'; will get an upgrade even if are mass stalling') end
+            if bDebugMessages == true then LOG(sFunctionRef..': Want to have at least 1 unit/mex upgrading as a high priority even if mass stalling. aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; aiBrain[refiMassGrossBaseIncome]='..aiBrain[refiMassGrossBaseIncome]..'; aiBrain[refiMexesUpgrading]='..aiBrain[refiMexesUpgrading]..'; iPausedMexes='..iPausedMexes..'; will get an upgrade even if are mass stalling') end
         elseif bGetT2FactoryEvenWithLowMass or bWantHQEvenWithLowMass or (aiBrain[refiPausedUpgradeCount] >= 1 and table.getn(aiBrain[reftUpgrading]) <= 1) then
             --Want to resume unless we're energy stalling
             if bDebugMessages == true then

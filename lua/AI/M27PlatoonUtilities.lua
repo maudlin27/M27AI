@@ -1562,7 +1562,9 @@ function GetNearbyEnemyData(oPlatoon, iEnemySearchRadius, bPlatoonIsAUnit)
         if oPlatoon[refbACUInPlatoon] and oPlatoon[reftCurrentUnits][1][M27Overseer.refbInDangerOfBeingFlanked] and M27Utilities.IsTableEmpty(oPlatoon[reftCurrentUnits][1][M27Overseer.reftPotentialFlankingUnits]) == false then
             if not(tNearbyEnemies) then tNearbyEnemies = {} end
             for iUnit, oUnit in oPlatoon[reftCurrentUnits][1][M27Overseer.reftPotentialFlankingUnits] do
-                table.insert(tNearbyEnemies, oUnit)
+                if M27UnitInfo.IsUnitValid(oUnit) then
+                    table.insert(tNearbyEnemies, oUnit)
+                end
             end
         end
         local sPathing = M27UnitInfo.GetUnitPathingType(oPlatoon[refoPathingUnit])
