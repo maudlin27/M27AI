@@ -3341,7 +3341,7 @@ function ThreatAssessAndRespond(aiBrain)
             local iACUModDistFromBase = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oACU:GetPosition())
             local iACUActualDistFromBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
             local iDistFromThreatGroupToACU
-            if not(aiBrain[refiDefaultStrategy] == refStrategyTurtle) and iACUModDistFromBase > 100 and iACUActualDistFromBase >= math.min(200, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) then
+            if not(aiBrain[refiDefaultStrategy] == refStrategyTurtle) and iACUModDistFromBase > 100 and oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemySearchRadius] <= 100 and iACUActualDistFromBase >= math.min(200, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) then
                 if not(M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                     bCheckForACUFlanking = true
                     if M27Conditions.DoesACUHaveGun(aiBrain, false, oACU) then
