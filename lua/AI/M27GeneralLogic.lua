@@ -4102,7 +4102,8 @@ function GetRandomPointInAreaThatCanPathTo(sPathing, iSegmentGroup, tMidpoint, i
             end
             if iLoopCount > iMaxLoop3 then
 
-                M27Utilities.ErrorHandler('Couldnt find random point in area after looking more than iMaxLoop3='..iMaxLoop3..' times, tMidpoint='..math.floor(tMidpoint[1])..'-'..math.floor(tMidpoint[2])..'-'..math.floor(tMidpoint[3])..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1])..';hopefully the code that called this should recheck pathing', true)
+                M27Utilities.ErrorHandler('Couldnt find random point in area after looking a few times', true)
+                if bDebugMessages == true then LOG(sFunctionRef..': iMaxLoop3='..iMaxLoop3..'; tMidpoint='..math.floor(tMidpoint[1])..'-'..math.floor(tMidpoint[2])..'-'..math.floor(tMidpoint[3])..'; iMaxDistance='..iMaxDistance..'; iMinDistance='..iMinDistance..'; sPathing='..sPathing..'; iSegmentGroup='..iSegmentGroup..'; Start position 1 grouping of this map='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[1])..';hopefully the code that called this should recheck pathing') end
                 if bDebugMessages == true then
                     --Draw midpoint in white, draw last place checked in gold
                     M27Utilities.DrawLocation(M27MapInfo.GetPositionFromPathingSegments(iRandX, iRandZ), nil, 4, 20)

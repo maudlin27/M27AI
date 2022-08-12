@@ -282,24 +282,42 @@ function LocalVariableImpact()
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+
+
 function LogGamePerformanceData()
     --Call via forkthread at start of game (duplicate of performance check condition to be extra sure we only run this when intended)
     if M27Config.M27RunGamePerformanceCheck and not(GamePerformanceTrackerIsActive) then
         GamePerformanceTrackerIsActive = true
-        local iTimeAtTickStart
+        local iTimeAtMainTickStart = 0
         local iIntervalInTicks = 100 --Every 10s
-        local iCurUnitCount
+        local iCurUnitCount = 0
+
+        local iCurTickCycle = iIntervalInTicks
+
+        local iFreeze1Count = 0
+        local iFreeze1Threshold = 0.1
+        local iTimeAtSingleTickStart = 0
+
 
 
         while ArmyBrains do
-            iTimeAtTickStart = GetSystemTimeSecondsOnlyForProfileUse()
-            WaitTicks(iIntervalInTicks)
-            iCurUnitCount = 0
-            for iBrain, oBrain in ArmyBrains do
-                iCurUnitCount = iCurUnitCount + oBrain:GetCurrentUnits(categories.ALLUNITS - categories.BENIGN)
+            iTimeAtSingleTickStart = GetSystemTimeSecondsOnlyForProfileUse()
+            WaitTicks(1)
+            iCurTickCycle = iCurTickCycle - 1
+            if GetSystemTimeSecondsOnlyForProfileUse() - iTimeAtSingleTickStart > iFreeze1Threshold then
+                iFreeze1Count = iFreeze1Count + 1
             end
-            LOG('LogGamePerformanceData: GameTime='..math.floor(GetGameTimeSeconds())..' Time taken='..GetSystemTimeSecondsOnlyForProfileUse() - iTimeAtTickStart..'; Unit Count='..iCurUnitCount)
-        end
 
+            if iCurTickCycle <= 0 then
+                iCurUnitCount = 0
+                for iBrain, oBrain in ArmyBrains do
+                    iCurUnitCount = iCurUnitCount + oBrain:GetCurrentUnits(categories.ALLUNITS - categories.BENIGN)
+                end
+                LOG('LogGamePerformanceData: GameTime='..math.floor(GetGameTimeSeconds())..' Time taken='..GetSystemTimeSecondsOnlyForProfileUse() - iTimeAtMainTickStart..'; Unit Count='..iCurUnitCount..'; iFreeze1Count='..iFreeze1Count)
+                iCurTickCycle = iIntervalInTicks
+                iTimeAtMainTickStart = GetSystemTimeSecondsOnlyForProfileUse()
+                iFreeze1Count = 0
+            end
+        end
     end
 end

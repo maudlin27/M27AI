@@ -1083,7 +1083,7 @@ function OnConstructed(oEngineer, oJustBuilt)
 
         if oJustBuilt:GetAIBrain().M27AI and not(oJustBuilt.M27OnConstructedCalled) then
             local sFunctionRef = 'OnConstructed'
-            local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+            local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
 

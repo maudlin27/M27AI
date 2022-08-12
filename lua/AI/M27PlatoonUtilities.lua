@@ -4888,7 +4888,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
     else
         sPlatoonName = oPlatoon:GetPlan()
         aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
-        if oPlatoon[M27PlatoonTemplates.refbSingletonPlatoon] and oPlatoon[refiCurrentUnits] == 1 and oPlatoon[reftCurrentUnits][1].PlatoonHandle == oPlatoon and oPlatoon[refiPrevCurrentUnits] == 1 then
+        if oPlatoon[M27PlatoonTemplates.refbSingletonPlatoon] and not(oPlatoon[refbUnitHasDiedRecently]) and oPlatoon[refiCurrentUnits] == 1 and oPlatoon[reftCurrentUnits][1].PlatoonHandle == oPlatoon and oPlatoon[refiPrevCurrentUnits] == 1 then
             bAbort = true --no point refreshing data for ACU platoon or other singleton platoons when they will be the only unit in the platoon
         end
     end
@@ -7972,7 +7972,8 @@ function GetPlateauMovementPath(oPlatoon, bDontClearActions)
         iPlateauGroup = oPlatoon[M27Transport.refiAssignedPlateau]
         if M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup]) or M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMidpoint]) or M27Utilities.IsTableEmpty(M27MapInfo.tAllPlateausWithMexes[iPlateauGroup][M27MapInfo.subrefPlateauMaxRadius]) then
             bAbort = true
-            M27Utilities.ErrorHandler('Platoon plateau '..(oPlatoon[M27Transport.refiAssignedPlateau] or 'nil')..' isnt recognised, will move platoon '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..' to a random point around current position')
+            M27Utilities.ErrorHandler('Platoon plateau isnt recognised, will move platoon to a random point around current position')
+            if bDebugMessages == true then LOG(sFunctionRef..': Platoon='..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]) end
             oPlatoon[reftMovementPath] = {}
             oPlatoon[refiCurrentPathTarget] = 1
             oPlatoon[reftMovementPath][1] = {GetPlatoonFrontPosition(oPlatoon)[1] + math.random(-5, 5), 0, GetPlatoonFrontPosition(oPlatoon)[3] + math.random(-5, 5)}

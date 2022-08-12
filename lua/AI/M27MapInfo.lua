@@ -5010,6 +5010,7 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
             if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
                 sPlatoonSubref = nil
                 if oPlatoon[M27PlatoonUtilities.refiCurrentUnits] > 0 then
+                    oFrontUnit = nil
                     if M27UnitInfo.IsUnitValid(oPlatoon[M27PlatoonUtilities.refoFrontUnit]) then
                         oFrontUnit = oPlatoon[M27PlatoonUtilities.refoFrontUnit]
                     else
@@ -5020,27 +5021,30 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
                             end
                         end
                     end
-                    iPlateauGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFrontUnit:GetPosition())
-                    oPlatoon[M27Transport.refiAssignedPlateau] = iPlateauGroup
-                    if not(iPlateauGroup == aiBrain[refiOurBasePlateauGroup]) then
-                        sPlan = oPlatoon:GetPlan()
-                        if sPlan == 'M27PlateauLandCombat' then
-                            sPlatoonSubref = subrefPlateauLandCombatPlatoons
-                        elseif sPlan == 'M27PlateauIndirect' then
-                            sPlatoonSubref = subrefPlateauIndirectPlatoons
-                        elseif sPlan == 'M27PlateauMAA' then
-                            sPlatoonSubref = subrefPlateauMAAPlatoons
-                        elseif sPlan == 'M27PlateauScout' then
-                            sPlatoonSubref = subrefPlateauScoutPlatoons
-                        else
-                            --Not sure want to add a pathing check due to the risk of an infinite loop/massive slowdown
-                            M27Utilities.ErrorHandler('Couldnt identify a plateau plan for oPlatoon with plan='..sPlan..' so will ignore from record of plateau units. aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup])
+                    if oFrontUnit then
+                        iPlateauGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFrontUnit:GetPosition())
+                        oPlatoon[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                        if not(iPlateauGroup == aiBrain[refiOurBasePlateauGroup]) then
+                            sPlan = oPlatoon:GetPlan()
+                            if sPlan == 'M27PlateauLandCombat' then
+                                sPlatoonSubref = subrefPlateauLandCombatPlatoons
+                            elseif sPlan == 'M27PlateauIndirect' then
+                                sPlatoonSubref = subrefPlateauIndirectPlatoons
+                            elseif sPlan == 'M27PlateauMAA' then
+                                sPlatoonSubref = subrefPlateauMAAPlatoons
+                            elseif sPlan == 'M27PlateauScout' then
+                                sPlatoonSubref = subrefPlateauScoutPlatoons
+                            else
+                                --Not sure want to add a pathing check due to the risk of an infinite loop/massive slowdown
+                                M27Utilities.ErrorHandler('Couldnt identify a plateau plan for the platoon, so will ignore from record of plateau units')
+                                if bDebugMessages == true then LOG(sFunctionRef..': Platoon ref='..sPlan..oPlatoon[refiPlatoonCount]..'; aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup]) end
+                            end
                         end
-                    end
-                    if sPlatoonSubref then
-                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
-                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref] = {} end
-                        aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref][sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]] = oPlatoon
+                        if sPlatoonSubref then
+                            if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
+                            if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref] = {} end
+                            aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref][sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]] = oPlatoon
+                        end
                     end
                 end
             end
