@@ -88,6 +88,9 @@ refiHighestMobileLandEnemyRange = 'M27overseerHighestMobileEnemyRange' --Against
 
 refbGroundCombatEnemyNearBuilding = 'M27OverseerGroundCombatNearMexCur' --against aibrain, true/false
 reftEnemyGroupsThreateningBuildings = 'M27OverseerGroundCombatLocations' --against aiBrain, [x] is count, returns location of threat group average position
+refbInDangerOfBeingFlanked = 'M27OverseerInDangerBeingFlanked' --Against ACU object, true or false
+reftPotentialFlankingUnits = 'M27OverseerFlankingUnits' --Against ACU object, table of units we think could flank ACU
+
 
 local iMaxACUEmergencyThreatRange = 150 --If ACU is more than this distance from our base then won't help even if an emergency threat
 
@@ -3330,6 +3333,34 @@ function ThreatAssessAndRespond(aiBrain)
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': tACUPos=' .. repru(tACUPos))
             end
+
+            local bCheckForACUFlanking = false
+            local iThreatThresholdHigh, iThreatThresholdLow
+            oACU[reftPotentialFlankingUnits] = {}
+            oACU[refbInDangerOfBeingFlanked] = false
+            local iACUModDistFromBase = GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oACU:GetPosition())
+            local iACUActualDistFromBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            local iDistFromThreatGroupToACU
+            if not(aiBrain[refiDefaultStrategy] == refStrategyTurtle) and iACUModDistFromBase > 100 and iACUActualDistFromBase >= math.min(200, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) then
+                if not(M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
+                    bCheckForACUFlanking = true
+                    if M27Conditions.DoesACUHaveGun(aiBrain, false, oACU) then
+                        if M27UnitInfo.GetNumberOfUpgradesObtained(oACU) >= 3 then
+                            iThreatThresholdHigh = 2400
+                            iThreatThresholdLow = 2000
+                        else
+                            iThreatThresholdHigh = 1000
+                            iThreatThresholdLow = 800
+                        end
+                    else
+                        iThreatThresholdHigh = 500
+                        iThreatThresholdLow = 400
+                    end
+                end
+
+                if bCheckForACUFlanking then
+                end
+            end
             --if bDebugMessages == true then LOG(sFunctionRef..': ACU ID='..oACU.UnitId) end
             for iCurGroup, tEnemyThreatGroup in aiBrain[reftEnemyThreatGroup] do
                 UpdatePreviousPlatoonThreatReferences(aiBrain, tEnemyThreatGroup)
@@ -3353,6 +3384,7 @@ function ThreatAssessAndRespond(aiBrain)
                     end
                 else
                     iCurThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemyThreatGroup[refoEnemyGroupUnits], true)
+
                     --Note: This gets adjusted further below
                 end
 
@@ -3465,6 +3497,31 @@ function ThreatAssessAndRespond(aiBrain)
 
                     --Land based threats: send platoons to deal with them
                     if bConsideringNavy == false then
+                        --ACU flanking check
+                        --Check for ACU flanking
+                        if bCheckForACUFlanking and not(bIndirectThreatOnly) and tEnemyThreatGroup[refiTotalThreat] > iThreatThresholdHigh then
+                            --How close is threat group to ACU?
+                            if tEnemyThreatGroup[refiModDistanceFromOurStart] < iACUActualDistFromBase and math.abs(tEnemyThreatGroup[refiDistanceFromOurBase] - iACUActualDistFromBase) < 110 then
+                                iDistFromThreatGroupToACU = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), tEnemyThreatGroup[reftFrontPosition])
+                                if iDistFromThreatGroupToACU >= 25 and iDistFromThreatGroupToACU <= 110 then
+                                    local iACUEnemySearchRange = oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemySearchRadius]
+                                    local tUnitsToAdd = {}
+                                    for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
+                                        iDistFromThreatGroupToACU = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oACU:GetPosition())
+                                        if iDistFromThreatGroupToACU <= 110 and iDistFromThreatGroupToACU > iACUEnemySearchRange then
+                                            table.insert(tUnitsToAdd, oUnit)
+                                        end
+                                    end
+                                    if M27Logic.GetCombatThreatRating(aiBrain, tUnitsToAdd) >= iThreatThresholdLow then
+                                        oACU[refbInDangerOfBeingFlanked] = true
+                                        for iUnit, oUnit in tUnitsToAdd do
+                                            table.insert(oACU[reftPotentialFlankingUnits], oUnit)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
                         --Check for friendly mexes that have enemies near them (so bombers can prioritise them)
                         if bDebugMessages == true then LOG(sFunctionRef..': Threat group mod dist from our start='..tEnemyThreatGroup[refiModDistanceFromOurStart]..'; bomber defence mod dist='..aiBrain[M27AirOverseer.refiBomberDefenceModDistance]..'; aiBrain[refiHighestMobileLandEnemyRange]='..aiBrain[refiHighestMobileLandEnemyRange]) end
                         if tEnemyThreatGroup[refiModDistanceFromOurStart] <= (aiBrain[M27AirOverseer.refiBomberDefenceModDistance] + aiBrain[refiHighestMobileLandEnemyRange]) then
@@ -7264,6 +7321,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 aiBrain[refiACUHealthToRunOn] = math.min(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn] + 2000)
             end
 
+            if oACU[refbInDangerOfBeingFlanked] then
+                aiBrain[refiACUHealthToRunOn] = math.max(oACU:GetMaxHealth() * 0.9, aiBrain[refiACUHealthToRunOn])
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU is in danger of being flanked. Size of flanking units table='..table.getn(oACU[reftPotentialFlankingUnits])) end
+            end
+
             --Also set health to run as a high value if we have high mass and energy income and enemy is at tech 3
             if aiBrain[refiEnemyHighestTechLevel] >= 3 and (aiBrain[refiHighestEnemyGroundUnitHealth] >= 5000 or aiBrain[refiTotalEnemyShortRangeThreat] >= 10000) and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50 then
                 if bDebugMessages == true then LOG(sFunctionRef..': Enemy has access to tech 3, and we have at least 100 mass per second income') end
@@ -7703,7 +7765,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
         if aiBrain.M27AI and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains]) then
             if GetGameTimeSeconds() <= 10 then
                 --REDUNDANCY (code in overseer initialisation triggers first)
-                M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI may not function as expected', 0, 10)
+                M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityWarning', 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI may not function as expected', 0, 10)
                 aiBrain[refbNoEnemies] = true
                 if bDebugMessages == true then LOG(sFunctionRef..': Rdundancy as no enemybrains, Setting no enemies to be true') end
             end
@@ -7964,7 +8026,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[toAllyBrains] = {}
     local iNearestEnemyIndex = M27Logic.GetNearestEnemyIndex(aiBrain, false)
     if (not(iNearestEnemyIndex) and M27Utilities.IsTableEmpty(aiBrain[toEnemyBrains])) or aiBrain[refbNoEnemies] then
-        M27Chat.SendGameCompatibilityWarning(aiBrain, 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI may not function as expected.', 0, 10)
+        M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityWarning', 'No enemies detected for '..(aiBrain.Nickname or '')..'; The AI may not function as expected.', 0, 10)
         aiBrain[refbNoEnemies] = true
         if bDebugMessages == true then LOG(sFunctionRef..': No enemies detected for the brain so sent compatibility message, Setting no enemies to be true') end
         local tEnemyBase = M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)
@@ -8049,7 +8111,7 @@ function SendWarningIfNoM27(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if not (M27Utilities.bM27AIInGame) then
-        M27Chat.SendGameCompatibilityWarning(aiBrain, 'No Active M27 AI detected, disable M27AI mod to make the game run faster', 0, 1)
+        M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityWarning', 'No Active M27 AI detected, disable M27AI mod to make the game run faster', 0, 1)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -8065,6 +8127,7 @@ function GameSettingWarningsAndChecks(aiBrain)
     end
     local sIncompatibleMessage = ''
     local bIncompatible = false
+    local bHaveOtherAIMod = false
     if not (ScenarioInfo.Options.Victory == "demoralization") then
         bIncompatible = true
         sIncompatibleMessage = sIncompatibleMessage .. ' Victory setting (non-assassination). '
@@ -8087,9 +8150,13 @@ function GameSettingWarningsAndChecks(aiBrain)
         'M27AI', 'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'SACUAI',
     }
     local tModIsOk = {}
+    local bHaveOtherAI = false
+    local sUnnecessaryAIMod
+    local iUnnecessaryAIModCount = 0
     for iAI, sAI in tAIModNameWhitelist do
         tModIsOk[sAI] = true
     end
+
     local iSimModCount = 0
     local bFlyingEngineers
     for iMod, tModData in tSimMods do
@@ -8112,8 +8179,29 @@ function GameSettingWarningsAndChecks(aiBrain)
                 bFlyingEngineers = true
                 if bDebugMessages == true then LOG(sFunctionRef..': Have flying engineers mod enabled so will adjust engineer categories') end
             end
+        elseif tModIsOk[tModData.name] and not(tModData.name == 'M27AI') then
+            if not(bHaveOtherAIMod) then
+                bHaveOtherAIMod = true
+                --Do we have non-M27 AI?
+                for iBrain, oBrain in ArmyBrains do
+                    if oBrain.BrainType == 'AI' and not(oBrain.M27AI) and not(M27Logic.IsCivilianBrain(oBrain)) then
+                        bHaveOtherAI = true
+                        if bDebugMessages == true then LOG('Have an AI for a brain') end
+                        break
+                    end
+                end
+            end
+            if not(bHaveOtherAI) then
+                iUnnecessaryAIModCount = iUnnecessaryAIModCount + 1
+                if iUnnecessaryAIModCount == 1 then
+                    sUnnecessaryAIMod = tModData.name
+                else
+                    sUnnecessaryAIMod = sUnnecessaryAIMod..', '..tModData.name
+                end
+            end
         end
     end
+
     if iSimModCount > 0 then
         sIncompatibleMessage = sIncompatibleMessage .. '. '
     end
@@ -8192,8 +8280,12 @@ function GameSettingWarningsAndChecks(aiBrain)
     end
 
     if bIncompatible then
-        M27Chat.SendGameCompatibilityWarning(aiBrain, "Less testing has been done with M27 on the following settings: " .. sIncompatibleMessage .. ' If issues are encountered, report them to maudlin27 via Discord or the M27 forum thread, and include the replay ID.', 0, 10)
+        M27Chat.SendMessage(aiBrain, 'SendGameCompatibilityWarning', 'Less testing has been done with M27 on the following settings: ' .. sIncompatibleMessage .. ' If issues are encountered, report them to maudlin27 via Discord or the M27 forum thread, and include the replay ID.', 0, 10)
     end
+    if bHaveOtherAIMod and not(bHaveOtherAI) and sUnnecessaryAIMod then
+        M27Chat.SendMessage(aiBrain, 'UnnecessaryMods', 'No other AI detected, These AI mods can be disabled: '..sUnnecessaryAIMod, 1, 10)
+    end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
