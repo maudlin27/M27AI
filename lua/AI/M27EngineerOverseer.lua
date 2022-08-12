@@ -3103,6 +3103,11 @@ function AdjustPDBuildLocation(aiBrain, tBasePosition, sUnitID)
         tBasePosition[2] = GetTerrainHeight(tBasePosition[1], tBasePosition[3])
     end
 
+    local bMoveAwayFromEnemyBaseInstead = false
+    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint]) == false and aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][math.floor(tBasePosition[1])] and aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][math.floor(tBasePosition[1])][math.floor(tBasePosition[3])] then
+        bMoveAwayFromEnemyBaseInstead = true
+    end
+
 
     if M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, tBasePosition) then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -3146,7 +3151,13 @@ function AdjustPDBuildLocation(aiBrain, tBasePosition, sUnitID)
         else
             iAbortDistance = iMaxRange * 5.8 --If going to cycle through lots of entries might as well get a better result
 
-            local iAngleToBase = M27Utilities.GetAngleFromAToB(tBasePosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            local iAngleToBase
+            if bMoveAwayFromEnemyBaseInstead then
+                iAngleToBase = M27Utilities.GetAngleFromAToB(tBasePosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) - 180
+                if iAngleToBase < 0 then iAngleToBase = iAngleToBase + 360 end
+            else
+                iAngleToBase = M27Utilities.GetAngleFromAToB(tBasePosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            end
             local tPotentialBuildLocation
             local tBestBuildLocation = {tBasePosition[1], tBasePosition[2], tBasePosition[3]}
             local iAngleFromBuildToEnemyBase
