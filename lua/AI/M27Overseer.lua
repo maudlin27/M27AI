@@ -234,6 +234,7 @@ refiIgnoreMexesUntilThisManyUnits = 'M27ThresholdToAttackMexes'
 bUnitNameUpdateActive = false --true if are cycling through every unit and updating the name
 refbCloseToUnitCap = 'M27OverseerCloseToUnitCap' --True if are about to hit unit cap
 refiTeamsWithSameAmphibiousPathingGroup = 'M27OverseerTeamsWithSameAmphibiousPathingGroup' --Against aiBrain, number of teams including our own one that have this amphibious pathing group
+iSystemTimeBeforeStartOverseerLoop = 0 --Set just before main overseer loop started
 
 
 
@@ -7102,10 +7103,10 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 tsGameState['01. aiBrain'] = 'Name=' .. aiBrain.Nickname .. '; Index=' .. aiBrain:GetArmyIndex() .. 'Start=' .. aiBrain.M27StartPositionNumber
 
                 --Time
-                tsGameState['02.CurTimeInSecondsRounded'] = iCurTime
+                tsGameState['02.GameTime'] = iCurTime
                 tsGameState['02.SystemTimeSinceLastLog'] = GetSystemTimeSecondsOnlyForProfileUse() - (aiBrain[M27Utilities.refiLastSystemTimeRecorded] or 0)
                 aiBrain[M27Utilities.refiLastSystemTimeRecorded] = GetSystemTimeSecondsOnlyForProfileUse()
-                tsGameState['02.SystemTimeTotal'] = aiBrain[M27Utilities.refiLastSystemTimeRecorded]
+                tsGameState['02.SystemTimeTotal'] = aiBrain[M27Utilities.refiLastSystemTimeRecorded] - iSystemTimeBeforeStartOverseerLoop
 
                 --Grand Strategy and enemy base
                 tsGameState['03.' .. refiAIBrainCurrentStrategy] = aiBrain[refiAIBrainCurrentStrategy]
@@ -8988,6 +8989,8 @@ function OverseerManager(aiBrain)
     local iTicksWaitedThisCycle = 0
     local iTicksToWait
     local iCost
+
+    iSystemTimeBeforeStartOverseerLoop = GetSystemTimeSecondsOnlyForProfileUse()
 
     while (not (aiBrain:IsDefeated())) do
         --M27IsDefeated check is below
