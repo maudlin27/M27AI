@@ -2871,8 +2871,12 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
                     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                     return FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToBuild, iSearchSizeMin, iSearchSizeMax, false, nil, true)
                 else
-                    if bDebugMessages == true then M27Utilities.DrawLocation(tStartPosition, nil, 1, 100, nil) end
-                    M27Utilities.ErrorHandler('Possible infinite loop or just bad terrain/lots of buildings already - unable to find anywhere to build despite iSearchSizeMax='..iSearchSizeMax..'; iGroupCycleCount='..iGroupCycleCount..'; iMaxCycles='..iMaxCycles..'; iCycleAbortCount='..iCycleAbortCount..'; tStartPosition='..math.floor(tStartPosition[1])..'-'..math.floor(tStartPosition[2])..'-'..math.floor(tStartPosition[3])..'; aiBrain index='..aiBrain:GetArmyIndex()..'; start number='..aiBrain.M27StartPositionNumber..'; sBlueprintToBuild='..(sBlueprintToBuild or 'nil')..'; Builder='..(oBuilder.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oBuilder) or 'nil')..'; will check pathing and rerun if pathing changes if not already checked, bAlreadyRecheckedPathing='..tostring(bAlreadyRecheckedPathing or false)..'; iFirstSearchSizeMax='..(iFirstSearchSizeMax or 'nil')..'; iFirstSearchSizeMin='..(iFirstSearchSizeMin or 'nil'), true)
+                    if bDebugMessages == true then
+                        M27Utilities.DrawLocation(tStartPosition, nil, 1, 100, nil)
+                        LOG(sFunctionRef..': Couldnt find despite iSearchSizeMax='..iSearchSizeMax..'; iGroupCycleCount='..iGroupCycleCount..'; iMaxCycles='..iMaxCycles..'; iCycleAbortCount='..iCycleAbortCount..'; tStartPosition='..math.floor(tStartPosition[1])..'-'..math.floor(tStartPosition[2])..'-'..math.floor(tStartPosition[3])..'; aiBrain index='..aiBrain:GetArmyIndex()..'; start number='..aiBrain.M27StartPositionNumber..'; sBlueprintToBuild='..(sBlueprintToBuild or 'nil')..'; Builder='..(oBuilder.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oBuilder) or 'nil')..'; will check pathing and rerun if pathing changes if not already checked, bAlreadyRecheckedPathing='..tostring(bAlreadyRecheckedPathing or false)..'; iFirstSearchSizeMax='..(iFirstSearchSizeMax or 'nil')..'; iFirstSearchSizeMin='..(iFirstSearchSizeMin or 'nil'))
+                    end
+                    M27Utilities.ErrorHandler('Possible infinite loop or just bad terrain/lots of buildings already - unable to find anywhere to build', true)
+
                     if oBuilder then
                         LOG('Pathing='..sPathing..'; Engineer pathing group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, oBuilder:GetPosition())..'; start position group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, tStartPosition)..'; our base group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]))
                     else LOG(sFunctionRef..': Dont have a builder so cant provide more info')
@@ -3099,6 +3103,11 @@ function AdjustPDBuildLocation(aiBrain, tBasePosition, sUnitID)
         tBasePosition[2] = GetTerrainHeight(tBasePosition[1], tBasePosition[3])
     end
 
+    local bMoveAwayFromEnemyBaseInstead = false
+    if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint]) == false and aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][math.floor(tBasePosition[1])] and aiBrain[M27MapInfo.tCliffsAroundBaseChokepoint][math.floor(tBasePosition[1])][math.floor(tBasePosition[3])] then
+        bMoveAwayFromEnemyBaseInstead = true
+    end
+
 
     if M27Logic.IsLocationUnderFriendlyFixedShield(aiBrain, tBasePosition) then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -3142,7 +3151,13 @@ function AdjustPDBuildLocation(aiBrain, tBasePosition, sUnitID)
         else
             iAbortDistance = iMaxRange * 5.8 --If going to cycle through lots of entries might as well get a better result
 
-            local iAngleToBase = M27Utilities.GetAngleFromAToB(tBasePosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            local iAngleToBase
+            if bMoveAwayFromEnemyBaseInstead then
+                iAngleToBase = M27Utilities.GetAngleFromAToB(tBasePosition, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) - 180
+                if iAngleToBase < 0 then iAngleToBase = iAngleToBase + 360 end
+            else
+                iAngleToBase = M27Utilities.GetAngleFromAToB(tBasePosition, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            end
             local tPotentialBuildLocation
             local tBestBuildLocation = {tBasePosition[1], tBasePosition[2], tBasePosition[3]}
             local iAngleFromBuildToEnemyBase
@@ -3203,7 +3218,7 @@ function GetBuildLocationUnderShieldNearestEnemy(oShield)
     local tTargetLocation
     local sBlueprintToBuild = 'xrb0204'
     if iShieldRange >= 4 then
-        for iDistanceAdjust = math.floor(iShieldRange - 0.25), 2, -1 do
+        for iDistanceAdjust = math.floor(iShieldRange - 0.5), 2, -1 do
             for iAngleAdjust = 0, 30, 10 do
                 for iAngleFactor = -1, 1, 2 do
                     tTargetLocation = M27Utilities.MoveInDirection(oShield:GetPosition(), iAngleToEnemy + iAngleAdjust * iAngleFactor, iDistanceAdjust, true)
@@ -6182,7 +6197,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                 local tLocationToMoveTowards
                                 local bMoveTowardsTarget = true
                                 if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionToAssign]) then
-                                    local tAssumedUnitWantingProtection = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryProtectFromTML, tTargetLocation, 1, 'Ally')
+                                    local tAssumedUnitWantingProtection = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryProtectFromTML + M27UnitInfo.refCategoryT1Mex, tTargetLocation, 1, 'Ally')
                                     if bDebugMessages == true then
                                         LOG(sFunctionRef .. ': Trying to build TMD, iMaxAreaToSearch=' .. iMaxAreaToSearch .. '; Is tAssumedUnitWantingProtection empty=' .. tostring(M27Utilities.IsTableEmpty(tAssumedUnitWantingProtection)))
                                     end
@@ -8659,6 +8674,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         local sEngineerID
 
         if M27Utilities.IsTableEmpty(tEngineers) == false then
+            local iHighestTechLevel = aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]
             for iEngineer, oEngineer in tEngineers do
                 --if GetEngineerUniqueCount(oEngineer) == 169 and GetGameTimeSeconds() >= 2300 then bDebugMessages = true end
                 --if oEngineer.UnitId == 'xsl0105' and M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 4 and aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 1326 and GetGameTimeSeconds() <= 1327 then bDebugMessages = true else bDebugMessages = false end
@@ -8781,6 +8797,11 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                 elseif oEngineer.Dead then
                     if bDebugMessages == true then LOG(sFunctionRef..': Engineer is dead so clearing its actions') end
                     ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+                end
+
+                if iEngineersToConsider >= 20 and (tiAvailableEngineersByTech[iHighestTechLevel] >= 5 or iEngineersToConsider >= 30) then
+                    --Cap on how many engineers to consider at once
+                    break
                 end
             end
         end
@@ -9098,6 +9119,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Dont have any existing actions to build TMD so will just record locations of all units wanting TMD and then consider later which of these is closest to the nearest idle engineer') end
                                 for iUnit, oUnit in aiBrain[reftUnitsWantingTMD] do
                                     if M27UnitInfo.IsUnitValid(oUnit) then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': About to add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' as one of the locations to get TMD protection') end
                                         table.insert(tExistingLocationsToPickFrom, oUnit:GetPosition())
                                     end
                                 end
@@ -9142,7 +9164,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                         if M27UnitInfo.IsUnitValid(oUnit) then
                                             iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tPrimaryEngiLocation)
                                             if iCurDistance < (iClosestDistanceToEngi + 50) then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': Found a closer target to the primary engineer, target='..oUnit:GetPosition()..'; which is the postiion of unit wanting TMD '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Found a closer target to the primary engineer, target='..repru(oUnit:GetPosition())..'; which is the postiion of unit wanting TMD '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                                                 bHaveBetterAlternative = true
                                                 break
                                             end
@@ -9165,6 +9187,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                     tExistingLocationsToPickFrom = {}
                                     for iUnit, oUnit in aiBrain[reftUnitsWantingTMD] do
                                         if M27UnitInfo.IsUnitValid(oUnit) then
+                                            if bDebugMessages == true then LOG(sFunctionRef..': Will add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' as one of the locations to get TMD protection') end
                                             table.insert(tExistingLocationsToPickFrom, oUnit:GetPosition())
                                         end
                                     end
@@ -12200,6 +12223,7 @@ function EngineerManager(aiBrain)
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
+    local iTicksToWait
     while(not(aiBrain:IsDefeated()) and not(aiBrain.M27IsDefeated)) do
         if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
 
@@ -12226,7 +12250,7 @@ function EngineerManager(aiBrain)
         --TEMPTEST(aiBrain, sFunctionRef..': Pre wait 10 ticks')
         --]]
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitTicks(10)
+        iTicksToWait = _G.MyM27Scheduler:WaitTicks(10, 15, 1.5)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
         if bDebugMessages == true then LOG(sFunctionRef..': End of cycle after waiting 10 ticks') end
         --TEMPTEST(aiBrain, sFunctionRef..': Post wait 10 ticks')

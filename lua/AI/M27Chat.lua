@@ -73,7 +73,29 @@ function SendGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function SendGameCompatibilityWarning(aiBrain, sMessage, iOptionalDelay, iOptionalTimeBetweenTaunts)
+function SendMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType)
+    --If just sending a message rather than a taunt then can use this. sMessageType will be used to check if we have sent similar messages recently with the same sMessageType
+    local sFunctionRef = 'SendMessage'
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if iOptionalDelayBeforeSending then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        WaitSeconds(iOptionalDelayBeforeSending)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': iOptionalTimeBetweenTaunts='..(iOptionalTimeBetweenMessageType or 'nil')..'; tiM27VoiceTauntByType[sMessageType]='..(tiM27VoiceTauntByType[sMessageType] or 'nil')..'; Cur game time='..GetGameTimeSeconds()) end
+
+    if GetGameTimeSeconds() - (tiM27VoiceTauntByType[sMessageType] or -10000) > (iOptionalTimeBetweenMessageType or 60) then
+        LOG(sFunctionRef..': Sent chat message for sMessageType='..sMessageType..': sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
+        SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
+        tiM27VoiceTauntByType[sMessageType] = GetGameTimeSeconds()
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)) end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+--[[function SendGameCompatibilityWarning(aiBrain, sMessage, iOptionalDelay, iOptionalTimeBetweenTaunts)
     local sFunctionRef = 'SendGameCompatibilityWarning'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -92,4 +114,4 @@ function SendGameCompatibilityWarning(aiBrain, sMessage, iOptionalDelay, iOption
     end
     if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-end
+end--]]

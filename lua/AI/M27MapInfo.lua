@@ -23,7 +23,7 @@ PlayerStartPoints = {} -- Stores position values i.e. a table with 3 values, x, 
 reftPrimaryEnemyBaseLocation = 'M27MapPrimaryEnemyBase'
 reftMidpointToPrimaryEnemyBase = 'M27MapMidpointToPrimaryEnemyBase'
 refiLastTimeCheckedEnemyBaseLocation = 'M27LastTimeChecked'
-tResourceNearStart = {} --[iArmy][iResourceType (1=mex2=hydro)][iCount][tLocation] Stores location of mass extractors and hydrocarbons that are near to start locations; 1st value is the army number, 2nd value the resource type, 3rd the mex number, 4th value the position array (which itself is made up of 3 values)
+tResourceNearStart = {} --[Player start ponit/ARMY_x number (NOT ARMY INDEX)][iResourceType (1=mex2=hydro)][iCount][tLocation] Stores location of mass extractors and hydrocarbons that are near to start locations; 1st value is the army number, 2nd value the resource type, 3rd the mex number, 4th value the position array (which itself is made up of 3 values)
 MassCount = 0 -- used as a way of checking if have the core markers needed
 HydroCount = 0
 iHighestReclaimInASegment = 0 --WARNING - reference the higher of this and previoushighestreclaiminasegment, since this gets reset to 0 each time
@@ -184,10 +184,11 @@ function DetermineMaxTerrainHeightDif()
     ['Fields of Isis'] = 0.15, --minor for completeness - one of cliffs reclaim looks like its pathable but default settings show it as non-pathable
     ['Selkie Mirror'] = 0.15,
     ['Adaptive Point of Reason'] = 0.26,
+    ['Hyperion'] = 0.215, --0.213 results in apparant plateau with 2 mexes (that is actually pathable) being treated as a plateau incorrectly
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
-    if bDebugMessages == true then LOG(sFunctionRef..': sMapName='..sMapName..'; tMapHeightOverride='..(tMapHeightOverride[sMapName] or 'No override')) end
+    if bDebugMessages == true then LOG(sFunctionRef..': sMapName='..sMapName..'; tMapHeightOverride='..(tMapHeightOverride[sMapName] or 'No override')..'; iMaxHeightDif='..iMaxHeightDif) end
 end
 
 
@@ -5010,6 +5011,7 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
             if not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
                 sPlatoonSubref = nil
                 if oPlatoon[M27PlatoonUtilities.refiCurrentUnits] > 0 then
+                    oFrontUnit = nil
                     if M27UnitInfo.IsUnitValid(oPlatoon[M27PlatoonUtilities.refoFrontUnit]) then
                         oFrontUnit = oPlatoon[M27PlatoonUtilities.refoFrontUnit]
                     else
@@ -5020,27 +5022,30 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
                             end
                         end
                     end
-                    iPlateauGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFrontUnit:GetPosition())
-                    oPlatoon[M27Transport.refiAssignedPlateau] = iPlateauGroup
-                    if not(iPlateauGroup == aiBrain[refiOurBasePlateauGroup]) then
-                        sPlan = oPlatoon:GetPlan()
-                        if sPlan == 'M27PlateauLandCombat' then
-                            sPlatoonSubref = subrefPlateauLandCombatPlatoons
-                        elseif sPlan == 'M27PlateauIndirect' then
-                            sPlatoonSubref = subrefPlateauIndirectPlatoons
-                        elseif sPlan == 'M27PlateauMAA' then
-                            sPlatoonSubref = subrefPlateauMAAPlatoons
-                        elseif sPlan == 'M27PlateauScout' then
-                            sPlatoonSubref = subrefPlateauScoutPlatoons
-                        else
-                            --Not sure want to add a pathing check due to the risk of an infinite loop/massive slowdown
-                            M27Utilities.ErrorHandler('Couldnt identify a plateau plan for oPlatoon with plan='..sPlan..' so will ignore from record of plateau units. aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup])
+                    if oFrontUnit then
+                        iPlateauGroup = GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, oFrontUnit:GetPosition())
+                        oPlatoon[M27Transport.refiAssignedPlateau] = iPlateauGroup
+                        if not(iPlateauGroup == aiBrain[refiOurBasePlateauGroup]) then
+                            sPlan = oPlatoon:GetPlan()
+                            if sPlan == 'M27PlateauLandCombat' then
+                                sPlatoonSubref = subrefPlateauLandCombatPlatoons
+                            elseif sPlan == 'M27PlateauIndirect' then
+                                sPlatoonSubref = subrefPlateauIndirectPlatoons
+                            elseif sPlan == 'M27PlateauMAA' then
+                                sPlatoonSubref = subrefPlateauMAAPlatoons
+                            elseif sPlan == 'M27PlateauScout' then
+                                sPlatoonSubref = subrefPlateauScoutPlatoons
+                            else
+                                --Not sure want to add a pathing check due to the risk of an infinite loop/massive slowdown
+                                M27Utilities.ErrorHandler('Couldnt identify a plateau plan for the platoon, so will ignore from record of plateau units')
+                                if bDebugMessages == true then LOG(sFunctionRef..': Platoon ref='..sPlan..oPlatoon[refiPlatoonCount]..'; aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup]) end
+                            end
                         end
-                    end
-                    if sPlatoonSubref then
-                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
-                        if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref] = {} end
-                        aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref][sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]] = oPlatoon
+                        if sPlatoonSubref then
+                            if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup]) then aiBrain[reftOurPlateauInformation][iPlateauGroup] = {} end
+                            if M27Utilities.IsTableEmpty(aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref]) then aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref] = {} end
+                            aiBrain[reftOurPlateauInformation][iPlateauGroup][sPlatoonSubref][sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]] = oPlatoon
+                        end
                     end
                 end
             end
@@ -5123,6 +5128,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
 
     if bForceRefresh or GetGameTimeSeconds() - (aiBrain[refiLastPlateausUpdate] or -100) > 10 then
         if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains]) == false then
+            M27Utilities.FunctionProfiler(sFunctionRef..'Main loop', M27Utilities.refProfilerStart)
             aiBrain[refiLastPlateausUpdate] = GetGameTimeSeconds()
 
             --Cycle through each plateau and check if we already control it, and if not if it is safe
@@ -5305,6 +5311,7 @@ function UpdatePlateausToExpandTo(aiBrain, bForceRefresh, bPathingChange)
                     end
                 end
             end
+            M27Utilities.FunctionProfiler(sFunctionRef..'Main loop', M27Utilities.refProfilerEnd)
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

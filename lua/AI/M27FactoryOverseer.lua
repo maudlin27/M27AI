@@ -2582,15 +2582,15 @@ function KillIdleFactory(aiBrain, oFactory)
     aiBrain[refiTimeOfLastCtrlK] = GetGameTimeSeconds()
 end
 
-function FactoryMainOverseerLoop(aiBrain)
+function FactoryMainOverseerLoop(aiBrain, tAllFactories, iTicksWaited)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'FactoryMainOverseerLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    local iFactoryCategory = M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryQuantumGateway
+    --local iFactoryCategory = M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryQuantumGateway
     local sUnitToBuild, oCommandAction, tCommandQueue, bFactoryIsIdle
     local refbUpdatedFactoryUnitTracker = 'M27FactoryUnitTracker'
     local oTrackerLastUnit
-    local tAllFactories = aiBrain:GetListOfUnits(iFactoryCategory, true, true)
+    --local tAllFactories = aiBrain:GetListOfUnits(iFactoryCategory, true, true)
 
     if tAllFactories then
         for iFactory, oFactory in tAllFactories do
@@ -2633,7 +2633,7 @@ function FactoryMainOverseerLoop(aiBrain)
                                             if oFactory[refFactoryIdleCount] == nil then
                                                 oFactory[refFactoryIdleCount] = 0
                                             end
-                                            oFactory[refFactoryIdleCount] = oFactory[refFactoryIdleCount] + 1
+                                            oFactory[refFactoryIdleCount] = oFactory[refFactoryIdleCount] + iTicksWaited
                                             if oFactory[refFactoryIdleCount] > iMaxCyclesBeforeOverride then
                                                 if oLastUnit.GetPosition and oFactory.GetPosition then
                                                     if oLastUnit[M27PlatoonFormer.refbJustCleared] == false and not (oLastUnit[M27PlatoonFormer.refbJustBuilt] == true) then
@@ -2687,8 +2687,9 @@ function FactoryMainOverseerLoop(aiBrain)
                                             if oFactory[refFactoryIdleCount] > 200 then
                                                 if bDebugMessages == true then
                                                     M27Utilities.DrawLocation(oFactory:GetPosition())
+                                                    LOG(sFunctionRef..': Factory position=' .. repru(oFactory:GetPosition()) .. '; iFactory=' .. iFactory..'; Factory='..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory))
                                                 end
-                                                M27Utilities.ErrorHandler('Factory has gone 200 cycles of being stuck - will reset count. Factory position=' .. repru(oFactory:GetPosition()) .. '; iFactory=' .. iFactory, true)
+                                                M27Utilities.ErrorHandler('Factory has gone 200 cycles of being stuck - will reset count', true)
                                                 oFactory[refFactoryIdleCount] = 1
                                             end
                                         end
@@ -2830,18 +2831,29 @@ function FactoryOverseer(aiBrain)
     local sFunctionRef = 'FactoryOverseer'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    local iTicksBetweenCycle = 1
-    iMaxCyclesBeforeOverride = 28 / iTicksBetweenCycle --2.5s triggers often; 3s doesnt
+    local iTicksToWait  = 1
+    iMaxCyclesBeforeOverride = 28 / iTicksToWait --2.5s triggers often; 3s doesnt
+
+    local iCurCycleCount = 0
 
     aiBrain[refiFactoriesTemporarilyPaused] = 0
+    local tAllFactories = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryQuantumGateway, true, true)
+
     while aiBrain do
         if bDebugMessages == true then LOG(sFunctionRef..': Checking if any idle factories') end
-        ForkThread(FactoryMainOverseerLoop, aiBrain)
-      --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Pre wait tick')
+        ForkThread(FactoryMainOverseerLoop, aiBrain, tAllFactories, iTicksToWait)
+        --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Pre wait tick')
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitTicks(iTicksBetweenCycle)
+        iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 3, 0.1)
+        --WaitTicks(iTicksToWait )
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-      --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Post wait tick')
+        iCurCycleCount = iCurCycleCount + iTicksToWait
+        --Refresh list of factories every second
+        if iCurCycleCount >= 10 then
+            iCurCycleCount = 0
+            tAllFactories = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryQuantumGateway, true, true)
+        end
+        --M27EngineerOverseer.TEMPTEST(aiBrain, sFunctionRef..'Post wait tick')
         if aiBrain:IsDefeated() or aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

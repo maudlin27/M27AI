@@ -2211,6 +2211,8 @@ function PlatoonIdleUnitOverseer(aiBrain)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleAir)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleOther)
 
+    local iTicksToWait
+
     while(not(aiBrain:IsDefeated()) and not(aiBrain.M27IsDefeated)) do
         if aiBrain.M27IsDefeated or M27Logic.iTimeOfLastBrainAllDefeated > 10 then break end
         if bDebugMessages == true then LOG(sFunctionRef..': About to fork thread function to assign idle platoon units to platoons') end
@@ -2218,7 +2220,9 @@ function PlatoonIdleUnitOverseer(aiBrain)
         ForkThread(PlatoonMainIdleUnitLoop, aiBrain, iCycleCount)
         if iCycleCount == iIdleUnitSearchThreshold then iCycleCount = 0 end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitTicks(10)
+        iTicksToWait = _G.MyM27Scheduler:WaitTicks(10, 20, 0.01)
+
+        --WaitTicks(iTicksToWait)
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

@@ -24,6 +24,7 @@ refbWantsShieldEscort = 'M27PlatoonWantsShieldEscort' --true if should be consid
 refbWantsStealthEscort = 'M27PlatoonWantsStealthEscort' --true if should consider when assigning mobile stealth; will be nil (or false) otherwise
 refbSkirmisherRetreatLogic = 'M27PlatoonSkirmisherRetreatLogic' --true if will retreat when lacking intel coverage or if any enemy within firing range; will alos use this flag to decide whether to run from t2 arti
 refiAirAttackRange = 'M27PlatoonAirAttackRange' --If this is not nil, then will check if the platoon has any MAA in it, and if so will search for enemy air units within this value + the MAA range; if any are detected, the platoon will move towards these air units (assuming there aren't ground units nearby that they're running from)
+refbSingletonPlatoon = 'M27PlatoonSingleton' --True for platoons which will only have 1 unit (used to disable some of the refresh logic for performance reasons)
 
 --AI global idle platoon references (i.e. only have 1 of these per aibrain):
 refoIdleScouts = 'M27IdleScouts'
@@ -36,7 +37,19 @@ refoIdleIndirect = 'M27IdleIndirect'
 refoIdleAir = 'M27IdleAir'
 refoIdleOther = 'M27IdleOther'
 
+--Profiling:
+refiMaxTicksBetweenCycleNoEnemies = 'M27PlatoonTemplateMaxTicksNoEnemies'
+refiMaxTicksBetweenCycleEnemies  = 'M27PlatoonTemplateMaxTicksEnemies'
+
 --NOTE: If adding a platoon to platoon template, also need to add it to platoon.lua
+iLowPriorityNoEnemy = 60
+iLowPriorityEnemy = 40
+iMedPriorityNoEnemy = 40
+iMedPriorityEnemy = 20
+iHighPriorityNoEnemy = 20
+iHighPriorityEnemy = 15
+iVHighPriorityNoEnemy = 12
+iVHighPriorityEnemy = 11
 
 
 PlatoonTemplate = {
@@ -61,6 +74,8 @@ PlatoonTemplate = {
             [refbUsedByThreatDefender] = true,
             [refbWantsShieldEscort] = true,
             [refbWantsStealthEscort] = true,
+            [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
+            [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
         },
     ['M27MexRaiderAI'] =
     {
@@ -81,6 +96,8 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     ['M27MexLargerRaiderAI'] =
     {
@@ -101,6 +118,8 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     ['M27CombatPatrolAI'] =
     {
@@ -123,6 +142,8 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationMaxSize] = 20,
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     ['M27LargeAttackForce'] =
     {
@@ -144,6 +165,8 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationMaxSize] = 40,
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
     },
     ['M27GroundExperimental'] =
     {
@@ -163,6 +186,9 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = false,
         [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27DefenderAI'] =
     {
@@ -184,6 +210,8 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = true,
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
     },
     ['M27AmphibiousDefender'] =
     {
@@ -205,6 +233,8 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = false,
         [refbWantsStealthEscort] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
     },
     ['M27IndirectDefender'] =
     {
@@ -226,6 +256,8 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = true,
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     ['M27IndirectSpareAttacker'] =
     {
@@ -248,6 +280,8 @@ PlatoonTemplate = {
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
         [refbSkirmisherRetreatLogic] = true, --only need to specify if true (default is false)
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     ['M27Skirmisher'] =
     {
@@ -271,6 +305,8 @@ PlatoonTemplate = {
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
         [refbSkirmisherRetreatLogic] = true, --only need to specify if true (default is false)
+        [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
     },
     ['M27RAS'] =
     {
@@ -292,6 +328,8 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationMaxSize] = 6,
         [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
     },
     ['M27EscortAI'] =
     {
@@ -312,6 +350,8 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     ['M27MAAAssister'] =
     {
@@ -334,6 +374,8 @@ PlatoonTemplate = {
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
         [refiAirAttackRange] = 25,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     --MAAPatrol - different platoon to MAA assister as the overseer will treat units in MAApatrol as being available for assignment (i.e. its effectively an active 'idle' platoon)
     ['M27MAAPatrol'] =
@@ -357,6 +399,8 @@ PlatoonTemplate = {
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
         [refiAirAttackRange] = 40,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     ['M27ScoutAssister'] =
     {
@@ -374,6 +418,9 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27LocationAssister'] = --used for scouts to stay near mexes
     {
@@ -389,6 +436,8 @@ PlatoonTemplate = {
         [refbAlwaysAttack] = false,
         [refbAttackMove] = false,
         [refbWantsShieldEscort] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
     },
     ['M27IntelPathAI'] =
     {
@@ -406,6 +455,9 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27ACUMain'] =
     {
@@ -426,6 +478,9 @@ PlatoonTemplate = {
         [refbUsedByThreatDefender] = false, --Some of functionality in platoon utilities such as building factory is turned off if this is true
         [refbWantsShieldEscort] = true,
         [refbWantsStealthEscort] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iVHighPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iVHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27AssistHydroEngi'] = --Dont think this is used any more
     {
@@ -443,6 +498,9 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iVHighPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iVHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
 
     ['M27MobileShield'] =
@@ -463,6 +521,8 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
     },
     ['M27MobileStealth'] =
     {
@@ -482,6 +542,9 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iHighPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iHighPriorityEnemy,
+        [refbSingletonPlatoon] = true,
     },
     ['M27RetreatingShieldUnits'] =
     {
@@ -499,6 +562,8 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
     },
     ['M27SuicideSquad'] =
     {
@@ -516,6 +581,8 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = true,
+        [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
     },
 
 
@@ -541,6 +608,8 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     ['M27PlateauIndirect'] =
     {
@@ -561,6 +630,8 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbUsedByThreatDefender] = false,
         [refbWantsShieldEscort] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
     },
     ['M27PlateauMAA'] =
     {
@@ -582,6 +653,8 @@ PlatoonTemplate = {
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = false,
         [refiAirAttackRange] = 40,
+        [refiMaxTicksBetweenCycleNoEnemies] = iMedPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iMedPriorityEnemy,
     },
     ['M27PlateauScout'] =
     {
@@ -599,6 +672,8 @@ PlatoonTemplate = {
         [reftPlatoonsToAmalgamate] = nil,
         [refiPlatoonAmalgamationRange] = nil,
         [refbWantsShieldEscort] = false,
+        [refiMaxTicksBetweenCycleNoEnemies] = iLowPriorityNoEnemy,
+        [refiMaxTicksBetweenCycleEnemies] = iLowPriorityEnemy,
     },
 
 

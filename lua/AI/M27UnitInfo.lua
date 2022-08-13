@@ -308,8 +308,8 @@ end
 
 function GetUnitPathingType(oUnit)
     --Returns Land, Amphibious, Air or Water or None
-    if oUnit and not(oUnit.Dead) and oUnit.GetBlueprint then
-        local mType = oUnit:GetBlueprint().Physics.MotionType
+    --if oUnit and not(oUnit.Dead) and oUnit.GetBlueprint then
+        local mType = __blueprints[oUnit.UnitId].Physics.MotionType
         if (mType == 'RULEUMT_AmphibiousFloating' or mType == 'RULEUMT_Hover' or mType == 'RULEUMT_Amphibious') then
             return refPathingTypeAmphibious
         elseif (mType == 'RULEUMT_Water' or mType == 'RULEUMT_SurfacingSub') then
@@ -320,9 +320,9 @@ function GetUnitPathingType(oUnit)
             return refPathingTypeLand
         else return refPathingTypeNone
         end
-    else
-        M27Utilities.ErrorHandler('oUnit is nil or doesnt have a GetBlueprint function')
-    end
+    --else
+        --M27Utilities.ErrorHandler('oUnit is nil or doesnt have a GetBlueprint function')
+    --end
 end
 
 function GetUnitUpgradeBlueprint(oUnitToUpgrade, bGetSupportFactory)
@@ -751,6 +751,7 @@ function GetBomberAOEAndStrikeDamage(oUnit)
             if (tWeapon.DamageRadius or 0) > iAOE then
                 iAOE = tWeapon.DamageRadius
                 iStrikeDamage = tWeapon.Damage * tWeapon.MuzzleSalvoSize
+                if tWeapon.MuzzleSalvoSize > 2 then iStrikeDamage = iStrikeDamage * 0.5 end
                 iFiringRandomness = (tWeapon.FiringRandomness or 0)
             end
         end
@@ -808,6 +809,17 @@ function GetBomberRange(oUnit)
         end
     end
     return iRange
+end
+
+function GetBomberSalvoDelay(oUnit)
+    local oBP = oUnit:GetBlueprint()
+    local iDelay = 0.5 --basic default; in reality should be 0.2 or 0.25 checking zeus, scorcher and janus
+    for sWeaponRef, tWeapon in oBP.Weapon do
+        if tWeapon.WeaponCategory == 'Bomb' or tWeapon.WeaponCategory == 'Direct Fire' or tWeapon.WeaponCategory == 'Anti Navy' then
+            if tWeapon.MuzzleSalvoDelay then return tWeapon.MuzzleSalvoDelay end
+        end
+    end
+    return iDelay
 end
 
 function GetBomberSpeedAndTimeToReload(oBomber)

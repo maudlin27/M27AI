@@ -1083,7 +1083,7 @@ function GetOverchargeExtraAction(aiBrain, oPlatoon, oUnitWithOvercharge)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function HoverBombTargetOldBase(aiBrain, oBomber, oTarget)
+--[[function HoverBombTargetOldBase(aiBrain, oBomber, oTarget)
     --Called if we dont think our bomb will kill the target; call via fork thread
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'HoverBombTarget'
@@ -1175,6 +1175,7 @@ function HoverBombTargetOldBase(aiBrain, oBomber, oTarget)
             if bDebugMessages == true then LOG(sFunctionRef..': either the bomber or target is no longer valid so aborting micro') end
             break
         end
+        --]]
 
         --[[if GetGameTimeSeconds() - iStartTime >= iReloadTime then
             --Only keep going if our angle is far away
@@ -1203,6 +1204,7 @@ function HoverBombTargetOldBase(aiBrain, oBomber, oTarget)
             elseif bDebugMessages == true then LOG(sFunctionRef..': Angle dif too far to attack but might be able to do better so will keep trying')
             end
         end--]]
+        --[[
     end
     if M27UnitInfo.IsUnitValid(oBomber) then
         oBomber[M27UnitInfo.refbSpecialMicroActive] = false
@@ -1219,7 +1221,7 @@ function HoverBombTargetOldBase(aiBrain, oBomber, oTarget)
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-end
+end--]]
 
 function HoverBombTarget(aiBrain, oBomber, oTarget)
     --Called if we dont think our bomb will kill the target; call via fork thread
@@ -1375,6 +1377,7 @@ function HoverBombTarget(aiBrain, oBomber, oTarget)
                 end
             else
                 IssueClearCommands({oBomber})
+                if bDebugMessages == true then LOG(sFunctionRef..': Cleared bomber commands and will call the bomber target recheck') end
                 ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber)
             end
         end
@@ -1712,6 +1715,7 @@ function ExperimentalSAMHitAndRun(oBomber, oTarget)
                         end
                     else
                         IssueClearCommands({oBomber})
+                        if bDebugMessages == true then LOG(sFunctionRef..': Cleared bomber'..oBomber.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomber)..' commands and will call delayed bomber target recheck') end
                         ForkThread(M27AirOverseer.DelayedBomberTargetRecheck, oBomber)
                     end
                 end
