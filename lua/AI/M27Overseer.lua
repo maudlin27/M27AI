@@ -8159,6 +8159,10 @@ function GameSettingWarningsAndChecks(aiBrain)
     local tAIModNameWhitelist = {
         'M27AI', 'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'SACUAI',
     }
+
+    local tAIModNameWhereExpectAI = {
+        'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI',
+    }
     local tModIsOk = {}
     local bHaveOtherAI = false
     local sUnnecessaryAIMod
@@ -8189,24 +8193,41 @@ function GameSettingWarningsAndChecks(aiBrain)
                 bFlyingEngineers = true
                 if bDebugMessages == true then LOG(sFunctionRef..': Have flying engineers mod enabled so will adjust engineer categories') end
             end
-        elseif tModIsOk[tModData.name] and not(tModData.name == 'M27AI') then
+        elseif tModIsOk[tModData.name] then
             if not(bHaveOtherAIMod) then
-                bHaveOtherAIMod = true
-                --Do we have non-M27 AI?
-                for iBrain, oBrain in ArmyBrains do
-                    if oBrain.BrainType == 'AI' and not(oBrain.M27AI) and not(M27Logic.IsCivilianBrain(oBrain)) then
-                        bHaveOtherAI = true
-                        if bDebugMessages == true then LOG('Have an AI for a brain') end
+                for iAIMod, sAIMod in tAIModNameWhereExpectAI do
+                    if sAIMod == tModData.name then
+                        bHaveOtherAIMod = true
                         break
                     end
                 end
+                if bHaveOtherAIMod then
+                    --Do we have non-M27 AI?
+                    for iBrain, oBrain in ArmyBrains do
+                        if oBrain.BrainType == 'AI' and not(oBrain.M27AI) and not(M27Logic.IsCivilianBrain(oBrain)) then
+                            bHaveOtherAI = true
+                            if bDebugMessages == true then LOG('Have an AI for a brain') end
+                            break
+                        end
+                    end
+                end
             end
-            if not(bHaveOtherAI) then
-                iUnnecessaryAIModCount = iUnnecessaryAIModCount + 1
-                if iUnnecessaryAIModCount == 1 then
-                    sUnnecessaryAIMod = tModData.name
-                else
-                    sUnnecessaryAIMod = sUnnecessaryAIMod..', '..tModData.name
+            if bHaveOtherAIMod and not(bHaveOtherAI) then
+                local bUnnecessaryMod = false
+                for iAIMod, sAIMod in tAIModNameWhereExpectAI do
+                    if sAIMod == tModData.name then
+                        bUnnecessaryMod = true
+                        break
+                    end
+                end
+                if bUnnecessaryMod then
+
+                    iUnnecessaryAIModCount = iUnnecessaryAIModCount + 1
+                    if iUnnecessaryAIModCount == 1 then
+                        sUnnecessaryAIMod = tModData.name
+                    else
+                        sUnnecessaryAIMod = sUnnecessaryAIMod..', '..tModData.name
+                    end
                 end
             end
         end
