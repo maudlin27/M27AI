@@ -1,6 +1,8 @@
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local SUtils = import('/lua/AI/sorianutilities.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
+local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 
 tiM27VoiceTauntByType = {} --[x] = string for the type of voice taunt (functionref), returns gametimeseconds it was last issued
 
@@ -73,26 +75,52 @@ function SendGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function SendMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType)
+function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType, bOnlySendToTeam)
+    --Use SendMessage rather than this
+
     --If just sending a message rather than a taunt then can use this. sMessageType will be used to check if we have sent similar messages recently with the same sMessageType
+    --if bOnlySendToTeam is true then will both only consider if message has been sent to teammates before (not all AI), and will send via team chat
     local sFunctionRef = 'SendMessage'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if iOptionalDelayBeforeSending then
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-        WaitSeconds(iOptionalDelayBeforeSending)
-        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    end
-    if bDebugMessages == true then LOG(sFunctionRef..': iOptionalTimeBetweenTaunts='..(iOptionalTimeBetweenMessageType or 'nil')..'; tiM27VoiceTauntByType[sMessageType]='..(tiM27VoiceTauntByType[sMessageType] or 'nil')..'; Cur game time='..GetGameTimeSeconds()) end
+    --Do we have allies?
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
 
-    if GetGameTimeSeconds() - (tiM27VoiceTauntByType[sMessageType] or -10000) > (iOptionalTimeBetweenMessageType or 60) then
-        LOG(sFunctionRef..': Sent chat message for sMessageType='..sMessageType..': sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
-        SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
-        tiM27VoiceTauntByType[sMessageType] = GetGameTimeSeconds()
+        if iOptionalDelayBeforeSending then
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            WaitSeconds(iOptionalDelayBeforeSending)
+            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': iOptionalTimeBetweenTaunts='..(iOptionalTimeBetweenMessageType or 'nil')..'; tiM27VoiceTauntByType[sMessageType]='..(tiM27VoiceTauntByType[sMessageType] or 'nil')..'; Cur game time='..GetGameTimeSeconds()) end
+
+        local iTimeSinceSentSimilarMessage
+        if bOnlySendToTeam then
+            iTimeSinceSentSimilarMessage = GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages][sMessageType] or -100000)
+        else
+            iTimeSinceSentSimilarMessage = GetGameTimeSeconds() - (tiM27VoiceTauntByType[sMessageType] or -100000)
+        end
+
+        if iTimeSinceSentSimilarMessage > (iOptionalTimeBetweenMessageType or 60) then
+            LOG(sFunctionRef..': Sent chat message for sMessageType='..sMessageType..': sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
+            if bOnlySendToTeam then
+                SUtils.AISendChat('allies', aiBrain.Nickname, sMessage)
+                M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages][sMessageType] = GetGameTimeSeconds()
+                if bDebugMessages == true then LOG(sFunctionRef..': Sent a team chat message') end
+            else
+                SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
+                tiM27VoiceTauntByType[sMessageType] = GetGameTimeSeconds()
+            end
+            LOG(sFunctionRef..': Sent chat message. bOnlySendToTeam='..tostring(bOnlySendToTeam)..'; sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)) end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function SendMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType, bOnlySendToTeam)
+    --Fork thread as backup to make sure any unforseen issues dont break the code that called this
+    ForkThread(SendForkedMessage, aiBrain, sMessageType, sMessage, iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType, bOnlySendToTeam)
 end
 
 --[[function SendGameCompatibilityWarning(aiBrain, sMessage, iOptionalDelay, iOptionalTimeBetweenTaunts)

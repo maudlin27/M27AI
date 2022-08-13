@@ -20,6 +20,7 @@ local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
+local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -60,6 +61,49 @@ function OnPlayerDefeated(aiBrain)
     end
 end
 
+function OnACUKilled(oUnit)
+    if M27Utilities.bM27AIInGame then
+        local sFunctionRef = 'OnACUKilled'
+        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+        if EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then
+            --Update list of brains
+            local oACUBrain = oUnit:GetAIBrain()
+            if not(oACUBrain.M27IsDefeated) and not(oUnit.M27IsDefeated) then
+                oUnit.M27IsDefeated = true --As OnACUKilled may be called multiple times as have the logic in several places to make sure its picked up
+                M27Overseer.iACUDeathCount = M27Overseer.iACUDeathCount + 1
+                LOG(sFunctionRef..' ACU kill detected; total kills='..M27Overseer.iACUDeathCount..'; ACU position at time of death='..repru(oUnit:GetPosition()))
+
+                if ScenarioInfo.Options.Victory == "demoralization" then
+                    M27Utilities.ErrorHandler('ACU has died for brain='..oACUBrain:GetArmyIndex()..'; are in assassination so will flag the brain is defeated', true)
+                    OnPlayerDefeated(oACUBrain)
+                end
+
+                if oACUBrain.M27AI then
+                    M27Chat.SendMessage(oACUBrain, 'Our ACU Died', 'gg', 3, 60)
+                end
+                for iArmyIndex, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
+                    if aiBrain == oACUBrain and ScenarioInfo.Options.Victory == "demoralization" then
+                        M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
+                        M27Overseer.tAllActiveM27Brains[iArmyIndex] = nil
+                    elseif aiBrain.M27AI and ScenarioInfo.Options.Victory == "demoralization" then
+                        ForkThread(M27Overseer.RecordAllEnemiesAndAllies, aiBrain)
+                    end
+                    --Clear ACU Kill strategy and last ACU position from any M27AI brain enemies
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering aiBrain with army index='..aiBrain:GetArmyIndex()..'; oACUBrain index='..oACUBrain:GetArmyIndex()..'; Are tehse enemies='..tostring(IsEnemy(aiBrain:GetArmyIndex(), oACUBrain:GetArmyIndex()))..'; aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] or 'nil')..'; Default strategy='..(aiBrain[M27Overseer.refiDefaultStrategy] or 'nil')) end
+                    if aiBrain.M27AI and IsEnemy(aiBrain:GetArmyIndex(), oACUBrain:GetArmyIndex()) and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
+                        aiBrain[M27Overseer.refiAIBrainCurrentStrategy] = aiBrain[M27Overseer.refiDefaultStrategy]
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering aiBrain with army index='..aiBrain:GetArmyIndex()..': Updated strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]) end
+                    end
+                end
+            end
+        end
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    end
+end
+
 function OnKilled(oUnitKilled, instigator, type, overkillRatio)
     --WARNING: Doesnt trigger when an ACU is killed
 
@@ -73,7 +117,14 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
         if bDebugMessages == true then LOG(sFunctionRef..': oUnitKilled='..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)..'; Is unit killed an ACU='..tostring(M27Utilities.IsACU(oUnitKilled))) end
 
         if oUnitKilled.GetAIBrain then
+            if EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId) then
+                bDebugMessages = true
+                if bDebugMessages == true then LOG(sFunctionRef..': About to call the OnACUKilled function') end
+                OnACUKilled(oUnitKilled)
+            end
             local oKilledBrain = oUnitKilled:GetAIBrain()
+
+
             if oKilledBrain.M27AI then
                 --were we killed by something?
                 local oKillerUnit
@@ -295,29 +346,7 @@ function OnUnitDeath(oUnit)
         if bDebugMessages == true then LOG(sFunctionRef..'Hook successful. oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; IsACU='..tostring(M27Utilities.IsACU(oUnit))) end
         --Is it an ACU?
         if M27Utilities.IsACU(oUnit) then --NOTE: THis doesnt always trigger for ACU (not sure if it triggers some of the time, or none of the time)
-            M27Overseer.iACUDeathCount = M27Overseer.iACUDeathCount + 1
-            LOG(sFunctionRef..' ACU kill detected; total kills='..M27Overseer.iACUDeathCount..'; ACU position at time of death='..repru(oUnit:GetPosition()))
-            --Update list of brains
-            local oACUBrain = oUnit:GetAIBrain()
-            if ScenarioInfo.Options.Victory == "demoralization" then
-                M27Utilities.ErrorHandler('ACU has died for brain='..oACUBrain:GetArmyIndex()..'; are in assassination so will flag the brain is defeated', true)
-                OnPlayerDefeated(oACUBrain)
-            end
-            for iArmyIndex, aiBrain in M27Overseer.tAllAIBrainsByArmyIndex do
-                if aiBrain == oACUBrain and ScenarioInfo.Options.Victory == "demoralization" then
-                    M27Overseer.tAllAIBrainsByArmyIndex[iArmyIndex] = nil
-                    M27Overseer.tAllActiveM27Brains[iArmyIndex] = nil
-                elseif aiBrain.M27AI then
-                    ForkThread(M27Overseer.RecordAllEnemiesAndAllies, aiBrain)
-                end
-                --Clear ACU Kill strategy and last ACU position from any M27AI brain enemies
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering aiBrain with army index='..aiBrain:GetArmyIndex()..'; oACUBrain index='..oACUBrain:GetArmyIndex()..'; Are tehse enemies='..tostring(IsEnemy(aiBrain:GetArmyIndex(), oACUBrain:GetArmyIndex()))..'; aiBrain[M27Overseer.refiAIBrainCurrentStrategy]='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]..'; Default strategy='..aiBrain[M27Overseer.refiDefaultStrategy]) end
-                if aiBrain.M27AI and IsEnemy(aiBrain:GetArmyIndex(), oACUBrain:GetArmyIndex()) and aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill then
-                    aiBrain[M27Overseer.refiAIBrainCurrentStrategy] = aiBrain[M27Overseer.refiDefaultStrategy]
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering aiBrain with army index='..aiBrain:GetArmyIndex()..': Updated strategy='..aiBrain[M27Overseer.refiAIBrainCurrentStrategy]) end
-                end
-            end
-
+            OnACUKilled(oUnit)
 
         else
             if bDebugMessages == true then

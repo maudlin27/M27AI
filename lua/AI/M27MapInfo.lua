@@ -12,6 +12,7 @@ local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
+local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 
 bUsingArmyIndexForStartPosition = false --by default will assume armies are ARMY_1 etc.; this will be changed to true if any exceptions are found
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
@@ -5850,6 +5851,7 @@ function IdentifyTeamChokepoints(aiBrain)
                                     iClosestChokepointRef = oBrain[refiAssignedChokepointCount]
                                 end
                                 oBrain[reftClosestChokepoint] = {M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][1], M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][2], M27Team.tTeamData[aiBrain.M27Team][tPotentialChokepointsByDistFromStart][iBestChokepointDistFromStart][iClosestChokepointRef][reftChokepointBuildLocation][3]}
+                                M27Chat.SendMessage(aiBrain, 'Chokepoint assignment', 'Ill try and fortify the chokepoint near me', 10, 0, true)
                             end
                         end
                     end

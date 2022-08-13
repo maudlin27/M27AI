@@ -2298,6 +2298,8 @@ function AirThreatChecker(aiBrain)
     --Increase enemy air threat based on how many factories and of what tech
     local tAirThreatByTech = { 100, 500, 2000, 4000 }
     local tEnemyAirFactories = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain[refiMaxScoutRadius], 'Enemy')
+    local bWarnOfT3
+    if aiBrain[reftEnemyAirFactoryByTech][3] == 0 then bWarnOfT3 = true end
     aiBrain[reftEnemyAirFactoryByTech] = { 0, 0, 0 }
     local iAirFacTech
     if M27Utilities.IsTableEmpty(tEnemyAirFactories) == false then
@@ -2306,6 +2308,9 @@ function AirThreatChecker(aiBrain)
             iAllAirThreat = iAllAirThreat + tAirThreatByTech[M27UnitInfo.GetUnitTechLevel(oAirFac)]
             aiBrain[reftEnemyAirFactoryByTech][iAirFacTech] = aiBrain[reftEnemyAirFactoryByTech][iAirFacTech] + 1
         end
+    end
+    if bWarnOfT3 and aiBrain[reftEnemyAirFactoryByTech][3] > 0 then
+        M27Chat.SendMessage(aiBrain, 'Enemy T3 Air', 'Enemy has T3 air', 0, 10000, true)
     end
 
     if aiBrain[refiHighestEnemyAirThreat] == nil then
