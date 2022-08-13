@@ -8713,7 +8713,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                         for iLocation, tLocation in tVulnerableMexes do
                             iCurDistance = M27Utilities.GetDistanceBetweenPositions(tCurPosition, tLocation)
                             if iCurDistance < iNearestDistance and GetSegmentFailedAttempts(tLocation) < iMaxPrevTargets then
-                                if not (oUnit[refiTimeWhenFirstEverRan]) or GetLastTimeScoutedLocation(aiBrain, tLocation) <= 60 or M27Logic.GetIntelCoverageOfPosition(aiBrain, tLocation, 20, true) then
+                                if not (oUnit[refiTimeWhenFirstEverRan]) or GetTimeSinceLastScoutedLocation(aiBrain, tLocation) <= 60 or M27Logic.GetIntelCoverageOfPosition(aiBrain, tLocation, 20, true) then
                                     tLocationToMoveTo = tLocation
                                     iNearestDistance = iCurDistance
                                 end

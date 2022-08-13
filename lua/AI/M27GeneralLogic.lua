@@ -3913,7 +3913,7 @@ function IsLocationUnderFriendlyFixedShield(aiBrain, tTargetPos)
                     if iCurShieldRadius > 0 then
                         iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
                         if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius..'; shield position='..repru(oUnit:GetPosition())..'; target position='..repru(tTargetPos)) end
-                        if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
+                        if iCurDistanceFromTarget <= (iCurShieldRadius - 1) then --if dont decrease by anything then more than half of unit might be under shield which means bombs cant hit it due to the 'snap to' logic e.g. for building placement
                             if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target') end
                             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             return true
@@ -3971,6 +3971,10 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
         local iTotalShieldCurHealth = 0
         local iTotalShieldMaxHealth = 0
         local iMinFractionComplete = 0.95
+
+        local iShieldSizeAdjust = 2 --i.e. if want to be prudent about whether can hit an enemy should be positive, if prudent about whether an ally is protected want a negative value
+        if not(bEnemy) then iShieldSizeAdjust = -1 end
+
         if bTreatPartCompleteAsComplete then iMinFractionComplete = 0 end
         if M27Utilities.IsTableEmpty(tNearbyShields) == false then
             if bDebugMessages == true then LOG(sFunctionRef..': Size of tNearbyShields='..table.getn(tNearbyShields)) end
@@ -3985,7 +3989,7 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
                         if iCurShieldRadius > 0 then
                             iCurDistanceFromTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tTargetPos)
                             if bDebugMessages == true then LOG(sFunctionRef..': iCurDistance to shield='..iCurDistanceFromTarget..'; iCurShieldRadius='..iCurShieldRadius..'; shield position='..repru(oUnit:GetPosition())..'; target position='..repru(tTargetPos)) end
-                            if iCurDistanceFromTarget <= (iCurShieldRadius + 2) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
+                            if iCurDistanceFromTarget <= (iCurShieldRadius + iShieldSizeAdjust) then --if dont increase by anything then half of unit might be under shield which means bombs cant hit it
                                 if bDebugMessages == true then LOG(sFunctionRef..': Shield is large enough to cover target, will check its health') end
                                 iShieldCurHealth, iShieldMaxHealth = M27UnitInfo.GetCurrentAndMaximumShield(oUnit)
                                 iTotalShieldCurHealth = iTotalShieldCurHealth + iShieldCurHealth

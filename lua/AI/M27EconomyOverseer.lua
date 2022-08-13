@@ -1906,8 +1906,12 @@ function DecideMaxAmountToBeUpgrading(aiBrain)
         local bNeedToUpgradeMexesByBase = false
         if not(aiBrain[refiMexPointsNearBase]) then
             aiBrain[refiMexPointsNearBase] = 0
-            for iMex, tMex in M27MapInfo.tResourceNearStart[aiBrain:GetArmyIndex()][1] do
-                aiBrain[refiMexPointsNearBase] = aiBrain[refiMexPointsNearBase] + 1
+            if M27Utilities.IsTableEmpty(M27MapInfo.tResourceNearStart[aiBrain:GetArmyIndex()][1]) then
+                M27Utilities.ErrorHandler('No mexes recorded near start of our base')
+            else
+                for iMex, tMex in M27MapInfo.tResourceNearStart[aiBrain.M27StartPositionNumber][1] do
+                    aiBrain[refiMexPointsNearBase] = aiBrain[refiMexPointsNearBase] + 1
+                end
             end
         end
         if aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyLandMain and aiBrain[M27Overseer.refiEnemyHighestTechLevel] >= 2 then

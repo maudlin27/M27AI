@@ -23,7 +23,7 @@ PlayerStartPoints = {} -- Stores position values i.e. a table with 3 values, x, 
 reftPrimaryEnemyBaseLocation = 'M27MapPrimaryEnemyBase'
 reftMidpointToPrimaryEnemyBase = 'M27MapMidpointToPrimaryEnemyBase'
 refiLastTimeCheckedEnemyBaseLocation = 'M27LastTimeChecked'
-tResourceNearStart = {} --[iArmy][iResourceType (1=mex2=hydro)][iCount][tLocation] Stores location of mass extractors and hydrocarbons that are near to start locations; 1st value is the army number, 2nd value the resource type, 3rd the mex number, 4th value the position array (which itself is made up of 3 values)
+tResourceNearStart = {} --[Player start ponit/ARMY_x number (NOT ARMY INDEX)][iResourceType (1=mex2=hydro)][iCount][tLocation] Stores location of mass extractors and hydrocarbons that are near to start locations; 1st value is the army number, 2nd value the resource type, 3rd the mex number, 4th value the position array (which itself is made up of 3 values)
 MassCount = 0 -- used as a way of checking if have the core markers needed
 HydroCount = 0
 iHighestReclaimInASegment = 0 --WARNING - reference the higher of this and previoushighestreclaiminasegment, since this gets reset to 0 each time
@@ -184,10 +184,11 @@ function DetermineMaxTerrainHeightDif()
     ['Fields of Isis'] = 0.15, --minor for completeness - one of cliffs reclaim looks like its pathable but default settings show it as non-pathable
     ['Selkie Mirror'] = 0.15,
     ['Adaptive Point of Reason'] = 0.26,
+    ['Hyperion'] = 0.215, --0.213 results in apparant plateau with 2 mexes (that is actually pathable) being treated as a plateau incorrectly
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
-    if bDebugMessages == true then LOG(sFunctionRef..': sMapName='..sMapName..'; tMapHeightOverride='..(tMapHeightOverride[sMapName] or 'No override')) end
+    if bDebugMessages == true then LOG(sFunctionRef..': sMapName='..sMapName..'; tMapHeightOverride='..(tMapHeightOverride[sMapName] or 'No override')..'; iMaxHeightDif='..iMaxHeightDif) end
 end
 
 

@@ -3218,7 +3218,7 @@ function GetBuildLocationUnderShieldNearestEnemy(oShield)
     local tTargetLocation
     local sBlueprintToBuild = 'xrb0204'
     if iShieldRange >= 4 then
-        for iDistanceAdjust = math.floor(iShieldRange - 0.25), 2, -1 do
+        for iDistanceAdjust = math.floor(iShieldRange - 0.5), 2, -1 do
             for iAngleAdjust = 0, 30, 10 do
                 for iAngleFactor = -1, 1, 2 do
                     tTargetLocation = M27Utilities.MoveInDirection(oShield:GetPosition(), iAngleToEnemy + iAngleAdjust * iAngleFactor, iDistanceAdjust, true)
