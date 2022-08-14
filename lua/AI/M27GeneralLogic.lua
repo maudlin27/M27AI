@@ -5297,7 +5297,6 @@ function DetermineTMDWantedForTML(aiBrain, oTML, toOptionalUnitsToProtect)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineTMDWantedForTML'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 1223 then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': oTML='..oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)) end
 
@@ -5396,7 +5395,6 @@ function DetermineTMDWantedForUnits(aiBrain, tUnits)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineTMDWantedForUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 1223 then bDebugMessages = true end
 
     --First remove tUnits from the list of units wanting TMD (will re-add them per the below if we still want TMD)
     if bDebugMessages == true then
@@ -5497,16 +5495,16 @@ function CalculateUnitThreatsByType()
         function RecordBlueprintThreatValues(oBP, sUnitId)
 
             tUnitThreatByIDAndType[sUnitId] = {}
-            if bDebugMessages == true then LOG(sFunctionRef..': About to consider different land threat values for unit '..sUnitId..' Name='..(oBP.General.UnitName or 'nil')) end
+            if bDebugMessages == true then LOG(sFunctionRef..': About to consider different land threat values for unit '..sUnitId..' Name='..LOCF((oBP.General.UnitName) or 'nil')) end
             for iRef, tConditions in tiLandThreatTypes do
                 tUnitThreatByIDAndType[sUnitId][iRef] = GetCombatThreatRating(nil, { {['UnitId']=sUnitId }}, nil, nil, nil, tConditions[1], tConditions[2], true)
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating land threat values for '..(oBP.General.UnitName or 'nil')..', result='..reprs(tUnitThreatByIDAndType[sUnitId])) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating land threat values for '..LOCF((oBP.General.UnitName or 'nil'))..', result='..reprs(tUnitThreatByIDAndType[sUnitId])) end
 
             for iRef, tConditions in tiAirThreatTypes do
                 tUnitThreatByIDAndType[sUnitId][iRef] = GetAirThreatLevel(nil, { {['UnitId']=sUnitId }}, nil, tConditions[1], tConditions[2], tConditions[3], tConditions[4], nil, nil, nil, nil, tConditions[5], true)
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating air threat values, result of land and air for '..oBP.General.UnitName..'='..reprs(tUnitThreatByIDAndType[sUnitId])) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating air threat values, result of land and air for '..LOCF(oBP.General.UnitName)..'='..reprs(tUnitThreatByIDAndType[sUnitId])) end
         end
 
         local iCount = 0

@@ -35,9 +35,10 @@ function SendSuicideMessage(aiBrain)
     end
 end
 
-function SendGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts)
+function SendForkedGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts)
+    --Call via sendgloatingmessage
     --Sends a taunt message after waiting iOptionalDelay, provided we havent sent one within 60s or iOptionalTimeBetweenTaunts
-    local sFunctionRef = 'SendGloatingMessage'
+    local sFunctionRef = 'SendForkedGloatingMessage'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -51,10 +52,10 @@ function SendGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts
     if GetGameTimeSeconds() - (tiM27VoiceTauntByType[sFunctionRef] or -10000) > (iOptionalTimeBetweenTaunts or 60) then
         local iFactionIndex = aiBrain:GetFactionIndex()
         local tTauntsByFaction = {
-            [M27UnitInfo.refFactionUEF] = {4,16}, --Hall: The gloves are coming off; Fletcher: I feel a bit bad, beatin' up on you like this
-            [M27UnitInfo.refFactionAeon] = {26, 30}, --Rhiza: All enemies of the Princess will be destroyed; Behold the power of the Illuminate
-            [M27UnitInfo.refFactionCybran] = {58, 81}, --Dostya: Observe. You may learn something; QAI: All calculations indicate that your demise is near
-            [M27UnitInfo.refFactionSeraphim] = {98}, --Sera: You will perish at my hand
+            [M27UnitInfo.refFactionUEF] = {1,4,7,16}, --Hall: You will not stop the UEF; The gloves are coming off; I guess its time to end this farce, Fletcher: I feel a bit bad, beatin' up on you like this
+            [M27UnitInfo.refFactionAeon] = {26, 28, 30,39,40,41}, --Rhiza: All enemies of the Princess will be destroyed; For the Aeon; Behold the power of the Illuminate; run while you can; it must be frustrating to be so completely overmatched; beg for mercy
+            [M27UnitInfo.refFactionCybran] = {58, 59, 60, 62, 74, 77, 78, 79, 81}, --Dostya: Observe. You may learn something; I would flee if I were you; You will be just another in my list of victories; Your defeat is without question; QAI: Your destruction is 99% certain; My victory is without question; Your defeat can be the only outcome; Your efforts are futile; All calculations indicate that your demise is near
+            [M27UnitInfo.refFactionSeraphim] = {94,97,98}, --Sera: Do not fret. Dying by my hand is the supreme honor; Bow down before our might, and we may spare you; You will perish at my hand
             [M27UnitInfo.refFactionNomads] = {81} --QAI: All calculations indicate that your demise is near
         }
         local iTauntOptions
@@ -75,17 +76,22 @@ function SendGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function SendGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts)
+    ForkThread(SendForkedGloatingMessage, aiBrain, iOptionalDelay, iOptionalTimeBetweenTaunts)
+end
+
 function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBeforeSending, iOptionalTimeBetweenMessageType, bOnlySendToTeam)
     --Use SendMessage rather than this
 
     --If just sending a message rather than a taunt then can use this. sMessageType will be used to check if we have sent similar messages recently with the same sMessageType
     --if bOnlySendToTeam is true then will both only consider if message has been sent to teammates before (not all AI), and will send via team chat
-    local sFunctionRef = 'SendMessage'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'SendForkedMessage'
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Do we have allies?
-    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+    if not(bOnlySendToTeam) or M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toAllyBrains]) == false then
+
 
         if iOptionalDelayBeforeSending then
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -143,3 +149,50 @@ end
     if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end--]]
+
+function ConsiderPlayerSpecificMessages(aiBrain)
+    --Call via forkthread given the delay - considers messages at start of game, including generic gl hf
+    local sFunctionRef = 'ConsiderPlayerSpecificMessages'
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy brains empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]))) end
+    local bSentSpecificMessage = false
+    WaitSeconds(5)
+    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy brains empty after waiting 5s='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]))) end
+    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]) == false then
+        if M27Utilities.IsTableEmpty(tiM27VoiceTauntByType['Specific opponent']) then
+            for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
+                if bDebugMessages == true then LOG(sFunctionRef..': oBrain.BrainType='..oBrain.BrainType..'; oBrain.Nickname='..oBrain.Nickname) end
+                if oBrain.BrainType == 'Human' then
+                    local i, j = string.find(oBrain.Nickname, 'maudlin27')
+                    if bDebugMessages == true then LOG(sFunctionRef..': i='..(i or 'nil')..'; j='..(j or 'nil')) end
+                    if i > 0 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': maudlin27 is playing') end
+                        SendMessage(oBrain, 'Specific opponent', 'What is this, what are you doing, my son?', 10, 0)
+                        SendMessage(aiBrain, 'Specific opponent', 'Succeeding you, father', 15, 0)
+                        bSentSpecificMessage = true
+                    elseif oBrain.Nickname == 'Jip' or oBrain.Nickname == 'FAF_Jip' then
+                        SendMessage(aiBrain, 'Specific opponent', 'A fight against the game councillor? I hope my algorithms havent been sabotaged', 10, 10000)
+                        bSentSpecificMessage = true
+                    else
+                        if math.random(0,1) == 1 then
+                            local tPrevPlayers = {'gunner1069', 'relentless', 'Azraeel', 'Babel', 'Wingflier', 'Radde', 'YungDookie', 'Spyro', 'Skinnydude', 'savinguptobebrok', 'Tomma', 'IgneusTempus', 'tyne141'}
+                            for iPlayer, sPlayer in tPrevPlayers do
+                                if oBrain.Nickname == tPrevPlayers or oBrain.Nickname == 'FAF_'..tPrevPlayers then
+                                    SendMessage(aiBrain, 'Specific opponent', '/83', 5, 10000) --QAI message re analysing prev subroutines
+                                    bSentSpecificMessage = true
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            if not(bSentSpecificMessage) and M27Utilities.IsTableEmpty(tiM27VoiceTauntByType['Specific opponent']) then
+                SendMessage(aiBrain, 'Initial greeting', 'gl hf', 50 - math.floor(GetGameTimeSeconds()), 10)
+            end
+        end
+    end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end

@@ -6339,6 +6339,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             tCurCategoryUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
             if iCategory == M27UnitInfo.refCategoryExperimentalStructure or iCategory == M27UnitInfo.refCategoryFixedT3Arti then
                 tReferenceTable = aiBrain[reftEnemyArtiAndExpStructure]
+                bConsiderChatWarning = true
             elseif iCategory == M27UnitInfo.refCategorySML then
                 tReferenceTable = aiBrain[reftEnemyNukeLaunchers]
                 bConsiderChatWarning = true
@@ -6399,16 +6400,17 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                             end
                         end
                         if not(bAlreadyInTable) then
-                            table.insert(tReferenceTable, oUnit)
+
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to reference table. Is table empty='..tostring(M27Utilities.IsTableEmpty(tReferenceTable))..'; bConsiderChatWarning='..tostring(bConsiderChatWarning)..'; Unit fraction complete='..oUnit:GetFractionComplete()..'; T3 resource generation units held by owner='..oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon)) end
                             if bConsiderChatWarning and M27Utilities.IsTableEmpty(tReferenceTable) then
                                 if sCategoryDesc == 'Experimental building' then
-                                    if EntityCategoryContains(M27UnitInfo.refCategoryNovax, oUnit.UnitId) then
+                                    if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
                                         M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy Novax detected', 0, 1000, true)
                                     else
                                         if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon) <= 20 then
-                                            M27Chat.SendMessage(aiBrain, sCategoryDesc, 'LOL theyre building a '..oUnit:GetBlueprint().General.UnitName, 0, 1000, true)
+                                            M27Chat.SendMessage(aiBrain, sCategoryDesc, 'LOL theyre building a '..LOCF(oUnit:GetBlueprint().General.UnitName), 0, 1000, true)
                                         else
-                                            M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..oUnit:GetBlueprint().General.UnitName..' detected', 0, 1000, true)
+                                            M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
                                         end
                                     end
 
@@ -6416,6 +6418,8 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                     M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..sCategoryDesc..' detected', 0, 1000, true)
                                 end
                             end
+
+                            table.insert(tReferenceTable, oUnit)
                         end
                         --[[sUnitUniqueRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
                         if tReferenceTable[sUnitUniqueRef] == nil then
@@ -6930,7 +6934,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                         bBigEnemyThreat = true
                                     end
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs])..'; ACU health 1s ago='..(oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or 'nil')..'; ACU health 11s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]..'; Are all chokepoitns covered='..tostring(M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)))
+                                        LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat or false) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs] or false)..'; ACU health 1s ago='..(oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or 'nil')..'; ACU health 11s ago='..(oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11] or 'nil')..'; Are all chokepoitns covered='..tostring((M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)) or false))
                                     end
 
 
@@ -8132,7 +8136,7 @@ function OverseerInitialisation(aiBrain)
     ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain)
     ForkThread(M27Transport.TransportInitialisation, aiBrain)
 
-    ForkThread(M27Chat.SendMessage, aiBrain, 'Initial greeting', 'gl hf', 50 - math.floor(GetGameTimeSeconds()), 10)
+    ForkThread(M27Chat.ConsiderPlayerSpecificMessages, aiBrain)
 
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': End of code')
@@ -9043,7 +9047,7 @@ function OverseerManager(aiBrain)
     end
 
     --ForkThread(ConstantBomberLocation, aiBrain)
-    TestCustom(aiBrain)
+    --TestCustom(aiBrain)
 
 
 
@@ -9087,6 +9091,7 @@ function OverseerManager(aiBrain)
         if aiBrain[refbIntelPathsGenerated] == true then
             ForkThread(AssignScoutsToPreferredPlatoons, aiBrain)
         end
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, 0.08) --MAA wait
         --[[if not (WaitTicksSpecial(aiBrain, iTicksToWait)) then
@@ -9103,6 +9108,7 @@ function OverseerManager(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
             DebugPrintACUPlatoon(aiBrain)
         end
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, 2) --Threat assess
 
@@ -9121,6 +9127,7 @@ function OverseerManager(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
         end
 
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, 0.2) --ACU manager
 
@@ -9147,6 +9154,7 @@ function OverseerManager(aiBrain)
 
         iCost = 1
         if iSlowerCycleCount <= 1 then iCost = iCost + 0.15 end
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, iCost) --Strategic overseer
 
@@ -9170,6 +9178,7 @@ function OverseerManager(aiBrain)
                 --M27EngineerOverseer.TEMPTEST(aiBrain)
             end
         end
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, 0.22) --Refresh economy data
 
@@ -9192,6 +9201,7 @@ function OverseerManager(aiBrain)
 
         --NOTE: We dont have the number of ticks below as 'available' for use, since on initialisation we're waiting ticks as well when initialising things such as the engineer and upgrade overseers which work off their own loops
         --therefore the actual available tick count will be the below number less the number of ticks we're already waiting
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(math.max(1, 10 - iTicksWaitedThisCycle), 5, 1) --wait for the start of the loop (scout scheduler)
 
