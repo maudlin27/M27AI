@@ -2330,7 +2330,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -3469,7 +3469,8 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                             --local iPlatoonMaxRange
                             if oPlatoon[refbACUInPlatoon] == true then
                                 --iPlatoonMaxRange = M27Logic.GetDFAndT1ArtiUnitMinOrMaxRange(oPlatoon:GetPlatoonUnits(), 2)
-                                local bShotIsBlockedForAnyUnit = false
+                                local bShotIsBlockedForAnyUnit = oPlatoon[reftBuilders][1][M27UnitInfo.refbLastShotBlocked]
+                                local bShotBlockedForCurTarget = oPlatoon[reftBuilders][1][M27UnitInfo.refbLastShotBlocked]
                                 local bShotIsBlockedForAllUnits = false
                                 local iClosestUnitWhereShotNotBlocked = 1000
                                 local iClosestMobileUnit = 1000
@@ -3478,32 +3479,35 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                 local sEnemyRef, sEnemyCountRef, iCurDistance
                                 local tACUPosition = GetPlatoonFrontPosition(oPlatoon)
                                 local oACU = M27Utilities.GetACU(aiBrain)
-                                if bDebugMessages == true then LOG(sFunctionRef..': About to check if any nearby enemies are blocked') end
+                                if bDebugMessages == true then LOG(sFunctionRef..': About to check if any nearby enemies are blocked. Is shot blocked for front unit='..tostring(oPlatoon[refoFrontUnit][M27UnitInfo.refbLastShotBlocked])) end
                                 --Do we have a current target, and if so is the shot blocked?
                                 local iWeaponCount = oACU:GetWeaponCount()
                                 local oWeapon
                                 local oCurTarget
-                                local bShotBlockedForCurTarget = false
-                                bShotIsBlockedForAnyUnit = false
-                                for i = 1, iWeaponCount do
-                                    oWeapon = oACU:GetWeapon(i)
-                                    if oWeapon.GetCurrentTarget and oWeapon.RangeCategory == 'UWRC_DirectFire' then
-                                        oCurTarget = oWeapon:GetCurrentTarget()
-                                        if oCurTarget and not(oCurTarget.Dead) then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': oCurTarget='..oCurTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurTarget)) end
-                                            bShotBlockedForCurTarget = M27Logic.IsShotBlocked(oACU, oCurTarget)
-                                            if bShotBlockedForCurTarget then
-                                                bShotIsBlockedForAnyUnit = true
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef..': Will draw red circle at target that is blocked')
-                                                    M27Utilities.DrawLocation(oCurTarget:GetPosition(), nil, 2, 100)
+
+
+
+                                if not(bShotBlockedForCurTarget) then
+                                    for i = 1, iWeaponCount do
+                                        oWeapon = oACU:GetWeapon(i)
+                                        if oWeapon.GetCurrentTarget and oWeapon.RangeCategory == 'UWRC_DirectFire' then
+                                            oCurTarget = oWeapon:GetCurrentTarget()
+                                            if oCurTarget and not(oCurTarget.Dead) then
+                                                if bDebugMessages == true then LOG(sFunctionRef..': oCurTarget='..oCurTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oCurTarget)) end
+                                                bShotBlockedForCurTarget = M27Logic.IsShotBlocked(oACU, oCurTarget)
+                                                if bShotBlockedForCurTarget then
+                                                    bShotIsBlockedForAnyUnit = true
+                                                    if bDebugMessages == true then
+                                                        LOG(sFunctionRef..': Will draw red circle at target that is blocked')
+                                                        M27Utilities.DrawLocation(oCurTarget:GetPosition(), nil, 2, 100)
+                                                    end
                                                 end
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef..': Found a target for ACUs current weapon, checking if shot is blocked. bShotBlockedForCurTarget='..tostring(bShotBlockedForCurTarget))
+                                                    M27Utilities.DrawLocation(oCurTarget:GetPosition())
+                                                end
+                                                break
                                             end
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef..': Found a target for ACUs current weapon, checking if shot is blocked. bShotBlockedForCurTarget='..tostring(bShotBlockedForCurTarget))
-                                                M27Utilities.DrawLocation(oCurTarget:GetPosition())
-                                            end
-                                            break
                                         end
                                     end
                                 end
@@ -6968,7 +6972,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
+            if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -10283,7 +10287,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
 
-            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 and aiBrain:GetArmyIndex() == 4 then bDebugMessages = true end
+            if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end

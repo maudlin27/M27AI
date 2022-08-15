@@ -3766,6 +3766,8 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
     local sFunctionRef = 'IsShotBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    if GetGameTimeSeconds() >= 870 and EntityCategoryContains(categories.COMMAND, oFiringUnit.UnitId) and oTargetUnit.UnitId == 'uab2101' then bDebugMessages = true end
+
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local bShotIsBlocked = false
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end

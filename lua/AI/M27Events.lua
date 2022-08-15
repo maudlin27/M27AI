@@ -747,7 +747,7 @@ end
 
 function OnBombFired(oWeapon, projectile)
     if M27Utilities.bM27AIInGame then
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'OnBombFired'
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -833,9 +833,14 @@ function OnWeaponFired(oWeapon)
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryDFTank, oUnit.UnitId) then
                     --Get weapon target
                     local oTarget = oWeapon:GetCurrentTarget()
+                    if GetGameTimeSeconds() >= 870 and EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then bDebugMessages = true end
+                    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has just fired a shot. Do we have a valid target for our weapon='..tostring(M27UnitInfo.IsUnitValid(oTarget))..'; time last shot was blocked='..(oUnit[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
                     if M27UnitInfo.IsUnitValid(oTarget) then
+
                         oUnit[M27UnitInfo.refiTimeOfLastCheck] = GetGameTimeSeconds()
                         oUnit[M27UnitInfo.refbLastShotBlocked] = M27Logic.IsShotBlocked(oUnit, oTarget)
+                        if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Is shot blocked='..tostring(oUnit[M27UnitInfo.refbLastShotBlocked])) end
+
                         if oUnit[M27UnitInfo.refbLastShotBlocked] then
                             --Reset after 20s if we havent fired any more shots at the target
                             --function DelayChangeVariable(oVariableOwner, sVariableName, vVariableValue, iDelayInSeconds, sOptionalOwnerConditionRef, iMustBeLessThanThisTimeValue, iMustBeMoreThanThisTimeValue, vMustNotEqualThisValue)
@@ -1308,6 +1313,11 @@ function OnReclaimStarted(oEngineer, oReclaim)
                 oEngineer.PlatoonHandle[M27PlatoonUtilities.refbNotStartedReclaimingYet] = false
             elseif oEngineer[M27PlatoonUtilities.refbNotStartedReclaimingYet] then
                 oEngineer[M27PlatoonUtilities.refbNotStartedReclaimingYet] = false
+            end
+        elseif M27UnitInfo.IsUnitValid(oReclaim) and oReclaim:GetAIBrain().M27AI and oReclaim:GetFractionComplete() == 1 then
+            local oReclaimingBrain = oEngineer:GetAIBrain()
+            if not(oReclaimingBrain == oReclaim:GetAIBrain()) and IsAlly(oReclaimingBrain:GetArmyIndex(), oReclaim:GetAIBrain():GetArmyIndex()) then
+                M27Chat.SendMessage(oReclaim:GetAIBrain(), 'Ally reclaiming', 'Hey, stop reclaiming my units '..oEngineer:GetAIBrain().Nickname, 0, 60)
             end
         end
 
