@@ -2330,7 +2330,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
-    if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
@@ -6983,7 +6983,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
-            if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
             --if sPlatoonName == 'M27GroundExperimental' and oPlatoon[refiPlatoonCount] == 1 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
@@ -9986,7 +9986,7 @@ function RefreshSupportPlatoonMovementPath(oPlatoon)
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
-    if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+    --if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
     --if sPlatoonName == 'M27MobileStealth' then bDebugMessages = true end
     --if oPlatoon:GetPlan() == 'M27AttackNearestUnits' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
@@ -10306,8 +10306,7 @@ function ProcessPlatoonAction(oPlatoon)
             local sPlatoonName = oPlatoon:GetPlan()
             --if sPlatoonName == 'M27DefenderAI' and oPlatoon[refiPlatoonCount] == 2 then bDebugMessages = true end
             --if oPlatoon[refiCurrentAction] == refActionUseAttackAI then bDebugMessages = true end
-
-            if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
+            --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
             --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
@@ -12566,7 +12565,7 @@ function PlatoonInitialSetup(oPlatoon)
     --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27CombatPatrolAI' then bDebugMessages = true end
     --if sPlatoonName == 'M27RetreatingShieldUnits' then bDebugMessages = true end
-    if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
+    --if sPlatoonName == 'M27MobileShield' then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauScout' then bDebugMessages = true end
     --if sPlatoonName == 'M27PlateauLandCombat' then bDebugMessages = true end

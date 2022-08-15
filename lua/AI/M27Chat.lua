@@ -193,6 +193,10 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                 --Do we have an enemy M27 brain?
                 if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]) == false then
                     for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
+                        if oBrain.M27AI then
+                            SendMessage(aiBrain, 'Initial greeting', 'thx, u2', 50 - math.floor(GetGameTimeSeconds()), 0)
+                            break
+                        end
                     end
                 end
             end
