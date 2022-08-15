@@ -295,7 +295,7 @@ function GetPlatoonUnitsOrUnitCount(oPlatoon, sFriendlyUnitTableVariableWanted, 
     if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Start of code') end
     if not(bOnlyGetIfUnitAvailable) or not(oPlatoon[M27UnitInfo.refbSpecialMicroActive]) then
         if bDebugMessages == true then LOG(sFunctionRef..': Either no micro active or not interested in checking if its active') end
-        if oPlatoon[M27UnitInfo.refbSpecialMicroActive] then LOG('refbSpecialMicroActive='..tostring(oPlatoon[M27UnitInfo.refbSpecialMicroActive])) end
+        --if oPlatoon[M27UnitInfo.refbSpecialMicroActive] then LOG('refbSpecialMicroActive='..tostring(oPlatoon[M27UnitInfo.refbSpecialMicroActive])) end
         if not(bOnlyGetIfUnitAvailable==nil) and bDebugMessages == true then LOG('bOnlyGetIfUnitAvailable='..tostring(bOnlyGetIfUnitAvailable)) end
         if bReturnCountNotTable then
             if M27Utilities.IsTableEmpty(tBaseVariable) == true then iCount = 0 else iCount = table.getn(tBaseVariable) end
@@ -1475,7 +1475,7 @@ function DeterminePlatoonCompletionAction(oPlatoon)
                             oPlatoon[refiCurrentAction] = refActionReissueMovementPath
                         else
                             --Cant path to the nearest enemy, Move to first rally point if theyre within 100 of base though
-                            if M27Utilities.GetDistanceBetweenPositions(oNearestEnemy, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 100 then
+                            if M27Utilities.GetDistanceBetweenPositions(oNearestEnemy:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 100 then
                                 oPlatoon[refiCurrentAction] = refActionGoToNearestRallyPoint
                             else
                                 oPlatoon[refiCurrentAction] = refActionSuicide
@@ -3581,13 +3581,9 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                         end
                                         bDontConsiderFurtherOrders = true
                                         --elseif bShotIsBlockedForAnyUnit == true then
-                                    else
+                                    elseif not(bShotIsBlockedForAllUnits) and oClosestUnitWhereShotNotBlocked then
                                         oPlatoon[refiCurrentAction] = refActionAttackSpecificUnit
                                         oPlatoon[refoTemporaryAttackTarget] = oClosestUnitWhereShotNotBlocked
-                                        if oClosestUnitWhereShotNotBlocked == nil then
-                                            M27Utilities.ErrorHandler('Trying to assign attack command when no unit, will clear action instead')
-                                            oPlatoon[refiCurrentAction] = nil
-                                        end
                                     end
                                 end
                                 if bDebugMessages == true then
@@ -4610,7 +4606,7 @@ function CombineNearbyPlatoonsOfType(aiBrain, sPlanToCombine)
         local iMergesWanted = 5
         if bDebugMessages == true then LOG(sFunctionRef..': iSkirmisherCount='..iSkirmisherCount..'; will cycle through every platoon and see if can merge any of them') end
         for iPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-            if oPlatoon.GetPlan and oPlatoon:GetPlan() == sPlanToCombine then
+            if oPlatoon.GetPlan and oPlatoon[M27PlatoonTemplates.refiPlatoonAmalgamationMaxSize] and oPlatoon[refoFrontUnit] and oPlatoon[refiCurrentUnits] > 0 and oPlatoon:GetPlan() == sPlanToCombine then
                 if oPlatoon[refiCurrentUnits] < oPlatoon[M27PlatoonTemplates.refiPlatoonAmalgamationMaxSize] then
                     oPlatoon[M27PlatoonTemplates.reftPlatoonsToAmalgamate] = {sPlanToCombine}
                     iUnitsBeforeMerge = oPlatoon[refiCurrentUnits]

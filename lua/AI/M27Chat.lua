@@ -191,12 +191,12 @@ function ConsiderPlayerSpecificMessages(aiBrain)
             if not(bSentSpecificMessage) and M27Utilities.IsTableEmpty(tiM27VoiceTauntByType['Specific opponent']) then
                 SendMessage(aiBrain, 'Initial greeting', 'gl hf', 50 - math.floor(GetGameTimeSeconds()), 10)
                 --Do we have an enemy M27 brain?
-                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.toEnemyBrains]) == false then
-                    for iBrain, oBrain in aiBrain[M27Overseer.toEnemyBrains] do
-                        if oBrain.M27AI then
-                            SendMessage(aiBrain, 'Initial greeting', 'thx, u2', 50 - math.floor(GetGameTimeSeconds()), 0)
-                            break
-                        end
+                for iBrain, oBrain in ArmyBrains do
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..'; ArmyIndex='..oBrain:GetArmyIndex()..'; .M27AI='..tostring(oBrain.M27AI or false)) end
+                    if oBrain.M27AI and not(oBrain == aiBrain) and IsEnemy(aiBrain:GetArmyIndex(), oBrain:GetArmyIndex()) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will send thanks you too message') end
+                        SendMessage(aiBrain, 'Initial greeting', 'thx, u2', 55 - math.floor(GetGameTimeSeconds()), 0)
+                        break
                     end
                 end
             end

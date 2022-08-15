@@ -445,6 +445,43 @@ function IsCivilianBrain(aiBrain)
     return bIsCivilian
 end
 
+function CheckIfAllEnemiesDead(aiBrain)
+    --Returns true if aiBrain has no enemies and did at start of game.  Also updates variables rleating to this
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'CheckIfAllEnemiesDead'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. aiBrain[M27Overseer.refbNoEnemies]='..tostring(aiBrain[M27Overseer.refbNoEnemies] or false)..'; aiBrain[refbAllEnemiesDead]='..tostring(aiBrain[refbAllEnemiesDead] or false)) end
+    if aiBrain[refbAllEnemiesDead] then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return true
+    else
+        if not(aiBrain[M27Overseer.refbNoEnemies]) then
+            local bHaveAnyEnemies = false
+            for iBrain, oBrain in ArmyBrains do
+                if IsEnemy(oBrain:GetArmyIndex(), aiBrain:GetArmyIndex()) then
+                    if not(oBrain.M27IsDefeated) and not(oBrain:IsDefeated()) and not(IsCivilianBrain(oBrain)) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy '..oBrain.Nickname..' isnt flagged as defeated') end
+                        bHaveAnyEnemies = true
+                        break
+                    end
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished checking every brain in ArmyBrains. bHaveAnyEnemies='..tostring(bHaveAnyEnemies)) end
+            if not(bHaveAnyEnemies) then
+                aiBrain[refbAllEnemiesDead] = true
+                iTimeOfLastBrainAllDefeated = GetGameTimeSeconds()
+                if bDebugMessages == true then LOG(sFunctionRef..': Returning true') end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return true
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Returning false') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return false
+    end
+end
+
 function GetNearestEnemyIndex(aiBrain, bForceDebug)
     --Returns the ai brain index of the enemy who's got the nearest start location to aiBrain's start location and is still alive
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -573,18 +610,23 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                         end
                     end
                     if bHaveBrains and bAllDefeated == true then
-                        LOG('All enemies defeated, ACU death count=' .. M27Overseer.iACUDeathCount .. '; will ignore errors with nearest enemy index and wait 1 second1')
-                        if M27Overseer.iACUDeathCount == 0 then
-                            if GetGameTimeSeconds() - iTimeOfLastBrainAllDefeated >= 5 then
-                                M27Utilities.ErrorHandler('All brains are showing as dead but we havent recorded any ACU deaths.  Assuming all enemies are dead and aborting all code; will show this message every 5s')
-                                iTimeOfLastBrainAllDefeated = GetGameTimeSeconds()
-                                aiBrain[refbAllEnemiesDead] = true
+                        if not(aiBrain[refbAllEnemiesDead]) then
+                            LOG('All enemies defeated, ACU death count=' .. M27Overseer.iACUDeathCount)
+                            if CheckIfAllEnemiesDead(aiBrain) then return nil end
+                            if M27Overseer.iACUDeathCount == 0 then
+                                if GetGameTimeSeconds() - iTimeOfLastBrainAllDefeated >= 5 then
+                                    M27Utilities.ErrorHandler('All brains are showing as dead but we havent recorded any ACU deaths.  Assuming all enemies are dead and aborting all code; will show this message every 5s')
+                                    iTimeOfLastBrainAllDefeated = GetGameTimeSeconds()
+                                    aiBrain[refbAllEnemiesDead] = true
+                                end
                             end
-                        end
 
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        WaitSeconds(1)
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            WaitSeconds(1)
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                        else
+                            return nil
+                        end
                     elseif bHaveBrains and not(aiBrain[refbAllEnemiesDead]) then
                         M27Utilities.ErrorHandler('iNearestEnemyIndex is nil so will wait 1 sec and then repeat function with logs enabled; if gametime is <=10s then will also flag that the aiBrain has no enemies')
                         if GetGameTimeSeconds() <= 10 then
@@ -599,12 +641,15 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                     else
                         --No brains - could be game mode doesnt have enemy player brains
                         if not(aiBrain[refbAllEnemiesDead]) then
-                            M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will call again with logs enabled. if gametime is <=10s then will also flag that the aiBrain has no enemies and update start positions accordingly')
+                            M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; if gametime is <=10s then will also flag that the aiBrain has no enemies and update start positions accordingly; otherwise will assume all enemies defeated')
                             if GetGameTimeSeconds() <= 10 then
                                 aiBrain[M27Overseer.refbNoEnemies] = true
                                 M27MapInfo.bUsingArmyIndexForStartPosition = true
                                 M27MapInfo.RecordPlayerStartLocations()
                                 if bDebugMessages == true then LOG(sFunctionRef..': No enemy brains identified, Setting no enemies to be true') end
+                            elseif not(aiBrain[M27Overseer.refbNoEnemies]) then
+                                --Check if any of armybrains are enemies
+                                if CheckIfAllEnemiesDead(aiBrain) then return nil end
                             end
                             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             return GetNearestEnemyIndex(aiBrain, true)
@@ -664,7 +709,7 @@ function IndexToStartNumber(iArmyIndex)
     iStartPoint = tPlayerStartPointByIndex[iArmyIndex]
     if iStartPoint == nil then
         if not(iTimeOfLastBrainAllDefeated) or iTimeOfLastBrainAllDefeated<10 then
-            M27Utilities.ErrorHandler('Dont have start position for iArmyIndex='..(iArmyIndex or 'nil')..'; will now enable logs and try to figure out why')
+            M27Utilities.ErrorHandler('Dont have start position for iArmyIndex='..(iArmyIndex or 'nil')..'; will now enable logs and try to figure out why. iTimeOfLastBrainAllDefeated='..(iTimeOfLastBrainAllDefeated or 'nil'))
             for iCurBrain, aiBrain in ArmyBrains do
                 LOG('iCurBrain='..iCurBrain..'; ArmyIndex='..aiBrain:GetArmyIndex()..'; M27StartPositionNumber='..(aiBrain.M27StartPositionNumber or 'nil'))
                 if not(aiBrain.M27StartPositionNumber) then

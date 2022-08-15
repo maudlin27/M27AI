@@ -4792,7 +4792,7 @@ function AirBomberManager(aiBrain)
         local iAvailableBombers
         local tBasePosition
         local iHighestPriorityFound
-        local tStartPoint
+        local tStartPoint = {M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][2], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]}
         local tEnemyAA
 
         local iNearestCruiserModDistance = 10000
@@ -4889,7 +4889,7 @@ function AirBomberManager(aiBrain)
                 aiBrain[refbEnemyHasHadCruisersOrT3AA] = true
                 if M27Utilities.IsTableEmpty(M27Chat.tiM27VoiceTauntByType['LotsOfAA']) then
                     if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false and table.getn(tEnemyAAAndCruisers) >= 10 then
-                        M27Chat.SendMessage(aiBrain, 'LotsOfAA', 'Thats a lot of anti-air commander.  Think it\'ll be enough to calm the fear?', 0, 10000)
+                        M27Chat.SendMessage(aiBrain, 'LotsOfAA', 'That\'s a lot of anti-air commander.  Think it\'ll be enough to calm the fear?', 0, 10000)
                     end
                 end
             end

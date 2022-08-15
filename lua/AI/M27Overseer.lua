@@ -7670,6 +7670,10 @@ function RecordAllEnemiesAndAllies(aiBrain)
             M27Team.TeamInitialisation(M27Team.iTotalTeamCount)
         end
 
+        if iEnemyCount == 0 and not(aiBrain[refbNoEnemies]) then
+            M27Logic.CheckIfAllEnemiesDead(aiBrain)
+        end
+
 
         --Record if we have omni vision for every AI in our team; want to do here so this re-runs whenever an AI dies
         local bHaveOmniVision = false
@@ -8240,7 +8244,8 @@ function GameSettingWarningsAndChecks(aiBrain)
                 if bHaveOtherAIMod then
                     --Do we have non-M27 AI?
                     for iBrain, oBrain in ArmyBrains do
-                        if oBrain.BrainType == 'AI' and not(oBrain.M27AI) and not(M27Logic.IsCivilianBrain(oBrain)) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have another AI mod enabled. reprs of oBrain='..reprs(oBrain)..'; is BrainType empty='..tostring(oBrain.BrainType == 'nil')..'; is brian type an empty string='..tostring(oBrain.BrainType == '')) end
+                        if ((oBrain.BrainType == 'AI' and not(oBrain.M27AI)) or oBrain.DilliDalli) and not(M27Logic.IsCivilianBrain(oBrain)) then
                             bHaveOtherAI = true
                             if bDebugMessages == true then LOG('Have an AI for a brain') end
                             break
