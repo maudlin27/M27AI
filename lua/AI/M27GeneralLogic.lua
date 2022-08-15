@@ -3713,23 +3713,32 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE, bRet
     --If iAOE is specified then will end once reach the iAOE range
     --(aiBrain included as argument as want to retry CheckBlockingTerrain in the future)
     --bReturnDistanceThatBlocked - if true then returns either distance at which shot is blocked, or the distance+1 between the start and end position
+
+    --Angle (looking only at vertical dif) from shot start to shot end, theta: Tan Theta = Opp/Adj, so Theta = tan-1 Opp/Adj
+    --Once have this angle, then the height if move vertically to the target is: Sin theta = opp / hyp
+    --Opp is the height dif; adj is the distance between start and end (referred to below as iFlatDistance)
+
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLineBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bShotIsBlocked = false
     local iFlatDistance = M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition)
     local tTerrainPositionAtPoint = {}
+    local bStartHigherThanEnd = false
+    if tShotStartPosition[2] > tShotEndPosition[2] then bStartHigherThanEnd = true end
     if iFlatDistance > 1 then
-        local iAngle = math.atan(M27Utilities.ConvertAngleToRadians((tShotEndPosition[2] - tShotStartPosition[2]) / iFlatDistance))
+        local iAngleInRadians = math.atan(math.abs((tShotEndPosition[2] - tShotStartPosition[2])) / iFlatDistance)
         local iShotHeightAtPoint
-        if bDebugMessages == true then LOG(sFunctionRef..': About to check if at any point on path shot will be lower than terrain; iAngle='..iAngle..'; startshot height='..tShotStartPosition[2]..'; target height='..tShotEndPosition[2]..'; iFlatDistance='..iFlatDistance) end
+        if bDebugMessages == true then LOG(sFunctionRef..': About to check if at any point on path shot will be lower than terrain; iAngle='..M27Utilities.ConvertAngleToRadians(iAngleInRadians)..'; startshot height='..tShotStartPosition[2]..'; target height='..tShotEndPosition[2]..'; iFlatDistance='..iFlatDistance) end
         local iEndPoint = math.max(1, math.floor(iFlatDistance - (iAOE or 0)))
         for iPointToTarget = 1, iEndPoint do
-        --math.min(math.floor(iFlatDistance), math.max(math.floor(iStartDistance or 1),1)), math.floor(iFlatDistance) do
+            --math.min(math.floor(iFlatDistance), math.max(math.floor(iStartDistance or 1),1)), math.floor(iFlatDistance) do
             --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
             tTerrainPositionAtPoint = M27Utilities.MoveTowardsTarget(tShotStartPosition, tShotEndPosition, iPointToTarget, 0)
             if bDebugMessages == true then LOG(sFunctionRef..': iPointToTarget='..iPointToTarget..'; tTerrainPositionAtPoint='..repru(tTerrainPositionAtPoint)) end
-            iShotHeightAtPoint = math.tan(M27Utilities.ConvertAngleToRadians(iAngle)) * iPointToTarget + tShotStartPosition[2]
+            if bStartHigherThanEnd then iShotHeightAtPoint = tShotStartPosition[2] - math.sin(iAngleInRadians) * iPointToTarget
+            else iShotHeightAtPoint = tShotStartPosition[2] + math.sin(iAngleInRadians) * iPointToTarget
+            end
             if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
                 if not(iPointToTarget == iEndPoint and iShotHeightAtPoint == tTerrainPositionAtPoint[2]) then
                     if bDebugMessages == true then
@@ -3746,7 +3755,10 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE, bRet
                 elseif bDebugMessages == true then LOG(sFunctionRef..': Are at end point and terrain height is identical, so will assume we will actually reach the target')
                 end
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': Shot not blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Shot not blocked at this position, will draw in blue; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]..'; iAngle='..M27Utilities.ConvertAngleToRadians(iAngleInRadians)..'; iPointToTarget='..iPointToTarget..'; tShotStartPosition[2]='..tShotStartPosition[2])
+                    M27Utilities.DrawLocation(tTerrainPositionAtPoint, false, 1, 20)
+                end
             end
         end
     else bShotIsBlocked = false
@@ -3766,7 +3778,6 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
     local sFunctionRef = 'IsShotBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if GetGameTimeSeconds() >= 870 and EntityCategoryContains(categories.COMMAND, oFiringUnit.UnitId) and oTargetUnit.UnitId == 'uab2101' then bDebugMessages = true end
 
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local bShotIsBlocked = false
@@ -3843,6 +3854,7 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
                 bShotIsBlocked = true
             else
                 --Have the shot end and start positions; now want to move along a line between the two and work out if terrain will block the shot
+                if bDebugMessages == true then LOG(sFunctionRef..': About to see if line is blocked. tShotStartPosition='..repru(tShotStartPosition)..'; tShotEndPosition='..repru(tShotEndPosition)..'; Terrain height at start='..GetTerrainHeight(tShotStartPosition[1], tShotStartPosition[3])..'; Terrain height at end='..GetTerrainHeight(tShotEndPosition[1], tShotEndPosition[3])) end
                 bShotIsBlocked = IsLineBlocked(oFiringUnit:GetAIBrain(), tShotStartPosition, tShotEndPosition)
             end
         end

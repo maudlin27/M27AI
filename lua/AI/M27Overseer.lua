@@ -220,6 +220,8 @@ refbStopACUKillStrategy = 'M27OverseerStopACUKillStrat'
 refoLastNearestACU = 'M27OverseerLastACUObject'
 reftLastNearestACU = 'M27OverseerLastACUPosition' --Position of the last ACU we saw
 refiLastNearestACUDistance = 'M27OverseerLastNearestACUDistance'
+
+
 refbEnemyACUNearOurs = 'M27OverseerACUNearOurs'
 refoACUKillTarget = 'M27OverseerACUKillTarget'
 reftACUKillTarget = 'M27OverseerACUKillPosition'
@@ -4913,6 +4915,7 @@ function ACUManager(aiBrain)
                                 aiBrain[refoLastNearestACU] = oNearestACU
                                 aiBrain[reftLastNearestACU] = tNearestACU
                                 iLastDistanceToACU = iDistanceToACU
+                                aiBrain[refiLastNearestACUDistance] = iDistanceToACU
                             else
                                 --Nearest ACU may just be temporarily hidden so dont want to revise the value
                             end

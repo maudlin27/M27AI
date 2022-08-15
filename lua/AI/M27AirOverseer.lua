@@ -1985,7 +1985,6 @@ function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangin
             --if bDebugMessages == true then LOG(sFunctionRef..': Projectile still there. iTargetHealth='..iTargetHealth) end
         end
     end
-    if M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': End of loop. is target still valid='..tostring(M27UnitInfo.IsUnitValid(oTarget))..'; Bomber LC='..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Is bomber valid='..tostring(M27UnitInfo.IsUnitValid(oBomber))) end
     if M27UnitInfo.IsUnitValid(oTarget) then
         if bFailedAttack then

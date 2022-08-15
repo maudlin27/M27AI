@@ -436,7 +436,7 @@ function OnUnitDeath(oUnit)
                     --Is the unit owned by M27AI?
                     if aiBrain.M27AI then
                         --Flag for the platoon count of units to be updated:
-                        if oUnit.PlatoonHandle then oUnit.PlatoonHandle[M27PlatoonUtilities.refbUnitHasDiedRecently] = true end
+                        if oUnit.PlatoonHandle then oUnit.PlatoonHandle[M27PlatoonUtilities.refbPlatoonUnitDetailsChangedRecently] = true end
 
                         --Run unit type specific on death logic
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -747,7 +747,7 @@ end
 
 function OnBombFired(oWeapon, projectile)
     if M27Utilities.bM27AIInGame then
-        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         local sFunctionRef = 'OnBombFired'
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -833,7 +833,6 @@ function OnWeaponFired(oWeapon)
                 elseif EntityCategoryContains(M27UnitInfo.refCategoryDFTank, oUnit.UnitId) then
                     --Get weapon target
                     local oTarget = oWeapon:GetCurrentTarget()
-                    if GetGameTimeSeconds() >= 870 and EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then bDebugMessages = true end
                     if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has just fired a shot. Do we have a valid target for our weapon='..tostring(M27UnitInfo.IsUnitValid(oTarget))..'; time last shot was blocked='..(oUnit[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
                     if M27UnitInfo.IsUnitValid(oTarget) then
 
