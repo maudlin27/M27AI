@@ -220,6 +220,8 @@ refbStopACUKillStrategy = 'M27OverseerStopACUKillStrat'
 refoLastNearestACU = 'M27OverseerLastACUObject'
 reftLastNearestACU = 'M27OverseerLastACUPosition' --Position of the last ACU we saw
 refiLastNearestACUDistance = 'M27OverseerLastNearestACUDistance'
+
+
 refbEnemyACUNearOurs = 'M27OverseerACUNearOurs'
 refoACUKillTarget = 'M27OverseerACUKillTarget'
 reftACUKillTarget = 'M27OverseerACUKillPosition'
@@ -4913,6 +4915,7 @@ function ACUManager(aiBrain)
                                 aiBrain[refoLastNearestACU] = oNearestACU
                                 aiBrain[reftLastNearestACU] = tNearestACU
                                 iLastDistanceToACU = iDistanceToACU
+                                aiBrain[refiLastNearestACUDistance] = iDistanceToACU
                             else
                                 --Nearest ACU may just be temporarily hidden so dont want to revise the value
                             end
@@ -5570,6 +5573,8 @@ function ACUManager(aiBrain)
                                     LOG(sFunctionRef .. ': Are either away from base or below emergency response; have flagged we want emergency requisition so will set strategy to protect ACU')
                                 end
                                 aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
+                                --ask for help if we are far from base (if closer then assume teammates can already tell we need help
+                                if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 150 then M27Chat.SendMessage(aiBrain, 'Protect ACU', 'My ACU could use some help', 0, 300, true) end
                             end
                         end
 
@@ -5652,6 +5657,8 @@ function ACUManager(aiBrain)
                 aiBrain[refiAIBrainCurrentStrategy] = refStrategyACUKill
                 aiBrain[refbStopACUKillStrategy] = false
                 aiBrain[refbIncludeACUInAllOutAttack] = bIncludeACUInAttack
+
+                if EntityCategoryContains(categories.COMMAND, aiBrain[refoACUKillTarget].UnitId) and ScenarioInfo.Options.Victory == "demoralization" then M27Chat.SendMessage(aiBrain, 'Kill ACU', 'Targeting '..aiBrain[refoACUKillTarget]:GetAIBrain().Nickname..' ACU', 0, 300, true) end
                 --Consider Ctrl-K of ACU
                 local bSuicide = false
                 if oACU:GetHealth() <= 275 and M27UnitInfo.IsUnitValid(oEnemyACUToConsiderAttacking) then
@@ -6320,21 +6327,25 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
         local iBigThreatSearchRange = 10000
 
-        local tEnemyBigThreatCategories = { M27UnitInfo.refCategoryLandExperimental, M27UnitInfo.refCategoryFixedT3Arti, M27UnitInfo.refCategoryExperimentalStructure, M27UnitInfo.refCategorySML, M27UnitInfo.refCategoryTML, M27UnitInfo.refCategoryMissileNavy, M27UnitInfo.refCategorySMD }
+        local tEnemyBigThreatCategories = { ['Land experimental'] = M27UnitInfo.refCategoryLandExperimental, ['T3 arti'] = M27UnitInfo.refCategoryFixedT3Arti, ['Experimental building'] = M27UnitInfo.refCategoryExperimentalStructure, ['Nuke'] = M27UnitInfo.refCategorySML, ['TML'] = M27UnitInfo.refCategoryTML, ['Missile ships'] = M27UnitInfo.refCategoryMissileNavy, ['SMD'] = M27UnitInfo.refCategorySMD }
         local tCurCategoryUnits
         local tReferenceTable, bRemovedUnit
         local sUnitUniqueRef
         local bWantACUToReturnToBase = false --Affects whether ACU will run or not
         local bAlreadyInTable
         local iPathingGroupWanted = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+        local bConsiderChatWarning = false
 
-        for _, iCategory in tEnemyBigThreatCategories do
+        for sCategoryDesc, iCategory in tEnemyBigThreatCategories do
             bWantACUToReturnToBase = false
+            bConsiderChatWarning = false
             tCurCategoryUnits = aiBrain:GetUnitsAroundPoint(iCategory, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], iBigThreatSearchRange, 'Enemy')
             if iCategory == M27UnitInfo.refCategoryExperimentalStructure or iCategory == M27UnitInfo.refCategoryFixedT3Arti then
                 tReferenceTable = aiBrain[reftEnemyArtiAndExpStructure]
+                bConsiderChatWarning = true
             elseif iCategory == M27UnitInfo.refCategorySML then
                 tReferenceTable = aiBrain[reftEnemyNukeLaunchers]
+                bConsiderChatWarning = true
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Looking for enemy nukes')
                 end
@@ -6346,9 +6357,11 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 end
             elseif iCategory == M27UnitInfo.refCategoryLandExperimental then
                 tReferenceTable = aiBrain[reftEnemyLandExperimentals]
+                bConsiderChatWarning = true
                 bWantACUToReturnToBase = true
             elseif iCategory == M27UnitInfo.refCategoryFixedT3Arti or iCategory == M27UnitInfo.refCategoryExperimentalStructure then
                 tReferenceTable = aiBrain[reftEnemyArtiAndExpStructure]
+                bConsiderChatWarning = true
             elseif iCategory == M27UnitInfo.refCategorySMD then
                 tReferenceTable = aiBrain[reftEnemySMD]
             else
@@ -6390,6 +6403,25 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                             end
                         end
                         if not(bAlreadyInTable) then
+
+                            if bDebugMessages == true then LOG(sFunctionRef..': About to add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to reference table. Is table empty='..tostring(M27Utilities.IsTableEmpty(tReferenceTable))..'; bConsiderChatWarning='..tostring(bConsiderChatWarning)..'; Unit fraction complete='..oUnit:GetFractionComplete()..'; T3 resource generation units held by owner='..oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon)) end
+                            if bConsiderChatWarning and M27Utilities.IsTableEmpty(tReferenceTable) then
+                                if sCategoryDesc == 'Experimental building' then
+                                    if EntityCategoryContains(M27UnitInfo.refCategoryNovaxCentre, oUnit.UnitId) then
+                                        M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy Novax detected', 0, 1000, true)
+                                    else
+                                        if oUnit:GetFractionComplete() <= 0.2 and oUnit:GetAIBrain():GetCurrentUnits(M27UnitInfo.refCategoryT3Mex + M27UnitInfo.refCategoryRASSACU + M27UnitInfo.refCategoryParagon) <= 20 then
+                                            M27Chat.SendMessage(aiBrain, sCategoryDesc, 'LOL theyre building a '..LOCF(oUnit:GetBlueprint().General.UnitName), 0, 1000, true)
+                                        else
+                                            M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..LOCF(oUnit:GetBlueprint().General.UnitName)..' detected', 0, 1000, true)
+                                        end
+                                    end
+
+                                else
+                                    M27Chat.SendMessage(aiBrain, sCategoryDesc, 'Enemy '..sCategoryDesc..' detected', 0, 1000, true)
+                                end
+                            end
+
                             table.insert(tReferenceTable, oUnit)
                         end
                         --[[sUnitUniqueRef = oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)
@@ -6403,7 +6435,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                     aiBrain[refbAreBigThreats] = true
                 end
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Have some units for experimental threat category _=' .. _ .. '; is tReferenceTableEmpty after considering if civilian or pathable to us='..tostring(M27Utilities.IsTableEmpty(tReferenceTable))..'; aiBrain[refbAreBigThreats]='..tostring(aiBrain[refbAreBigThreats]))
+                    LOG(sFunctionRef .. ': Have some units for experimental threat category sCategoryDesc=' .. sCategoryDesc .. '; is tReferenceTableEmpty after considering if civilian or pathable to us='..tostring(M27Utilities.IsTableEmpty(tReferenceTable))..'; aiBrain[refbAreBigThreats]='..tostring(aiBrain[refbAreBigThreats]))
                 end
             end
 
@@ -6441,6 +6473,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             if aiBrain[refbEnemyTMLSightedBefore] == false then
                 aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
                 aiBrain[refbEnemyTMLSightedBefore] = true
+                M27Chat.SendMessage(aiBrain, 'TML sighted', 'They have TML, get TMD', 0, 90, true)
             end
         else
             --No TML - remove the flag that we need TMD from units
@@ -6861,6 +6894,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                         LOG(sFunctionRef .. ': Setting strategy as air dominance')
                     end
                     aiBrain[refiAIBrainCurrentStrategy] = refStrategyAirDominance
+                    M27Chat.SendMessage(aiBrain, 'Air domination', 'Im going to try and win with bombers', 0, 150, true)
                 else
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Dont want air dom strategy so will consider alternatives')
@@ -6903,7 +6937,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                                         bBigEnemyThreat = true
                                     end
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs])..'; ACU health 1s ago='..(oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or 'nil')..'; ACU health 11s ago='..oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11]..'; Are all chokepoitns covered='..tostring(M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)))
+                                        LOG(sFunctionRef .. 'Not protecting ACU, seeing whether to eco; bBigEnemyTHreat=' .. tostring(bBigEnemyThreat or false) .. '; aiBrain[refbEnemyACUNearOurs]=' .. tostring(aiBrain[refbEnemyACUNearOurs] or false)..'; ACU health 1s ago='..(oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 1] or 'nil')..'; ACU health 11s ago='..(oACU[reftACURecentHealth][math.floor(GetGameTimeSeconds()) - 11] or 'nil')..'; Are all chokepoitns covered='..tostring((M27Conditions.AreAllChokepointsCoveredByTeam(aiBrain)) or false))
                                     end
 
 
@@ -7636,6 +7670,10 @@ function RecordAllEnemiesAndAllies(aiBrain)
             M27Team.TeamInitialisation(M27Team.iTotalTeamCount)
         end
 
+        if iEnemyCount == 0 and not(aiBrain[refbNoEnemies]) then
+            M27Logic.CheckIfAllEnemiesDead(aiBrain)
+        end
+
 
         --Record if we have omni vision for every AI in our team; want to do here so this re-runs whenever an AI dies
         local bHaveOmniVision = false
@@ -8105,6 +8143,8 @@ function OverseerInitialisation(aiBrain)
     ForkThread(M27MapInfo.UpdatePlateausToExpandTo, aiBrain)
     ForkThread(M27Transport.TransportInitialisation, aiBrain)
 
+    ForkThread(M27Chat.ConsiderPlayerSpecificMessages, aiBrain)
+
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': End of code')
     end
@@ -8159,6 +8199,10 @@ function GameSettingWarningsAndChecks(aiBrain)
     local tAIModNameWhitelist = {
         'M27AI', 'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI', 'SACUAI',
     }
+
+    local tAIModNameWhereExpectAI = {
+        'AI-Swarm', 'AI-Uveso', 'AI: DilliDalli', 'Dalli AI', 'Dilli AI', 'M20AI', 'Marlo\'s Sorian AI edit', 'RNGAI',
+    }
     local tModIsOk = {}
     local bHaveOtherAI = false
     local sUnnecessaryAIMod
@@ -8189,24 +8233,42 @@ function GameSettingWarningsAndChecks(aiBrain)
                 bFlyingEngineers = true
                 if bDebugMessages == true then LOG(sFunctionRef..': Have flying engineers mod enabled so will adjust engineer categories') end
             end
-        elseif tModIsOk[tModData.name] and not(tModData.name == 'M27AI') then
+        elseif tModIsOk[tModData.name] then
             if not(bHaveOtherAIMod) then
-                bHaveOtherAIMod = true
-                --Do we have non-M27 AI?
-                for iBrain, oBrain in ArmyBrains do
-                    if oBrain.BrainType == 'AI' and not(oBrain.M27AI) and not(M27Logic.IsCivilianBrain(oBrain)) then
-                        bHaveOtherAI = true
-                        if bDebugMessages == true then LOG('Have an AI for a brain') end
+                for iAIMod, sAIMod in tAIModNameWhereExpectAI do
+                    if sAIMod == tModData.name then
+                        bHaveOtherAIMod = true
                         break
                     end
                 end
+                if bHaveOtherAIMod then
+                    --Do we have non-M27 AI?
+                    for iBrain, oBrain in ArmyBrains do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have another AI mod enabled. reprs of oBrain='..reprs(oBrain)..'; is BrainType empty='..tostring(oBrain.BrainType == 'nil')..'; is brian type an empty string='..tostring(oBrain.BrainType == '')) end
+                        if ((oBrain.BrainType == 'AI' and not(oBrain.M27AI)) or oBrain.DilliDalli) and not(M27Logic.IsCivilianBrain(oBrain)) then
+                            bHaveOtherAI = true
+                            if bDebugMessages == true then LOG('Have an AI for a brain') end
+                            break
+                        end
+                    end
+                end
             end
-            if not(bHaveOtherAI) then
-                iUnnecessaryAIModCount = iUnnecessaryAIModCount + 1
-                if iUnnecessaryAIModCount == 1 then
-                    sUnnecessaryAIMod = tModData.name
-                else
-                    sUnnecessaryAIMod = sUnnecessaryAIMod..', '..tModData.name
+            if bHaveOtherAIMod and not(bHaveOtherAI) then
+                local bUnnecessaryMod = false
+                for iAIMod, sAIMod in tAIModNameWhereExpectAI do
+                    if sAIMod == tModData.name then
+                        bUnnecessaryMod = true
+                        break
+                    end
+                end
+                if bUnnecessaryMod then
+
+                    iUnnecessaryAIModCount = iUnnecessaryAIModCount + 1
+                    if iUnnecessaryAIModCount == 1 then
+                        sUnnecessaryAIMod = tModData.name
+                    else
+                        sUnnecessaryAIMod = sUnnecessaryAIMod..', '..tModData.name
+                    end
                 end
             end
         end
@@ -8599,7 +8661,10 @@ end
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
 
+    --Send team chat message
+    M27Chat.SendMessage(aiBrain, 'Test', 'Hi there team', 1, 5, true)
 
+    --[[
 
     if aiBrain:GetArmyIndex() == 1 or aiBrain:GetArmyIndex() == 2 then
         --Spawn a hoplie and gift it to an ally
@@ -8615,7 +8680,7 @@ function TestCustom(aiBrain)
             end
             end
         end
-    end
+    end--]]
 
     --Give resources
     --[[local oBrainToGive
@@ -9034,6 +9099,7 @@ function OverseerManager(aiBrain)
         if aiBrain[refbIntelPathsGenerated] == true then
             ForkThread(AssignScoutsToPreferredPlatoons, aiBrain)
         end
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, 0.08) --MAA wait
         --[[if not (WaitTicksSpecial(aiBrain, iTicksToWait)) then
@@ -9050,6 +9116,7 @@ function OverseerManager(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
             DebugPrintACUPlatoon(aiBrain)
         end
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, 2) --Threat assess
 
@@ -9068,6 +9135,7 @@ function OverseerManager(aiBrain)
             --M27EngineerOverseer.TEMPTEST(aiBrain)
         end
 
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, 0.2) --ACU manager
 
@@ -9094,6 +9162,7 @@ function OverseerManager(aiBrain)
 
         iCost = 1
         if iSlowerCycleCount <= 1 then iCost = iCost + 0.15 end
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, iCost) --Strategic overseer
 
@@ -9117,6 +9186,7 @@ function OverseerManager(aiBrain)
                 --M27EngineerOverseer.TEMPTEST(aiBrain)
             end
         end
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(1, 2, 0.22) --Refresh economy data
 
@@ -9139,6 +9209,7 @@ function OverseerManager(aiBrain)
 
         --NOTE: We dont have the number of ticks below as 'available' for use, since on initialisation we're waiting ticks as well when initialising things such as the engineer and upgrade overseers which work off their own loops
         --therefore the actual available tick count will be the below number less the number of ticks we're already waiting
+        if aiBrain.M27IsDefeated then break end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(math.max(1, 10 - iTicksWaitedThisCycle), 5, 1) --wait for the start of the loop (scout scheduler)
 

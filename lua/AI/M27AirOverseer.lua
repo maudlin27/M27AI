@@ -12,6 +12,7 @@ local M27UnitMicro = import('/mods/M27AI/lua/AI/M27UnitMicro.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
+local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 
 --General air scouting values
 iAirSegmentSize = 1 --Updated/set in initialisation
@@ -1984,7 +1985,7 @@ function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangin
             --if bDebugMessages == true then LOG(sFunctionRef..': Projectile still there. iTargetHealth='..iTargetHealth) end
         end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': End of loop. is target still valid='..tostring(M27UnitInfo.IsUnitValid(oTarget))) end
+    if bDebugMessages == true then LOG(sFunctionRef..': End of loop. is target still valid='..tostring(M27UnitInfo.IsUnitValid(oTarget))..'; Bomber LC='..M27UnitInfo.GetUnitLifetimeCount(oBomber)..'; Is bomber valid='..tostring(M27UnitInfo.IsUnitValid(oBomber))) end
     if M27UnitInfo.IsUnitValid(oTarget) then
         if bFailedAttack then
             oTarget[refiFailedHitCount] = (oTarget[refiFailedHitCount] or 0) + 1
@@ -2000,6 +2001,16 @@ function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangin
             if bDebugMessages == true then LOG(sFunctionRef..': About to decrease target strike damage assigned as bomb has now landed. Target='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Strike damage before decrease='..oTarget[refiStrikeDamageAssigned]) end
             oTarget[refiStrikeDamageAssigned] = math.max(0, oTarget[refiStrikeDamageAssigned] - iStrikeDamage)
             if bDebugMessages == true then LOG(sFunctionRef..': Strike damage after decrease='..oTarget[refiStrikeDamageAssigned]) end
+        end
+    else
+        if M27UnitInfo.IsUnitValid(oBomber) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 and M27Utilities.IsTableEmpty(M27Chat.tiM27VoiceTauntByType['Effective Bomber']) then
+            local iVetLevel = oBomber.Sync.VeteranLevel
+            if bDebugMessages == true then LOG(sFunctionRef..': Bomber vet level='..(iVetLevel or 'nil')..'; Mass killed='..(oBomber.Sync.totalMassKilled or 'nil')) end
+            local iVetLevelWanted = 3
+            if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, oBomber.UnitId) then iVetLevelWanted = 2 end
+            if iVetLevel >= iVetLevelWanted or (not(EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId)) and oBomber.Sync.totalMassKilled >= 6000) or (oBomber.Sync.totalMassKilled >= 30000) then
+                M27Chat.SendMessage(aiBrain, 'Effective Bomber', 'How are you enjoying the shock and awe, Commander?', 2, 10000)
+            end
         end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
@@ -2274,6 +2285,7 @@ function AirThreatChecker(aiBrain)
 
     aiBrain[refiEnemyAirAAThreat] = math.max(aiBrain[refiEnemyAirAAThreat], M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, true, false, false, false, nil, 0, 0, 0) * 1.1)
     aiBrain[refiHighestEverEnemyAirAAThreat] = math.max(aiBrain[refiHighestEverEnemyAirAAThreat], aiBrain[refiEnemyAirAAThreat]) --Unlike airaathreat it doesnt get reduced when enemy airaa dies
+
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': aiBrain[refiEnemyAirAAThreat] after update=' .. aiBrain[refiEnemyAirAAThreat])
     end
@@ -2298,6 +2310,8 @@ function AirThreatChecker(aiBrain)
     --Increase enemy air threat based on how many factories and of what tech
     local tAirThreatByTech = { 100, 500, 2000, 4000 }
     local tEnemyAirFactories = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), aiBrain[refiMaxScoutRadius], 'Enemy')
+    local bWarnOfT3
+    if aiBrain[reftEnemyAirFactoryByTech][3] == 0 then bWarnOfT3 = true end
     aiBrain[reftEnemyAirFactoryByTech] = { 0, 0, 0 }
     local iAirFacTech
     if M27Utilities.IsTableEmpty(tEnemyAirFactories) == false then
@@ -2306,6 +2320,9 @@ function AirThreatChecker(aiBrain)
             iAllAirThreat = iAllAirThreat + tAirThreatByTech[M27UnitInfo.GetUnitTechLevel(oAirFac)]
             aiBrain[reftEnemyAirFactoryByTech][iAirFacTech] = aiBrain[reftEnemyAirFactoryByTech][iAirFacTech] + 1
         end
+    end
+    if bWarnOfT3 and aiBrain[reftEnemyAirFactoryByTech][3] > 0 then
+        M27Chat.SendMessage(aiBrain, 'Enemy T3 Air', 'Enemy has T3 air', 0, 10000, true)
     end
 
     if aiBrain[refiHighestEnemyAirThreat] == nil then
@@ -4775,7 +4792,7 @@ function AirBomberManager(aiBrain)
         local iAvailableBombers
         local tBasePosition
         local iHighestPriorityFound
-        local tStartPoint
+        local tStartPoint = {M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][2], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]}
         local tEnemyAA
 
         local iNearestCruiserModDistance = 10000
@@ -4870,6 +4887,11 @@ function AirBomberManager(aiBrain)
             if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false then
                 tEnemySAMsAndCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser, tEnemyAAAndCruisers)
                 aiBrain[refbEnemyHasHadCruisersOrT3AA] = true
+                if M27Utilities.IsTableEmpty(M27Chat.tiM27VoiceTauntByType['LotsOfAA']) then
+                    if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false and table.getn(tEnemyAAAndCruisers) >= 10 then
+                        M27Chat.SendMessage(aiBrain, 'LotsOfAA', 'That\'s a lot of anti-air commander.  Think it\'ll be enough to calm the fear?', 0, 10000)
+                    end
+                end
             end
         end
 

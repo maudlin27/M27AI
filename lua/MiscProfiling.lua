@@ -36,11 +36,11 @@ function ListAmphibiousUnitsMissingAmphibiousCategory()
         if oBP.Physics.MotionType == 'RULEUMT_AmphibiousFloating' or oBP.Physics.MotionType == 'RULEUMT_Amphibious' or oBP.Physics.AltMotionType == 'RULEUMT_AmphibiousFloating' or oBP.Physics.AltMotionType == 'RULEUMT_Amphibious' then
             if not(EntityCategoryContains(categories.AMPHIBIOUS, oBP.BlueprintId)) then
                 iMissingCategoryCount = iMissingCategoryCount + 1
-                tsAmphibiousPathingMissingCategory[iMissingCategoryCount] = {oBP.BlueprintId, oBP.Description, oBP.General.UnitName}
+                tsAmphibiousPathingMissingCategory[iMissingCategoryCount] = {oBP.BlueprintId, oBP.Description, LOCF(oBP.General.UnitName)}
             end
         elseif EntityCategoryContains(categories.AMPHIBIOUS, oBP.BlueprintId) then
             iIncorrectCategoryCount = iIncorrectCategoryCount + 1
-            tsIncorrectlyHasAmphibious[iIncorrectCategoryCount] = {oBP.BlueprintId, oBP.Description, oBP.General.UnitName}
+            tsIncorrectlyHasAmphibious[iIncorrectCategoryCount] = {oBP.BlueprintId, oBP.Description, LOCF(oBP.General.UnitName)}
         end
     end
     LOG(sFunctionRef..': Categories missing AMPHIBIOUS category but having amphibious pathing='..repru(tsAmphibiousPathingMissingCategory))
@@ -86,7 +86,7 @@ function ListCategoriesUsedByCount(tAllBlueprints)
             sCurID = oBP.BlueprintId
             if tIDOnlyOnce[sCurID] == nil then
                 tIDOnlyOnce[sCurID] = true
-                sCurRef = sCurID..': '..(oBP.General.UnitName or 'nil name')
+                sCurRef = sCurID..': '..(LOCF(oBP.General.UnitName) or 'nil name')
                 local tOnlyListOnce = {}
 
                 for iCat, sCat in oBP.Categories do

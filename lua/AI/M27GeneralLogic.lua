@@ -445,6 +445,43 @@ function IsCivilianBrain(aiBrain)
     return bIsCivilian
 end
 
+function CheckIfAllEnemiesDead(aiBrain)
+    --Returns true if aiBrain has no enemies and did at start of game.  Also updates variables rleating to this
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'CheckIfAllEnemiesDead'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. aiBrain[M27Overseer.refbNoEnemies]='..tostring(aiBrain[M27Overseer.refbNoEnemies] or false)..'; aiBrain[refbAllEnemiesDead]='..tostring(aiBrain[refbAllEnemiesDead] or false)) end
+    if aiBrain[refbAllEnemiesDead] then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return true
+    else
+        if not(aiBrain[M27Overseer.refbNoEnemies]) then
+            local bHaveAnyEnemies = false
+            for iBrain, oBrain in ArmyBrains do
+                if IsEnemy(oBrain:GetArmyIndex(), aiBrain:GetArmyIndex()) then
+                    if not(oBrain.M27IsDefeated) and not(oBrain:IsDefeated()) and not(IsCivilianBrain(oBrain)) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Enemy '..oBrain.Nickname..' isnt flagged as defeated') end
+                        bHaveAnyEnemies = true
+                        break
+                    end
+                end
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished checking every brain in ArmyBrains. bHaveAnyEnemies='..tostring(bHaveAnyEnemies)) end
+            if not(bHaveAnyEnemies) then
+                aiBrain[refbAllEnemiesDead] = true
+                iTimeOfLastBrainAllDefeated = GetGameTimeSeconds()
+                if bDebugMessages == true then LOG(sFunctionRef..': Returning true') end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                return true
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Returning false') end
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return false
+    end
+end
+
 function GetNearestEnemyIndex(aiBrain, bForceDebug)
     --Returns the ai brain index of the enemy who's got the nearest start location to aiBrain's start location and is still alive
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
@@ -573,18 +610,23 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                         end
                     end
                     if bHaveBrains and bAllDefeated == true then
-                        LOG('All enemies defeated, ACU death count=' .. M27Overseer.iACUDeathCount .. '; will ignore errors with nearest enemy index and wait 1 second1')
-                        if M27Overseer.iACUDeathCount == 0 then
-                            if GetGameTimeSeconds() - iTimeOfLastBrainAllDefeated >= 5 then
-                                M27Utilities.ErrorHandler('All brains are showing as dead but we havent recorded any ACU deaths.  Assuming all enemies are dead and aborting all code; will show this message every 5s')
-                                iTimeOfLastBrainAllDefeated = GetGameTimeSeconds()
-                                aiBrain[refbAllEnemiesDead] = true
+                        if not(aiBrain[refbAllEnemiesDead]) then
+                            LOG('All enemies defeated, ACU death count=' .. M27Overseer.iACUDeathCount)
+                            if CheckIfAllEnemiesDead(aiBrain) then return nil end
+                            if M27Overseer.iACUDeathCount == 0 then
+                                if GetGameTimeSeconds() - iTimeOfLastBrainAllDefeated >= 5 then
+                                    M27Utilities.ErrorHandler('All brains are showing as dead but we havent recorded any ACU deaths.  Assuming all enemies are dead and aborting all code; will show this message every 5s')
+                                    iTimeOfLastBrainAllDefeated = GetGameTimeSeconds()
+                                    aiBrain[refbAllEnemiesDead] = true
+                                end
                             end
-                        end
 
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-                        WaitSeconds(1)
-                        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                            WaitSeconds(1)
+                            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                        else
+                            return nil
+                        end
                     elseif bHaveBrains and not(aiBrain[refbAllEnemiesDead]) then
                         M27Utilities.ErrorHandler('iNearestEnemyIndex is nil so will wait 1 sec and then repeat function with logs enabled; if gametime is <=10s then will also flag that the aiBrain has no enemies')
                         if GetGameTimeSeconds() <= 10 then
@@ -599,12 +641,15 @@ function GetNearestEnemyIndex(aiBrain, bForceDebug)
                     else
                         --No brains - could be game mode doesnt have enemy player brains
                         if not(aiBrain[refbAllEnemiesDead]) then
-                            M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; will call again with logs enabled. if gametime is <=10s then will also flag that the aiBrain has no enemies and update start positions accordingly')
+                            M27Utilities.ErrorHandler('Have no enemy brains to check if are defeated; if gametime is <=10s then will also flag that the aiBrain has no enemies and update start positions accordingly; otherwise will assume all enemies defeated')
                             if GetGameTimeSeconds() <= 10 then
                                 aiBrain[M27Overseer.refbNoEnemies] = true
                                 M27MapInfo.bUsingArmyIndexForStartPosition = true
                                 M27MapInfo.RecordPlayerStartLocations()
                                 if bDebugMessages == true then LOG(sFunctionRef..': No enemy brains identified, Setting no enemies to be true') end
+                            elseif not(aiBrain[M27Overseer.refbNoEnemies]) then
+                                --Check if any of armybrains are enemies
+                                if CheckIfAllEnemiesDead(aiBrain) then return nil end
                             end
                             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
                             return GetNearestEnemyIndex(aiBrain, true)
@@ -664,7 +709,7 @@ function IndexToStartNumber(iArmyIndex)
     iStartPoint = tPlayerStartPointByIndex[iArmyIndex]
     if iStartPoint == nil then
         if not(iTimeOfLastBrainAllDefeated) or iTimeOfLastBrainAllDefeated<10 then
-            M27Utilities.ErrorHandler('Dont have start position for iArmyIndex='..(iArmyIndex or 'nil')..'; will now enable logs and try to figure out why')
+            M27Utilities.ErrorHandler('Dont have start position for iArmyIndex='..(iArmyIndex or 'nil')..'; will now enable logs and try to figure out why. iTimeOfLastBrainAllDefeated='..(iTimeOfLastBrainAllDefeated or 'nil'))
             for iCurBrain, aiBrain in ArmyBrains do
                 LOG('iCurBrain='..iCurBrain..'; ArmyIndex='..aiBrain:GetArmyIndex()..'; M27StartPositionNumber='..(aiBrain.M27StartPositionNumber or 'nil'))
                 if not(aiBrain.M27StartPositionNumber) then
@@ -3713,23 +3758,32 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE, bRet
     --If iAOE is specified then will end once reach the iAOE range
     --(aiBrain included as argument as want to retry CheckBlockingTerrain in the future)
     --bReturnDistanceThatBlocked - if true then returns either distance at which shot is blocked, or the distance+1 between the start and end position
+
+    --Angle (looking only at vertical dif) from shot start to shot end, theta: Tan Theta = Opp/Adj, so Theta = tan-1 Opp/Adj
+    --Once have this angle, then the height if move vertically to the target is: Sin theta = opp / hyp
+    --Opp is the height dif; adj is the distance between start and end (referred to below as iFlatDistance)
+
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsLineBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local bShotIsBlocked = false
     local iFlatDistance = M27Utilities.GetDistanceBetweenPositions(tShotStartPosition, tShotEndPosition)
     local tTerrainPositionAtPoint = {}
+    local bStartHigherThanEnd = false
+    if tShotStartPosition[2] > tShotEndPosition[2] then bStartHigherThanEnd = true end
     if iFlatDistance > 1 then
-        local iAngle = math.atan(M27Utilities.ConvertAngleToRadians((tShotEndPosition[2] - tShotStartPosition[2]) / iFlatDistance))
+        local iAngleInRadians = math.atan(math.abs((tShotEndPosition[2] - tShotStartPosition[2])) / iFlatDistance)
         local iShotHeightAtPoint
-        if bDebugMessages == true then LOG(sFunctionRef..': About to check if at any point on path shot will be lower than terrain; iAngle='..iAngle..'; startshot height='..tShotStartPosition[2]..'; target height='..tShotEndPosition[2]..'; iFlatDistance='..iFlatDistance) end
+        if bDebugMessages == true then LOG(sFunctionRef..': About to check if at any point on path shot will be lower than terrain; iAngle='..M27Utilities.ConvertAngleToRadians(iAngleInRadians)..'; startshot height='..tShotStartPosition[2]..'; target height='..tShotEndPosition[2]..'; iFlatDistance='..iFlatDistance) end
         local iEndPoint = math.max(1, math.floor(iFlatDistance - (iAOE or 0)))
         for iPointToTarget = 1, iEndPoint do
-        --math.min(math.floor(iFlatDistance), math.max(math.floor(iStartDistance or 1),1)), math.floor(iFlatDistance) do
+            --math.min(math.floor(iFlatDistance), math.max(math.floor(iStartDistance or 1),1)), math.floor(iFlatDistance) do
             --MoveTowardsTarget(tStartPos, tTargetPos, iDistanceToTravel, iAngle)
             tTerrainPositionAtPoint = M27Utilities.MoveTowardsTarget(tShotStartPosition, tShotEndPosition, iPointToTarget, 0)
             if bDebugMessages == true then LOG(sFunctionRef..': iPointToTarget='..iPointToTarget..'; tTerrainPositionAtPoint='..repru(tTerrainPositionAtPoint)) end
-            iShotHeightAtPoint = math.tan(M27Utilities.ConvertAngleToRadians(iAngle)) * iPointToTarget + tShotStartPosition[2]
+            if bStartHigherThanEnd then iShotHeightAtPoint = tShotStartPosition[2] - math.sin(iAngleInRadians) * iPointToTarget
+            else iShotHeightAtPoint = tShotStartPosition[2] + math.sin(iAngleInRadians) * iPointToTarget
+            end
             if iShotHeightAtPoint <= tTerrainPositionAtPoint[2] then
                 if not(iPointToTarget == iEndPoint and iShotHeightAtPoint == tTerrainPositionAtPoint[2]) then
                     if bDebugMessages == true then
@@ -3746,7 +3800,10 @@ function IsLineBlocked(aiBrain, tShotStartPosition, tShotEndPosition, iAOE, bRet
                 elseif bDebugMessages == true then LOG(sFunctionRef..': Are at end point and terrain height is identical, so will assume we will actually reach the target')
                 end
             else
-                if bDebugMessages == true then LOG(sFunctionRef..': Shot not blocked at this position; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]) end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Shot not blocked at this position, will draw in blue; iPointToTarget='..iPointToTarget..'; iShotHeightAtPoint='..iShotHeightAtPoint..'; tTerrainPositionAtPoint='..tTerrainPositionAtPoint[2]..'; iAngle='..M27Utilities.ConvertAngleToRadians(iAngleInRadians)..'; iPointToTarget='..iPointToTarget..'; tShotStartPosition[2]='..tShotStartPosition[2])
+                    M27Utilities.DrawLocation(tTerrainPositionAtPoint, false, 1, 20)
+                end
             end
         end
     else bShotIsBlocked = false
@@ -3765,6 +3822,7 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'IsShotBlocked'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
 
     local oBPFiringUnit = oFiringUnit:GetBlueprint()
     local bShotIsBlocked = false
@@ -3841,6 +3899,7 @@ function IsShotBlocked(oFiringUnit, oTargetUnit)
                 bShotIsBlocked = true
             else
                 --Have the shot end and start positions; now want to move along a line between the two and work out if terrain will block the shot
+                if bDebugMessages == true then LOG(sFunctionRef..': About to see if line is blocked. tShotStartPosition='..repru(tShotStartPosition)..'; tShotEndPosition='..repru(tShotEndPosition)..'; Terrain height at start='..GetTerrainHeight(tShotStartPosition[1], tShotStartPosition[3])..'; Terrain height at end='..GetTerrainHeight(tShotEndPosition[1], tShotEndPosition[3])) end
                 bShotIsBlocked = IsLineBlocked(oFiringUnit:GetAIBrain(), tShotStartPosition, tShotEndPosition)
             end
         end
@@ -5297,7 +5356,6 @@ function DetermineTMDWantedForTML(aiBrain, oTML, toOptionalUnitsToProtect)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineTMDWantedForTML'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 1223 then bDebugMessages = true end
 
     if bDebugMessages == true then LOG(sFunctionRef..': oTML='..oTML.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTML)) end
 
@@ -5396,7 +5454,6 @@ function DetermineTMDWantedForUnits(aiBrain, tUnits)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'DetermineTMDWantedForUnits'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 1223 then bDebugMessages = true end
 
     --First remove tUnits from the list of units wanting TMD (will re-add them per the below if we still want TMD)
     if bDebugMessages == true then
@@ -5497,16 +5554,16 @@ function CalculateUnitThreatsByType()
         function RecordBlueprintThreatValues(oBP, sUnitId)
 
             tUnitThreatByIDAndType[sUnitId] = {}
-            if bDebugMessages == true then LOG(sFunctionRef..': About to consider different land threat values for unit '..sUnitId..' Name='..(oBP.General.UnitName or 'nil')) end
+            if bDebugMessages == true then LOG(sFunctionRef..': About to consider different land threat values for unit '..sUnitId..' Name='..LOCF((oBP.General.UnitName) or 'nil')) end
             for iRef, tConditions in tiLandThreatTypes do
                 tUnitThreatByIDAndType[sUnitId][iRef] = GetCombatThreatRating(nil, { {['UnitId']=sUnitId }}, nil, nil, nil, tConditions[1], tConditions[2], true)
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating land threat values for '..(oBP.General.UnitName or 'nil')..', result='..reprs(tUnitThreatByIDAndType[sUnitId])) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating land threat values for '..LOCF((oBP.General.UnitName or 'nil'))..', result='..reprs(tUnitThreatByIDAndType[sUnitId])) end
 
             for iRef, tConditions in tiAirThreatTypes do
                 tUnitThreatByIDAndType[sUnitId][iRef] = GetAirThreatLevel(nil, { {['UnitId']=sUnitId }}, nil, tConditions[1], tConditions[2], tConditions[3], tConditions[4], nil, nil, nil, nil, tConditions[5], true)
             end
-            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating air threat values, result of land and air for '..oBP.General.UnitName..'='..reprs(tUnitThreatByIDAndType[sUnitId])) end
+            if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating air threat values, result of land and air for '..LOCF(oBP.General.UnitName)..'='..reprs(tUnitThreatByIDAndType[sUnitId])) end
         end
 
         local iCount = 0
