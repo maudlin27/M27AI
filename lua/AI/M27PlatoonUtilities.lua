@@ -4894,7 +4894,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
     else
         sPlatoonName = oPlatoon:GetPlan()
         aiBrain = (oPlatoon[refoBrain] or oPlatoon:GetBrain())
-        if oPlatoon[M27PlatoonTemplates.refbSingletonPlatoon] and not(oPlatoon[refbUnitHasDiedRecently]) and oPlatoon[refiCurrentUnits] == 1 and oPlatoon[reftCurrentUnits][1].PlatoonHandle == oPlatoon and oPlatoon[refiPrevCurrentUnits] == 1 then
+        if oPlatoon[M27PlatoonTemplates.refbSingletonPlatoon] and not(oPlatoon[refbUnitHasDiedRecently]) and oPlatoon[refiCurrentUnits] == 1 and oPlatoon[reftCurrentUnits][1].PlatoonHandle == oPlatoon and oPlatoon[refiPrevCurrentUnits] == 1 and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) then
             bAbort = true --no point refreshing data for ACU platoon or other singleton platoons when they will be the only unit in the platoon
         end
     end
