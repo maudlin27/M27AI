@@ -1,6 +1,6 @@
 name = "M27AI"
-uid = "f27c55b4-v048-55b4-92b6-64398e75e23f"
-version = 48 --REMINDER: before release: Update M27Config; Version reference in uid updated; Tested offline vs AI it should beat to check for any last minute errors introduced
+uid = "f27c55b4-v049-55b4-92b6-64398e75e23f"
+version = 49 --REMINDER: before release: Update M27Config; Version reference in uid updated; Tested offline vs AI it should beat to check for any last minute errors introduced
 copyright = "GNU GENERAL PUBLIC LICENSE 3.0"
 description = "Adaptive AI, Suitable for 20km and smaller maps.  Est 400 1v1 ladder / 700 global rating.  Report bugs to maudlin27 (discord or M27AI forum thread, which has more info on M27AI).  Changes: v44-47-Teamwork, v48-Personality"
 author = "maudlin27" --With thanks to Softles/Softlnoob for original Micro AI that was used as a starting point as I learned how to code AI

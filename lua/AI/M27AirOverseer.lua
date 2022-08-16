@@ -2003,13 +2003,21 @@ function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangin
             if bDebugMessages == true then LOG(sFunctionRef..': Strike damage after decrease='..oTarget[refiStrikeDamageAssigned]) end
         end
     else
-        if M27UnitInfo.IsUnitValid(oBomber) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 and M27Utilities.IsTableEmpty(M27Chat.tiM27VoiceTauntByType['Effective Bomber']) then
+        if M27UnitInfo.IsUnitValid(oBomber) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 and not(M27Chat.tiM27VoiceTauntByType['Effective Bomber']) then
             local iVetLevel = oBomber.Sync.VeteranLevel
             if bDebugMessages == true then LOG(sFunctionRef..': Bomber vet level='..(iVetLevel or 'nil')..'; Mass killed='..(oBomber.Sync.totalMassKilled or 'nil')) end
             local iVetLevelWanted = 3
             if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, oBomber.UnitId) then iVetLevelWanted = 2 end
             if iVetLevel >= iVetLevelWanted or (not(EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId)) and oBomber.Sync.totalMassKilled >= 6000) or (oBomber.Sync.totalMassKilled >= 30000) then
-                M27Chat.SendMessage(aiBrain, 'Effective Bomber', 'How are you enjoying the shock and awe, Commander?', 2, 10000)
+                local sMessage = 'How are you enjoying the shock and awe, Commander?'
+                if math.random(1,2) == 1 then
+                    if EntityCategoryContains(categories.TECH3, oBomber.UnitId) and __blueprints[oTarget.UnitId].Economy.BuildCostMass >= 800 then sMessage = 'Ouch! That must have been expensive!'
+                    elseif EntityCategoryContains(categories.TECH1, oBomber.UnitId) then sMessage = 'Birds away! Let\'s go hunt some engis.'
+                    end
+                end
+
+                M27Chat.SendMessage(aiBrain, 'Effective Bomber', sMessage, 2, 10000)
+
             end
         end
     end
@@ -4887,7 +4895,7 @@ function AirBomberManager(aiBrain)
             if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false then
                 tEnemySAMsAndCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser, tEnemyAAAndCruisers)
                 aiBrain[refbEnemyHasHadCruisersOrT3AA] = true
-                if M27Utilities.IsTableEmpty(M27Chat.tiM27VoiceTauntByType['LotsOfAA']) then
+                if not(M27Chat.tiM27VoiceTauntByType['LotsOfAA']) then
                     if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false and table.getn(tEnemyAAAndCruisers) >= 10 then
                         M27Chat.SendMessage(aiBrain, 'LotsOfAA', 'That\'s a lot of anti-air commander.  Think it\'ll be enough to calm the fear?', 0, 10000)
                     end

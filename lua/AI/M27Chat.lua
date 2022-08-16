@@ -86,7 +86,7 @@ function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBefore
     --If just sending a message rather than a taunt then can use this. sMessageType will be used to check if we have sent similar messages recently with the same sMessageType
     --if bOnlySendToTeam is true then will both only consider if message has been sent to teammates before (not all AI), and will send via team chat
     local sFunctionRef = 'SendForkedMessage'
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     --Do we have allies?
@@ -108,7 +108,6 @@ function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBefore
         end
 
         if iTimeSinceSentSimilarMessage > (iOptionalTimeBetweenMessageType or 60) then
-            LOG(sFunctionRef..': Sent chat message for sMessageType='..sMessageType..': sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
             if bOnlySendToTeam then
                 SUtils.AISendChat('allies', aiBrain.Nickname, sMessage)
                 M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages][sMessageType] = GetGameTimeSeconds()
@@ -117,9 +116,9 @@ function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBefore
                 SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
                 tiM27VoiceTauntByType[sMessageType] = GetGameTimeSeconds()
             end
-            LOG(sFunctionRef..': Sent chat message. bOnlySendToTeam='..tostring(bOnlySendToTeam)..'; sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
+            LOG(sFunctionRef..': Sent chat message. bOnlySendToTeam='..tostring(bOnlySendToTeam)..'; sMessageType='..sMessageType..'; sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)..'; M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages='..repru(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages])) end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -189,7 +188,9 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                 end
             end
             if not(bSentSpecificMessage) and M27Utilities.IsTableEmpty(tiM27VoiceTauntByType['Specific opponent']) then
-                SendMessage(aiBrain, 'Initial greeting', 'gl hf', 50 - math.floor(GetGameTimeSeconds()), 10)
+                local sMessage = 'gl hf'
+                if math.random(1,2) == 1 then sMessage = 'hf' end
+                SendMessage(aiBrain, 'Initial greeting', sMessage, 50 - math.floor(GetGameTimeSeconds()), 10)
                 --Do we have an enemy M27 brain?
                 for iBrain, oBrain in ArmyBrains do
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..'; ArmyIndex='..oBrain:GetArmyIndex()..'; .M27AI='..tostring(oBrain.M27AI or false)) end
