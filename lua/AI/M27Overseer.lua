@@ -1151,7 +1151,7 @@ end
 function AssignMAAToPreferredPlatoons(aiBrain)
     --Similar to assigning scouts, but for MAA - for now just focus on having MAA helping ACU and any platoon of >20 size that doesnt contain MAA
     --===========ACU MAA helper--------------------------
-    local bDebugMessages = false
+    local bDebugMessages = true
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AssignMAAToPreferredPlatoons'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -1160,15 +1160,22 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         aiBrain[refbMAABuiltOrDied] = false
         aiBrain[refiLastCheckedMAAAssignments] = GetGameTimeSeconds()
 
-        local iACUMinMAAThreatWantedWithAirThreat = 84 --Equivalent to 3 T1 MAA
-        if aiBrain[refiOurHighestFactoryTechLevel] > 1 then
+        local iACUMinMAAThreatWantedWithAirThreat = 110 --Equivalent to 2 T1 MAA
+        if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 then
+            iACUMinMAAThreatWantedWithAirThreat = 800 --1 T3 MAA
+        elseif aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] > 0 or aiBrain[refiOurHighestFactoryTechLevel] >= 3 then
+            iACUMinMAAThreatWantedWithAirThreat = 320 --2 T2 MAA
+        elseif aiBrain[refiOurHighestFactoryTechLevel] >= 2 then
+            iACUMinMAAThreatWantedWithAirThreat = 160 --1 T2 MAA
+        end
+        --[[if aiBrain[refiOurHighestFactoryTechLevel] > 1 then
             if aiBrain[refiOurHighestFactoryTechLevel] == 2 then
                 iACUMinMAAThreatWantedWithAirThreat = 320 --2 T2 MAA
             elseif aiBrain[refiOurHighestFactoryTechLevel] >= 3 then
                 iACUMinMAAThreatWantedWithAirThreat = 800 --1 T3 MAA
             end
-        end
-        local iAirThreatMAAFactor = 0.2 --approx mass value of MAA wanted with ACU as a % of the total air threat
+        end--]]
+        local iAirThreatMAAFactor = 0.2 --approx mass value of MAA wanted with ACU as a % of the total air to ground threat
         local iMaxMAAThreatForACU = iACUMinMAAThreatWantedWithAirThreat * 3 --equivalent to 3 T3 MAA at T3
         local iACUMinMAAThreatWantedWithNoAirThreat = iACUMinMAAThreatWantedWithAirThreat * 0.5
         local iMAAThreatWanted = 0
@@ -1181,9 +1188,16 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         if aiBrain[M27AirOverseer.refbHaveAirControl] then
             iAirThreatMAAFactor = 0.1
             iMaxMAAWantedForACUAtOnce = 1
+        else
+            --Increase minimum MAA slightly if enemy has a notable air threat
+            if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 250 then iACUMinMAAThreatWantedWithAirThreat = iACUMinMAAThreatWantedWithAirThreat + 55 * aiBrain[refiOurHighestFactoryTechLevel] end
         end
         if aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] > 0 then
-            iMinACUMAAThreatWanted = iACUMinMAAThreatWantedWithAirThreat
+            if (aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0) > 0 then
+                iMinACUMAAThreatWanted = iACUMinMAAThreatWantedWithAirThreat
+            else
+                iMinACUMAAThreatWanted = iACUMinMAAThreatWantedWithAirThreat * 0.7
+            end
         end
 
         local function GetMAAThreat(tMAAUnits)
@@ -1192,7 +1206,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
 
         local refCategoryMAA = M27UnitInfo.refCategoryMAA
 
-        iMAAThreatWanted = math.min(iMaxMAAThreatForACU, math.max(iMinACUMAAThreatWanted, math.floor((aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] or 0) * iAirThreatMAAFactor)))
+        iMAAThreatWanted = math.min(iMaxMAAThreatForACU, math.max(iMinACUMAAThreatWanted, math.floor((aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0) * iAirThreatMAAFactor)))
 
         --If ACU is near base or chokepoint and we own T2+ fixed AA near it, then reduce MAA threat wanted
         local oACU = M27Utilities.GetACU(aiBrain)
@@ -1227,7 +1241,8 @@ function AssignMAAToPreferredPlatoons(aiBrain)
         local oNewMAAPlatoon
         local oExistingMAAPlatoon = oACU[refoUnitsMAAHelper]
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': About to check if ACU needs MAA; iMAAWanted=' .. iMAAThreatWanted)
+            LOG(sFunctionRef .. ': About to check if ACU needs MAA; iMAAWanted=' .. iMAAThreatWanted..'; iMinACUMAAThreatWanted='..iMinACUMAAThreatWanted..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 0)..'; Enemy air factories='..repru(aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech]))
+            if oExistingMAAPlatoon then LOG(sFunctionRef..': oExistingMAAPlatoon mass value='..oExistingMAAPlatoon[M27PlatoonUtilities.refiPlatoonMassValue]..'; current units='..oExistingMAAPlatoon[M27PlatoonUtilities.refiCurrentUnits]) end
         end
         if not (oExistingMAAPlatoon == nil) then
             --A helper was assigned, check if it still exists
@@ -1375,7 +1390,7 @@ function AssignMAAToPreferredPlatoons(aiBrain)
             if aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand] then
                 local iOurBaseLandPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
                 for iCurPlatoon, oPlatoon in aiBrain:GetPlatoonsList() do
-                    if oPlatoon.GetPlan and not (oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) and not (oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow]) and not (oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies]) then
+                    if oPlatoon.GetPlan and not (oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) and not (oPlatoon[M27PlatoonTemplates.refbRequiresUnitToFollow]) and not (oPlatoon[M27PlatoonTemplates.refbRunFromAllEnemies]) and not(oPlatoon[M27PlatoonUtilities.refbACUInPlatoon]) then
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': Considering platoon ' .. (oPlatoon:GetPlan() or 'nil') .. (oPlatoon[M27PlatoonUtilities.refiPlatoonCount] or 'nil') .. '; Land pathing segment=' .. M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27PlatoonUtilities.GetPlatoonFrontPosition(oPlatoon)) .. '; Our base segment=' .. iOurBaseLandPathingGroup .. '; Mass value=' .. (oPlatoon[M27PlatoonUtilities.refiPlatoonMassValue] or 'nil') .. '; iThresholdForAMAA=' .. (iThresholdForAMAA or 'nil'))
                         end
