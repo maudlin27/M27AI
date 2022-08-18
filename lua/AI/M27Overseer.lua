@@ -4601,6 +4601,8 @@ function ACUManager(aiBrain)
             local oEnemyACUToConsiderAttacking
 
             --ACU platoon and idle overrides
+            local iOurACUDistToOurBase = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tACUPos)
+            local iOurACUDistToEnemyBase = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), tACUPos)
             if M27Utilities.IsACU(oACU) then
 
                 if oACUPlatoon then
@@ -5007,7 +5009,7 @@ function ACUManager(aiBrain)
                     bWantEscort = true
                     --Extra health buffer for some of below checks
                     local iExtraHealthCheck = 0
-                    if M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tACUPos) > M27Utilities.GetDistanceBetweenPositions(M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), tACUPos) then
+                    if iOurACUDistToOurBase > iOurACUDistToEnemyBase then
                         iExtraHealthCheck = 1000
                     end
                     --Do we have a big gun, or is the enemy ACU low on health?
@@ -5279,7 +5281,7 @@ function ACUManager(aiBrain)
                 end
                 --Override - dont include ACU in attack if we are massively ahead on eco
                 if bIncludeACUInAttack then
-                    if (iLastDistanceToACU > iACURange or M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75) and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 16 and not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
+                    if (iLastDistanceToACU > iACURange or M27UnitInfo.GetUnitHealthPercent(oACU) <= 0.75) and iOurACUDistToOurBase > aiBrain[refiDistanceToNearestEnemyBase] * 0.6 and aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 16 and not (M27Conditions.DoesACUHaveBigGun(aiBrain, oACU)) then
                         bIncludeACUInAttack = false
                         --Dont include ACU in attack if there are nearby enemy T1 PD and not about to kill their ACU
                     elseif oACU.PlatoonHandle[M27PlatoonUtilities.refiEnemyStructuresInRange] > 0 and oEnemyACUToConsiderAttacking:GetHealth() >= 600 then
@@ -5365,7 +5367,7 @@ function ACUManager(aiBrain)
                                     iHealthReduction = iHealthReduction - 2000
                                     iTurtleFurtherAdjust = 0.75
                                 end --If are turtling then really important we get the upgrade, will also get a health boost from T2
-                                if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 125 then
+                                if iOurACUDistToOurBase <= 125 then
                                     iHealthReduction = math.max(0, iHealthReduction * 0.5)
                                 end
                                 if iTimeToComplete * iHealthLossPerSec > math.min(oACU[reftACURecentHealth][iCurTime] * 0.9 - iHealthReduction, oACU:GetMaxHealth() * 0.7 - iHealthReduction) then
@@ -5373,9 +5375,9 @@ function ACUManager(aiBrain)
                                     bCancelUpgradeAndRun = true
                                     bNeedProtecting = true
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef .. ': We will be really low health if we finish the upgrade; consider if we are near base/if expect we might be able to reduce the damage taken where the upgrade is at least 50% done. % done=' .. oACU[reftACURecentUpgradeProgress][iCurTime] .. '; Dist to base=' .. M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; oACU[reftACURecentHealth][iCurTime] * 1.1=' .. oACU[reftACURecentHealth][iCurTime] * 1.1 .. '; iTimeToComplete * iHealthLossPerSec=' .. iTimeToComplete * iHealthLossPerSec .. '; iHealthReduction=' .. iHealthReduction .. '; ACU Max health=' .. oACU:GetMaxHealth())
+                                        LOG(sFunctionRef .. ': We will be really low health if we finish the upgrade; consider if we are near base/if expect we might be able to reduce the damage taken where the upgrade is at least 50% done. % done=' .. oACU[reftACURecentUpgradeProgress][iCurTime] .. '; Dist to base=' .. iOurACUDistToOurBase .. '; oACU[reftACURecentHealth][iCurTime] * 1.1=' .. oACU[reftACURecentHealth][iCurTime] * 1.1 .. '; iTimeToComplete * iHealthLossPerSec=' .. iTimeToComplete * iHealthLossPerSec .. '; iHealthReduction=' .. iHealthReduction .. '; ACU Max health=' .. oACU:GetMaxHealth())
                                     end
-                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.225 or iTurtleFurtherAdjust < 1 or M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= math.min(200, math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.333)) then
+                                    if oACU[reftACURecentUpgradeProgress][iCurTime] > 0.225 or iTurtleFurtherAdjust < 1 or iOurACUDistToOurBase <= math.min(200, math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.333)) then
                                         if iTimeToComplete * iHealthLossPerSec < oACU[reftACURecentHealth][iCurTime] * 1.1 - iHealthReduction then
                                             if bDebugMessages == true then
                                                 LOG(sFunctionRef .. ': Will try and finish upgrade and hope units can save us')
@@ -5459,7 +5461,7 @@ function ACUManager(aiBrain)
                             LOG(sFunctionRef .. ': Want to cancel upgrade and run')
                         end
                         --Only actually cancel if we're not close to our base as if we're close to base then will probably die if cancel as well
-                        if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
+                        if iOurACUDistToOurBase > iDistanceFromBaseWhenVeryLowHealthToBeSafe then
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Clearing commands for ACU')
                             end
@@ -5547,6 +5549,18 @@ function ACUManager(aiBrain)
                 end
             end--]]
             if oACUPlatoon then
+                --Having escort - further tests
+                if not(bWantEscort) then
+                    if iOurACUDistToOurBase >= math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) and not(aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle) then
+                        if not(M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) or oACU:HasEnhancement('CloakingGenerator')) then
+                            if aiBrain[refiTotalEnemyShortRangeThreat] >= 2700 or (aiBrain[refiTotalEnemyShortRangeThreat] >= 1800 and not(M27Conditions.DoesACUHaveGun(aiBrain, false, oACU))) then
+                                bWantEscort = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': ACU is away from our base so want to give it an escort') end
+                            end
+                        end
+                    end
+                end
+
                 oACUPlatoon[M27PlatoonUtilities.refbShouldHaveEscort] = bWantEscort
 
                 --If we dont want an escort and we last wanted an escort 15+ seconds ago, then disband the escort platoon
@@ -5576,7 +5590,7 @@ function ACUManager(aiBrain)
                 end
                 if bEmergencyRequisition and not (bAllInAttack) then
                     --Is the ACU close to our base? If so then only do emergency response if very low health
-                    if M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) > iRangeForACUToBeNearBase or iHealthPercentage < iACUEmergencyHealthPercentThreshold then
+                    if iOurACUDistToOurBase > iRangeForACUToBeNearBase or iHealthPercentage < iACUEmergencyHealthPercentThreshold then
                         if not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyAirDominance) and not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) then
                             --If ACU not taken damage in a while and no nearby enemy units, then dont adopt protectACU strategy
                             if M27Conditions.CanWeStopProtectingACU(aiBrain, oACU) then
@@ -5589,7 +5603,7 @@ function ACUManager(aiBrain)
                                 end
                                 aiBrain[refiAIBrainCurrentStrategy] = refStrategyProtectACU
                                 --ask for help if we are far from base (if closer then assume teammates can already tell we need help
-                                if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 150 then M27Chat.SendMessage(aiBrain, 'Protect ACU', 'My ACU could use some help', 0, 300, true) end
+                                if iOurACUDistToOurBase >= 150 then M27Chat.SendMessage(aiBrain, 'Protect ACU', 'My ACU could use some help', 0, 300, true) end
                             end
                         end
 
