@@ -5250,9 +5250,9 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                     oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount] = {}
                 end
                 local iCurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], oPlatoon[refoFrontUnit]:GetPosition())
-                if not(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][iCurPathingGroup]) and M27Utilities.IsTableEmpty(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount]) == false then
+                if not(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][iCurPathingGroup]) and M27Utilities.IsTableEmpty(oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount]) == false and EntityCategoryContains(categories.MOBILE, oPlatoon[refoFrontUnit]) then
                     --Likely pathing error unless the platoon has no other values
-                    if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..sPlatoonName..oPlatoon[refiPlatoonCount]..': Likely pathing error, will check pathing, cur segment group='..iCurPathingGroup..'; Front unit='..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit])..'; Prev segment group counts for unit='..repru((oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount] or {'nil'}))..';  FrontUnit[M27Transport.refiAssignedPlateau]='.. oPlatoon[refoFrontUnit][M27Transport.refiAssignedPlateau]..'; Segment group of start position='..M27MapInfo.GetSegmentGroupOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Platoon '..(sPlatoonName or 'nil')..(oPlatoon[refiPlatoonCount] or 'nil')..': Likely pathing error, will check pathing, cur segment group='..(iCurPathingGroup or 'nil')..'; Front unit='..(oPlatoon[refoFrontUnit].UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit]) or 'nil')..'; Prev segment group counts for unit='..repru((oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount] or {'nil'}))..';  FrontUnit[M27Transport.refiAssignedPlateau]='.. (oPlatoon[refoFrontUnit][M27Transport.refiAssignedPlateau] or 'nil')..'; Segment group of start position='..(M27MapInfo.GetSegmentGroupOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) or 'nil')) end
                     if oPlatoon[refoFrontUnit][M27UnitInfo.refiLastPathingGroup] and oPlatoon[refoFrontUnit][M27UnitInfo.reftPathingGroupCount][oPlatoon[refoFrontUnit][M27UnitInfo.refiLastPathingGroup]] >= 2 then
                         if M27MapInfo.RecheckPathingOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], oPlatoon[refoFrontUnit], oPlatoon[refoFrontUnit]:GetPosition(), oPlatoon[refoFrontUnit][M27UnitInfo.reftLastLocationOfPathingGroup], false) then
                             if bDebugMessages == true then LOG(sFunctionRef..': Pathing has changed') end
@@ -6714,7 +6714,7 @@ function RetreatToMobileShields(oPlatoon)
             if M27Utilities.IsTableEmpty(oPlatoon[reftTemporaryMoveTarget]) == true then
                 if bDebugMessages == true then LOG(sFunctionRef..': No merge location so will move to shield platoon position instead if we can path there and its not too far away') end
                 if iDistanceToShieldHelper <= 150 then
-                    if oPlatoon[refoFrontUnit]:CanPathTo(GetPlatoonFrontPosition(oPlatoon[refoSupportingShieldPlatoon])) then
+                    if EntityCategoryContains(categories.MOBILE, oPlatoon[refoFrontUnit].UnitId) and oPlatoon[refoFrontUnit]:CanPathTo(GetPlatoonFrontPosition(oPlatoon[refoSupportingShieldPlatoon])) then
                         oPlatoon[reftTemporaryMoveTarget] = GetPlatoonFrontPosition(oPlatoon[refoSupportingShieldPlatoon])
                         if bDebugMessages == true then LOG(sFunctionRef..': Moving to shield platoon, setting temporary move target to '..repru(oPlatoon[reftTemporaryMoveTarget])) end
                     else
@@ -10285,7 +10285,7 @@ function ReplaceMovementPathWithNewTarget(oPlatoon, tNewTarget)
         if iLoopCountCheck > 20 then M27Utilities.ErrorHandler('Infinite loop') break end
         table.remove(oPlatoon[reftMovementPath], oPlatoon[refiCurrentPathTarget] + 1)
     end
-    if bDebugMessages == true then LOG(sPlatoonName..oPlatoon[refiPlatoonCount]..': Replacing remaining movement path with tNewTarget='..repru(tNewTarget)) end
+    if bDebugMessages == true then LOG(oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Replacing remaining movement path with tNewTarget='..repru(tNewTarget)) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 

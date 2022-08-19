@@ -351,7 +351,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
         else tAllZ[iRectKey - 2] = iRectVal end
     end--]]
 
-    if bDebugMessages == true then LOG(sFunctionRef..'tAllX='..repru(tAllX)..'; tAllZ='..repru(tAllZ)..'; Rectx0='..rRect['x0']) end
+    --if bDebugMessages == true then LOG(sFunctionRef..'tAllX='..repru(tAllX)..'; tAllZ='..repru(tAllZ)..'; Rectx0='..rRect['x0']) end
     local iCurDrawCount = 0
 
     local iCount = 0
@@ -1900,6 +1900,7 @@ M27Scheduler = Class({
         while not item[4] do
             WaitTicks(1)
             ticksWaited = ticksWaited+1
+            if GetGameTimeSeconds() >= 2455 then bGlobalDebugOverride = true M27Config.M27ShowUnitNames = true end
             self:CheckTick()
         end
         return ticksWaited

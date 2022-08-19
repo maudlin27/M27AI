@@ -1900,7 +1900,7 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
 
                         if oUnit.Sync.VeteranLevel > 0 then
                             iHealthPercentage = iHealthPercentage * ((iMaxHealth) / (oUnit[refiMaxHealth] + iMaxShield) + oUnit.Sync.VeteranLevel * 0.04)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' veterancy level='..oUnit.Sync.VeteranLevel..'; max health='..iMaxHealth..'; BP max health='..oBP.Defense.MaxHealth..'; Unit max health='..oUnit:GetMaxHealth()..'; iMaxShield='..iMaxShield..'; iHealthPercentage='..iHealthPercentage) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Unit '..(oUnit.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oUnit) or 'nil')..' veterancy level='..(oUnit.Sync.VeteranLevel or 'nil')..'; max health='..(iMaxHealth or 'nil')..'; BP max health='..(oBP.Defense.MaxHealth or 'nil')..'; Unit max health='..(oUnit:GetMaxHealth() or 'nil')..'; iMaxShield='..(iMaxShield or 0)..'; iHealthPercentage='..(iHealthPercentage or 'nil')) end
                         end
 
                         --Calculate max unit health (used elsewhere in code e.g. to calculate energy storage wanted for overcharge)
@@ -2202,7 +2202,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                     end
 
                     iCurThreat = iBaseThreat * iHealthThreatFactor + iGhettoGunshipAdjust
-                    if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..oUnit.UnitId..'; iBaseThreat='..iBaseThreat..'; iMassMod='..iMassMod..'iCurThreat='..iCurThreat) end
+                    if bDebugMessages == true then LOG(sFunctionRef..': UnitBP='..(oUnit.UnitId or 'nil')..'; iBaseThreat='..(iBaseThreat or 'nil')..'; iMassMod='..(iMassMod or 'nil')..'iCurThreat='..(iCurThreat or 'nil')) end
                 end
             else
                 --Calculate the base threat for hte blueprint (start of game)
@@ -4001,7 +4001,11 @@ function IsTargetUnderShield(aiBrain, oTarget, iIgnoreShieldsWithLessThanThisHea
     --if oTarget.UnitId == 'urb4206' then bDebugMessages = true end
     if M27UnitInfo.IsUnitValid(oTarget) and oTarget.GetHealth then
         if bDebugMessages == true and EntityCategoryContains(M27UnitInfo.refCategoryFixedShield, oTarget.UnitId) then
-            LOG(sFunctionRef..': oTarget is a shield='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Shield ratio='..oTarget:GetShieldRatio(false)..'; Shield ratio true='..oTarget:GetShieldRatio(true)..'; Shield health='..oTarget.MyShield:GetHealth()..'; SHield max health='..oTarget.MyShield:GetMaxHealth()..'; Active consumption='..tostring(oTarget.ActiveConsumption)..'; reprs of shield='..reprs(oTarget.MyShield))
+            if oTarget.MyShield.GetHealth then
+                LOG(sFunctionRef..': oTarget is a shield='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Shield ratio='..oTarget:GetShieldRatio(false)..'; Shield ratio true='..oTarget:GetShieldRatio(true)..'; Shield health='..oTarget.MyShield:GetHealth()..'; SHield max health='..oTarget.MyShield:GetMaxHealth()..'; Active consumption='..tostring(oTarget.ActiveConsumption)..'; reprs of shield='..reprs(oTarget.MyShield))
+            else
+                LOG(sFunctionRef..': oTarget is a shield but it doesnt have a .GetHealth property. target='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'reprs of shield='..reprs(oTarget.MyShield))
+            end
         end
         if iIgnoreShieldsWithLessThanThisHealth == nil then iIgnoreShieldsWithLessThanThisHealth = 0 end
         local bUnderShield = false

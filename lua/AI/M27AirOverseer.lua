@@ -3440,7 +3440,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
                             end
                         else
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Already assigned ' .. iCurActiveScoutsAssigned .. ' scouts to this location')
+                                LOG(sFunctionRef .. ': Already assigned ' .. (iCurActiveScoutsAssigned or 'nil') .. ' scouts to this location')
                             end
                         end
                     elseif bDebugMessages == true then
@@ -7672,7 +7672,7 @@ function GetNovaxTarget(aiBrain, oNovax)
             --Are there any near-exposed shields nearby? Then target them instead
             local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oTarget:GetPosition(), 23, 'Enemy')
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields) .. '; target subject to this=' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget)))
+                LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields)) .. '; target subject to this=' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget))
             end
             if M27Utilities.IsTableEmpty(tNearbyEnemyShields) == false then
                 local iCurShield, iMaxShield
