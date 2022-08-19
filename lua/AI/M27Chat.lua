@@ -196,7 +196,7 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..'; ArmyIndex='..oBrain:GetArmyIndex()..'; .M27AI='..tostring(oBrain.M27AI or false)) end
                     if oBrain.M27AI and not(oBrain == aiBrain) and IsEnemy(aiBrain:GetArmyIndex(), oBrain:GetArmyIndex()) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Will send thanks you too message') end
-                        SendMessage(aiBrain, 'Initial greeting', 'thx, u2', 55 - math.floor(GetGameTimeSeconds()), 0)
+                        SendMessage(oBrain, 'Initial greeting', 'thx, u2', 55 - math.floor(GetGameTimeSeconds()), 0)
                         break
                     end
                 end
