@@ -1151,7 +1151,7 @@ end
 function AssignMAAToPreferredPlatoons(aiBrain)
     --Similar to assigning scouts, but for MAA - for now just focus on having MAA helping ACU and any platoon of >20 size that doesnt contain MAA
     --===========ACU MAA helper--------------------------
-    local bDebugMessages = true
+    local bDebugMessages = false
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'AssignMAAToPreferredPlatoons'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -6352,7 +6352,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
-        if aiBrain:GetArmyIndex() == 6 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
         local iBigThreatSearchRange = 10000
 
@@ -8395,7 +8394,6 @@ function CoordinateNovax(aiBrain)
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CoordinateNovax'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetGameTimeSeconds() >= 2400 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code, does our team have an active coordinator=' .. tostring((M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] or false)))
     end
@@ -8404,7 +8402,6 @@ function CoordinateNovax(aiBrain)
         --Do we have any novax to coordinate?
         local bWantToCoordinate = true
         while bWantToCoordinate do
-            if GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             bWantToCoordinate = false
             local tFriendlyNovax = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySatellite, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1500, 'Ally')
             if bDebugMessages == true then LOG(sFunctionRef..': Is table of friendly novax empty='..tostring(M27Utilities.IsTableEmpty(tFriendlyNovax))) end

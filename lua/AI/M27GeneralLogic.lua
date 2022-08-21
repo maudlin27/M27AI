@@ -5058,8 +5058,6 @@ function GetT3ArtiTarget(oT3Arti)
     local sFunctionRef = 'GetT3ArtiTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    if GetGameTimeSeconds() >= 2395 and oT3Arti.UnitId == 'urb2302' then bDebugMessages = true end
-
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oT3Arti='..oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..'; Fraction complete='..oT3Arti:GetFractionComplete()) end
 
     --Redundancy incase we've been gifted a scathis that we havent started construction on:

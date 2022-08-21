@@ -490,7 +490,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
             local iCurMAA = 0
             local iCurIndirect = 0
 
-            if bIsLandFactory and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMAA) >= 4 then bDebugMessages = true end
+            --if bIsLandFactory and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMAA) >= 4 then bDebugMessages = true end
 
 
 
@@ -1350,7 +1350,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             --=======AIR FACTORY------------------
                         elseif bIsAirFactory then
-                            if aiBrain:GetArmyIndex() == 6 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
+                            --if aiBrain:GetArmyIndex() == 6 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
                             --if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false and table.getsize(aiBrain[M27AirOverseer.reftAvailableAirAA]) >= 20 then bDebugMessages = true end
 
 
@@ -2448,7 +2448,6 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                         --Dont build units with a combat ability if in norush
                         if M27MapInfo.bNoRushActive and M27MapInfo.iNoRushTimer - GetGameTimeSeconds() >= 120 and (aiBrain:GetEconomyStoredRatio('MASS') <= 0.8 or aiBrain:GetEconomyStoredRatio('ENERGY') < 0.999 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] <= 5) then
                             if not(EntityCategoryContains(M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryExperimentalLevel, sBPIDToBuild)) then
-                                bDebugMessages = true
                                 if bDebugMessages == true then LOG(sFunctionRef..': Still have a bit of norush time left so wont try and build non-engineer units') end
                                 sBPIDToBuild = nil
                             end
