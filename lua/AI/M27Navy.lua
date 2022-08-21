@@ -91,7 +91,10 @@ function RecordPonds()
                             for iEntry, iDist in tiDistToTry do
                                 for iAngleAdjust = iAngleInterval, 360, iAngleInterval do
                                     tPossibleWaterPosition = M27Utilities.MoveInDirection(tMex, iAngleAdjust, iDist, true)
-                                    if M27MapInfo.IsUnderwater(tPossibleWaterPosition, false, 0.05)
+                                    if M27MapInfo.IsUnderwater(tPossibleWaterPosition, false, 0.05) then
+                                        M27Utilities.ErrorHandler('TO COMPELTE')
+                                        --TODO - Finish off code
+                                    end
                                 end
                                 if bInRange then break end
                             end
@@ -100,10 +103,10 @@ function RecordPonds()
                                 iPondMexCount = iPondMexCount + 1
                                 tPondSubtable[subrefMexLocation] = {tMex[1], tMex[2], tMex[3]}
                             end
-
-                            subrefMexDistance
-                            subrefMexCanHitWithDF
-                            subrefMexCanHitWithIndirect
+                            --TODO - Finish off code - below were variables of interest
+                            --subrefMexDistance
+                            --subrefMexCanHitWithDF
+                            --subrefMexCanHitWithIndirect
                         end
                     end
                 end

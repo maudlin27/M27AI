@@ -5551,7 +5551,7 @@ function ACUManager(aiBrain)
             if oACUPlatoon then
                 --Having escort - further tests
                 if not(bWantEscort) then
-                    if iOurACUDistToOurBase >= math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) and not(aiBrain[M27Overseer.refiDefaultStrategy] == M27Overseer.refStrategyTurtle) then
+                    if iOurACUDistToOurBase >= math.max(125, aiBrain[refiDistanceToNearestEnemyBase] * 0.35) and not(aiBrain[refiDefaultStrategy] == refStrategyTurtle) then
                         if not(M27Conditions.DoesACUHaveBigGun(aiBrain, oACU) or oACU:HasEnhancement('CloakingGenerator')) then
                             if aiBrain[refiTotalEnemyShortRangeThreat] >= 2700 or (aiBrain[refiTotalEnemyShortRangeThreat] >= 1800 and not(M27Conditions.DoesACUHaveGun(aiBrain, false, oACU))) then
                                 bWantEscort = true
@@ -8522,7 +8522,7 @@ end
 
 function CoordinateLandExperimentals(aiBrain)
 
-    local bDebugMessages = false
+    local bDebugMessages = true
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CoordinateLandExperimentals'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -9128,7 +9128,7 @@ function OverseerManager(aiBrain)
 
         --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
-        if GetGameTimeSeconds() >= 1920 then M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
+        --if GetGameTimeSeconds() >= 1920 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
         --[[if not(bSetHook) and GetGameTimeSeconds() >= 322 then
             bDebugMessages = true
             bSetHook = true
