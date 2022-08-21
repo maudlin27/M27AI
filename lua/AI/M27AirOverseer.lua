@@ -127,7 +127,7 @@ refbLastCoveredByAAByTech = 'M27AirIsUnitCoveredByAA' --[x] is the tech level of
 
 --Build order related
 refiExtraAirScoutsWanted = 'M27AirExtraAirScoutsWanted'
-refiBombersWanted = 'M27AirBombersWanted'
+--refiBombersWanted = 'M27AirBombersWanted'
 refiTorpBombersWanted = 'M27TorpBombersWanted'
 refiAirStagingWanted = 'M27AirStagingWanted'
 local iMinScoutsForMap
@@ -3407,8 +3407,8 @@ function UpdateScoutingSegmentRequirements(aiBrain)
             aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiDeadScoutsSinceLastReveal] = 0
             aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiNormalScoutingIntervalWanted]
         else--]]
-                iCurIntervalWanted = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval]
-                iCurTimeSinceWantedToScout = GetTimeSinceLastScoutedSegment(aiBrain, iCurAirSegmentX, iCurAirSegmentZ) - iCurIntervalWanted
+                iCurIntervalWanted = (aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] or aiBrain[refiIntervalLowestPriority])
+                iCurTimeSinceWantedToScout = (GetTimeSinceLastScoutedSegment(aiBrain, iCurAirSegmentX, iCurAirSegmentZ) or 0) - iCurIntervalWanted
                 if iCurTimeSinceWantedToScout > 0 then
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Found a location that we havent scouted for a while, X-Z=' .. iCurAirSegmentX .. '-' .. iCurAirSegmentZ .. '; Dead scouts=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiDeadScoutsSinceLastReveal] .. '; assigned scouts=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned])
@@ -3448,7 +3448,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
                             end
                         else
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Already assigned ' .. iCurActiveScoutsAssigned .. ' scouts to this location')
+                                LOG(sFunctionRef .. ': Already assigned ' .. (iCurActiveScoutsAssigned or 'nil') .. ' scouts to this location')
                             end
                         end
                     elseif bDebugMessages == true then
@@ -7415,7 +7415,7 @@ function SetupAirOverseer(aiBrain)
     aiBrain[refiTorpBombersWanted] = 0
     aiBrain[refiAirAANeeded] = 0
     aiBrain[refiAirAAWanted] = 1
-    aiBrain[refiBombersWanted] = 1
+    --aiBrain[refiBombersWanted] = 1
     aiBrain[refiBomberDefencePercentRange] = 0.25
     aiBrain[refiBomberDefenceModDistance] = 125
     aiBrain[refiBomberDefenceDistanceCap] = 200
@@ -7667,6 +7667,8 @@ function GetNovaxTarget(aiBrain, oNovax)
     local tEnemyUnits
     local iMaxRange = 600
     local oTarget
+
+    --Check for priority override (but still consider shields and ACU even if have a priority target)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Is there a valid target override set=' .. tostring(oNovax[refoPriorityTargetOverride]) .. '; Time since last override=' .. GetGameTimeSeconds() - (oNovax[refiTimeOfLastOverride] or -100))
     end
@@ -7676,11 +7678,10 @@ function GetNovaxTarget(aiBrain, oNovax)
             LOG(sFunctionRef .. ': Will ignore override if in ACU kill mode. Strategy=' .. aiBrain[M27Overseer.refiAIBrainCurrentStrategy] .. '; Victory setting=' .. ScenarioInfo.Options.Victory)
         end
         if not (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and ScenarioInfo.Options.Victory == "demoralization") then
-            oTarget = oNovax[refoPriorityTargetOverride]
             --Are there any near-exposed shields nearby? Then target them instead
             local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oTarget:GetPosition(), 23, 'Enemy')
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields) .. '; target subject to this=' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget)))
+                LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields)) .. '; target subject to this=' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget))
             end
             if M27Utilities.IsTableEmpty(tNearbyEnemyShields) == false then
                 local iCurShield, iMaxShield
@@ -7696,6 +7697,47 @@ function GetNovaxTarget(aiBrain, oNovax)
                             end
                         end
                     end
+                end
+            end
+            if not(oTarget) then
+                --Is there an expoesd enemy ACU that we can kill instead?
+                if ScenarioInfo.Options.Victory == "demoralization" then
+                    local iRange = math.max(20, oNovax:GetBlueprint().Weapon[1].MaxRadius)
+                    local tNearbyACUs = aiBrain:GetUnitsAroundPoint(categories.COMMAND, oNovax:GetPosition(), iRange + 10, 'Enemy')
+                    local iDPS = 243
+
+                    if M27Utilities.IsTableEmpty(tNearbyACUs) == false then
+                        local iShortestTimeToKillTarget = 60 --Wont consider ACUs where will take more than this time to kill them
+                        local oACUForShortestTime
+                        local iTimeToKillTarget
+                        local iCurDPSMod = 0
+                        for iACU, oACU in tNearbyACUs do
+                            iTimeToKillTarget = 10000
+                            if not(oACU:IsUnitState('Attached')) and not(M27MapInfo.IsUnderwater(oACU:GetPosition())) then --Even if ACU slightly above water watn to ignore since it could probably easily get underwater
+                                local iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
+                                iCurDPSMod = -M27UnitInfo.GetACUShieldRegenRate(oACU) - M27UnitInfo.GetACUHealthRegenRate(oACU)
+                                local iACUHealth = oACU:GetHealth() + iACUCurShield
+                                if -iCurDPSMod < iCurDPSMod then
+                                    iTimeToKillTarget = iACUHealth / (iDPS + iCurDPSMod)
+                                    if iTimeToKillTarget > 0 and  iTimeToKillTarget < iShortestTimeToKillTarget then
+                                        --Are there nearby shields?
+                                        local iDistToTravel = (oACU:GetBlueprint().Physics.MaxSpeed or 1.7) * iTimeToKillTarget
+                                        local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryMobileLandShield, oACU:GetPosition(), iDistToTravel, 'Enemy')
+                                        if M27Utilities.IsTableEmpty(tNearbyShields) then
+                                            iShortestTimeToKillTarget = iTimeToKillTarget
+                                            oTarget = oACU
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iShortestTimeToKillTarget='..iShortestTimeToKillTarget..'; is oTarget valid='..tostring(M27UnitInfo.IsUnitValid(oTarget))) end
+                    end
+                end
+
+                if not(oTarget) then
+                    --Target the priority override
+                    oTarget = oNovax[refoPriorityTargetOverride]
                 end
             end
         end
@@ -7805,7 +7847,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                     iSearchRange = iRange + 10
                     if ScenarioInfo.Options.Victory == "demoralization" then
                         iSearchRange = iSearchRange + 100
-                        iMassFactor = 2
+                        iMassFactor = 3
                     end
                 elseif iCurTargetType == 10 then
                     iCategoriesToSearch = categories.VOLATILE * categories.STRUCTURE + categories.VOLATILE * categories.LAND
@@ -7996,7 +8038,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                             if oClosestUnshieldedUnit and iClosestUnshieldedDist <= math.max(250, iClosestShieldedDist + 60) then
                                 oTarget = oClosestUnshieldedUnit
                             elseif oClosestShieldedUnit then
-                                oTarget = oUnit
+                                oTarget = oClosestShieldedUnit
                             else
                                 oTarget = aiBrain[M27Overseer.refoLastNearestACU]
                             end

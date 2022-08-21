@@ -921,13 +921,18 @@ function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable,
                     if iDistanceToStart <= iMaxDistanceForHydro then
                         if bDebugMessages == true then LOG(sFunctionRef..': Is table of uncliamed hydros containing just this hydro empty='..tostring(M27Utilities.IsTableEmpty(M27EngineerOverseer.FilterLocationsBasedOnIfUnclaimed(aiBrain, { tHydro }, false)))) end
                         if not(bNotYetBuiltOn) or M27Utilities.IsTableEmpty(M27EngineerOverseer.FilterLocationsBasedOnIfUnclaimed(aiBrain, { tHydro }, false)) == false then
-                            bHydroNear = true
-                            if bAlsoReturnHydroTable == false then
-                                break
-                            else
-                                if bDebugMessages == true then LOG(sFunctionRef..': Have a valid hydro location') end
-                                iValidHydroCount = iValidHydroCount + 1
-                                tValidHydro[iValidHydroCount] = tHydro
+                            if not(M27MapInfo.bNoRushActive) or iDistanceToStart + 0.5 < M27MapInfo.iNoRushRange then
+                                --Norush active - check if hydro is in range of norush
+
+
+                                bHydroNear = true
+                                if bAlsoReturnHydroTable == false then
+                                    break
+                                else
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Have a valid hydro location') end
+                                    iValidHydroCount = iValidHydroCount + 1
+                                    tValidHydro[iValidHydroCount] = tHydro
+                                end
                             end
                         end
                     end
@@ -935,6 +940,7 @@ function HydroNearACUAndBase(aiBrain, bNearBaseOnlyCheck, bAlsoReturnHydroTable,
             end
         end
     end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bHydroNear, tValidHydro
 end

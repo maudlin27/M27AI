@@ -38,7 +38,7 @@ refbRecentlyRemovedHealthUpgrade = 'M27UnitRecentlyRemovedHealthUpgrade' --Used 
 refbActiveMissileChecker = 'M27UnitMissileTracker' --True if are actively checking for missile targets
 refbActiveSMDChecker = 'M27UnitSMDChecker' -- true if unit is checking for enemy SMD (use on nuke)
 refbActiveTargetChecker = 'M27UnitActiveTargetChecker' --e.g. used for T3 fixed arti, Quantum optics, hive
-refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will update this when given an IssueAttack order; hives will update when given a reclaim order
+refoLastTargetUnit = 'M27UnitLastTargetUnit' --e.g. indirect fire units will update this when given an IssueAttack order; hives will update when given a reclaim order; T3 arti will update when they are told to attack a specific unit
 reftAdjacencyPGensWanted = 'M27UnitAdjacentPGensWanted' --Table, [x] = subref: 1 = category wanted; 2 = buildlocation
 refiSubrefCategory = 1 --for reftAdjacencyPGensWanted
 refiSubrefBuildLocation = 2 --for reftAdjacencyPGensWanted
@@ -512,6 +512,37 @@ function GetACUShieldRegenRate(oUnit)
         end
     end
     return iRegenRate
+end
+
+function GetACUHealthRegenRate(oUnit)
+    --Cycles through every ACU enhancement and factors it into its health regen, along with veterancy
+    local oBP = oUnit:GetBlueprint()
+    local iRegenRate = (oBP.Defense.RegenRate or 0)
+
+    --Adjust for veterancy:
+    local iVetLevel = (oUnit.Sync.VeteranLevel or 0)
+    if iVetLevel > 0 and oBP.Buffs.Regen then
+        local iCurVet = 0
+        for iVet, iRegenMod in oBP.Buffs.Regen do
+            iCurVet = iCurVet + 1
+            if iCurVet == iVetLevel then
+                iRegenRate = iRegenRate + iRegenMod
+                break
+            end
+        end
+    end
+
+    --Adjust for enhancements
+    if M27Utilities.IsTableEmpty(oBP.Enhancements) == false then
+        for iEnhancement, tEnhancement in oBP.Enhancements do
+            if tEnhancement.NewRegenRate and oUnit:HasEnhancement(iEnhancement) then
+                iRegenRate = iRegenRate + tEnhancement.NewRegenRate
+            end
+        end
+    end
+
+    return iRegenRate
+
 end
 
 function GetCurrentAndMaximumShield(oUnit, bIgnoreIfShieldFailedFromLowPower)

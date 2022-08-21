@@ -598,22 +598,25 @@ function RecheckPathingAroundLocationIfUnitIsCorrect(sPathing, oPathingUnit, iUn
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecheckPathingAroundLocationIfUnitIsCorrect'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if iSegmentSizeAdjust == nil then iSegmentSizeAdjust = 4 end
 
-    if iSegmentSizeAdjust > 0 then
+    if EntityCategoryContains(categories.MOBILE, oPathingUnit.UnitId) then --Hard crash of game if do :CanPathTo on a structure, which could happen given structures use some of the platoon logic e.g. for mobile shield assistance
+        if iSegmentSizeAdjust == nil then iSegmentSizeAdjust = 4 end
+
+        if iSegmentSizeAdjust > 0 then
 
 
-        local iBaseSegmentX, iBaseSegmentZ = GetPathingSegmentFromPosition(tTargetLocation)
-        local tCurTargetLocation
+            local iBaseSegmentX, iBaseSegmentZ = GetPathingSegmentFromPosition(tTargetLocation)
+            local tCurTargetLocation
 
-        for iSegmentX = -iSegmentSizeAdjust + iBaseSegmentX, iSegmentSizeAdjust + iBaseSegmentX, 1 do
-            for iSegmentZ = -iSegmentSizeAdjust + iBaseSegmentZ, iSegmentSizeAdjust + iBaseSegmentZ, 1 do
-                if not(iSegmentX == iBaseSegmentX and iSegmentZ == iBaseSegmentZ) then
-                    if not(GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ) == iUnitCorrectPathingGroup) then
-                        tCurTargetLocation = GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
-                        if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tCurTargetLocation)]) then
-                            if oPathingUnit:CanPathTo(tCurTargetLocation) then
-                                FixSegmentPathingGroup(sPathing, tCurTargetLocation, iUnitCorrectPathingGroup)
+            for iSegmentX = -iSegmentSizeAdjust + iBaseSegmentX, iSegmentSizeAdjust + iBaseSegmentX, 1 do
+                for iSegmentZ = -iSegmentSizeAdjust + iBaseSegmentZ, iSegmentSizeAdjust + iBaseSegmentZ, 1 do
+                    if not(iSegmentX == iBaseSegmentX and iSegmentZ == iBaseSegmentZ) then
+                        if not(GetSegmentGroupOfTarget(sPathing, iSegmentX, iSegmentZ) == iUnitCorrectPathingGroup) then
+                            tCurTargetLocation = GetPositionFromPathingSegments(iSegmentX, iSegmentZ)
+                            if not(tManualPathingChecks[sPathing][M27Utilities.ConvertLocationToReference(tCurTargetLocation)]) then
+                                if oPathingUnit:CanPathTo(tCurTargetLocation) then
+                                    FixSegmentPathingGroup(sPathing, tCurTargetLocation, iUnitCorrectPathingGroup)
+                                end
                             end
                         end
                     end
@@ -634,7 +637,7 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RecheckPathingOfLocation'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if M27UnitInfo.IsUnitValid(oPathingUnit) then
+    if M27UnitInfo.IsUnitValid(oPathingUnit) and EntityCategoryContains(categories.MOBILE, oPathingUnit.UnitId) then --Hard crash of game if do :CanPathTo on a structure, which could happen given structures use some of the platoon logic e.g. for mobile shield assistance then
 
         --Ignore the check if we have had too many slowdowns for this unit
         if oPathingUnit[M27UnitInfo.refiPathingCheckCount] and oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 2 and ((oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 10 and oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.3) or oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.7) then
@@ -3346,20 +3349,20 @@ function IdentifyCliffsAroundBase(aiBrain)
         --First record all locations that have cliffs around them
         for iDistToEnemy = iInterval, math.min(126, math.floor((aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.4 / iInterval))*iInterval), iInterval do
             tLineStartPoint = M27Utilities.MoveInDirection(PlayerStartPoints[aiBrain.M27StartPositionNumber], iAngleToEnemy, iDistToEnemy, false)
-            if bDebugMessages == true then LOG(sFunctionRef..': Our start point='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; iAngleToEnemy='..iAngleToEnemy..'; iDistToEnemy='..iDistToEnemy..'; tLineStartPoint='..repru(tLineStartPoint)..'; iSegmentGroupWanted='..iSegmentGroupWanted) end
+            --if bDebugMessages == true then LOG(sFunctionRef..': Our start point='..repru(PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; iAngleToEnemy='..iAngleToEnemy..'; iDistToEnemy='..iDistToEnemy..'; tLineStartPoint='..repru(tLineStartPoint)..'; iSegmentGroupWanted='..iSegmentGroupWanted) end
             --Check we haven't already recorded this in the cliffs around base
             iCurX = math.floor(tLineStartPoint[1])
             iCurZ = math.floor(tLineStartPoint[3])
 
             if not(aiBrain[tCliffsAroundBaseChokepoint][iCurX]) or not(aiBrain[tCliffsAroundBaseChokepoint][iCurX][iCurZ]) then
                 --Can we path here from main base?
-                if bDebugMessages == true then LOG(sFunctionRef..': Segment group of line start point='..GetSegmentGroupOfLocation(sPathing, tLineStartPoint)) end
+                --if bDebugMessages == true then LOG(sFunctionRef..': Segment group of line start point='..GetSegmentGroupOfLocation(sPathing, tLineStartPoint)) end
                 if not(iSegmentGroupWanted == GetSegmentGroupOfLocation(sPathing, tLineStartPoint)) then
                     --Record all locations in a different pathing group from this position
-                    if bDebugMessages == true then
+                    --[[if bDebugMessages == true then
                         LOG(sFunctionRef..': Have a different pathing group, will draw line base in black')
                         M27Utilities.DrawLocation(tLineStartPoint, false, 3, 250, 1)
-                    end
+                    end--]]
                     tRecursivePosition = {}
                     iCurRecursivePosition = 1
                     iLowestX = 10000
@@ -3368,7 +3371,7 @@ function IdentifyCliffsAroundBase(aiBrain)
                     iHighestZ = 0
                     iCliffCount = iCliffCount + 1
                     while iCurRecursivePosition > 0 do
-                        if bDebugMessages == true then LOG(sFunctionRef..': iCurRecursivePosition='..iCurRecursivePosition..'; iCurX='..iCurX..'; iCurZ='..iCurZ) end
+                        --if bDebugMessages == true then LOG(sFunctionRef..': iCurRecursivePosition='..iCurRecursivePosition..'; iCurX='..iCurX..'; iCurZ='..iCurZ) end
                         bHaveSubsequentPath = false
                         RecordCliff()
                         if iHighestX - iLowestX > iMaxSize or iHighestZ - iLowestZ > iMaxSize then
@@ -3390,7 +3393,7 @@ function IdentifyCliffsAroundBase(aiBrain)
                         }
 
 
-                        if bDebugMessages == true then LOG(sFunctionRef..': iCurX-Z='..iCurX..'-'..iCurZ..'; iCurRecursivePosition='..iCurRecursivePosition..': About to check if are at edge of map') end
+                        --if bDebugMessages == true then LOG(sFunctionRef..': iCurX-Z='..iCurX..'-'..iCurZ..'; iCurRecursivePosition='..iCurRecursivePosition..': About to check if are at edge of map') end
                         --Dont check if are at map edge (if we really wanted to optimise this then I expect predefined tables of all the options would work but for now I'll leave it at this
                         if iCurX >= rMapPlayableArea[3] or iCurZ >= rMapPlayableArea[4] or iCurX < iInterval or iCurZ < iInterval then
                             --if bDebugMessages == true then LOG(sFunctionRef..': Are at map edge so limit the adjacent segments to consider') end
@@ -3449,10 +3452,10 @@ function IdentifyCliffsAroundBase(aiBrain)
                 end
             elseif bDebugMessages == true then
                 LOG(sFunctionRef..': Have the same pathing group, will draw line base in white')
-                M27Utilities.DrawLocation(tLineStartPoint, false, 7, 250, 1)
+                --M27Utilities.DrawLocation(tLineStartPoint, false, 7, 250, 1)
             end
         end
-        if bDebugMessages == true then
+        --[[if bDebugMessages == true then
             if bDebugMessages == true then LOG(sFunctionRef..': Will draw all cliffs in red. tiCliffBoundaries='..repru(tiCliffBoundaries)) end
             if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint]) == false then
                 for iX, tSubtable in aiBrain[tCliffsAroundBaseChokepoint] do
@@ -3461,7 +3464,7 @@ function IdentifyCliffsAroundBase(aiBrain)
                     end
                 end
             end
-        end
+        end--]]
 
         if bAbortRecordingCliff then
             --Clear any values we just added
@@ -3541,12 +3544,12 @@ function IdentifyCliffsAroundBase(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': After updating closest corners: iCurDist='..iCurDist..'; iClosestDist='..iClosestDist..'; iClosestCorner='..(iClosestCorner or 'nil')..'; iSecondClosestDist='..iSecondClosestDist..'; iSecondClosestCorner='..(iSecondClosestCorner or 'nil')) end
                 end
 
-                if bDebugMessages == true then
+                --[[if bDebugMessages == true then
                     LOG(sFunctionRef..': iCliff='..iCliff..'; tBoundaries='..repru(tBoundaries)..'; will draw in gold, and will draw the corners in blue. iClosestCorner='..iClosestCorner..'; iClosestDist='..iClosestDist..'; iSecondClosestCorner='..iSecondClosestCorner..'; iSecondClosestDist='..iSecondClosestDist..'; table of corners='..repru(tCornerPositions))
                     M27Utilities.DrawRectangle(Rect(tBoundaries[1], tBoundaries[2], tBoundaries[3], tBoundaries[4]), 4, 500)
                     M27Utilities.DrawLocation(tCornerPositions[iClosestCorner], nil, 1, 500)
                     M27Utilities.DrawLocation(tCornerPositions[iSecondClosestCorner], nil, 1, 500)
-                end
+                end--]]
 
                 --Adjust if are intersecting a map edge - only need 1 corner point
                 local tSinglePointOverride
@@ -3555,7 +3558,7 @@ function IdentifyCliffsAroundBase(aiBrain)
                 if bIntersectsMapEdge then
                     --Fill in all the cliff positions since they're currently only at intervals of 2
                     for iX = tBoundaries[1], tBoundaries[3] do
-                        if bDebugMessages == true then LOG(sFunctionRef..': repru of tCliffsAroundBaseChokepoint for this iX of '..iX..' before filling in='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX])) end
+                        --if bDebugMessages == true then LOG(sFunctionRef..': repru of tCliffsAroundBaseChokepoint for this iX of '..iX..' before filling in='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX])) end
                         if M27Utilities.IsTableEmpty(aiBrain[tCliffsAroundBaseChokepoint][iX]) == false then
                             for iZ = tBoundaries[2], tBoundaries[4] do
                                 --if bDebugMessages == true then LOG(sFunctionRef..': Updating entries around iX-Z='..iX..'-'..iZ) end
@@ -3570,7 +3573,7 @@ function IdentifyCliffsAroundBase(aiBrain)
                                 end
                             end
                         end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Finished filling in entries for iX='..iX..' repru of table for this iX='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX])) end
+                        --if bDebugMessages == true then LOG(sFunctionRef..': Finished filling in entries for iX='..iX..' repru of table for this iX='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX])) end
                     end
 
 
@@ -3604,8 +3607,8 @@ function IdentifyCliffsAroundBase(aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if iX-Z='..iX..'-'..iZ..' is intersecting with the box.') end
                             if aiBrain[tCliffsAroundBaseChokepoint][iX] and aiBrain[tCliffsAroundBaseChokepoint][iX][iZ] then
                                 tiAnglesWithNoCliffs[iCurAngle] = false
-                                if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 5, 200) end --black
-                                if bDebugMessages == true then LOG(sFunctionRef..': iCurAngle='..iCurAngle..'; Interesects box at iX='..iX..'; iZ='..iZ..'; will draw in black') end
+                                --if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 5, 200) end --black
+                                --if bDebugMessages == true then LOG(sFunctionRef..': iCurAngle='..iCurAngle..'; Interesects box at iX='..iX..'; iZ='..iZ..'; will draw in black') end
                                 break
                             else
                                 --Have we intersected with X part of the box?
@@ -3613,9 +3616,9 @@ function IdentifyCliffsAroundBase(aiBrain)
 
                                     --We have reached the edge of the square
                                     tiAngleSquareIntersectPosition[iCurAngle] = {iX, GetTerrainHeight(iX, iZ), iZ}
-                                    if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 1, 200) end --dark blue
+                                    --if bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 1, 200) end --dark blue
                                     break
-                                elseif bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 6, 200) --Cyan
+                                --elseif bDebugMessages == true then M27Utilities.DrawLocation(tCurPoint, false, 6, 200) --Cyan
                                 end
                             end
                         end
@@ -3744,7 +3747,7 @@ function IdentifyCliffsAroundBase(aiBrain)
 
                 --bDebugMessages = false
 
-                if bDebugMessages == true then
+                if bDebugMessages == true and false then
                     LOG(sFunctionRef..': Will give result of the first row of x values at the lowest Z boundary')
                     for iX = tBoundaries[1], tBoundaries[3] do
                         LOG('Result of table for iX='..iX..'; iZ='..tBoundaries[2]..'='..repru(aiBrain[tCliffsAroundBaseChokepoint][iX][tBoundaries[2]]))
@@ -4349,6 +4352,7 @@ end
 
 function TempCanPathToEveryMex(oUnit)
     local sFunctionRef = 'TempCanPathToEveryMex'
+    --For testing purposes
 
     local iCurTime = M27Utilities.ProfilerTimeSinceLastCall(sFunctionRef..': Start', nil)
     local bCanPath
@@ -5041,7 +5045,7 @@ function ReRecordUnitsAndPlatoonsInPlateaus(aiBrain)
                             else
                                 --Not sure want to add a pathing check due to the risk of an infinite loop/massive slowdown
                                 M27Utilities.ErrorHandler('Couldnt identify a plateau plan for the platoon, so will ignore from record of plateau units')
-                                if bDebugMessages == true then LOG(sFunctionRef..': Platoon ref='..sPlan..oPlatoon[refiPlatoonCount]..'; aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup]) end
+                                if bDebugMessages == true then LOG(sFunctionRef..': Platoon ref='..sPlan..oPlatoon[M27PlatoonUtilities.refiPlatoonCount]..'; aiBrain[refiOurBasePlateauGroup]='..aiBrain[refiOurBasePlateauGroup]) end
                             end
                         end
                         if sPlatoonSubref then

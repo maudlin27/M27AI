@@ -5963,17 +5963,17 @@ function SetMaximumFactoryLevels(aiBrain)
             aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
         end
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': aiBrain[M27AirOverseer.refiAirAANeeded]=' .. aiBrain[M27AirOverseer.refiAirAANeeded] .. '; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]=' .. aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] .. '; aiBrain[M27AirOverseer.refiBombersWanted]=' .. aiBrain[M27AirOverseer.refiBombersWanted] .. '; iTorpBomberShortfall=' .. iTorpBomberShortfall)
+            LOG(sFunctionRef .. ': aiBrain[M27AirOverseer.refiAirAANeeded]=' .. aiBrain[M27AirOverseer.refiAirAANeeded] .. '; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]=' .. aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] .. '; iTorpBomberShortfall=' .. iTorpBomberShortfall)
         end
-        local iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 3)
+        local iModBombersWanted = 1 --math.min(aiBrain[M27AirOverseer.refiBombersWanted], 3)
         --reftBomberEffectiveness = 'M27AirBomberEffectiveness' --[x][y]: x = unit tech level, y = nth entry; returns subtable {refiBomberMassCost}{refiBomberMassKilled}
         if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]]) == false then
             if aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassKilled] >= aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassCost] then
                 --Last bomber that died at this tech levle killed more than it cost
-                iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 6)
+                iModBombersWanted = 1 --math.min(aiBrain[M27AirOverseer.refiBombersWanted], 6)
             end
         end
-        local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(3, math.ceil(aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] / 10)) + math.min(5, aiBrain[M27AirOverseer.refiBombersWanted]) + iTorpBomberShortfall
+        local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(3, math.ceil(aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] / 10)) + 1 + iTorpBomberShortfall
         if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTransport) == 0 then
             iAirUnitsWanted = iAirUnitsWanted + 1
         end
@@ -6352,7 +6352,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
-        --if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
+        if aiBrain:GetArmyIndex() == 6 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
         local iBigThreatSearchRange = 10000
 
@@ -8395,17 +8395,19 @@ function CoordinateNovax(aiBrain)
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CoordinateNovax'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if GetGameTimeSeconds() >= 2400 then bDebugMessages = true M27Config.M27ShowUnitNames = true end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Start of code, does our team have an active coordinator=' .. tostring((M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] or false)))
     end
 
     if not (M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator]) then
-        M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] = true
         --Do we have any novax to coordinate?
         local bWantToCoordinate = true
         while bWantToCoordinate do
+            if GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
             bWantToCoordinate = false
-            local tFriendlyNovax = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySatellite, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
+            local tFriendlyNovax = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategorySatellite, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1500, 'Ally')
+            if bDebugMessages == true then LOG(sFunctionRef..': Is table of friendly novax empty='..tostring(M27Utilities.IsTableEmpty(tFriendlyNovax))) end
             if M27Utilities.IsTableEmpty(tFriendlyNovax) == false then
                 local tFriendlyT3Arti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 1000, 'Ally')
                 --What is the shield power of M27 controlled units?
@@ -8441,17 +8443,23 @@ function CoordinateNovax(aiBrain)
                         for iUnit, oUnit in aiBrain[reftEnemyArtiAndExpStructure] do
                             iInRangeArti = 0
 
-                            if oUnit:GetFractionComplete() >= 0.3 then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to target Exp structure/arti='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; fraction complete='..oUnit:GetFractionComplete()) end
+
+                            if oUnit:GetFractionComplete() >= 0.35 then
                                 for iFriendlyArti, oFriendlyArti in tFriendlyM27T3Arti do
-                                    iCurDistance = M27Utilities.GetDistanceBetweenPositions(oFriendlyArti:GetPosition(), oUnit:GetPosition())
-                                    if iCurDistance <= 825 and iCurDistance >= 150 then
-                                        iInRangeArti = iInRangeArti + 1
+                                    if oFriendlyArti[M27UnitInfo.refoLastTargetUnit] == oUnit then
+                                        iCurDistance = M27Utilities.GetDistanceBetweenPositions(oFriendlyArti:GetPosition(), oUnit:GetPosition())
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if in range of oFriendlyArti='..oFriendlyArti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFriendlyArti)..'; Distance='..iCurDistance) end
+                                        if iCurDistance <= 825 and iCurDistance >= 150 then
+                                            iInRangeArti = iInRangeArti + 1
+                                        end
                                     end
                                 end
                             end
                             if iInRangeArti > iMostInRangeArti then
                                 oBestPriorityTarget = oUnit
                                 iMostInRangeArti = iInRangeArti
+                                if bDebugMessages == true then LOG(sFunctionRef..': Setting best priority target to '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)) end
                             end
                         end
                     end
@@ -8494,6 +8502,7 @@ function CoordinateNovax(aiBrain)
                     if oBestPriorityTarget then
                         --We have a target that we want to co-ordinate an attack on
                         bWantToCoordinate = true
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want to coordinate attack on the target, will tell novac it has a priority target override') end
                         --Get all novax to move near the target if they are far away
 
                         for iNovax, oNovax in tAvailableNovax do
@@ -8503,11 +8512,13 @@ function CoordinateNovax(aiBrain)
                     end
                 end
             end
+            M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] = true
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             WaitSeconds(10)
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+            M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] = false
         end
-        M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] = false
+        M27Team.tTeamData[aiBrain.M27Team][M27Team.refbActiveNovaxCoordinator] = false --redundancy
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 end
@@ -8556,10 +8567,30 @@ function CoordinateLandExperimentals(aiBrain)
             while bExperimentalsAreFarApart do
                 bExperimentalsAreFarApart = false
                 if M27Utilities.IsTableEmpty(tAlliedLandExperimentals) == false and table.getn(tAlliedLandExperimentals) >= 2 then
+                    local oBrain
+                    local bNearbyEnemyExperimental
+                    local bCoordinateUnit
                     for iUnit, oUnit in tAlliedLandExperimentals do
                         if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain().M27AI and (bCoordinateFatboys or not(EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId))) then
-                            iM27LandExperimentals = iM27LandExperimentals + 1
-                            tM27LandExperimentals[iM27LandExperimentals] = oUnit
+                            --Only coordinate if experimental is within 150 of enemy experimental or on our side of map
+                            bCoordinateUnit = false
+                            bNearbyEnemyExperimental = false
+                            oBrain = oUnit:GetAIBrain()
+                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) < oBrain[refiDistanceToNearestEnemyBase] then
+                                bCoordinateUnit = true
+                            else
+                                --Is there a nearby enemy experimental? If not, dont coordinate as might be about to damage enemy base
+                                for iEnemyExperimental, oEnemyExperimental in oBrain[reftEnemyLandExperimentals] do
+                                    if M27Utilities.GetDistanceBetweenPositions(oEnemyExperimental:GetPosition(), oUnit:GetPosition()) <= 150 then
+                                        bCoordinateUnit = true
+                                        break
+                                    end
+                                end
+                            end
+                            if bCoordinateUnit then
+                                iM27LandExperimentals = iM27LandExperimentals + 1
+                                tM27LandExperimentals[iM27LandExperimentals] = oUnit
+                            end
                         end
                     end
                     if bDebugMessages == true then
@@ -9100,6 +9131,7 @@ function OverseerManager(aiBrain)
 
         --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
+        if GetGameTimeSeconds() >= 1920 then M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
         --[[if not(bSetHook) and GetGameTimeSeconds() >= 322 then
             bDebugMessages = true
             bSetHook = true
