@@ -3584,6 +3584,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                     elseif not(bShotIsBlockedForAllUnits) and oClosestUnitWhereShotNotBlocked then
                                         oPlatoon[refiCurrentAction] = refActionAttackSpecificUnit
                                         oPlatoon[refoTemporaryAttackTarget] = oClosestUnitWhereShotNotBlocked
+                                        if not(M27UnitInfo.IsUnitValid(oClosestUnitWhereShotNotBlocked)) then M27Utilities.ErrorHandler('Invalid unit') end
                                     end
                                 end
                                 if bDebugMessages == true then
@@ -4060,6 +4061,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                                     bAttackACU = true
                                                     oPlatoon[refiCurrentAction] = refActionAttackSpecificUnit
                                                     oPlatoon[refoTemporaryAttackTarget] = oNearestUpgradingACU
+                                                    if not(M27UnitInfo.IsUnitValid(oNearestUpgradingACU)) then M27Utilities.ErrorHandler('Invalid oNearestUpgradingACU unit') end
                                                 end
                                             end
                                         end
@@ -10394,6 +10396,10 @@ function ProcessPlatoonAction(oPlatoon)
                                                 end
                                             end
                                         end
+                                        if oPlatoon[refiCurrentAction] == refActionAttackSpecificUnit and not(M27UnitInfo.IsUnitValid(refoTemporaryAttackTarget)) then
+                                            M27Utilities.ErrorHandler(sFunctionRef..': No action for the platoon so using prev action but it was to attack a unit that is no logner valid, so will issue new movement path')
+                                            oPlatoon[refiCurrentAction] = refActionNewMovementPath
+                                        end
                                     end
                                 elseif bDebugMessages == true then LOG(sFunctionRef..': Cancelling overcharge')
                                 end
@@ -10858,12 +10864,14 @@ function ProcessPlatoonAction(oPlatoon)
                             if oUnitToAttackInstead and oPlatoon[refoFrontUnit] and oPlatoon[refoFrontUnit][M27UnitInfo.refbLastShotBlocked] and oUnitToAttackInstead == oPlatoon[refoTemporaryAttackTarget] then
                                 tDFTargetPosition[1], tDFTargetPosition[2], tDFTargetPosition[3] = oUnitToAttackInstead:GetPosition()
                                 oPlatoon[refoTemporaryAttackTarget] = oUnitToAttackInstead
+                                if not(M27UnitInfo.IsUnitValid(oUnitToAttackInstead)) then M27Utilities.ErrorHandler('Invalid oUnitToAttackInstead unit') end
                                 oUnitToAttackInstead = nil
                             end
                             if oUnitToAttackInstead then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Issuing a manual attack order at unit '..oUnitToAttackInstead.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToAttackInstead)) end
                                 IssueAttack(oPlatoon[reftCurrentUnits], oUnitToAttackInstead)
                                 oPlatoon[refoTemporaryAttackTarget] = oUnitToAttackInstead
+                                if not(M27UnitInfo.IsUnitValid(oUnitToAttackInstead)) then M27Utilities.ErrorHandler('Invalid oUnitToAttackInstead2 unit') end
                                 oPlatoon[refiLastOrderType] = refiOrderIssueAttack
                                 if M27Utilities.IsTableEmpty(tUnitsToAttackAfterFirst) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Queuing up attack orders on the other units') end
@@ -11013,10 +11021,12 @@ function ProcessPlatoonAction(oPlatoon)
                                     end
                                 end
                                 if bDebugMessages == true then LOG(sFunctionRef..': tDFTargetPosition='..repru(tDFTargetPosition)..'; bMoveNotAttack='..tostring(bMoveNotAttack)) end
-                                if oUnitToAttackInstead then
+                                if M27UnitInfo.IsUnitValid(oUnitToAttackInstead) then
                                     if bDebugMessages == true then LOG(sFunctionRef..': Issuing a manual attack order at unit '..oUnitToAttackInstead.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToAttackInstead)) end
+
                                     IssueAttack(oPlatoon[reftCurrentUnits], oUnitToAttackInstead)
                                     oPlatoon[refoTemporaryAttackTarget] = oUnitToAttackInstead
+
                                     oPlatoon[refiLastOrderType] = refiOrderIssueAttack
                                     if bDebugMessages == true then LOG(sFunctionRef..': Are attacking a specific unit='..oUnitToAttackInstead.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToAttackInstead)) end
                                 else
@@ -12151,8 +12161,13 @@ function ProcessPlatoonAction(oPlatoon)
                                 if bDebugMessages == true then LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': Clearing commands; Gametime='..GetGameTimeSeconds()) end
                                 IssueClearCommands(tCurrentUnits)
                             end
-                            IssueAttack(tCurrentUnits, oPlatoon[refoTemporaryAttackTarget])
-                            oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                            if not(M27UnitInfo.IsUnitValid(oPlatoon[refoTemporaryAttackTarget])) then
+                                M27Utilities.ErrorHandler('Dont have a valid temporary attack target. reprs will go in log if first time')
+                                if not(oPlatoon['M27TempTargetError']) then oPlatoon['M27TempTargetError'] = true LOG(sFunctionRef..': '..oPlatoon:GetPlan()..oPlatoon[refiPlatoonCount]..': reprs='..reprs(oPlatoon[refoTemporaryAttackTarget])) end
+                            else
+                                IssueAttack(tCurrentUnits, oPlatoon[refoTemporaryAttackTarget])
+                                oPlatoon[refiLastOrderType] = refiOrderIssueAttack
+                            end
                         end
                     end
                 elseif oPlatoon[refiCurrentAction] == refActionCoordinatedAttack then
