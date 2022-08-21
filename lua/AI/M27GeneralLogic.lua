@@ -5058,6 +5058,10 @@ function GetT3ArtiTarget(oT3Arti)
     local sFunctionRef = 'GetT3ArtiTarget'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
+    if GetGameTimeSeconds() >= 2395 and oT3Arti.UnitId == 'urb2302' then bDebugMessages = true end
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, oT3Arti='..oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..'; Fraction complete='..oT3Arti:GetFractionComplete()) end
+
     --Redundancy incase we've been gifted a scathis that we havent started construction on:
     if EntityCategoryContains(categories.MOBILE, oT3Arti) then
         oT3Arti:GetAIBrain()[M27EngineerOverseer.reftFriendlyScathis][oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)] = oT3Arti
@@ -5088,20 +5092,21 @@ function GetT3ArtiTarget(oT3Arti)
     local tEnemyUnitsOfInterest
     local iBestTargetValue
     local iCurTargetValue
+    local oTarget
 
     --First prioritise enemy T3 arti regardless of how well shielded, as if we dont kill them quickly we will die
     if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure]) == false then
         --Pick the one in range of the most t3 arti including this one; if there are multiple, then pick the one closest to this (since its accuracy will be best)
         local iMostT3ArtiInRange = 0
         local iCurDistance
-        local tT3ArtiInRange
+        local tT3ArtiInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oT3Arti:GetPosition(), math.max(825, iEffectiveMaxRange * 2), 'Ally')
         local tTargetShortlist = {}
         local iTargetShortlist = 0
         local iFriendlyT3ArtiInRange = 0
         local iCompleteOrNearCompleteEnemyArti = 0
         local iNearCompletePercent = 0.65
         if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through every enemy artillery and experimental structure, size of table='..table.getsize(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure])) end
-        local tExperimentalArti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalArti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 3000)
+        --[[local tExperimentalArti = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryExperimentalArti, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 3000)
         local iExperimentalArti = 0
         if M27Utilities.IsTableEmpty(tExperimentalArti) == false then
             for iUnit, oUnit in tExperimentalArti do
@@ -5109,20 +5114,22 @@ function GetT3ArtiTarget(oT3Arti)
                     iExperimentalArti = iExperimentalArti + 1
                 end
             end
-        end
+        end--]]
         for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
-            if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetFractionComplete() >= 0.2 then
+            if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetFractionComplete() >= 0.25 then
                 iCurDistance = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                 --Use 15 above normal range due to inaccuracy of shots
                 if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistance='..iCurDistance) end
                 if iCurDistance <= iEffectiveMaxRange then
 
-                    tT3ArtiInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, oUnit:GetPosition(), 840, 'Ally')
+                    --tT3ArtiInRange = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedT3Arti, oUnit:GetPosition(), 840, 'Ally')
 
-                    if M27Utilities.IsTableEmpty(tT3ArtiInRange) == false or iExperimentalArti > 0 then
-                        iFriendlyT3ArtiInRange = iExperimentalArti
+                    if M27Utilities.IsTableEmpty(tT3ArtiInRange) == false then
+
+                        iFriendlyT3ArtiInRange = 0
+                        --iFriendlyT3ArtiInRange = iExperimentalArti
                         for iFriendlyArti, oFriendlyArti in tT3ArtiInRange do
-                            if oUnit:GetFractionComplete() == 1 then
+                            if oUnit:GetFractionComplete() == 1 and (oFriendlyArti == oT3Arti or oUnit == oFriendlyArti[M27UnitInfo.refoLastTargetUnit] or not(oFriendlyArti[M27UnitInfo.refoLastTargetUnit])) then
                                 iFriendlyT3ArtiInRange = iFriendlyT3ArtiInRange + 1
                             end
                         end
@@ -5173,15 +5180,17 @@ function GetT3ArtiTarget(oT3Arti)
         if iTargetShortlist > 0 then
             --Pick the closest target
             if iTargetShortlist == 1 then
-                tTarget = tTargetShortlist[1]:GetPosition()
-                if bDebugMessages == true then LOG(sFunctionRef..': Only one target so will pick this, position='..repru(tTarget)) end
+                oTarget = tTargetShortlist[1]
+                tTarget = oTarget:GetPosition()
+                if bDebugMessages == true then LOG(sFunctionRef..': Only one target '..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..' so will pick this, position='..repru(tTarget)) end
             else
                 local iClosestTarget = 100000
                 for iUnit, oUnit in tTargetShortlist do
                     if iCompleteOrNearCompleteEnemyArti == 0 or oUnit:GetFractionComplete() >= iNearCompletePercent then
                         iCurDistance =  M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oT3Arti:GetPosition())
                         if iCurDistance < iClosestTarget then
-                            tTarget = oUnit:GetPosition()
+                            oTarget = oUnit
+                            tTarget = oTarget:GetPosition()
                             iClosestTarget = iCurDistance
                         end
                         if bDebugMessages == true then LOG(sFunctionRef..': Unit in shortlist='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurDistance='..iCurDistance..'; iClosestTarget='..iClosestTarget..'; tTarget='..repru(tTarget)) end
@@ -5225,7 +5234,8 @@ function GetT3ArtiTarget(oT3Arti)
                             end
                             if iCurTargetValue > iBestTargetValue then
                                 iBestTargetValue = iCurTargetValue
-                                tTarget = oUnit:GetPosition()
+                                oTarget = oUnit
+                                tTarget = oTarget:GetPosition()
                             end
                         end
                         if iBestTargetValue > 15000 and iUnit >=10 then break end
@@ -5246,6 +5256,7 @@ function GetT3ArtiTarget(oT3Arti)
         IssueClearCommands({oT3Arti})
         IssueAttack({oT3Arti}, tTarget)
         if bDebugMessages == true then LOG(sFunctionRef..': Told oT3Arti '..oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..' to attack tTarget '..repru(tTarget)) end
+        oT3Arti[M27UnitInfo.refoLastTargetUnit] = oTarget
     end
     if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
