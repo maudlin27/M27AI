@@ -2333,7 +2333,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
-    if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:GetHealthPercent() >= 0.8 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) >= 2 then bDebugMessages = true end
+    --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:GetHealthPercent() >= 0.8 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) >= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     --if sPlatoonName == 'M27LargeAttackForce' then bDebugMessages = true end
     --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
@@ -6980,7 +6980,7 @@ function DeterminePlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
-        if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:GetHealthPercent() >= 0.8 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) >= 2 then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:GetHealthPercent() >= 0.8 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) >= 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
@@ -8179,7 +8179,7 @@ function GetNewMovementPath(oPlatoon, bDontClearActions)
 
             --if sPlatoonName == 'M27IntelPathAI' then bDebugMessages = true end
             --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
-            if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:GetHealthPercent() >= 0.8 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) >= 2 then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:GetHealthPercent() >= 0.8 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) >= 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end
             --if sPlatoonName == 'M27MAAAssister' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' then bDebugMessages = true end
@@ -10307,7 +10307,7 @@ function ProcessPlatoonAction(oPlatoon)
             --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
             --if sPlatoonName == 'M27AmphibiousDefender' then bDebugMessages = true end
             --if sPlatoonName == 'M27EscortAI' and (oPlatoon[refiPlatoonCount] == 21 or oPlatoon[refiPlatoonCount] == 31) then bDebugMessages = true end
-            if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:GetHealthPercent() >= 0.8 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) >= 2 then bDebugMessages = true end
+            --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refoFrontUnit]:GetHealthPercent() >= 0.8 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental) >= 2 then bDebugMessages = true end
             --if sPlatoonName == 'M27AttackNearestUnits' and oPlatoon[refiPlatoonCount] == 86 then bDebugMessages = true end
             --if sPlatoonName == 'M27MexRaiderAI' and oPlatoon[refiPlatoonCount] == 2 and GetGameTimeSeconds() >= 270 then bDebugMessages = true end
             --if sPlatoonName == 'M27ScoutAssister' then bDebugMessages = true end

@@ -1594,7 +1594,6 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                     ClearAirUnitAssignmentTrackers(aiBrain, oBomber, true)
                                     IssueClearCommands({ oBomber })
                                     IssueAttack({ oBomber }, oNearestGroundAA)
-                                    if EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId) then bDebugMessages = true M27Utilities.ErrorHandler('Unexpected result') end
                                     for iGroundAA, oGroundAA in tAllValidAATargets do
                                         IssueAttack({ oBomber }, oGroundAA)
                                     end
@@ -1754,7 +1753,6 @@ function UpdateBomberTargets(oBomber, bRemoveIfOnLand, bLookForHigherPrioritySho
                                                 TellBomberToAttackTarget(oBomber, oTargetToSwitchTo, false)
                                             else
                                                 IssueAttack({ oBomber }, oTargetToSwitchTo)
-                                                if EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId) then bDebugMessages = true M27Utilities.ErrorHandler('Unexpected result') end
                                             end
                                         end
                                     end
@@ -4364,10 +4362,8 @@ function TellBomberToAttackTarget(oBomber, oTarget, bClearCommands, bAreHoverBom
 
     if not (bTargetGround) then
         IssueAttack({ oBomber }, oTarget)
-        if EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId) then bDebugMessages = true M27Utilities.ErrorHandler('Unexpected result') end
     else
         IssueAttack({ oBomber }, tGroundTarget)
-        if EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId) then bDebugMessages = true M27Utilities.ErrorHandler('Unexpected result') end
         oBomber[reftGroundAttackLocation] = tGroundTarget
     end
     if bDebugMessages == true then
@@ -7118,7 +7114,6 @@ function AirAAManager(aiBrain)
                             ClearAirUnitAssignmentTrackers(aiBrain, oClosestAirAA, true)
                             IssueClearCommands({ oClosestAirAA })
                             IssueAttack({ oClosestAirAA }, oCurTarget)
-                            if EntityCategoryContains(categories.EXPERIMENTAL, oClosestAirAA.UnitId) then bDebugMessages = true M27Utilities.ErrorHandler('Unexpected result') end
                             IssueAggressiveMove({ oClosestAirAA }, tStartPosition)
                             if M27Config.M27ShowUnitNames == true and oClosestAirAA.GetUnitId then
                                 M27PlatoonUtilities.UpdateUnitNames({ oClosestAirAA }, oClosestAirAA.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oClosestAirAA) .. ':IntereceptAir')
@@ -8118,7 +8113,6 @@ function NovaxCoreTargetLoop(aiBrain, oNovax, bCalledFromUnitDeath)
                     IssueClearCommands({ oNovax })
                 end
                 IssueAttack({ oNovax }, oTarget)
-                if EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId) then bDebugMessages = true M27Utilities.ErrorHandler('Unexpected result') end
                 oNovax[refiLastIssuedOrderType] = iOrderType
                 oNovax[refoLastIssuedOrderUnit] = oTarget
                 oNovax[reftLastIssuedOrderLocation] = nil
@@ -8176,7 +8170,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     --Broad idea (at time of first draft) - target locations that expect to be lightly defended, but try to dominate enemy groundAA when come across threats
     --bIsCzar - will affect some of the logic
 
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ExperimentalGunshipCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetGameTimeSeconds() >= 2872 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true end

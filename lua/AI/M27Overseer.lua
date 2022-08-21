@@ -8522,7 +8522,7 @@ end
 
 function CoordinateLandExperimentals(aiBrain)
 
-    local bDebugMessages = true
+    local bDebugMessages = false
     if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'CoordinateLandExperimentals'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
