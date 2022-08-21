@@ -5934,17 +5934,17 @@ function SetMaximumFactoryLevels(aiBrain)
             aiBrain[refiMinLandFactoryBeforeOtherTypes] = 1
         end
         if bDebugMessages == true then
-            LOG(sFunctionRef .. ': aiBrain[M27AirOverseer.refiAirAANeeded]=' .. aiBrain[M27AirOverseer.refiAirAANeeded] .. '; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]=' .. aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] .. '; aiBrain[M27AirOverseer.refiBombersWanted]=' .. aiBrain[M27AirOverseer.refiBombersWanted] .. '; iTorpBomberShortfall=' .. iTorpBomberShortfall)
+            LOG(sFunctionRef .. ': aiBrain[M27AirOverseer.refiAirAANeeded]=' .. aiBrain[M27AirOverseer.refiAirAANeeded] .. '; aiBrain[M27AirOverseer.refiExtraAirScoutsWanted]=' .. aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] .. '; iTorpBomberShortfall=' .. iTorpBomberShortfall)
         end
-        local iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 3)
+        local iModBombersWanted = 1 --math.min(aiBrain[M27AirOverseer.refiBombersWanted], 3)
         --reftBomberEffectiveness = 'M27AirBomberEffectiveness' --[x][y]: x = unit tech level, y = nth entry; returns subtable {refiBomberMassCost}{refiBomberMassKilled}
         if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]]) == false then
             if aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassKilled] >= aiBrain[M27AirOverseer.reftBomberEffectiveness][aiBrain[refiOurHighestAirFactoryTech]][1][M27AirOverseer.refiBomberMassCost] then
                 --Last bomber that died at this tech levle killed more than it cost
-                iModBombersWanted = math.min(aiBrain[M27AirOverseer.refiBombersWanted], 6)
+                iModBombersWanted = 1 --math.min(aiBrain[M27AirOverseer.refiBombersWanted], 6)
             end
         end
-        local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(3, math.ceil(aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] / 10)) + math.min(5, aiBrain[M27AirOverseer.refiBombersWanted]) + iTorpBomberShortfall
+        local iAirUnitsWanted = math.max(aiBrain[M27AirOverseer.refiAirAANeeded], aiBrain[M27AirOverseer.refiAirAAWanted]) + math.min(3, math.ceil(aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] / 10)) + 1 + iTorpBomberShortfall
         if M27Utilities.IsTableEmpty(aiBrain[M27MapInfo.reftPlateausOfInterest]) == false and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTransport) == 0 then
             iAirUnitsWanted = iAirUnitsWanted + 1
         end
@@ -6323,7 +6323,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
-        --if aiBrain:GetArmyIndex() == 4 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
+        if aiBrain:GetArmyIndex() == 6 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
         --Super enemy threats that need a big/unconventional response - check every second as some e.g. nuke require immediate response
         local iBigThreatSearchRange = 10000
 
@@ -8538,10 +8538,30 @@ function CoordinateLandExperimentals(aiBrain)
             while bExperimentalsAreFarApart do
                 bExperimentalsAreFarApart = false
                 if M27Utilities.IsTableEmpty(tAlliedLandExperimentals) == false and table.getn(tAlliedLandExperimentals) >= 2 then
+                    local oBrain
+                    local bNearbyEnemyExperimental
+                    local bCoordinateUnit
                     for iUnit, oUnit in tAlliedLandExperimentals do
                         if M27UnitInfo.IsUnitValid(oUnit) and oUnit:GetAIBrain().M27AI and (bCoordinateFatboys or not(EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId))) then
-                            iM27LandExperimentals = iM27LandExperimentals + 1
-                            tM27LandExperimentals[iM27LandExperimentals] = oUnit
+                            --Only coordinate if experimental is within 150 of enemy experimental or on our side of map
+                            bCoordinateUnit = false
+                            bNearbyEnemyExperimental = false
+                            oBrain = oUnit:GetAIBrain()
+                            if M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]) < oBrain[refiDistanceToNearestEnemyBase] then
+                                bCoordinateUnit = true
+                            else
+                                --Is there a nearby enemy experimental? If not, dont coordinate as might be about to damage enemy base
+                                for iEnemyExperimental, oEnemyExperimental in oBrain[reftEnemyLandExperimentals] do
+                                    if M27Utilities.GetDistanceBetweenPositions(oEnemyExperimental:GetPosition(), oUnit:GetPosition()) <= 150 then
+                                        bCoordinateUnit = true
+                                        break
+                                    end
+                                end
+                            end
+                            if bCoordinateUnit then
+                                iM27LandExperimentals = iM27LandExperimentals + 1
+                                tM27LandExperimentals[iM27LandExperimentals] = oUnit
+                            end
                         end
                     end
                     if bDebugMessages == true then
@@ -9082,6 +9102,7 @@ function OverseerManager(aiBrain)
 
         --TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
+        if GetGameTimeSeconds() >= 1920 then M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
         --[[if not(bSetHook) and GetGameTimeSeconds() >= 322 then
             bDebugMessages = true
             bSetHook = true

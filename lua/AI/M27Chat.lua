@@ -178,7 +178,7 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                         if math.random(0,1) == 1 then
                             local tPrevPlayers = {'gunner1069', 'relentless', 'Azraeel', 'Babel', 'Wingflier', 'Radde', 'YungDookie', 'Spyro', 'Skinnydude', 'savinguptobebrok', 'Tomma', 'IgneusTempus', 'tyne141'}
                             for iPlayer, sPlayer in tPrevPlayers do
-                                if oBrain.Nickname == tPrevPlayers or oBrain.Nickname == 'FAF_'..tPrevPlayers then
+                                if oBrain.Nickname == sPlayer or oBrain.Nickname == 'FAF_'..sPlayer then
                                     SendMessage(aiBrain, 'Specific opponent', '/83', 5, 10000) --QAI message re analysing prev subroutines
                                     bSentSpecificMessage = true
                                     break

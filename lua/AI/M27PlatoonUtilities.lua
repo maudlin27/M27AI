@@ -5968,7 +5968,7 @@ function DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code') end
     local oACU = M27Utilities.GetACU(aiBrain)
-    if not(oACU[M27UnitInfo.refbFullyUpgraded]) then
+    if not(oACU[M27UnitInfo.refbFullyUpgraded]) and (not(M27MapInfo.bNoRushActive) or M27MapInfo.iNoRushTimer - GetGameTimeSeconds() <= 120) then
         if bDebugMessages == true then LOG(sFunctionRef..': ACU not fully upgraded; does ACU have enhancement blastattack='..tostring(M27Utilities.GetACU(aiBrain):HasEnhancement('BlastAttack'))) end
         if not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) and not(oACU:HasEnhancement('AdvancedEngineering')) and not(oACU:HasEnhancement('T3Engineering')) and M27Conditions.DoesACUHaveGun(aiBrain, true) == false and not(oACU[M27Overseer.refbACUCantPathAwayFromBase]) then
             if bDebugMessages == true then LOG(sFunctionRef..': ACU doesnt have gun, checking if we want to get the upgrade now') end
@@ -5998,7 +5998,7 @@ function DecideWhetherToGetACUUpgrade(aiBrain, oPlatoon)
             end
         end
     else
-        if bDebugMessages == true then LOG(sFunctionRef..': ACU is fully upgraded so wont try and get an upgrade') end
+        if bDebugMessages == true then LOG(sFunctionRef..': ACU is fully upgraded or have norush timer active so wont try and get an upgrade') end
     end
     if bDebugMessages == true then LOG(sFunctionRef..': End of function, ACU action='..(oPlatoon[refiCurrentAction] or 'nil')) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

@@ -5258,7 +5258,7 @@ function GetT3ArtiTarget(oT3Arti)
         if bDebugMessages == true then LOG(sFunctionRef..': Told oT3Arti '..oT3Arti.UnitId..M27UnitInfo.GetUnitLifetimeCount(oT3Arti)..' to attack tTarget '..repru(tTarget)) end
         oT3Arti[M27UnitInfo.refoLastTargetUnit] = oTarget
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location='..iBestTargetValue) end
+    if bDebugMessages == true then LOG(sFunctionRef..': iBestTargetValue after getting best location (will be nil if targeting t3 arti)='..(iBestTargetValue or 'nil')) end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 

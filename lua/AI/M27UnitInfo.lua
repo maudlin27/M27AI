@@ -514,6 +514,37 @@ function GetACUShieldRegenRate(oUnit)
     return iRegenRate
 end
 
+function GetACUHealthRegenRate(oUnit)
+    --Cycles through every ACU enhancement and factors it into its health regen, along with veterancy
+    local oBP = oUnit:GetBlueprint()
+    local iRegenRate = (oBP.Defense.RegenRate or 0)
+
+    --Adjust for veterancy:
+    local iVetLevel = (oUnit.Sync.VeteranLevel or 0)
+    if iVetLevel > 0 and oBP.Buffs.Regen then
+        local iCurVet = 0
+        for iVet, iRegenMod in oBP.Buffs.Regen do
+            iCurVet = iCurVet + 1
+            if iCurVet == iVetLevel then
+                iRegenRate = iRegenRate + iRegenMod
+                break
+            end
+        end
+    end
+
+    --Adjust for enhancements
+    if M27Utilities.IsTableEmpty(oBP.Enhancements) == false then
+        for iEnhancement, tEnhancement in oBP.Enhancements do
+            if tEnhancement.NewRegenRate and oUnit:HasEnhancement(iEnhancement) then
+                iRegenRate = iRegenRate + tEnhancement.NewRegenRate
+            end
+        end
+    end
+
+    return iRegenRate
+
+end
+
 function GetCurrentAndMaximumShield(oUnit, bIgnoreIfShieldFailedFromLowPower)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetCurrentAndMaximumShield'
