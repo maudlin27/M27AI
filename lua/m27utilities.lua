@@ -351,7 +351,7 @@ function DrawRectBase(rRect, iColour, iDisplayCount)
         else tAllZ[iRectKey - 2] = iRectVal end
     end--]]
 
-    if bDebugMessages == true then LOG(sFunctionRef..'tAllX='..repru(tAllX)..'; tAllZ='..repru(tAllZ)..'; Rectx0='..rRect['x0']) end
+    --if bDebugMessages == true then LOG(sFunctionRef..'tAllX='..repru(tAllX)..'; tAllZ='..repru(tAllZ)..'; Rectx0='..rRect['x0']) end
     local iCurDrawCount = 0
 
     local iCount = 0
@@ -1259,56 +1259,58 @@ function FunctionProfiler(sFunctionRef, sStartOrEndRef)
             --if bDebugMessages == true then LOG('FunctionProfiler: '..sFunctionRef..': refProfilerStart; iCount='..iCount..'; iGameTimeInTicks='..iGameTimeInTicks..'; System time at start='..GetSystemTimeSecondsOnlyForProfileUse()..'; tProfilerFunctionStart[sFunctionRef][iCount]='..tProfilerFunctionStart[sFunctionRef][iCount]) end
 
         elseif sStartOrEndRef == refProfilerEnd then
-            tProfilerEndCount[sFunctionRef] = (tProfilerEndCount[sFunctionRef] or 0) + 1
-            local iCount = tProfilerEndCount[sFunctionRef]
-            local iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
-            if tProfilerFunctionStart[sFunctionRef][iCount] == nil then
-                ErrorHandler('Didnt record a start for this count.  Will assume the start time was equal to the previous count, and will increase the start count by 1 to try and align.  sFunctionRef='..sFunctionRef..'; iGameTimeInTicks='..iGameTimeInTicks..'; iCount='..(iCount or 'nil'))
-                if not(tProfilerFunctionStart[sFunctionRef]) then tProfilerFunctionStart[sFunctionRef] = {} end
-                if iCount > 1 then
-                    for iAdjust = 1, (iCount - 1), 1 do
-                        if tProfilerFunctionStart[sFunctionRef][iCount - iAdjust] then
-                            tProfilerFunctionStart[sFunctionRef][iCount] = tProfilerFunctionStart[sFunctionRef][iCount - iAdjust]
-                            break
+            if tProfilerStartCount[sFunctionRef] then --needed to support e.g. running this part-way through the game
+                tProfilerEndCount[sFunctionRef] = (tProfilerEndCount[sFunctionRef] or 0) + 1
+                local iCount = tProfilerEndCount[sFunctionRef]
+                local iGameTimeInTicks = math.floor(GetGameTimeSeconds()*10)
+                if tProfilerFunctionStart[sFunctionRef][iCount] == nil then
+                    ErrorHandler('Didnt record a start for this count.  Will assume the start time was equal to the previous count, and will increase the start count by 1 to try and align.  sFunctionRef='..sFunctionRef..'; iGameTimeInTicks='..iGameTimeInTicks..'; iCount='..(iCount or 'nil'))
+                    if not(tProfilerFunctionStart[sFunctionRef]) then tProfilerFunctionStart[sFunctionRef] = {} end
+                    if iCount > 1 then
+                        for iAdjust = 1, (iCount - 1), 1 do
+                            if tProfilerFunctionStart[sFunctionRef][iCount - iAdjust] then
+                                tProfilerFunctionStart[sFunctionRef][iCount] = tProfilerFunctionStart[sFunctionRef][iCount - iAdjust]
+                                break
+                            end
                         end
                     end
+                    if not(tProfilerFunctionStart[sFunctionRef][iCount]) then
+                        tProfilerFunctionStart[sFunctionRef][iCount] = 0
+                    end
+                    tProfilerStartCount[sFunctionRef] = iCount
                 end
-                if not(tProfilerFunctionStart[sFunctionRef][iCount]) then
-                    tProfilerFunctionStart[sFunctionRef][iCount] = 0
+                local iCurTimeTaken = GetSystemTimeSecondsOnlyForProfileUse() - tProfilerFunctionStart[sFunctionRef][iCount]
+
+                if M27Config.M27ProfilingIgnoreFirst2Seconds and iGameTimeInTicks <= 20 then iCurTimeTaken = 0 end
+                --if bDebugMessages == true then LOG('FunctionProfiler: '..sFunctionRef..': refProfilerEnd; iCount='..iCount..'; iCurTimeTaken='..iCurTimeTaken..'; tProfilerFunctionStart[sFunctionRef][iCount]='..tProfilerFunctionStart[sFunctionRef][iCount]) end
+                if not(tProfilerTimeTakenCumulative[sFunctionRef]) then tProfilerTimeTakenCumulative[sFunctionRef] = 0 end
+                tProfilerTimeTakenCumulative[sFunctionRef] = tProfilerTimeTakenCumulative[sFunctionRef] + iCurTimeTaken
+                tProfilerTimeTakenByCount[sFunctionRef][iCount] = iCurTimeTaken
+
+
+                if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks]) then
+                    tProfilerTimeTakenInTickByFunction[iGameTimeInTicks] = {}
+                    tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = 0
+                    tProfilerCountByTickByFunction[iGameTimeInTicks] = {}
                 end
-                tProfilerStartCount[sFunctionRef] = iCount
-            end
-            local iCurTimeTaken = GetSystemTimeSecondsOnlyForProfileUse() - tProfilerFunctionStart[sFunctionRef][iCount]
 
-            if M27Config.M27ProfilingIgnoreFirst2Seconds and iGameTimeInTicks <= 20 then iCurTimeTaken = 0 end
-            --if bDebugMessages == true then LOG('FunctionProfiler: '..sFunctionRef..': refProfilerEnd; iCount='..iCount..'; iCurTimeTaken='..iCurTimeTaken..'; tProfilerFunctionStart[sFunctionRef][iCount]='..tProfilerFunctionStart[sFunctionRef][iCount]) end
-            if not(tProfilerTimeTakenCumulative[sFunctionRef]) then tProfilerTimeTakenCumulative[sFunctionRef] = 0 end
-            tProfilerTimeTakenCumulative[sFunctionRef] = tProfilerTimeTakenCumulative[sFunctionRef] + iCurTimeTaken
-            tProfilerTimeTakenByCount[sFunctionRef][iCount] = iCurTimeTaken
+                if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef]) then tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] = 0 end
 
+                tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] = tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] + iCurTimeTaken
 
-            if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks]) then
-                tProfilerTimeTakenInTickByFunction[iGameTimeInTicks] = {}
-                tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = 0
-                tProfilerCountByTickByFunction[iGameTimeInTicks] = {}
-            end
+                --if bDebugMessages == true then LOG('FunctionProfiler: iGameTimeInTicks='..iGameTimeInTicks..'; sFunctionRef='..sFunctionRef..'; sProfilerActiveFunctionForThisTick='..sProfilerActiveFunctionForThisTick) end
+                if sFunctionRef == sProfilerActiveFunctionForThisTick or sProfilerActiveFunctionForThisTick == 'nil' then
+                    tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] + iCurTimeTaken
+                    --if bDebugMessages == true then LOG('FunctionProfiler: iGameTimeInTicks='..iGameTimeInTicks..'; Clearing active function from profiler; iCurTimeTaken='..iCurTimeTaken..'; tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks]='..tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks]) end
+                    sProfilerActiveFunctionForThisTick = 'nil'
+                end
 
-            if not(tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef]) then tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] = 0 end
-
-            tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] = tProfilerTimeTakenInTickByFunction[iGameTimeInTicks][sFunctionRef] + iCurTimeTaken
-
-            --if bDebugMessages == true then LOG('FunctionProfiler: iGameTimeInTicks='..iGameTimeInTicks..'; sFunctionRef='..sFunctionRef..'; sProfilerActiveFunctionForThisTick='..sProfilerActiveFunctionForThisTick) end
-            if sFunctionRef == sProfilerActiveFunctionForThisTick or sProfilerActiveFunctionForThisTick == 'nil' then
-                tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] = tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks] + iCurTimeTaken
-                --if bDebugMessages == true then LOG('FunctionProfiler: iGameTimeInTicks='..iGameTimeInTicks..'; Clearing active function from profiler; iCurTimeTaken='..iCurTimeTaken..'; tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks]='..tProfilerCumulativeTimeTakenInTick[iGameTimeInTicks]) end
-                sProfilerActiveFunctionForThisTick = 'nil'
-            end
-
-            --Track longest tick (ignore first min due to mapping initialisation)
-            if iGameTimeInTicks > 600 then
-                if iCurTimeTaken > refiLongestTickAfterStartTime then
-                    refiLongestTickAfterStartTime = iCurTimeTaken
-                    refiLongestTickAfterStartRef = iGameTimeInTicks
+                --Track longest tick (ignore first min due to mapping initialisation)
+                if iGameTimeInTicks > 600 then
+                    if iCurTimeTaken > refiLongestTickAfterStartTime then
+                        refiLongestTickAfterStartTime = iCurTimeTaken
+                        refiLongestTickAfterStartRef = iGameTimeInTicks
+                    end
                 end
             end
 
@@ -1900,6 +1902,7 @@ M27Scheduler = Class({
         while not item[4] do
             WaitTicks(1)
             ticksWaited = ticksWaited+1
+            --if GetGameTimeSeconds() >= 2455 then bGlobalDebugOverride = true M27Config.M27ShowUnitNames = true end
             self:CheckTick()
         end
         return ticksWaited

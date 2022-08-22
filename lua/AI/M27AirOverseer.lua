@@ -127,7 +127,7 @@ refbLastCoveredByAAByTech = 'M27AirIsUnitCoveredByAA' --[x] is the tech level of
 
 --Build order related
 refiExtraAirScoutsWanted = 'M27AirExtraAirScoutsWanted'
-refiBombersWanted = 'M27AirBombersWanted'
+--refiBombersWanted = 'M27AirBombersWanted'
 refiTorpBombersWanted = 'M27TorpBombersWanted'
 refiAirStagingWanted = 'M27AirStagingWanted'
 local iMinScoutsForMap
@@ -2003,13 +2003,21 @@ function TrackBombImpact(aiBrain, oBomber, oTarget, projectile, bConsiderChangin
             if bDebugMessages == true then LOG(sFunctionRef..': Strike damage after decrease='..oTarget[refiStrikeDamageAssigned]) end
         end
     else
-        if M27UnitInfo.IsUnitValid(oBomber) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 and M27Utilities.IsTableEmpty(M27Chat.tiM27VoiceTauntByType['Effective Bomber']) then
+        if M27UnitInfo.IsUnitValid(oBomber) and M27UnitInfo.GetUnitLifetimeCount(oBomber) == 1 and not(M27Chat.tiM27VoiceTauntByType['Effective Bomber']) then
             local iVetLevel = oBomber.Sync.VeteranLevel
             if bDebugMessages == true then LOG(sFunctionRef..': Bomber vet level='..(iVetLevel or 'nil')..'; Mass killed='..(oBomber.Sync.totalMassKilled or 'nil')) end
             local iVetLevelWanted = 3
             if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, oBomber.UnitId) then iVetLevelWanted = 2 end
             if iVetLevel >= iVetLevelWanted or (not(EntityCategoryContains(categories.EXPERIMENTAL, oBomber.UnitId)) and oBomber.Sync.totalMassKilled >= 6000) or (oBomber.Sync.totalMassKilled >= 30000) then
-                M27Chat.SendMessage(aiBrain, 'Effective Bomber', 'How are you enjoying the shock and awe, Commander?', 2, 10000)
+                local sMessage = 'How are you enjoying the shock and awe, Commander?'
+                if math.random(1,2) == 1 then
+                    if EntityCategoryContains(categories.TECH3, oBomber.UnitId) and __blueprints[oTarget.UnitId].Economy.BuildCostMass >= 800 then sMessage = 'Ouch! That must have been expensive!'
+                    elseif EntityCategoryContains(categories.TECH1, oBomber.UnitId) then sMessage = 'Birds away! Let\'s go hunt some engis.'
+                    end
+                end
+
+                M27Chat.SendMessage(aiBrain, 'Effective Bomber', sMessage, 2, 10000)
+
             end
         end
     end
@@ -3399,8 +3407,8 @@ function UpdateScoutingSegmentRequirements(aiBrain)
             aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiDeadScoutsSinceLastReveal] = 0
             aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiNormalScoutingIntervalWanted]
         else--]]
-                iCurIntervalWanted = aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval]
-                iCurTimeSinceWantedToScout = GetTimeSinceLastScoutedSegment(aiBrain, iCurAirSegmentX, iCurAirSegmentZ) - iCurIntervalWanted
+                iCurIntervalWanted = (aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiCurrentScoutingInterval] or aiBrain[refiIntervalLowestPriority])
+                iCurTimeSinceWantedToScout = (GetTimeSinceLastScoutedSegment(aiBrain, iCurAirSegmentX, iCurAirSegmentZ) or 0) - iCurIntervalWanted
                 if iCurTimeSinceWantedToScout > 0 then
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': Found a location that we havent scouted for a while, X-Z=' .. iCurAirSegmentX .. '-' .. iCurAirSegmentZ .. '; Dead scouts=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiDeadScoutsSinceLastReveal] .. '; assigned scouts=' .. aiBrain[reftAirSegmentTracker][iCurAirSegmentX][iCurAirSegmentZ][refiAirScoutsAssigned])
@@ -3440,7 +3448,7 @@ function UpdateScoutingSegmentRequirements(aiBrain)
                             end
                         else
                             if bDebugMessages == true then
-                                LOG(sFunctionRef .. ': Already assigned ' .. iCurActiveScoutsAssigned .. ' scouts to this location')
+                                LOG(sFunctionRef .. ': Already assigned ' .. (iCurActiveScoutsAssigned or 'nil') .. ' scouts to this location')
                             end
                         end
                     elseif bDebugMessages == true then
@@ -4887,7 +4895,7 @@ function AirBomberManager(aiBrain)
             if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false then
                 tEnemySAMsAndCruisers = EntityCategoryFilterDown(M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryCruiser, tEnemyAAAndCruisers)
                 aiBrain[refbEnemyHasHadCruisersOrT3AA] = true
-                if M27Utilities.IsTableEmpty(M27Chat.tiM27VoiceTauntByType['LotsOfAA']) then
+                if not(M27Chat.tiM27VoiceTauntByType['LotsOfAA']) then
                     if M27Utilities.IsTableEmpty(tEnemyAAAndCruisers) == false and table.getn(tEnemyAAAndCruisers) >= 10 then
                         M27Chat.SendMessage(aiBrain, 'LotsOfAA', 'That\'s a lot of anti-air commander.  Think it\'ll be enough to calm the fear?', 0, 10000)
                     end
@@ -7407,7 +7415,7 @@ function SetupAirOverseer(aiBrain)
     aiBrain[refiTorpBombersWanted] = 0
     aiBrain[refiAirAANeeded] = 0
     aiBrain[refiAirAAWanted] = 1
-    aiBrain[refiBombersWanted] = 1
+    --aiBrain[refiBombersWanted] = 1
     aiBrain[refiBomberDefencePercentRange] = 0.25
     aiBrain[refiBomberDefenceModDistance] = 125
     aiBrain[refiBomberDefenceDistanceCap] = 200
@@ -7659,6 +7667,8 @@ function GetNovaxTarget(aiBrain, oNovax)
     local tEnemyUnits
     local iMaxRange = 600
     local oTarget
+
+    --Check for priority override (but still consider shields and ACU even if have a priority target)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Is there a valid target override set=' .. tostring(oNovax[refoPriorityTargetOverride]) .. '; Time since last override=' .. GetGameTimeSeconds() - (oNovax[refiTimeOfLastOverride] or -100))
     end
@@ -7668,11 +7678,10 @@ function GetNovaxTarget(aiBrain, oNovax)
             LOG(sFunctionRef .. ': Will ignore override if in ACU kill mode. Strategy=' .. aiBrain[M27Overseer.refiAIBrainCurrentStrategy] .. '; Victory setting=' .. ScenarioInfo.Options.Victory)
         end
         if not (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and ScenarioInfo.Options.Victory == "demoralization") then
-            oTarget = oNovax[refoPriorityTargetOverride]
             --Are there any near-exposed shields nearby? Then target them instead
             local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oTarget:GetPosition(), 23, 'Enemy')
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields) .. '; target subject to this=' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget)))
+                LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields)) .. '; target subject to this=' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget))
             end
             if M27Utilities.IsTableEmpty(tNearbyEnemyShields) == false then
                 local iCurShield, iMaxShield
@@ -7688,6 +7697,47 @@ function GetNovaxTarget(aiBrain, oNovax)
                             end
                         end
                     end
+                end
+            end
+            if not(oTarget) then
+                --Is there an expoesd enemy ACU that we can kill instead?
+                if ScenarioInfo.Options.Victory == "demoralization" then
+                    local iRange = math.max(20, oNovax:GetBlueprint().Weapon[1].MaxRadius)
+                    local tNearbyACUs = aiBrain:GetUnitsAroundPoint(categories.COMMAND, oNovax:GetPosition(), iRange + 10, 'Enemy')
+                    local iDPS = 243
+
+                    if M27Utilities.IsTableEmpty(tNearbyACUs) == false then
+                        local iShortestTimeToKillTarget = 60 --Wont consider ACUs where will take more than this time to kill them
+                        local oACUForShortestTime
+                        local iTimeToKillTarget
+                        local iCurDPSMod = 0
+                        for iACU, oACU in tNearbyACUs do
+                            iTimeToKillTarget = 10000
+                            if not(oACU:IsUnitState('Attached')) and not(M27MapInfo.IsUnderwater(oACU:GetPosition())) then --Even if ACU slightly above water watn to ignore since it could probably easily get underwater
+                                local iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(oACU)
+                                iCurDPSMod = -M27UnitInfo.GetACUShieldRegenRate(oACU) - M27UnitInfo.GetACUHealthRegenRate(oACU)
+                                local iACUHealth = oACU:GetHealth() + iACUCurShield
+                                if -iCurDPSMod < iCurDPSMod then
+                                    iTimeToKillTarget = iACUHealth / (iDPS + iCurDPSMod)
+                                    if iTimeToKillTarget > 0 and  iTimeToKillTarget < iShortestTimeToKillTarget then
+                                        --Are there nearby shields?
+                                        local iDistToTravel = (oACU:GetBlueprint().Physics.MaxSpeed or 1.7) * iTimeToKillTarget
+                                        local tNearbyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield + M27UnitInfo.refCategoryMobileLandShield, oACU:GetPosition(), iDistToTravel, 'Enemy')
+                                        if M27Utilities.IsTableEmpty(tNearbyShields) then
+                                            iShortestTimeToKillTarget = iTimeToKillTarget
+                                            oTarget = oACU
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        if bDebugMessages == true then LOG(sFunctionRef..': iShortestTimeToKillTarget='..iShortestTimeToKillTarget..'; is oTarget valid='..tostring(M27UnitInfo.IsUnitValid(oTarget))) end
+                    end
+                end
+
+                if not(oTarget) then
+                    --Target the priority override
+                    oTarget = oNovax[refoPriorityTargetOverride]
                 end
             end
         end
@@ -7797,7 +7847,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                     iSearchRange = iRange + 10
                     if ScenarioInfo.Options.Victory == "demoralization" then
                         iSearchRange = iSearchRange + 100
-                        iMassFactor = 2
+                        iMassFactor = 3
                     end
                 elseif iCurTargetType == 10 then
                     iCategoriesToSearch = categories.VOLATILE * categories.STRUCTURE + categories.VOLATILE * categories.LAND
@@ -7988,7 +8038,7 @@ function GetNovaxTarget(aiBrain, oNovax)
                             if oClosestUnshieldedUnit and iClosestUnshieldedDist <= math.max(250, iClosestShieldedDist + 60) then
                                 oTarget = oClosestUnshieldedUnit
                             elseif oClosestShieldedUnit then
-                                oTarget = oUnit
+                                oTarget = oClosestShieldedUnit
                             else
                                 oTarget = aiBrain[M27Overseer.refoLastNearestACU]
                             end
@@ -8203,11 +8253,12 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
 
     if bDebugMessages == true then
         if M27UnitInfo.IsUnitValid(oUnit[refoLastUnitTarget]) then
-            LOG(sFunctionRef .. ': Last target was a unit ' .. oUnit[refoLastUnitTarget].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoLastUnitTarget]) .. '; distance to this target=' .. M27Utilities.GetDistanceBetweenPositions(oUnit[refoLastUnitTarget]:GetPosition(), tCurPosition))
+            LOG(sFunctionRef .. ': Last target was a unit ' .. oUnit[refoLastUnitTarget].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit[refoLastUnitTarget]) .. '; distance to this target=' .. M27Utilities.GetDistanceBetweenPositions(oUnit[refoLastUnitTarget]:GetPosition(), tCurPosition)..'; Last target cur position='..repru(oUnit[refoLastUnitTarget]:GetPosition())..'; recorded last target position='..repru((oUnit[reftLastLocationTarget] or { 'nil' })))
         else
             LOG(sFunctionRef .. ': Last target was a location or nil =' .. repru((oUnit[reftLastLocationTarget] or { 'nil' })))
         end
         LOG(sFunctionRef .. ': Last time run=' .. (oUnit[refiTimeSinceLastRan] or 0) .. '; which is ' .. iTimeSinceLastRan .. ' seconds ago')
+        if M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) then LOG(sFunctionRef..': Have valid last nearest ACU, distance to it='..M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), tCurPosition)..'; Time since last ran='..iTimeSinceLastRan..'; iCombatRangeToUse='..iCombatRangeToUse) end
     end
 
     --ACU OVERRIDE
@@ -8234,58 +8285,62 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             if iDistToTarget <= iActualRange then
                 iTimeToTarget = 0
             else
-                iTimeToTarget = iDistToTarget / iActualRange
+                iTimeToTarget = (iDistToTarget - iActualRange) / iSpeed
             end
             local iACUCurShield, iACUMaxShield = M27UnitInfo.GetCurrentAndMaximumShield(aiBrain[M27Overseer.refoLastNearestACU])
             local iNearbyShieldHealth = M27Logic.IsTargetUnderShield(aiBrain, aiBrain[M27Overseer.refoLastNearestACU], 0, true, false, false, true)
             local iCrashDamage = 0
+            local iACURegen = M27UnitInfo.GetACUShieldRegenRate(aiBrain[M27Overseer.refoLastNearestACU]) + M27UnitInfo.GetACUHealthRegenRate(aiBrain[M27Overseer.refoLastNearestACU])
             if bIsCzar then
                 iCrashDamage = 10000
             end
+
+            local iTimeToKillTarget = iTimeToTarget + math.max(1, (iNearbyShieldHealth * 1.1 + aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() + iACUCurShield - iCrashDamage)) / math.max(0.001, iOurDPS - iACURegen)
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': iNearbyShieldHealth=' .. iNearbyShieldHealth .. '; iCrashDamage=' .. iCrashDamage .. '; ACU cur health=' .. aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() .. '; iACUCurShield=' .. (iACUCurShield or 0) .. '; iOurDPS=' .. iOurDPS)
+                LOG(sFunctionRef .. ': iNearbyShieldHealth=' .. iNearbyShieldHealth .. '; iCrashDamage=' .. iCrashDamage .. '; ACU cur health=' .. aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() .. '; iACUCurShield=' .. (iACUCurShield or 0) .. '; iOurDPS=' .. iOurDPS..'; iACURegen='..iACURegen..'; iTimeToKillTarget='..iTimeToKillTarget)
             end
-            local iTimeToKillTarget = iTimeToTarget + math.max(1, (iNearbyShieldHealth * 1.1 + aiBrain[M27Overseer.refoLastNearestACU]:GetHealth() + iACUCurShield - iCrashDamage)) / math.max(0.001, iOurDPS)
-            local iTimeUntilWeDie
+            if iTimeToKillTarget <= 150 then
+                local iTimeUntilWeDie
 
-            local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA + M27UnitInfo.refCategoryGroundAA, tCurPosition, 100, 'Enemy')
-            local iEstimatedEnemyAADPS = 0
-            local iEstimatedMassDPSFactor = 0.4
-            local iEnemyAAMass = 0
+                local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA + M27UnitInfo.refCategoryGroundAA, tCurPosition, 100, 'Enemy')
+                local iEstimatedEnemyAADPS = 0
+                local iEstimatedMassDPSFactor = 0.4
+                local iEnemyAAMass = 0
 
-            if M27Utilities.IsTableEmpty(tEnemyAA) == false then
-                for iAA, oAA in tEnemyAA do
-                    iEnemyAAMass = iEnemyAAMass + oAA:GetBlueprint().Economy.BuildCostMass
+                if M27Utilities.IsTableEmpty(tEnemyAA) == false then
+                    for iAA, oAA in tEnemyAA do
+                        iEnemyAAMass = iEnemyAAMass + oAA:GetBlueprint().Economy.BuildCostMass
+                    end
                 end
-            end
-            iEstimatedEnemyAADPS = iEnemyAAMass * iEstimatedMassDPSFactor
+                iEstimatedEnemyAADPS = iEnemyAAMass * iEstimatedMassDPSFactor
 
-            if iEstimatedEnemyAADPS == 0 then
-                iTimeUntilWeDie = 100000
-            else
-                iTimeUntilWeDie = iOurTotalHealth / iEstimatedEnemyAADPS
-            end
-            if iNearbyFriendlyAirExperimental > 0 then
-                iTimeUntilWeDie = iTimeUntilWeDie * (1 + 0.25 * iNearbyFriendlyAirExperimental)
-            end
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': iOurTotalHealth=' .. iOurTotalHealth .. '; iEstimatedEnemyAADPS=' .. iEstimatedEnemyAADPS .. '; iTimeToKillTarget=' .. iTimeToKillTarget .. '; iTimeUntilWeDie=' .. iTimeUntilWeDie)
-            end
-            --Give a small margin of error
-            local iTimeToKillFactor = 0.9 --Want to kill enemy in 90% of the time it will take for us to die
-            if not (ScenarioInfo.Options.Victory == "demoralization") then
-                iTimeToKillFactor = 0.4
-            end
-            if iTimeToKillTarget > 2 and (iTimeUntilWeDie * 0.9 - 2) < iTimeToKillTarget then
-                if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': We will die before we kill the target so want to revert to normal logic (which will likely ahve us retreat once low on health')
+                if iEstimatedEnemyAADPS == 0 then
+                    iTimeUntilWeDie = 100000
+                else
+                    iTimeUntilWeDie = iOurTotalHealth / iEstimatedEnemyAADPS
                 end
-                --Dont try and attack enemy ACU
-            else
-                bUpdateLocationAttemptCount = false
-                oAttackTarget = aiBrain[M27Overseer.refoLastNearestACU]
+                if iNearbyFriendlyAirExperimental > 0 then
+                    iTimeUntilWeDie = iTimeUntilWeDie * (1 + 0.25 * iNearbyFriendlyAirExperimental)
+                end
                 if bDebugMessages == true then
-                    LOG(sFunctionRef .. ': Near enemy ACU and should kill it before we die so will attack it')
+                    LOG(sFunctionRef .. ': iOurTotalHealth=' .. iOurTotalHealth .. '; iEstimatedEnemyAADPS=' .. iEstimatedEnemyAADPS .. '; iTimeToKillTarget=' .. iTimeToKillTarget .. '; iTimeUntilWeDie=' .. iTimeUntilWeDie)
+                end
+                --Give a small margin of error
+                local iTimeToKillFactor = 0.9 --Want to kill enemy in 90% of the time it will take for us to die
+                if not (ScenarioInfo.Options.Victory == "demoralization") then
+                    iTimeToKillFactor = 0.4
+                end
+                if iTimeToKillTarget > 2 and (iTimeUntilWeDie * 0.9 - 2) < iTimeToKillTarget then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': We will die before we kill the target so want to revert to normal logic (which will likely ahve us retreat once low on health')
+                    end
+                    --Dont try and attack enemy ACU
+                else
+                    bUpdateLocationAttemptCount = false
+                    oAttackTarget = aiBrain[M27Overseer.refoLastNearestACU]
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Near enemy ACU and should kill it before we die so will attack it')
+                    end
                 end
             end
         elseif bDebugMessages == true then
@@ -8364,6 +8419,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 end
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': bWantToRun pre adjustments='..tostring(bWantToRun)) end
         --Decide whether to continue attackign our last target (overrides whether we want to run, i.e. if we're about to kill the target then should try and finish it off before we run)
         if M27Utilities.IsTableEmpty(tLocationToMoveTo) and not (oAttackTarget) and (M27UnitInfo.IsUnitValid(oUnit[refoLastUnitTarget]) and oUnit[refoLastUnitTarget]:GetHealth() <= 15000 and M27Utilities.GetDistanceBetweenPositions(oUnit[refoLastUnitTarget]:GetPosition(), tCurPosition) <= iImmediateCombatRange and not (M27Logic.IsTargetUnderShield(aiBrain, oUnit[refoLastUnitTarget], 5000, false, false, false))) then
             --Keep attacking this unit rather than changing our target
@@ -8454,6 +8510,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 bWantToRun = false
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': bWantToRun post adjustments='..tostring(bWantToRun)) end
         if M27Utilities.IsTableEmpty(tLocationToMoveTo) and not (oAttackTarget) then
             --NEARBY TARGET LOGIC
             --Lots of enemy SAMs or T3 MAA nearby?
@@ -8868,6 +8925,15 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 bRefreshAttack = true
             elseif bIsCzar and oAttackTarget == oUnit[refoLastUnitTarget] and (M27Utilities.IsTableEmpty(oUnit[reftLastLocationTarget]) or M27Utilities.GetDistanceBetweenPositions(oUnit[reftLastLocationTarget], oAttackTarget:GetPosition()) >= 3) then
                 bRefreshAttack = true
+            elseif oAttackTarget == oUnit[refoLastUnitTarget] and oUnit.GetNavigator then
+                local oNavigator = oUnit:GetNavigator()
+                if oNavigator and oNavigator.GetCurrentTargetPos then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Distance between our navigator target and the target unit='..M27Utilities.GetDistanceBetweenPositions(oNavigator:GetCurrentTargetPos(), oAttackTarget:GetPosition())) end
+                    if M27Utilities.GetDistanceBetweenPositions(oNavigator:GetCurrentTargetPos(), oAttackTarget:GetPosition()) >= 3.5 then
+                        bRefreshAttack = true
+                        LOG(sFunctionRef..': INCONSISTENT TARGETS, will refresh')
+                    end
+                end
             end
             if bDebugMessages == true then
                 LOG(sFunctionRef .. ': Attacking target. bRefreshAttack=' .. tostring(bRefreshAttack) .. '; bIsCzar=' .. tostring(bIsCzar) .. '; oAttackTarget=' .. oAttackTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oAttackTarget) .. '; Position=' .. repru(oAttackTarget:GetPosition()) .. '; Is this the same as last target=' .. tostring(oAttackTarget == oUnit[refoLastUnitTarget]) .. '; Is last target location empty=' .. tostring(M27Utilities.IsTableEmpty(oUnit[reftLastLocationTarget])) .. '; Last target=' .. repru(oUnit[reftLastLocationTarget] or { 'nil' }))

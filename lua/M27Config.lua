@@ -11,7 +11,7 @@ M27StrategicLog = false --Affects the strategic overseer logs which give various
 M27ShowPathingGraphically = false --(also turns on log showing map name) - Will draw the pathing for land, amphibious and navy if set to true, but will make things very slow
 
 --Profiling options:
-M27RunProfiling = false --Records data on how long most functions are taking
+M27RunProfiling = false --Records data on how long most functions are taking; if setting to true part-way through game then need to also run ForkThread(M27Utilities.ProfilerActualTimePerTick)
 M27ProfilingIgnoreFirst2Seconds = true --Means logic relating to pathing generation gets ignored
 --M27ProfilingIgnoreFirstMin = true --Means logic relating to pathing generation gets ignored
 M27RunSoftlesProfiling = false --Runs Softles profiling which tracks every function call (not just in my code but in the game) which allows calculation of the average tick length that a function occurs in (i.e. doesnt track time spent by each function but instead can use the correlation between function calls and how long a tick is taking)

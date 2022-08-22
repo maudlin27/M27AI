@@ -245,61 +245,72 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                 local oKillerBrain = instigator:GetAIBrain()
                 if oKillerBrain.M27AI then
                     --Chat message for experimentals
-                    if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) and (oUnitKilled.Sync.totalMassKilled or 0) <= math.min(10000, oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.35) and M27Utilities.GetDistanceBetweenPositions(oUnitKilled:GetPosition(), M27MapInfo.PlayerStartPoints[oKillerBrain.M27StartPositionNumber]) <= 150 and M27Logic.GetCombatThreatRating(oKillerBrain, oKillerBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL, oUnitKilled:GetPosition(), 80, 'Enemy')) <= 5000 then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Instigator='..instigator.UnitId..'; Time since last OC='..GetGameTimeSeconds() - (instigator[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100)..'; oUnitKilled='..oUnitKilled.UnitId..'; killed nearby experimental value='..(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental'] or 'nil')..'; Did we kill a land experimental='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnitKilled.UnitId))..'; Did we kill it with an ACU='..tostring(EntityCategoryContains(categories.COMMAND, instigator.UnitId))..'; repru of M27Chat.tiM27VoiceTauntByType='..repru(M27Chat.tiM27VoiceTauntByType)) end
+                    if EntityCategoryContains(categories.EXPERIMENTAL, oUnitKilled.UnitId) and not(M27Chat.tiM27VoiceTauntByType['Killed nearby experimental']) and (oUnitKilled.Sync.totalMassKilled or 0) <= math.min(10000, oUnitKilled:GetBlueprint().Economy.BuildCostMass * 0.35) and M27Utilities.GetDistanceBetweenPositions(oUnitKilled:GetPosition(), M27MapInfo.PlayerStartPoints[oKillerBrain.M27StartPositionNumber]) <= 150 and M27Logic.GetCombatThreatRating(oKillerBrain, oKillerBrain:GetUnitsAroundPoint(categories.EXPERIMENTAL, oUnitKilled:GetPosition(), 80, 'Enemy')) <= 5000 then
                         M27Chat.SendMessage(oKillerBrain, 'Killed nearby experimental', 'Thanks for the mass', 5, 10000)
+                    elseif EntityCategoryContains(M27UnitInfo.refCategoryLandExperimental, oUnitKilled.UnitId) and EntityCategoryContains(categories.COMMAND, instigator.UnitId) and GetGameTimeSeconds() - (instigator[M27UnitInfo.refiTimeOfLastOverchargeShot] or -100) <= 5 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': About to send ACU OC message') end
+                        local sMessage = 'Wow, talk about a clutch overcharge'
+                        if math.random(1,2) == 1 and M27Conditions.DoesACUHaveGun(oKillerBrain, false, instigator) then sMessage = 'Lol, turns out guncom counters '..LOCF(oUnitKilled:GetBlueprint().General.UnitName) end
+                        M27Chat.SendMessage(oKillerBrain, 'ACU OC experimental', sMessage, 5, 10000)
                     elseif EntityCategoryContains(categories.STRUCTURE * M27UnitInfo.refCategoryExperimentalLevel, oUnitKilled.UnitId) and oUnitKilled:GetFractionComplete() >= 0.5 then
                         M27Chat.SendGloatingMessage(oKillerBrain, 1, 900)
                     else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Will consider if we killed a target that got lots of kills') end
 
                         local iMassKilled = (oUnitKilled.Sync.totalMassKilled or 0)
-                        if bDebugMessages == true then LOG(sFunctionRef..': Just killed '..oUnitKilled.UnitId..'; Mass that unit had killed='..iMassKilled..'; Is table for this chat message empty='..tostring(M27Utilities.IsTableEmpty(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']))..'; BP mass cost='..(oUnitKilled:GetBlueprint().Economy.BuildCostMass or 'nil')..'; Vet level='..(oUnitKilled.Sync.VeteranLevel or 'nil')) end
-                        if iMassKilled >= 1000 and M27Utilities.IsTableEmpty(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Just killed '..oUnitKilled.UnitId..'; Mass that unit had killed='..iMassKilled..'; Is this chat message empty='..(M27Chat.tiM27VoiceTauntByType['Killed deadly unit'] or 'nil')..'; BP mass cost='..(oUnitKilled:GetBlueprint().Economy.BuildCostMass or 'nil')..'; Vet level='..(oUnitKilled.Sync.VeteranLevel or 'nil')) end
+                        if iMassKilled >= 1000 and not(M27Chat.tiM27VoiceTauntByType['Killed deadly unit']) and not(EntityCategoryContains(categories.COMMAND, oUnitKilled.UnitId)) and oUnitKilled.Sync.VeteranLevel >= 5 and oUnitKilled.GetAIBrain and not(M27Logic.IsCivilianBrain(oUnitKilled:GetAIBrain())) then
                             --local oBP = oUnitKilled:GetBlueprint()
                             --if iMassKilled >= oBP.Economy.BuildCostMass * 7 then
-                            M27Chat.SendMessage(oKillerBrain, 'Killed deadly unit', 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName), 2, 10000)
+                            local sMessage = 'FINALLY killed that annoying '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                            if math.random(1,2) == 1 then
+                                sMessage = 'About time I killed that '..LOCF(oUnitKilled:GetBlueprint().General.UnitName)
+                            end
+                            M27Chat.SendMessage(oKillerBrain, 'Killed deadly unit', sMessage, 2, 10000)
                             --end
                         end
                     end
 
                     if EntityCategoryContains(M27UnitInfo.refCategoryPD, instigator.UnitId) then
-                    oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] = oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
+                        oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] = oKillerBrain[M27EngineerOverseer.refiMassKilledByPD] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, instigator.UnitId) then
-                    --Did we kill something with a TML that wasnt our last target (so e.g. a unit might have managed to block the TML missile meaning we can try again)?
-                    if M27UnitInfo.IsUnitValid(instigator[M27EngineerOverseer.refoLastTMLTarget]) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': TML last target='..instigator[M27EngineerOverseer.refoLastTMLTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator[M27EngineerOverseer.refoLastTMLTarget])..'; shots fired at last target='..(instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0)..'; Mass killed currently='..instigator.Sync.totalMassKilled..'; mass killed when fired missile='..instigator[M27EngineerOverseer.refiLastTMLMassKills]) end
-                    --if instigator[M27EngineerOverseer.refiLastTMLMassKills] < (instigator.Sync.totalMassKilled or 0) and (instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0) > 0 then
-                    --if bDebugMessages == true then LOG(sFunctionRef..': TML killed a unit that wasnt its last target so missile may have been blocked') end
+                        --Did we kill something with a TML that wasnt our last target (so e.g. a unit might have managed to block the TML missile meaning we can try again)?
+                        if M27UnitInfo.IsUnitValid(instigator[M27EngineerOverseer.refoLastTMLTarget]) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': TML last target='..instigator[M27EngineerOverseer.refoLastTMLTarget].UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator[M27EngineerOverseer.refoLastTMLTarget])..'; shots fired at last target='..(instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0)..'; Mass killed currently='..instigator.Sync.totalMassKilled..'; mass killed when fired missile='..instigator[M27EngineerOverseer.refiLastTMLMassKills]) end
+                            --if instigator[M27EngineerOverseer.refiLastTMLMassKills] < (instigator.Sync.totalMassKilled or 0) and (instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 0) > 0 then
+                            --if bDebugMessages == true then LOG(sFunctionRef..': TML killed a unit that wasnt its last target so missile may have been blocked') end
 
-                    --Allow to go to -1 to give a small margin for error incase e.g. the next time it is blocked by a higher health unit
-                    instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] = math.max((instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 1) - 1, -1)
-                    --end
-                    end
+                            --Allow to go to -1 to give a small margin for error incase e.g. the next time it is blocked by a higher health unit
+                            instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] = math.max((instigator[M27EngineerOverseer.refoLastTMLTarget][M27EngineerOverseer.refiTMLShotsFired] or 1) - 1, -1)
+                            --end
+                        end
                     elseif EntityCategoryContains(M27UnitInfo.refCategorySkirmisher, instigator.UnitId) then
-                    local aiBrain = instigator:GetAIBrain()
-                    aiBrain[M27Overseer.refiSkirmisherMassKills] = aiBrain[M27Overseer.refiSkirmisherMassKills] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
+                        local aiBrain = instigator:GetAIBrain()
+                        aiBrain[M27Overseer.refiSkirmisherMassKills] = aiBrain[M27Overseer.refiSkirmisherMassKills] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
                     elseif EntityCategoryContains(M27UnitInfo.refCategorySatellite, instigator.UnitId) then
-                    ForkThread(M27AirOverseer.NovaxCoreTargetLoop, oKillerBrain, instigator, true)
+                        ForkThread(M27AirOverseer.NovaxCoreTargetLoop, oKillerBrain, instigator, true)
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryBomber * categories.TECH1,  instigator.UnitId) and M27UnitInfo.IsUnitValid(instigator) then
-                    --if M27UnitInfo.GetUnitLifetimeCount(instigator) == 4 then bDebugMessages = true end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Killer unit='..instigator.UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator)..'; is instigator valid='..tostring(M27UnitInfo.IsUnitValid(instigator))..'; unit killed='..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)) end
-                    if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnitKilled.UnitId) then
-                    --T1 mex just killed by T1 bomber - get bomber to target nearby enemy engineer (if any)
-                    ForkThread(M27AirOverseer.OneOffTargetNearbyEngineer, oKillerBrain, instigator)
-                    else
-                    --if just killed an engineer that were trying to kill then also look to kill another nearby engineer (this wont run if this is an engi hunter bomber, i.e. intended for bombers that targeted an engi in the above logic)
-                    if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnitKilled.UnitId) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to target another engineer as just killed one. Cur target number='..(instigator[M27AirOverseer.refiCurTargetNumber] or 'nil')..'; is target list empty='..tostring(M27Utilities.IsTableEmpty(instigator[M27AirOverseer.reftTargetList]))) end
-                    if instigator[M27AirOverseer.refiCurTargetNumber] and M27Utilities.IsTableEmpty(instigator[M27AirOverseer.reftTargetList]) == false then
-                    local oBomberTarget = instigator[M27AirOverseer.reftTargetList][instigator[M27AirOverseer.refiCurTargetNumber]][M27AirOverseer.refiShortlistUnit]
-                    if bDebugMessages == true then LOG(sFunctionRef..': oBomberTarget='..oBomberTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomberTarget)) end
-                    if oBomberTarget == oUnitKilled then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Will look for another nearby engineer to target') end
-                    ForkThread(M27AirOverseer.OneOffTargetNearbyEngineer, oKillerBrain, instigator)
+                        --if M27UnitInfo.GetUnitLifetimeCount(instigator) == 4 then bDebugMessages = true end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Killer unit='..instigator.UnitId..M27UnitInfo.GetUnitLifetimeCount(instigator)..'; is instigator valid='..tostring(M27UnitInfo.IsUnitValid(instigator))..'; unit killed='..oUnitKilled.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitKilled)) end
+                        if EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnitKilled.UnitId) then
+                            --T1 mex just killed by T1 bomber - get bomber to target nearby enemy engineer (if any)
+                            ForkThread(M27AirOverseer.OneOffTargetNearbyEngineer, oKillerBrain, instigator)
+                        else
+                            --if just killed an engineer that were trying to kill then also look to kill another nearby engineer (this wont run if this is an engi hunter bomber, i.e. intended for bombers that targeted an engi in the above logic)
+                            if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnitKilled.UnitId) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to target another engineer as just killed one. Cur target number='..(instigator[M27AirOverseer.refiCurTargetNumber] or 'nil')..'; is target list empty='..tostring(M27Utilities.IsTableEmpty(instigator[M27AirOverseer.reftTargetList]))) end
+                                if instigator[M27AirOverseer.refiCurTargetNumber] and M27Utilities.IsTableEmpty(instigator[M27AirOverseer.reftTargetList]) == false then
+                                    local oBomberTarget = instigator[M27AirOverseer.reftTargetList][instigator[M27AirOverseer.refiCurTargetNumber]][M27AirOverseer.refiShortlistUnit]
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oBomberTarget='..oBomberTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oBomberTarget)) end
+                                    if oBomberTarget == oUnitKilled then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will look for another nearby engineer to target') end
+                                        ForkThread(M27AirOverseer.OneOffTargetNearbyEngineer, oKillerBrain, instigator)
+                                    end
+                                end
+                            end
+                        end
                     end
-                    end
-                        end
-                        end
-                        end
                 end
 
             end
@@ -498,24 +509,26 @@ function OnUnitDeath(oUnit)
 
                         --All non-mex/hydro - if have shield locations that cant build on, then check if this was near any of them
                         if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftFailedShieldLocations]) == false and EntityCategoryContains(categories.STRUCTURE - M27UnitInfo.refCategoryMex - M27UnitInfo.refCategoryHydro, sUnitBP) then
-                        if bDebugMessages == true then LOG(sFunctionRef..': Have failed shield locations so will check if any buildings need adjusting') end
-                        local iBuildingSize = math.max(1, math.ceil(oUnit:GetBlueprint().Physics.SkirtSizeX))
-                        local tLocation = oUnit:GetPosition()
-                        for iXAdj = -iBuildingSize, iBuildingSize, 1 do
-                        for iZAdj = -iBuildingSize, iBuildingSize, 1 do
-                        aiBrain[M27EngineerOverseer.reftFailedShieldLocations][M27Utilities.ConvertLocationToReference({tLocation[1] + iXAdj, tLocation[2], tLocation[3] + iZAdj})] = nil
-                        end
-                        end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Have failed shield locations so will check if any buildings need adjusting')
+                            end
+                            local iBuildingSize = math.max(1, math.ceil(oUnit:GetBlueprint().Physics.SkirtSizeX))
+                            local tLocation = oUnit:GetPosition()
+                            for iXAdj = -iBuildingSize, iBuildingSize, 1 do
+                                for iZAdj = -iBuildingSize, iBuildingSize, 1 do
+                                    aiBrain[M27EngineerOverseer.reftFailedShieldLocations][M27Utilities.ConvertLocationToReference({ tLocation[1] + iXAdj, tLocation[2], tLocation[3] + iZAdj })] = nil
+                                end
+                            end
                         end
 
                         --Shields - reset tracking of assisting engineers
                         if M27Utilities.IsTableEmpty(oUnit[M27EngineerOverseer.reftAssistingEngineers]) == false then
-                        for iEngi, oEngi in oUnit[M27EngineerOverseer.reftAssistingEngineers] do
-                        if M27UnitInfo.IsUnitValid(oEngi) then
-                        IssueClearCommands({oEngi})
-                        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
-                        end
-                        end
+                            for iEngi, oEngi in oUnit[M27EngineerOverseer.reftAssistingEngineers] do
+                                if M27UnitInfo.IsUnitValid(oEngi) then
+                                    IssueClearCommands({ oEngi })
+                                    M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+                                end
+                            end
                         end
 
                         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -859,7 +872,9 @@ function OnWeaponFired(oWeapon)
                     if EntityCategoryContains(M27UnitInfo.refCategorySMD, oUnit.UnitId) then
                         local aiBrain = oUnit:GetAIBrain()
                         if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == false and table.getn(aiBrain[M27Overseer.reftEnemyNukeLaunchers]) == 1 then
-                            M27Chat.SendMessage(aiBrain, 'Stopped nuke', 'Nice try', 2, 10000)
+                            local sMessage = 'Nice try'
+                            if math.random(1,2) == 1 then sMessage = 'Loaded :)' end
+                            M27Chat.SendMessage(aiBrain, 'Stopped nuke', sMessage, 2, 10000)
                         end
                     end
                 end

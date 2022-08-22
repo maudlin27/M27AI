@@ -105,136 +105,144 @@ function GetBlueprintsThatCanBuildOfCategory(aiBrain, iCategoryCondition, oFacto
 
 
     if bDebugMessages == true then LOG(sFunctionRef..': reftBlueprintPriorityOverride='..repru(aiBrain[reftBlueprintPriorityOverride])) end
-    for _, sBlueprint in tBlueprints do
-        if bDebugMessages == true then LOG(sFunctionRef..': About to see if factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; can build blueprint '..sBlueprint..'; CanBuild='..tostring(oFactory:CanBuild(sBlueprint))) end
-        if oFactory:CanBuild(sBlueprint) == true then
-            --Check we can build the desired category
-            if not(iOptionalCategoryThatMustBeAbleToBuild) then bCanBuildRequiredCategory = true
-            else
-                if bDebugMessages == true then LOG(sFunctionRef..': Have said we need to build a particualr category, will see if sBLueprint='..sBlueprint..' can build this') end
-                bCanBuildRequiredCategory = false
-                iCategoriesThatBlueprintCanBuild = nil
-                if tAllBlueprints[sBlueprint].Economy.BuildableCategory and not(M27Utilities.IsTableEmpty(tsBlueprintsMeetingDesiredCategoriesToBuild)) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint has a buildablecategory set, will convert it into a category and see if it matches any of the blueprints we want to be able to build') end
-                    for categoryIndex, category in tAllBlueprints[sBlueprint].Economy.BuildableCategory do
-                        if categoryIndex == 1 then
-                            iCategoriesThatBlueprintCanBuild = ParseEntityCategory(category)
-                        else
-                            iCategoriesThatBlueprintCanBuild = iCategoriesThatBlueprintCanBuild + ParseEntityCategory(category)
-                        end
-                    end
-
-                    for iAltBlueprint, sAltBlueprint in tsBlueprintsMeetingDesiredCategoriesToBuild do
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering if sAltBlueprint='..sAltBlueprint..' has a category that matches with what sBLueprint can build') end
-                        if EntityCategoryContains(iCategoriesThatBlueprintCanBuild, sAltBlueprint) then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Can build the desired category') end
-                            bCanBuildRequiredCategory = true
-                            break
-                        end
-                    end
-                end
-            end
-
-            if bCanBuildRequiredCategory then
-                --if EntityCategoryContains(iCategoryCondition, sBlueprint) then --tBlueprints is already filtered to just those that meet the categories
-                iValidBlueprints = iValidBlueprints + 1
-                tValidBlueprints[iValidBlueprints] = sBlueprint
-                if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, sBlueprint) then iCurrentTech = 3
-                elseif EntityCategoryContains(categories.TECH2, sBlueprint) then iCurrentTech = 2
-                else iCurrentTech = 1
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': '..sBlueprint..': iCurrentTech='..iCurrentTech..'; iHighestTech='..iHighestTech) end
-                if iCurrentTech > iHighestTech then
-                    iHighestTech = iCurrentTech
-                    iHighestPriority = 0
-                end
-                if bDebugMessages == true then LOG(sFunctionRef..': Considering if sBlueprint has a priority specified if we arent looking for slowest or fastest. sBlueprint='..sBlueprint..'; bGetSlowest='..tostring(bGetSlowest)..'; bGetFastest='..tostring(bGetFastest)..'; bGetCheapest='..tostring((bGetCheapest or false))) end
-                if not(bGetSlowest) and not(bGetFastest) and not(bGetCheapest) and aiBrain[reftBlueprintPriorityOverride][sBlueprint] then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have a priority specified='..aiBrain[reftBlueprintPriorityOverride][sBlueprint]..'; iHighestPriority='..iHighestPriority) end
-                    iHighestPriority = math.max(aiBrain[reftBlueprintPriorityOverride][sBlueprint], iHighestPriority)
-                end
-                if bGetSlowest == true or bGetFastest == true then
-                    oCurBlueprint = tAllBlueprints[sBlueprint]
-                    iCurSpeed = oCurBlueprint.Physics.MaxSpeed
-                    if bDebugMessages == true then LOG(sFunctionRef..': '..sBlueprint..': iCurSpeed='..iCurSpeed) end
-                    if bGetSlowest == true then
-                        if iCurSpeed < tiLowestSpeedByTech[iCurrentTech] then tiLowestSpeedByTech[iCurrentTech] = iCurSpeed end
-                    elseif bGetFastest == true then
-                        if iCurSpeed > tiHighestSpeedByTech[iCurrentTech] then tiHighestSpeedByTech[iCurrentTech] = iCurSpeed end
-                    end
-                elseif bGetCheapest then
-                    oCurBlueprint = tAllBlueprints[sBlueprint]
-                    iCurMass = oCurBlueprint.Economy.BuildCostMass
-                    if iCurMass < tiLowestMassByTech[iCurrentTech] then tiLowestMassByTech[iCurrentTech] = iCurMass end
-                    if bDebugMessages == true then LOG(sFunctionRef..': Want to get cheapest; iCurMass='..iCurMass..'; iCurrentTech='..iCurrentTech..'; tiLowestMassByTech[iCurrentTech]='..tiLowestMassByTech[iCurrentTech]) end
-                end
-                --end
-            end
-        end
-    end
-    --Now get a list of blueprints that are this tech level and of the highest priority
-    --if bDebugMessages == true then LOG(sFunctionRef..': iHighestTech='..iHighestTech..'; tiHighestSpeedByTech='..tiHighestSpeedByTech[iHighestTech]..'; bGetSlowest='..tostring(bGetSlowest)..'; bGetFastest='..tostring(bGetFastest)) end
-    local bIsValid, iCurrentPriority
-    local iMinTechToUse = iHighestTech
-    local iFastestSpeed = tiHighestSpeedByTech[iHighestTech]
-    if bGetFastest == true and iHighestTech >= 3 then
-        --If cybran, want loyalist instead of bomb; if Aeon want blaze instead of harbinger or shield disrupter; If sera probably want hover tank instead of siege tank; if UEF want titan
-        if tiHighestSpeedByTech[3] <= 3.5 and tiHighestSpeedByTech[2] - tiHighestSpeedByTech[3] >= 0.6 then
-            iMinTechToUse = 2
-            iFastestSpeed = math.max(tiHighestSpeedByTech[3], tiHighestSpeedByTech[2])
-        end
-    end
-
-    for _, sBlueprint in tValidBlueprints do
-        bIsValid = false
-        if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, sBlueprint) then iCurrentTech = 3
-        elseif EntityCategoryContains(categories.TECH2, sBlueprint) then iCurrentTech = 2
-        else iCurrentTech = 1
-        end
-        if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..': Considering whether we have high enough tech to consider') end
-        if iCurrentTech >= iMinTechToUse then
-            if not(bGetFastest) and not(bGetSlowest) and not(bGetCheapest) then iCurrentPriority = aiBrain[reftBlueprintPriorityOverride][sBlueprint] end
-            if iCurrentPriority == nil then iCurrentPriority = 0 end
-            if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..'; iCurrentTech='..iCurrentTech..'; considering priority, iCurrentPriority='..iCurrentPriority..'; iHighestPriority='..iHighestPriority) end
-            if iCurrentPriority >= iHighestPriority then
-                bIsValid = true
-
-                if not(bGetSlowest) and not(bGetFastest) and not(bGetCheapest) then
-                    if bDebugMessages == true then LOG(sFunctionRef..': Not interested in if slowest or fastest or cheapest so marking BP as valid') end
-                    bIsValid = true
+    if not(oFactory.CanBuild) then
+        M27Utilities.ErrorHandler('Factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..' doesnt have .canbuild')
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return nil
+    else
+        for _, sBlueprint in tBlueprints do
+            if bDebugMessages == true then LOG(sFunctionRef..': About to see if factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; can build blueprint '..sBlueprint..'; CanBuild='..tostring(oFactory:CanBuild(sBlueprint))) end
+            if oFactory:CanBuild(sBlueprint) == true then
+                --Check we can build the desired category
+                if not(iOptionalCategoryThatMustBeAbleToBuild) then bCanBuildRequiredCategory = true
                 else
-                    if bDebugMessages == true then LOG(sFunctionRef..': Want to get either the slowest, fastest or cheapest') end
-                    bIsValid = false
-                    if bGetSlowest or bGetFastest then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have said we need to build a particualr category, will see if sBLueprint='..sBlueprint..' can build this') end
+                    bCanBuildRequiredCategory = false
+                    iCategoriesThatBlueprintCanBuild = nil
+                    if tAllBlueprints[sBlueprint].Economy.BuildableCategory and not(M27Utilities.IsTableEmpty(tsBlueprintsMeetingDesiredCategoriesToBuild)) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint has a buildablecategory set, will convert it into a category and see if it matches any of the blueprints we want to be able to build') end
+                        for categoryIndex, category in tAllBlueprints[sBlueprint].Economy.BuildableCategory do
+                            if categoryIndex == 1 then
+                                iCategoriesThatBlueprintCanBuild = ParseEntityCategory(category)
+                            else
+                                iCategoriesThatBlueprintCanBuild = iCategoriesThatBlueprintCanBuild + ParseEntityCategory(category)
+                            end
+                        end
+
+                        for iAltBlueprint, sAltBlueprint in tsBlueprintsMeetingDesiredCategoriesToBuild do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering if sAltBlueprint='..sAltBlueprint..' has a category that matches with what sBLueprint can build') end
+                            if EntityCategoryContains(iCategoriesThatBlueprintCanBuild, sAltBlueprint) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Can build the desired category') end
+                                bCanBuildRequiredCategory = true
+                                break
+                            end
+                        end
+                    end
+                end
+
+                if bCanBuildRequiredCategory then
+                    --if EntityCategoryContains(iCategoryCondition, sBlueprint) then --tBlueprints is already filtered to just those that meet the categories
+                    iValidBlueprints = iValidBlueprints + 1
+                    tValidBlueprints[iValidBlueprints] = sBlueprint
+                    if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, sBlueprint) then iCurrentTech = 3
+                    elseif EntityCategoryContains(categories.TECH2, sBlueprint) then iCurrentTech = 2
+                    else iCurrentTech = 1
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': '..sBlueprint..': iCurrentTech='..iCurrentTech..'; iHighestTech='..iHighestTech) end
+                    if iCurrentTech > iHighestTech then
+                        iHighestTech = iCurrentTech
+                        iHighestPriority = 0
+                    end
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering if sBlueprint has a priority specified if we arent looking for slowest or fastest. sBlueprint='..sBlueprint..'; bGetSlowest='..tostring(bGetSlowest)..'; bGetFastest='..tostring(bGetFastest)..'; bGetCheapest='..tostring((bGetCheapest or false))) end
+                    if not(bGetSlowest) and not(bGetFastest) and not(bGetCheapest) and aiBrain[reftBlueprintPriorityOverride][sBlueprint] then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have a priority specified='..aiBrain[reftBlueprintPriorityOverride][sBlueprint]..'; iHighestPriority='..iHighestPriority) end
+                        iHighestPriority = math.max(aiBrain[reftBlueprintPriorityOverride][sBlueprint], iHighestPriority)
+                    end
+                    if bGetSlowest == true or bGetFastest == true then
                         oCurBlueprint = tAllBlueprints[sBlueprint]
                         iCurSpeed = oCurBlueprint.Physics.MaxSpeed
-                        if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..'; iCurSpeed='..iCurSpeed) end
+                        if bDebugMessages == true then LOG(sFunctionRef..': '..sBlueprint..': iCurSpeed='..iCurSpeed) end
                         if bGetSlowest == true then
-                            if iCurSpeed <= tiLowestSpeedByTech[iHighestTech] then bIsValid = true end
-                        elseif iCurSpeed >= iFastestSpeed then
-                            if bDebugMessages == true then LOG(sFunctionRef..': Have the highest speed for tech levels being considered') end
-                            bIsValid = true
+                            if iCurSpeed < tiLowestSpeedByTech[iCurrentTech] then tiLowestSpeedByTech[iCurrentTech] = iCurSpeed end
+                        elseif bGetFastest == true then
+                            if iCurSpeed > tiHighestSpeedByTech[iCurrentTech] then tiHighestSpeedByTech[iCurrentTech] = iCurSpeed end
                         end
                     elseif bGetCheapest then
                         oCurBlueprint = tAllBlueprints[sBlueprint]
                         iCurMass = oCurBlueprint.Economy.BuildCostMass
-                        if iCurMass <= tiLowestMassByTech[iCurrentTech] then bIsValid = true end
-                        if bDebugMessages == true then LOG(sFunctionRef..': Want to get cheapest; iCurMass='..iCurMass..'; iCurrentTech='..iCurrentTech..'; tiLowestMassByTech[iCurrentTech]='..tiLowestMassByTech[iCurrentTech]..'; bIsValid='..tostring(bIsValid)) end
-                    else M27Utilities.ErrorHandler('Missing code')
+                        if iCurMass < tiLowestMassByTech[iCurrentTech] then tiLowestMassByTech[iCurrentTech] = iCurMass end
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want to get cheapest; iCurMass='..iCurMass..'; iCurrentTech='..iCurrentTech..'; tiLowestMassByTech[iCurrentTech]='..tiLowestMassByTech[iCurrentTech]) end
                     end
+                    --end
                 end
             end
-            if bIsValid == true then
-                iBestBlueprints = iBestBlueprints + 1
-                tBestBlueprints[iBestBlueprints] = sBlueprint
-                if bDebugMessages == true then LOG(sFunctionRef..': Have valid blueprint='..sBlueprint) end
+        end
+        --Now get a list of blueprints that are this tech level and of the highest priority
+        --if bDebugMessages == true then LOG(sFunctionRef..': iHighestTech='..iHighestTech..'; tiHighestSpeedByTech='..tiHighestSpeedByTech[iHighestTech]..'; bGetSlowest='..tostring(bGetSlowest)..'; bGetFastest='..tostring(bGetFastest)) end
+        local bIsValid, iCurrentPriority
+        local iMinTechToUse = iHighestTech
+        local iFastestSpeed = tiHighestSpeedByTech[iHighestTech]
+        if bGetFastest == true and iHighestTech >= 3 then
+            --If cybran, want loyalist instead of bomb; if Aeon want blaze instead of harbinger or shield disrupter; If sera probably want hover tank instead of siege tank; if UEF want titan
+            if tiHighestSpeedByTech[3] <= 3.5 and tiHighestSpeedByTech[2] - tiHighestSpeedByTech[3] >= 0.6 then
+                iMinTechToUse = 2
+                iFastestSpeed = math.max(tiHighestSpeedByTech[3], tiHighestSpeedByTech[2])
             end
         end
+
+        for _, sBlueprint in tValidBlueprints do
+            bIsValid = false
+            if EntityCategoryContains(categories.TECH3 + categories.EXPERIMENTAL, sBlueprint) then iCurrentTech = 3
+            elseif EntityCategoryContains(categories.TECH2, sBlueprint) then iCurrentTech = 2
+            else iCurrentTech = 1
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..': Considering whether we have high enough tech to consider') end
+            if iCurrentTech >= iMinTechToUse then
+                if not(bGetFastest) and not(bGetSlowest) and not(bGetCheapest) then iCurrentPriority = aiBrain[reftBlueprintPriorityOverride][sBlueprint] end
+                if iCurrentPriority == nil then iCurrentPriority = 0 end
+                if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..'; iCurrentTech='..iCurrentTech..'; considering priority, iCurrentPriority='..iCurrentPriority..'; iHighestPriority='..iHighestPriority) end
+                if iCurrentPriority >= iHighestPriority then
+                    bIsValid = true
+
+                    if not(bGetSlowest) and not(bGetFastest) and not(bGetCheapest) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Not interested in if slowest or fastest or cheapest so marking BP as valid') end
+                        bIsValid = true
+                    else
+                        if bDebugMessages == true then LOG(sFunctionRef..': Want to get either the slowest, fastest or cheapest') end
+                        bIsValid = false
+                        if bGetSlowest or bGetFastest then
+                            oCurBlueprint = tAllBlueprints[sBlueprint]
+                            iCurSpeed = oCurBlueprint.Physics.MaxSpeed
+                            if bDebugMessages == true then LOG(sFunctionRef..': sBlueprint='..sBlueprint..'; iCurSpeed='..iCurSpeed) end
+                            if bGetSlowest == true then
+                                if iCurSpeed <= tiLowestSpeedByTech[iHighestTech] then bIsValid = true end
+                            elseif iCurSpeed >= iFastestSpeed then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Have the highest speed for tech levels being considered') end
+                                bIsValid = true
+                            end
+                        elseif bGetCheapest then
+                            oCurBlueprint = tAllBlueprints[sBlueprint]
+                            iCurMass = oCurBlueprint.Economy.BuildCostMass
+                            if iCurMass <= tiLowestMassByTech[iCurrentTech] then bIsValid = true end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want to get cheapest; iCurMass='..iCurMass..'; iCurrentTech='..iCurrentTech..'; tiLowestMassByTech[iCurrentTech]='..tiLowestMassByTech[iCurrentTech]..'; bIsValid='..tostring(bIsValid)) end
+                        else M27Utilities.ErrorHandler('Missing code')
+                        end
+                    end
+                end
+                if bIsValid == true then
+                    iBestBlueprints = iBestBlueprints + 1
+                    tBestBlueprints[iBestBlueprints] = sBlueprint
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have valid blueprint='..sBlueprint) end
+                end
+            end
+        end
+
+        local iBPToBuild = math.random(1, iBestBlueprints)
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return tBestBlueprints[iBPToBuild]
     end
 
-    local iBPToBuild = math.random(1, iBestBlueprints)
-    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    return tBestBlueprints[iBPToBuild]
+
 end
 
 function RecordUnderConstruction(aiBrain, oFactory, iUnitCategoryToBuild)
@@ -481,6 +489,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
             local iCurScouts = 0
             local iCurMAA = 0
             local iCurIndirect = 0
+
+            --if bIsLandFactory and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryMAA) >= 4 then bDebugMessages = true end
 
 
 
@@ -920,6 +930,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             end
 
                                         elseif iCurrentConditionToTry == 17 then --MAA initial
+                                            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain[M27Overseer.refbNeedMAABuilt]='..tostring(aiBrain[M27Overseer.refbNeedMAABuilt])..'; Current MAA+'..aiBrain:GetCurrentUnits(refCategoryMAA)) end
                                             if aiBrain[M27Overseer.refbNeedMAABuilt] == true and aiBrain:GetCurrentUnits(refCategoryMAA) < 1 then
                                                 iCategoryToBuild = refCategoryMAA
                                                 iTotalWanted = math.max(1, aiBrain[M27Overseer.refiMAAShortfallACUCore])
@@ -1339,8 +1350,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             --=======AIR FACTORY------------------
                         elseif bIsAirFactory then
+                            --if aiBrain:GetArmyIndex() == 6 and GetGameTimeSeconds() >= 300 then bDebugMessages = true end
                             --if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false and table.getsize(aiBrain[M27AirOverseer.reftAvailableAirAA]) >= 20 then bDebugMessages = true end
-                            --if GetGameTimeSeconds() >= 1140 and iFactoryTechLevel >= 2 then bDebugMessages = true end
 
 
                             if iCurrentConditionToTry == 1 and bDebugMessages == true then LOG(sFunctionRef..': About to determine what to build for an air factory, mass stored ratio='..aiBrain:GetEconomyStoredRatio('MASS')..'; GameTime='..GetGameTimeSeconds()) end
@@ -1718,8 +1729,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 elseif iCurrentConditionToTry == 11 then --2nd strat bomber if first not died yet and dont have any idle bombers; also build 2nd/3rd strat if have more AA than enemy and they lack T3 AA
                                     if iFactoryTechLevel >= 3 and (M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3]) or M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1]) or M27UnitInfo.IsUnitValid(aiBrain[M27AirOverseer.reftBomberEffectiveness][3][1][M27AirOverseer.subrefoBomber])) then
                                         if iAvailableT3Bombers == 0 or (iAvailableT3Bombers <= 2 and aiBrain[M27AirOverseer.refbHaveAirControl] and not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA])) then
-                                    --1st Bomber still alive - check have lifetime build count <=2
-                                        local iLifetimeStratBuildCount = M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryBomber * categories.TECH3)
+                                            --1st Bomber still alive - check have lifetime build count <=2
+                                            local iLifetimeStratBuildCount = M27Conditions.GetLifetimeBuildCount(aiBrain, refCategoryBomber * categories.TECH3)
 
                                             if iLifetimeStratBuildCount <= 1 or (iLifetimeStratBuildCount <= 4 and not(aiBrain[M27AirOverseer.refbEnemyHasHadCruisersOrT3AA])) then
                                                 iCategoryToBuild = refCategoryBomber
@@ -1901,7 +1912,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                             LOG(sFunctionRef .. ': Air domination - Want bombers for targets and have fewer than 10 bombers (or in air dominance mode) and condition is later tahn the one checking if airAA needed')
                                         end
                                         iCategoryToBuild = refCategoryBomber
-                                        iTotalWanted = math.max(1, aiBrain[M27AirOverseer.refiBombersWanted])
+                                        iTotalWanted = 2 --math.max(1, aiBrain[M27AirOverseer.refiBombersWanted])
+                                        if aiBrain[M27AirOverseer.refbHaveAirControl] then iTotalWanted = 3 end
                                     end
                                 elseif iCurrentConditionToTry == 19 then --More air scouts
                                     if bHavePowerForAir and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) and aiBrain[M27AirOverseer.refiExtraAirScoutsWanted] > 0 then
@@ -1991,6 +2003,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 iTotalWanted = 8 - iFactoryTechLevel * 2
                                             else
                                                 iTotalWanted = 1
+                                                if aiBrain[M27AirOverseer.refbHaveAirControl] then iTotalWanted = 2 end
                                             end
                                         end
                                     end
@@ -2027,9 +2040,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     elseif iCurrentConditionToTry == 28 then
                                         --Bomber defence
                                         if bDebugMessages == true then
-                                            LOG(sFunctionRef .. ': Bombers wanted=' .. aiBrain[M27AirOverseer.refiBombersWanted] .. '; Outstanding threat=' .. aiBrain[M27Overseer.refiPercentageOutstandingThreat] .. '; Bobmer defence range=' .. aiBrain[M27AirOverseer.refiBomberDefenceModDistance])
+                                            LOG(sFunctionRef .. ': Outstanding threat=' .. aiBrain[M27Overseer.refiPercentageOutstandingThreat] .. '; Bobmer defence range=' .. aiBrain[M27AirOverseer.refiBomberDefenceModDistance]..'; aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat]='..aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat])
                                         end
-                                        if bHavePowerForAir and aiBrain[M27AirOverseer.refiBombersWanted] > 0 and ((aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel] == true and iAvailableT3Bombers <=2) or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= aiBrain[M27AirOverseer.refiBomberDefenceModDistance]) then
+                                        if bHavePowerForAir and ((iFactoryTechLevel == 3 and aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel] == true and iAvailableT3Bombers <=2) or aiBrain[M27Overseer.refiModDistFromStartNearestOutstandingThreat] <= aiBrain[M27AirOverseer.refiBomberDefenceModDistance] or (aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel] and aiBrain[M27AirOverseer.reftAvailableBombers] == 0 and not(iStrategy == M27Overseer.refStrategyEcoAndTech) and not(iStrategy == M27Overseer.refStrategyTurtle))) then
                                             --If we are dealing with a T2 or lower air factory, do we have many idle bombers?
                                             if iFactoryTechLevel >= 3 or aiBrain[M27AirOverseer.refiPreviousAvailableBombers] <= math.min(10 * aiBrain[M27Overseer.refiEnemyHighestTechLevel], math.max(5 * aiBrain[M27Overseer.refiEnemyHighestTechLevel], aiBrain[M27Overseer.refiHighestEnemyGroundUnitHealth] / 250)) then
                                                 --T2 factory specific - want max of 2 idle T2 bombers unless ahve <=4 idle bombers generally
@@ -2038,7 +2051,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     if bDebugMessages == true then
                                                         LOG(sFunctionRef .. ': Want bombers for defence, will build highest tech bomber')
                                                     end
-                                                    iTotalWanted = aiBrain[M27AirOverseer.refiBombersWanted]
+                                                    iTotalWanted = 1
+                                                    if aiBrain[M27AirOverseer.refbHaveAirControl] then iTotalWanted = 3 end
                                                 end
                                             end
                                         end
@@ -2066,7 +2080,8 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                     --Do we have targets for the bombers?
                                                     if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftBomberTargetShortlist]) == false and (not (aiBrain[M27AirOverseer.refbShortlistContainsLowPriorityTargets]) or aiBrain[M27AirOverseer.refbBombersAreEffective][iFactoryTechLevel]) then
                                                         iCategoryToBuild = refCategoryBomber
-                                                        iTotalWanted = 3
+                                                        iTotalWanted = 2
+                                                        if aiBrain[M27AirOverseer.refbHaveAirControl] then iTotalWanted = 3 end
                                                         if bDebugMessages == true then
                                                             LOG(sFunctionRef .. ': have targets for bombers so will build them, at highest tech possible')
                                                         end
@@ -2074,6 +2089,12 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                                 end
                                             end
                                         elseif iCurrentConditionToTry == 32 then
+                                            --AirAA if dont ahve air control (rdundancy condition)
+                                            if not(aiBrain[M27AirOverseer.refbHaveAirControl]) and bHavePowerForAir and not (iStrategy == M27Overseer.refStrategyEcoAndTech or iStrategy == M27Overseer.refStrategyTurtle) and not (M27Conditions.HaveLowMass(aiBrain)) then
+                                                iCategoryToBuild = refCategoryAirAA
+                                                iTotalWanted = 10
+                                            end
+                                        elseif iCurrentConditionToTry == 33 then
                                             --Build spare air scouts
                                             if not (iStrategy == M27Overseer.refStrategyEcoAndTech) and not(aiBrain[M27AirOverseer.refbHaveOmniVision]) then
                                                 local iAvailableAirScouts = 0
@@ -2424,6 +2445,14 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                     --=================Overrides based on blueprint or more generalised categories
                     if sBPIDToBuild then
+                        --Dont build units with a combat ability if in norush
+                        if M27MapInfo.bNoRushActive and M27MapInfo.iNoRushTimer - GetGameTimeSeconds() >= 120 and (aiBrain:GetEconomyStoredRatio('MASS') <= 0.8 or aiBrain:GetEconomyStoredRatio('ENERGY') < 0.999 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] <= 5) then
+                            if not(EntityCategoryContains(M27UnitInfo.refCategoryEngineer + M27UnitInfo.refCategoryExperimentalLevel, sBPIDToBuild)) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Still have a bit of norush time left so wont try and build non-engineer units') end
+                                sBPIDToBuild = nil
+                            end
+                        end
+
                         --Unit cap by unit type (engineer is covered above)
                         iUnitToBuildTechLevel = M27UnitInfo.GetUnitIDTechLevel(sBPIDToBuild)
                         if aiBrain[M27Overseer.refbCloseToUnitCap] and iUnitToBuildTechLevel <= 2 then

@@ -108,7 +108,6 @@ function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBefore
         end
 
         if iTimeSinceSentSimilarMessage > (iOptionalTimeBetweenMessageType or 60) then
-            LOG(sFunctionRef..': Sent chat message for sMessageType='..sMessageType..': sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
             if bOnlySendToTeam then
                 SUtils.AISendChat('allies', aiBrain.Nickname, sMessage)
                 M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages][sMessageType] = GetGameTimeSeconds()
@@ -117,9 +116,9 @@ function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBefore
                 SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
                 tiM27VoiceTauntByType[sMessageType] = GetGameTimeSeconds()
             end
-            LOG(sFunctionRef..': Sent chat message. bOnlySendToTeam='..tostring(bOnlySendToTeam)..'; sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
+            LOG(sFunctionRef..': Sent chat message. bOnlySendToTeam='..tostring(bOnlySendToTeam)..'; sMessageType='..sMessageType..'; sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)) end
+        if bDebugMessages == true then LOG(sFunctionRef..': tiM27VoiceTauntByType='..repru(tiM27VoiceTauntByType)..'; M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages='..repru(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages])) end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -178,7 +177,7 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                         if math.random(0,1) == 1 then
                             local tPrevPlayers = {'gunner1069', 'relentless', 'Azraeel', 'Babel', 'Wingflier', 'Radde', 'YungDookie', 'Spyro', 'Skinnydude', 'savinguptobebrok', 'Tomma', 'IgneusTempus', 'tyne141'}
                             for iPlayer, sPlayer in tPrevPlayers do
-                                if oBrain.Nickname == tPrevPlayers or oBrain.Nickname == 'FAF_'..tPrevPlayers then
+                                if oBrain.Nickname == sPlayer or oBrain.Nickname == 'FAF_'..sPlayer then
                                     SendMessage(aiBrain, 'Specific opponent', '/83', 5, 10000) --QAI message re analysing prev subroutines
                                     bSentSpecificMessage = true
                                     break
@@ -189,13 +188,15 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                 end
             end
             if not(bSentSpecificMessage) and M27Utilities.IsTableEmpty(tiM27VoiceTauntByType['Specific opponent']) then
-                SendMessage(aiBrain, 'Initial greeting', 'gl hf', 50 - math.floor(GetGameTimeSeconds()), 10)
+                local sMessage = 'gl hf'
+                if math.random(1,2) == 1 then sMessage = 'hf' end
+                SendMessage(aiBrain, 'Initial greeting', sMessage, 50 - math.floor(GetGameTimeSeconds()), 10)
                 --Do we have an enemy M27 brain?
                 for iBrain, oBrain in ArmyBrains do
                     if bDebugMessages == true then LOG(sFunctionRef..': Considering brain '..oBrain.Nickname..'; ArmyIndex='..oBrain:GetArmyIndex()..'; .M27AI='..tostring(oBrain.M27AI or false)) end
                     if oBrain.M27AI and not(oBrain == aiBrain) and IsEnemy(aiBrain:GetArmyIndex(), oBrain:GetArmyIndex()) then
                         if bDebugMessages == true then LOG(sFunctionRef..': Will send thanks you too message') end
-                        SendMessage(aiBrain, 'Initial greeting', 'thx, u2', 55 - math.floor(GetGameTimeSeconds()), 0)
+                        SendMessage(oBrain, 'Initial greeting', 'thx, u2', 55 - math.floor(GetGameTimeSeconds()), 0)
                         break
                     end
                 end
