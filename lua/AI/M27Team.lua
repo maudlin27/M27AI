@@ -335,31 +335,35 @@ function AllocateTeamMassResources(iTeam, iFirstM27Brain)
     local iPriority
 
     for iBrain, oBrain in tTeamData[iTeam][reftFriendlyActiveM27Brains] do
-        iMassStorageMax = M27EconomyOverseer.GetMassStorageMaximum(oBrain)
-
-        if bDebugMessages == true then LOG(sFunctionRef..': Considering brain with name='..oBrain.Nickname..'; iMassStorageMax='..iMassStorageMax..'; Is M27='..tostring(oBrain.M27AI or false)..'; % stored Mass='..oBrain:GetEconomyStoredRatio('MASS')..'; flagged as stalling Mass='..tostring(oBrain[M27EconomyOverseer.refbStallingMass] or false)) end
-
-        --Do we have low mass?
-        if oBrain:GetEconomyStoredRatio('MASS') < 0.05 then
-            if oBrain:GetEconomyStoredRatio('MASS') < 0.01 and oBrain:GetEconomyStoredRatio('ENERGY') == 1 then
-                iPriority = 1
-            else
-                iPriority = 2
-            end
-            table.insert(tBrainsNeedingMassByPriority, {[subrefBrain] = oBrain, [subrefMassPriority] = iPriority, [subrefRemainingMassNeeded] = iMassStorageMax * (0.05 - oBrain:GetEconomyStoredRatio('MASS'))})
-            tiCountOfBrainsNeedingMassByPriority[iPriority] = (tiCountOfBrainsNeedingMassByPriority[iPriority] or 0) + 1
-            if bDebugMessages == true then LOG(sFunctionRef..': Not in combat, want Mass as priority '..iPriority) end
+        if oBrain.M27IsDefeated and (not(oBrain.GetCurrentUnits) or oBrain:GetCurrentUnits(categories.ALLUNITS - categories.BENIGN) <= 1) then tTeamData[iTeam][reftFriendlyActiveM27Brains][iBrain] = nil break
         else
-            --Do we have enough to offer some?
-            if oBrain:GetEconomyStoredRatio('MASS') > 0.25 and not(oBrain[M27EconomyOverseer.refbStallingMass]) and not(M27Conditions.HaveLowMass(oBrain)) then
-                if oBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('MASS') >= 0.3 then
-                    table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = oBrain:GetEconomyStored('MASS') * 0.02})
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have Mass available to give even though have negative mass income') end
-                elseif oBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 then
-                    table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = iMassStorageMax * (oBrain:GetEconomyStoredRatio('MASS') - 0.25)})
-                    if bDebugMessages == true then LOG(sFunctionRef..': Have positive Mass income so have Mass avialable to give') end
+
+            iMassStorageMax = M27EconomyOverseer.GetMassStorageMaximum(oBrain)
+
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering brain with name='..oBrain.Nickname..'; iMassStorageMax='..iMassStorageMax..'; Is M27='..tostring(oBrain.M27AI or false)..'; % stored Mass='..oBrain:GetEconomyStoredRatio('MASS')..'; flagged as stalling Mass='..tostring(oBrain[M27EconomyOverseer.refbStallingMass] or false)) end
+
+            --Do we have low mass?
+            if oBrain:GetEconomyStoredRatio('MASS') < 0.05 then
+                if oBrain:GetEconomyStoredRatio('MASS') < 0.01 and oBrain:GetEconomyStoredRatio('ENERGY') == 1 then
+                    iPriority = 1
                 else
-                    --Dont have positive net income, and not got 100% Mass, so want to keep our Mass for ourself
+                    iPriority = 2
+                end
+                table.insert(tBrainsNeedingMassByPriority, {[subrefBrain] = oBrain, [subrefMassPriority] = iPriority, [subrefRemainingMassNeeded] = iMassStorageMax * (0.05 - oBrain:GetEconomyStoredRatio('MASS'))})
+                tiCountOfBrainsNeedingMassByPriority[iPriority] = (tiCountOfBrainsNeedingMassByPriority[iPriority] or 0) + 1
+                if bDebugMessages == true then LOG(sFunctionRef..': Not in combat, want Mass as priority '..iPriority) end
+            else
+                --Do we have enough to offer some?
+                if oBrain:GetEconomyStoredRatio('MASS') > 0.25 and not(oBrain[M27EconomyOverseer.refbStallingMass]) and not(M27Conditions.HaveLowMass(oBrain)) then
+                    if oBrain[M27EconomyOverseer.refiMassNetBaseIncome] < 0 and oBrain:GetEconomyStoredRatio('MASS') >= 0.3 then
+                        table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = oBrain:GetEconomyStored('MASS') * 0.02})
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have Mass available to give even though have negative mass income') end
+                    elseif oBrain[M27EconomyOverseer.refiMassNetBaseIncome] > 0 then
+                        table.insert(tBrainsWithMassAndMassAvailable, {[subrefBrain] = oBrain, [subrefMassAvailable] = iMassStorageMax * (oBrain:GetEconomyStoredRatio('MASS') - 0.25)})
+                        if bDebugMessages == true then LOG(sFunctionRef..': Have positive Mass income so have Mass avialable to give') end
+                    else
+                        --Dont have positive net income, and not got 100% Mass, so want to keep our Mass for ourself
+                    end
                 end
             end
         end

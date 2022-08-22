@@ -10499,14 +10499,29 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                             RefreshShieldsWantingHives(aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': Considering if want to build hive by t3 shield. is table of shields wanting hives empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[reftShieldsWantingHives]))) end
                             if M27Utilities.IsTableEmpty(aiBrain[reftShieldsWantingHives]) == false then
-                                local oShield = M27Utilities.GetNearestUnit(aiBrain[reftShieldsWantingHives], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                tExistingLocationsToPickFrom[1] = GetBuildLocationUnderShieldNearestEnemy(oShield)
-                                if bDebugMessages == true then LOG(sFunctionRef..': oShield='..oShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oShield)..'; tExistingLocationsToPickFrom='..repru((tExistingLocationsToPickFrom or {'nil'}))) end
-                                if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom[1]) == false then
-                                    iActionToAssign = refActionBuildHive
-                                    iMinEngiTechLevelWanted = 2
-                                    iMaxEngisWanted = 2
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Will try and build a hive at '..repru(tExistingLocationsToPickFrom[1])) end
+                                local iNearestDist = 10000
+                                local iCurDist
+                                local oShield
+                                for iUnit, oUnit in aiBrain[reftShieldsWantingHives] do
+                                    if M27UnitInfo.IsUnitValid(oUnit) then
+                                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                        if iCurDist < iNearestDist then
+                                            iNearestDist = iCurDist
+                                            oShield = oUnit
+                                        end
+                                    end
+                                end
+                                if oShield then
+
+
+                                    tExistingLocationsToPickFrom[1] = GetBuildLocationUnderShieldNearestEnemy(oShield)
+                                    if bDebugMessages == true then LOG(sFunctionRef..': oShield='..oShield.UnitId..M27UnitInfo.GetUnitLifetimeCount(oShield)..'; tExistingLocationsToPickFrom='..repru((tExistingLocationsToPickFrom or {'nil'}))) end
+                                    if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom[1]) == false then
+                                        iActionToAssign = refActionBuildHive
+                                        iMinEngiTechLevelWanted = 2
+                                        iMaxEngisWanted = 2
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Will try and build a hive at '..repru(tExistingLocationsToPickFrom[1])) end
+                                    end
                                 end
                             end
                         end

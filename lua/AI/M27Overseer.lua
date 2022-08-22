@@ -111,6 +111,7 @@ refiTotalEnemyLongRangeThreat = 'M27OverseerLongRangeThreat' --against aiBrain, 
 refiTotalEnemyShortRangeThreat = 'M27OverseerShortRangeThreat' --as above
 refbT2NavyNearOurBase = 'M27OverseerT2NavyNearBase' --Against aiBrain, true if enemy has T2 navy near our base
 refiNearestT2PlusNavalThreat = 'M27OverseerNearestT2PlusNavalThreat' --against aibrain, returns absolute (not mod) distance of nearest enemy naval threat
+refbEnemyHasSeraDestroyers = 'M27OverseerEnemyHasT2Sera'
 
 
 --Platoon references
@@ -3139,6 +3140,7 @@ function ThreatAssessAndRespond(aiBrain)
     local bAddedUnitsToPlatoon = false
     local iDistanceToEnemyFromStart = aiBrain[refiDistanceToNearestEnemyBase]
     local iNavySearchRange = math.min(iDistanceToEnemyFromStart, aiBrain[refiModDistFromStartNearestOutstandingThreat] + 120)
+    aiBrain[refbEnemyHasSeraDestroyers] = false
     --Do we have air control/immediate air threats? If not, then limit search range to 200
     if not (aiBrain[refiAIBrainCurrentStrategy] == refStrategyACUKill) and aiBrain[M27AirOverseer.refiAirAANeeded] > 0 then
         iNavySearchRange = math.min(iNavySearchRange, 200)
@@ -4235,6 +4237,13 @@ function ThreatAssessAndRespond(aiBrain)
                         local iAssignedThreatWanted
                         if bDebugMessages == true then
                             LOG(sFunctionRef .. ': About to consider if we have any available torp bombers and if so assign them to enemy naval threat. Is table of available torp bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers])))
+                        end
+
+                        --Does the enemy have sera t2 destroyers? (flag will determine whether to run platoon logic to look for unsubmerged destroyers)
+                        if not(aiBrain[refbEnemyHasSeraDestroyers]) then
+                            if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategorySeraphimDestroyer, tEnemyThreatGroup[refoEnemyGroupUnits])) == false then
+                                aiBrain[refbEnemyHasSeraDestroyers] = true
+                            end
                         end
 
                         --Do we have a T2+ naval threat near our base that is close to being in firing range?
