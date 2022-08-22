@@ -1120,8 +1120,8 @@ end
 function GetReclaimLocationFromSegment(iReclaimSegmentX, iReclaimSegmentZ)
     --e.g. segment (1,1) will be 0 to ReclaimSegmentSizeX and 0 to ReclaimSegmentSizeZ in size
     --This will return the midpoint
-    local iX = (iReclaimSegmentX - 0.5) * iReclaimSegmentSizeX
-    local iZ = (iReclaimSegmentZ - 0.5) * iReclaimSegmentSizeZ
+    local iX = math.max(rMapPlayableArea[1], math.min(rMapPlayableArea[3], (iReclaimSegmentX - 0.5) * iReclaimSegmentSizeX))
+    local iZ = math.max(rMapPlayableArea[2], math.min(rMapPlayableArea[4], (iReclaimSegmentZ - 0.5) * iReclaimSegmentSizeZ))
     return {iX, GetSurfaceHeight(iX, iZ), iZ}
 end
 
