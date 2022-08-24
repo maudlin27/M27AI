@@ -617,10 +617,12 @@ function GetAngleFromAToB(tLocA, tLocB)
     return iTheta
 end
 
-function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
+function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds, bTravelUnderwater)
     --iAngle: 0 = north, 90 = east, etc.; use GetAngleFromAToB if need angle from 2 positions
     --tStart = {x,y,z} (y isnt used)
     --if bKeepInMapBounds is true then will limit to map bounds
+    --bTravelUnderwater - if true then will get the terrain height instead of the surface height
+
     --local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     --local sFunctionRef = 'MoveInDirection'
     local iTheta
@@ -646,9 +648,18 @@ function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
 
     if not(bKeepInMapBounds) then
         --if bDebugMessages == true then LOG(sFunctionRef..': Are within map bounds, iXAdj='..iXAdj..'; iZAdj='..iZAdj..'; iTheta='..iTheta..'; position='..repru({tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj})) end
-        return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        if bTravelUnderwater then
+            return {tStart[1] + iXAdj, GetTerrainHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        else
+            return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        end
     else
-        local tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        local tTargetPosition
+        if bTravelUnderwater then
+            tTargetPosition = {tStart[1] + iXAdj, GetTerrainHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        else
+            tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        end
         --Get actual distance required to keep within map bounds
         --local iMaxDistanceFlat = 0
         local iNewDistWanted = 10000

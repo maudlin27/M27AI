@@ -19,6 +19,7 @@ local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27Events = import('/mods/M27AI/lua/AI/M27Events.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
+local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 
 
 --Semi-Global for this code:
@@ -7834,7 +7835,9 @@ function RecordAllEnemiesAndAllies(aiBrain)
 
 
         --Set mod distance emergency range
+        bDebugMesssages = true
         aiBrain[refiModDistEmergencyRange] = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.4, 150), aiBrain[refiDistanceToNearestEnemyBase] * 0.15)
+        if bDebugMessages == true then LOG(sFunctionRef..': Have set emergency range='..(aiBrain[refiModDistEmergencyRange] or 'nil')) end
 
         --Update nearest ACU
         aiBrain[reftLastNearestACU] = M27MapInfo.PlayerStartPoints[M27Logic.IndexToStartNumber(M27Logic.GetNearestEnemyIndex(aiBrain, false))]
@@ -7919,6 +7922,9 @@ function RecordAllEnemiesAndAllies(aiBrain)
                 oBrain[refiTeamsWithSameAmphibiousPathingGroup] = iCountOfTeamsWithSamePathingGroup
             end
         end
+
+        --Record ponds of interest
+        ForkThread(M27Navy.RecordPondToExpandTo, aiBrain)
     end
 
 

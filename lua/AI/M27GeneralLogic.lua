@@ -122,8 +122,8 @@ function ReturnUnitsInTargetSegmentGroup(tUnits, iTargetGroup)
     return tMatchingUnits
 end
 
-function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim)
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim, iIgnoreAssignedSegmentRange, aiBrain)
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReturnUnitsInTargetSegmentGroup'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -137,9 +137,13 @@ function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim)
     local iReclaimSegmentX
     local iReclaimSegmentZ
     local bFoundEnergyReclaim = false
+    local tAlreadyAsisgnedSegmentXZ
+    local bAlreadyAssigned
+    local sLocationRef
 
     --Find nearest segment to engineer containing energy reclaim
     while iCurLevel < math.min(iSegmentSearchRange, 10000) do
+        bAlreadyAssigned = false
         iCurLevel = iCurLevel + 1
         iCurSublevel = iCurSublevel + 1
         if iCurSublevel > 4 then iCurSublevel = 1 end
@@ -151,15 +155,38 @@ function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim)
                 if M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ] then
                     if bDebugMessages == true then LOG(sFunctionRef..': Checking for energy reclaim in segment '..iReclaimSegmentX..'-'..iReclaimSegmentZ..'; Dist to the base segment='..M27Utilities.GetDistanceBetweenPositions(tStartPosition, M27MapInfo.GetReclaimLocationFromSegment(iReclaimSegmentX, iReclaimSegmentZ))) end
                     if M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimTotalEnergy] >= iMinEnergyReclaim then
-                        bFoundEnergyReclaim = true
-                        if bDebugMessages == true then LOG(sFunctionRef..': Found sufficient reclaim') end
-                        break
+                        --Is this already assigned?
+                        if iIgnoreAssignedSegmentRange then
+                            for iAdjustX = -iIgnoreAssignedSegmentRange, iIgnoreAssignedSegmentRange do
+                                for iAdjustZ = -iIgnoreAssignedSegmentRange, iIgnoreAssignedSegmentRange do
+                                    sLocationRef = M27Utilities.ConvertLocationToStringRef(M27MapInfo.GetReclaimLocationFromSegment(iReclaimSegmentX + iAdjustX, iReclaimSegmentZ + iAdjustZ))
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Found segment '..iReclaimSegmentX..'-'..iReclaimSegmentZ..'; seeing if nearby segment is assigned. iAdjustX='..iAdjustX..'; iAdjustZ='..iAdjustZ..'; sLocationRef='..sLocationRef..'; Is table of actions empty for this location='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]))) end
+                                    if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and (aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaimArea] or aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaimTrees]) then
+                                        bAlreadyAssigned = true
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                        if not(bAlreadyAssigned) then
+                            bFoundEnergyReclaim = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': Found sufficient reclaim') end
+                            break
+                        else
+                            if not(tAlreadyAsisgnedSegmentXZ) then tAlreadyAsisgnedSegmentXZ = {iReclaimSegmentX, iReclaimSegmentZ} end
+                        end
                     end
                 end
 
             end
             if iCurLevel == 0 then break end
         end
+    end
+    --If couldnt find anywhere for energy reclaim then pick the location already assigned
+    if not(bFoundEnergyReclaim) and tAlreadyAsisgnedSegmentXZ then
+        bFoundEnergyReclaim = true
+        iReclaimSegmentX = tAlreadyAsisgnedSegmentXZ[1]
+        iReclaimSegmentZ = tAlreadyAsisgnedSegmentXZ[2]
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if bFoundEnergyReclaim then return iReclaimSegmentX, iReclaimSegmentZ
@@ -187,10 +214,12 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
     local tEngiPosition = oEngineer:GetPosition()
 
     if bWantEnergy then
-        local iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(tEngiPosition, 20)
+        --See if can find unassigned segment for energy reclaim
+        local iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(tEngiPosition, 20, 0, aiBrain)
 
 
         if not(iEnergySegmentX) then
+            --Get energy segment and ignore if already assigned
             iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 20)
             if bDebugMessages == true then LOG(sFunctionRef..': Energy segment X and Z after checking near base='..(iEnergySegmentX or 'nil')..'-'..(iEnergySegmentZ or 'nil')) end
             if not(iEnergySegmentX) then

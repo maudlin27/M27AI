@@ -13,6 +13,7 @@ local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
+local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 
 bUsingArmyIndexForStartPosition = false --by default will assume armies are ARMY_1 etc.; this will be changed to true if any exceptions are found
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
@@ -99,7 +100,7 @@ iLowHeightDifThreshold = 0.007 --Used to trigger check for max height dif in an 
 iHeightDifAreaSize = 0.2 --T1 engineer is 0.6 x 0.9, so this results in a 1x1 size box by searching +- iHeightDifAreaSize if this is set to 0.5; however given are using a 0.25 interval size dont want this to be too large or destroys the purpose of the interval size and makes the threshold unrealistic
 iMaxHeightDif = 0.115 --NOTE: Map specific code should be added below in DetermineMaxTerrainHeightDif (hardcoded table with overrides by map name); Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119
 local iChangeInHeightThreshold = 0.04 --Amount by which to change iMaxHeightDif if we have pathing inconsistencies
-iMinWaterDepth = 1 --Ships cant move right up to shore, this is a guess at how much clearance is needed (testing on Africa, depth of 2 leads to some pathable areas being considered unpathable)
+iMinWaterDepth = 1.5 --Ships cant move right up to shore, this is a guess at how much clearance is needed (testing on Africa, depth of 2 leads to some pathable areas being considered unpathable)
 iWaterPathingIntervalSize = 1
 tWaterAreaAroundTargetAdjustments = {} --Defined in map initialisation
 iWaterMinArea = 3 --Square with x/z of this size must be underwater for the target position to be considered pathable; with value of 2 ships cant get as close to shore as expect them to
@@ -2859,7 +2860,7 @@ function RecordBaseLevelPathability()
     local iMaxDifInHeight = iMaxHeightDif
     local iDifInHeightThreshold = iLowHeightDifThreshold
     local iIntervalSize = iPathingIntervalSize
-    local iNavyMinWaterDepth = iMinWaterDepth
+    local iNavyMinWaterDepth = iMinWaterDepth --Dif between terrain and surface height required to be pathable to most ships
     local tAdjustmentsForArea = tGeneralAreaAroundTargetAdjustments
     local tAreaAdjToSearch = tWaterAreaAroundTargetAdjustments
     local iMinAreaSize = iWaterMinArea
@@ -4086,6 +4087,10 @@ function MappingInitialisation(aiBrain)
             --LOG('MapGroup='..repru(GetMapGroup()))
             LOG(sFunctionRef..': End of code')
         end
+
+        --Record ponds
+        M27Navy.RecordPonds()
+
         bPathfindingComplete = true
 
         --Other variables used by all M27ai
