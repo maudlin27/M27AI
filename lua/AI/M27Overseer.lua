@@ -7835,7 +7835,6 @@ function RecordAllEnemiesAndAllies(aiBrain)
 
 
         --Set mod distance emergency range
-        bDebugMesssages = true
         aiBrain[refiModDistEmergencyRange] = math.max(math.min(aiBrain[refiDistanceToNearestEnemyBase] * 0.4, 150), aiBrain[refiDistanceToNearestEnemyBase] * 0.15)
         if bDebugMessages == true then LOG(sFunctionRef..': Have set emergency range='..(aiBrain[refiModDistEmergencyRange] or 'nil')) end
 

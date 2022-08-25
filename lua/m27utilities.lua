@@ -1736,6 +1736,7 @@ end
 
 function DebugArray(Table)
     --Thanks to Uveso who gave me this as a solution for doing a repr of a large table such as a unit or aiBrain that would normally crash the game
+    --Note - largely superceded by Jip introducing reprs()
     for Index, Array in Table do
         if type(Array) == 'thread' or type(Array) == 'userdata' then
             LOG('Index['..Index..'] is type('..type(Array)..'). I wont print that!')

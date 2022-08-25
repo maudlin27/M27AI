@@ -221,7 +221,7 @@ Platoon = Class(M27PlatoonClass) {
     end,--]]
 
 
-    M27ReclaimAI = function(self)
+    --[[M27ReclaimAI = function(self)
         --NOTE: REDUNDANT AI LOGIC
 
         --Gets engineer to attack-move to the best reclaim area on the map (based on location, mass value, how many other platoons have gone, etc.)
@@ -685,7 +685,7 @@ Platoon = Class(M27PlatoonClass) {
             if self and aiBrain and aiBrain.PlatoonExists and aiBrain:PlatoonExists(self) then self:PlatoonDisband() end
         end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    end,
+    end,--]]
 
 
     --START OF ACTUAL PLATOON CODE - we just list out every platoon here for now, long term might want to just remove use of platoon.lua entirely
@@ -803,6 +803,9 @@ Platoon = Class(M27PlatoonClass) {
         M27PlatoonUtilities.PlatoonInitialSetup(self)
     end,
     M27IdleAir = function(self)
+        M27PlatoonUtilities.PlatoonInitialSetup(self)
+    end,
+    M27IdleNavy = function(self)
         M27PlatoonUtilities.PlatoonInitialSetup(self)
     end,
     M27IdleOther = function(self)

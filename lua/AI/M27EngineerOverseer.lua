@@ -5312,7 +5312,7 @@ end
 function RegularlyCheckForNearbyReclaim(oEngineer, bWantEnergy)
     --Should be called via a fork thread
     --(dont use function profiler as too few commands absent the waitseconds to be worth putting in lots of profiler calls)
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'RegularlyCheckForNearbyReclaim'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     local iMinReclaimValue = 2.5
@@ -5961,7 +5961,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
     --if GetEngineerUniqueCount(oEngineer) == 169 and GetGameTimeSeconds() >= 2300 then bDebugMessages = true end
-    if iActionToAssign == refActionReclaimTrees then bDebugMessages = true end
+    --if iActionToAssign == refActionReclaimTrees then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
     --if aiBrain:GetArmyIndex() == 5 and GetGameTimeSeconds() >= 2160 and (iActionToAssign == refActionBuildShield or iActionToAssign == refActionBuildSecondShield) then bDebugMessages = true end
 
@@ -9034,7 +9034,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
             while iEngineersToConsider >= 0 do --want >= rather than > so get correct calculation of engineers needed
                 --if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end
                 --if iEngineersToConsider > 0 and aiBrain:GetEconomyStoredRatio('MASS') >= 0.6 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 and tiAvailableEngineersByTech[3] > 0 then bDebugMessages = true else bDebugMessages = false end
-                if iEngineersToConsider > 0 then bDebugMessages = true else bDebugMessages = false end
 
                 M27Utilities.FunctionProfiler(sFunctionRef..': EngiConditions', M27Utilities.refProfilerStart)
                 M27Utilities.FunctionProfiler(sFunctionRef..': Condition'..(iCurrentConditionToTry or 'nil')..'Strat'..(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] or 'nil'), M27Utilities.refProfilerStart)

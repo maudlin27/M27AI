@@ -8,12 +8,23 @@ local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
+local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 
+--aiBrian variables
 refiPriorityPondRef = 'M27PriorityPondRef' --against aibrain, returns the pond ref (naval segment group) that we think is most important to that aibrain (only recorded for M27 brains)
 reftiPondThreatToUs = 'M27PondThreatToUs' --against aiBrain, [x] is the pond ref (naval segment group), returns the 'mex value' of that pond when considering mexes within 40% of our base (mod distance).  Only recorded for ponds where we have identified a naval yard build location
 reftiPondValueToUs = 'M27PondValueToUs' --against aiBrain, [x] is the pond ref (naval segment group), returns the expected value of the pond if we have naval control of it (so ignores distance reductions that are used to decide if we want to build navy there in the first place)
 
+--Unit varaibles
+refiAssignedPond = 'M27PondAssigned' --set against a unit to reflect the pond it is in; set to 0 if not in a pond
+reftiTeamRefsUpdatedFor = 'M27UpdatedTeamRefs' --Reflects M27 team ref numbers that have recorded the unit against a pond
+
+
+--TeamData variables (references are to tTeamData[aiBrain.M27Team] - see M27Team
+
+--Global variables
 tPondDetails = {} --[a] = the naval pathing group; returns subtable of various information on ponds; Global information on ponds (requiring at least 200 space
+iMinPondSize = 1000 --1000 is a small pond that probably barely fits a couple of naval factories
 subrefPondSize = 'PondSize'
 subrefPondMinX = 'PondMinX'
 subrefPondMinZ = 'PondMinZ'
@@ -124,7 +135,7 @@ function RecordPonds()
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': Considering pond group ' .. iPathingGroup .. '; Pond size=' .. (tPondSubtable[subrefPondSize] or 'nil'))
                 end
-                if (tPondSubtable[subrefPondSize] or 0) >= 1000 then
+                if (tPondSubtable[subrefPondSize] or 0) >= iMinPondSize then
                     --Pond is large enough for us to consider tracking; record information of interest for the pond:
                     iPondMexCount = 0
                     tPondSubtable[subrefPondMidpoint] = { (tPondDetails[iPathingGroup][subrefPondMinX] + tPondDetails[iPathingGroup][subrefPondMaxX]) * 0.5, M27MapInfo.iMapWaterHeight, (tPondDetails[iPathingGroup][subrefPondMinZ] + tPondDetails[iPathingGroup][subrefPondMaxZ]) * 0.5 }
@@ -258,7 +269,7 @@ end
 
 function RecordPondToExpandTo(aiBrain)
     --Calculates which pond we think is most important to hold
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'RecordPondToExpandTo'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -515,4 +526,98 @@ function RecordPondToExpandTo(aiBrain)
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function RemoveUnitFromAssignedPond(oUnit)
+    if oUnit[refiAssignedPond] then --redundancy
+        if oUnit[reftiTeamRefsUpdatedFor] then
+            local aiBrain = oUnit:GetAIBrain()
+            local iFriendlyTeamRef
+            if aiBrain.M27AI then iFriendlyTeamRef = aiBrain.M27Team end
+
+            if not(oUnit[refiAssignedPond] == 0) then
+                for iM27TeamUpdatingFor, bValue in  oUnit[reftiTeamRefsUpdatedFor] do
+                    if iFriendlyTeamRef == iM27TeamUpdatingFor then
+                        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oUnit[refiAssignedPond]]) == false then --redundancy
+                            for iRecordedUnit, oRecordedUnit in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oUnit[refiAssignedPond]] do
+                                if oRecordedUnit == oUnit then
+                                    table.remove(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oUnit[refiAssignedPond]], iRecordedUnit)
+                                    break
+                                end
+                            end
+                        end
+                    else
+                        if M27Utilities.IsTableEmpty(M27Team.tTeamData[iM27TeamUpdatingFor][M27Team.reftEnemyUnitsByPond][oUnit[refiAssignedPond]]) == false then --redundancy
+                            for iRecordedUnit, oRecordedUnit in M27Team.tTeamData[iM27TeamUpdatingFor][M27Team.reftEnemyUnitsByPond][oUnit[refiAssignedPond]] do
+                                if oRecordedUnit == oUnit then
+                                    table.remove(M27Team.tTeamData[iM27TeamUpdatingFor][M27Team.reftEnemyUnitsByPond][oUnit[refiAssignedPond]], iRecordedUnit)
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            oUnit[reftiTeamRefsUpdatedFor] = {}
+        end
+        oUnit[refiAssignedPond] = nil
+    end
+end
+
+function AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
+    --Updates table of friendly and enemy units for oUnit; only records units if they are in a recognised pond
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local sFunctionRef = 'AddUnitToPond'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iCurPond='..iCurPond..'; iM27TeamUpdatingFor='..iM27TeamUpdatingFor..'; bIsEnemy='..tostring((bIsEnemy or false))..'; repr of oUnit[reftiTeamRefsUpdatedFor]='..repru(oUnit[reftiTeamRefsUpdatedFor])..'; oUnit[refiAssignedPond]='..(oUnit[refiAssignedPond] or 'nil')) end
+
+    if not(oUnit[reftiTeamRefsUpdatedFor]) then
+        oUnit[reftiTeamRefsUpdatedFor] = {}
+    end
+
+    function AddToFriendlyUnitList()
+
+        if not(iCurPond == 0) then
+            if not(M27Team.tTeamData[oUnit:GetAIBrain().M27Team][M27Team.reftFriendlyUnitsByPond][iCurPond]) then M27Team.tTeamData[oUnit:GetAIBrain().M27Team][M27Team.reftFriendlyUnitsByPond][iCurPond] = {} end
+            table.insert(M27Team.tTeamData[oUnit:GetAIBrain().M27Team][M27Team.reftFriendlyUnitsByPond][iCurPond], oUnit)
+        end
+        oUnit[reftiTeamRefsUpdatedFor][oUnit:GetAIBrain().M27Team] = true
+    end
+
+    if bIsEnemy then
+
+        oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor] = true
+        if not(iCurPond == 0) then
+            if not(M27Team.tTeamData[iM27TeamUpdatingFor][M27Team.reftEnemyUnitsByPond][iCurPond]) then M27Team.tTeamData[iM27TeamUpdatingFor][M27Team.reftEnemyUnitsByPond][iCurPond] = {} end
+            table.insert(M27Team.tTeamData[iM27TeamUpdatingFor][M27Team.reftEnemyUnitsByPond][iCurPond], oUnit)
+        end
+        if not(oUnit[refiAssignedPond]) and oUnit:GetAIBrain().M27AI then
+            AddToFriendlyUnitList()
+        end
+
+    else
+        AddToFriendlyUnitList()
+    end
+
+    oUnit[refiAssignedPond] = iCurPond
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy)
+    --Check the unit's pond
+    if not(oUnit[refiAssignedPond]) or not(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId)) or (bIsEnemy and not(oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor])) then
+        local iCurPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnit:GetPosition())
+        if not(tPondDetails[iCurPond]) or (tPondDetails[iCurPond][subrefPondSize] or 0) <= iMinPondSize then iCurPond = 0 end
+        if oUnit[refiAssignedPond] then
+            if not(iCurPond == oUnit[refiAssignedPond]) then
+                RemoveUnitFromAssignedPond(oUnit)
+                AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
+            elseif not(oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor]) then
+                AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
+            end
+        else
+            AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
+        end
+    end
 end

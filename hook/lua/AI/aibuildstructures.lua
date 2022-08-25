@@ -1,5 +1,3 @@
--- As of 2021-07 the base aibuildstructures.lua is 773 without UVESO, before appending the below (989 lines long with Uveso mod enabled), i.e. line 1 of this is line 990 of the hooked file
---2021-09 it might be 772
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27ConUtility = import('/mods/M27AI/lua/AI/M27ConstructionUtilities.lua')
