@@ -2329,6 +2329,11 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     return 0
 end
 
+function GetNavalThreatRating(aiBrain, tUnits, bIncludeSurfaceThreat, bIncludeAntiNavyThreat, bBlueprintThreat)
+    --Temp placeholder until get proper threat calculation in place:
+    return GetCombatThreatRating(aiBrain, tUnits, false)
+end
+
 function CategoriesInVisibleUnits(aiBrain, tEnemyUnits, category, iReturnType)
     --iReturnType1 - returns true if contains category;
     --2 = no. of units meeting the conditions

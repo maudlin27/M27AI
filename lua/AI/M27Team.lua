@@ -28,9 +28,11 @@ refbActiveResourceMonitor = 'M27TeamActiveResourceMonitor' --against tTeamData[a
 reftUnseenPD = 'M27TeamUnseenPD' --against tTeamData[aiBrain.M27Team], table of T2+ PD objects that have damaged an ally but havent been revealed yet
 refbEnemyTeamHasUpgrade = 'M27TeamEnemeyHasUpgrade' --against tTeamData[aiBrain.M27Team], true if enemy has started ACU upgrade or has ACU upgrade
 reftiTeamMessages = 'M27TeamMessages' --against tTeamData[aiBrain.M27Team], [x] is the message type string, returns the gametime that last sent a message of this type to the team
+
 --Naval team data:
 reftEnemyUnitsByPond = 'NavalEnemyUnitsByPond' --[x] is the pond ref, returns table of enemy units
 reftFriendlyUnitsByPond = 'NavalM27UnitsByPond' --[x] is the pond ref; only stores M27 naval units
+refiDestroyedNavalFactoriesByPond = 'NavalM27FailedBuildAttempts' --[x] is the pond ref; number of naval factories that have been destroyed by pond
 
 reftTimeOfTransportLastLocationAttempt = 'M27TeamTimeOfLastTransportAttempt' --against tTeamData[aiBrain.M27Team], returns a table with [x] being the string location ref, and the value being the game time in seconds that we last tried to land a transport there
 tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --tTeamData[aiBrain.M27Team][this]: returns a table, with key [sLocationRef], that returns a scout object, e.g. [X1Z1] = oScout; only returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
@@ -655,4 +657,5 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][reftiTeamMessages] = {}
     tTeamData[iTeamRef][reftEnemyUnitsByPond] = {}
     tTeamData[iTeamRef][reftFriendlyUnitsByPond] = {}
+    tTeamData[iTeamRef][refiDestroyedNavalFactoriesByPond] = {}
 end

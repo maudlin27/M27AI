@@ -192,7 +192,7 @@ refbEnemyHasTech2PD = 'M27EnemyHasTech2PD'
 refiOurHighestFactoryTechLevel = 'M27OverseerOurHighestFactoryTech'
 refiOurHighestAirFactoryTech = 'M27OverseerOurHighestAirFactoryTech'
 refiOurHighestLandFactoryTech = 'M27OverseerOurHighestLandFactoryTech'
-
+refiOurHighestNavalFactoryTech = 'M27OverseerOurHighestLandFactoryTech'
 
 
 --Helper related
@@ -6237,12 +6237,21 @@ function UpdateHighestFactoryTechTracker(aiBrain)
         else
             aiBrain[refiOurHighestLandFactoryTech] = 1
         end
+
+        if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNavalFactory * categories.TECH3 - categories.SUPPORTFACTORY) > 0 then
+            aiBrain[refiOurHighestNavalFactoryTech] = 3
+        elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNavalFactory * categories.TECH2 - categories.SUPPORTFACTORY) > 0 then
+            aiBrain[refiOurHighestNavalFactoryTech] = 2
+        else
+            aiBrain[refiOurHighestNavalFactoryTech] = 1
+        end
     else
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Highest of any factory tech is only tech 1')
         end
         aiBrain[refiOurHighestAirFactoryTech] = 1
         aiBrain[refiOurHighestLandFactoryTech] = 1
+        aiBrain[refiOurHighestNavalFactoryTech] = 1
     end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Number of tech2 factories=' .. aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllHQFactories * categories.TECH2) .. '; Number of tech3 factories=' .. aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAllHQFactories * categories.TECH3) .. '; iHighestTechLevel=' .. iHighestTechLevel .. '; aiBrain[refiOurHighestFactoryTechLevel]=' .. aiBrain[refiOurHighestFactoryTechLevel] .. '; aiBrain[refiOurHighestAirFactoryTech]=' .. aiBrain[refiOurHighestAirFactoryTech] .. '; Number of T3 land factories=' .. aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH3) .. '; Highest land factory tech=' .. aiBrain[refiOurHighestLandFactoryTech])
@@ -8087,6 +8096,7 @@ function OverseerInitialisation(aiBrain)
 
     aiBrain[refiOurHighestFactoryTechLevel] = 1
     aiBrain[refiOurHighestAirFactoryTech] = 1
+    aiBrain[refiOurHighestNavalFactoryTech] = 1
 
     aiBrain[M27PlatoonFormer.refbUsingTanksForPlatoons] = true
 

@@ -9,11 +9,16 @@ local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
+local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
+local M27Conditions = import('/mods/M27AI/lua/AI/M27CustomConditions.lua')
+local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
+
 
 --aiBrian variables
 refiPriorityPondRef = 'M27PriorityPondRef' --against aibrain, returns the pond ref (naval segment group) that we think is most important to that aibrain (only recorded for M27 brains)
 reftiPondThreatToUs = 'M27PondThreatToUs' --against aiBrain, [x] is the pond ref (naval segment group), returns the 'mex value' of that pond when considering mexes within 40% of our base (mod distance).  Only recorded for ponds where we have identified a naval yard build location
 reftiPondValueToUs = 'M27PondValueToUs' --against aiBrain, [x] is the pond ref (naval segment group), returns the expected value of the pond if we have naval control of it (so ignores distance reductions that are used to decide if we want to build navy there in the first place)
+refbEnemyNavyPreventingBuildingNavy = 'M27PondEnemyNavyNearBuildLocation' --against aibrain, true if enemy has navy near to the build location
 
 --Unit varaibles
 refiAssignedPond = 'M27PondAssigned' --set against a unit to reflect the pond it is in; set to 0 if not in a pond
@@ -400,7 +405,7 @@ function RecordPondToExpandTo(aiBrain)
 
                         if bDebugMessages == true then LOG(sFunctionRef..': Have a pond that is in range of our start position, value based on mexes in range pre adjust='..iCurPondValue) end
                         --Do we have sufficient value to consider?
-                        if iCurPondValue >= 4 or iCurMexDefensiveValue >= 4 then
+                        if iCurPondValue >= 4 or iCurPondDefensiveValue >= 4 then
                             if iCurPondValue <= 0 then iCurPondValue = 0.1 end --Pond has defensive value so greater than 0
                             --Adjust value based on how close the naval build location would be for this pond
                             if not(tPondSubtable[subrefBuildLocationByStartPosition]) then
@@ -502,7 +507,8 @@ function RecordPondToExpandTo(aiBrain)
                             else
                                 iCurPondValue = 0
                             end
-                            if bDebugMessages == true then LOG(sFunctionRef..': Pond value after getting naval build area='..iCurPondValue) end
+                            aiBrain[reftiPondThreatToUs][iCurPondRef] = iCurPondDefensiveValue
+                            if bDebugMessages == true then LOG(sFunctionRef..': Pond value after getting naval build area='..iCurPondValue..'; Defensive value='..(aiBrain[reftiPondThreatToUs][iCurPondRef] or 'nil')) end
                         else
                             if bDebugMessages == true then LOG(sFunctionRef..': Pond value is too low to be worth considering') end
                             iCurPondValue = 0
@@ -566,7 +572,7 @@ end
 
 function AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
     --Updates table of friendly and enemy units for oUnit; only records units if they are in a recognised pond
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --set to true for certain positions where want logs to print
     local sFunctionRef = 'AddUnitToPond'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -604,10 +610,10 @@ function AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy)
+function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
     --Check the unit's pond
     if not(oUnit[refiAssignedPond]) or not(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId)) or (bIsEnemy and not(oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor])) then
-        local iCurPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnit:GetPosition())
+        local iCurPond = iPondRefOverride or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnit:GetPosition())
         if not(tPondDetails[iCurPond]) or (tPondDetails[iCurPond][subrefPondSize] or 0) <= iMinPondSize then iCurPond = 0 end
         if oUnit[refiAssignedPond] then
             if not(iCurPond == oUnit[refiAssignedPond]) then
@@ -620,4 +626,227 @@ function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy)
             AddUnitToPond(oUnit, iCurPond, iM27TeamUpdatingFor, bIsEnemy)
         end
     end
+end
+
+
+function GetPrimaryNavalFactory(aiBrain, iPond)
+    local iDistanceCap = 200
+    local oPrimaryFactory
+
+    local tExistingNavalFactory = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalFactory, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond])
+    local tFactoriesCloseToNavalBase = {}
+    local tNavalBase = tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber]
+    local iCurTechLevel
+
+    if M27Utilities.IsTableEmpty(tExistingNavalFactory) == false then
+        local iHighestTechFactory = 1
+        for iFactory, oFactory in tExistingNavalFactory do
+            iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oFactory)
+
+            if M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase) <= iDistanceCap then
+                iHighestTechFactory = math.max(iHighestTechFactory, M27UnitInfo.GetUnitTechLevel(oFactory))
+                table.insert(tFactoriesCloseToNavalBase, oFactory)
+            end
+        end
+        if M27Utilities.IsTableEmpty(tFactoriesCloseToNavalBase) == false then
+
+            local iClosestDistToTarget = 10000
+            local iCurDistToTarget
+
+            for iFactory, oFactory in tFactoriesCloseToNavalBase do
+                if not(oPrimaryFactory) then oPrimaryFactory = oFactory end --Redundancy in case below fails to find anything
+                if oFactory:IsUnitState('Upgrading') then
+                    oPrimaryFactory = oFactory
+                    break
+                else
+                    if M27UnitInfo.GetUnitTechLevel(oFactory) >= iHighestTechFactory then
+                        iCurDistToTarget = M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber])
+                        if iCurDistToTarget < iClosestDistToTarget then
+                            iClosestDistToTarget = iCurDistToTarget
+                            oPrimaryFactory = oFactory
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return oPrimaryFactory
+end
+
+function ReassignNavalEngineer(oEngineer)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ReassignNavalEngineer'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --Intended to give an order to an engineer already assigned to a pond, on a team basis
+    --Note - this doesnt decide original assignment - that is done in the main engineer reassignment code; once an engineer has been assigned to pond naval duties though this function takes over
+
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, for oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UC='..M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)..'; Pond assigned='..(oEngineer[refiAssignedPond] or 'nil')..'; Engineer unit state='..M27Logic.GetUnitState(oEngineer)) end
+
+    local aiBrain = oEngineer:GetAIBrain()
+    local oPrimaryFactory = GetPrimaryNavalFactory(aiBrain, oEngineer[refiAssignedPond])
+    if not(oPrimaryFactory) then
+        --No naval factories near us so no longer have the engineer assigned to the pond
+        oEngineer[refiAssignedPond] = nil
+        IssueClearCommands({oEngineer})
+        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+    else
+        local oActionTargetObject
+        local iCurLoopCount = 0
+        local iCurrentConditionToTry = 0
+        local iCurLandFactories = 0
+        local iMaxEngisWanted
+        local iActionToAssign
+        local iMinEngiTechLevelWanted = 1
+        local iSearchRangeForNearestEngi
+        local iExistingEngineersAssigned
+        local oExistingBuilder
+        local tActionTargetLocation
+
+        --Common conditions
+        local bHaveLowMass = M27Conditions.HaveLowMass(aiBrain)
+        local bHaveLowPower = false
+
+        if aiBrain[M27EconomyOverseer.refbStallingEnergy] or GetGameTimeSeconds() - aiBrain[M27EconomyOverseer.refiLastEnergyStall] <= 20 then
+            if bDebugMessages == true then LOG(sFunctionRef..': Have low power as recently stalled') end
+            bHaveLowPower = true
+        else
+            if aiBrain:GetEconomyStoredRatio('ENERGY') < 0.99 and (aiBrain:GetEconomyStored('ENERGY') < 1000 or aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] <= 0) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Have low power as dont have much stored') end
+                bHaveLowPower = true
+            end
+        end
+        if bHaveLowPower and aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] >= 50000 then bHaveLowPower = false end
+
+
+        while iCurLoopCount <= 100 do
+            iCurLoopCount = iCurLoopCount + 1
+            if iCurLoopCount >= 99 then M27Utilities.ErrorHandler('Infinite loop') break end
+
+            iCurrentConditionToTry = iCurrentConditionToTry + 1
+
+
+            --Set defaults
+            iMaxEngisWanted = 1
+            iMinEngiTechLevelWanted = 1
+            iActionToAssign = nil
+            oExistingBuilder = nil
+            tActionTargetLocation = nil
+
+            if iCurrentConditionToTry == 1 then
+                --Assist primary factory (so it mvoes closer)
+                iActionToAssign = M27EngineerOverseer.refActionAssistNavalFactory
+                oActionTargetObject = oPrimaryFactory
+                iMaxEngisWanted = 100
+            elseif iCurrentConditionToTry == 2 then
+                iActionToAssign = M27EngineerOverseer.refActionAssistNavalFactory --always want some engis assisting naval factory
+                oActionTargetObject = oPrimaryFactory
+                --Primary factory is upgrading
+                if oPrimaryFactory:IsUnitState('Upgrading') then
+                    iMaxEngisWanted = 8 * M27UnitInfo.GetUnitTechLevel(oPrimaryFactory)
+                    if bHaveLowMass then iMaxEngisWanted = iMaxEngisWanted * 0.5 end
+                else
+                    iMaxEngisWanted = 5 * M27UnitInfo.GetUnitTechLevel(oPrimaryFactory)
+                    if bHaveLowMass then iMaxEngisWanted = iMaxEngisWanted * 0.5 end
+                end
+            elseif iCurrentConditionToTry == 3 then
+                --Lack sonar
+                if not(bHaveLowPower) then
+                    local iSonarRangeWanted = 80
+                    if M27UnitInfo.GetUnitTechLevel(oPrimaryFactory) >= 2 then iSonarRangeWanted = 180 end
+                    local tSonarInPond = EntityCategoryFilterDown(M27UnitInfo.refCategorySonar, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oEngineer[refiAssignedPond]])
+                    local bHaveSonarCoverageWanted = false
+
+                    if M27Utilities.IsTableEmpty(tSonarInPond) == false then
+                        local iCurSonarRange
+                        for iUnit, oUnit in tSonarInPond do
+                            iCurSonarRange = oUnit:GetBlueprint().Intel.Sonar or 0
+                            if iCurSonarRange >= iSonarRangeWanted and iCurSonarRange - M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oPrimaryFactory:GetPosition()) >= iSonarRangeWanted then
+                                bHaveSonarCoverageWanted = true
+                                break
+                            end
+                        end
+                    end
+                    if not(bHaveSonarCoverageWanted) then
+                        if M27UnitInfo.GetUnitTechLevel(oPrimaryFactory) >= 2 then
+                            iActionToAssign = M27EngineerOverseer.refActionBuildT2Sonar
+                            iMinEngiTechLevelWanted = 2
+                        else
+                            iActionToAssign = M27EngineerOverseer.refActionBuildT1Sonar
+                        end
+                    end
+                    if iActionToAssign then
+                        iMaxEngisWanted = 3
+                        if bHaveLowMass then iMaxEngisWanted = 1 end
+                        tActionTargetLocation = oPrimaryFactory:GetPosition()
+                    end
+                end
+            else --Spare action
+                iActionToAssign = M27EngineerOverseer.refActionNavalSpareAction
+                iMaxEngisWanted = 100
+            end
+
+            if iActionToAssign then
+
+                --Check we havent recently failed to assign this action
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Have iActionToAssign=' .. iActionToAssign)
+                end
+                if aiBrain[M27EngineerOverseer.refiTimeOfLastFailure][iActionToAssign] and GetGameTimeSeconds() - aiBrain[M27EngineerOverseer.refiTimeOfLastFailure][iActionToAssign] <= 9 then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Time since last failure=' .. GetGameTimeSeconds() - aiBrain[M27EngineerOverseer.refiTimeOfLastFailure][iActionToAssign])
+                    end
+                    iActionToAssign = nil
+                end
+            end
+            if iActionToAssign then
+                iExistingEngineersAssigned = 0
+                if iActionToAssign and aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef] and aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][iActionToAssign] and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][iActionToAssign]) == false then
+                    --Cant use table.getn for this table so do manually:
+                    for iRef, tEngSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][iActionToAssign] do
+                        if tEngSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][refiAssignedPond] == oEngineer[refiAssignedPond] then
+                            iExistingEngineersAssigned = iExistingEngineersAssigned + 1
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': Engineer assigned=' .. tEngSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef].UnitId .. M27UnitInfo.GetUnitLifetimeCount(tEngSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]) .. '; UC=' .. M27EngineerOverseer.GetEngineerUniqueCount(tEngSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]) .. '; Engineer action=' .. (tEngSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][M27EngineerOverseer.refiEngineerCurrentAction] or 'nil'))
+                            end
+                            if tEngSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][M27EngineerOverseer.refbPrimaryBuilder] then
+                                oExistingBuilder = tEngSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]
+                            end
+                        end
+                    end
+                end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef .. ': iExistingEngineersAssigned=' .. iExistingEngineersAssigned .. '; iMaxEngisWanted=' .. iMaxEngisWanted)
+                end
+                if iExistingEngineersAssigned < iMaxEngisWanted then
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': Want to assign more engis, if action is to buidl factory then will tell engis to assist existing builder. iActionToAssign=' .. iActionToAssign .. '; iExistingEngineersAssigned=' .. iExistingEngineersAssigned)
+                    end
+                    if iActionToAssign == M27EngineerOverseer.refActionBuildNavalFactory and iExistingEngineersAssigned > 0 then
+                        oActionTargetObject = oExistingBuilder
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': Will tell engis to assist existing builder ' .. oExistingBuilder.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oExistingBuilder))
+                        end
+                    end
+                    if not(tActionTargetLocation) then
+                        if oActionTargetObject then tActionTargetLocation = oActionTargetObject:GetPosition()
+                        else
+                            tActionTargetLocation = oEngineer:GetPosition()
+                        end
+                    end
+
+                    --if are building a factory then check if already have engineer assigned, in which case will assist that
+                    if bDebugMessages == true then
+                        LOG(sFunctionRef .. ': About to assign ' .. iActionToAssign .. ' action to the engineer ' .. oEngineer.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oEngineer) .. '; UC=' .. M27EngineerOverseer.GetEngineerUniqueCount(oEngineer))
+                    end
+
+                    M27EngineerOverseer.AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iCurrentConditionToTry)
+                end
+            end
+
+            if iActionToAssign then
+                break
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
