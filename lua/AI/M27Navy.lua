@@ -469,6 +469,52 @@ function RecordPondToExpandTo(aiBrain)
 
 
                             if M27Utilities.IsTableEmpty(tNavalBuildArea) == false then
+                                if bDebugMessages == true then LOG(sFunctionRef..': tNavalBuildArea pre adjust='..repru(tNavalBuildArea)) end
+                                --Move towards base to help with cliff building if we have cliffs
+                                local bHaveNearbyCliff = false
+                                local iDistToMoveTarget = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], tNavalBuildArea)
+                                local iAngleFromTarget = M27Utilities.GetAngleFromAToB(tNavalBuildArea, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                local tCliffPositionCheck
+                                local sPathing = M27UnitInfo.refPathingTypeAmphibious
+                                local iStartPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing,M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+
+                                if iDistToMoveTarget > 1 then
+                                    for iDistAdjust = 1, math.min(13, math.floor(iDistToMoveTarget)) do
+                                        tCliffPositionCheck = M27Utilities.MoveInDirection(tNavalBuildArea, iAngleFromTarget, iDistAdjust, true, false)
+                                        if not(M27MapInfo.GetSegmentGroupOfLocation(sPathing, tCliffPositionCheck) == iStartPathingGroup) then
+                                            bHaveNearbyCliff = true
+                                            break
+                                        end
+
+                                    end
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': bHaveNearbyCliff='..tostring(bHaveNearbyCliff)) end
+                                if bHaveNearbyCliff then
+                                    --Try to move closer to base
+                                    local tLastValidPosition = {tNavalBuildArea[1], tNavalBuildArea[2], tNavalBuildArea[3]}
+                                    local tAlternativePosition
+
+                                    for iDistAdjust = 1, math.min(13, math.floor(iDistToMoveTarget)) do
+                                        tAlternativePosition = M27Utilities.MoveInDirection(tNavalBuildArea, iAngleFromTarget, iDistAdjust, true, false)
+                                        if not(M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tAlternativePosition) == iCurPondRef) then
+                                            break
+                                        else
+                                            --Can we build here?
+                                            if aiBrain:CanBuildStructureAt('ueb0103', tAlternativePosition) then
+                                                tLastValidPosition = {tAlternativePosition[1], tAlternativePosition[2], tAlternativePosition[3]}
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Have an alternative position that is closer to our base, iDistAdjust='..iDistAdjust) end
+                                            else
+                                                break
+                                            end
+                                        end
+                                    end
+                                    tNavalBuildArea = tLastValidPosition
+
+
+                                end
+
+
+
                                 if bDebugMessages == true then
                                     LOG(sFunctionRef..': Have a naval build area='..repru(tNavalBuildArea)..'; will draw large square around it in blue')
                                     M27Utilities.DrawLocation(tNavalBuildArea, nil, nil, 200, 10)

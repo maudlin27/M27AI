@@ -9908,6 +9908,7 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveNearConstruction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, sBlueprintID) then bDebugMessages = true end
     --if oBuilder == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
     if bDebugMessages == true then
         local sBuilderName = oBuilder.UnitId
@@ -9944,13 +9945,73 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
     if iCurrentDistanceFromTarget > iDistanceWantedFromTarget then
         --Add slight buffer so move into place:
         if bDebugMessages == true then LOG(sFunctionRef..': About to get move position near the target '..repru(tLocation)..'; iCurrentDistanceFromTarget='..iCurrentDistanceFromTarget..'; iDistanceWantedFromTarget='..iDistanceWantedFromTarget..'; will decrease distance wanted very slightly; tBuilderLocation='..repru(tBuilderLocation)) end
-        iDistanceWantedFromTarget = iDistanceWantedFromTarget - 0.25
+        iDistanceWantedFromTarget = iDistanceWantedFromTarget - 0.25 --NOTE: If changing this, then also consider if the below adjustment for naval factories with cliffs needs changing
 
         --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceWantedFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions)
         local iMinDistanceFromCurrentBuilderMoveTarget = 2 --dont want to change movement path from the one generated if it's not that different
 
         --tPossibleTarget = GetPositionNearTargetInSamePathingGroup(tBuilderLocation, tLocation, iDistanceWantedFromTarget, 0, oBuilder, 1, true, true, iMinDistanceFromCurrentBuilderMoveTarget)
         tPossibleTarget = GetPositionAtOrNearTargetInPathingGroup(tBuilderLocation, tLocation, iDistanceWantedFromTarget, 0, oBuilder, true, true, iMinDistanceFromCurrentBuilderMoveTarget)
+
+        --Adjust further for naval factory to facilitate greater cliff-building
+        if tPossibleTarget and EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, sBlueprintID) then
+            --If we move from Possible target towards our currnet position do we come across a cliff very soon?
+
+            local bHaveCliff = false
+
+            local iAngleFromMoveTarget = M27Utilities.GetAngleFromAToB(tPossibleTarget, tBuilderLocation)
+
+            local iMaxCliffSearchRange = 15 + math.floor(iBuildDistance)
+            local sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
+            local iEngiPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tBuilderLocation)
+            function IsCliffBlockingTarget(tTarget)
+                local iDistToMoveTarget = M27Utilities.GetDistanceBetweenPositions(tBuilderLocation, tTarget)
+                local tCliffPositionCheck
+                if iDistToMoveTarget > 1 then
+                    for iDistAdjust = 1, math.min(iMaxCliffSearchRange, math.floor(iDistToMoveTarget)) do
+                        tCliffPositionCheck = M27Utilities.MoveInDirection(tPossibleTarget, iAngleFromMoveTarget, iDistAdjust, true, false)
+                        if not(M27MapInfo.GetSegmentGroupOfLocation(sPathing, tCliffPositionCheck) == iEngiPathingGroup) then
+                            return true
+                        end
+                    end
+                end
+                return false
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Building naval factory, IsCliffBlockingTarget(tPossibleTarget='..tostring(IsCliffBlockingTarget(tPossibleTarget))..'; tPossibleTarget='..repru(tPossibleTarget)..'; tLocation (of where we want to build)='..repru(tLocation)) end
+            if IsCliffBlockingTarget(tPossibleTarget) then
+                --Can we get any closer to our build distance if we broaden the angle range?  Also increase the distance slightly
+                iDistanceWantedFromTarget = iDistanceWantedFromTarget + 0.1
+                local iAngleToEngi = M27Utilities.GetAngleFromAToB(tLocation, tBuilderLocation)
+                local tReplacementTarget
+                local tPathingPosition
+                if bDebugMessages == true then LOG(sFunctionRef..': About to try different positions from tLocation '..repru(tLocation)..' to tBuilderLocation '..repru(tBuilderLocation)..'; Angle to here='..iAngleToEngi..'; iDistanceWantedFromTarget='..iDistanceWantedFromTarget) end
+                for iAngleAdjust = 0, 40, 8 do
+                    for iAngleFactor = -1, 1, 2 do
+                                                    --MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds, bTravelUnderwater)
+                        tPathingPosition = M27Utilities.MoveInDirection(tLocation, iAngleToEngi + iAngleAdjust * iAngleFactor, iDistanceWantedFromTarget, true, false)
+                        if bDebugMessages == true then
+
+                            local iColour = 3
+                            if M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPathingPosition) == iEngiPathingGroup and not(IsCliffBlockingTarget(tPathingPosition)) then iColour = 7 end
+                            LOG(sFunctionRef..': Considering tPathingPosition='..repru(tPathingPosition)..'; iAngleAdjust='..iAngleAdjust * iAngleFactor..'; Pathing group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPathingPosition)..'; Engi pathing group='..iEngiPathingGroup..'; Is cliff blocking target='..tostring(IsCliffBlockingTarget(tPathingPosition))..'; will draw match in white, nonmatch in black. iColour='..iColour..'; Dist from original move target planned='..M27Utilities.GetDistanceBetweenPositions(tPathingPosition, tPossibleTarget))
+                            M27Utilities.DrawLocation(tPathingPosition, false, iColour, 200)
+                        end
+                        if M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPathingPosition) == iEngiPathingGroup and not(IsCliffBlockingTarget(tPathingPosition)) then
+                            tReplacementTarget = tPathingPosition
+                        end
+
+                        if iAngleAdjust == 0 or tReplacementTarget then break end
+                    end
+                    if tReplacementTarget then break end
+                end
+                if tReplacementTarget then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a replacement position to use') end
+                    tPossibleTarget = {tReplacementTarget[1], tReplacementTarget[2], tReplacementTarget[3]}
+
+                end
+            end
+        end
+
 
         if tPossibleTarget == nil then
             if bDebugMessages == true then LOG(sFunctionRef..': Cant get a nearby location for target; will return tLocation if can path to it') end
