@@ -10461,7 +10461,11 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                                 if iActionToAssign then
                                                     --Will be referring to this when trying to locate naval factory to assist
                                                     tExistingLocationsToPickFrom = {}
-                                                    tExistingLocationsToPickFrom[1] = {M27Navy.tPondDetails[iPondWanted][M27Navy.subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber][1], M27Navy.tPondDetails[iPondWanted][M27Navy.subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber][2], M27Navy.tPondDetails[iPondWanted][M27Navy.subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber][3]}
+                                                    local oPrimaryFactory = M27Navy.GetPrimaryNavalFactory(aiBrain, iPondWanted)
+                                                    if oPrimaryFactory then tExistingLocationsToPickFrom[1] = oPrimaryFactory:GetPosition()
+                                                    else
+                                                        tExistingLocationsToPickFrom[1] = {M27Navy.tPondDetails[iPondWanted][M27Navy.subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber][1], M27Navy.tPondDetails[iPondWanted][M27Navy.subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber][2], M27Navy.tPondDetails[iPondWanted][M27Navy.subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber][3]}
+                                                    end
                                                     if bDebugMessages == true then LOG(sFunctionRef..': iPondWanted='..(iPondWanted or 'nil')..'; Existing locations to pick from='..repru(tExistingLocationsToPickFrom)) end
                                                     if iActionToAssign == refActionAssistNavalFactory then
                                                         --Set the target here so we dont have to repeat all the above logic or setup new varaibles

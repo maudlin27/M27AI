@@ -9292,6 +9292,10 @@ function OverseerManager(aiBrain)
         --NOTE: We dont have the number of ticks below as 'available' for use, since on initialisation we're waiting ticks as well when initialising things such as the engineer and upgrade overseers which work off their own loops
         --therefore the actual available tick count will be the below number less the number of ticks we're already waiting
         if aiBrain.M27IsDefeated then break end
+
+        --Call separate code to run navy (note this has its own wait ticks incorporated):
+        ForkThread(M27Navy.ManageNavyMainLoop, aiBrain)
+
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         iTicksToWait = _G.MyM27Scheduler:WaitTicks(math.max(1, 10 - iTicksWaitedThisCycle), 5, 1) --wait for the start of the loop (scout scheduler)
 

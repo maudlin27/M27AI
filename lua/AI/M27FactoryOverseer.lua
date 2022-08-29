@@ -2147,6 +2147,10 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             --=======NAVAL FACTORY------------------
                         elseif bIsNavalFactory then
+                            if iCurrentConditionToTry == 1 then
+
+
+                            end
                             if aiBrain:GetEconomyStored('MASS') > 10 then
                                 if not (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill) then
                                     if M27Conditions.HaveLowMass(aiBrain) == false then

@@ -30,9 +30,13 @@ refbEnemyTeamHasUpgrade = 'M27TeamEnemeyHasUpgrade' --against tTeamData[aiBrain.
 reftiTeamMessages = 'M27TeamMessages' --against tTeamData[aiBrain.M27Team], [x] is the message type string, returns the gametime that last sent a message of this type to the team
 
 --Naval team data:
+refbActiveNavalManager = 'NavalActiveManager' --True/false
 reftEnemyUnitsByPond = 'NavalEnemyUnitsByPond' --[x] is the pond ref, returns table of enemy units
 reftFriendlyUnitsByPond = 'NavalM27UnitsByPond' --[x] is the pond ref; only stores M27 naval units
 refiDestroyedNavalFactoriesByPond = 'NavalM27FailedBuildAttempts' --[x] is the pond ref; number of naval factories that have been destroyed by pond
+refoClosestEnemyNavalUnit = 'NavalM27ClosestEnemy' --[x] is the pond ref
+refoPrimaryNavalFactoryByPond = 'NavalM27PrimaryNavalFactory' --[x] is the pond ref
+refiTimeOfLastPrimaryNavalUpdateByPond = 'NavalM27TimeOfLastNavalUpdate' --[x] is the pond ref
 
 reftTimeOfTransportLastLocationAttempt = 'M27TeamTimeOfLastTransportAttempt' --against tTeamData[aiBrain.M27Team], returns a table with [x] being the string location ref, and the value being the game time in seconds that we last tried to land a transport there
 tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --tTeamData[aiBrain.M27Team][this]: returns a table, with key [sLocationRef], that returns a scout object, e.g. [X1Z1] = oScout; only returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
@@ -655,7 +659,11 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][reftTimeOfTransportLastLocationAttempt] = {}
     tTeamData[iTeamRef][tScoutAssignedToMexLocation] = {}
     tTeamData[iTeamRef][reftiTeamMessages] = {}
+
+    --Naval variables
     tTeamData[iTeamRef][reftEnemyUnitsByPond] = {}
     tTeamData[iTeamRef][reftFriendlyUnitsByPond] = {}
     tTeamData[iTeamRef][refiDestroyedNavalFactoriesByPond] = {}
+    tTeamData[iTeamRef][refoPrimaryNavalFactoryByPond] = {}
+    tTeamData[iTeamRef][refiTimeOfLastPrimaryNavalUpdateByPond] = {}
 end

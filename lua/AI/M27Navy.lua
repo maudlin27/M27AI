@@ -676,47 +676,70 @@ end
 
 
 function GetPrimaryNavalFactory(aiBrain, iPond)
-    local iDistanceCap = 200
-    local oPrimaryFactory
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetPrimaryNavalFactory'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
-    local tExistingNavalFactory = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalFactory, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond])
-    local tFactoriesCloseToNavalBase = {}
-    local tNavalBase = tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber]
-    local iCurTechLevel
+    if M27UnitInfo.IsUnitValid(M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond]) and GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][iPond][M27Team.refiTimeOfLastPrimaryNavalUpdateByPond] or -100) < 5 then
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond]
+    else
+        local iDistanceCap = 200
+        local oPrimaryFactory
+        local oPreviousPrimary = M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond]
+        if not(M27UnitInfo.IsUnitValid(oPreviousPrimary)) then oPreviousPrimary = nil end
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond]) then
+            --Will return nil
+        else
+            local tExistingNavalFactory = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalFactory, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond])
+            local tFactoriesCloseToNavalBase = {}
+            local tNavalBase = tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber]
+            local iCurTechLevel
 
-    if M27Utilities.IsTableEmpty(tExistingNavalFactory) == false then
-        local iHighestTechFactory = 1
-        for iFactory, oFactory in tExistingNavalFactory do
-            iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oFactory)
+            if M27Utilities.IsTableEmpty(tExistingNavalFactory) == false then
+                local iHighestTechFactory = 1
+                for iFactory, oFactory in tExistingNavalFactory do
+                    iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oFactory)
 
-            if M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase) <= iDistanceCap then
-                iHighestTechFactory = math.max(iHighestTechFactory, M27UnitInfo.GetUnitTechLevel(oFactory))
-                table.insert(tFactoriesCloseToNavalBase, oFactory)
-            end
-        end
-        if M27Utilities.IsTableEmpty(tFactoriesCloseToNavalBase) == false then
-
-            local iClosestDistToTarget = 10000
-            local iCurDistToTarget
-
-            for iFactory, oFactory in tFactoriesCloseToNavalBase do
-                if not(oPrimaryFactory) then oPrimaryFactory = oFactory end --Redundancy in case below fails to find anything
-                if oFactory:IsUnitState('Upgrading') then
-                    oPrimaryFactory = oFactory
-                    break
+                    if M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase) <= iDistanceCap then
+                        iHighestTechFactory = math.max(iHighestTechFactory, M27UnitInfo.GetUnitTechLevel(oFactory))
+                        table.insert(tFactoriesCloseToNavalBase, oFactory)
+                    end
+                end
+                if M27UnitInfo.GetUnitTechLevel(oPreviousPrimary) >= iHighestTechFactory then
+                    oPrimaryFactory = oPreviousPrimary
                 else
-                    if M27UnitInfo.GetUnitTechLevel(oFactory) >= iHighestTechFactory then
-                        iCurDistToTarget = M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber])
-                        if iCurDistToTarget < iClosestDistToTarget then
-                            iClosestDistToTarget = iCurDistToTarget
-                            oPrimaryFactory = oFactory
+                    if M27Utilities.IsTableEmpty(tFactoriesCloseToNavalBase) == false then
+
+                        local iClosestDistToTarget = 10000
+                        local iCurDistToTarget
+
+                        for iFactory, oFactory in tFactoriesCloseToNavalBase do
+                            if not(oPrimaryFactory) then oPrimaryFactory = oFactory end --Redundancy in case below fails to find anything
+                            if oFactory:IsUnitState('Upgrading') then
+                                oPrimaryFactory = oFactory
+                                break
+                            else
+                                if M27UnitInfo.GetUnitTechLevel(oFactory) >= iHighestTechFactory then
+                                    iCurDistToTarget = M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber])
+                                    if iCurDistToTarget < iClosestDistToTarget then
+                                        iClosestDistToTarget = iCurDistToTarget
+                                        oPrimaryFactory = oFactory
+                                    end
+                                end
+                            end
                         end
                     end
                 end
             end
         end
+
+        M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond] = oPrimaryFactory
+        if oPrimaryFactory then M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastPrimaryNavalUpdateByPond][iPond] = GetGameTimeSeconds() end
+
+        M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        return oPrimaryFactory
     end
-    return oPrimaryFactory
 end
 
 function ReassignNavalEngineer(oEngineer)
@@ -894,5 +917,47 @@ function ReassignNavalEngineer(oEngineer)
             end
         end
     end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function ManageTeamNavy(aiBrain, iTeam, iPond)
+    --Decides what to do with our naval units, as well as recording information such as the nearest enemy naval unit
+
+    --Should have already confirmed have friendly units in this pond; check if we have enemy units
+    local oClosestEnemyUnit
+    local tPondBasePosition = GetPrimaryNavalFactory(aiBrain, iPond)
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond]) == false then
+        for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond] do
+
+        end
+    end
+
+end
+
+function ManageNavyMainLoop(aiBrain)
+    --aiBrain just used for functionality like getting the primary factory that in some cases requires an aibrain
+
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ManageNavyMainLoop'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local iTeam = aiBrain.M27Team
+    if bDebugMessages == true then LOG(sFunctionRef..': iTeam='..(iTeam or 'nil')..'; Is tTeamData empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData))) end
+    if not(M27Team.tTeamData[iTeam][M27Team.refbActiveNavalManager]) then
+        M27Team.tTeamData[iTeam][M27Team.refbActiveNavalManager] = true
+        local iTotalTicksWaited = 0
+        if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond]) == false then
+            for iPond, tFriendlyUnits in M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond] do
+                if M27Utilities.IsTableEmpty(tFriendlyUnits) == false then
+                    ForkThread(ManageTeamNavy, aiBrain, iTeam, iPond)
+                    iTotalTicksWaited = iTotalTicksWaited + _G.MyM27Scheduler:WaitTicks(1, 2, 0.4)
+                end
+            end
+
+            iTotalTicksWaited = iTotalTicksWaited + _G.MyM27Scheduler:WaitTicks(math.max(1, 10 - iTotalTicksWaited), math.max(2, 15 - iTotalTicksWaited), 1)
+            M27Team.tTeamData[iTeam][M27Team.refbActiveNavalManager] = false
+        end
+    end
+
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end

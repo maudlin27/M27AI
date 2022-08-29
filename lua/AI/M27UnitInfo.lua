@@ -713,21 +713,25 @@ function GetUnitIndirectRange(oUnit)
     return iMaxRange
 end
 
-function GetUnitMaxGroundRange(oUnit)
+function GetBlueprintMaxGroundRange(oBP)
     local iMaxRange = 0
-    if oUnit.GetBlueprint then
-        local oBP = oUnit:GetBlueprint()
-        if oBP.Weapon then
-            for iCurWeapon, oCurWeapon in oBP.Weapon do
-                if oCurWeapon.MaxRadius > iMaxRange and not(oCurWeapon.EnabledByEnhancement) and oCurWeapon.Damage > 0 then
-                    if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' then
-                        iMaxRange = oCurWeapon.MaxRadius
-                    end
+    if oBP.Weapon then
+        for iCurWeapon, oCurWeapon in oBP.Weapon do
+            if oCurWeapon.MaxRadius > iMaxRange and not(oCurWeapon.EnabledByEnhancement) and oCurWeapon.Damage > 0 then
+                if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' then
+                    iMaxRange = oCurWeapon.MaxRadius
                 end
             end
         end
     end
-    return iMaxRange
+end
+
+function GetUnitMaxGroundRange(oUnit)
+    if oUnit.GetBlueprint then
+        return GetBlueprintMaxGroundRange(oUnit:GetBlueprint())
+    else
+        return 0
+    end
 end
 
 function GetUpgradeBuildTime(oUnit, sUpgradeRef)
