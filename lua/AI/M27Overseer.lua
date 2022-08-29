@@ -192,7 +192,7 @@ refbEnemyHasTech2PD = 'M27EnemyHasTech2PD'
 refiOurHighestFactoryTechLevel = 'M27OverseerOurHighestFactoryTech'
 refiOurHighestAirFactoryTech = 'M27OverseerOurHighestAirFactoryTech'
 refiOurHighestLandFactoryTech = 'M27OverseerOurHighestLandFactoryTech'
-refiOurHighestNavalFactoryTech = 'M27OverseerOurHighestLandFactoryTech'
+refiOurHighestNavalFactoryTech = 'M27OverseerOurHighestNavalFactoryTech'
 
 
 --Helper related
@@ -6230,12 +6230,13 @@ function UpdateHighestFactoryTechTracker(aiBrain)
             end
             aiBrain[refiOurHighestLandFactoryTech] = 3
         elseif aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory * categories.TECH2 - categories.SUPPORTFACTORY) > 0 then
-            if bDebugMessages == true then
-                LOG(sFunctionRef .. ': We dont have T3 land factories but do have T2')
-            end
             aiBrain[refiOurHighestLandFactoryTech] = 2
+            if bDebugMessages == true then
+                LOG(sFunctionRef .. ': We dont have T3 land factories but do have T2, setting highest land fac tech to 2. aiBrain[refiOurHighestLandFactoryTech] after update='..aiBrain[refiOurHighestLandFactoryTech])
+            end
         else
             aiBrain[refiOurHighestLandFactoryTech] = 1
+            if bDebugMessages == true then LOG(sFunctionRef..': Set our highest land fac tech to 1') end
         end
 
         if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryNavalFactory * categories.TECH3 - categories.SUPPORTFACTORY) > 0 then
@@ -6330,7 +6331,7 @@ function CheckUnitCap(aiBrain)
         local tiCategoryToDestroy = {
             [0] = categories.TECH1 - categories.COMMAND,
             [1] = M27UnitInfo.refCategoryAllAir * categories.TECH1,
-            [2] = M27UnitInfo.refCategoryMobileLand * categories.TECH2 - categories.COMMAND - M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryAirScout + M27UnitInfo.refCategoryAirAA,
+            [2] = M27UnitInfo.refCategoryMobileLand * categories.TECH2 - categories.COMMAND - M27UnitInfo.refCategoryMAA + M27UnitInfo.refCategoryAirScout + M27UnitInfo.refCategoryAirAA + categories.NAVAL * categories.MOBILE * categories.TECH1,
             [3] = M27UnitInfo.refCategoryMobileLand * categories.TECH1 - categories.COMMAND,
             [4] = M27UnitInfo.refCategoryWall + M27UnitInfo.refCategoryEngineer - categories.TECH3,
         }
@@ -8086,6 +8087,7 @@ function OverseerInitialisation(aiBrain)
     aiBrain[M27FactoryOverseer.refiMinimumTanksWanted] = 5 --SetWhetherCanPathToEnemy will update this based on pathing
     aiBrain[M27FactoryOverseer.refiAirAACap] = 250
     aiBrain[M27FactoryOverseer.refiAirScoutCap] = 35
+    aiBrain[M27FactoryOverseer.refiNavalT2AndBelowCap] = 100 --max T2 and lower naval units
 
     aiBrain[M27PlatoonFormer.refbUsingMobileShieldsForPlatoons] = true
     aiBrain[M27PlatoonFormer.reftPriorityUnitsForShielding] = {}

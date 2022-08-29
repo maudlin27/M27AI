@@ -2393,11 +2393,6 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
     return 0
 end
 
-function GetNavalThreatRating(aiBrain, tUnits, bIncludeSurfaceThreat, bIncludeAntiNavyThreat, bBlueprintThreat)
-    --Temp placeholder until get proper threat calculation in place:
-    return GetCombatThreatRating(aiBrain, tUnits, false)
-end
-
 function CategoriesInVisibleUnits(aiBrain, tEnemyUnits, category, iReturnType)
     --iReturnType1 - returns true if contains category;
     --2 = no. of units meeting the conditions
@@ -5648,6 +5643,8 @@ function CalculateUnitThreatsByType()
             ['1000010'] = { false, false, false, false, true, false }, --Submersible threat only
             ['1000001'] = { false, false, false, false, false, true }, --Long range threat only
         }
+        --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
+        --{bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, bIncludeAirTorpedo}
         local tiAirThreatTypes = {
             ['200001'] = {false, false, false, false, true,}, --Torpedo bombers
             ['200100'] = { false, false, true, false, false }, --Air to ground
@@ -5657,6 +5654,7 @@ function CalculateUnitThreatsByType()
             ['210000'] = { true, false, false, false, false }, --Air AA
             ['210110'] = { true, false, true, true, false }, --Air threat (general)
             ['210111'] = { true, false, true, true, true }, --Air threat (general)
+            ['200101'] = { true, false, true, true, true }, --Bombers and torpedo bombers
         }
 
         for iRef, tValue in tiLandAndNavyThreatTypes do

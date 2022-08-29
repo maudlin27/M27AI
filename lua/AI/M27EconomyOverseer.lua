@@ -727,16 +727,17 @@ function TrackHQUpgrade(oUnitUpgradingToHQ)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
+function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker, bDontUpdateHQTracker)
     --Work out the upgrade ID wanted; if bUpdateUpgradeTracker is true then records upgrade against unit's aiBrain
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'UpgradeUnit'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
+    --if EntityCategoryContains(M27UnitInfo.refCategoryLandFactory, oUnitToUpgrade.UnitId) then bDebugMessages = true end
     --if oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade) == 'urb01012' then bDebugMessages = true end
 
     --Do we have any HQs of the same factory type of a higher tech level?
     local sUpgradeID = M27UnitInfo.GetUnitUpgradeBlueprint(oUnitToUpgrade, true) --If not a factory or dont recognise the faction then just returns the normal unit ID
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, sUpgradeID='..(sUpgradeID or 'nil')..'; bUpdateUpgradeTracker='..tostring((bUpdateUpgradeTracker or false))..'; bDontUpdateHQTracker='..tostring(bDontUpdateHQTracker or false)) end
     --local oUnitBP = oUnitToUpgrade:GetBlueprint()
     --local iFactoryTechLevel = GetUnitTechLevel(oUnitBP.BlueprintId)
 
@@ -784,7 +785,9 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker)
                 if bDebugMessages == true then
                     LOG(sFunctionRef .. ': sUpgradeID is not a support factory')
                 end
-                ForkThread(TrackHQUpgrade, oUnitToUpgrade)
+                if not(bDontUpdateHQTracker) then
+                    ForkThread(TrackHQUpgrade, oUnitToUpgrade)
+                end
             end
             --T1 mexes - if start upgrading, then flag for TML protection
         elseif EntityCategoryContains(M27UnitInfo.refCategoryT1Mex, oUnitToUpgrade.UnitId) and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then

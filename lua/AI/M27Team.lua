@@ -34,9 +34,11 @@ refbActiveNavalManager = 'NavalActiveManager' --True/false
 reftEnemyUnitsByPond = 'NavalEnemyUnitsByPond' --[x] is the pond ref, returns table of enemy units
 reftFriendlyUnitsByPond = 'NavalM27UnitsByPond' --[x] is the pond ref; only stores M27 naval units
 refiDestroyedNavalFactoriesByPond = 'NavalM27FailedBuildAttempts' --[x] is the pond ref; number of naval factories that have been destroyed by pond
-refoClosestEnemyNavalUnit = 'NavalM27ClosestEnemy' --[x] is the pond ref
+refoClosestEnemyNavalUnitByPond = 'NavalM27ClosestEnemy' --[x] is the pond ref
 refoPrimaryNavalFactoryByPond = 'NavalM27PrimaryNavalFactory' --[x] is the pond ref
 refiTimeOfLastPrimaryNavalUpdateByPond = 'NavalM27TimeOfLastNavalUpdate' --[x] is the pond ref
+reftBackupBaseLocationByPond = 'NavalM27BackupBase' --[x] is pond ref; will return the last naval factory location (used e.g. if want to manage navy after naval fac destroyed)
+refbHaveNavalShortfall = 'NavalM27Shortfall' --[x] is pond ref
 
 reftTimeOfTransportLastLocationAttempt = 'M27TeamTimeOfLastTransportAttempt' --against tTeamData[aiBrain.M27Team], returns a table with [x] being the string location ref, and the value being the game time in seconds that we last tried to land a transport there
 tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --tTeamData[aiBrain.M27Team][this]: returns a table, with key [sLocationRef], that returns a scout object, e.g. [X1Z1] = oScout; only returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
@@ -666,4 +668,8 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][refiDestroyedNavalFactoriesByPond] = {}
     tTeamData[iTeamRef][refoPrimaryNavalFactoryByPond] = {}
     tTeamData[iTeamRef][refiTimeOfLastPrimaryNavalUpdateByPond] = {}
+    tTeamData[iTeamRef][reftBackupBaseLocationByPond] = {}
+    tTeamData[iTeamRef][refoClosestEnemyNavalUnitByPond] = {}
+    tTeamData[iTeamRef][refbHaveNavalShortfall] = {}
+
 end

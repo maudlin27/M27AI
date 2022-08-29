@@ -679,7 +679,7 @@ function GetPrimaryNavalFactory(aiBrain, iPond)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'GetPrimaryNavalFactory'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code. do we already have a valid primary naval factory for pond '..iPond..'='..tostring(M27UnitInfo.IsUnitValid(M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond]))..'; Time of last update='..GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][iPond][M27Team.refiTimeOfLastPrimaryNavalUpdateByPond] or -100)) end
     if M27UnitInfo.IsUnitValid(M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond]) and GetGameTimeSeconds() - (M27Team.tTeamData[aiBrain.M27Team][iPond][M27Team.refiTimeOfLastPrimaryNavalUpdateByPond] or -100) < 5 then
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond]
@@ -688,6 +688,7 @@ function GetPrimaryNavalFactory(aiBrain, iPond)
         local oPrimaryFactory
         local oPreviousPrimary = M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond]
         if not(M27UnitInfo.IsUnitValid(oPreviousPrimary)) then oPreviousPrimary = nil end
+        if bDebugMessages == true then LOG(sFunctionRef..': Is the table of friendly units for this pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond]))) end
         if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond]) then
             --Will return nil
         else
@@ -696,19 +697,24 @@ function GetPrimaryNavalFactory(aiBrain, iPond)
             local tNavalBase = tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber]
             local iCurTechLevel
 
+            if bDebugMessages == true then LOG(sFunctionRef..': Is the table of naval factories empty='..tostring(M27Utilities.IsTableEmpty(tExistingNavalFactory))) end
+
             if M27Utilities.IsTableEmpty(tExistingNavalFactory) == false then
                 local iHighestTechFactory = 1
                 for iFactory, oFactory in tExistingNavalFactory do
                     iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oFactory)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Considering factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; Dist to naval base='..M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase)..'; iDistanceCap='..iDistanceCap) end
 
                     if M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase) <= iDistanceCap then
                         iHighestTechFactory = math.max(iHighestTechFactory, M27UnitInfo.GetUnitTechLevel(oFactory))
                         table.insert(tFactoriesCloseToNavalBase, oFactory)
                     end
                 end
-                if M27UnitInfo.GetUnitTechLevel(oPreviousPrimary) >= iHighestTechFactory then
+                if M27Utilities.IsTableEmpty(tFactoriesCloseToNavalBase) then tFactoriesCloseToNavalBase = tExistingNavalFactory end
+                if M27UnitInfo.GetUnitTechLevel(oPreviousPrimary) >= iHighestTechFactory and M27UnitInfo.IsUnitValid(oPreviousPrimary) then
                     oPrimaryFactory = oPreviousPrimary
                 else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of factories close to naval base empty='..tostring(M27Utilities.IsTableEmpty(tFactoriesCloseToNavalBase))) end
                     if M27Utilities.IsTableEmpty(tFactoriesCloseToNavalBase) == false then
 
                         local iClosestDistToTarget = 10000
@@ -732,10 +738,28 @@ function GetPrimaryNavalFactory(aiBrain, iPond)
                     end
                 end
             end
+            if bDebugMessages == true then LOG(sFunctionRef..': Have we got a valid primary factory now='..tostring(M27UnitInfo.IsUnitValid(oPrimaryFactory))) end
+            if oPrimaryFactory then
+                M27Team.tTeamData[aiBrain.M27Team][M27Team.reftBackupBaseLocationByPond][iPond] = oPrimaryFactory:GetPosition()
+            end
         end
 
         M27Team.tTeamData[aiBrain.M27Team][M27Team.refoPrimaryNavalFactoryByPond][iPond] = oPrimaryFactory
-        if oPrimaryFactory then M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastPrimaryNavalUpdateByPond][iPond] = GetGameTimeSeconds() end
+        if oPrimaryFactory then M27Team.tTeamData[aiBrain.M27Team][M27Team.refiTimeOfLastPrimaryNavalUpdateByPond][iPond] = GetGameTimeSeconds()
+        else
+            --No primary factory - set a base location if we dont have one already
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftBackupBaseLocationByPond][iPond]) then
+                if M27Utilities.IsTableEmpty(tPondDetails[iPond][subrefBuildLocationByStartPosition]) or M27Utilities.IsTableEmpty(tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber]) then
+                    M27Utilities.ErrorHandler('Dont have a build location for our start position, will just set the backup location to be our base')
+                    M27Team.tTeamData[aiBrain.M27Team][M27Team.reftBackupBaseLocationByPond][iPond] = {M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][1], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][2], M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber][3]}
+                else
+
+                    M27Team.tTeamData[aiBrain.M27Team][M27Team.reftBackupBaseLocationByPond][iPond] = {tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber][1], tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber][2], tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber][3]}
+                end
+            end
+        end
+
+        if bDebugMessages == true then LOG(sFunctionRef..': Returning primary naval factory '..(oPrimaryFactory.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oPrimaryFactory) or 'nil')) end
 
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return oPrimaryFactory
@@ -749,6 +773,8 @@ function ReassignNavalEngineer(oEngineer)
     --Intended to give an order to an engineer already assigned to a pond, on a team basis
     --Note - this doesnt decide original assignment - that is done in the main engineer reassignment code; once an engineer has been assigned to pond naval duties though this function takes over
 
+    --if M27EngineerOverseer.GetEngineerUniqueCount(oEngineer) == 21 and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
+
     if bDebugMessages == true then LOG(sFunctionRef..': Start of code, for oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; UC='..M27EngineerOverseer.GetEngineerUniqueCount(oEngineer)..'; Pond assigned='..(oEngineer[refiAssignedPond] or 'nil')..'; Engineer unit state='..M27Logic.GetUnitState(oEngineer)) end
 
     local aiBrain = oEngineer:GetAIBrain()
@@ -758,6 +784,7 @@ function ReassignNavalEngineer(oEngineer)
         oEngineer[refiAssignedPond] = nil
         IssueClearCommands({oEngineer})
         M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+        if bDebugMessages == true then LOG(sFunctionRef..': No naval factory so clearing engineer assigned pond and trackers') end
     else
         local oActionTargetObject
         local iCurLoopCount = 0
@@ -803,9 +830,11 @@ function ReassignNavalEngineer(oEngineer)
 
             if iCurrentConditionToTry == 1 then
                 --Assist primary factory (so it mvoes closer)
-                iActionToAssign = M27EngineerOverseer.refActionAssistNavalFactory
-                oActionTargetObject = oPrimaryFactory
-                iMaxEngisWanted = 100
+                if M27Utilities.GetDistanceBetweenPositions(oPrimaryFactory:GetPosition(), oEngineer:GetPosition()) >= 150 then
+                    iActionToAssign = M27EngineerOverseer.refActionAssistNavalFactory
+                    oActionTargetObject = oPrimaryFactory
+                    iMaxEngisWanted = 100
+                end
             elseif iCurrentConditionToTry == 2 then
                 iActionToAssign = M27EngineerOverseer.refActionAssistNavalFactory --always want some engis assisting naval factory
                 oActionTargetObject = oPrimaryFactory
@@ -817,6 +846,7 @@ function ReassignNavalEngineer(oEngineer)
                     iMaxEngisWanted = 5 * M27UnitInfo.GetUnitTechLevel(oPrimaryFactory)
                     if bHaveLowMass then iMaxEngisWanted = iMaxEngisWanted * 0.5 end
                 end
+                if bDebugMessages == true then LOG(sFunctionRef..': Want to be assisting naval fac with iMaxEngisWanted='..iMaxEngisWanted) end
             elseif iCurrentConditionToTry == 3 then
                 --Lack sonar
                 if not(bHaveLowPower) then
@@ -850,6 +880,7 @@ function ReassignNavalEngineer(oEngineer)
                     end
                 end
             else --Spare action
+                if bDebugMessages == true then LOG(sFunctionRef..': Issuing spare naval action') end
                 iActionToAssign = M27EngineerOverseer.refActionNavalSpareAction
                 iMaxEngisWanted = 100
             end
@@ -906,9 +937,13 @@ function ReassignNavalEngineer(oEngineer)
                     --if are building a factory then check if already have engineer assigned, in which case will assist that
                     if bDebugMessages == true then
                         LOG(sFunctionRef .. ': About to assign ' .. iActionToAssign .. ' action to the engineer ' .. oEngineer.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oEngineer) .. '; UC=' .. M27EngineerOverseer.GetEngineerUniqueCount(oEngineer))
+                        if oActionTargetObject then LOG(sFunctionRef..': oActionTargetObject='..(oActionTargetObject.UnitId..M27UnitInfo.GetUnitLifetimeCount(oActionTargetObject))) end
                     end
 
                     M27EngineerOverseer.AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTargetLocation, oActionTargetObject, iCurrentConditionToTry)
+                else
+                    if bDebugMessages == true then LOG(sFunctionRef..': Too many engineers assigned so will change action to nil') end
+                    iActionToAssign = nil
                 end
             end
 
@@ -923,21 +958,42 @@ end
 function ManageTeamNavy(aiBrain, iTeam, iPond)
     --Decides what to do with our naval units, as well as recording information such as the nearest enemy naval unit
 
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ManageTeamNavy'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
     --Should have already confirmed have friendly units in this pond; check if we have enemy units
     local oClosestEnemyUnit
     local tPondBasePosition = GetPrimaryNavalFactory(aiBrain, iPond)
     if M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond]) == false then
-        for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond] do
-
+        local tOurBase
+        local oPrimaryFactory = GetPrimaryNavalFactory(aiBrain, iPond)
+        if oPrimaryFactory then tOurBase = oPrimaryFactory:GetPosition()
+        else
+            tOurBase = {M27Team.tTeamData[aiBrain.M27Team][M27Team.reftBackupBaseLocationByPond][iPond][1], M27Team.tTeamData[aiBrain.M27Team][M27Team.reftBackupBaseLocationByPond][iPond][2], M27Team.tTeamData[aiBrain.M27Team][M27Team.reftBackupBaseLocationByPond][iPond][3]}
         end
+
+        local iClosestDistance = 100000
+        local oClosestEnemyUnit
+        local iCurDistToOurBase
+        for iUnit, oUnit in M27Team.tTeamData[iTeam][M27Team.reftEnemyUnitsByPond][iPond] do
+            iCurDistToOurBase = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), tOurBase)
+            if iCurDistToOurBase < iClosestDistance then
+                oClosestEnemyUnit = oUnit
+                iClosestDistance = iCurDistToOurBase
+            end
+        end
+        M27Team.tTeamData[aiBrain.M27Team][refoClosestEnemyNavalUnitByPond][iPond] = oClosestEnemyUnit
     end
+
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 
 end
 
 function ManageNavyMainLoop(aiBrain)
     --aiBrain just used for functionality like getting the primary factory that in some cases requires an aibrain
 
-    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ManageNavyMainLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
 
@@ -960,4 +1016,31 @@ function ManageNavyMainLoop(aiBrain)
     end
 
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function GetPondToFocusOn(aiBrain)
+    --Returns nil if no pond to focus on
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'GetPondToFocusOn'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    local iPondWanted = aiBrain[refiAssignedPond] --default
+    local iBestPondDefensiveValue = 0
+    if iPondWanted then iBestPondDefensiveValue = (aiBrain[reftiPondThreatToUs][iPondWanted] or 0) end
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
+        for iPondWithEnemies, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering iPondWithEnemies='..iPondWithEnemies..'; Pond defensive value='..(aiBrain[reftiPondThreatToUs][iPondWithEnemies] or 'nil')..'; iBestPondDefensiveValue='..iBestPondDefensiveValue..'; Is tEnemyUnits empty='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+            if (aiBrain[reftiPondThreatToUs][iPondWithEnemies] or 0) > iBestPondDefensiveValue and M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                --Can we build on this pond easily?
+                if bDebugMessages == true then LOG(sFunctionRef..': Have a pond with a threat to us of '..aiBrain[reftiPondThreatToUs][iPondWithEnemies]..' and enemy units in it. Do we have a build location for this pond='..repru(tPondDetails[iPondWithEnemies][subrefBuildLocationByStartPosition])..'; Our start number='..aiBrain.M27StartPositionNumber) end
+                if M27Utilities.IsTableEmpty(tPondDetails[iPondWithEnemies][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber]) == false then
+                    iPondWanted = iPondWithEnemies
+                    iBestPondDefensiveValue = (aiBrain[reftiPondThreatToUs][iPondWithEnemies] or 0)
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return iPondWanted
 end
