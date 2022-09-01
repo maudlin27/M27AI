@@ -2226,9 +2226,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         if EntityCategoryContains(categories.UEF, oFactory.UnitId) then iT1LifetimeCountWanted = 20
                                         elseif EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) then iT1LifetimeCountWanted = 40
                                         end
+
                                         if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.refCategoryTorpedoLauncher, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])) == false then
                                             iT1LifetimeCountWanted = iT1LifetimeCountWanted * 0.25
                                         end
+
+                                        --Limit based on pond size
+                                        iT1LifetimeCountWanted = math.min(iT1LifetimeCountWanted, math.ceil(M27Navy.tPondDetails[oFactory[M27Navy.refiAssignedPond]][M27Navy.subrefPondSize] / 2500))
                                         if bDebugMessages == true then LOG(sFunctionRef..': iT1LifetimeCountWanted='..iT1LifetimeCountWanted..'; Lifetime count='..M27Conditions.GetLifetimeBuildCount(aiBrain, categories.NAVAL)) end
                                         if M27Conditions.GetLifetimeBuildCount(aiBrain, categories.NAVAL) >= iT1LifetimeCountWanted then
                                             bUpgradeFactoryInstead = true
@@ -2251,8 +2255,9 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     local iCurrentFrigates = 0
                                     local tPondFrigates = EntityCategoryFilterDown(M27UnitInfo.refCategoryFrigate, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                                     if M27Utilities.IsTableEmpty(tPondFrigates) == false then iCurrentFrigates = table.getn(tPondFrigates) end
-                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurrentFrigates='..iCurrentFrigates) end
-                                    if iCurrentFrigates <= 4 then iCategoryToBuild = M27UnitInfo.refCategoryFrigate end
+                                    local iMinFrigatesWanted = math.min(4, math.ceil(M27Navy.tPondDetails[oFactory[M27Navy.refiAssignedPond]][M27Navy.subrefPondSize] / 2500))
+                                    if bDebugMessages == true then LOG(sFunctionRef..': iCurrentFrigates='..iCurrentFrigates..'; iMinFrigatesWanted='..iMinFrigatesWanted) end
+                                    if iCurrentFrigates <= iMinFrigatesWanted then iCategoryToBuild = M27UnitInfo.refCategoryFrigate end
                                 end
                             elseif iCurrentConditionToTry == 6 then --Antisub
                                 if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]]) == false then
