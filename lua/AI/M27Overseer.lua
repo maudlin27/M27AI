@@ -5809,7 +5809,7 @@ function PlatoonNameUpdater(aiBrain, bUpdateCustomPlatoons)
                         iPlatoonCount = 0
                     end
                     local iPlatoonAction = oPlatoon[M27PlatoonUtilities.refiCurrentAction]
-                    if iPlatoonAction == nil then
+                    if iPlatoonAction == nil and not(oPlatoon[M27PlatoonTemplates.refbIdlePlatoon]) then
                         iPlatoonAction = 0
                         M27PlatoonUtilities.UpdatePlatoonName(oPlatoon, sPlatoonName .. iPlatoonCount .. ':Action=' .. iPlatoonAction)
                     end

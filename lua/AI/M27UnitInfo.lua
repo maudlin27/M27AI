@@ -55,6 +55,11 @@ refiLastPathingGroup = 'M27UnitLastPathingGroup' --Last pathing group of the uni
 reftLastLocationOfPathingGroup = 'M27UnitLastLocationOfPathingGroup' --Unit's position when it last had a pathing group with sufficient count
 refoOriginalBrainOwner = 'M27UnitOriginalOwner' --used if transfer unit from one player to another, so can transfer it back later
 refbTreatAsVisible = 'M27UnitTreatAsVisible' --used for unseen T2PD that damages us - means we will calculate threat on it
+reftLastKnownPosition = 'M27UnitLastKnownPosition' --Used for naval units to try and avoid AI cheating while giving it a basic memory
+
+--Order related - used for navy (platoon uses platoon tracking)
+reftLastOrderTarget = 'M27UnitLastOrderTarget' --location of last target (e.g. for issuemove)
+refoLastOrderUnitTarget = 'M27UnitLastUnitOrderTarget' --Unit targeted (e.g. for issueattack)
 
 --Strike damage/coordinated attack (currently used for sniperbots):
 refiDFStrikeDamageAssigned = 'M27UnitDFStrikeDamage' --cumulative value of strike damage assigned to this unit
@@ -71,6 +76,10 @@ reftTMLThreats = 'M27TMLThreats' --[sTMLRef] - returns object number of TML that
 refbCantBuildTMDNearby = 'M27CantBuildTMDNearby'
 refiNearbyTMD = 'M27TMDNearby' --Number of friendly TMD nearby
 
+--Recorded range
+refiDFRange = 'M27UnitDFRange'
+refiIndirectRange = 'M27UnitIndirectRange'
+refiAntiNavyRange = 'M27UnitAntiNavyRange'
 
 --Factions
 refFactionUEF = 1
@@ -736,6 +745,28 @@ function GetUnitMaxGroundRange(oUnit)
     else
         return 0
     end
+end
+
+function GetNavalDirectAndSubRange(oUnit)
+    --Returns higher of units antinavy and directfire range while also updating its antinavy range; also updates indirect range
+    if not(oUnit[refiDFRange]) then
+        local oBP = oUnit:GetBlueprint()
+        local iMaxDFRange = 0
+        local iMaxAntiNavyRange = 0
+        if oBP.Weapon then
+            for iCurWeapon, oCurWeapon in oBP.Weapon do
+                if oCurWeapon.RangeCategory == 'UWRC_DirectFire' then
+                    iMaxDFRange = math.max(iMaxDFRange, oCurWeapon.MaxRadius)
+                elseif oCurWeapon.RangeCategory == 'UWRC_AntiNavy' then
+                    iMaxAntiNavyRange = math.max(iMaxAntiNavyRange, oCurWeapon.MaxRadius)
+                end
+            end
+        end
+        oUnit[refiDFRange] = iMaxDFRange
+        oUnit[refiAntiNavyRange] = iMaxAntiNavyRange
+        oUnit[refiIndirectRange] = GetUnitIndirectRange(oUnit)
+    end
+    return math.max(oUnit[refiDFRange], oUnit[refiAntiNavyRange])
 end
 
 function GetUpgradeBuildTime(oUnit, sUpgradeRef)

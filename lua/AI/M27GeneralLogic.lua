@@ -1977,10 +1977,9 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                         iMassMod = 0
                         if not(bIndirectFireThreatOnly) then
                             if bAntiNavyOnly or bSubmersibleOnly then
-                                if bSubmersibleOnly and not((EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) or oBP.Physics.MotionType == 'RULEUMT_Amphibious')) then
-                                    --iMassMod = 0
-                                else
-                                    iMassMod = 0.25 --e.g. for overlayantinavy
+                                iMassMod = 0
+                                if (bSubmersibleOnly and (EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) or oBP.Physics.MotionType == 'RULEUMT_Amphibious')) or (bAntiNavyOnly and EntityCategoryContains(categories.ANTINAVY+categories.OVERLAYANTINAVY, oUnit.UnitId)) then
+                                    iMassMod = 0.25 --e.g. for overlayantinavy or submersibles with no attack
                                     if EntityCategoryContains(categories.SUBMERSIBLE * categories.ANTINAVY, oUnit.UnitId) then
                                         iMassMod = 1
                                     elseif EntityCategoryContains(categories.LAND * categories.ANTINAVY, oUnit.UnitId) then
@@ -2000,17 +1999,6 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                     elseif EntityCategoryContains(M27UnitInfo.refCategoryMegalith, oUnit.UnitId) then
                                         iMassMod = 0.5
                                     end
-                                    if bAddAntiNavy and iMassMod < 1 and EntityCategoryContains(categories.ANTINAVY  + categories.OVERLAYANTINAVY, oUnit.UnitId) then
-                                        --Increase mass mod for certain units
-                                        if iMassMod < 0.25 then iMassMod = 0.25 end
-                                        if EntityCategoryContains(categories.SUBMERSIBLE + categories.ANTINAVY, oUnit.UnitId) then
-                                            iMassMod = 1 --Subs
-                                        elseif EntityCategoryContains(categories.LAND * categories.ANTINAVY, oUnit.UnitId) then
-                                            iMassMod = math.max(iMassMod, 0.5) --wagners, bricks etc.
-                                        elseif EntityCategoryContains(categories.SUBMERSIBLE * categories.SILO * categories.TECH3, oUnit.UnitId) then
-                                            iMassMod = math.max(iMassMod, 0.25) --missile ship
-                                        end
-                                    end
                                 end
                             elseif bLongRangeThreatOnly then
                                 if EntityCategoryContains(categories.DIRECTFIRE + categories.INDIRECTFIRE, oUnit.UnitId) then
@@ -2021,7 +2009,6 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                                         end
                                     end
                                 end
-
                             else
                                 if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then
                                     if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit.UnitId) then

@@ -4,6 +4,7 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Events = import('/mods/M27AI/lua/AI/M27Events.lua')
+local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 
 refProfilerStart = 0
 refProfilerEnd = 1
@@ -473,7 +474,7 @@ end
 
 function GetAveragePosition(tUnits)
     --returns a table with the average position of tUnits
-    local sFunctionRef = 'GetAveragePosition'
+    --local sFunctionRef = 'GetAveragePosition'
     local tTotalPos = {0,0,0}
     local iUnitCount = 0
     local tCurPos = {}
@@ -486,6 +487,34 @@ function GetAveragePosition(tUnits)
             iUnitCount = iUnitCount + 1
         end
     end
+    return {tTotalPos[1]/iUnitCount, tTotalPos[2]/iUnitCount, tTotalPos[3]/iUnitCount}
+end
+
+function GetAveragePositionOfMultipleTablesOfUnits(tTablesOfUnits)
+    local tTotalPos = {0,0,0}
+    local iUnitCount = 0
+    local tCurPos = {}
+    for iUnitTable, tUnitTable in tTablesOfUnits do
+        LOG('GetAveragePositionOfMultipleTablesOfUnits: Size of tUnitTable='..table.getn(tUnitTable))
+        if IsTableEmpty(tUnitTable) == false then
+            for iUnit, oUnit in tUnitTable do
+                LOG('GetAveragePositionOfMultipleTablesOfUnits: considiring unit '..(oUnit.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oUnit) or 'nil'))
+                if oUnit.GetPosition then
+                    tCurPos = oUnit:GetPosition()
+                    if tCurPos[1] then
+                        for iAxis = 1, 3 do
+                            tTotalPos[iAxis] = tTotalPos[iAxis] + tCurPos[iAxis]
+                        end
+                        iUnitCount = iUnitCount + 1
+                    end
+                end
+            end
+        end
+    end
+    if iUnitCount == 0 then
+        iUnitCount = 1
+        ErrorHandler('No units in the tables of units')
+    end --Avoid error
     return {tTotalPos[1]/iUnitCount, tTotalPos[2]/iUnitCount, tTotalPos[3]/iUnitCount}
 end
 
