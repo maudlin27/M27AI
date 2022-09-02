@@ -304,15 +304,15 @@ function RecordResourceLocations(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNotHydro)
-    -- iArmy is the army number, e.g. 1 for ARMY_1; iMaxDistance is the max distance for a mex to be returned (this only works the first time ever this function is called)
+function RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, bMexNotHydro)
+    -- iStartPositionNumber is the army number, e.g. 1 for ARMY_1; iMaxDistance is the max distance for a mex to be returned (this only works the first time ever this function is called)
     --bMexNotHydro - true if looking for nearby mexes, false if looking for nearby hydros; defaults to true
 
     -- Returns a table containing positions of any mex meeting the criteria, unless bCountOnly is true in which case returns the no. of such mexes
     local sFunctionRef = 'RecordResourceNearStartPosition'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, iArmy='..(iArmy or 'nil')..'; iMaxDistance='..(iMaxDistance or 'nil')..'; bCountOnly='..tostring(bCountOnly or false)..'; bMexNotHydro='..tostring(bMexNotHydro or false)..'; Full PlayerStartPoints table='..repru(PlayerStartPoints)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, iStartPositionNumber='..(iStartPositionNumber or 'nil')..'; iMaxDistance='..(iMaxDistance or 'nil')..'; bCountOnly='..tostring(bCountOnly or false)..'; bMexNotHydro='..tostring(bMexNotHydro or false)..'; Full PlayerStartPoints table='..repru(PlayerStartPoints)..'; GameTime='..GetGameTimeSeconds()) end
     if iMaxDistance == nil then iMaxDistance = 12 end --NOTE: As currently only run the actual code to locate nearby mexes once, the first iMaxDistance will determine what to use, and any subsequent uses it wont matter
     if bMexNotHydro == nil then bMexNotHydro = true end
     if bCountOnly == nil then bCountOnly = false end
@@ -320,26 +320,27 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
     local iResourceType = 1 --1 = mex, 2 = hydro
     if bMexNotHydro == false then iResourceType = 2 end
 
-    if tResourceNearStart[iArmy] == nil then tResourceNearStart[iArmy] = {} end
+    if tResourceNearStart[iStartPositionNumber] == nil then tResourceNearStart[iStartPositionNumber] = {} end
 
-    if tResourceNearStart[iArmy][iResourceType] == nil then
+    if tResourceNearStart[iStartPositionNumber][iResourceType] == nil then
         --Haven't determined nearby resource yet
         local iDistance = 0
-        local pStartPos =  PlayerStartPoints[iArmy]
+        local pStartPos =  PlayerStartPoints[iStartPositionNumber]
 
-        tResourceNearStart[iArmy][iResourceType] = {}
+        tResourceNearStart[iStartPositionNumber][iResourceType] = {}
         local AllResourcePoints = {}
         if bMexNotHydro then AllResourcePoints = MassPoints
         else AllResourcePoints = HydroPoints end
 
         if not(AllResourcePoints == nil) then
+            if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through all resource points to find mexes near start position='..repru(pStartPos)..' for start position number='..iStartPositionNumber..'; PlayerStartPoints='..repru(PlayerStartPoints)) end
             for key,pResourcePos in AllResourcePoints do
                 iDistance = M27Utilities.GetDistanceBetweenPositions(pStartPos, pResourcePos)
                 if iDistance <= iMaxDistance then
                     if bDebugMessages == true then LOG('Found position near to start; iDistance='..iDistance..'; imaxDistance='..iMaxDistance..'; pStartPos[1][3]='..pStartPos[1]..'-'..pStartPos[3]..'; pResourcePos='..pResourcePos[1]..'-'..pResourcePos[3]..'; bMexNotHydro='..tostring(bMexNotHydro)) end
                     iResourceCount = iResourceCount + 1
-                    if tResourceNearStart[iArmy][iResourceType][iResourceCount] == nil then tResourceNearStart[iArmy][iResourceType][iResourceCount] = {} end
-                    tResourceNearStart[iArmy][iResourceType][iResourceCount] = pResourcePos
+                    if tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] == nil then tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] = {} end
+                    tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] = pResourcePos
                 end
             end
         end
@@ -347,29 +348,29 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
     if bCountOnly == false then
         --Create a table of nearby resource locations:
         local NearbyResourcePos = {}
-        for iCurResource, v in tResourceNearStart[iArmy][iResourceType] do
+        for iCurResource, v in tResourceNearStart[iStartPositionNumber][iResourceType] do
             NearbyResourcePos[iResourceCount] = v
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+        if bDebugMessages == true then LOG(sFunctionRef..': End of code. tResourceNearStart='..repru(tResourceNearStart)) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return NearbyResourcePos
     else
         iResourceCount = 0
-        for iCurResource, v in tResourceNearStart[iArmy][iResourceType] do
+        for iCurResource, v in tResourceNearStart[iStartPositionNumber][iResourceType] do
             iResourceCount = iResourceCount + 1
             if bDebugMessages == true then LOG('valid resource location iResourceCount='..iResourceCount..'; v[1-3]='..v[1]..'-'..v[2]..'-'..v[3]) end
         end
-        if bDebugMessages == true then LOG('RecordResourceNearStartPosition: iResourceCount='..iResourceCount..'; bmexNotHydro='..tostring(bMexNotHydro)..'; iMaxDistance='..iMaxDistance) end
+        if bDebugMessages == true then LOG('RecordResourceNearStartPosition: iResourceCount='..iResourceCount..'; bmexNotHydro='..tostring(bMexNotHydro)..'; iMaxDistance='..iMaxDistance..'; tResourceNearStart='..repru(tResourceNearStart)) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iResourceCount
     end
 end
-function RecordMexNearStartPosition(iArmy, iMaxDistance, bCountOnly)
-    return RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, true)
+function RecordMexNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly)
+    return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, true)
 end
 
-function RecordHydroNearStartPosition(iArmy, iMaxDistance, bCountOnly)
-    return RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, false)
+function RecordHydroNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly)
+    return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, false)
 end
 
 function RecordPlayerStartLocations()

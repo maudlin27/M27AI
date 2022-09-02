@@ -7926,9 +7926,15 @@ function RecordAllEnemiesAndAllies(aiBrain)
                 iCountOfTeamsWithSamePathingGroup = iCountOfTeamsWithSamePathingGroup + 1
             end
         end
+
+        --Update pathing and check have recorded nearby resources
         for iBrain, oBrain in tAllAIBrainsByArmyIndex do
             if IsBrainInSamePathingGroup(oBrain) then
                 oBrain[refiTeamsWithSameAmphibiousPathingGroup] = iCountOfTeamsWithSamePathingGroup
+            end
+            if GetGameTimeSeconds() <= 20 and not(M27Logic.IsCivilianBrain(oBrain)) and (not(M27MapInfo.tResourceNearStart[oBrain.M27StartPositionNumber]) or M27Utilities.IsTableEmpty(M27MapInfo.tResourceNearStart[oBrain.M27StartPositionNumber][1])) then
+                if bDebugMessages == true then LOG(sFunctionRef..': About to update nearby mex locations for brain '..oBrain.Nickname..'; Army index='..oBrain:GetArmyIndex()..'; Start pos='..oBrain.M27StartPositionNumber) end
+                ForkThread(M27MapInfo.RecordMexNearStartPosition, oBrain.M27StartPositionNumber, 26)
             end
         end
 

@@ -836,6 +836,10 @@ function OnWeaponFired(oWeapon)
                 end
 
                 ForkThread(M27UnitMicro.DodgeBomb, oUnit, oWeapon, nil)
+            else
+                --Dodge logic for certain other attacks (conditions for this are in considerdodgingshot)
+                if bDebugMessages == true then LOG(sFunctionRef..': Will consider whether we want to dodge the shot') end
+                ForkThread(M27UnitMicro.ConsiderDodgingShot, oUnit, oWeapon)
             end
 
             --Overcharge
@@ -855,13 +859,16 @@ function OnWeaponFired(oWeapon)
                 end
             end
 
+
             if oUnit:GetAIBrain().M27AI then
                 --T3 and experimental arti
+                if bDebugMessages == true then LOG(sFunctionRef..': Shot just fired by '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Weapon range category='..oWeapon.Blueprint.RangeCategory or 'nil') end
                 if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oUnit.UnitId) then
                     ForkThread(M27Logic.GetT3ArtiTarget, oUnit)
-                    --DF units whose shot is blocked
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryDFTank, oUnit.UnitId) then
-                    --Get weapon target
+                    --DF units whose DF shot is blocked
+                elseif oWeapon.Blueprint.RangeCategory == 'UWRC_DirectFire' and EntityCategoryContains(M27UnitInfo.refCategoryDFTank + M27UnitInfo.refCategoryNavalSurface * categories.DIRECTFIRE + M27UnitInfo.refCategorySeraphimDestroyer - M27UnitInfo.refCategoryMissileNavy, oUnit.UnitId) then
+                    --Get weapon target if it is a DF weapon
+                    --if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, oUnit.UnitId) then bDebugMessages = true LOG('reprs of weapon='..reprs(oWeapon)..'; will now do log of the weapon blueprint='..reprs(oWeapon.Blueprint)) end
                     local oTarget = oWeapon:GetCurrentTarget()
                     if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has just fired a shot. Do we have a valid target for our weapon='..tostring(M27UnitInfo.IsUnitValid(oTarget))..'; time last shot was blocked='..(oUnit[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
                     if M27UnitInfo.IsUnitValid(oTarget) then

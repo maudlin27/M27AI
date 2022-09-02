@@ -205,7 +205,8 @@ refCategoryTransport = categories.AIR * categories.TRANSPORTATION - categories.U
 
 --Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
-refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE
+refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE --NOTE: This includes structures (e.g. torp launcher and factory)
+refCategoryMobileNavalSurface = refCategoryNavalSurface * categories.MOBILE
 refCategoryAllNavy = categories.NAVAL
 refCategoryNavalAA = refCategoryAllNavy * categories.ANTIAIR
 refCategoryCruiser = categories.NAVAL * categories.CRUISER

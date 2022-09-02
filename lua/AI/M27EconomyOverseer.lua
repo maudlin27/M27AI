@@ -749,18 +749,22 @@ function UpgradeUnit(oUnitToUpgrade, bUpdateUpgradeTracker, bDontUpdateHQTracker
 
     if sUpgradeID then
         local aiBrain = oUnitToUpgrade:GetAIBrain()
+        if bDebugMessages == true then LOG(sFunctionRef..': About to issue ugprade to unit '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..'; Current state='..M27Logic.GetUnitState(oUnitToUpgrade)..'; Work progress='..(oUnitToUpgrade:GetWorkProgress() or 'nil')..'; Is unit upgrading='..tostring(oUnitToUpgrade:IsUnitState('Upgrading'))) end
 
-        --Factory specific - if work progress is <=5% then cancel so can do the upgrade
-        if EntityCategoryContains(M27UnitInfo.refCategoryAllFactories, oUnitToUpgrade.UnitId) then
-            if bDebugMessages == true then LOG(sFunctionRef..': Are upgrading a factory '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..'; work progress='..oUnitToUpgrade:GetWorkProgress()) end
-            if oUnitToUpgrade.GetWorkProgress and oUnitToUpgrade:GetWorkProgress() <= 0.05 then
-                IssueClearCommands({ oUnitToUpgrade })
-                if bDebugMessages == true then LOG(sFunctionRef..': Have barely started with current construction so will cancel so can get upgrade sooner') end
+        if not(oUnitToUpgrade:IsUnitState('Upgrading')) then
+
+            --Factory specific - if work progress is <=5% then cancel so can do the upgrade
+            if EntityCategoryContains(M27UnitInfo.refCategoryAllFactories, oUnitToUpgrade.UnitId) then
+                if bDebugMessages == true then LOG(sFunctionRef..': Are upgrading a factory '..oUnitToUpgrade.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToUpgrade)..'; work progress='..oUnitToUpgrade:GetWorkProgress()) end
+                if oUnitToUpgrade.GetWorkProgress and oUnitToUpgrade:GetWorkProgress() <= 0.05 then
+                    IssueClearCommands({ oUnitToUpgrade })
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have barely started with current construction so will cancel so can get upgrade sooner') end
+                end
             end
-        end
 
-        --Issue upgrade
-        IssueUpgrade({ oUnitToUpgrade }, sUpgradeID)
+            --Issue upgrade
+            IssueUpgrade({ oUnitToUpgrade }, sUpgradeID)
+        end
 
         --Clear any pausing of the unit
         if M27UnitInfo.IsUnitValid(oUnitToUpgrade) then
@@ -2442,20 +2446,29 @@ function UpgradeMainLoop(aiBrain)
                                                     oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryFixedShield * categories.TECH2 + M27UnitInfo.refCategoryFixedShield * categories.TECH3 * categories.CYBRAN * categories.CQUEMOV, tStartPosition)
                                                 end
                                                 if oUnitToUpgrade == nil then
-                                                    --Consider whether to show an error message or not
+                                                    --Consider upgrading naval factory
+                                                    if aiBrain[refiMassGrossBaseIncome] >= 5 then
+                                                        oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryNavalFactory * categories.TECH1, tStartPosition)
+                                                        if not(oUnitToUpgrade) and aiBrain[refiMassGrossBaseIncome] >= 10 then
+                                                            oUnitToUpgrade = GetUnitToUpgrade(aiBrain, M27UnitInfo.refCategoryNavalFactory * categories.TECH2, tStartPosition)
+                                                        end
+                                                    end
+                                                    if not(oUnitToUpgrade) then
 
-                                                    --FOR DEBUG ONLY: Is it unexpected that there is nothing to upgrade?
 
-                                                    --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
-                                                    if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 150 then
-                                                        --Do we have any T1 or T2 factories or mexes within 100 of our base? If not, then we have presumably run out of units to upgrade
-                                                        local tNearbyUpgradables = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryMex - categories.TECH3 - categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 100, 'Ally')
-                                                        if M27Utilities.IsTableEmpty(tNearbyUpgradables) == false then
-                                                            --Do we own any of these
-                                                            for iUpgradable, oUpgradable in tNearbyUpgradables do
-                                                                if oUpgradable:GetAIBrain() == aiBrain and not (oUpgradable:IsUnitState('Upgrading')) then
-                                                                    M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; oUpgradable='..oUpgradable.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUpgradable)..'; Unit state='..M27Logic.GetUnitState(oUpgradable)..'; nearest enemy to base=' .. math.floor(aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) .. '; Have a T2 or below mex or factory within 100 of our base, which includes ' .. oUpgradable.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUpgradable), nil, true)
-                                                                    break
+                                                        --FOR DEBUG ONLY: Is it unexpected that there is nothing to upgrade?
+
+                                                        --Do we have enemies within 100 of our base? if so then this is probably why we cant find anything to upgrade as buildings check no enemies within 90
+                                                        if M27Utilities.IsTableEmpty(aiBrain[reftActiveHQUpgrades]) and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] > 150 then
+                                                            --Do we have any T1 or T2 factories or mexes within 100 of our base? If not, then we have presumably run out of units to upgrade
+                                                            local tNearbyUpgradables = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllFactories + M27UnitInfo.refCategoryMex - categories.TECH3 - categories.EXPERIMENTAL, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 100, 'Ally')
+                                                            if M27Utilities.IsTableEmpty(tNearbyUpgradables) == false then
+                                                                --Do we own any of these
+                                                                for iUpgradable, oUpgradable in tNearbyUpgradables do
+                                                                    if oUpgradable:GetAIBrain() == aiBrain and not (oUpgradable:IsUnitState('Upgrading')) then
+                                                                        M27Utilities.ErrorHandler('Couldnt find unit to upgrade after trying all backup options; oUpgradable='..oUpgradable.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUpgradable)..'; Unit state='..M27Logic.GetUnitState(oUpgradable)..'; nearest enemy to base=' .. math.floor(aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) .. '; Have a T2 or below mex or factory within 100 of our base, which includes ' .. oUpgradable.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUpgradable), nil, true)
+                                                                        break
+                                                                    end
                                                                 end
                                                             end
                                                         end
