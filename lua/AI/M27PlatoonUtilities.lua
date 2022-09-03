@@ -2386,7 +2386,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
+    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1380 and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end
@@ -2531,7 +2531,19 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                 iCurrentHealth = iCurrentHealth + 2000
                             end
                             if oPlatoon[refbNeedToHeal] == true then
-                                iHealthToRunOn = math.max(6250, math.min(iHealthToRunOn + 750, oACU:GetMaxHealth() * 0.98))
+                                --If worried about air snipe then only do this if ACU is within 75 of an air rally point or 150 of base
+                                local bCapHealthToRunOn = true
+                                if aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] then
+                                    local tAirRallyPoint = M27AirOverseer.GetAirRallyPoint(aiBrain)
+                                    if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), tAirRallyPoint) >= 75 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 150 then
+                                        bCapHealthToRunOn = false
+                                    end
+                                end
+                                if bCapHealthToRunOn then
+                                    iHealthToRunOn = math.max(6250, math.min(iHealthToRunOn + 750, oACU:GetMaxHealth() * 0.98))
+                                else
+                                    iHealthToRunOn = math.max(6250, iHealthToRunOn)
+                                end
                             end
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Checking if ACU health is low enough that it should run.  refbNeedToHeal=' .. tostring(oPlatoon[refbNeedToHeal]) .. '; iHealthToRunOn=' .. iHealthToRunOn .. '; iCurrentHealth=' .. iCurrentHealth .. '; M27Overseer.iACUEmergencyHealthPercentThreshold=' .. M27Overseer.iACUEmergencyHealthPercentThreshold .. '; ACU health %=' .. M27UnitInfo.GetUnitHealthPercent(oACU))
@@ -2596,8 +2608,19 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                     if bDebugMessages == true then LOG(sFunctionRef..': If are vulnerable to an air snipe and are more than 150 from base, will look for rally point nearest air rally point.  Dist to air rally point='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27AirOverseer.GetAirRallyPoint(aiBrain))..'; Dist to base='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; aiBrain[M27Overseer.refbACUVulnerableToAirSnipe]='..tostring(aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] or false)) end
                                     if aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 150 then
                                         if aiBrain[M27AirOverseer.refbHaveAirControl] then
-                                            oPlatoon[refiCurrentAction] = refActionGoToRallyPointNearAir
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Basing rally point on the one nearest the air rally point') end
+                                            --Do we have at least 4 AirAA units available?
+                                            local iAirAAAvailable = 0
+                                            if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false then
+                                                iAirAAAvailable = table.getn(aiBrain[M27AirOverseer.reftAvailableAirAA])
+                                            end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': iAirAAAvailable='..iAirAAAvailable..'; Is table of available airaa empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]))..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]) end
+                                            if iAirAAAvailable >= 4 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1200 then
+                                                oPlatoon[refiCurrentAction] = refActionGoToRallyPointNearAir
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Basing rally point on the one nearest the air rally point') end
+                                            else
+                                                oPlatoon[refiCurrentAction] = refActionReturnToBase
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Dont have much available AirAA so will return to base to be safe') end
+                                            end
                                         else
                                             oPlatoon[refiCurrentAction] = refActionReturnToBase
                                             if bDebugMessages == true then LOG(sFunctionRef..': Will return to base') end
@@ -5330,7 +5353,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                             if bDebugMessages == true then LOG(sFunctionRef..': Pathing has changed') end
                             iCurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], oPlatoon[refoFrontUnit]:GetPosition())
                         else
-                            M27Utilities.ErrorHandler(sFunctionRef..': Likely pathing error for unit '..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit]))
+                            M27Utilities.ErrorHandler(sFunctionRef..': Likely pathing error for unit')
                         end
                     elseif bDebugMessages == true then LOG(sFunctionRef..': Prev group had insufficient count so wont recheck pathing')
                     end
@@ -9908,6 +9931,7 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveNearConstruction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    --if EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, sBlueprintID) then bDebugMessages = true end
     --if oBuilder == M27Utilities.GetACU(aiBrain) then bDebugMessages = true end
     if bDebugMessages == true then
         local sBuilderName = oBuilder.UnitId
@@ -9944,13 +9968,73 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
     if iCurrentDistanceFromTarget > iDistanceWantedFromTarget then
         --Add slight buffer so move into place:
         if bDebugMessages == true then LOG(sFunctionRef..': About to get move position near the target '..repru(tLocation)..'; iCurrentDistanceFromTarget='..iCurrentDistanceFromTarget..'; iDistanceWantedFromTarget='..iDistanceWantedFromTarget..'; will decrease distance wanted very slightly; tBuilderLocation='..repru(tBuilderLocation)) end
-        iDistanceWantedFromTarget = iDistanceWantedFromTarget - 0.25
+        iDistanceWantedFromTarget = iDistanceWantedFromTarget - 0.25 --NOTE: If changing this, then also consider if the below adjustment for naval factories with cliffs needs changing
 
         --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceWantedFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions)
         local iMinDistanceFromCurrentBuilderMoveTarget = 2 --dont want to change movement path from the one generated if it's not that different
 
         --tPossibleTarget = GetPositionNearTargetInSamePathingGroup(tBuilderLocation, tLocation, iDistanceWantedFromTarget, 0, oBuilder, 1, true, true, iMinDistanceFromCurrentBuilderMoveTarget)
         tPossibleTarget = GetPositionAtOrNearTargetInPathingGroup(tBuilderLocation, tLocation, iDistanceWantedFromTarget, 0, oBuilder, true, true, iMinDistanceFromCurrentBuilderMoveTarget)
+
+        --Adjust further for naval factory to facilitate greater cliff-building
+        if tPossibleTarget and EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, sBlueprintID) then
+            --If we move from Possible target towards our currnet position do we come across a cliff very soon?
+
+            local bHaveCliff = false
+
+            local iAngleFromMoveTarget = M27Utilities.GetAngleFromAToB(tPossibleTarget, tBuilderLocation)
+
+            local iMaxCliffSearchRange = 15 + math.floor(iBuildDistance)
+            local sPathing = M27UnitInfo.GetUnitPathingType(oBuilder)
+            local iEngiPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tBuilderLocation)
+            function IsCliffBlockingTarget(tTarget)
+                local iDistToMoveTarget = M27Utilities.GetDistanceBetweenPositions(tBuilderLocation, tTarget)
+                local tCliffPositionCheck
+                if iDistToMoveTarget > 1 then
+                    for iDistAdjust = 1, math.min(iMaxCliffSearchRange, math.floor(iDistToMoveTarget)) do
+                        tCliffPositionCheck = M27Utilities.MoveInDirection(tPossibleTarget, iAngleFromMoveTarget, iDistAdjust, true, false)
+                        if not(M27MapInfo.GetSegmentGroupOfLocation(sPathing, tCliffPositionCheck) == iEngiPathingGroup) then
+                            return true
+                        end
+                    end
+                end
+                return false
+            end
+            if bDebugMessages == true then LOG(sFunctionRef..': Building naval factory, IsCliffBlockingTarget(tPossibleTarget='..tostring(IsCliffBlockingTarget(tPossibleTarget))..'; tPossibleTarget='..repru(tPossibleTarget)..'; tLocation (of where we want to build)='..repru(tLocation)) end
+            if IsCliffBlockingTarget(tPossibleTarget) then
+                --Can we get any closer to our build distance if we broaden the angle range?  Also increase the distance slightly
+                iDistanceWantedFromTarget = iDistanceWantedFromTarget + 0.1
+                local iAngleToEngi = M27Utilities.GetAngleFromAToB(tLocation, tBuilderLocation)
+                local tReplacementTarget
+                local tPathingPosition
+                if bDebugMessages == true then LOG(sFunctionRef..': About to try different positions from tLocation '..repru(tLocation)..' to tBuilderLocation '..repru(tBuilderLocation)..'; Angle to here='..iAngleToEngi..'; iDistanceWantedFromTarget='..iDistanceWantedFromTarget) end
+                for iAngleAdjust = 0, 40, 8 do
+                    for iAngleFactor = -1, 1, 2 do
+                                                    --MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds, bTravelUnderwater)
+                        tPathingPosition = M27Utilities.MoveInDirection(tLocation, iAngleToEngi + iAngleAdjust * iAngleFactor, iDistanceWantedFromTarget, true, false)
+                        if bDebugMessages == true then
+
+                            local iColour = 3
+                            if M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPathingPosition) == iEngiPathingGroup and not(IsCliffBlockingTarget(tPathingPosition)) then iColour = 7 end
+                            LOG(sFunctionRef..': Considering tPathingPosition='..repru(tPathingPosition)..'; iAngleAdjust='..iAngleAdjust * iAngleFactor..'; Pathing group='..M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPathingPosition)..'; Engi pathing group='..iEngiPathingGroup..'; Is cliff blocking target='..tostring(IsCliffBlockingTarget(tPathingPosition))..'; will draw match in white, nonmatch in black. iColour='..iColour..'; Dist from original move target planned='..M27Utilities.GetDistanceBetweenPositions(tPathingPosition, tPossibleTarget))
+                            M27Utilities.DrawLocation(tPathingPosition, false, iColour, 200)
+                        end
+                        if M27MapInfo.GetSegmentGroupOfLocation(sPathing, tPathingPosition) == iEngiPathingGroup and not(IsCliffBlockingTarget(tPathingPosition)) then
+                            tReplacementTarget = tPathingPosition
+                        end
+
+                        if iAngleAdjust == 0 or tReplacementTarget then break end
+                    end
+                    if tReplacementTarget then break end
+                end
+                if tReplacementTarget then
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have a replacement position to use') end
+                    tPossibleTarget = {tReplacementTarget[1], tReplacementTarget[2], tReplacementTarget[3]}
+
+                end
+            end
+        end
+
 
         if tPossibleTarget == nil then
             if bDebugMessages == true then LOG(sFunctionRef..': Cant get a nearby location for target; will return tLocation if can path to it') end

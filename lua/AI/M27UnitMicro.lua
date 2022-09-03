@@ -71,11 +71,13 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
 
     local tTempLocationToMove
 
-    oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+    TrackTemporaryUnitMicro(oUnit, iTimeToRun)
+
+    --[[oUnit[M27UnitInfo.refbSpecialMicroActive] = true
     if oUnit.PlatoonHandle then
         oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
     end
-    M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
+    M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
 
     if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; iTimeToRun='..iTimeToRun..'; iCurFacingDirection='..iCurFacingDirection..'; iAngleFromUnitToBomb='..iAngleFromUnitToBomb..'; iFacingAngleWanted='..iFacingAngleWanted..'; tUnitStartPosition='..repru(oUnit:GetPosition())..'; tPositionToRunFrom='..repru(tPositionToRunFrom)) end
     IssueClearCommands({oUnit})
@@ -142,11 +144,14 @@ function MoveAwayFromTargetTemporarily(oUnit, iTimeToRun, tPositionToRunFrom)
         if bDebugMessages == true then LOG(sFunctionRef..': Starting bomber dodge for unit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; tNewTargetInSameGroup='..repru(tNewTargetInSameGroup)) end
         --IssueClearCommands({oUnit})
         IssueMove({oUnit}, tNewTargetInSameGroup)
-        oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+
+        TrackTemporaryUnitMicro(oUnit, iTimeToRun)
+
+        --[[oUnit[M27UnitInfo.refbSpecialMicroActive] = true
         if oUnit.PlatoonHandle then
             oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
         end
-        M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
+        M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -186,11 +191,13 @@ function ForkedMoveInHalfCircle(oUnit, iTimeToRun, tPositionToRunFrom)
 
     local tTempLocationToMove
 
-    oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+    TrackTemporaryUnitMicro(oUnit, iTimeToRun)
+
+    --[[oUnit[M27UnitInfo.refbSpecialMicroActive] = true
     if oUnit.PlatoonHandle then
         oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
     end
-    M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
+    M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
 
     if bDebugMessages == true then LOG(sFunctionRef..': About to start main loop for move commands; iTimeToRun='..iTimeToRun..'; iStartTime='..iStartTime..'; iCurFacingDirection='..iCurFacingDirection..'; iAngleToTargetToEscape='..iAngleToTargetToEscape..'; iFacingAngleWanted='..iFacingAngleWanted..'; tUnitStartPosition='..repru(tUnitStartPosition)) end
     IssueClearCommands({oUnit})
@@ -282,11 +289,12 @@ function ForkedMoveInCircle(oUnit, iTimeToRun, bDontTreatAsMicroAction, bDontCle
 
 
     if not(bDontTreatAsMicroAction) then
-        oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+        TrackTemporaryUnitMicro(oUnit, iTimeToRun)
+        --[[oUnit[M27UnitInfo.refbSpecialMicroActive] = true
         if oUnit.PlatoonHandle then
             oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
         end
-        M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)
+        M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToRun)--]]
     end
     local bRecentMicro = false
     local iRecentMicroThreshold = 1
@@ -374,13 +382,16 @@ function MoveInOppositeDirectionTemporarily(oUnit, iTimeToMove)
             if oUnit[M27UnitInfo.refbSpecialMicroActive] and iGameTime - oUnit[M27UnitInfo.refiGameTimeMicroStarted] < iRecentMicroThreshold then bRecentMicro = true end
             if bRecentMicro == false then IssueClearCommands({oUnit}) end
             IssueMove({oUnit}, tNewTargetInSameGroup)
-            oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+
+            TrackTemporaryUnitMicro(oUnit, iTimeToMove)
+
+            --[[oUnit[M27UnitInfo.refbSpecialMicroActive] = true
             oUnit[M27UnitInfo.refiGameTimeToResetMicroActive] = iGameTime + iTimeToMove
             if oUnit.PlatoonHandle then
                 oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
             end
 
-            M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToMove, M27UnitInfo.refiGameTimeToResetMicroActive, oUnit[M27UnitInfo.refiGameTimeToResetMicroActive])
+            M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeToMove, M27UnitInfo.refiGameTimeToResetMicroActive, oUnit[M27UnitInfo.refiGameTimeToResetMicroActive])--]]
         end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
@@ -427,6 +438,116 @@ function GetBombTarget(weapon, projectile)
         if weapon:GetCurrentTarget().GetPosition then return weapon:GetCurrentTarget():GetPosition() end
     end
     return nil
+end
+
+function TrackTemporaryUnitMicro(oUnit, iTimeActiveFor)
+    --Where we are doing all actions upfront can call this to enable micro and then turn the flag off after set period of time
+    --Note that air logic currently doesnt make use of this
+
+    oUnit[M27UnitInfo.refbSpecialMicroActive] = true
+    oUnit[M27UnitInfo.refiGameTimeMicroStarted] = GetGameTimeSeconds()
+    oUnit[M27UnitInfo.refiGameTimeToResetMicroActive] = GetGameTimeSeconds() + iTimeActiveFor
+    --Navy tracking - clear last unit target since are only moving to its location not attacking
+    oUnit[M27UnitInfo.refoLastOrderUnitTarget] = nil
+
+    M27Utilities.DelayChangeVariable(oUnit, M27UnitInfo.refbSpecialMicroActive, false, iTimeActiveFor - 0.01)
+
+    if oUnit.PlatoonHandle then
+        oUnit.PlatoonHandle[M27UnitInfo.refbSpecialMicroActive] = true
+        M27Utilities.DelayChangeVariable(oUnit.PlatoonHandle, M27UnitInfo.refbSpecialMicroActive, false, iTimeActiveFor - 0.01)
+    end
+end
+
+function DodgeShot(oTarget, oWeapon, oAttacker, iTimeToDodge)
+    --Should have already checked oTarget is a valid unit that has a chance of dodging the shot in time before claling this
+    --Gets unit to move at a slightly different angle to its current facing direction for iTimeToDodge
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'DodgeShot'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    local oNavigator = oTarget:GetNavigator()
+    local tCurDestination
+    if oNavigator and oNavigator.GetCurrentTargetPos then
+        tCurDestination = oNavigator:GetCurrentTargetPos()
+    else
+        tCurDestination = oAttacker:GetPosition()
+    end
+    local iCurFacingAngle = M27UnitInfo.GetUnitFacingAngle(oTarget)
+    local iAngleToDestination = M27Utilities.GetAngleFromAToB(oTarget:GetPosition(), tCurDestination)
+    local oBP = oTarget:GetBlueprint()
+    local iSpeed = oBP.Physics.MaxSpeed
+    local iDistanceToRun = iTimeToDodge * iSpeed
+    local iAngleAdjust = math.max(15, oBP.Physics.TurnRate * 0.3)
+    if M27Utilities.GetAngleDifference(iCurFacingAngle + iAngleAdjust, iAngleToDestination) > M27Utilities.GetAngleDifference(iCurFacingAngle - iAngleAdjust, iAngleToDestination) then
+        iAngleAdjust = iAngleAdjust * -1
+    end
+
+    local tTempDestination = M27Utilities.MoveInDirection(oTarget:GetPosition(), iCurFacingAngle + iAngleAdjust, iDistanceToRun, true, false)
+    local bAttackMove = false
+    local iLastOrder = (oTarget[M27PlatoonUtilities.refiLastOrderType] or oTarget.PlatoonHandle[M27PlatoonUtilities.refiLastOrderType])
+    if iLastOrder and (iLastOrder == M27PlatoonUtilities.refiOrderIssueAttack or iLastOrder == M27PlatoonUtilities.refiOrderIssueAggressiveMove or iLastOrder == M27PlatoonUtilities.refiOrderIssueAggressiveFormMove) then
+        bAttackMove = true
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; clearing current orders which have a possible destination of '..repru(tCurDestination)..'; and giving an order to move to '..repru(tTempDestination)..'; Dist from our position to temp position='..M27Utilities.GetDistanceBetweenPositions(oTarget:GetPosition(), tTempDestination)) end
+    IssueClearCommands({oTarget})
+    TrackTemporaryUnitMicro(oTarget, iTimeToDodge)
+    IssueMove({oTarget}, tTempDestination)
+    --Also send an order to go to the destination that we had before
+    if bAttackMove then
+        IssueAggressiveMove({oTarget}, tCurDestination)
+    else
+        IssueMove({oTarget}, tCurDestination)
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
+
+function ConsiderDodgingShot(oUnit, oWeapon)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ConsiderDodgingShot'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+    if bDebugMessages == true then
+        LOG(sFunctionRef..': Just fired, oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
+        if oWeapon.GetCurrentTarget then
+            LOG(sFunctionRef..': Is current target valid='..tostring(M27UnitInfo.IsUnitValid(oWeapon:GetCurrentTarget()))..'; Weapon category='..oWeapon.Blueprint.WeaponCategory)
+        else
+            LOG(sFunctionRef..': Dont have a current target for this weapon')
+        end
+    end
+
+    if oWeapon.GetCurrentTarget and (oWeapon.Blueprint.WeaponCategory == 'Direct Fire' or oWeapon.Blueprint.WeaponCategory == 'Direct Fire Naval' or (oWeapon.Blueprint.WeaponCategory == 'Artillery' and EntityCategoryContains(categories.TECH1, oUnit.UnitId))) then
+        local oTarget = oWeapon:GetCurrentTarget()
+
+        if M27UnitInfo.IsUnitValid(oTarget) and oTarget:GetAIBrain().M27AI then
+            if bDebugMessages == true then LOG(sFunctionRef..': oTarget='..oTarget.UnitId..M27UnitInfo.GetUnitLifetimeCount(oTarget)..'; Is special micro active='..tostring(oTarget[M27UnitInfo.refbSpecialMicroActive] or false)..'; Is the target mobile non-shield='..tostring(EntityCategoryContains(categories.MOBILE - categories.AIR - categories.SHIELD, oTarget.UnitId))..'; Target unit state='..M27Logic.GetUnitState(oTarget)) end
+            if not(oTarget[M27UnitInfo.refbSpecialMicroActive]) and EntityCategoryContains(categories.MOBILE - categories.AIR - categories.SHIELD, oTarget.UnitId) and not(oTarget:IsUnitState('Upgrading')) then
+                --Does the shot do enough damage that we want to try and doge it?
+                if bDebugMessages == true then LOG(sFunctionRef..': Weapon damage='..oWeapon.Blueprint.Damage..'; Target health='..oTarget:GetHealth()) end
+                if oWeapon.Blueprint.Damage / oTarget:GetHealth() >= 0.01 then
+                    --Do we think we can dodge the shot?
+                    local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTarget:GetPosition())
+                    if oWeapon.Blueprint.WeaponCategory == 'Artillery' then iDistToTarget = iDistToTarget + 15 end
+                    local iShotSpeed = oWeapon.Blueprint.MuzzleVelocity
+                    local iTimeUntilImpact = iDistToTarget / iShotSpeed
+                    if bDebugMessages == true then LOG(sFunctionRef..': Dist to target='..iDistToTarget..'; Shot speed='..iShotSpeed..'; iTimeUntilImpact='..iTimeUntilImpact) end
+                    if iTimeUntilImpact > 0.7 then
+                        --If we are a large unit then only dodge if will be a while for the shot to hit
+                        local oBP = oTarget:GetBlueprint()
+                        local iAverageSize = (oBP.SizeX + oBP.SizeZ) * 0.5
+                        if bDebugMessages == true then LOG(sFunctionRef..': iAverageSize='..iAverageSize..'; Is unit underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oUnit))..'; Unit speed='..oBP.Physics.MaxSpeed) end
+                        if iTimeUntilImpact > 0.35 + iAverageSize * 1.5 / oBP.Physics.MaxSpeed then
+                            --Are we not underwater?
+                            if not(M27UnitInfo.IsUnitUnderwater(oUnit)) then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Will try to dodge shot') end
+                                DodgeShot(oTarget, oUnit, oWeapon, iTimeUntilImpact)
+                            end
+                        end
+                    end
+                end
+            end
+
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
 function DodgeBomb(oBomber, oWeapon, projectile)

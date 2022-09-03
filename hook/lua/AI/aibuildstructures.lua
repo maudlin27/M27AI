@@ -1,11 +1,11 @@
--- As of 2021-07 the base aibuildstructures.lua is 773 without UVESO, before appending the below (989 lines long with Uveso mod enabled), i.e. line 1 of this is line 990 of the hooked file
---2021-09 it might be 772
 local M27Utilities = import('/mods/M27AI/lua/M27Utilities.lua')
-local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
-local M27ConUtility = import('/mods/M27AI/lua/AI/M27ConstructionUtilities.lua')
-local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
+--local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
+--local M27ConUtility = import('/mods/M27AI/lua/AI/M27ConstructionUtilities.lua')
+--local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 
+
+--Not sure if any of the below are used, but left in as e.g. might want for future debugging/hooks and just in case part of my code uses this
 M27AIExecuteBuildStructure = AIExecuteBuildStructure
 
 local M27AddToBuildQueue = AddToBuildQueue
@@ -60,7 +60,7 @@ function M27BuildStructureDirectAtLocation(oBuilder, sBuildingType, tBuildLocati
     IssueBuildMobile({oBuilder}, tBuildLocation, sBuildingBlueprintID, {})
 end
 
-function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder, relative, buildingTemplate, baseTemplate, reference, NearMarkerType)
+--[[function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder, relative, buildingTemplate, baseTemplate, reference, NearMarkerType)
     -- aiBrain - various functions that can be used for this, including aiBrain:GetArmyStartPos()
     -- builder - error message suggests it's a table value, but doesn't return anything using log; however builder.UnitId returns a string with the unit blueprint ID, e.g. ual0001 is the aeon ACU
         --Other functions: builder:getarmy(); builder:GetPosition()
@@ -284,5 +284,5 @@ function AIExecuteBuildStructure(aiBrain, builder, buildingType, closeToBuilder,
         end
 
     end --not aiBrain.M27AI
-end
+end--]]
 

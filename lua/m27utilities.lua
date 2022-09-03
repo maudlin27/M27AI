@@ -4,6 +4,7 @@ local M27Overseer = import('/mods/M27AI/lua/AI/M27Overseer.lua')
 local M27MapInfo = import('/mods/M27AI/lua/AI/M27MapInfo.lua')
 local M27Logic = import('/mods/M27AI/lua/AI/M27GeneralLogic.lua')
 local M27Events = import('/mods/M27AI/lua/AI/M27Events.lua')
+local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 
 refProfilerStart = 0
 refProfilerEnd = 1
@@ -473,7 +474,7 @@ end
 
 function GetAveragePosition(tUnits)
     --returns a table with the average position of tUnits
-    local sFunctionRef = 'GetAveragePosition'
+    --local sFunctionRef = 'GetAveragePosition'
     local tTotalPos = {0,0,0}
     local iUnitCount = 0
     local tCurPos = {}
@@ -486,6 +487,34 @@ function GetAveragePosition(tUnits)
             iUnitCount = iUnitCount + 1
         end
     end
+    return {tTotalPos[1]/iUnitCount, tTotalPos[2]/iUnitCount, tTotalPos[3]/iUnitCount}
+end
+
+function GetAveragePositionOfMultipleTablesOfUnits(tTablesOfUnits)
+    local tTotalPos = {0,0,0}
+    local iUnitCount = 0
+    local tCurPos = {}
+    for iUnitTable, tUnitTable in tTablesOfUnits do
+        --LOG('GetAveragePositionOfMultipleTablesOfUnits: Size of tUnitTable='..table.getn(tUnitTable))
+        if IsTableEmpty(tUnitTable) == false then
+            for iUnit, oUnit in tUnitTable do
+                --LOG('GetAveragePositionOfMultipleTablesOfUnits: considiring unit '..(oUnit.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oUnit) or 'nil'))
+                if oUnit.GetPosition then
+                    tCurPos = oUnit:GetPosition()
+                    if tCurPos[1] then
+                        for iAxis = 1, 3 do
+                            tTotalPos[iAxis] = tTotalPos[iAxis] + tCurPos[iAxis]
+                        end
+                        iUnitCount = iUnitCount + 1
+                    end
+                end
+            end
+        end
+    end
+    if iUnitCount == 0 then
+        iUnitCount = 1
+        ErrorHandler('No units in the tables of units')
+    end --Avoid error
     return {tTotalPos[1]/iUnitCount, tTotalPos[2]/iUnitCount, tTotalPos[3]/iUnitCount}
 end
 
@@ -617,10 +646,12 @@ function GetAngleFromAToB(tLocA, tLocB)
     return iTheta
 end
 
-function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
+function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds, bTravelUnderwater)
     --iAngle: 0 = north, 90 = east, etc.; use GetAngleFromAToB if need angle from 2 positions
     --tStart = {x,y,z} (y isnt used)
     --if bKeepInMapBounds is true then will limit to map bounds
+    --bTravelUnderwater - if true then will get the terrain height instead of the surface height
+
     --local bDebugMessages = false if bGlobalDebugOverride == true then   bDebugMessages = true end
     --local sFunctionRef = 'MoveInDirection'
     local iTheta
@@ -646,9 +677,18 @@ function MoveInDirection(tStart, iAngle, iDistance, bKeepInMapBounds)
 
     if not(bKeepInMapBounds) then
         --if bDebugMessages == true then LOG(sFunctionRef..': Are within map bounds, iXAdj='..iXAdj..'; iZAdj='..iZAdj..'; iTheta='..iTheta..'; position='..repru({tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj})) end
-        return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        if bTravelUnderwater then
+            return {tStart[1] + iXAdj, GetTerrainHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        else
+            return {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        end
     else
-        local tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        local tTargetPosition
+        if bTravelUnderwater then
+            tTargetPosition = {tStart[1] + iXAdj, GetTerrainHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        else
+            tTargetPosition = {tStart[1] + iXAdj, GetSurfaceHeight(tStart[1] + iXAdj, tStart[3] + iZAdj), tStart[3] + iZAdj}
+        end
         --Get actual distance required to keep within map bounds
         --local iMaxDistanceFlat = 0
         local iNewDistWanted = 10000
@@ -1725,6 +1765,7 @@ end
 
 function DebugArray(Table)
     --Thanks to Uveso who gave me this as a solution for doing a repr of a large table such as a unit or aiBrain that would normally crash the game
+    --Note - largely superceded by Jip introducing reprs()
     for Index, Array in Table do
         if type(Array) == 'thread' or type(Array) == 'userdata' then
             LOG('Index['..Index..'] is type('..type(Array)..'). I wont print that!')

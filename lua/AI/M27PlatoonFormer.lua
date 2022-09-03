@@ -11,6 +11,7 @@ local M27EngineerOverseer = import('/mods/M27AI/lua/AI/M27EngineerOverseer.lua')
 local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27Transport = import('/mods/M27AI/lua/AI/M27Transport.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
+local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 
 
 local reftoCombatUnitsWaitingForAssignment = 'M27CombatUnitsWaitingForAssignment'
@@ -855,6 +856,7 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
         local tEngi = {}
         local tStructures = {}
         local tAir = {}
+        local tNavy = {}
         local tMobileShield = {}
         local tMobileStealth = {}
         local tRAS = {}
@@ -914,11 +916,12 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                             end
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandShield, sUnitID) then table.insert(tMobileShield, oUnit)
                         elseif EntityCategoryContains(M27UnitInfo.refCategoryMobileLandStealth, sUnitID) then table.insert(tMobileStealth, oUnit)
+                        elseif EntityCategoryContains(M27UnitInfo.refCategoryAllNavy, sUnitID) then table.insert(tNavy, oUnit)
                         else table.insert(tOther, oUnit) end
 
                         if bDebugMessages == true then
                         LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; will go through each table type and note if it is empty now')
-                        for iTable, tTable in {tMAA, tACU, tEngi, tStructures, tLandExperimentals, tSkirmishers, tRAS, tCombat, tIndirect, tAir, tMobileShield, tMobileStealth} do
+                        for iTable, tTable in {tMAA, tACU, tEngi, tStructures, tLandExperimentals, tSkirmishers, tRAS, tCombat, tIndirect, tAir, tNavy, tMobileShield, tMobileStealth} do
                         LOG(sFunctionRef..': iTable='..iTable..'; Is table empty='..tostring(M27Utilities.IsTableEmpty(tTable)))
                             end
                             end
@@ -975,6 +978,14 @@ function AllocateUnitsToIdlePlatoons(aiBrain, tNewUnits)
                     end
                 end
             end
+            if M27Utilities.IsTableEmpty(tNavy) == false then
+                AddIdleUnitsToPlatoon(aiBrain, tNavy, aiBrain[M27PlatoonTemplates.refoIdleNavy])
+                --Update unit pond details
+                for iUnit, oUnit in tNavy do
+                    M27Navy.UpdateUnitPond(oUnit, aiBrain.M27Team, false)
+                end
+            end
+
             if M27Utilities.IsTableEmpty(tMobileShield) == false then AllocateNewUnitsToPlatoonNotFromFactory(tMobileShield) end
             if M27Utilities.IsTableEmpty(tMobileStealth) == false then AllocateNewUnitsToPlatoonNotFromFactory(tMobileStealth) end
             if M27Utilities.IsTableEmpty(tOther) == false then
@@ -2209,6 +2220,7 @@ function PlatoonIdleUnitOverseer(aiBrain)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoAllStructures)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoUnderConstruction)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleAir)
+    SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleNavy)
     SetupIdlePlatoon(aiBrain, M27PlatoonTemplates.refoIdleOther)
 
     local iTicksToWait

@@ -122,7 +122,7 @@ function ReturnUnitsInTargetSegmentGroup(tUnits, iTargetGroup)
     return tMatchingUnits
 end
 
-function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim)
+function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim, iIgnoreAssignedSegmentRange, aiBrain)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ReturnUnitsInTargetSegmentGroup'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -137,9 +137,13 @@ function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim)
     local iReclaimSegmentX
     local iReclaimSegmentZ
     local bFoundEnergyReclaim = false
+    local tAlreadyAsisgnedSegmentXZ
+    local bAlreadyAssigned
+    local sLocationRef
 
     --Find nearest segment to engineer containing energy reclaim
     while iCurLevel < math.min(iSegmentSearchRange, 10000) do
+        bAlreadyAssigned = false
         iCurLevel = iCurLevel + 1
         iCurSublevel = iCurSublevel + 1
         if iCurSublevel > 4 then iCurSublevel = 1 end
@@ -151,15 +155,38 @@ function GetNearestSegmentWithEnergyReclaim(tStartPosition, iMinEnergyReclaim)
                 if M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ] then
                     if bDebugMessages == true then LOG(sFunctionRef..': Checking for energy reclaim in segment '..iReclaimSegmentX..'-'..iReclaimSegmentZ..'; Dist to the base segment='..M27Utilities.GetDistanceBetweenPositions(tStartPosition, M27MapInfo.GetReclaimLocationFromSegment(iReclaimSegmentX, iReclaimSegmentZ))) end
                     if M27MapInfo.tReclaimAreas[iReclaimSegmentX][iReclaimSegmentZ][M27MapInfo.refReclaimTotalEnergy] >= iMinEnergyReclaim then
-                        bFoundEnergyReclaim = true
-                        if bDebugMessages == true then LOG(sFunctionRef..': Found sufficient reclaim') end
-                        break
+                        --Is this already assigned?
+                        if iIgnoreAssignedSegmentRange then
+                            for iAdjustX = -iIgnoreAssignedSegmentRange, iIgnoreAssignedSegmentRange do
+                                for iAdjustZ = -iIgnoreAssignedSegmentRange, iIgnoreAssignedSegmentRange do
+                                    sLocationRef = M27Utilities.ConvertLocationToStringRef(M27MapInfo.GetReclaimLocationFromSegment(iReclaimSegmentX + iAdjustX, iReclaimSegmentZ + iAdjustZ))
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Found segment '..iReclaimSegmentX..'-'..iReclaimSegmentZ..'; seeing if nearby segment is assigned. iAdjustX='..iAdjustX..'; iAdjustZ='..iAdjustZ..'; sLocationRef='..sLocationRef..'; Is table of actions empty for this location='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef]))) end
+                                    if aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef] and (aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaimArea] or aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByLocation][sLocationRef][M27EngineerOverseer.refActionReclaimTrees]) then
+                                        bAlreadyAssigned = true
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                        if not(bAlreadyAssigned) then
+                            bFoundEnergyReclaim = true
+                            if bDebugMessages == true then LOG(sFunctionRef..': Found sufficient reclaim') end
+                            break
+                        else
+                            if not(tAlreadyAsisgnedSegmentXZ) then tAlreadyAsisgnedSegmentXZ = {iReclaimSegmentX, iReclaimSegmentZ} end
+                        end
                     end
                 end
 
             end
             if iCurLevel == 0 then break end
         end
+    end
+    --If couldnt find anywhere for energy reclaim then pick the location already assigned
+    if not(bFoundEnergyReclaim) and tAlreadyAsisgnedSegmentXZ then
+        bFoundEnergyReclaim = true
+        iReclaimSegmentX = tAlreadyAsisgnedSegmentXZ[1]
+        iReclaimSegmentZ = tAlreadyAsisgnedSegmentXZ[2]
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     if bFoundEnergyReclaim then return iReclaimSegmentX, iReclaimSegmentZ
@@ -187,10 +214,12 @@ function ChooseReclaimTarget(oEngineer, bWantEnergy)
     local tEngiPosition = oEngineer:GetPosition()
 
     if bWantEnergy then
-        local iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(tEngiPosition, 20)
+        --See if can find unassigned segment for energy reclaim
+        local iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(tEngiPosition, 20, 0, aiBrain)
 
 
         if not(iEnergySegmentX) then
+            --Get energy segment and ignore if already assigned
             iEnergySegmentX, iEnergySegmentZ = GetNearestSegmentWithEnergyReclaim(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 20)
             if bDebugMessages == true then LOG(sFunctionRef..': Energy segment X and Z after checking near base='..(iEnergySegmentX or 'nil')..'-'..(iEnergySegmentZ or 'nil')) end
             if not(iEnergySegmentX) then
@@ -1739,7 +1768,7 @@ function DetermineEnemyScoutSpeed(aiBrain)
     end
 end
 
-function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue, bBlueprintThreat)
+function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue, bBlueprintThreat, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly)
     --Determines threat rating for tUnits; if bMustBeVisibleToIntelOrSight is true then will assume threat where dont have visual
     --bMustBeVisibleToIntelOrSight - Set to false to get threat information regardless of visibility; automatically done where the unit's owner is equal to aiBrain
     --Threat method: based on mass value * multiplier; 1 if are direct fire, 0.2 if are indirect (0.75 for t1 arti), *2 if are a direct fire structure, *1.5 if are a shield or wall
@@ -1794,14 +1823,13 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
             end
         end
 
-        local iThreatRef
-        if bIndirectFireThreatOnly then
-            iThreatRef = '110'
-        elseif bJustGetMassValue then
-            iThreatRef = '101'
-        else
-            iThreatRef = '100'
-        end
+        local iThreatRef = '1'
+        if bIndirectFireThreatOnly then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
+        if bJustGetMassValue then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
+        if bAntiNavyOnly then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
+        if bAddAntiNavy then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
+        if bSubmersibleOnly then iThreatRef = iThreatRef .. '1' else iThreatRef = iThreatRef .. '0' end
+        if bLongRangeThreatOnly then iThreatRef = iThreatRef..'1' else iThreatRef = iThreatRef .. '0' end
 
         if not(tiThreatRefsCalculated[iThreatRef]) then M27Utilities.ErrorHandler('Havent calculated threat values for iThreatRef='..iThreatRef) end
 
@@ -1948,31 +1976,83 @@ function GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iM
                     else
                         iMassMod = 0
                         if not(bIndirectFireThreatOnly) then
-                            if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then
-                                if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit.UnitId) then
-                                    iMassMod = 0.55 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
-                                elseif EntityCategoryContains(M27UnitInfo.refCategoryCruiserCarrier, oUnit.UnitId) then
-                                    if EntityCategoryContains(categories.CYBRAN * categories.TECH2, oUnit.UnitId) then iMassMod = 0.45
-                                    else
-                                        iMassMod = 0.2
+                            if bAntiNavyOnly or bSubmersibleOnly then
+                                iMassMod = 0
+                                if (bSubmersibleOnly and (EntityCategoryContains(categories.SUBMERSIBLE, oUnit.UnitId) or oBP.Physics.MotionType == 'RULEUMT_Amphibious')) or (bAntiNavyOnly and EntityCategoryContains(categories.ANTINAVY+categories.OVERLAYANTINAVY, oUnit.UnitId)) then
+                                    iMassMod = 0.25 --e.g. for overlayantinavy or submersibles with no attack
+                                    if EntityCategoryContains(categories.SUBMERSIBLE * categories.ANTINAVY, oUnit.UnitId) then
+                                        iMassMod = 1
+                                    elseif EntityCategoryContains(categories.LAND * categories.ANTINAVY, oUnit.UnitId) then
+                                        iMassMod = 0.5 --brick, wagner etc
+                                        --UEF units (which are either really bad or good at antinavy)
+                                    elseif EntityCategoryContains(categories.UEF * categories.ANTINAVY, oUnit.UnitId) then
+                                        --Destroyer and battlecruiser
+                                        if EntityCategoryContains(categories.DIRECTFIRE * categories.TECH2, oUnit.UnitId) then iMassMod = 0.25 --valiant
+                                        elseif EntityCategoryContains(categories.DIRECTFIRE * categories.TECH3, oUnit.UnitId) then iMassMod = 0.15 --battlecruiser
+                                        elseif EntityCategoryContains(categories.TECH2 - categories.DIRECTFIRE, oUnit.UnitId) then iMassMod = 1.2 --Cooper
+                                        else
+                                            --Unexpected category
+                                            iMassMod = 0.5
+                                        end
+                                    elseif EntityCategoryContains(categories.CYBRAN * categories.ANTINAVY, oUnit.UnitId) then
+                                        iMassMod = 0.8
+                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryMegalith, oUnit.UnitId) then
+                                        iMassMod = 0.5
                                     end
-                                elseif EntityCategoryContains(M27UnitInfo.refCategoryAttackBot * categories.TECH1, oUnit.UnitId) then
-                                    iMassMod = 0.85
-                                else iMassMod = 1
                                 end
-                            elseif EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) then
-                                iMassMod = 0.55
-                            elseif EntityCategoryContains(categories.SUBCOMMANDER, oUnit.UnitId) then iMassMod = 1 --SACUs dont have directfire category for some reason (they have subcommander and overlaydirectfire)
-                            elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.STRUCTURE * categories.TECH2, oUnit.UnitId) then iMassMod = 0.1 --Gets doubled as its a structure
-                            elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH1, oUnit.UnitId) then iMassMod = 0.9
-                            elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH3, oUnit.UnitId) then iMassMod = 0.5
-                            elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 0.75 --will be doubled for structures
-                            elseif EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then iMassMod = 1 --Put in just in case - code was working before this, but dont want it to be affected yb more recenlty added engineer category
-                            elseif EntityCategoryContains(categories.ENGINEER,oUnit.UnitId) then iMassMod = 0.1 --Engis can reclaim and capture so can't just e.g. beat with a scout
+                            elseif bLongRangeThreatOnly then
+                                if EntityCategoryContains(categories.DIRECTFIRE + categories.INDIRECTFIRE, oUnit.UnitId) then
+                                    local iUnitRange = M27UnitInfo.GetBlueprintMaxGroundRange(oBP)
+                                    if iUnitRange >= 55 then
+                                        if EntityCategoryContains(categories.SILO * categories.TECH3 * categories.SUBMERSIBLE, oUnit.UnitId) then
+                                            iMassMod = 0.25 --Missile sub
+                                        end
+                                    end
+                                end
+                            else
+                                if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then
+                                    if EntityCategoryContains(M27UnitInfo.refCategoryLandScout, oUnit.UnitId) then
+                                        iMassMod = 0.55 --Selen costs 20, so Selen ends up with a threat of 12; engineer logic will ignore threats <10 (so all other lands couts)
+                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryCruiserCarrier, oUnit.UnitId) then
+                                        if EntityCategoryContains(categories.CYBRAN * categories.TECH2, oUnit.UnitId) then iMassMod = 0.55
+                                        elseif EntityCategoryContains(categories.AEON, oUnit.UnitId) then
+                                            iMassMod = 0.35
+                                        else
+                                            iMassMod = 0.2 --e.g. uef cruiser
+                                        end
+                                    elseif EntityCategoryContains(M27UnitInfo.refCategoryAttackBot * categories.TECH1, oUnit.UnitId) then
+                                        iMassMod = 0.85
+                                    else iMassMod = 1
+                                    end
+                                elseif EntityCategoryContains(M27UnitInfo.refCategoryFatboy, oUnit.UnitId) then
+                                    iMassMod = 0.55
+                                elseif EntityCategoryContains(categories.SUBCOMMANDER, oUnit.UnitId) then iMassMod = 1 --SACUs dont have directfire category for some reason (they have subcommander and overlaydirectfire)
+                                elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.STRUCTURE * categories.TECH2, oUnit.UnitId) then iMassMod = 0.1 --Gets doubled as its a structure
+                                elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH1, oUnit.UnitId) then iMassMod = 0.9
+                                elseif EntityCategoryContains(categories.INDIRECTFIRE * categories.ARTILLERY * categories.MOBILE * categories.TECH3, oUnit.UnitId) then iMassMod = 0.5
+                                elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 0.75 --will be doubled for structures
+                                elseif EntityCategoryContains(categories.COMMAND, oUnit.UnitId) then iMassMod = 1 --Put in just in case - code was working before this, but dont want it to be affected yb more recenlty added engineer category
+                                elseif EntityCategoryContains(categories.ENGINEER,oUnit.UnitId) then iMassMod = 0.1 --Engis can reclaim and capture so can't just e.g. beat with a scout
+                                end
+                                if bAddAntiNavy and iMassMod < 1 and EntityCategoryContains(categories.ANTINAVY  + categories.OVERLAYANTINAVY, oUnit.UnitId) then
+                                    --Increase mass mod for certain units
+                                    if iMassMod < 0.25 then iMassMod = 0.25 end
+                                    if EntityCategoryContains(categories.SUBMERSIBLE + categories.ANTINAVY, oUnit.UnitId) then
+                                        iMassMod = 1 --Subs
+                                    elseif EntityCategoryContains(categories.LAND * categories.ANTINAVY, oUnit.UnitId) then
+                                        iMassMod = math.max(iMassMod, 0.5) --wagners, bricks etc.
+                                    elseif EntityCategoryContains(categories.SUBMERSIBLE * categories.SILO * categories.TECH3, oUnit.UnitId) then
+                                        iMassMod = math.max(iMassMod, 0.25) --missile ship
+                                    end
+                                end
                             end
                         else
                             if EntityCategoryContains(categories.INDIRECTFIRE, oUnit.UnitId) then
-                                iMassMod = 1
+                                if EntityCategoryContains(categories.SILO * categories.TECH3 * categories.SUBMERSIBLE, oUnit.UnitId) then
+                                    iMassMod = 0.25 --Missile sub
+                                else
+                                    iMassMod = 1
+                                end
                                 if EntityCategoryContains(categories.DIRECTFIRE, oUnit.UnitId) then iMassMod = 0.5 end
                             elseif EntityCategoryContains(categories.ANTIMISSILE, oUnit.UnitId) then iMassMod = 2 --Doubled for structures ontop of this, i.e. want 4xmass of TMD in indirect fire so can overwhelm it
                             elseif EntityCategoryContains(categories.SHIELD, oUnit.UnitId) then iMassMod = 1
@@ -5539,11 +5619,19 @@ function CalculateUnitThreatsByType()
 
     if M27Utilities.IsTableEmpty(tUnitThreatByIDAndType) then
         local sUnitId
-        local tiLandThreatTypes = {
-            ['100'] = { false, false }, --Normal land threat
-            ['101'] = { false, true }, --mass cost
-            ['110'] = { true, false }, --Indirect
+        --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue, bBlueprintThreat, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly)
+        --{bIndirectFireThreatOnly, bJustGetMassValue, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly}
+        local tiLandAndNavyThreatTypes = {
+            ['1000000'] = { false, false, false, false, false, false }, --Normal land threat
+            ['1010000'] = { false, true, false, false, false, false }, --mass cost
+            ['1100000'] = { true, false, false, false, false, false }, --Indirect
+            ['1000100'] = { false, false, false, true, false, false }, --Normal land threat plus antinavy threat if higher
+            ['1001000'] = { false, false, true, false, false, false }, --Antinavy threat only
+            ['1000010'] = { false, false, false, false, true, false }, --Submersible threat only
+            ['1000001'] = { false, false, false, false, false, true }, --Long range threat only
         }
+        --GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, iAirBlipThreatOverride, iMobileLandBlipThreatOverride, iNavyBlipThreatOverride, iStructureBlipThreatOverride, bIncludeAirTorpedo, bBlueprintThreat)
+        --{bIncludeAirToAir, bIncludeGroundToAir, bIncludeAirToGround, bIncludeNonCombatAir, bIncludeAirTorpedo}
         local tiAirThreatTypes = {
             ['200001'] = {false, false, false, false, true,}, --Torpedo bombers
             ['200100'] = { false, false, true, false, false }, --Air to ground
@@ -5553,9 +5641,10 @@ function CalculateUnitThreatsByType()
             ['210000'] = { true, false, false, false, false }, --Air AA
             ['210110'] = { true, false, true, true, false }, --Air threat (general)
             ['210111'] = { true, false, true, true, true }, --Air threat (general)
+            ['200101'] = { true, false, true, true, true }, --Bombers and torpedo bombers
         }
 
-        for iRef, tValue in tiLandThreatTypes do
+        for iRef, tValue in tiLandAndNavyThreatTypes do
             tiThreatRefsCalculated[iRef] = true
         end
         for iRef, tValue in tiAirThreatTypes do
@@ -5568,8 +5657,10 @@ function CalculateUnitThreatsByType()
 
             tUnitThreatByIDAndType[sUnitId] = {}
             if bDebugMessages == true then LOG(sFunctionRef..': About to consider different land threat values for unit '..sUnitId..' Name='..LOCF((oBP.General.UnitName) or 'nil')) end
-            for iRef, tConditions in tiLandThreatTypes do
-                tUnitThreatByIDAndType[sUnitId][iRef] = GetCombatThreatRating(nil, { {['UnitId']=sUnitId }}, nil, nil, nil, tConditions[1], tConditions[2], true)
+            for iRef, tConditions in tiLandAndNavyThreatTypes do
+                        --GetCombatThreatRating(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, iMassValueOfBlipsOverride, iSoloBlipMassOverride, bIndirectFireThreatOnly, bJustGetMassValue, bBlueprintThreat, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly)
+                        --{bIndirectFireThreatOnly, bJustGetMassValue, bAntiNavyOnly, bAddAntiNavy, bSubmersibleOnly, bLongRangeThreatOnly}
+                tUnitThreatByIDAndType[sUnitId][iRef] = GetCombatThreatRating(nil, { {['UnitId']=sUnitId }}, nil, nil, nil, tConditions[1], tConditions[2], true, tConditions[3], tConditions[4], tConditions[5], tConditions[6])
             end
             if bDebugMessages == true then LOG(sFunctionRef..': Finished calculating land threat values for '..LOCF((oBP.General.UnitName or 'nil'))..', result='..reprs(tUnitThreatByIDAndType[sUnitId])) end
 

@@ -55,6 +55,11 @@ refiLastPathingGroup = 'M27UnitLastPathingGroup' --Last pathing group of the uni
 reftLastLocationOfPathingGroup = 'M27UnitLastLocationOfPathingGroup' --Unit's position when it last had a pathing group with sufficient count
 refoOriginalBrainOwner = 'M27UnitOriginalOwner' --used if transfer unit from one player to another, so can transfer it back later
 refbTreatAsVisible = 'M27UnitTreatAsVisible' --used for unseen T2PD that damages us - means we will calculate threat on it
+reftLastKnownPosition = 'M27UnitLastKnownPosition' --Used for naval units to try and avoid AI cheating while giving it a basic memory
+
+--Order related - used for navy (platoon uses platoon tracking)
+reftLastOrderTarget = 'M27UnitLastOrderTarget' --location of last target (e.g. for issuemove)
+refoLastOrderUnitTarget = 'M27UnitLastUnitOrderTarget' --Unit targeted (e.g. for issueattack)
 
 --Strike damage/coordinated attack (currently used for sniperbots):
 refiDFStrikeDamageAssigned = 'M27UnitDFStrikeDamage' --cumulative value of strike damage assigned to this unit
@@ -71,6 +76,10 @@ reftTMLThreats = 'M27TMLThreats' --[sTMLRef] - returns object number of TML that
 refbCantBuildTMDNearby = 'M27CantBuildTMDNearby'
 refiNearbyTMD = 'M27TMDNearby' --Number of friendly TMD nearby
 
+--Recorded range (recorded for naval logic)
+refiDFRange = 'M27UnitDFRange'
+refiIndirectRange = 'M27UnitIndirectRange'
+refiAntiNavyRange = 'M27UnitAntiNavyRange'
 
 --Factions
 refFactionUEF = 1
@@ -196,16 +205,23 @@ refCategoryTransport = categories.AIR * categories.TRANSPORTATION - categories.U
 
 --Naval units
 refCategoryFrigate = categories.NAVAL * categories.FRIGATE
-refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE
+refCategoryNavalSurface = categories.NAVAL - categories.SUBMERSIBLE --NOTE: This includes structures (e.g. torp launcher and factory)
+refCategoryMobileNavalSurface = refCategoryNavalSurface * categories.MOBILE
 refCategoryAllNavy = categories.NAVAL
+refCategoryNavalAA = refCategoryAllNavy * categories.ANTIAIR
 refCategoryCruiser = categories.NAVAL * categories.CRUISER
 refCategorySalem = categories.NAVAL * categories.AMPHIBIOUS * categories.DIRECTFIRE
 refCategorySeraphimDestroyer = categories.SUBMERSIBLE * categories.DESTROYER
+refCategoryDestroyer = categories.DESTROYER
 refCategoryCruiserCarrier = refCategoryCruiser + categories.NAVAL * categories.NAVALCARRIER
-refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + categories.STRUCTURE --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
+refCategoryTorpedoLauncher = categories.ANTINAVY * categories.STRUCTURE
+refCategoryAllAmphibiousAndNavy = categories.NAVAL + categories.AMPHIBIOUS + categories.HOVER + refCategoryTMD + refCategoryTorpedoLauncher + refCategorySonar + refCategoryStructureAA --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures
+refCategoryPondFixedCategory = refCategoryNavalSurface - categories.AMPHIBIOUS * categories.MOBILE + refCategoryTMD + refCategoryTorpedoLauncher + refCategorySonar + refCategoryStructureAA
 refCategoryNavyThatCanBeTorpedoed = categories.NAVAL + categories.AMPHIBIOUS + categories.STRUCTURE + categories.COMMAND + refCategoryEngineer - categories.HOVER --NOTE: Structures have no category indicating whether they can be built on sea (instead they have aquatic ability) hence the need to include all structures; Hover units cant be targeted
 refCategoryTorpedoLandAndNavy = categories.ANTINAVY * categories.LAND + categories.ANTINAVY * categories.NAVAL + categories.OVERLAYANTINAVY * categories.LAND + categories.ANTINAVY * categories.STRUCTURE --If removing overlayantinavy then think up better solution for fatboy/experimentals so they dont run when in water
-refCategoryMissileNavy = categories.NAVAL * categories.SILO - categories.BATTLESHIP --i.e. UEF+Sera cruisers, and nukesubs
+refCategoryMissileNavy = categories.NAVAL * categories.SILO + categories.BATTLESHIP * categories.INDIRECTFIRE - categories.BATTLESHIP * categories.SERAPHIM --i.e. UEF+Sera cruisers, and nukesubs
+refCategorySubmarine = categories.NAVAL * categories.SUBMERSIBLE * categories.ANTINAVY
+refCategoryCooper = categories.NAVAL * categories.ANTINAVY * categories.TECH2 - categories.SUBMERSIBLE - categories.DESTROYER
 
 
 --Multi-category:
@@ -711,21 +727,47 @@ function GetUnitIndirectRange(oUnit)
     return iMaxRange
 end
 
-function GetUnitMaxGroundRange(oUnit)
+function GetBlueprintMaxGroundRange(oBP)
     local iMaxRange = 0
-    if oUnit.GetBlueprint then
-        local oBP = oUnit:GetBlueprint()
-        if oBP.Weapon then
-            for iCurWeapon, oCurWeapon in oBP.Weapon do
-                if oCurWeapon.MaxRadius > iMaxRange and not(oCurWeapon.EnabledByEnhancement) and oCurWeapon.Damage > 0 then
-                    if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' then
-                        iMaxRange = oCurWeapon.MaxRadius
-                    end
+    if oBP.Weapon then
+        for iCurWeapon, oCurWeapon in oBP.Weapon do
+            if oCurWeapon.MaxRadius > iMaxRange and not(oCurWeapon.EnabledByEnhancement) and oCurWeapon.Damage > 0 then
+                if oCurWeapon.FireTargetLayerCapsTable and oCurWeapon.FireTargetLayerCapsTable['Land'] == 'Land|Water|Seabed' then
+                    iMaxRange = oCurWeapon.MaxRadius
                 end
             end
         end
     end
-    return iMaxRange
+end
+
+function GetUnitMaxGroundRange(oUnit)
+    if oUnit.GetBlueprint then
+        return GetBlueprintMaxGroundRange(oUnit:GetBlueprint())
+    else
+        return 0
+    end
+end
+
+function GetNavalDirectAndSubRange(oUnit)
+    --Returns higher of units antinavy and directfire range while also updating its antinavy range; also updates indirect range
+    if not(oUnit[refiDFRange]) then
+        local oBP = oUnit:GetBlueprint()
+        local iMaxDFRange = 0
+        local iMaxAntiNavyRange = 0
+        if oBP.Weapon then
+            for iCurWeapon, oCurWeapon in oBP.Weapon do
+                if oCurWeapon.RangeCategory == 'UWRC_DirectFire' then
+                    iMaxDFRange = math.max(iMaxDFRange, oCurWeapon.MaxRadius)
+                elseif oCurWeapon.RangeCategory == 'UWRC_AntiNavy' then
+                    iMaxAntiNavyRange = math.max(iMaxAntiNavyRange, oCurWeapon.MaxRadius)
+                end
+            end
+        end
+        oUnit[refiDFRange] = iMaxDFRange
+        oUnit[refiAntiNavyRange] = iMaxAntiNavyRange
+        oUnit[refiIndirectRange] = GetUnitIndirectRange(oUnit)
+    end
+    return math.max(oUnit[refiDFRange], oUnit[refiAntiNavyRange])
 end
 
 function GetUpgradeBuildTime(oUnit, sUpgradeRef)

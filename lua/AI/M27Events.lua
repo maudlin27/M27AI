@@ -21,6 +21,7 @@ local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
+local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 
 
 local refCategoryEngineer = M27UnitInfo.refCategoryEngineer
@@ -238,6 +239,17 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                         local aiBrain = oUnitKilled:GetAIBrain()
                         aiBrain[M27Overseer.refiSkirmisherMassDeathsFromLand] = aiBrain[M27Overseer.refiSkirmisherMassDeathsFromLand] + oUnitKilled:GetBlueprint().Economy.BuildCostMass
                     end
+                end
+
+                --Naval factory destroyed - track re pond
+                if EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oUnitKilled.UnitId) then
+                    local iCurPond = oUnitKilled[M27Navy.refiAssignedPond]
+                    local aiBrain = oUnitKilled:GetAIBrain()
+                    if not(iCurPond) then
+                        iCurPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnitKilled:GetPosition())
+                    end
+                    M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iCurPond] = (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iCurPond] or 0) + 1
+
                 end
             end
             --Did a PD or skirmisher we own kill something?
@@ -552,6 +564,11 @@ function OnUnitDeath(oUnit)
                             end
                         end
                     end
+
+                    --Naval units
+                    if (oUnit[M27Navy.refiAssignedPond] or 0) > 0 then
+                        M27Navy.RemoveUnitFromAssignedPond(oUnit)
+                    end
                 end
             end
         end
@@ -819,6 +836,10 @@ function OnWeaponFired(oWeapon)
                 end
 
                 ForkThread(M27UnitMicro.DodgeBomb, oUnit, oWeapon, nil)
+            else
+                --Dodge logic for certain other attacks (conditions for this are in considerdodgingshot)
+                if bDebugMessages == true then LOG(sFunctionRef..': Will consider whether we want to dodge the shot') end
+                ForkThread(M27UnitMicro.ConsiderDodgingShot, oUnit, oWeapon)
             end
 
             --Overcharge
@@ -838,13 +859,16 @@ function OnWeaponFired(oWeapon)
                 end
             end
 
+
             if oUnit:GetAIBrain().M27AI then
                 --T3 and experimental arti
+                if bDebugMessages == true then LOG(sFunctionRef..': Shot just fired by '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Weapon range category='..oWeapon.Blueprint.RangeCategory or 'nil') end
                 if EntityCategoryContains(M27UnitInfo.refCategoryFixedT3Arti + M27UnitInfo.refCategoryExperimentalArti, oUnit.UnitId) then
                     ForkThread(M27Logic.GetT3ArtiTarget, oUnit)
-                    --DF units whose shot is blocked
-                elseif EntityCategoryContains(M27UnitInfo.refCategoryDFTank, oUnit.UnitId) then
-                    --Get weapon target
+                    --DF units whose DF shot is blocked
+                elseif oWeapon.Blueprint.RangeCategory == 'UWRC_DirectFire' and EntityCategoryContains(M27UnitInfo.refCategoryDFTank + M27UnitInfo.refCategoryNavalSurface * categories.DIRECTFIRE + M27UnitInfo.refCategorySeraphimDestroyer - M27UnitInfo.refCategoryMissileNavy, oUnit.UnitId) then
+                    --Get weapon target if it is a DF weapon
+                    --if EntityCategoryContains(M27UnitInfo.refCategoryNavalSurface, oUnit.UnitId) then bDebugMessages = true LOG('reprs of weapon='..reprs(oWeapon)..'; will now do log of the weapon blueprint='..reprs(oWeapon.Blueprint)) end
                     local oTarget = oWeapon:GetCurrentTarget()
                     if bDebugMessages == true then LOG(sFunctionRef..': oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' has just fired a shot. Do we have a valid target for our weapon='..tostring(M27UnitInfo.IsUnitValid(oTarget))..'; time last shot was blocked='..(oUnit[M27UnitInfo.refiTimeOfLastCheck] or 'nil')) end
                     if M27UnitInfo.IsUnitValid(oTarget) then
@@ -1260,6 +1284,24 @@ function OnConstructed(oEngineer, oJustBuilt)
                 aiBrain[M27Overseer.refbScoutBuiltOrDied] = true
             elseif EntityCategoryContains(M27UnitInfo.refCategoryMAA, oJustBuilt.UnitId) then
                 aiBrain[M27Overseer.refbMAABuiltOrDied] = true
+                --naval factory just built something?
+            elseif EntityCategoryContains(M27UnitInfo.refCategoryNavalFactory, oEngineer.UnitId) then
+                --Clear assisting engineers
+                if M27Utilities.IsTableEmpty(oEngineer[M27EngineerOverseer.reftAssistingEngineers]) == false then
+                    for iAssistingEngi, oAssistingEngi in oEngineer[M27EngineerOverseer.reftAssistingEngineers] do
+                        --Dont clear engineers still travelling to the naval factory
+                        if M27Utilities.GetDistanceBetweenPositions(oAssistingEngi:GetPosition(), oEngineer:GetPosition()) <= 30 then
+                            IssueClearCommands({ oAssistingEngi})
+                            ClearEngineerActionTrackers(aiBrain, oAssistingEngi, true)
+                        end
+                    end
+                end
+
+                --Update pond
+                if not(oJustBuilt[M27Navy.refiAssignedPond]) then M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false) end
+                --Just built a naval based building?
+            elseif EntityCategoryContains(M27UnitInfo.refCategorySonar + M27UnitInfo.refCategoryNavalFactory + M27UnitInfo.refCategoryTorpedoLauncher, oJustBuilt.UnitId) then
+                if not(oJustBuilt[M27Navy.refiAssignedPond]) then M27Navy.UpdateUnitPond(oJustBuilt, oJustBuilt:GetAIBrain().M27Team, false) end
 
                 --Other tracking
             else
@@ -1290,12 +1332,12 @@ function OnConstructed(oEngineer, oJustBuilt)
 
             --If have just upgraded a shield then clear tracking (redundancy as should also trigger from 'death' of old shield)
             if EntityCategoryContains(M27UnitInfo.refCategoryStructure - M27UnitInfo.refCategoryEngineer, oEngineer.UnitId) and M27Utilities.IsTableEmpty(oJustBuilt[M27EngineerOverseer.reftAssistingEngineers]) == false then
-                for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
-                    if M27UnitInfo.IsUnitValid(oEngi) then
-                        IssueClearCommands({ oEngi })
-                        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
-                    end
-                end
+            for iEngi, oEngi in oJustBuilt[M27EngineerOverseer.reftAssistingEngineers] do
+            if M27UnitInfo.IsUnitValid(oEngi) then
+            IssueClearCommands({ oEngi })
+            M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, oEngi, true)
+            end
+            end
             end
 
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)

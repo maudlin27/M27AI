@@ -154,6 +154,7 @@ refiHighestEnemyAirThreat = 'M27HighestEnemyAirThreat' --highest ever value the 
 refiEnemyAirAAThreat = 'M27HighestEnemyAirAAThreat'
 refiHighestEverEnemyAirAAThreat = 'M27HighestEverAirAAThreat'
 refiEnemyAirToGroundThreat = 'M27HighestEnemyAirToGroundThreat'
+refbEnemyHasBuiltTorpedoBombers = 'M27AirHasEnemyBuildTorpBombers' --true if torp bombers have been detected for an enemy at any point in the game
 refiEnemyMassInGroundAA = 'M27HighestEnemyGroundAAThreat'
 refbEnemyHasHadCruisersOrT3AA = 'M27EnemyHadCruisersOrT3AA' --True if enemy had cruisers or T3 AA - used to decide if should switch to air domination mode
 refbHaveAirControl = 'M27AirHaveAirControl' --Against aiBrain, true if our team has air control (Considering only M27 airAA)
@@ -2300,6 +2301,9 @@ function AirThreatChecker(aiBrain)
     --local iAllAirThreat =
     --iAllAirThreat = iAllAirThreat + M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirGroundUnits, true, true, false, true, true, nil, 0, 0, 0) * 0.4
     aiBrain[refiEnemyAirToGroundThreat] = math.max((aiBrain[refiEnemyAirToGroundThreat] or 0), M27Logic.GetAirThreatLevel(aiBrain, tEnemyAirUnits, true, false, false, true, true, nil, 0, 0, 0))
+    if not(aiBrain[refbEnemyHasBuiltTorpedoBombers]) and aiBrain[refiEnemyAirToGroundThreat] >= 200 and M27Utilities.IsTableEmpty(tEnemyAirUnits) == false and M27Utilities.IsTableEmpty(EntityCategoryFilterDown(refCategoryTorpBomber, tEnemyAirUnits)) == false then
+        aiBrain[refbEnemyHasBuiltTorpedoBombers] = true
+    end
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': EnemyAAThreat=' .. aiBrain[refiEnemyAirAAThreat] .. '; Enemy Air to ground threat=' .. aiBrain[refiEnemyAirToGroundThreat])
     end
@@ -7679,9 +7683,9 @@ function GetNovaxTarget(aiBrain, oNovax)
         end
         if not (aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyACUKill and ScenarioInfo.Options.Victory == "demoralization") then
             --Are there any near-exposed shields nearby? Then target them instead
-            local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oTarget:GetPosition(), 23, 'Enemy')
+            local tNearbyEnemyShields = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryFixedShield, oNovax[refoPriorityTargetOverride]:GetPosition(), 23, 'Enemy')
             if bDebugMessages == true then
-                LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields)) .. '; target subject to this=' .. oTarget.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oTarget))
+                LOG(sFunctionRef .. ': is table of nearby shields empty=' .. tostring(M27Utilities.IsTableEmpty(tNearbyEnemyShields)) .. '; target subject to this=' .. oNovax[refoPriorityTargetOverride].UnitId .. M27UnitInfo.GetUnitLifetimeCount(oNovax[refoPriorityTargetOverride]))
             end
             if M27Utilities.IsTableEmpty(tNearbyEnemyShields) == false then
                 local iCurShield, iMaxShield

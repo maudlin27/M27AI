@@ -35,6 +35,7 @@ refoAllStructures = 'M27AllStructures'
 refoUnderConstruction = 'M27UnderConstruction'
 refoIdleIndirect = 'M27IdleIndirect'
 refoIdleAir = 'M27IdleAir'
+refoIdleNavy = 'M27IdleNavy'
 refoIdleOther = 'M27IdleOther'
 
 --Profiling:
@@ -718,6 +719,12 @@ PlatoonTemplate = {
         [refbRunFromAllEnemies] = true
     },
     [refoIdleAir] =
+    {
+        [refbIdlePlatoon] = true,
+        [refbRunFromAllEnemies] = true,
+        [refbDontDisplayName] = true
+    },
+    [refoIdleNavy] =
     {
         [refbIdlePlatoon] = true,
         [refbRunFromAllEnemies] = true,

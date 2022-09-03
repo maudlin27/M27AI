@@ -167,9 +167,11 @@ function ConsiderPlayerSpecificMessages(aiBrain)
                     if bDebugMessages == true then LOG(sFunctionRef..': i='..(i or 'nil')..'; j='..(j or 'nil')) end
                     if i > 0 then
                         if bDebugMessages == true then LOG(sFunctionRef..': maudlin27 is playing') end
-                        SendMessage(oBrain, 'Specific opponent', 'What is this, what are you doing, my son?', 10, 0)
-                        SendMessage(aiBrain, 'Specific opponent', 'Succeeding you, father', 15, 0)
-                        bSentSpecificMessage = true
+                        if math.random(0, 2) == 2 then
+                            SendMessage(oBrain, 'Specific opponent', 'What is this, what are you doing, my son?', 10, 0)
+                            SendMessage(aiBrain, 'Specific opponent', 'Succeeding you, father', 15, 0)
+                            bSentSpecificMessage = true
+                        end
                     elseif oBrain.Nickname == 'Jip' or oBrain.Nickname == 'FAF_Jip' then
                         SendMessage(aiBrain, 'Specific opponent', 'A fight against the game councillor? I hope my algorithms havent been sabotaged', 10, 10000)
                         bSentSpecificMessage = true

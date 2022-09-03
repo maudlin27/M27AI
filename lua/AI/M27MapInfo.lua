@@ -13,6 +13,7 @@ local M27PlatoonUtilities = import('/mods/M27AI/lua/AI/M27PlatoonUtilities.lua')
 local M27PlatoonTemplates = import('/mods/M27AI/lua/AI/M27PlatoonTemplates.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
 local M27Chat = import('/mods/M27AI/lua/AI/M27Chat.lua')
+local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 
 bUsingArmyIndexForStartPosition = false --by default will assume armies are ARMY_1 etc.; this will be changed to true if any exceptions are found
 MassPoints = {} -- Stores position of each mass point (as a position value, i.e. a table with 3 values, x, y, z
@@ -99,7 +100,7 @@ iLowHeightDifThreshold = 0.007 --Used to trigger check for max height dif in an 
 iHeightDifAreaSize = 0.2 --T1 engineer is 0.6 x 0.9, so this results in a 1x1 size box by searching +- iHeightDifAreaSize if this is set to 0.5; however given are using a 0.25 interval size dont want this to be too large or destroys the purpose of the interval size and makes the threshold unrealistic
 iMaxHeightDif = 0.115 --NOTE: Map specific code should be added below in DetermineMaxTerrainHeightDif (hardcoded table with overrides by map name); Max dif in height allowed if move iPathingIntervalSize blocks away from current position in a straight line along x or z; Testing across 3 maps (africa, astro crater battles, open palms) a value of viable range across the 3 maps is a value between 0.11-0.119
 local iChangeInHeightThreshold = 0.04 --Amount by which to change iMaxHeightDif if we have pathing inconsistencies
-iMinWaterDepth = 1 --Ships cant move right up to shore, this is a guess at how much clearance is needed (testing on Africa, depth of 2 leads to some pathable areas being considered unpathable)
+iMinWaterDepth = 1.5 --Ships cant move right up to shore, this is a guess at how much clearance is needed (testing on Africa, depth of 2 leads to some pathable areas being considered unpathable)
 iWaterPathingIntervalSize = 1
 tWaterAreaAroundTargetAdjustments = {} --Defined in map initialisation
 iWaterMinArea = 3 --Square with x/z of this size must be underwater for the target position to be considered pathable; with value of 2 ships cant get as close to shore as expect them to
@@ -184,8 +185,10 @@ function DetermineMaxTerrainHeightDif()
     ['Adaptive Flooded Corona'] = 0.15,
     ['Fields of Isis'] = 0.15, --minor for completeness - one of cliffs reclaim looks like its pathable but default settings show it as non-pathable
     ['Selkie Mirror'] = 0.15,
+    ['Flooded Strip Mine'] = 0.24, --middle island should be pathable by amphibious; ast 0.235 it isnt, at 0.24 it is
     ['Adaptive Point of Reason'] = 0.26,
     ['Hyperion'] = 0.215, --0.213 results in apparant plateau with 2 mexes (that is actually pathable) being treated as a plateau incorrectly
+    ['adaptive millennium'] = 0.16 --Default and 0.15 results in top right and bottom left being thought to be plateaus when theyre not, 0.17 shows them as pathable
     }
     local sMapName = ScenarioInfo.name
     iMaxHeightDif = (tMapHeightOverride[sMapName] or iMaxHeightDif)
@@ -303,15 +306,15 @@ function RecordResourceLocations(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
-function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNotHydro)
-    -- iArmy is the army number, e.g. 1 for ARMY_1; iMaxDistance is the max distance for a mex to be returned (this only works the first time ever this function is called)
+function RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, bMexNotHydro)
+    -- iStartPositionNumber is the army number, e.g. 1 for ARMY_1; iMaxDistance is the max distance for a mex to be returned (this only works the first time ever this function is called)
     --bMexNotHydro - true if looking for nearby mexes, false if looking for nearby hydros; defaults to true
 
     -- Returns a table containing positions of any mex meeting the criteria, unless bCountOnly is true in which case returns the no. of such mexes
     local sFunctionRef = 'RecordResourceNearStartPosition'
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, iArmy='..(iArmy or 'nil')..'; iMaxDistance='..(iMaxDistance or 'nil')..'; bCountOnly='..tostring(bCountOnly or false)..'; bMexNotHydro='..tostring(bMexNotHydro or false)..'; Full PlayerStartPoints table='..repru(PlayerStartPoints)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': Start of code, iStartPositionNumber='..(iStartPositionNumber or 'nil')..'; iMaxDistance='..(iMaxDistance or 'nil')..'; bCountOnly='..tostring(bCountOnly or false)..'; bMexNotHydro='..tostring(bMexNotHydro or false)..'; Full PlayerStartPoints table='..repru(PlayerStartPoints)..'; GameTime='..GetGameTimeSeconds()) end
     if iMaxDistance == nil then iMaxDistance = 12 end --NOTE: As currently only run the actual code to locate nearby mexes once, the first iMaxDistance will determine what to use, and any subsequent uses it wont matter
     if bMexNotHydro == nil then bMexNotHydro = true end
     if bCountOnly == nil then bCountOnly = false end
@@ -319,26 +322,27 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
     local iResourceType = 1 --1 = mex, 2 = hydro
     if bMexNotHydro == false then iResourceType = 2 end
 
-    if tResourceNearStart[iArmy] == nil then tResourceNearStart[iArmy] = {} end
+    if tResourceNearStart[iStartPositionNumber] == nil then tResourceNearStart[iStartPositionNumber] = {} end
 
-    if tResourceNearStart[iArmy][iResourceType] == nil then
+    if tResourceNearStart[iStartPositionNumber][iResourceType] == nil then
         --Haven't determined nearby resource yet
         local iDistance = 0
-        local pStartPos =  PlayerStartPoints[iArmy]
+        local pStartPos =  PlayerStartPoints[iStartPositionNumber]
 
-        tResourceNearStart[iArmy][iResourceType] = {}
+        tResourceNearStart[iStartPositionNumber][iResourceType] = {}
         local AllResourcePoints = {}
         if bMexNotHydro then AllResourcePoints = MassPoints
         else AllResourcePoints = HydroPoints end
 
         if not(AllResourcePoints == nil) then
+            if bDebugMessages == true then LOG(sFunctionRef..': About to cycle through all resource points to find mexes near start position='..repru(pStartPos)..' for start position number='..iStartPositionNumber..'; PlayerStartPoints='..repru(PlayerStartPoints)) end
             for key,pResourcePos in AllResourcePoints do
                 iDistance = M27Utilities.GetDistanceBetweenPositions(pStartPos, pResourcePos)
                 if iDistance <= iMaxDistance then
                     if bDebugMessages == true then LOG('Found position near to start; iDistance='..iDistance..'; imaxDistance='..iMaxDistance..'; pStartPos[1][3]='..pStartPos[1]..'-'..pStartPos[3]..'; pResourcePos='..pResourcePos[1]..'-'..pResourcePos[3]..'; bMexNotHydro='..tostring(bMexNotHydro)) end
                     iResourceCount = iResourceCount + 1
-                    if tResourceNearStart[iArmy][iResourceType][iResourceCount] == nil then tResourceNearStart[iArmy][iResourceType][iResourceCount] = {} end
-                    tResourceNearStart[iArmy][iResourceType][iResourceCount] = pResourcePos
+                    if tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] == nil then tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] = {} end
+                    tResourceNearStart[iStartPositionNumber][iResourceType][iResourceCount] = pResourcePos
                 end
             end
         end
@@ -346,29 +350,29 @@ function RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, bMexNo
     if bCountOnly == false then
         --Create a table of nearby resource locations:
         local NearbyResourcePos = {}
-        for iCurResource, v in tResourceNearStart[iArmy][iResourceType] do
+        for iCurResource, v in tResourceNearStart[iStartPositionNumber][iResourceType] do
             NearbyResourcePos[iResourceCount] = v
         end
-        if bDebugMessages == true then LOG(sFunctionRef..': End of code') end
+        if bDebugMessages == true then LOG(sFunctionRef..': End of code. tResourceNearStart='..repru(tResourceNearStart)) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return NearbyResourcePos
     else
         iResourceCount = 0
-        for iCurResource, v in tResourceNearStart[iArmy][iResourceType] do
+        for iCurResource, v in tResourceNearStart[iStartPositionNumber][iResourceType] do
             iResourceCount = iResourceCount + 1
             if bDebugMessages == true then LOG('valid resource location iResourceCount='..iResourceCount..'; v[1-3]='..v[1]..'-'..v[2]..'-'..v[3]) end
         end
-        if bDebugMessages == true then LOG('RecordResourceNearStartPosition: iResourceCount='..iResourceCount..'; bmexNotHydro='..tostring(bMexNotHydro)..'; iMaxDistance='..iMaxDistance) end
+        if bDebugMessages == true then LOG('RecordResourceNearStartPosition: iResourceCount='..iResourceCount..'; bmexNotHydro='..tostring(bMexNotHydro)..'; iMaxDistance='..iMaxDistance..'; tResourceNearStart='..repru(tResourceNearStart)) end
         M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
         return iResourceCount
     end
 end
-function RecordMexNearStartPosition(iArmy, iMaxDistance, bCountOnly)
-    return RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, true)
+function RecordMexNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly)
+    return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, true)
 end
 
-function RecordHydroNearStartPosition(iArmy, iMaxDistance, bCountOnly)
-    return RecordResourceNearStartPosition(iArmy, iMaxDistance, bCountOnly, false)
+function RecordHydroNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly)
+    return RecordResourceNearStartPosition(iStartPositionNumber, iMaxDistance, bCountOnly, false)
 end
 
 function RecordPlayerStartLocations()
@@ -639,12 +643,16 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27UnitInfo.IsUnitValid(oPathingUnit) and EntityCategoryContains(categories.MOBILE, oPathingUnit.UnitId) then --Hard crash of game if do :CanPathTo on a structure, which could happen given structures use some of the platoon logic e.g. for mobile shield assistance then
 
-        --Ignore the check if we have had too many slowdowns for this unit
-        if oPathingUnit[M27UnitInfo.refiPathingCheckCount] and oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 2 and ((oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 10 and oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.3) or oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.7) then
+        --Ignore the check if we have had too many slowdowns for this unit, or this brain
+        local aiBrain = oPathingUnit:GetAIBrain()
+        if (oPathingUnit[M27UnitInfo.refiPathingCheckCount] and oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 2 and ((oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 10 and oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.3) or oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.7))
+            or (aiBrain[M27UnitInfo.refiPathingCheckCount] >= 4 and (aiBrain[M27UnitInfo.refiPathingCheckTime] >= 3.5 or aiBrain[M27UnitInfo.refiPathingCheckCount] >= 8 and aiBrain[M27UnitInfo.refiPathingCheckTime] >= 2.5))
+            then
+
             --Do nothing, dont want to risk constant slowdowns which can happen on larger maps if a unit manages to break out of a plateau
             if not(oPathingUnit['M27UnitMapPathingCheckAbort']) then
                 oPathingUnit['M27UnitMapPathingCheckAbort'] = true
-                M27Utilities.ErrorHandler('Wont do any more pathing checks for unit '..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..' as it already has had '..oPathingUnit[M27UnitInfo.refiPathingCheckCount]..' pathing checks and want to avoid slowdown', true)
+                M27Utilities.ErrorHandler('Wont do any more pathing checks for unit '..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..' as want to avoid major slowdowns. Total time spent on this unit='..(oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0)..'; Total time spent on this brain='..(aiBrain[M27UnitInfo.refiPathingCheckTime] or 0), true)
             end
         else
 
@@ -838,8 +846,10 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
             end
 
             oPathingUnit[M27UnitInfo.refiPathingCheckTime] = (oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
-
-            if bDebugMessages == true then LOG(sFunctionRef..': bHaveChangedPathing='..tostring(bHaveChangedPathing)) end
+            aiBrain[M27UnitInfo.refiPathingCheckTime] = (aiBrain[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
+            aiBrain[M27UnitInfo.refiPathingCheckCount] = (aiBrain[M27UnitInfo.refiPathingCheckCount] or 0) + 1
+            if (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime) > 0.3 then bDebugMessages = true end --Retain for audit trail - to show significant pathing related freezes we have had
+            if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; Time taken='..(GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)..'; Brain count='..aiBrain[M27UnitInfo.refiPathingCheckCount]..'; Brain total time='..aiBrain[M27UnitInfo.refiPathingCheckTime]) end
             if bDebugMessages == true and bHaveChangedPathing then M27Utilities.ErrorHandler('Have changed pathing', true) end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return bHaveChangedPathing
@@ -1120,8 +1130,8 @@ end
 function GetReclaimLocationFromSegment(iReclaimSegmentX, iReclaimSegmentZ)
     --e.g. segment (1,1) will be 0 to ReclaimSegmentSizeX and 0 to ReclaimSegmentSizeZ in size
     --This will return the midpoint
-    local iX = (iReclaimSegmentX - 0.5) * iReclaimSegmentSizeX
-    local iZ = (iReclaimSegmentZ - 0.5) * iReclaimSegmentSizeZ
+    local iX = math.max(rMapPlayableArea[1], math.min(rMapPlayableArea[3], (iReclaimSegmentX - 0.5) * iReclaimSegmentSizeX))
+    local iZ = math.max(rMapPlayableArea[2], math.min(rMapPlayableArea[4], (iReclaimSegmentZ - 0.5) * iReclaimSegmentSizeZ))
     return {iX, GetSurfaceHeight(iX, iZ), iZ}
 end
 
@@ -2859,7 +2869,7 @@ function RecordBaseLevelPathability()
     local iMaxDifInHeight = iMaxHeightDif
     local iDifInHeightThreshold = iLowHeightDifThreshold
     local iIntervalSize = iPathingIntervalSize
-    local iNavyMinWaterDepth = iMinWaterDepth
+    local iNavyMinWaterDepth = iMinWaterDepth --Dif between terrain and surface height required to be pathable to most ships
     local tAdjustmentsForArea = tGeneralAreaAroundTargetAdjustments
     local tAreaAdjToSearch = tWaterAreaAroundTargetAdjustments
     local iMinAreaSize = iWaterMinArea
@@ -4086,6 +4096,10 @@ function MappingInitialisation(aiBrain)
             --LOG('MapGroup='..repru(GetMapGroup()))
             LOG(sFunctionRef..': End of code')
         end
+
+        --Record ponds
+        M27Navy.RecordPonds()
+
         bPathfindingComplete = true
 
         --Other variables used by all M27ai
