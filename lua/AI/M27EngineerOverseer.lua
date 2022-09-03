@@ -10389,7 +10389,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
                     elseif iCurrentConditionToTry == 29 then --Naval factory
                         --Does enemy have a naval threat on a pond of danger to us?
-                        if aiBrain:GetArmyIndex() == 4 and iEngineersToConsider > 0 and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
 
                         aiBrain[M27Navy.refbEnemyNavyPreventingBuildingNavy] = false
                         if bDebugMessages == true then LOG(sFunctionRef..': Mass gross income='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; Is table of pond details empty='..tostring(M27Utilities.IsTableEmpty(M27Navy.tPondDetails))..'; Assigned pond='..(aiBrain[M27Navy.refiAssignedPond] or 'nil')..'; Is table of all enemy units in ponds empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
@@ -10501,7 +10500,6 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
 
                     elseif iCurrentConditionToTry == 30 then --Nuke assist
-                        bDebugMessages = false
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if have a nuke that want to assist; aiBrain[M27EconomyOverseer.refbStallingEnergy]='..tostring(aiBrain[M27EconomyOverseer.refbStallingEnergy])..'; Number of SMLs='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML)..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; aiBrain[M27EconomyOverseer.refbReclaimNukes]='..tostring((aiBrain[M27EconomyOverseer.refbReclaimNukes] or false))) end
                         if iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML - categories.EXPERIMENTAL) > 0 and not(aiBrain[M27EconomyOverseer.refbReclaimNukes]) and not(aiBrain[M27EconomyOverseer.refbStallingEnergy]) then
                             --Is our nuke not paused?

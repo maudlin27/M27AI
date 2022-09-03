@@ -7556,7 +7556,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
             else
                 aiBrain[refbACUVulnerableToAirSnipe] = false
             end
-            bDebugMessages = true
             if bDebugMessages == true then LOG(sFunctionRef..': aiBrain='..aiBrain.Nickname..'; iDistToOurBase='..iDistToOurBase..'; Has enemy built torpedo bombers='..tostring(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or false)..'; iUpgradeCount='..iUpgradeCount..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; can path to enemy with amphib='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; Is ACU underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oACU))) end
 
             --If ACU far from base and is amphibious map and ACU is in big pond, without many upgrades, and enemy has built at least 1 torpedo bomber this game, then have it run if the enemy has torp bombers
@@ -7568,7 +7567,6 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 end
                 if M27Navy.tPondDetails[iPond] and M27Navy.tPondDetails[iPond][M27Navy.subrefPondSize] >= 10000 then
                     aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
-                    bDebugMessages = true
                     if bDebugMessages == true then LOG(sFunctionRef..': Enemy has built torp bombers and our ACU is vulnerable so want to retreat it') end
                 end
             end

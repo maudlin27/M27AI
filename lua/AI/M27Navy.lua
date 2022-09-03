@@ -1451,8 +1451,12 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                     end
                 end
                 if bAttackNearestThreatInstead then
-                    --Attack nearest enemy unit
-                    tGlobalNavalDestination = { oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][1], oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][2], oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][3] }
+                    --Attack nearest enemy unit - move to just before actual position if we have seen the unit
+                    if M27Utilities.CanSeeUnit(aiBrain, oNearestThreatToConsider, true) then
+                        tGlobalNavalDestination = M27Utilities.MoveInDirection(oNearestThreatToConsider:GetPosition(), M27Utilities.GetAngleFromAToB(oNearestThreatToConsider:GetPosition(), tOurBase), 4, true, false)
+                    else
+                        tGlobalNavalDestination = { oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][1], oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][2], oNearestThreatToConsider[M27UnitInfo.reftLastKnownPosition][3] }
+                    end
                 else
                     --Attack enemy base
                     tGlobalNavalDestination = tEnemyBase
@@ -1709,7 +1713,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         end
 
         if bDebugMessages == true then LOG(sFunctionRef..': Considering if any enemy mexes to bombard. iClosestMexRef='..(iClosestMexRef or 'nil')) end
-        local tNonBombardmentRallyPoint
+        local tNonBombardmentRallyPoint = M27Utilities.MoveInDirection(oClosestFriendlyUnitToEnemyBase:GetPosition(), M27Utilities.GetAngleFromAToB(oClosestFriendlyUnitToEnemyBase:GetPosition(), tOurBase), 20, true, false)
         local tBombardmentRallyPoint
         local tBlockedShotBaseMoveLocation --Closest position to mex that we thought a shot wouldnt be blocked from
         local tBlockedShotActualMoveLocation --Moves back based on our current distance to the mex if we are further away
@@ -1719,7 +1723,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         if iClosestMexRef then
             local tClosestMex = { tPondDetails[iPond][subrefPondMexInfo][iClosestMexRef][subrefMexLocation][1], tPondDetails[iPond][subrefPondMexInfo][iClosestMexRef][subrefMexLocation][2], tPondDetails[iPond][subrefPondMexInfo][iClosestMexRef][subrefMexLocation][3] }
             --Attack-move to nearest mex; for units that wont be in range to attack the mex position, attack-move towards our base by 10 below the bombardment range
-            tNonBombardmentRallyPoint = M27Utilities.MoveInDirection(tClosestMex, M27Utilities.GetAngleFromAToB(tClosestMex, tOurBase), math.max(iOurBestDFRange, iOurBestIndirectRange), true, false)
+            --tNonBombardmentRallyPoint = M27Utilities.MoveInDirection(tClosestMex, M27Utilities.GetAngleFromAToB(tClosestMex, tOurBase), math.max(iOurBestDFRange, iOurBestIndirectRange), true, false)
             tBombardmentRallyPoint = tClosestMex
             iDFMinRange = tPondDetails[iPond][subrefPondMexInfo][iClosestMexRef][subrefMexDFDistance]
             if iDFMinRange == 0 then
@@ -1734,7 +1738,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
 
         else
             tBombardmentRallyPoint = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]}
-            tNonBombardmentRallyPoint = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]}
+            --tNonBombardmentRallyPoint = {tEnemyBase[1], tEnemyBase[2], tEnemyBase[3]}
             tBlockedShotBaseMoveLocation = nil --dont want to consider
             iDFMinRange = iOurBestDFRange
             iIndirectMinRange = iOurBestIndirectRange

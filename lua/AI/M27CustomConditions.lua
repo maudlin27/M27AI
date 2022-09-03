@@ -242,7 +242,6 @@ function SafeToGetACUUpgrade(aiBrain)
 
                         if (oACU:HasEnhancement('CloakingGenerator') and not(IsLocationNearEnemyOmniRange(aiBrain, oACU:GetPosition(), 3))) then bIsSafe = true
                         elseif bAreUnderwater then
-                            bDebugMessages = true
                             if not(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers]) then
                                 local iPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oACU:GetPosition())
                                 if not(M27Navy.tPondDetails[iPond]) then
@@ -259,7 +258,6 @@ function SafeToGetACUUpgrade(aiBrain)
                                 end
                             elseif bDebugMessages == true then LOG(sFunctionRef..': ACU not safe to get upgrade as enemy has prev built torp bombers')
                             end
-                            bDebugMessages = false
                         else
                             --Are we near to enemy base and not near ours?
                             local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
