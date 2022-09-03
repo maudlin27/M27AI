@@ -495,10 +495,10 @@ function GetAveragePositionOfMultipleTablesOfUnits(tTablesOfUnits)
     local iUnitCount = 0
     local tCurPos = {}
     for iUnitTable, tUnitTable in tTablesOfUnits do
-        LOG('GetAveragePositionOfMultipleTablesOfUnits: Size of tUnitTable='..table.getn(tUnitTable))
+        --LOG('GetAveragePositionOfMultipleTablesOfUnits: Size of tUnitTable='..table.getn(tUnitTable))
         if IsTableEmpty(tUnitTable) == false then
             for iUnit, oUnit in tUnitTable do
-                LOG('GetAveragePositionOfMultipleTablesOfUnits: considiring unit '..(oUnit.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oUnit) or 'nil'))
+                --LOG('GetAveragePositionOfMultipleTablesOfUnits: considiring unit '..(oUnit.UnitId or 'nil')..(M27UnitInfo.GetUnitLifetimeCount(oUnit) or 'nil'))
                 if oUnit.GetPosition then
                     tCurPos = oUnit:GetPosition()
                     if tCurPos[1] then

@@ -7361,6 +7361,7 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
 
 
             -------->>>>>>>>>>>>Set ACU health to run on<<<<<<<<<<<----------------
+            --NOTE: Platoon utilities nearby enemies logic will adjust this slightly, in particular see the variable bCapHealthToRunOn, which reduces health to run on from 100% to 98% in most cases
 
 
             aiBrain[refiACUHealthToRunOn] = math.max(5250, oACU:GetMaxHealth() * 0.45)
@@ -7554,6 +7555,22 @@ function StrategicOverseer(aiBrain, iCurCycleCount)
                 end
             else
                 aiBrain[refbACUVulnerableToAirSnipe] = false
+            end
+            bDebugMessages = true
+            if bDebugMessages == true then LOG(sFunctionRef..': aiBrain='..aiBrain.Nickname..'; iDistToOurBase='..iDistToOurBase..'; Has enemy built torpedo bombers='..tostring(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or false)..'; iUpgradeCount='..iUpgradeCount..'; Enemy air to ground threat='..(aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] or 'nil')..'; Can path to enemy with land='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand])..'; can path to enemy with amphib='..tostring(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious])..'; Is ACU underwater='..tostring(M27UnitInfo.IsUnitUnderwater(oACU))) end
+
+            --If ACU far from base and is amphibious map and ACU is in big pond, without many upgrades, and enemy has built at least 1 torpedo bomber this game, then have it run if the enemy has torp bombers
+            if iDistToOurBase > 175 and (aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers] or aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0) and iUpgradeCount < 3 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 200 and not(aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithLand]) and aiBrain[M27MapInfo.refbCanPathToEnemyBaseWithAmphibious] and M27UnitInfo.IsUnitUnderwater(oACU) then
+                --is the ACU in a large pond (10k+ in size)?
+                local iPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oACU:GetPosition())
+                if bDebugMessages == true then LOG(sFunctionRef..': ACU pond='..iPond..'; is pond details empty for this pond='..tostring(M27Utilities.IsTableEmpty(M27Navy.tPondDetails[iPond])))
+                    if M27Navy.tPondDetails[iPond] then LOG(sFunctionRef..': Pond size='..(M27Navy.tPondDetails[iPond][M27Navy.subrefPondSize] or 'nil')) end
+                end
+                if M27Navy.tPondDetails[iPond] and M27Navy.tPondDetails[iPond][M27Navy.subrefPondSize] >= 10000 then
+                    aiBrain[refiACUHealthToRunOn] = oACU:GetMaxHealth()
+                    bDebugMessages = true
+                    if bDebugMessages == true then LOG(sFunctionRef..': Enemy has built torp bombers and our ACU is vulnerable so want to retreat it') end
+                end
             end
 
 

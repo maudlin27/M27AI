@@ -76,7 +76,7 @@ reftTMLThreats = 'M27TMLThreats' --[sTMLRef] - returns object number of TML that
 refbCantBuildTMDNearby = 'M27CantBuildTMDNearby'
 refiNearbyTMD = 'M27TMDNearby' --Number of friendly TMD nearby
 
---Recorded range
+--Recorded range (recorded for naval logic)
 refiDFRange = 'M27UnitDFRange'
 refiIndirectRange = 'M27UnitIndirectRange'
 refiAntiNavyRange = 'M27UnitAntiNavyRange'

@@ -248,7 +248,7 @@ function OnKilled(oUnitKilled, instigator, type, overkillRatio)
                     if not(iCurPond) then
                         iCurPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnitKilled:GetPosition())
                     end
-                    M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iCurPond] = (M27Team.tTeamData[aiBrain.M27Team][M27Navy.refiDestroyedNavalFactoriesByPond][iCurPond] or 0) + 1
+                    M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iCurPond] = (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iCurPond] or 0) + 1
 
                 end
             end

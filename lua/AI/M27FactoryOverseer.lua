@@ -2288,7 +2288,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     if iEnemySurfaceThreat >= 500 then
                                         local iOurNavalThreat =   M27Logic.GetCombatThreatRating(aiBrain, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]], false, nil, nil, false, false, false, false, true, false, false)
                                         if iOurNavalThreat < iEnemySurfaceThreat then
-                                            iCategoryToBuild = M27UnitInfo.refCategoryFrigate + M27UnitInfo.refCategoryDestroyer + categories.TECH3 * M27UnitInfo.refCategoryDirectFire * M27UnitInfo.refCategoryNavalSurface
+                                            iCategoryToBuild = M27UnitInfo.refCategoryFrigate + M27UnitInfo.refCategoryDestroyer + categories.TECH3 * categories.DIRECTFIRE * M27UnitInfo.refCategoryNavalSurface
                                         end
                                     end
                                 end

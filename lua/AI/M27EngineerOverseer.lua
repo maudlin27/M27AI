@@ -9204,12 +9204,31 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                             if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionBuildTMD]) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Dont have any existing actions to build TMD so will just record locations of all units wanting TMD and then consider later which of these is closest to the nearest idle engineer') end
+                                local bHaveInvalidUnits = false
                                 for iUnit, oUnit in aiBrain[reftUnitsWantingTMD] do
                                     if M27UnitInfo.IsUnitValid(oUnit) then
                                         if bDebugMessages == true then LOG(sFunctionRef..': About to add unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' as one of the locations to get TMD protection') end
                                         table.insert(tExistingLocationsToPickFrom, oUnit:GetPosition())
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have invalid unit wanting TMD') end
+                                        bHaveInvalidUnits = true
                                     end
                                 end
+                                --Remove up to 5 invalid units
+                                local iRemovedCount = 0
+                                while bHaveInvalidUnits do
+                                    bHaveInvalidUnits = false
+                                    for iUnit, oUnit in aiBrain[reftUnitsWantingTMD] do
+                                        if not(M27UnitInfo.IsUnitValid(oUnit)) then
+                                            bHaveInvalidUnits = true
+                                            iRemovedCount = iRemovedCount + 1
+                                            aiBrain[reftUnitsWantingTMD][iUnit] = nil --Doesnt use table.remove as is using unit string refs
+                                            break
+                                        end
+                                    end
+                                    if iRemovedCount >= 5 then break end
+                                end
+
                             else
                                 local iClosestDistanceToEngi = 10000
                                 local tPrimaryEngiLocation
@@ -9289,8 +9308,8 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 LOG(sFunctionRef..': Have set action to build TMD; list of locations of units wanting TMD='..repru(tExistingLocationsToPickFrom)..'; will draw locations in black')
                                 M27Utilities.DrawLocations(tExistingLocationsToPickFrom, nil, 3, 200, false, nil)
                             end
-                            if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom) then
-                                M27Utilities.ErrorHandler('Couldnt find any locations to build TMD at, wont try and build TMD')
+                            if M27Utilities.IsTableEmpty(tExistingLocationsToPickFrom) and M27Utilities.IsTableEmpty(aiBrain[reftUnitsWantingTMD]) == false then
+                                M27Utilities.ErrorHandler('Couldnt find any locations to build TMD at despite having units wanting tmd, wont try and build TMD')
                                 iActionToAssign = nil
                             end
                         end
@@ -10370,20 +10389,23 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
                     elseif iCurrentConditionToTry == 29 then --Naval factory
                         --Does enemy have a naval threat on a pond of danger to us?
+                        if aiBrain:GetArmyIndex() == 4 and iEngineersToConsider > 0 and GetGameTimeSeconds() >= 600 then bDebugMessages = true end
+
                         aiBrain[M27Navy.refbEnemyNavyPreventingBuildingNavy] = false
                         if bDebugMessages == true then LOG(sFunctionRef..': Mass gross income='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; Is table of pond details empty='..tostring(M27Utilities.IsTableEmpty(M27Navy.tPondDetails))..'; Assigned pond='..(aiBrain[M27Navy.refiAssignedPond] or 'nil')..'; Is table of all enemy units in ponds empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
                         if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 2 and M27Utilities.IsTableEmpty(M27Navy.tPondDetails) == false and (aiBrain[M27Navy.refiAssignedPond] or M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false) then
                             --Decide on the pond we want to get, and if it's because of the enemy or us
                             local iPondWanted = M27Navy.GetPondToFocusOn(aiBrain)
-                            if bDebugMessages == true then LOG(sFunctionRef..': Finished identifying pond that we want='..(iPondWanted or 'nil')..'; default pond='..(aiBrain[M27Navy.refiAssignedPond] or 'nil')) end
+                            if bDebugMessages == true then LOG(sFunctionRef..': Finished identifying pond that we want='..(iPondWanted or 'nil')..'; default pond='..(aiBrain[M27Navy.refiAssignedPond] or 'nil')..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]) end
                             if iPondWanted then
                                 --Only start navy if have at least 40 mass/s, unless enemy is in a pond that threatens us
+                                if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy units empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPondWanted]))..'; Naval facs destroyed in this pond='..(M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iPondWanted] or 0)..'; Is table of friendly units for this pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPondWanted]))) end
                                 if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 4 or M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPondWanted]) == false then
                                     --Have we had a naval factory destroyed in this pond?
                                     if (M27Team.tTeamData[aiBrain.M27Team][M27Team.refiDestroyedNavalFactoriesByPond][iPondWanted] or 0) == 0 then
                                         --We want to support the pond - how many engineers does it need?
                                         local tCurPondEngis
-                                        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPondWanted]) == false then tCurPondEngis = EntityCategoryFilterDown(M27UnitInfo.refCategoryEngineer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPondWanted]) end
+                                        if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPondWanted]) == false then tCurPondEngis = EntityCategoryFilterDown(M27UnitInfo.refCategoryEngineer, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPondWanted]) end
 
                                         local iPondEngisWanted = math.min(16, math.max(4, math.floor(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome])))
                                         if aiBrain:GetEconomyStored('MASS') <= 1 and aiBrain[M27EconomyOverseer.refiMassNetBaseIncome] < -0.5 then iPondEngisWanted = math.floor(iPondEngisWanted * 0.6)
@@ -10391,6 +10413,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
 
                                         local iCurPondEngis = 0
                                         if M27Utilities.IsTableEmpty(tCurPondEngis) == false then iCurPondEngis = table.getn(tCurPondEngis) end
+                                        if bDebugMessages == true then LOG(sFunctionRef..': iPondEngisWanted='..iPondEngisWanted..'; iCurPondEngis='..iCurPondEngis) end
                                         if iPondEngisWanted > iCurPondEngis then
                                             --Want to get more engineers to support the pond; are there enemy naval units near the pond?
                                             local bNearbyEnemies = false
@@ -10478,6 +10501,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                         end
 
                     elseif iCurrentConditionToTry == 30 then --Nuke assist
+                        bDebugMessages = false
                         if bDebugMessages == true then LOG(sFunctionRef..': Checking if have a nuke that want to assist; aiBrain[M27EconomyOverseer.refbStallingEnergy]='..tostring(aiBrain[M27EconomyOverseer.refbStallingEnergy])..'; Number of SMLs='..aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML)..'; iHighestFactoryOrEngineerTechAvailable='..iHighestFactoryOrEngineerTechAvailable..'; aiBrain[M27EconomyOverseer.refbReclaimNukes]='..tostring((aiBrain[M27EconomyOverseer.refbReclaimNukes] or false))) end
                         if iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategorySML - categories.EXPERIMENTAL) > 0 and not(aiBrain[M27EconomyOverseer.refbReclaimNukes]) and not(aiBrain[M27EconomyOverseer.refbStallingEnergy]) then
                             --Is our nuke not paused?

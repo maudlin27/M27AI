@@ -2386,7 +2386,7 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
     --if sPlatoonName == 'M27ScoutAssister' and oPlatoon[refiPlatoonCount] <= 2 then bDebugMessages = true end
     --if sPlatoonName == 'M27RAS' and oPlatoon[refiPlatoonCount] == 8 and GetGameTimeSeconds() >= 2400 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 30 then bDebugMessages = true end
-    --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 840 then bDebugMessages = true end
+    if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 1380 and aiBrain:GetArmyIndex() == 3 then bDebugMessages = true end
     --if sPlatoonName == 'M27Skirmisher' and oPlatoon[refiPlatoonCount] == 1 and GetGameTimeSeconds() >= 1080 then bDebugMessages = true end
     --if oPlatoon[refbACUInPlatoon] == true and GetGameTimeSeconds() >= 950 then bDebugMessages = true end
     --if sPlatoonName == 'M27GroundExperimental' and M27UnitInfo.IsUnitValid(oPlatoon[refoFrontUnit]) and oPlatoon[refiPlatoonMaxRange] >= 60 then bDebugMessages = true end
@@ -2531,7 +2531,19 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                 iCurrentHealth = iCurrentHealth + 2000
                             end
                             if oPlatoon[refbNeedToHeal] == true then
-                                iHealthToRunOn = math.max(6250, math.min(iHealthToRunOn + 750, oACU:GetMaxHealth() * 0.98))
+                                --If worried about air snipe then only do this if ACU is within 75 of an air rally point or 150 of base
+                                local bCapHealthToRunOn = true
+                                if aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] then
+                                    local tAirRallyPoint = M27AirOverseer.GetAirRallyPoint(aiBrain)
+                                    if M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), tAirRallyPoint) >= 75 and M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 150 then
+                                        bCapHealthToRunOn = false
+                                    end
+                                end
+                                if bCapHealthToRunOn then
+                                    iHealthToRunOn = math.max(6250, math.min(iHealthToRunOn + 750, oACU:GetMaxHealth() * 0.98))
+                                else
+                                    iHealthToRunOn = math.max(6250, iHealthToRunOn)
+                                end
                             end
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Checking if ACU health is low enough that it should run.  refbNeedToHeal=' .. tostring(oPlatoon[refbNeedToHeal]) .. '; iHealthToRunOn=' .. iHealthToRunOn .. '; iCurrentHealth=' .. iCurrentHealth .. '; M27Overseer.iACUEmergencyHealthPercentThreshold=' .. M27Overseer.iACUEmergencyHealthPercentThreshold .. '; ACU health %=' .. M27UnitInfo.GetUnitHealthPercent(oACU))
@@ -2596,8 +2608,19 @@ function UpdatePlatoonActionForNearbyEnemies(oPlatoon, bAlreadyHaveAttackActionF
                                     if bDebugMessages == true then LOG(sFunctionRef..': If are vulnerable to an air snipe and are more than 150 from base, will look for rally point nearest air rally point.  Dist to air rally point='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27AirOverseer.GetAirRallyPoint(aiBrain))..'; Dist to base='..M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; aiBrain[M27Overseer.refbACUVulnerableToAirSnipe]='..tostring(aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] or false)) end
                                     if aiBrain[M27Overseer.refbACUVulnerableToAirSnipe] and M27Utilities.GetDistanceBetweenPositions(GetPlatoonFrontPosition(oPlatoon), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) >= 150 then
                                         if aiBrain[M27AirOverseer.refbHaveAirControl] then
-                                            oPlatoon[refiCurrentAction] = refActionGoToRallyPointNearAir
-                                            if bDebugMessages == true then LOG(sFunctionRef..': Basing rally point on the one nearest the air rally point') end
+                                            --Do we have at least 4 AirAA units available?
+                                            local iAirAAAvailable = 0
+                                            if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]) == false then
+                                                iAirAAAvailable = table.getn(aiBrain[M27AirOverseer.reftAvailableAirAA])
+                                            end
+                                            if bDebugMessages == true then LOG(sFunctionRef..': iAirAAAvailable='..iAirAAAvailable..'; Is table of available airaa empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableAirAA]))..'; aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]='..aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat]) end
+                                            if iAirAAAvailable >= 4 and aiBrain[M27AirOverseer.refiEnemyAirToGroundThreat] >= 1200 then
+                                                oPlatoon[refiCurrentAction] = refActionGoToRallyPointNearAir
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Basing rally point on the one nearest the air rally point') end
+                                            else
+                                                oPlatoon[refiCurrentAction] = refActionReturnToBase
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Dont have much available AirAA so will return to base to be safe') end
+                                            end
                                         else
                                             oPlatoon[refiCurrentAction] = refActionReturnToBase
                                             if bDebugMessages == true then LOG(sFunctionRef..': Will return to base') end

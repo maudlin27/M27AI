@@ -8,6 +8,7 @@ local M27AirOverseer = import('/mods/M27AI/lua/AI/M27AirOverseer.lua')
 local M27EconomyOverseer = import('/mods/M27AI/lua/AI/M27EconomyOverseer.lua')
 local M27UnitInfo = import('/mods/M27AI/lua/AI/M27UnitInfo.lua')
 local M27Team = import('/mods/M27AI/lua/AI/M27Team.lua')
+local M27Navy = import('/mods/M27AI/lua/AI/M27Navy.lua')
 
 --NOTE: Below are replaced by GameSettingWarningsAndChecks if sim mods are detected that expand the acu enhancement list
 tGunUpgrades = { 'HeavyAntiMatterCannon',
@@ -238,70 +239,117 @@ function SafeToGetACUUpgrade(aiBrain)
                         --Are we either underwater, or are a cloaked ACU not in enemy omni range?
                         local bAreUnderwater = M27UnitInfo.IsUnitUnderwater(oACU)
                         if bDebugMessages == true then LOG(sFunctionRef..': Are we underwater='..tostring(bAreUnderwater)..'; Do we have cloaking enhancement='..tostring(oACU:HasEnhancement('CloakingGenerator'))) end
-                        if bAreUnderwater or (oACU:HasEnhancement('CloakingGenerator') and not(IsLocationNearEnemyOmniRange(aiBrain, oACU:GetPosition(), 3))) then bIsSafe = true
+
+                        if (oACU:HasEnhancement('CloakingGenerator') and not(IsLocationNearEnemyOmniRange(aiBrain, oACU:GetPosition(), 3))) then bIsSafe = true
+                        elseif bAreUnderwater then
+                            bDebugMessages = true
+                            if not(aiBrain[M27AirOverseer.refbEnemyHasBuiltTorpedoBombers]) then
+                                local iPond = M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oACU:GetPosition())
+                                if not(M27Navy.tPondDetails[iPond]) then
+                                    bIsSafe = true
+                                else
+                                    --Does the enemy have no units or no antinavy units in the pond?
+                                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond]) then
+                                        bIsSafe = true
+                                    elseif M27Utilities.IsTableEmpty(EntityCategoryFilterDown(categories.ANTINAVY * categories.MOBILE, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])) then
+                                        bIsSafe = true
+                                    else
+                                        if bDebugMessages == true then LOG(sFunctionRef..': ACU not safe to get upgrade as enemy has mobile antinavy in the pond') end
+                                    end
+                                end
+                            elseif bDebugMessages == true then LOG(sFunctionRef..': ACU not safe to get upgrade as enemy has prev built torp bombers')
+                            end
+                            bDebugMessages = false
                         else
                             --Are we near to enemy base and not near ours?
                             local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain))
                             if iDistToEnemy > 90 or iDistToEnemy > M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) then
                                 local bNearbyScout = false
-                                if oACU[M27Overseer.refoScoutHelper] and M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoScoutHelper][M27PlatoonUtilities.refoFrontUnit]) and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoScoutHelper]), tACUPos) <= math.max(8, oACU[M27Overseer.refoScoutHelper][M27PlatoonUtilities.refoFrontUnit]:GetBlueprint().Intel.RadarRadius - iSearchRange) then bNearbyScout = true end
+                                if oACU[M27Overseer.refoScoutHelper] and M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoScoutHelper][M27PlatoonUtilities.refoFrontUnit]) and M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoScoutHelper]), tACUPos) <= math.max(8, oACU[M27Overseer.refoScoutHelper][M27PlatoonUtilities.refoFrontUnit]:GetBlueprint().Intel.RadarRadius - iSearchRange) then
+                                    bNearbyScout = true
+                                end
                                 if bNearbyScout or M27Logic.GetIntelCoverageOfPosition(aiBrain, tACUPos, iSearchRange) == true then
 
                                     --Are there enemies near the ACU with a threat value?
                                     tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllNonAirScoutUnits, tACUPos, iSearchRange, 'Enemy')
                                     local iThreat = M27Logic.GetCombatThreatRating(aiBrain, tNearbyEnemies, true, nil, 50)
-                                    if iThreat <= 150 then bIsSafe = true end
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Have intel coverage, iThreat='..iThreat..'; bIsSafe='..tostring(bIsSafe)) end
+                                    if iThreat <= 150 then
+                                        bIsSafe = true
+                                    end
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': Have intel coverage, iThreat=' .. iThreat .. '; bIsSafe=' .. tostring(bIsSafe))
+                                    end
                                 elseif bDebugMessages == true then
-                                    LOG(sFunctionRef..': Dont have intel coverage of ACU')
+                                    LOG(sFunctionRef .. ': Dont have intel coverage of ACU')
                                     if oACU[M27Overseer.refoScoutHelper] then
-                                        LOG('Distance of assigned scout to ACU='..M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoScoutHelper]), tACUPos))
+                                        LOG('Distance of assigned scout to ACU=' .. M27Utilities.GetDistanceBetweenPositions(M27PlatoonUtilities.GetPlatoonFrontPosition(oACU[M27Overseer.refoScoutHelper]), tACUPos))
                                     else
                                         LOG('Scout helper isnt a valid platoon')
                                     end
                                 end
-                            elseif bDebugMessages == true then LOG(sFunctionRef..': iDistToEnemy='..iDistToEnemy)
+                            elseif bDebugMessages == true then
+                                LOG(sFunctionRef .. ': iDistToEnemy=' .. iDistToEnemy)
                             end
                         end
                         if bIsSafe == true then
-                            if bDebugMessages == true then LOG(sFunctionRef..': No nearby enemies or underwater, will now check ACUs health and if its trying to heal') end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': No nearby enemies or underwater, will now check ACUs health and if its trying to heal')
+                            end
                             local iCurrentHealth = oACU:GetHealth()
                             local bACUNearBase = false
-                            if bDebugMessages == true then LOG(sFunctionRef..': M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]='..repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])..'; M27Overseer.iDistanceFromBaseToBeSafe='..M27Overseer.iDistanceFromBaseToBeSafe..'; tACUPos='..repru(tACUPos)..'; ACU health %='..M27UnitInfo.GetUnitHealthPercent(oACU)..'; dist wanted from base='..math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25))) end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef .. ': M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]=' .. repru(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) .. '; M27Overseer.iDistanceFromBaseToBeSafe=' .. M27Overseer.iDistanceFromBaseToBeSafe .. '; tACUPos=' .. repru(tACUPos) .. '; ACU health %=' .. M27UnitInfo.GetUnitHealthPercent(oACU) .. '; dist wanted from base=' .. math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25)))
+                            end
 
                             local iACUDistToBase = M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                            if iACUDistToBase <= M27Overseer.iDistanceFromBaseToBeSafe or (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 and iACUDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase]*0.25))) then bACUNearBase = true
+                            if iACUDistToBase <= M27Overseer.iDistanceFromBaseToBeSafe or (M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 and iACUDistToBase <= math.min(150, math.max(M27Overseer.iDistanceFromBaseToBeSafe, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.25))) then
+                                bACUNearBase = true
                             elseif M27Utilities.GetDistanceBetweenPositions(tACUPos, M27Logic.GetNearestRallyPoint(aiBrain, tACUPos, oACU)) <= math.min(10, M27Overseer.iDistanceFromBaseToBeSafe * 0.5) then
                                 --Treat ACU as though it's near our base if its close to a rally point
                                 bACUNearBase = true
                             end
                             if iCurrentHealth <= aiBrain[M27Overseer.refiACUHealthToRunOn] and bACUNearBase == false then
-                                if bDebugMessages == true then LOG(sFunctionRef..': ACU health is '..iCurrentHealth..'; Health to run on='..aiBrain[M27Overseer.refiACUHealthToRunOn]) end
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': ACU health is ' .. iCurrentHealth .. '; Health to run on=' .. aiBrain[M27Overseer.refiACUHealthToRunOn])
+                                end
                                 bIsSafe = false
                             elseif oACU.PlatoonHandle and oACU.PlatoonHandle[M27PlatoonUtilities.refbNeedToHeal] and bACUNearBase == false then
-                                if bDebugMessages == true then LOG(sFunctionRef..': ACU platoon is flagged that it needs to heal so not safe to get gun') end
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': ACU platoon is flagged that it needs to heal so not safe to get gun')
+                                end
                                 bIsSafe = false
                             elseif M27UnitInfo.GetUnitHealthPercent(oACU) <= M27Overseer.iACUEmergencyHealthPercentThreshold then
                                 if bACUNearBase then
-                                    if iACUDistToBase > M27Overseer.iDistanceFromBaseWhenVeryLowHealthToBeSafe then bIsSafe = false end
-                                else bIsSafe = false
+                                    if iACUDistToBase > M27Overseer.iDistanceFromBaseWhenVeryLowHealthToBeSafe then
+                                        bIsSafe = false
+                                    end
+                                else
+                                    bIsSafe = false
                                 end
                             end
-                            if bIsSafe == false then --Check if we have mobile shields nearby and are on our side of the map
-                                if bDebugMessages == true then LOG(sFunctionRef..': Not safe under normal checks, but if underwater and not vulnerable to navy then may still be save. bAreUnderwater='..tostring(bAreUnderwater)..'; aiBrain[M27AirOverseer.refiTorpBombersWanted]='..(aiBrain[M27AirOverseer.refiTorpBombersWanted] or 0)..'; Time since last took unseen damage='..(GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]) >= 30) end
+                            if bIsSafe == false then
+                                --Check if we have mobile shields nearby and are on our side of the map
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Not safe under normal checks, but if underwater and not vulnerable to navy then may still be save. bAreUnderwater=' .. tostring(bAreUnderwater) .. '; aiBrain[M27AirOverseer.refiTorpBombersWanted]=' .. (aiBrain[M27AirOverseer.refiTorpBombersWanted] or 0) .. '; Time since last took unseen damage=' .. (GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage]) >= 30)
+                                end
                                 if oACU.PlatoonHandle and HaveNearbyMobileShield(oACU.PlatoonHandle) and M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) < M27Utilities.GetDistanceBetweenPositions(tACUPos, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain)) and M27UnitInfo.GetUnitHealthPercent(oACU) <= M27Overseer.iACUEmergencyHealthPercentThreshold * 0.8 then
                                     bIsSafe = true
                                 elseif bAreUnderwater and aiBrain[M27AirOverseer.refiTorpBombersWanted] < 3 and (bFirstUpgrade or (aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] + aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3]) == 0) then
                                     local iTimeSinceTookUnseenDamage = (GetGameTimeSeconds() - (oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] or -1000))
-                                    if iTimeSinceTookUnseenDamage >= 30 or (iTimeSinceTookUnseenDamage >= 10 and aiBrain[M27AirOverseer.refiTorpBombersWanted] <= 0 and (not(M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoUnitDealingUnseenDamage])) or not(EntityCategoryContains(categories.ANTINAVY, oACU[M27Overseer.refoUnitDealingUnseenDamage].UnitId)))) then
-                                        if bDebugMessages == true then LOG(sFunctionRef..': Underwater and been a while since took damage so will treat as being safe') end
+                                    if iTimeSinceTookUnseenDamage >= 30 or (iTimeSinceTookUnseenDamage >= 10 and aiBrain[M27AirOverseer.refiTorpBombersWanted] <= 0 and (not (M27UnitInfo.IsUnitValid(oACU[M27Overseer.refoUnitDealingUnseenDamage])) or not (EntityCategoryContains(categories.ANTINAVY, oACU[M27Overseer.refoUnitDealingUnseenDamage].UnitId)))) then
+                                        if bDebugMessages == true then
+                                            LOG(sFunctionRef .. ': Underwater and been a while since took damage so will treat as being safe')
+                                        end
                                         bIsSafe = true
                                     end
                                 end
                             end
-                            if bIsSafe == true then --Check are either underwater, near base, or our shots wont be blocked if we upgrade
-                                if bDebugMessages == true then LOG(sFunctionRef..': CHecking if ACU is underwater or (if not) if its shot is blocked') end
-                                if not(bACUNearBase) and not(bAreUnderwater) then
+                            if bIsSafe == true then
+                                --Check are either underwater, near base, or our shots wont be blocked if we upgrade
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': CHecking if ACU is underwater or (if not) if its shot is blocked')
+                                end
+                                if not (bACUNearBase) and not (bAreUnderwater) then
                                     local iIntervalDegrees = 30
                                     local iMaxInterval = 180
                                     local iChecks = math.ceil(iMaxInterval / iIntervalDegrees)
@@ -311,12 +359,14 @@ function SafeToGetACUUpgrade(aiBrain)
 
                                     local iDistanceFromACU = 22
 
-                                    if DoesACUHaveGun(aiBrain, false, oACU) then iDistanceFromACU = 30 end
+                                    if DoesACUHaveGun(aiBrain, false, oACU) then
+                                        iDistanceFromACU = 30
+                                    end
                                     local tCurPositionToCheck
                                     local iHeightFromGround = 0.6
                                     --function DoesACUHaveGun(aiBrain, bROFAndRange, oAltACU)
                                     if bDebugMessages == true then
-                                        LOG(sFunctionRef..': Checking if any shots are blocked by ACU before decide whether to upgrade')
+                                        LOG(sFunctionRef .. ': Checking if any shots are blocked by ACU before decide whether to upgrade')
                                         M27Utilities.DrawLocation(tACUPos, nil, 1)
                                     end
 
@@ -324,19 +374,24 @@ function SafeToGetACUUpgrade(aiBrain)
                                     local iMaxBlockedShots = math.min(3, iChecks * 0.35) --If a third of shots are blocked dont want to upgrade here
                                     for iCurCheck = 0, iChecks do
                                         iCurAngle = iBaseAngle + iIntervalDegrees * iCurCheck
-                                        if iCurAngle > 360 then iCurAngle = iCurAngle - 360 elseif iCurAngle < 0 then iCurAngle = iCurAngle + 360 end
+                                        if iCurAngle > 360 then
+                                            iCurAngle = iCurAngle - 360
+                                        elseif iCurAngle < 0 then
+                                            iCurAngle = iCurAngle + 360
+                                        end
                                         --MoveInDirection(tStart, iAngle, iDistance)
                                         tCurPositionToCheck = M27Utilities.MoveInDirection(tACUPos, iCurAngle, iDistanceFromACU) --uses surfaceheight for y
                                         tCurPositionToCheck[2] = tCurPositionToCheck[2] + iHeightFromGround
                                         if bDebugMessages == true then
                                             M27Utilities.DrawLocation(tCurPositionToCheck, nil, 2)
-                                            LOG(sFunctionRef..': tCurPositionToCheck='..repru(tCurPositionToCheck)..'; iCurCheck='..iCurCheck)
+                                            LOG(sFunctionRef .. ': tCurPositionToCheck=' .. repru(tCurPositionToCheck) .. '; iCurCheck=' .. iCurCheck)
                                         end
-
 
                                         if M27Logic.IsLineBlocked(aiBrain, tACUPos, tCurPositionToCheck) then
                                             iBlockedShots = iBlockedShots + 1
-                                            if bDebugMessages == true then LOG(sFunctionRef..': expect a shot is blocked, iBlockedShots='..iBlockedShots..'; iMaxBlockedShots='..iMaxBlockedShots) end
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': expect a shot is blocked, iBlockedShots=' .. iBlockedShots .. '; iMaxBlockedShots=' .. iMaxBlockedShots)
+                                            end
                                             if iBlockedShots >= iMaxBlockedShots then
                                                 bIsSafe = false
                                                 break
@@ -349,26 +404,34 @@ function SafeToGetACUUpgrade(aiBrain)
                                 --Check not taken damage recently from unseen enemy
                                 if oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] and GetGameTimeSeconds() - oACU[M27Overseer.refiACULastTakenUnseenOrTorpedoDamage] <= 20 then
                                     local oUnseenDamageDealer = oACU[M27Overseer.refoUnitDealingUnseenDamage]
-                                    if oUnseenDamageDealer and not(oUnseenDamageDealer.Dead) and oUnseenDamageDealer.GetUnitId then
-                                        if M27Logic.GetUnitMaxGroundRange({oUnseenDamageDealer}) >= 35 or EntityCategoryContains(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnseenDamageDealer.UnitId) then
-                                            if bDebugMessages == true then LOG(sFunctionRef..': ACU taken unseem damage from a unit with a range of at least 35 so want to run') end
+                                    if oUnseenDamageDealer and not (oUnseenDamageDealer.Dead) and oUnseenDamageDealer.GetUnitId then
+                                        if M27Logic.GetUnitMaxGroundRange({ oUnseenDamageDealer }) >= 35 or EntityCategoryContains(M27UnitInfo.refCategoryTorpedoLandAndNavy, oUnseenDamageDealer.UnitId) then
+                                            if bDebugMessages == true then
+                                                LOG(sFunctionRef .. ': ACU taken unseem damage from a unit with a range of at least 35 so want to run')
+                                            end
                                             bIsSafe = false
                                         end
                                     end
                                 end
                             end
                             if bIsSafe == true then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Will check for nearby PD, T2 arti and TML unless are underwater') end
+                                if bDebugMessages == true then
+                                    LOG(sFunctionRef .. ': Will check for nearby PD, T2 arti and TML unless are underwater')
+                                end
                                 --Check no enemy T2 arti or T3 PD nearby, or TML
-                                if not(M27UnitInfo.IsUnitUnderwater(oACU)) then
+                                if not (M27UnitInfo.IsUnitUnderwater(oACU)) then
                                     tNearbyEnemies = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryPD * categories.TECH3 + M27UnitInfo.refCategoryFixedT2Arti, tACUPos, 128, 'Enemy')
                                     bIsSafe = M27Utilities.IsTableEmpty(tNearbyEnemies)
-                                    if bDebugMessages == true then LOG(sFunctionRef..': bIsSafe after checking for nearby enemies='..tostring(bIsSafe)) end
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': bIsSafe after checking for nearby enemies=' .. tostring(bIsSafe))
+                                    end
                                     if bIsSafe and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyTML]) == false then
                                         local iTMLInRange = 0
                                         for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyTML] do
                                             if EntityCategoryContains(M27UnitInfo.refCategoryTML, oUnit.UnitId) and M27Utilities.GetDistanceBetweenPositions(tACUPos, oUnit:GetPosition()) <= 259 then
-                                                if bDebugMessages == true then LOG(sFunctionRef..': In range of TML') end
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': In range of TML')
+                                                end
                                                 iTMLInRange = iTMLInRange + 1
                                                 if iTMLInRange >= 2 then
                                                     break
@@ -380,12 +443,15 @@ function SafeToGetACUUpgrade(aiBrain)
                             end
                         end
                     end
-                elseif bDebugMessages == true then LOG(sFunctionRef..': Want to run from big threat')
+                elseif bDebugMessages == true then
+                    LOG(sFunctionRef .. ': Want to run from big threat')
                 end
             end
         end
     end
-    if bDebugMessages == true then LOG(sFunctionRef..': End of check, bIsSafe='..tostring(bIsSafe)) end
+    if bDebugMessages == true then
+        LOG(sFunctionRef .. ': End of check, bIsSafe=' .. tostring(bIsSafe))
+    end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
     return bIsSafe
 end

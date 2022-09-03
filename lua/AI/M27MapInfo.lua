@@ -185,6 +185,7 @@ function DetermineMaxTerrainHeightDif()
     ['Adaptive Flooded Corona'] = 0.15,
     ['Fields of Isis'] = 0.15, --minor for completeness - one of cliffs reclaim looks like its pathable but default settings show it as non-pathable
     ['Selkie Mirror'] = 0.15,
+    ['Flooded Strip Mine'] = 0.24, --middle island should be pathable by amphibious; ast 0.235 it isnt, at 0.24 it is
     ['Adaptive Point of Reason'] = 0.26,
     ['Hyperion'] = 0.215, --0.213 results in apparant plateau with 2 mexes (that is actually pathable) being treated as a plateau incorrectly
     }
@@ -641,12 +642,16 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     if M27UnitInfo.IsUnitValid(oPathingUnit) and EntityCategoryContains(categories.MOBILE, oPathingUnit.UnitId) then --Hard crash of game if do :CanPathTo on a structure, which could happen given structures use some of the platoon logic e.g. for mobile shield assistance then
 
-        --Ignore the check if we have had too many slowdowns for this unit
-        if oPathingUnit[M27UnitInfo.refiPathingCheckCount] and oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 2 and ((oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 10 and oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.3) or oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.7) then
+        --Ignore the check if we have had too many slowdowns for this unit, or this brain
+        local aiBrain = oPathingUnit:GetAIBrain()
+        if (oPathingUnit[M27UnitInfo.refiPathingCheckCount] and oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 2 and ((oPathingUnit[M27UnitInfo.refiPathingCheckCount] >= 10 and oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.3) or oPathingUnit[M27UnitInfo.refiPathingCheckTime] >= 0.7))
+            or (aiBrain[M27UnitInfo.refiPathingCheckCount] >= 4 and (aiBrain[M27UnitInfo.refiPathingCheckTime] >= 3.5 or aiBrain[M27UnitInfo.refiPathingCheckCount] >= 8 and aiBrain[M27UnitInfo.refiPathingCheckTime] >= 2.5))
+            then
+
             --Do nothing, dont want to risk constant slowdowns which can happen on larger maps if a unit manages to break out of a plateau
             if not(oPathingUnit['M27UnitMapPathingCheckAbort']) then
                 oPathingUnit['M27UnitMapPathingCheckAbort'] = true
-                M27Utilities.ErrorHandler('Wont do any more pathing checks for unit '..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..' as it already has had '..oPathingUnit[M27UnitInfo.refiPathingCheckCount]..' pathing checks and want to avoid slowdown', true)
+                M27Utilities.ErrorHandler('Wont do any more pathing checks for unit '..oPathingUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oPathingUnit)..' as want to avoid major slowdowns. Total time spent on this unit='..(oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0)..'; Total time spent on this brain='..(aiBrain[M27UnitInfo.refiPathingCheckTime] or 0), true)
             end
         else
 
@@ -840,8 +845,10 @@ function RecheckPathingOfLocation(sPathing, oPathingUnit, tTargetLocation, tOpti
             end
 
             oPathingUnit[M27UnitInfo.refiPathingCheckTime] = (oPathingUnit[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
-
-            if bDebugMessages == true then LOG(sFunctionRef..': bHaveChangedPathing='..tostring(bHaveChangedPathing)) end
+            aiBrain[M27UnitInfo.refiPathingCheckTime] = (aiBrain[M27UnitInfo.refiPathingCheckTime] or 0) + (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)
+            aiBrain[M27UnitInfo.refiPathingCheckCount] = (aiBrain[M27UnitInfo.refiPathingCheckCount] or 0) + 1
+            if (GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime) > 0.3 then bDebugMessages = true end --Retain for audit trail - to show significant pathing related freezes we have had
+            if bDebugMessages == true then LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; bHaveChangedPathing='..tostring(bHaveChangedPathing)..'; Time taken='..(GetSystemTimeSecondsOnlyForProfileUse() - iCurSystemTime)..'; Brain count='..aiBrain[M27UnitInfo.refiPathingCheckCount]..'; Brain total time='..aiBrain[M27UnitInfo.refiPathingCheckTime]) end
             if bDebugMessages == true and bHaveChangedPathing then M27Utilities.ErrorHandler('Have changed pathing', true) end
             M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
             return bHaveChangedPathing
