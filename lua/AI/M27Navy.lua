@@ -837,6 +837,18 @@ function GetPrimaryNavalFactory(aiBrain, iPond)
             local tExistingNavalFactory = EntityCategoryFilterDown(M27UnitInfo.refCategoryNavalFactory, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][iPond])
             local tFactoriesCloseToNavalBase = {}
             local tNavalBase = tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber]
+            if M27Utilities.IsTableEmpty(tNavalBase) then
+                --Do we have teammates with a naval base start position?
+                for iBrain, oBrain in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyActiveM27Brains] do
+                    tNavalBase = tPondDetails[iPond][subrefBuildLocationByStartPosition][oBrain.M27StartPositionNumber]
+                    if M27Utilities.IsTableEmpty(tNavalBase) == false then break end
+                end
+                if M27Utilities.IsTableEmpty(tNavalBase) then
+                    --Just use our start position
+                    M27Utilities.ErrorHandler('Couldnt find naval build location for any teammate so will just use our start position to avoid error')
+                    tNavalBase = M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]
+                end
+            end
             local iCurTechLevel
 
             if bDebugMessages == true then LOG(sFunctionRef..': Is the table of naval factories empty='..tostring(M27Utilities.IsTableEmpty(tExistingNavalFactory))) end
@@ -844,14 +856,17 @@ function GetPrimaryNavalFactory(aiBrain, iPond)
             if M27Utilities.IsTableEmpty(tExistingNavalFactory) == false then
                 local iHighestTechFactory = 1
                 for iFactory, oFactory in tExistingNavalFactory do
-                    iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oFactory)
-                    if bDebugMessages == true then LOG(sFunctionRef..': Considering factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; Dist to naval base='..M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase)..'; iDistanceCap='..iDistanceCap) end
+                    if M27UnitInfo.IsUnitValid(oFactory) then
+                        iCurTechLevel = M27UnitInfo.GetUnitTechLevel(oFactory)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering factory '..oFactory.UnitId..M27UnitInfo.GetUnitLifetimeCount(oFactory)..'; Dist to naval base='..M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase)..'; iDistanceCap='..iDistanceCap) end
 
-                    if M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase) <= iDistanceCap then
-                        iHighestTechFactory = math.max(iHighestTechFactory, M27UnitInfo.GetUnitTechLevel(oFactory))
-                        table.insert(tFactoriesCloseToNavalBase, oFactory)
+                        if M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase) <= iDistanceCap then
+                            iHighestTechFactory = math.max(iHighestTechFactory, M27UnitInfo.GetUnitTechLevel(oFactory))
+                            table.insert(tFactoriesCloseToNavalBase, oFactory)
+                        end
                     end
                 end
+
                 if M27Utilities.IsTableEmpty(tFactoriesCloseToNavalBase) then tFactoriesCloseToNavalBase = tExistingNavalFactory end
                 if M27UnitInfo.GetUnitTechLevel(oPreviousPrimary) >= iHighestTechFactory and M27UnitInfo.IsUnitValid(oPreviousPrimary) then
                     oPrimaryFactory = oPreviousPrimary
@@ -869,7 +884,7 @@ function GetPrimaryNavalFactory(aiBrain, iPond)
                                 break
                             else
                                 if M27UnitInfo.GetUnitTechLevel(oFactory) >= iHighestTechFactory then
-                                    iCurDistToTarget = M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tPondDetails[iPond][subrefBuildLocationByStartPosition][aiBrain.M27StartPositionNumber])
+                                    iCurDistToTarget = M27Utilities.GetDistanceBetweenPositions(oFactory:GetPosition(), tNavalBase)
                                     if iCurDistToTarget < iClosestDistToTarget then
                                         iClosestDistToTarget = iCurDistToTarget
                                         oPrimaryFactory = oFactory
@@ -1789,6 +1804,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
         for iUnit, oUnit in EntityCategoryFilterDown(M27UnitInfo.refCategoryMobileNavalSurface - iSupportNavyCategory, M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond][iPond]) do
             if bDebugMessages == true then LOG(sFunctionRef..': Considering unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; is underwater='..tostring(oUnit[refbTempIsUnderwater])..'; oUnit[M27UnitInfo.refiDFRange]='..oUnit[M27UnitInfo.refiDFRange]..'; oUnit[M27UnitInfo.refiIndirectRange]='..oUnit[M27UnitInfo.refiIndirectRange]) end
             if not (oUnit[refbTempIsUnderwater]) then
+                if oUnit[M27UnitInfo.refiIndirectRange] == nil then M27UnitInfo.GetNavalDirectAndSubRange(oUnit) end
                 bRetreatUnit = false
                 --Are we in range of enemy PD/T2 arti? If so then retreat
                 if bCheckForDefences then
@@ -1800,7 +1816,7 @@ function ManageTeamNavy(aiBrain, iTeam, iPond)
                         iCurEnemyDist = M27Utilities.GetDistanceBetweenPositions(oDefence:GetPosition(), oUnit:GetPosition())
                         if bDebugMessages == true then LOG(sFunctionRef..': Considering if oUnit='..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' is in range of oDefence='..oDefence.UnitId..M27UnitInfo.GetUnitLifetimeCount(oDefence)..'; iCurEnemyRange='..iCurEnemyRange..'; iCurEnemyDist='..iCurEnemyDist..'; Our DF/Indirect range='..math.max(oUnit[M27UnitInfo.refiIndirectRange], oUnit[M27UnitInfo.refiDFRange])) end
                         iDefencesHeadroom = math.min(iDefencesHeadroom, iCurEnemyDist - iCurEnemyRange)
-                        if iCurEnemyDist <= iCurEnemyRange or (iCurEnemyDist - 10 <= iCurEnemyRange and math.max(oUnit[M27UnitInfo.refiIndirectRange], oUnit[M27UnitInfo.refiDFRange]) < iCurEnemyRange) then
+                        if iCurEnemyDist <= iCurEnemyRange or (iCurEnemyDist - 10 <= iCurEnemyRange and math.max((oUnit[M27UnitInfo.refiIndirectRange] or 0), (oUnit[M27UnitInfo.refiDFRange] or 0)) < (iCurEnemyRange or 0)) then
                             --Move away unless are a battleship and the enemy is more than 100 away
                             if not(iCurEnemyDist > 100 and EntityCategoryContains(M27UnitInfo.refCategoryMobileNavalSurface * categories.TECH3 * categories.BATTLESHIP, oUnit.UnitId)) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Want to retreat') end

@@ -525,6 +525,7 @@ function ConsiderDodgingShot(oUnit, oWeapon)
                 if oWeapon.Blueprint.Damage / oTarget:GetHealth() >= 0.01 then
                     --Do we think we can dodge the shot?
                     local iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oUnit:GetPosition(), oTarget:GetPosition())
+                    if oWeapon.Blueprint.WeaponCategory == 'Artillery' then iDistToTarget = iDistToTarget + 15 end
                     local iShotSpeed = oWeapon.Blueprint.MuzzleVelocity
                     local iTimeUntilImpact = iDistToTarget / iShotSpeed
                     if bDebugMessages == true then LOG(sFunctionRef..': Dist to target='..iDistToTarget..'; Shot speed='..iShotSpeed..'; iTimeUntilImpact='..iTimeUntilImpact) end

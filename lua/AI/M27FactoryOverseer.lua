@@ -2172,6 +2172,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
 
                             --=======NAVAL FACTORY------------------
                         elseif bIsNavalFactory then
+                            if aiBrain:GetCurrentUnits(categories.NAVAL * categories.TECH2) >= 30 then bDebugMessages = true end
                             if oFactory == M27Navy.GetPrimaryNavalFactory(aiBrain, oFactory[M27Navy.refiAssignedPond]) then M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][oFactory[M27Navy.refiAssignedPond]] = true end
                             iTotalWanted = 3 --As are looking at things on a team wide basis and this only checks on an aibrain basis will just try and build lots of the one category
                             if iCurrentConditionToTry == 1 then --Immediate threat to base
@@ -2312,13 +2313,13 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                 local iOurNavalThreat =   M27Logic.GetCombatThreatRating(aiBrain, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]], false, nil, nil, false, false, false, false, true, false, false)
                                 local iEnemySubmersibleThreat = 0
                                 local iOurAntiNavyThreat = 0
-                                local tOurSubs = EntityCategoryFilterDown(M27UnitInfo.refCategorySubmarine, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                local tOurAntiNavy = EntityCategoryFilterDown(categories.ANTINAVY * categories.MOBILE, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
                                 local tEnemySubs = EntityCategoryFilterDown(M27UnitInfo.refCategorySubmarine, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
 
                                 local iSurfaceCategoryToBuild = M27UnitInfo.refCategoryFrigate + M27UnitInfo.refCategoryDestroyer + categories.TECH3 * categories.DIRECTFIRE * M27UnitInfo.refCategoryNavalSurface
 
-                                if M27Utilities.IsTableEmpty(tOurSubs) == false then
-                                    iOurAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tOurSubs, false, nil, nil, false, false, false, true, false, false, false)
+                                if M27Utilities.IsTableEmpty(tOurAntiNavy) == false then
+                                    iOurAntiNavyThreat = M27Logic.GetCombatThreatRating(aiBrain, tOurAntiNavy, false, nil, nil, false, false, false, true, false, false, false)
                                 end
                                 if M27Utilities.IsTableEmpty(tEnemySurfaceNavy) == false then
                                     iEnemySurfaceThreat = M27Logic.GetCombatThreatRating(aiBrain, tEnemySurfaceNavy, false, nil, nil, false, false, false, false, true, false, false)
@@ -2412,7 +2413,7 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                         if M27Utilities.IsTableEmpty(tExistingBombardmentUnits) == false then iExistingBombardmentUnits = table.getn(tExistingBombardmentUnits) end
 
                                         if bDebugMessages == true then LOG(sFunctionRef..': iExistingBombardmentUnits='..(iExistingBombardmentUnits or 'nil')..'; Pond value to us='..(aiBrain[M27Navy.reftiPondValueToUs][oFactory[M27Navy.refiAssignedPond]] or 'nil')) end
-                                        if iExistingBombardmentUnits == 0 or iExistingBombardmentUnits <= aiBrain[M27Navy.reftiPondValueToUs][oFactory[M27Navy.refiAssignedPond]] * 0.3 then
+                                        if iExistingBombardmentUnits == 0 or iExistingBombardmentUnits <= math.max(iFactoryTechLevel - 1, aiBrain[M27Navy.reftiPondValueToUs][oFactory[M27Navy.refiAssignedPond]] * 0.3) then
                                             iCategoryToBuild = iBombardmentCategory
                                         else
                                             --How many mexes are in range?
@@ -2434,6 +2435,23 @@ function DetermineWhatToBuild(aiBrain, oFactory)
                                     elseif iCurrentConditionToTry == 15 then --Upgrade to t2 or T3 (lower priority)
                                         if iFactoryTechLevel < 3 and (oFactory == M27Navy.GetPrimaryNavalFactory(aiBrain, oFactory[M27Navy.refiAssignedPond]) or aiBrain:GetEconomyStored('MASS') >= 2000 * iFactoryTechLevel or aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 * iFactoryTechLevel) and (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 10 or (aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 7 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAllNavy * categories.TECH2) >= 10)) then
                                             bUpgradeFactoryInstead = true
+                                        end
+                                    elseif iCurrentConditionToTry == 16 then --Minimum level of bombardment units
+                                        local iExistingLongRange = 0
+                                        local iCategoryWanted
+                                        if iFactoryTechLevel <= 2 then
+                                            iCategoryWanted = M27UnitInfo.refCategoryMissileNavy + categories.BATTLESHIP * categories.TECH3
+                                            if EntityCategoryContains(categories.CYBRAN, oFactory.UnitId) then iCategoryWanted = iCategoryWanted + M27UnitInfo.refCategoryDestroyer end
+                                        else
+                                            iCategoryWanted = categories.BATTLESHIP * categories.TECH3
+                                        end
+                                        local tExistingUnits = EntityCategoryFilterDown(iCategoryWanted, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftFriendlyUnitsByPond][oFactory[M27Navy.refiAssignedPond]])
+                                        if M27Utilities.IsTableEmpty(tExistingUnits) == false then
+                                            iExistingLongRange = table.getn(tExistingUnits)
+                                        end
+                                        if iExistingLongRange == 0 then
+                                            iTotalWanted = 1
+                                            iCategoryToBuild = iCategoryWanted
                                         end
                                     elseif aiBrain:GetEconomyStoredRatio('MASS') >= 0.8 then
                                         iCategoryToBuild = M27UnitInfo.refCategoryDestroyer + categories.BATTLESHIP

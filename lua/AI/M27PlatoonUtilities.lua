@@ -5353,7 +5353,7 @@ function RecordPlatoonUnitsByType(oPlatoon, bPlatoonIsAUnit)
                             if bDebugMessages == true then LOG(sFunctionRef..': Pathing has changed') end
                             iCurPathingGroup = M27MapInfo.GetSegmentGroupOfLocation(oPlatoon[refoFrontUnit][M27UnitInfo.refsPathing], oPlatoon[refoFrontUnit]:GetPosition())
                         else
-                            M27Utilities.ErrorHandler(sFunctionRef..': Likely pathing error for unit '..oPlatoon[refoFrontUnit].UnitId..M27UnitInfo.GetUnitLifetimeCount(oPlatoon[refoFrontUnit]))
+                            M27Utilities.ErrorHandler(sFunctionRef..': Likely pathing error for unit')
                         end
                     elseif bDebugMessages == true then LOG(sFunctionRef..': Prev group had insufficient count so wont recheck pathing')
                     end
