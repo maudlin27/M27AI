@@ -3490,7 +3490,7 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
 
     local bDontBuildByMex = true
     if bWantAdjacency and EntityCategoryContains(categories.MASSEXTRACTION, sTargetBuildingBPID) then bDontBuildByMex = false end
-    if bDebugMessages == true then LOG(sFunctionRef..': sNewBuildingBPID='..sNewBuildingBPID..'; sTargetBuildingBPID='..(sTargetBuildingBPID or 'nil')..'; tablePosTarget='..repru(tablePosTarget)..'; bBetterIfNoReclaim='..tostring(bBetterIfNoReclaim or false)) end
+    if bDebugMessages == true then LOG(sFunctionRef..': sNewBuildingBPID='..sNewBuildingBPID..'; sTargetBuildingBPID='..(sTargetBuildingBPID or 'nil')..'; tablePosTarget='..repru(tablePosTarget)..'; bBetterIfNoReclaim='..tostring(bBetterIfNoReclaim or false)..'; bPreferCloseToEnemy='..tostring(bPreferCloseToEnemy or false)..'; bPreferFarFromEnemy='..tostring(bPreferFarFromEnemy or false)) end
     --local TargetSize = GetBuildingTypeInfo(TargetBuildingType, 1)
     local TargetSize
     if bWantAdjacency then TargetSize = M27UnitInfo.GetBuildingSize(sTargetBuildingBPID) end
@@ -3500,9 +3500,27 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     local fSizeMod = 0.5
     local iRectangleSizeReduction = 0
     local iNewBuildingRadius = tNewBuildingSize[1] * fSizeMod
-    if bDebugMessages == true and bWantAdjacency then LOG(sFunctionRef..': TargetSize='..repru(TargetSize)..'; NewBuildingSize='..repru(tNewBuildingSize)) end
+    if bDebugMessages == true and bWantAdjacency then LOG(sFunctionRef..': TargetSize='..repru(TargetSize)..'; NewBuildingSize='..repru(tNewBuildingSize)..'; iBuilderRange='..iBuilderRange..'; Gross energy income='..aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome]..'; Does building contain t1 land fac='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryLandFactory * categories.TECH1, sNewBuildingBPID))) end
     local iBuildRangeExtension = iNewBuildingRadius
-    if bDebugMessages == true then LOG(sFunctionRef..': Increasing builder distance from '..iBuilderRange..' by '..iBuildRangeExtension) end
+    local bBuildNearerHydro = false --If want to try and build factory closer to hydro so engi has less distance to travel
+    local tNearestHydro
+    local iHydroBaseDistance = 10000
+    if aiBrain[M27EconomyOverseer.refiEnergyGrossBaseIncome] <= 10 and iBuilderRange >= 9 and EntityCategoryContains(M27UnitInfo.refCategoryLandFactory * categories.TECH1, sNewBuildingBPID) then --proxy for assuming are dealing with an ACU building factory
+        --Do we have a nearby hydro?
+        local tHydroTableToBuildNear
+        bBuildNearerHydro, tHydroTableToBuildNear = M27Conditions.HydroNearACUAndBase(aiBrain, true, true, true)
+        local iCurHydroDist
+        for iHydroTable, tHydroLocation in tHydroTableToBuildNear do
+            iCurHydroDist = M27Utilities.GetDistanceBetweenPositions(tHydroLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+            if iCurHydroDist < iHydroBaseDistance then
+                iHydroBaseDistance = iCurHydroDist
+                tNearestHydro = {tHydroLocation[1], tHydroLocation[2], tHydroLocation[3]}
+            end
+        end
+        if bDebugMessages == true then LOG(sFunctionRef..': Think are building our first factory, bBuildNearerHydro='..tostring(bBuildNearerHydro)) end
+
+    end
+    if bDebugMessages == true then LOG(sFunctionRef..': Increasing builder distance from '..iBuilderRange..' by '..iBuildRangeExtension..'; bBuildNearerHydro='..tostring(bBuildNearerHydro)..'; tNearestHydro='..repru(tNearestHydro)..'; iHydroBaseDistance='..iHydroBaseDistance) end
     iBuilderRange = iBuilderRange + iBuildRangeExtension
     iMaxAreaToSearch = math.max(iMaxAreaToSearch, iBuilderRange + tNewBuildingSize[1])
 
@@ -3653,7 +3671,12 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
 
                         rBuildAreaRect = Rect(iNewX - iNewBuildingRadius + iRectangleSizeReduction, iNewZ - iNewBuildingRadius + iRectangleSizeReduction, iNewX + iNewBuildingRadius - iRectangleSizeReduction, iNewZ + iNewBuildingRadius - iRectangleSizeReduction)
                         --ReturnType: 1 = true/false: GetReclaimInRectangle(iReturnType, rRectangleToSearch)
-                        if M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect) == true then iPriority = iPriority - 4 end
+                        if M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect) == true then
+                            if bBuildNearerHydro then iPriority = iPriority - 6 --backup to reduce the risk we build close to hydro despite reclaim blocking us in later priority adjustment
+                            else
+                                iPriority = iPriority - 4
+                            end
+                        end
                         if bDebugMessages == true then
                             LOG(sFunctionRef..': Want to avoid reclaim if we can; Checking if any reclaim in the area, rBuildAreaRec='..repru(rBuildAreaRect)..'; iNewBuildingRadius='..iNewBuildingRadius..'; iRectangleSizeReduction='..iRectangleSizeReduction..'; iNewX-Z='..iNewX..'-'..iNewZ..'; M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect)='..tostring((M27MapInfo.GetReclaimInRectangle(1, rBuildAreaRect) or false)))
                         end
@@ -3739,10 +3762,18 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
                         if iDistanceToEnemy > iMaxDistanceToEnemy then iMaxDistanceToEnemy = iDistanceToEnemy end
                     end
 
+                    --Adjust priority for first factory so build closer to hydro
+                    if bBuildNearerHydro and not(bIgnore) then
+                        if bDebugMessages == true then LOG(sFunctionRef..': Priority pre hydro adjust='..iPriority..'; iHydroBaseDistance='..iHydroBaseDistance) end
+                        iPriority = iPriority + iHydroBaseDistance - M27Utilities.GetDistanceBetweenPositions(CurPosition, tNearestHydro)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Priority post hydro adjust='..iPriority) end
+                    end
+
                     if bIgnore == false then
                         --Check not blocking a mex
                         if bDebugMessages == true then LOG(sFunctionRef..': About to check whether we will block a mex by building '..sNewBuildingBPID..' and CurPosition='..repru(CurPosition)) end
                         if bDontBuildByMex and WillBuildingBlockMex(sNewBuildingBPID, CurPosition) then bIgnore = true end
+
                         if bIgnore == false then
                             iValidPosCount = iValidPosCount + 1
                             PossiblePositions[iValidPosCount] = CurPosition
