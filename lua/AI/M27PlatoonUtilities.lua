@@ -9929,13 +9929,14 @@ function MoveTowardsSameGroupTarget(tStartPos, tTargetPos, iDistanceFromTarget, 
     --GetPositionNearTargetInSamePathingGroup(tStartPos, tTargetPos, iDistanceFromTarget, iAngleBase, oPathingUnit, iNearbyMethodIfBlocked, bTrySidePositions, bCheckAgainstExistingCommandTarget, iMinDistanceFromCurrentBuilderMoveTarget)
 end
 
-function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction)
+function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuildDistanceMod, bReturnMovePathInstead, bUpdatePlatoonMovePath, bReturnNilIfAlreadyMovingNearConstruction, bReturnMoveLocationifGivenOne)
     --gives oBuilder a move command to get them within range of building on tLocation, factoring in the size of buildingType
     --sBlueprintID - if nil, then will treat the action as having a size of 0
     --iBuildDistanceMod - increase or decrease if want to move closer/further away than build distance would send you; e.g. if want to get 3 within the build distance, set this to -3
     --bReturnMovePathInstead - if true return move destination instead of moving there; returns oBuilder's current position if it doesnt need to move
     --bUpdatePlatoonMovePath - default false; if true then if oBuilder has a platoon, updates that platoon's movement path
     --bReturnNilIfAlreadyMovingNearConstruction - will return nil if bReturnMovePathInstead is set to true and unit is already moving towards target, otherwise will return current move target if its close enough, or the builder position if already in position
+    --bReturnMoveLocationifGivenOne - defaults to false, if true then will return the location of the move target if gave one (or nil if didnt refresh/update)
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'MoveNearConstruction'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
@@ -9951,6 +9952,7 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
     if bReturnMovePathInstead == nil then bReturnMovePathInstead = false end
     if bUpdatePlatoonMovePath == nil then bUpdatePlatoonMovePath = false end
     if bReturnNilIfAlreadyMovingNearConstruction == nil then bReturnNilIfAlreadyMovingNearConstruction = true end
+    local bReturnMoveTarget = false
     local tBuilderLocation = oBuilder:GetPosition()
     local iBuildDistance = 0
     local oBuilderBP = oBuilder:GetBlueprint()
@@ -10115,6 +10117,7 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
                 if not(oBuilder[M27UnitInfo.refbSpecialMicroActive]) then
                     IssueMove({oBuilder}, tPossibleTarget)
                     if oBuilder.PlatoonHandle then oBuilder.PlatoonHandle[refiLastOrderType] = refiOrderIssueMove end
+                    bReturnMoveTarget = bReturnMoveLocationifGivenOne
                 end
             else
                 if bDebugMessages == true then LOG(sFunctionRef..': Not issuing move command as tPossibleTarget is close to existing target') end
@@ -10132,7 +10135,7 @@ function MoveNearConstruction(aiBrain, oBuilder, tLocation, sBlueprintID, iBuild
     end
     --Return position if have asked for one:
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
-    if bReturnMovePathInstead == true then
+    if bReturnMovePathInstead == true or bReturnMoveTarget then
         if bDebugMessages == true then
             if tPossibleTarget == nil then LOG(sFunctionRef..': End of function, returning nil')
             else LOG(sFunctionRef..': End of function, returning '..repru(tPossibleTarget)) end
@@ -10460,6 +10463,54 @@ function ReplaceMovementPathWithNewTarget(oPlatoon, tNewTarget)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function ShouldACUMoveAndConsiderClearingEngis(aiBrain, oACU, sEngineerActionRef, tExistingBuildLocation)
+    --Check if want to help an existing engi instead. tExistingBuildLocation should be any existing location we have determined subject to override by this function
+    --Returns two variables; the first is true/false whether we want to move near target, the second is the location to move to (if we want to move towards target)
+    --Assumes have already checked for part-complete buildings to assist
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local sFunctionRef = 'ShouldACUMoveAndConsiderClearingEngis'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+
+    local bMoveNearTargetInstead = false
+    if M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sEngineerActionRef]) == false then
+        local oPrimaryEngineer
+        local tEngiTarget
+        for iRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sEngineerActionRef] do
+            if M27UnitInfo.IsUnitValid(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]) then
+                oPrimaryEngineer = tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef] --so always have one engi
+                if tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef][M27EngineerOverseer.refbPrimaryBuilder] then
+                    tEngiTarget = tSubtable[M27EngineerOverseer.refEngineerAssignmentActualLocation]
+                    oPrimaryEngineer = tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]
+                    break
+                end
+            end
+        end
+        if oPrimaryEngineer then
+            if not(tEngiTarget) then tEngiTarget = oPrimaryEngineer else tEngiTarget = oPrimaryEngineer[M27EngineerOverseer.reftEngineerCurrentTarget] end
+            local iEngiDistToTarget = M27Utilities.GetDistanceBetweenPositions(tEngiTarget, oPrimaryEngineer:GetPosition()) - oPrimaryEngineer:GetBlueprint().Economy.MaxBuildDistance
+            local iACUDistToTarget = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), oPrimaryEngineer:GetPosition()) - oACU:GetBlueprint().Economy.MaxBuildDistance
+            if iACUDistToTarget <= iEngiDistToTarget then
+                --Clear existing engis
+                local tEngineersToReassign = {}
+                for iRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sEngineerActionRef] do
+                    if M27UnitInfo.IsUnitValid(tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]) then
+                        M27EngineerOverseer.ClearEngineerActionTrackers(aiBrain, tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef], true)
+                        table.insert(tEngineersToReassign, tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef])
+                    end
+                    IssueClearCommands(tEngineersToReassign)
+                    ForkThread(M27EngineerOverseer.DelayedEngiReassignment, aiBrain, false, tEngineersToReassign)
+                    if bDebugMessages == true then LOG(sFunctionRef..': Have cleared all existing assigned engineers as our ACU is closer') end
+                end
+            else
+                bMoveNearTargetInstead = true
+                tExistingBuildLocation = {tEngiTarget[1], tEngiTarget[2], tEngiTarget[3]}
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+    return bMoveNearTargetInstead, tExistingBuildLocation
+end
 
 function ProcessPlatoonAction(oPlatoon)
     --Assumes DeterminePlatoonAction has been called
@@ -12085,17 +12136,22 @@ function ProcessPlatoonAction(oPlatoon)
                         --Air fac requires 80 energy per second just to build with an ACU
                         local tNearbyAirFactories = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirFactory, GetPlatoonFrontPosition(oPlatoon), 35, 'Ally')
                         local bHavePartCompleteAirFactory = false
+                        local bMoveNearTargetInstead = false --Used if another engi has queued up to build an air factory so we can move to be able to help build it if the other engi is closer
+                        local tExistingBuildLocation
 
                         local iMaxAreaToSearch = 35
                         if bDebugMessages == true then LOG(sFunctionRef..': refiMinLandFactoryBeforeOtherTypes='..aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes]) end
 
-                        if M27Utilities.IsTableEmpty(tNearbyAirFactories) == false then
+
+                        if M27Utilities.IsTableEmpty(tNearbyAirFactories) == false then --THIS SECTION MAY BE REDUNDANT as later on we tell ACU to guard a factory that is part-built (but within 30 rather than 35)
                             for iUnit, oUnit in tNearbyAirFactories do
                                 if oUnit:GetFractionComplete() < 1 then
                                     iCategoryToBuild = M27UnitInfo.refCategoryAirFactory
                                     iCategoryToBuildBy = M27UnitInfo.refCategoryPower + M27UnitInfo.refCategoryHydro
                                     bHavePartCompleteAirFactory = true
+                                    tExistingBuildLocation = oUnit:GetPosition()
                                     if bDebugMessages == true then LOG(sFunctionRef..': Have nearby part complete air factory so will build air factory') end
+                                    break
                                 end
                             end
                         end
@@ -12113,7 +12169,12 @@ function ProcessPlatoonAction(oPlatoon)
                                     if aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandFactory) >= aiBrain[M27Overseer.refiMinLandFactoryBeforeOtherTypes] and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirFactory) < aiBrain[M27Overseer.reftiMaxFactoryByType][M27Overseer.refFactoryTypeAir] then
                                         if bDebugMessages == true then LOG(sFunctionRef..': Will try to build air factory instead') end
                                         iCategoryToBuild = M27UnitInfo.refCategoryAirFactory
-                                        iCategoryToBuildBy = M27UnitInfo.refCategoryPower + M27UnitInfo.refCategoryHydro
+                                        --Is hydro nearby? If so then only try to build by hydro
+                                        if M27Conditions.HydroNearACUAndBase(aiBrain, false) then
+                                            iCategoryToBuildBy = M27UnitInfo.refCategoryT2Power + M27UnitInfo.refCategoryT3Power + M27UnitInfo.refCategoryHydro
+                                        else
+                                            iCategoryToBuildBy = M27UnitInfo.refCategoryPower + M27UnitInfo.refCategoryHydro
+                                        end
                                     end
                                 end
                             end
@@ -12123,10 +12184,30 @@ function ProcessPlatoonAction(oPlatoon)
 
                         local oNearbyUnderConstruction = M27EngineerOverseer.GetPartCompleteBuilding(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, 30)
                         if oNearbyUnderConstruction == nil then
+                            local sEngineerActionRef
+                            if M27Utilities.DoesCategoryContainCategory(M27UnitInfo.refCategoryAirFactory, iCategoryToBuild, false) then
+                                sEngineerActionRef = M27EngineerOverseer.refActionBuildAirFactory
+                            else
+                                sEngineerActionRef = M27EngineerOverseer.refActionBuildLandFactory
+                            end
+                            bMoveNearTargetInstead, tExistingBuildLocation = ShouldACUMoveAndConsiderClearingEngis(aiBrain, oACU, sEngineerActionRef, tExistingBuildLocation)
+                        end
+                        if oNearbyUnderConstruction == nil and not(bMoveNearTargetInstead) then
                             --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, tAlternativePositionToLookFrom)
-                            if bDebugMessages == true then LOG(sFunctionRef..': About to tell ACU to build land factory') end
+                            local bLookForNearbyBuildings = false
+                            if M27Utilities.DoesCategoryContainCategory(iCategoryToBuild, M27UnitInfo.refCategoryAirFactory) then
+                                bLookForNearbyBuildings = true
+                            end
+                            if bDebugMessages == true then
+                                LOG(sFunctionRef..': About to tell ACU to build land or air factory. iMaxAreaToSearch='..iMaxAreaToSearch..'; Is table of engineers assigned to build air factory empty='..tostring(M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][M27EngineerOverseer.refActionBuildAirFactory]))..'; will list out units that fall into iCategoryToBuildBy')
+                                if M27Utilities.IsTableEmpty(EntityCategoryGetUnitList(iCategoryToBuildBy)) == false then
+                                    for iBlueprint, sBlueprint in EntityCategoryGetUnitList(iCategoryToBuildBy) do
+                                        LOG(sBlueprint)
+                                    end
+                                end
+                            end
                             --BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxAreaToSearch, iCatToBuildBy, tAlternativePositionToLookFrom, bLookForPartCompleteBuildings, bLookForQueuedBuildings, oUnitToBuildBy, bNeverBuildRandom, iOptionalCategoryForStructureToBuild)
-                            oPlatoon[reftLastBuildLocation] = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil, false, false, nil, nil, M27UnitInfo.refCategoryEngineer)
+                            oPlatoon[reftLastBuildLocation] = M27EngineerOverseer.BuildStructureAtLocation(aiBrain, oACU, iCategoryToBuild, iMaxAreaToSearch, iCategoryToBuildBy, nil, bLookForNearbyBuildings, bLookForNearbyBuildings, nil, nil, M27UnitInfo.refCategoryEngineer)
                             if not(M27Utilities.IsTableEmpty(oPlatoon[reftLastBuildLocation])) then
                                 oPlatoon[refiLastOrderType] = refiOrderIssueBuild
                                 --Update engineer trackers so they can assist us, and clear existing trackers so we dont ahve engineers assisting us when theyre not meant to
@@ -12146,9 +12227,13 @@ function ProcessPlatoonAction(oPlatoon)
                             --Move as soon as are done:
                             IssueMove(tBuilders, oPlatoon[reftMovementPath][oPlatoon[refiCurrentPathTarget]])
                             oPlatoon[refiLastOrderType] = refiOrderIssueMove
+                        elseif bMoveNearTargetInstead then
+                            IssueMove(tBuilders, M27Utilities.MoveInDirection(tExistingBuildLocation, M27Utilities.GetAngleFromAToB(tExistingBuildLocation, oACU:GetPosition()), 6, true, false))
+                            if bDebugMessages == true then LOG(sFunctionRef..': Want to move near the location that another engineer has queued up. tExistingBuildLocation='..repru(tExistingBuildLocation)) end
                         else
                             IssueGuard(tBuilders, oNearbyUnderConstruction)
                             oPlatoon[refiLastOrderType] = refiOrderIssueGuard
+                            if bDebugMessages == true then LOG(sFunctionRef..': Already under construction nearby so want to assist') end
                         end
                     end
                 elseif oPlatoon[refiCurrentAction] == refActionBuildInitialPower then

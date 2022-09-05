@@ -618,6 +618,32 @@ function GetAngleDifference(iAngle1, iAngle2)
     --returns the absolute difference between two angles.  Assumes angles are 0-360
     return 180 - math.abs(math.abs(iAngle1 - iAngle2) - 180)
 end
+
+function GetDistanceToBuildingEdgeTowardsEngineer(tEngineerPosition, tBuildingPosition, iBuildingSquareRadius)
+    --Assumes building is a square, which simplifies the maths; might be a better way of doing this but couldn't figure it out so took the easy option
+    local iAngleToEngi = GetAngleFromAToB(tBuildingPosition, tEngineerPosition)
+    local iTheta
+    if iAngleToEngi <= 45 then
+        iTheta = iAngleToEngi
+    elseif iAngleToEngi <= 90 then
+        iTheta = 90 - iAngleToEngi
+    elseif iAngleToEngi <= 135 then
+        iTheta = iAngleToEngi - 90
+    elseif iAngleToEngi <= 180 then
+        iTheta = 180 - iAngleToEngi
+    elseif iAngleToEngi <= 225 then
+        iTheta = iAngleToEngi - 180
+    elseif iAngleToEngi <= 270 then
+        iTheta = 270 - iAngleToEngi
+    elseif iAngleToEngi <= 315 then
+        iTheta = iAngleToEngi - 270
+    else
+        iTheta = 360 - iAngleToEngi
+    end
+
+    return iBuildingSquareRadius / math.cos(ConvertAngleToRadians(iTheta))
+end
+
 function ConvertAngleToRadians(iAngle)
     return iAngle * math.pi / 180
 end

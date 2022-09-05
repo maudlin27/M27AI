@@ -116,7 +116,7 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
         --Refresh table of unseen PD
         if M27Utilities.IsTableEmpty(tTeamData[aiBrain.M27Team][reftUnseenPD]) == false then
             for iUnit, oUnit in tTeamData[aiBrain.M27Team][reftUnseenPD] do
-                if M27UnitInfo.IsUnitValid(oUnit) then
+                if not(M27UnitInfo.IsUnitValid(oUnit)) then
                     tTeamData[aiBrain.M27Team][reftUnseenPD][iUnit] = nil
                 elseif M27Utilities.CanSeeUnit(aiBrain, oUnit, true) then
                     tTeamData[aiBrain.M27Team][reftUnseenPD][iUnit] = nil

@@ -8767,8 +8767,32 @@ end
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
 
+    --Monitor location of E8 and draw it
+    local tEngineers = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer, false, true)
+    if M27Utilities.IsTableEmpty(tEngineers) == false then
+        local oEngiToMonitor
+        for iEngi, oEngi in tEngineers do
+            if M27EngineerOverseer.GetEngineerUniqueCount(oEngi) == 8 then
+                oEngiToMonitor = oEngi
+                break
+            end
+        end
+        if oEngiToMonitor then
+            local tCurNavigatorTarget
+            local oNavigator = oEngiToMonitor:GetNavigator()
+            if oNavigator and oNavigator.GetCurrentTargetPos then
+                local tUnitTarget = oNavigator:GetCurrentTargetPos()
+                if M27Utilities.IsTableEmpty(tUnitTarget) == false then
+                    LOG(sFunctionRef..': GameTime='..GetGameTimeSeconds()..'; Engineer has a navigator target='..repru(tUnitTarget)..'; will draw in blue')
+                    M27Utilities.DrawLocation(tUnitTarget)
+                end
+            end
+        end
+    end
+
+
     --Send team chat message
-    M27Chat.SendMessage(aiBrain, 'Test', 'Hi there team', 1, 5, true)
+    --M27Chat.SendMessage(aiBrain, 'Test', 'Hi there team', 1, 5, true)
 
     --[[
 
@@ -9176,6 +9200,7 @@ function OverseerManager(aiBrain)
         --M27IsDefeated check is below
 
         --TestCustom(aiBrain)
+
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
         --if GetGameTimeSeconds() >= 1920 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
         --[[if not(bSetHook) and GetGameTimeSeconds() >= 322 then
