@@ -1344,14 +1344,23 @@ function OnConstructed(oEngineer, oJustBuilt)
         elseif M27Config.M27ShowEnemyUnitNames then
             oJustBuilt:SetCustomName(oJustBuilt.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oJustBuilt))
         end
+
+
         --Engineer callbacks
-        if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
-            local sFunctionRef = 'OnConstructed'
-            local bDebugMessages = false
-            if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-            ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
-            M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+        if oEngineer:GetAIBrain().M27AI and not (oEngineer.Dead) then
+            if EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oEngineer:GetUnitId()) then
+                local sFunctionRef = 'OnConstructed'
+                local bDebugMessages = false
+                if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                ForkThread(M27EngineerOverseer.ReassignEngineers, oEngineer:GetAIBrain(), true, { oEngineer })
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+            elseif EntityCategoryContains(categories.COMMAND, oEngineer.UnitId) then
+                local bDebugMessages = true
+                local sFunctionRef = 'OnConstructed'
+                if bDebugMessages == true then LOG(sFunctionRef..': About to run ACU logic update out of cycle as it has just finished construction') end
+                ForkThread(M27PlatoonUtilities.RunPlatoonSingleCycle, oEngineer.PlatoonHandle)
+            end
         end
     end
 end
