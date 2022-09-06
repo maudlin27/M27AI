@@ -4601,6 +4601,8 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
     end
 
     if not(iCategoryRef) then
+        local iPond = (M27Navy.GetPondToFocusOn(aiBrain) or 0)
+
         --Can we path to enemy base with amphibious unit, and is there a land unit withi n40% of our base? then build land experimental
         local tEnemyPDThreat = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryT2PlusPD, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], math.min(1000, aiBrain[M27AirOverseer.refiMaxScoutRadius]), 'Enemy')
         local iEnemyPDThreat = 0
@@ -4631,7 +4633,7 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
         end
         iTotalActivePlayers = iTotalActivePlayers + iTotalEnemyPlayers
         --Is enemy's nearest unit more than 50% of dist to enemy base away, and we control at least half of mexes in our starting pathing group?
-        if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > 0.5 and (aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] - aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup]) >= aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] / iTotalActivePlayers then
+        if math.min(aiBrain[M27Overseer.refiNearestT2PlusNavalThreat], aiBrain[M27Overseer.refiModDistFromStartNearestThreat]) / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] > 0.5 and (aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] - aiBrain[M27Overseer.refiUnclaimedMexesInBasePathingGroup]) >= aiBrain[M27Overseer.refiAllMexesInBasePathingGroup] / iTotalActivePlayers then
             --Is the nearest enemy land experimental at least 70% away?
             local bEnemyLandExperimentalFarAway = true
             if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false then
@@ -4659,10 +4661,12 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
 
         --If enemy has t3 arti or novax then make building our own t3 arti a top priority
         local iEnemyArtiAndNovax = 0
+        local iEnemyEarlyConstructionArti = 0
         if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure]) == false then
             for iUnit, oUnit in aiBrain[M27Overseer.reftEnemyArtiAndExpStructure] do
                 if M27UnitInfo.IsUnitValid(oUnit) then
                     iEnemyArtiAndNovax = iEnemyArtiAndNovax + 1
+                    if oUnit:GetFractionComplete() <= 0.3 then iEnemyEarlyConstructionArti = iEnemyEarlyConstructionArti + 1 end
                 else
                     aiBrain[M27Overseer.reftEnemyArtiAndExpStructure][iUnit] = nil
                 end
@@ -4673,8 +4677,12 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
         local iLifetimeLandExperimentalCount = M27Conditions.GetLifetimeBuildCount(aiBrain, ConvertExperimentalRefToCategory(refiExperimentalLand))
 
         if iEnemyArtiAndNovax > 0 and bTargetsForT3Arti and iT3ArtiWeOwn < 4 then
-            iCategoryRef = refiExperimentalT3Arti
-        else
+            --Exception to prioritising T3 arti - if we already have 1 T3 arti, and enemy's only T3 arti is <30% complete
+            if iEnemyArtiAndNovax > iEnemyEarlyConstructionArti or iT3ArtiWeOwn == 0 then
+                iCategoryRef = refiExperimentalT3Arti
+            end
+        end
+        if not(iCategoryRef) then
             --Dont worry about building land experimental if enemy is turtling
             local bNearbyLandPathableThreat = false
             if aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 0.4 and ((aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= 175 and aiBrain[M27Overseer.refiModDistFromStartNearestThreat] / aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] <= 0.35) or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeLand, aiBrain[M27Overseer.reftLocationFromStartNearestThreat])) then
@@ -4794,7 +4802,16 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                         local iValueWanted = 20000 * iExistingNovax + 10000
 
                         --If enemy has T3 navy then want at least 1 novax
-                        if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalFactory * categories.TECH3, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 1500, 'Enemy')) == false then iNovaxTargetValue = iNovaxTargetValue + 10000 end
+                        if M27Utilities.IsTableEmpty(aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryNavalFactory * categories.TECH3, M27MapInfo.GetPrimaryEnemyBaseLocation(aiBrain), 1500, 'Enemy')) == false then
+                            if iPond > 0 then
+                                iNovaxTargetValue = iNovaxTargetValue + math.max(10000, M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond]) --(effectively double-counts, as want navy to be an extra priority)
+                            else
+                                iNovaxTargetValue = iNovaxTargetValue + 10000
+                            end
+                        elseif iPond > 0 then
+                            --Incrase by naval threat value of assigned pond
+                            iNovaxTargetValue = iNovaxTargetValue + M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond]
+                        end
 
                         if iNovaxTargetValue < iValueWanted then
                             --Include mass value of any enemy cruisers and carriers
@@ -4918,16 +4935,23 @@ function DecideOnExperimentalToBuild(iActionToAssign, aiBrain)
                             end
                         end
                         if not(iCategoryRef) then
-
-                            --Either enemy land experimental on our side of map and we lack sufficient air to deal with it, or the nearest threat is within 45% of start and is pathable amphibiously
-                            if iExistingLandExperimentals <= 2 and iEnemyPDThreat <= 20000 and ((bNearbyLandExperimental or (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]))) and (iLifetimeLandExperimentalCount < 3 or not(aiBrain[M27AirOverseer.refiPreviousAvailableBombers] >= 100 or (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 6 and aiBrain[M27AirOverseer.refiOurMassInAirAA] >= aiBrain[M27AirOverseer.refiAirAAWanted]*0.65)))) then
-                                if bDebugMessages == true then LOG(sFunctionRef..': Will build land experimental as nearby experimental or we can path to nearest <=45% threat') end
-                                iCategoryRef = refiExperimentalLand
-                            else
-                                --Do we still want to build an air experimental defensively if we havent built one before?
-                                if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and table.getn(aiBrain[M27Overseer.reftEnemyLandExperimentals]) >= 2 and table.getn(aiBrain[M27Overseer.reftEnemyLandExperimentals]) > iExistingLandExperimentals and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure]) and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) == 0 then
+                            --Still consider air experimental if we dont have much of an air shortfall and enemy has navy
+                            if aiBrain[M27AirOverseer.refbHaveAirControl] or aiBrain[M27AirOverseer.refiOurMassInAirAA] >= aiBrain[M27AirOverseer.refiHighestEnemyAirThreat] * iAirRatioWanted or aiBrain[M27AirOverseer.refiAirAAWanted] <= 10 then
+                                if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] >= 8000 and aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) == 0 then
                                     iCategoryRef = refiExperimentalAir
-                                    if bDebugMessages == true then LOG(sFunctionRef..': Want to build defensive air experimental') end
+                                end
+                            end
+                            if not(iCategoryRef) then
+                                --Either enemy land experimental on our side of map and we lack sufficient air to deal with it, or the nearest threat is within 45% of start and is pathable amphibiously
+                                if iExistingLandExperimentals <= 2 and iEnemyPDThreat <= 20000 and ((bNearbyLandExperimental or (aiBrain[M27Overseer.refiModDistFromStartNearestThreat] <= aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.45 and M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) == M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeAmphibious, aiBrain[M27Overseer.reftLocationFromStartNearestThreat]))) and (iLifetimeLandExperimentalCount < 3 or not(aiBrain[M27AirOverseer.refiPreviousAvailableBombers] >= 100 or (aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryBomber * categories.TECH3) >= 6 and aiBrain[M27AirOverseer.refiOurMassInAirAA] >= aiBrain[M27AirOverseer.refiAirAAWanted]*0.65)))) then
+                                    if bDebugMessages == true then LOG(sFunctionRef..': Will build land experimental as nearby experimental or we can path to nearest <=45% threat') end
+                                    iCategoryRef = refiExperimentalLand
+                                else
+                                    --Do we still want to build an air experimental defensively if we havent built one before?
+                                    if M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyLandExperimentals]) == false and table.getn(aiBrain[M27Overseer.reftEnemyLandExperimentals]) >= 2 and table.getn(aiBrain[M27Overseer.reftEnemyLandExperimentals]) > iExistingLandExperimentals and M27Utilities.IsTableEmpty(aiBrain[M27Overseer.reftEnemyArtiAndExpStructure]) and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirNonScout * categories.EXPERIMENTAL) == 0 then
+                                        iCategoryRef = refiExperimentalAir
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Want to build defensive air experimental') end
+                                    end
                                 end
                             end
 
@@ -8934,7 +8958,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Less than 4s since last assignment so will treat engineer as busy, unless it has a big idle count and isnt busy moving, repairing, building or reclaiming') end
                                 bEngineerIsBusy = true
                                 if oEngineer[M27Logic.refiIdleCount] >= 20 and not(oEngineer:IsUnitState('Moving')) and not(oEngineer:IsUnitState('Reclaiming')) and not(oEngineer:IsUnitState('Building')) and not(oEngineer:IsUnitState('Repairing')) then
-                                    if oEngineer[M27navy.refiAssignedPond] then M27Navy.ReassignNavalEngineer(oEngineer)
+                                    if oEngineer[M27Navy.refiAssignedPond] then M27Navy.ReassignNavalEngineer(oEngineer)
                                     else
                                         IssueSpareEngineerAction(aiBrain, oEngineer)
                                         if bDebugMessages == true then LOG(sFunctionRef..': Backup logic for engineer as has been idle a while - will give it a spare engineer action') end
@@ -9976,6 +10000,12 @@ end--]]
                                 elseif bHaveLowMass then iMaxEngisWanted = 10
                                 else iMaxEngisWanted = 15
                                 end
+                                --Increase max further if dont have low power
+                                if aiBrain:GetEconomyStoredRatio('ENERGY') >= 0.99 then
+                                    local iFactor = 1
+                                    if bHaveLowMass or bHaveLowPower then iFactor = 0.7 end
+                                    iMaxEngisWanted = math.max(iMaxEngisWanted, aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] * iFactor)
+                                end
                             end
                         end
                     elseif iCurrentConditionToTry == 12 then --Land factories (or early game potentially air) when are getting close to overflowing mass and dont have that many, or early game on a smallish map
@@ -10541,7 +10571,7 @@ end--]]
 
                         aiBrain[M27Navy.refbEnemyNavyPreventingBuildingNavy] = false
                         if bDebugMessages == true then LOG(sFunctionRef..': Mass gross income='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]..'; Is table of pond details empty='..tostring(M27Utilities.IsTableEmpty(M27Navy.tPondDetails))..'; Assigned pond='..(aiBrain[M27Navy.refiAssignedPond] or 'nil')..'; Is table of all enemy units in ponds empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
-                        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 2 and M27Utilities.IsTableEmpty(M27Navy.tPondDetails) == false and (aiBrain[M27Navy.refiAssignedPond] or M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false) then
+                        if aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] >= 2 and M27Utilities.IsTableEmpty(M27Navy.tPondDetails) == false and (aiBrain[M27Navy.refiAssignedPond] > 0 or M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false) then
                             --Decide on the pond we want to get, and if it's because of the enemy or us
                             local iPondWanted = M27Navy.GetPondToFocusOn(aiBrain)
                             if bDebugMessages == true then LOG(sFunctionRef..': Finished identifying pond that we want='..(iPondWanted or 'nil')..'; default pond='..(aiBrain[M27Navy.refiAssignedPond] or 'nil')..'; aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]='..aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome]) end
@@ -10842,9 +10872,9 @@ end--]]
                         local iPondWanted = M27Navy.GetPondToFocusOn(aiBrain)
                         if iPondWanted and M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][iPondWanted] then
                             local iPondEngisWanted
-                            if M27Conditions.HaveLowMass(aiBrain) then iPondEngisWanted = math.min(20, math.max(5, math.floor(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] * 0.7)))
+                            if M27Conditions.HaveLowMass(aiBrain) then iPondEngisWanted = math.min(30, math.max(5, math.floor(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] * 0.7)))
                             else
-                                iPondEngisWanted = math.min(35, math.max(5, math.floor(aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] * 1.1)))
+                                iPondEngisWanted = math.min(50, math.max(5, math.floor((aiBrain[M27EconomyOverseer.refiMassGrossBaseIncome] - 2))))
                             end
 
                             local iCurPondEngis = 0
@@ -11614,6 +11644,24 @@ end--]]
                                 iActionToAssign = refActionAssistAirFactory
                                 if bHaveLowMass == false then iMaxEngisWanted = 10
                                 else iMaxEngisWanted = 5 end
+
+                                --Increase engineers assisting if enemy has significant naval threat
+                                local iPond = M27Navy.GetPondToFocusOn(aiBrain)
+                                if M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] <= math.min(350, math.max(225, aiBrain[M27Overseer.refiDistanceToNearestEnemyBase] * 0.6)) then
+
+                                    if M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][iPond] or M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] >= 6000 then
+                                        local iNavalFactor = 1
+                                        local oPrimaryNavalFactory = GetPrimaryNavalFactory(aiBrain, iPond)
+                                        if M27UnitInfo.IsUnitValid(oPrimaryNavalFactory) and oPrimaryNavalFactory:GetAIBrain() == aiBrain then iNavalFactor = 0.4 end --dont get as much air units as want to invest in navy instead
+                                        if bHaveLowMass then
+                                            iMaxEngisWanted = math.min(30, math.max(iMaxEngisWanted, iNavalFactor * M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] / 750))
+                                        else
+                                            iMaxEngisWanted = math.min(40, math.max(iMaxEngisWanted, iNavalFactor * M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] / 500))
+                                        end
+                                    end
+                                end
+
+
                                 --Reduce engineers based on power; T3 engi will require between 135 and 450 net energy income; however if we had already assigned engineers then want to take that into account
                                 iExistingEngineersAssigned = 0
                                 if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][refActionAssistAirFactory]) == false then
@@ -11621,7 +11669,7 @@ end--]]
                                         iExistingEngineersAssigned = iExistingEngineersAssigned + 1
                                     end
                                 end
-
+                                --Cap engis assisting based on energy
                                 iMaxEngisWanted = math.min(iMaxEngisWanted, math.ceil(aiBrain[M27EconomyOverseer.refiEnergyNetBaseIncome] / (15 * iHighestFactoryOrEngineerTechAvailable) + iExistingEngineersAssigned))
                                 iSearchRangeForNearestEngi = 75
                             end

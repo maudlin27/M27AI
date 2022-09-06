@@ -8174,7 +8174,7 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
     --Broad idea (at time of first draft) - target locations that expect to be lightly defended, but try to dominate enemy groundAA when come across threats
     --bIsCzar - will affect some of the logic
 
-    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+    local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
     local sFunctionRef = 'ExperimentalGunshipCoreTargetLoop'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
     --if GetGameTimeSeconds() >= 2872 and M27UnitInfo.GetUnitLifetimeCount(oUnit) == 1 then bDebugMessages = true end
@@ -8193,6 +8193,33 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
         iImmediateCombatRange = 17 --Given czar's speed, this is a reasonable approximation
     end
     local iSAMSearchRange = 60 + iCombatRangeToUse + 6
+    local iRecentlySeenCruiserSearchRange = 100
+    local tRecentlySeenCruisersToAdd = {} --table of cruisers/carriers that we dont have visiblitliy of but have seen recently so we know to avoid an area
+    --Add any pond AA recently seen but not currently visible to this
+    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
+        for iPond, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
+                if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
+                if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
+                    for iUnit, oUnit in tEnemyT2PlusNavalAA do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
+                        if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
+                            if bDebugMessages == true then LOG(sFunctionRef..': Distance to last known position='..M27Utilities.GetDistanceBetweenPositions(tCurPosition, oUnit[M27UnitInfo.reftLastKnownPosition])..'; Distance to actual position='..M27Utilities.GetDistanceBetweenPositions(tCurPosition, oUnit:GetPosition())) end
+                            if M27Utilities.GetDistanceBetweenPositions(tCurPosition, oUnit[M27UnitInfo.reftLastKnownPosition]) <= iRecentlySeenCruiserSearchRange and M27Utilities.GetDistanceBetweenPositions(tCurPosition, oUnit:GetPosition()) <= iRecentlySeenCruiserSearchRange then
+                                bDebugMessages = true
+                                if bDebugMessages == true then LOG(sFunctionRef..': About to add naval unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..' to AA threats') end
+                                table.insert( tRecentlySeenCruisersToAdd, oUnit)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
 
     local reftLastLocationTarget = 'M27AirLastLocationTarget'
     local refoLastUnitTarget = 'M27AirLastUnitTarget'
@@ -8306,7 +8333,17 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             if iTimeToKillTarget <= 150 then
                 local iTimeUntilWeDie
 
+                local iEnemyAASearchRange = 100
                 local tEnemyAA = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAirAA + M27UnitInfo.refCategoryGroundAA, tCurPosition, 100, 'Enemy')
+                --Add any pond AA recently seen but not currently visible to this
+                if M27Utilities.IsTableEmpty(tRecentlySeenCruisersToAdd) == false then
+                    for iUnit, oUnit in tRecentlySeenCruisersToAdd do
+                        table.insert(tEnemyAA, oUnit)
+                    end
+                end
+
+
+
                 local iEstimatedEnemyAADPS = 0
                 local iEstimatedMassDPSFactor = 0.4
                 local iEnemyAAMass = 0
@@ -8452,7 +8489,13 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
             end
             if bStillRun and iTimeSinceFirstRan >= 15 and (bIsCzar or iTimeSinceFirstRan >= 25) then
                 --Does the enemy not have any SAMs (or other T3 ground AA) within range of us?
-                local tNearbyEnemySAMs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, iSAMSearchRange + 10, 'Enemy')
+                local tNearbyEnemySAMs = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3 + M27UnitInfo.refCategoryCruiserCarrier, tCurPosition, iSAMSearchRange + 10, 'Enemy')
+                if M27Utilities.IsTableEmpty(tRecentlySeenCruisersToAdd) == false then
+                    for iUnit, oUnit in tRecentlySeenCruisersToAdd do
+                        table.insert(tNearbyEnemySAMs, oUnit)
+                    end
+                end
+
                 if M27Utilities.IsTableEmpty(tNearbyEnemySAMs) then
                     local tNearbyUnits = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryMobileLand + M27UnitInfo.refCategoryStructure + M27UnitInfo.refCategoryNavalSurface - categories.TECH1, tCurPosition, iCombatRangeToUse, 'Enemy')
                     if M27Utilities.IsTableEmpty(tNearbyUnits) then
@@ -8522,6 +8565,11 @@ function ExperimentalGunshipCoreTargetLoop(aiBrain, oUnit, bIsCzar)
                 LOG(sFunctionRef .. ': No immediate targets so will consider units nearby')
             end
             local tNearbySAM = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryGroundAA * categories.TECH3, tCurPosition, iSAMSearchRange, 'Enemy')
+            if M27Utilities.IsTableEmpty(tRecentlySeenCruisersToAdd) == false then
+                for iUnit, oUnit in tRecentlySeenCruisersToAdd do
+                    table.insert(tNearbySAM, oUnit)
+                end
+            end
             iSAMThreshold = 6
             if iNearbyFriendlyAirExperimental > 0 then
                 iSAMThreshold = iSAMThreshold * (1 + iNearbyFriendlyAirExperimental)

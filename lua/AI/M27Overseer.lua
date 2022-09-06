@@ -3188,6 +3188,18 @@ function ThreatAssessAndRespond(aiBrain)
         iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall + 1500
         bACUNeedsTorpSupport = true
     end
+    local iTorpBomberThreatNotUsed = 0 --If skip attacking units due to being too far away then record here so we dont think we have no shortfall
+    local iMaxTorpBomberRange = 10000
+    --Do we have a naval factory in the pond? If so then limit torp bomber range
+    local iPond = M27Navy.GetPondToFocusOn(aiBrain)
+    local oPrimaryNavalFactory
+    if iPond > 0 then
+        oPrimaryNavalFactory = M27Navy.GetPrimaryNavalFactory(aiBrain, iPond)
+        if M27UnitInfo.IsUnitValid(oPrimaryNavalFactory) then
+            iMaxTorpBomberRange = math.max(200, aiBrain[refiDistanceToNearestEnemyBase] * 0.25, math.min(400, aiBrain[refiDistanceToNearestEnemyBase] * 0.5))
+        end
+    end
+
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': bACUNeedsTorpSupport=' .. tostring(bACUNeedsTorpSupport) .. '; Time ACU last took torp damage=' .. GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100))
     end
@@ -4249,11 +4261,11 @@ function ThreatAssessAndRespond(aiBrain)
 
                         --Do we have a T2+ naval threat near our base that is close to being in firing range?
 
-                        if tEnemyThreatGroup[refiDistanceFromOurBase] < aiBrain[refiNearestT2PlusNavalThreat] or (not(aiBrain[refiNearestT2PlusNavalThreat]) and tEnemyThreatGroup[refiDistanceFromOurBase] <= 240) then
+                        if tEnemyThreatGroup[refiDistanceFromOurBase] < aiBrain[refiNearestT2PlusNavalThreat] or (not(aiBrain[refiNearestT2PlusNavalThreat]) and tEnemyThreatGroup[refiDistanceFromOurBase] <= 260) then
                             for iUnit, oUnit in tEnemyThreatGroup[refoEnemyGroupUnits] do
                                 if EntityCategoryContains(M27UnitInfo.refCategoryAllNavy - categories.TECH1, oUnit.UnitId) then
                                     aiBrain[refiNearestT2PlusNavalThreat] = math.min(aiBrain[refiNearestT2PlusNavalThreat], tEnemyThreatGroup[refiDistanceFromOurBase])
-                                    if not(aiBrain[refbT2NavyNearOurBase]) and 50 + math.max(130, M27UnitInfo.GetUnitIndirectRange(oUnit), M27Logic.GetUnitMaxGroundRange({ oUnit })) >= tEnemyThreatGroup[refiDistanceFromOurBase] then
+                                    if not(aiBrain[refbT2NavyNearOurBase]) and 65 + math.max(130, M27UnitInfo.GetUnitIndirectRange(oUnit), M27Logic.GetUnitMaxGroundRange({ oUnit })) >= tEnemyThreatGroup[refiDistanceFromOurBase] then
                                         aiBrain[refbT2NavyNearOurBase] = true
                                         break
                                     end
@@ -4268,6 +4280,7 @@ function ThreatAssessAndRespond(aiBrain)
 
 
                         if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) == false then
+
                             local tAirRallyPoint = M27AirOverseer.GetAirRallyPoint(aiBrain)
                             if bDebugMessages == true then
                                 LOG(sFunctionRef .. ': Number of available torp bombers=' .. table.getn(aiBrain[M27AirOverseer.reftAvailableTorpBombers]))
@@ -4297,65 +4310,72 @@ function ThreatAssessAndRespond(aiBrain)
                         end
                         if not (bACUNeedsTorpSupport) and (iAvailableThreat >= iThreatNeeded or iAvailableTorpBombers >= 30 or (aiBrain[refbT2NavyNearOurBase] and iAvailableTorpBombers >= 8)) or (bACUNeedsTorpSupport and iAvailableTorpBombers > 1) then
                             --and (not(bACUNeedsTorpSupport) or iAvailableTorpBombers >= 3) then
-                            for iEntry, tTorpSubtable in M27Utilities.SortTableBySubtable(tTorpBombersByDistance, refiActualDistanceFromEnemy, true) do
-                                --Cycle through each enemy unit in the threat group
-                                if bDebugMessages == true then
-                                    LOG(sFunctionRef .. ': Considering torp bomber ' .. tTorpSubtable[refoTorpUnit].UnitId .. M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit]) .. '; tTorpSubtable[refiCurThreat]=' .. (tTorpSubtable[refiCurThreat] or 0) .. '; about to cycle through every enemy unit in threat group to see if should attack one of them')
-                                end
-                                local iMaxRangeToSendTorps = 10000
-                                local iMaxAngleDifToSendTorps
-                                local iAngleFromBaseToACU
-                                if bACUNeedsTorpSupport then
-                                    iMaxRangeToSendTorps = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetACU(aiBrain):GetPosition()) + 90
-                                    iAngleFromBaseToACU = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetACU(aiBrain):GetPosition())
-                                    iMaxAngleDifToSendTorps = 25
-                                end
+                            if tEnemyThreatGroup[refiDistanceFromOurBase] >= iMaxTorpBomberRange then
+                                if bDebugMessages == true then LOG(sFunctionRef..': Threat group too far away so wont attack it. tEnemyThreatGroup[refiDistanceFromOurBase]='..tEnemyThreatGroup[refiDistanceFromOurBase]..'; iMaxTorpBomberRange='..iMaxTorpBomberRange) end
+                                iTorpBomberThreatNotUsed = math.max(iTorpBomberThreatNotUsed, iAvailableThreat)
+                                iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall + iThreatNeeded
+                            else
 
-                                --First try AirAA units in the threat group
-                                local tEnemyUnits
-                                for iPriority = 1, 2 do
-                                    if iPriority == 1 then tEnemyUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryGroundAA + categories.SHIELD, tEnemyThreatGroup[refoEnemyGroupUnits])
-                                    else tEnemyUnits = tEnemyThreatGroup[refoEnemyGroupUnits]
+                                for iEntry, tTorpSubtable in M27Utilities.SortTableBySubtable(tTorpBombersByDistance, refiActualDistanceFromEnemy, true) do
+                                    --Cycle through each enemy unit in the threat group
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef .. ': Considering torp bomber ' .. tTorpSubtable[refoTorpUnit].UnitId .. M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit]) .. '; tTorpSubtable[refiCurThreat]=' .. (tTorpSubtable[refiCurThreat] or 0) .. '; about to cycle through every enemy unit in threat group to see if should attack one of them')
+                                    end
+                                    local iMaxRangeToSendTorps = 10000
+                                    local iMaxAngleDifToSendTorps
+                                    local iAngleFromBaseToACU
+                                    if bACUNeedsTorpSupport then
+                                        iMaxRangeToSendTorps = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetACU(aiBrain):GetPosition()) + 90
+                                        iAngleFromBaseToACU = M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetACU(aiBrain):GetPosition())
+                                        iMaxAngleDifToSendTorps = 25
                                     end
 
-                                    if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
-                                        for iUnit, oUnit in tEnemyUnits do
-                                            if bDebugMessages == true then
-                                                LOG(sFunctionRef .. ': Considering oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' within the curernt threat group. tTorpSubtable[refiActualDistanceFromEnemy]=' .. (tTorpSubtable[refiActualDistanceFromEnemy] or 'nil') .. '; iMaxRangeToSendTorps=' .. (iMaxRangeToSendTorps or 'nil'))
-                                            end
-                                            --If need to protect ACU then ignore other naval threats
-                                            if not (bACUNeedsTorpSupport) or (tTorpSubtable[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (tTorpSubtable[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
-                                                if iPriority == 2 then
-                                                    --Not dealing with dedicated AA units, assign torp bombers based on strike damage, or AA threat if higher
-                                                    iAssignedThreatWanted = math.max(iNavalThreatMaxFactor * (oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0), (tTorpSubtable[refiCurThreat] or 270) / 750 * oUnit:GetHealth())
-                                                    if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then
-                                                        iAssignedThreatWanted = iAssignedThreatWanted * 1.34
-                                                    end
-                                                else
-                                                    --T2 torp bomber should have threat of 270 and a strike damage of 750; however some may die on the way, so try to assign enough to kill the target and a bit more; during testing, if enemy cruiser isnt doing kiting retreat then 5 torp bombers can kill 1 cruiser of most factions (not seraphim)
-                                                    iAssignedThreatWanted = 270 / 750 * oUnit:GetMaxHealth() * 1.5
-                                                    if oUnit:GetMaxHealth() > 2500 then iAssignedThreatWanted = iAssignedThreatWanted + 270 end
-                                                end
-                                                if bDebugMessages == true then
-                                                    LOG(sFunctionRef .. ': Enemy Unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; iAssignedThreat=' .. (oUnit[iArmyIndex][refiAssignedThreat] or 0) .. '; oUnit[iArmyIndex][refiUnitNavalAAThreat]=' .. (oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0) .. '; iNavalThreatMaxFactor=' .. iNavalThreatMaxFactor .. '; iAssignedThreatWanted=' .. iAssignedThreatWanted)
-                                                end
+                                    --First try AirAA units in the threat group
+                                    local tEnemyUnits
+                                    for iPriority = 1, 2 do
+                                        if iPriority == 1 then tEnemyUnits = EntityCategoryFilterDown(M27UnitInfo.refCategoryGroundAA + categories.SHIELD, tEnemyThreatGroup[refoEnemyGroupUnits])
+                                        else tEnemyUnits = tEnemyThreatGroup[refoEnemyGroupUnits]
+                                        end
 
-                                                if oUnit[iArmyIndex][refiAssignedThreat] <= iAssignedThreatWanted then
-                                                    oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
-                                                    IssueClearCommands({ tTorpSubtable[refoTorpUnit] })
-                                                    IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
-                                                    M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, true)
-                                                    for iUnit, oUnit in tEnemyUnits do
-                                                        IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
-                                                        M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, false)
+                                        if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                                            for iUnit, oUnit in tEnemyUnits do
+                                                if bDebugMessages == true then
+                                                    LOG(sFunctionRef .. ': Considering oUnit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. ' within the curernt threat group. tTorpSubtable[refiActualDistanceFromEnemy]=' .. (tTorpSubtable[refiActualDistanceFromEnemy] or 'nil') .. '; iMaxRangeToSendTorps=' .. (iMaxRangeToSendTorps or 'nil'))
+                                                end
+                                                --If need to protect ACU then ignore other naval threats
+                                                if not (bACUNeedsTorpSupport) or (tTorpSubtable[refiActualDistanceFromEnemy] <= iMaxRangeToSendTorps and (tTorpSubtable[refiActualDistanceFromEnemy] <= 120 or math.abs(M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], oUnit:GetPosition()) - iAngleFromBaseToACU) <= iMaxAngleDifToSendTorps)) then
+                                                    if iPriority == 2 then
+                                                        --Not dealing with dedicated AA units, assign torp bombers based on strike damage, or AA threat if higher
+                                                        iAssignedThreatWanted = math.max(iNavalThreatMaxFactor * (oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0), (tTorpSubtable[refiCurThreat] or 270) / 750 * oUnit:GetHealth())
+                                                        if EntityCategoryContains(M27UnitInfo.refCategoryGroundAA, oUnit.UnitId) then
+                                                            iAssignedThreatWanted = iAssignedThreatWanted * 1.34
+                                                        end
+                                                    else
+                                                        --T2 torp bomber should have threat of 270 and a strike damage of 750; however some may die on the way, so try to assign enough to kill the target and a bit more; during testing, if enemy cruiser isnt doing kiting retreat then 5 torp bombers can kill 1 cruiser of most factions (not seraphim)
+                                                        iAssignedThreatWanted = 270 / 750 * oUnit:GetMaxHealth() * 1.5
+                                                        if oUnit:GetMaxHealth() > 2500 then iAssignedThreatWanted = iAssignedThreatWanted + 270 end
                                                     end
-                                                    IssueAggressiveMove({ tTorpSubtable[refoTorpUnit] }, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-                                                    tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
                                                     if bDebugMessages == true then
-                                                        LOG(sFunctionRef .. ': Clearing torp bomber and then Telling torpedo bomber with ID ref=' .. tTorpSubtable[refoTorpUnit].UnitId .. M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit]) .. ' to attack ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; GameTime=' .. GetGameTimeSeconds())
+                                                        LOG(sFunctionRef .. ': Enemy Unit=' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; iAssignedThreat=' .. (oUnit[iArmyIndex][refiAssignedThreat] or 0) .. '; oUnit[iArmyIndex][refiUnitNavalAAThreat]=' .. (oUnit[iArmyIndex][refiUnitNavalAAThreat] or 0) .. '; iNavalThreatMaxFactor=' .. iNavalThreatMaxFactor .. '; iAssignedThreatWanted=' .. iAssignedThreatWanted)
                                                     end
-                                                    iAvailableTorpBombers = iAvailableTorpBombers - 1
-                                                    break
+
+                                                    if oUnit[iArmyIndex][refiAssignedThreat] <= iAssignedThreatWanted then
+                                                        oUnit[iArmyIndex][refiAssignedThreat] = oUnit[iArmyIndex][refiAssignedThreat] + tTorpSubtable[refiCurThreat]
+                                                        IssueClearCommands({ tTorpSubtable[refoTorpUnit] })
+                                                        IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
+                                                        M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, true)
+                                                        for iUnit, oUnit in tEnemyUnits do
+                                                            IssueAttack({ tTorpSubtable[refoTorpUnit] }, oUnit)
+                                                            M27AirOverseer.TrackBomberTarget(tTorpSubtable[refoTorpUnit], oUnit, 1, false)
+                                                        end
+                                                        IssueAggressiveMove({ tTorpSubtable[refoTorpUnit] }, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                                                        tTorpSubtable[refoTorpUnit][M27AirOverseer.refbOnAssignment] = true
+                                                        if bDebugMessages == true then
+                                                            LOG(sFunctionRef .. ': Clearing torp bomber and then Telling torpedo bomber with ID ref=' .. tTorpSubtable[refoTorpUnit].UnitId .. M27UnitInfo.GetUnitLifetimeCount(tTorpSubtable[refoTorpUnit]) .. ' to attack ' .. oUnit.UnitId .. M27UnitInfo.GetUnitLifetimeCount(oUnit) .. '; GameTime=' .. GetGameTimeSeconds())
+                                                        end
+                                                        iAvailableTorpBombers = iAvailableTorpBombers - 1
+                                                        break
+                                                    end
                                                 end
                                             end
                                         end
@@ -4489,6 +4509,8 @@ function ThreatAssessAndRespond(aiBrain)
             LOG(sFunctionRef .. ': Have an experimental needing torp bomber support, havei ncreased shortfall by 2k to ' .. iCumulativeTorpBomberThreatShortfall)
         end
     end
+
+    iCumulativeTorpBomberThreatShortfall = math.max(0, iCumulativeTorpBomberThreatShortfall - iTorpBomberThreatNotUsed)
     if iCumulativeTorpBomberThreatShortfall > 0 then
         aiBrain[M27AirOverseer.refiTorpBombersWanted] = math.ceil(iCumulativeTorpBomberThreatShortfall / 240)
     else
@@ -4498,7 +4520,7 @@ function ThreatAssessAndRespond(aiBrain)
 
     --Send any idle torp bombers on attack move to base if they're not already headed there
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': is table of available torp bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers])))
+        LOG(sFunctionRef .. ': is table of available torp bombers empty=' .. tostring(M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]))..'; iTorpBomberThreatNotUsed='..iTorpBomberThreatNotUsed..'; iCumulativeTorpBomberThreatShortfall after adjusting for torp bomber threat not used='..iCumulativeTorpBomberThreatShortfall)
     end
     if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) == false then
         local tRallyPoint
@@ -8767,8 +8789,24 @@ end
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
 
+    --Spawn monkeylord for enemy at certain point in game
+    --[[if aiBrain:GetArmyIndex() == 4 then
+        local EnemyBrain
+        for iBrain, oBrain in ArmyBrains do
+            if oBrain:GetArmyIndex() == 1 then
+                EnemyBrain = oBrain
+                break
+            end
+        end
+        local iExistingMonkeylord = EnemyBrain:GetCurrentUnits(M27UnitInfo.refCategoryLandExperimental)
+        if iExistingMonkeylord == 0 and GetGameTimeSeconds() >= 1320 then
+            local tPos = M27Utilities.MoveInDirection(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.GetAngleFromAToB(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27MapInfo.PlayerStartPoints[EnemyBrain.M27StartPositionNumber]), aiBrain[refiDistanceToNearestEnemyBase] * 0.35, true, false)
+            local oUnitToSpawn = CreateUnit('url0402', M27Utilities.GetACU(EnemyBrain).Army, tPos[1], tPos[2], tPos[3], 0, 0, 0, 0, 'Air')
+        end
+    end--]]
+
     --Monitor location of E8 and draw it
-    local tEngineers = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer, false, true)
+    --[[local tEngineers = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryEngineer, false, true)
     if M27Utilities.IsTableEmpty(tEngineers) == false then
         local oEngiToMonitor
         for iEngi, oEngi in tEngineers do
@@ -8788,7 +8826,7 @@ function TestCustom(aiBrain)
                 end
             end
         end
-    end
+    end--]]
 
 
     --Send team chat message

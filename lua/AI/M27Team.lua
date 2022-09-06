@@ -45,6 +45,7 @@ refoPrimaryEnemyNavalUnitByPond = 'NavalM27PrimaryEnemyNavalUnit' --[x] - enemy 
 reftEnemyBaseLocationByPond = 'NavalM27NavalLocation'
 refiLastBombardmentSearchRangeByPond = 'NavalM27LastBombardmentSearchRange'
 refbLastBombardmentSearchRangeSuccessByPond = 'NavalM27LastBombardmentSuccess'
+refiEnemyNavalThreatByPond = 'NavalM27NavalThreatByPond'
 
 reftTimeOfTransportLastLocationAttempt = 'M27TeamTimeOfLastTransportAttempt' --against tTeamData[aiBrain.M27Team], returns a table with [x] being the string location ref, and the value being the game time in seconds that we last tried to land a transport there
 tScoutAssignedToMexLocation = 'M27ScoutsAssignedByMex' --tTeamData[aiBrain.M27Team][this]: returns a table, with key [sLocationRef], that returns a scout object, e.g. [X1Z1] = oScout; only returns scout unit if one has been assigned to that location; used to track scouts assigned by mex
@@ -144,8 +145,8 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
         --Record enemy naval units
         local tEnemyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAmphibiousAndNavy, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
         if M27Utilities.IsTableEmpty(tEnemyNavy) == false then
-            local iCurPond
-            local sPathing = M27UnitInfo.refPathingTypeNavy
+            --local iCurPond
+            --local sPathing = M27UnitInfo.refPathingTypeNavy
             for iUnit, oUnit in tEnemyNavy do
                 M27Navy.UpdateUnitPond(oUnit, aiBrain.M27Team, true)
             end
@@ -683,6 +684,7 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][reftEnemyBaseLocationByPond] = {}
     tTeamData[iTeamRef][refiLastBombardmentSearchRangeByPond] = {}
     tTeamData[iTeamRef][refbLastBombardmentSearchRangeSuccessByPond] = {}
+    tTeamData[iTeamRef][refiEnemyNavalThreatByPond] = {}
 
 
 
