@@ -48,7 +48,12 @@ do --Per Balthazaar - encasing the code in do .... end means that you dont have 
         OnDetachedFromTransport = function(self, transport, bone)
             ForkThread(M27Events.OnTransportUnload, self, transport, bone)
             return M27OldUnit.OnDetachedFromTransport(self, transport, bone)
-        end
+        end,
+        OnDetectedBy = function(self, index)
+
+            ForkThread(M27Events.OnDetectedBy, self, index)
+            return M27OldUnit.OnDetectedBy(self, index)
+        end,
     }
 end
 

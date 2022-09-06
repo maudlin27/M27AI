@@ -3955,7 +3955,7 @@ function TrackWhenEngineerInBuildRange(oEngineer, tMoveNearTargetLocation, sBuil
     local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --True if want most log messages to print
     local sFunctionRef = 'TrackWhenEngineerInBuildRange'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    if GetEngineerUniqueCount(oEngineer) == 8 then bDebugMessages = true end
+    --if GetEngineerUniqueCount(oEngineer) == 8 then bDebugMessages = true end
 
     local bCheckForValidUnit = false
     local bKeepChecking = true
@@ -4041,7 +4041,7 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
 
     --if iOptionalEngiActionRef == refActionBuildHive then bDebugMessages = true end
     --if iOptionalEngiActionRef == refActionBuildShield or iCategoryToBuild == M27UnitInfo.refCategoryFixedShield then bDebugMessages = true end
-    if GetEngineerUniqueCount(oEngineer) == 8 then bDebugMessages = true end
+    --if GetEngineerUniqueCount(oEngineer) == 8 then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
 
 

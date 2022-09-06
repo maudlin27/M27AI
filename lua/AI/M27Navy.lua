@@ -50,6 +50,58 @@ subrefMexIndirectDistance = 'PondMexIndirectDistance'
 subrefMexIndirectUnblockedLocation = 'PondMexIndirectLocation' --i.e. the closest location we found where an indirect unit should be able to hit the mex
 subrefBuildLocationByStartPosition = 'PondBuildLocationByStart' --Subtable, key is start position number, which stores the build location for that start position (will only record for M27 brain start
 
+function CheckForPondNearNavalUnit(oUnit)
+    --Looks at area around unit to see if in a recognised pond, if so then updates pathing of all points in the area.  Returns the revised pond (or 0 if no revised one found)
+    local iPond = 0
+    local tStartPosition = oUnit:GetPosition()
+    local sLocationRef = M27Utilities.ConvertLocationToReference(tStartPosition)
+    local sPathing = M27UnitInfo.refPathingTypeNavy
+    if not(M27MapInfo.tManualPathingChecks[sPathing][sLocationRef]) then
+        M27MapInfo.tManualPathingChecks[sPathing][sLocationRef] = {tStartPosition[1], tStartPosition[2], tStartPosition[3]}
+
+        --Can we find a nearby pond?
+        local iAlternativePond
+        local tAlternativeLocation
+        local iInterval = 4
+        local iSegmentSize = M27MapInfo.iSizeOfBaseLevelSegment
+
+        for iModX = -iInterval, iInterval, iInterval do
+            for iModZ = -iInterval, iInterval, iInterval do
+                tAlternativeLocation = {tStartPosition[1] + iModX, 0, tStartPosition[3] + iModZ}
+                iAlternativePond = M27MapInfo.GetSegmentGroupOfLocation(sPathing, tAlternativeLocation)
+                if tPondDetails[iAlternativePond] and (tPondDetails[iAlternativePond][subrefPondSize] or 0) >= iMinPondSize then
+                    iPond = iAlternativePond
+                    --Have a replacement pond to use
+                    local iBaseSegmentX, iBaseSegmentZ = M27MapInfo.GetPathingSegmentFromPosition(tAlternativeLocation)
+                    local iMinX, iMaxX, iMinZ, iMaxZ
+                    if iModX < 0 then iMinX = iModX iMaxX = 0
+                    elseif iModX > 0 then iMinX = 0 iMaxX = iModX
+                    else iMinX = 0 iMaxX = 0
+                    end
+
+                    if iModZ < 0 then iMinZ = iModX iMaxZ = 0
+                    elseif iModZ > 0 then iMinZ = 0 iMaxZ = iModX
+                    else iMinZ = 0 iMaxZ = 0
+                    end
+
+                    for iXAdj = iMinX / iSegmentSize, iMaxX / iSegmentSize, 1 do
+                        for iZAdj = iMinZ / iSegmentSize, iMaxZ / iSegmentSize, 1 do
+                            if not(tPondDetails[M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj]]) or (tPondDetails[M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj]] or 0) < iMinPondSize then
+                                M27MapInfo.tPathingSegmentGroupBySegment[sPathing][iBaseSegmentX + iXAdj][iBaseSegmentZ + iZAdj] = iPond
+                            end
+                        end
+                    end
+                    break
+                end
+            end
+        end
+
+    end
+
+
+    return iPond
+end
+
 function RecordPonds()
     --Call after recording all pathfinding for the map
     --intended to record key information on any ponds of interest
@@ -101,6 +153,7 @@ function RecordPonds()
         while bRemoveBlankPonds do
             bRemoveBlankPonds = false
             for iPathingGroup, tSubtable in tPondDetails do
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering whether to clear out a pond due to being too small, iPathingGroup='..iPathingGroup..'; tSubtable[subrefPondSize]='..(tSubtable[subrefPondSize] or 'nil')) end
                 if not(tSubtable) or (tSubtable[subrefPondSize] or 0) <= 1 then
                     bRemoveBlankPonds = true
                     tPondDetails[iPathingGroup] = nil
@@ -279,6 +332,7 @@ function RecordPonds()
                 end
             end
         end
+        if bDebugMessages == true then LOG(sFunctionRef..': Finished recording all ponds, repr='..reprs(tPondDetails)) end
     end
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
@@ -669,9 +723,20 @@ end
 
 function UpdateUnitPond(oUnit, iM27TeamUpdatingFor, bIsEnemy, iPondRefOverride)
     --Check the unit's pond
+    --LOG('UpdateUnitPond: Called for unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit))
     if not(oUnit[refiAssignedPond]) or not(EntityCategoryContains(M27UnitInfo.refCategoryPondFixedCategory, oUnit.UnitId)) or (bIsEnemy and not(oUnit[reftiTeamRefsUpdatedFor][iM27TeamUpdatingFor])) then
         local iCurPond = iPondRefOverride or M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, oUnit:GetPosition())
-        if not(tPondDetails[iCurPond]) or (tPondDetails[iCurPond][subrefPondSize] or 0) <= iMinPondSize then iCurPond = 0 end
+        --LOG('iCurPond pre adj='..(iCurPond or 'nil'))
+        if tPondDetails[iCurPond] then LOG('Pond size='..(tPondDetails[iCurPond][subrefPondSize] or 'nil')) end
+        if not(tPondDetails[iCurPond]) or (tPondDetails[iCurPond][subrefPondSize] or 0) <= iMinPondSize then
+            --If have a naval unit that isnt amphibious then update pathing
+            if EntityCategoryContains(categories.NAVAL * categories.MOBILE - categories.HOVER - categories.AMPHIBIOUS - categories.AIR - categories.LAND, oUnit.UnitId) then
+                iCurPond = CheckForPondNearNavalUnit(oUnit)
+            else
+                iCurPond = 0
+            end
+        end
+        --LOG('iCurPond post adj='..iCurPond)
         if iCurPond > 0 then
             oUnit[M27UnitInfo.reftLastKnownPosition] = {oUnit:GetPosition()[1], oUnit:GetPosition()[2], oUnit:GetPosition()[3]}
         end

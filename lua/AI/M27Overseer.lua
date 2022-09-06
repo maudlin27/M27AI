@@ -3199,9 +3199,38 @@ function ThreatAssessAndRespond(aiBrain)
             iMaxTorpBomberRange = math.max(200, aiBrain[refiDistanceToNearestEnemyBase] * 0.25, math.min(400, aiBrain[refiDistanceToNearestEnemyBase] * 0.5))
         end
     end
+    local tAllRecentlySeenCruisers = {}
+    local iClosestRecentlySeenCruiser = 10000
+    local iRangeReduction = 50
+
+
+    --Add any pond AA recently seen but not currently visible to this
+    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
+        for iPond, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
+            if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
+                if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
+                if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
+                    for iUnit, oUnit in tEnemyT2PlusNavalAA do
+                        if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
+                        if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
+                            if M27Utilities.GetDistanceBetweenPositions(oUnit[M27UnitInfo.reftLastKnownPosition], oUnit:GetPosition()) <= iRangeReduction then --approximation for human memory
+                                iClosestRecentlySeenCruiser = math.min(iClosestRecentlySeenCruiser, GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit[M27UnitInfo.reftLastKnownPosition]))
+                            end
+                            table.insert( tAllRecentlySeenCruisers, oUnit) --Include even if distance is further from last known position as we sitll know they have the unit so want to build more torp bombers, even if we dont want to limit our combat range
+                        end
+                    end
+                end
+            end
+        end
+    end
+    iMaxTorpBomberRange = math.min(iMaxTorpBomberRange, iClosestRecentlySeenCruiser - iRangeReduction) --Dont want to attack navy if there are cruisers nearby that we dont have visual of
+
 
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': bACUNeedsTorpSupport=' .. tostring(bACUNeedsTorpSupport) .. '; Time ACU last took torp damage=' .. GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100))
+        LOG(sFunctionRef .. ': bACUNeedsTorpSupport=' .. tostring(bACUNeedsTorpSupport) .. '; Time ACU last took torp damage=' .. GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100)..'; iMaxTorpBomberRange='..iMaxTorpBomberRange)
     end
 
     local bFirstUnassignedNavyThreat = true
@@ -4508,6 +4537,11 @@ function ThreatAssessAndRespond(aiBrain)
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Have an experimental needing torp bomber support, havei ncreased shortfall by 2k to ' .. iCumulativeTorpBomberThreatShortfall)
         end
+    end
+
+    --Increase torp bomber threat shortfall for unseen enemy cruisers
+    if M27Utilities.IsTableEmpty(tAllRecentlySeenCruisers) == false then
+        iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall + table.getn(tAllRecentlySeenCruisers) * 240 * 7
     end
 
     iCumulativeTorpBomberThreatShortfall = math.max(0, iCumulativeTorpBomberThreatShortfall - iTorpBomberThreatNotUsed)
