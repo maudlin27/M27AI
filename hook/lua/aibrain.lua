@@ -19,8 +19,8 @@ AIBrain = Class(M27AIBrainClass) {
 
     OnCreateAI = function(self, planName)
         local sFunctionRef = 'OnCreateAI'
-        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
-        if bDebugMessages == true then LOG(sFunctionRef..' M27AI: aibrain.lua: OnCreateAI function - before recorded if m27AI') end
+        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        if bDebugMessages == false then LOG(sFunctionRef..' M27AI: aibrain.lua: OnCreateAI function - before recorded if m27AI. reprs of AI='..reprs(self)) end
 
         --Set aiBrain attribute on all AIs:
         local iArmyNo = M27Utilities.GetAIBrainArmyNumber(self)

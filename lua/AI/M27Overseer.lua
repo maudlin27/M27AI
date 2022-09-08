@@ -8115,6 +8115,18 @@ function RevealCiviliansToAI(aiBrain)
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
 end
 
+function RecordTotalHumanPlayers()
+    if M27Utilities.refiHumansInGame < 0 then
+        M27Utilities.refiHumansInGame = 0
+        for iBrain, oBrain in ArmyBrains do
+            if oBrain.BrainType == 'Human' then M27Utilities.refiHumansInGame = M27Utilities.refiHumansInGame + 1 end
+            --LOG('reprs of brain='..reprs(oBrain))
+        end
+        LOG('RecordTotalHumanPlayers: Total humans detected='..M27Utilities.refiHumansInGame)
+    end
+end
+
+
 function OverseerInitialisation(aiBrain)
     --Below may get overwritten by later functions - this is just so we have a default/non nil value
     local bDebugMessages = false
@@ -8285,6 +8297,8 @@ function OverseerInitialisation(aiBrain)
     ForkThread(M27Transport.TransportInitialisation, aiBrain)
 
     ForkThread(M27Chat.ConsiderPlayerSpecificMessages, aiBrain)
+
+    ForkThread(RecordTotalHumanPlayers)
 
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': End of code')
