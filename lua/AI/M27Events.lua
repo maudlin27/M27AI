@@ -755,7 +755,7 @@ function OnDamaged(self, instigator) --This doesnt trigger when a shield bubble 
 
                             --Unseen naval units - record if they have dealt us damage
                             if not(oUnitCausingDamage[M27UnitInfo.reftLastKnownPosition]) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitCausingDamage.UnitId) then
-                                M27Navy.UpdateUnitPond(oUnitCausingDamage, aiBrain.M27Team, true)
+                                M27Navy.UpdateUnitPond(oUnitCausingDamage, aiBrain.M27Team, IsEnemy(aiBrain:GetArmyIndex(), oUnitCausingDamage:GetAIBrain():GetArmyIndex()))
                             end
                         end
                         --General logic for shields so are very responsive with micro
@@ -1510,9 +1510,9 @@ function OnDetectedBy(oUnitDetected, iBrainIndex)
     if M27Utilities.bM27AIInGame then
         local aiBrain = ArmyBrains[iBrainIndex]
         --LOG('OnDetectedBy: UnitID='..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected)..'; tAllAIBrainsByArmyIndex[iBrainIndex] name='..M27Overseer.tAllAIBrainsByArmyIndex[iBrainIndex].Nickname..'; ArmyBrains nickname='..ArmyBrains[iBrainIndex].Nickname..'; Does entity contain navy='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId))..'; aiBrain.M27AI='..tostring((aiBrain.M27AI or false)))
-        if aiBrain.M27AI and not(oUnitDetected[M27UnitInfo.reftLastKnownPosition]) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId) then
+        if aiBrain.M27AI and not(oUnitDetected[M27UnitInfo.reftLastKnownPosition]) and M27UnitInfo.IsUnitValid(oUnitDetected) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId) and aiBrain.M27Team then
             --LOG('OnDetectedBy: aiBrain='..aiBrain.Nickname..' has just detected unit '..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected))
-            M27Navy.UpdateUnitPond(oUnitDetected, aiBrain.M27Team, true)
+            M27Navy.UpdateUnitPond(oUnitDetected, aiBrain.M27Team, IsEnemy(iBrainIndex, oUnitDetected:GetAIBrain():GetArmyIndex()))
         end
     end
 end

@@ -10377,7 +10377,7 @@ end--]]
                             if M27Utilities.IsTableEmpty(tNearbyStructureAA) then bBuildAA = true
                             else
                                 --Do we have AirAA for our current tech level?
-                                if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.ConvertTechLevelToCategory(iHighestFactoryOrEngineerTechAvailable), tNearbyStructureAA)) then
+                                if M27Utilities.IsTableEmpty(EntityCategoryFilterDown(M27UnitInfo.ConvertTechLevelToCategory(iHighestFactoryOrEngineerTechAvailable), tNearbyStructureAA)) and M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) then
                                     bBuildAA = true
                                 elseif not(aiBrain[M27AirOverseer.refbHaveAirControl]) and not(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] == M27Overseer.refStrategyTurtle) then
                                     local iStructureAAThreat = M27Logic.GetAirThreatLevel(aiBrain, tNearbyStructureAA, false, false, true, false, false, nil, nil, nil, nil, nil)
@@ -11030,6 +11030,10 @@ end--]]
                             if iStaticAAWanted > 0 then
                                 iStaticAAWanted = math.min(iStaticAAWanted, 10)
                                 local iExistingAA = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryStructureAA * M27UnitInfo.ConvertTechLevelToCategory(iHighestFactoryOrEngineerTechAvailable))
+                                if iExistingAA == 0 and M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) == false then
+                                    iExistingAA = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryStructureAA)
+                                    iStaticAAWanted = iStaticAAWanted * iHighestFactoryOrEngineerTechAvailable
+                                end
                                 if bDebugMessages == true then LOG(sFunctionRef..': iStaticAAWanted='..iStaticAAWanted..'; iExistingAA='..iExistingAA) end
                                 if iExistingAA < iStaticAAWanted then
                                     iActionToAssign = refActionBuildAA
@@ -11651,7 +11655,7 @@ end--]]
 
                                     if M27Team.tTeamData[aiBrain.M27Team][M27Team.refbHaveNavalShortfall][iPond] or M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] >= 6000 then
                                         local iNavalFactor = 1
-                                        local oPrimaryNavalFactory = GetPrimaryNavalFactory(aiBrain, iPond)
+                                        local oPrimaryNavalFactory = M27Navy.GetPrimaryNavalFactory(aiBrain, iPond)
                                         if M27UnitInfo.IsUnitValid(oPrimaryNavalFactory) and oPrimaryNavalFactory:GetAIBrain() == aiBrain then iNavalFactor = 0.4 end --dont get as much air units as want to invest in navy instead
                                         if bHaveLowMass then
                                             iMaxEngisWanted = math.min(30, math.max(iMaxEngisWanted, iNavalFactor * M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond][iPond] / 750))
@@ -11950,6 +11954,7 @@ end--]]
                         if aiBrain[M27AirOverseer.refbHaveAirControl] == false and aiBrain:GetEconomyStored('MASS') > 0 and aiBrain:GetEconomyStoredRatio('ENERGY') >= 1 and iHighestFactoryOrEngineerTechAvailable >= 3 and aiBrain[M27Overseer.refiOurHighestAirFactoryTech] >= 3 and M27Conditions.GetLifetimeBuildCount(aiBrain, M27UnitInfo.refCategoryAirAA * categories.TECH3) >= 5 then
                             local tFixedShields = aiBrain:GetListOfUnits(M27UnitInfo.refCategoryFixedShield, false, true)
                             local iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3
+                            if M27Utilities.IsTableEmpty(ScenarioInfo.Options.RestrictedCategories) == false and aiBrain:GetCurrentUnits(iAACategory) == 0 then iAACategory = M27UnitInfo.refCategoryStructureAA end
                             local iPotentialShields = 0
                             if tiAvailableEngineersByTech[iHighestFactoryOrEngineerTechAvailable] > 0 then
 
@@ -11961,6 +11966,7 @@ end--]]
                                 end
                             end
                             if iPotentialShields > 0 then
+
                                 iSearchRangeForNearestEngi = 200
                                 iMinEngiTechLevelWanted = 3
                                 iActionToAssign = refActionBuildAA

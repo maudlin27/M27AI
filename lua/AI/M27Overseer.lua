@@ -4541,7 +4541,15 @@ function ThreatAssessAndRespond(aiBrain)
 
     --Increase torp bomber threat shortfall for unseen enemy cruisers
     if M27Utilities.IsTableEmpty(tAllRecentlySeenCruisers) == false then
-        iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall + table.getn(tAllRecentlySeenCruisers) * 240 * 7
+        local iRemainingAvailableTorps = 0 --Calculate again here due to risk that we have no naval threats to consider in main logic above but have hidden cruisers leading to always producing torps
+        if M27Utilities.IsTableEmpty(aiBrain[M27AirOverseer.reftAvailableTorpBombers]) == false then
+            for iUnit, oUnit in aiBrain[M27AirOverseer.reftAvailableTorpBombers] do
+                if not (oUnit.Dead) and not (oUnit[M27AirOverseer.refbOnAssignment]) then
+                    iRemainingAvailableTorps = iRemainingAvailableTorps + 1
+                end
+            end
+        end
+        iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall + math.max(0, (table.getn(tAllRecentlySeenCruisers) * 7 - iRemainingAvailableTorps) * 240)
     end
 
     iCumulativeTorpBomberThreatShortfall = math.max(0, iCumulativeTorpBomberThreatShortfall - iTorpBomberThreatNotUsed)

@@ -657,16 +657,34 @@ end
 
 function GetAngleFromAToB(tLocA, tLocB)
     --Returns an angle 0 = north, 90 = east, etc. based on direction of tLocB from tLocA
-    local iTheta = math.atan(math.abs(tLocA[3] - tLocB[3]) / math.abs(tLocA[1] - tLocB[1])) * 180 / math.pi
-    if tLocB[1] > tLocA[1] then
-        if tLocB[3] > tLocA[3] then
-            return 90 + iTheta
-        else return 90 - iTheta
+    local iTheta
+    if tLocA[1] == tLocB[1] then
+        --Will get infinite if try and use this; is [3] the same?
+        if tLocA[3] > tLocB[3] then --going south
+            iTheta = 180
+        else
+            --Either LocA == locB (so want 0) or going north (which is 0)
+            iTheta = 0
+        end
+    elseif tLocA[3] == tLocB[3] then
+        --Have dif in X values but not Z values, so moving in straight line east or west:
+        if tLocA[1] < tLocB[1] then --Moving east
+            iTheta = 90
+        else --must be moving west
+            iTheta = 270
         end
     else
-        if tLocB[3] > tLocA[3] then
-            return 270 - iTheta
-        else return 270 + iTheta
+        iTheta = math.atan(math.abs(tLocA[3] - tLocB[3]) / math.abs(tLocA[1] - tLocB[1])) * 180 / math.pi
+        if tLocB[1] > tLocA[1] then
+            if tLocB[3] > tLocA[3] then
+                return 90 + iTheta
+            else return 90 - iTheta
+            end
+        else
+            if tLocB[3] > tLocA[3] then
+                return 270 - iTheta
+            else return 270 + iTheta
+            end
         end
     end
     return iTheta
