@@ -8844,6 +8844,62 @@ end
 
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
+    LOG('Table with table key will get printed to give reference')
+    local tTempTable = {1,2,3}
+    local tTableWithTable = {}
+    tTableWithTable[tTempTable] = 1
+    reprsl(tTableWithTable) --This will present as something like: info:  - table: 202107A8: 1
+
+    if GetGameTimeSeconds() >= 1124 and GetGameTimeSeconds() <= 1126 then
+        --Do reprs of certain tables
+        LOG('About to start reprs. Starting with engineer reprs ')
+        local E = M27EngineerOverseer
+        reprsl(aiBrain[E.reftiBOActiveSpareEngineersByTechLevel])
+        reprsl(aiBrain[E.reftEngineerAssignmentsByLocation])
+        reprsl(aiBrain[E.reftEngineerAssignmentsByActionRef])
+        reprsl(aiBrain[E.reftEngineerActionsByEngineerRef])
+        reprsl(aiBrain[E.reftEngineersHelpingACU])
+        reprsl(aiBrain[E.reftSpareEngineerAttackMoveTimeByLocation])
+        reprsl(aiBrain[E.reftLastSuccessfulLargeBuildingLocation])
+        reprsl(aiBrain[E.reftFriendlyScathis])
+        reprsl(aiBrain[E.reftUnclaimedMexOrHydroByCondition])
+        reprsl(aiBrain[E.reftResourceLocations])
+        reprsl(aiBrain[E.reftUnitsWantingTMD])
+        reprsl(aiBrain[E.reftFirebaseUnitsByFirebaseRef])
+        reprsl(aiBrain[E.reftFirebasesWantingFortification])
+        reprsl(aiBrain[E.reftFirebasePosition])
+        reprsl(aiBrain[E.reftFirebaseFrontPDPosition])
+        reprsl(aiBrain[E.reftiFirebaseDeadPDMassCost])
+        reprsl(aiBrain[E.reftiFirebaseDeadPDMassKills])
+        reprsl(aiBrain[E.reftUnitsWantingFixedShield])
+        reprsl(aiBrain[E.reftUnitsWithFixedShield])
+        reprsl(aiBrain[E.reftFailedShieldLocations])
+        reprsl(aiBrain[E.reftShieldsWantingHives])
+        reprsl(aiBrain[E.reftPriorityShieldsToAssist])
+
+        --Now do navy tables
+        local N = M27Navy
+        reprsl(aiBrain[N.reftiPondThreatToUs])
+        reprsl(aiBrain[N.reftiPondValueToUs])
+        reprsl(aiBrain[N.tPondDetails])
+
+        --Team dta
+        reprsl(M27Team.tTeamData[aiBrain.M27Team])
+
+        reprsl(aiBrain[tiDistToPlayerByIndex])
+        reprsl(aiBrain[reftACURecentHealth])
+        reprsl(aiBrain[reftACURecentUpgradeProgress])
+        reprsl(aiBrain[reftEnemyThreatGroup])
+        reprsl(aiBrain[refsEnemyThreatGroup])
+        reprsl(aiBrain[refstPrevEnemyThreatGroup])
+        reprsl(aiBrain[reftoNearestEnemyBrainByGroup])
+        reprsl(aiBrain[reftLocationFromStartNearestThreat])
+        reprsl(aiBrain[reftEnemyGroupsThreateningBuildings])
+
+        --ACU unit
+        reprsl(M27Utilities.GetACU(aiBrain)[reftPotentialFlankingUnits])
+
+    end
 
     --Spawn monkeylord for enemy at certain point in game
     --[[if aiBrain:GetArmyIndex() == 4 then
@@ -9294,7 +9350,6 @@ function OverseerManager(aiBrain)
         --M27IsDefeated check is below
 
         --TestCustom(aiBrain)
-
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
         --if GetGameTimeSeconds() >= 1920 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
         --[[if not(bSetHook) and GetGameTimeSeconds() >= 322 then
