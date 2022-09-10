@@ -9400,7 +9400,7 @@ function OverseerManager(aiBrain)
     while (not (aiBrain:IsDefeated())) do
         --M27IsDefeated check is below
 
-        --TestCustom(aiBrain)
+        TestCustom(aiBrain)
         --if GetGameTimeSeconds() >= 720 then bDebugMessages = true M27Config.M27ShowUnitNames = true M27Config.M27ShowEnemyUnitNames = true bDebugMessages = false end
         --if GetGameTimeSeconds() >= 1920 then bDebugMessages = true M27Config.M27RunProfiling = true ForkThread(M27Utilities.ProfilerActualTimePerTick) end
         --[[if not(bSetHook) and GetGameTimeSeconds() >= 322 then
