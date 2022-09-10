@@ -8892,7 +8892,10 @@ end
 
 function TestCustom(aiBrain)
     local sFunctionRef = 'TestCustom'
-    LOG('Table with table key will get printed to give reference')
+
+    aiBrain:TakeResource('Mass', math.random(1,20))
+    aiBrain:GiveResource('Mass', math.random(1,20))
+    --[[LOG('Table with table key will get printed to give reference')
     local tTempTable = {1,2,3}
     local tTableWithTable = {}
     tTableWithTable[tTempTable] = 1
@@ -8947,7 +8950,7 @@ function TestCustom(aiBrain)
         --ACU unit
         reprsl(M27Utilities.GetACU(aiBrain)[reftPotentialFlankingUnits])
 
-    end
+    end--]]
 
     --Spawn monkeylord for enemy at certain point in game
     --[[if aiBrain:GetArmyIndex() == 4 then
