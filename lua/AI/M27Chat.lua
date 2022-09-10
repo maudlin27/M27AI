@@ -30,7 +30,7 @@ function SendSuicideMessage(aiBrain)
         end
 
         LOG(sFunctionRef..': Sent chat message '..sTauntChatCode) --Log so in replays can see if this triggers since chat doesnt show properly
-        SUtils.AISendChat('all', aiBrain.Nickname, '/'..sTauntChatCode) --QAI I cannot be defeated.
+        --SUtils.AISendChat('all', aiBrain.Nickname, '/'..sTauntChatCode) --QAI I cannot be defeated.
         tiM27VoiceTauntByType[sFunctionRef] = GetGameTimeSeconds()
     end
 end
@@ -69,7 +69,7 @@ function SendForkedGloatingMessage(aiBrain, iOptionalDelay, iOptionalTimeBetween
         if bDebugMessages == true then LOG(sFunctionRef..': Will send chat with taunt code '..sTauntChatCode) end
 
         LOG(sFunctionRef..': Sent chat message '..sTauntChatCode) --Log so in replays can see if this triggers since chat doesnt show properly
-        SUtils.AISendChat('all', aiBrain.Nickname, '/'..sTauntChatCode)
+        --SUtils.AISendChat('all', aiBrain.Nickname, '/'..sTauntChatCode)
 
         tiM27VoiceTauntByType[sFunctionRef] = GetGameTimeSeconds()
     end
@@ -109,11 +109,11 @@ function SendForkedMessage(aiBrain, sMessageType, sMessage, iOptionalDelayBefore
 
         if iTimeSinceSentSimilarMessage > (iOptionalTimeBetweenMessageType or 60) then
             if bOnlySendToTeam then
-                SUtils.AISendChat('allies', aiBrain.Nickname, sMessage)
+                --SUtils.AISendChat('allies', aiBrain.Nickname, sMessage)
                 M27Team.tTeamData[aiBrain.M27Team][M27Team.reftiTeamMessages][sMessageType] = GetGameTimeSeconds()
                 if bDebugMessages == true then LOG(sFunctionRef..': Sent a team chat message') end
             else
-                SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
+                --SUtils.AISendChat('all', aiBrain.Nickname, sMessage)
                 tiM27VoiceTauntByType[sMessageType] = GetGameTimeSeconds()
             end
             LOG(sFunctionRef..': Sent chat message. bOnlySendToTeam='..tostring(bOnlySendToTeam)..'; sMessageType='..sMessageType..'; sMessage='..sMessage) --Log so in replays can see if this triggers since chat doesnt show properly
