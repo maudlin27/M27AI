@@ -38,6 +38,7 @@ refoClosestEnemyNavalUnitByPond = 'NavalM27ClosestEnemy' --[x] is the pond ref
 refoClosestFriendlyUnitToEnemyByPond = 'NavalM27ClosestFriendlyToEnemy' --[x] is the pond ref
 refoPrimaryNavalFactoryByPond = 'NavalM27PrimaryNavalFactory' --[x] is the pond ref
 refiTimeOfLastPrimaryNavalUpdateByPond = 'NavalM27TimeOfLastNavalUpdate' --[x] is the pond ref
+refiTimeOfLastNavalUnitCheckByPond = 'NavalM27TimeOfLastNavalUnitCheck' --[x] is the pond ref
 reftBackupBaseLocationByPond = 'NavalM27BackupBase' --[x] is pond ref; will return the last naval factory location (used e.g. if want to manage navy after naval fac destroyed)
 refbHaveNavalShortfall = 'NavalM27Shortfall' --[x] is pond ref
 refiTimeOfLastEnemyNavalBaseUpdateByPond = 'NavalM27TimeOfLastEnemyNavalBase' --[x] is the pond ref
@@ -144,6 +145,7 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
 
         --Record enemy naval units
         local tEnemyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAmphibiousAndNavy, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
+        tTeamData[aiBrain.M27Team][refiTimeOfLastNavalUnitCheckByPond] = GetGameTimeSeconds()
         if M27Utilities.IsTableEmpty(tEnemyNavy) == false then
             --local iCurPond
             --local sPathing = M27UnitInfo.refPathingTypeNavy
@@ -675,6 +677,7 @@ function TeamInitialisation(iTeamRef)
     tTeamData[iTeamRef][refiDestroyedNavalFactoriesByPond] = {}
     tTeamData[iTeamRef][refoPrimaryNavalFactoryByPond] = {}
     tTeamData[iTeamRef][refiTimeOfLastPrimaryNavalUpdateByPond] = {}
+    tTeamData[iTeamRef][refiTimeOfLastNavalUnitCheckByPond] = {}
     tTeamData[iTeamRef][reftBackupBaseLocationByPond] = {}
     tTeamData[iTeamRef][refoClosestEnemyNavalUnitByPond] = {}
     tTeamData[iTeamRef][refoClosestFriendlyUnitToEnemyByPond] = {}

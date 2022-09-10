@@ -773,6 +773,7 @@ function CombatPlatoonFormer(aiBrain)
                         end
                     end --]]
                     if M27Utilities.IsTableEmpty(tTargetPosition) == false then
+
                         if bDebugMessages == true then LOG(sFunctionRef..': About to clear commands for all units waiting for assignment to a platoon and tell them to move to '..repru(tTargetPosition)) end
                         if M27Utilities.IsTableEmpty(aiBrain[reftoCombatUnitsWaitingForAssignment]) == false then
                             for iUnit, oUnit in aiBrain[reftoCombatUnitsWaitingForAssignment] do
@@ -1828,7 +1829,9 @@ function AllocateNewUnitToPlatoonBase(tNewUnits, bNotJustBuiltByFactory, iDelayI
                     end
 
                     if bFactoryNotBuilding then
+
                         IssueClearCommands(tUnitsToClear)
+                        if bDebugMessages == true then LOG(sFunctionRef..': Clearing all units in tUnitsToClear, will list out') for iUnitToClear, oUnitToClear in tUnitsToClear do LOG('Clearing unit '..oUnitToClear.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitToClear)) end end
                     else
                         bIssueTemporaryMoveOrder = false
                         bReissueMovementPath = false

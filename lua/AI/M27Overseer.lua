@@ -33,6 +33,7 @@ refiDistanceToNearestEnemyBase = 'M27DistanceToNearestEnemy' --Distance from our
 
 --AnotherAIBrainsBackup = {}
 toEnemyBrains = 'M27OverseerEnemyBrains'
+refiActiveEnemyBrains = 'M27OverseerActiveEnemyBrains' --Against aibrain, number of active enemy brains
 toAllyBrains = 'M27OverseerAllyBrains' --Against aiBrain
 tiDistToPlayerByIndex = 'M27OverseerDistToPlayerByIndex' --Against aiBrain, [x] is the player index, returns the distance to their start position
 refbNoEnemies = 'M27OverseerNoEnemyBrains' --against aiBrain, true if no enemy brains detected
@@ -65,7 +66,7 @@ refsEnemyThreatGroup = 'M27EnemyThreatGroupRef'
     local refiEnemyThreatGroupUnitCount = 'M27EnemyThreatGroupUnitCount'
     local refiHighestThreatRecorded = 'M27EnemyThreatGroupHighestThreatRecorded'
     local refiTotalThreat = 'M27TotalThreat'
-    local reftFrontPosition = 'M27AveragePosition'
+    local reftFrontPosition = 'M27TrheatFrontPosition'
     local refiDistanceFromOurBase = 'M27DistanceFromOurBase'
     local refiModDistanceFromOurStart = 'M27ModDistanceFromEnemy' --Distance that enemy threat group is from our start (adjusted to factor in distance from mid as well)
     local refiActualDistanceFromEnemy = 'M27ActualDistanceFromEnemy'
@@ -1212,26 +1213,28 @@ function AssignMAAToPreferredPlatoons(aiBrain)
 
         --If ACU is near base or chokepoint and we own T2+ fixed AA near it, then reduce MAA threat wanted
         local oACU = M27Utilities.GetACU(aiBrain)
+        if M27UnitInfo.IsUnitValid(oACU) then
 
-        if aiBrain[refiOurHighestFactoryTechLevel] >= 2 and M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 then
-            local iAACategory
-            if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 then iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3
-            elseif aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] > 0 then iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryStructureAA * categories.TECH2
-            else iAACategory = M27UnitInfo.refCategoryStructureAA
-            end
-            local tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(iAACategory, oACU:GetPosition(), 60, 'Ally')
-            local iDistToBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
-            if M27Utilities.IsTableEmpty(tNearbyGroundAA) == false then
-                if iDistToBase <= iDistanceFromBaseToBeSafe + 5 then
+            if aiBrain[refiOurHighestFactoryTechLevel] >= 2 and M27UnitInfo.GetUnitHealthPercent(oACU) >= 0.75 then
+                local iAACategory
+                if aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][3] > 0 then iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3
+                elseif aiBrain[M27AirOverseer.reftEnemyAirFactoryByTech][2] > 0 then iAACategory = M27UnitInfo.refCategoryStructureAA * categories.TECH3 + M27UnitInfo.refCategoryStructureAA * categories.TECH2
+                else iAACategory = M27UnitInfo.refCategoryStructureAA
+                end
+                local tNearbyGroundAA = aiBrain:GetUnitsAroundPoint(iAACategory, oACU:GetPosition(), 60, 'Ally')
+                local iDistToBase = M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
+                if M27Utilities.IsTableEmpty(tNearbyGroundAA) == false then
+                    if iDistToBase <= iDistanceFromBaseToBeSafe + 5 then
 
-                    iMAAThreatWanted = math.min(iMinACUMAAThreatWanted, iMAAThreatWanted)
-                    iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.4
-                elseif iDistToBase <= 125 then
-                    iMAAThreatWanted = math.min(iMAAThreatWanted, iMinACUMAAThreatWanted * 1.2)
-                    iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.6
-                else
-                    iMAAThreatWanted = math.min(iMAAThreatWanted, iMinACUMAAThreatWanted * 1.5)
-                    iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.8
+                        iMAAThreatWanted = math.min(iMinACUMAAThreatWanted, iMAAThreatWanted)
+                        iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.4
+                    elseif iDistToBase <= 125 then
+                        iMAAThreatWanted = math.min(iMAAThreatWanted, iMinACUMAAThreatWanted * 1.2)
+                        iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.6
+                    else
+                        iMAAThreatWanted = math.min(iMAAThreatWanted, iMinACUMAAThreatWanted * 1.5)
+                        iMinACUMAAThreatWanted = iMinACUMAAThreatWanted * 0.8
+                    end
                 end
             end
         end
@@ -3189,48 +3192,77 @@ function ThreatAssessAndRespond(aiBrain)
         bACUNeedsTorpSupport = true
     end
     local iTorpBomberThreatNotUsed = 0 --If skip attacking units due to being too far away then record here so we dont think we have no shortfall
-    local iMaxTorpBomberRange = 10000
-    --Do we have a naval factory in the pond? If so then limit torp bomber range
-    local iPond = M27Navy.GetPondToFocusOn(aiBrain)
-    local oPrimaryNavalFactory
-    if iPond > 0 then
-        oPrimaryNavalFactory = M27Navy.GetPrimaryNavalFactory(aiBrain, iPond)
-        if M27UnitInfo.IsUnitValid(oPrimaryNavalFactory) then
-            iMaxTorpBomberRange = math.max(200, aiBrain[refiDistanceToNearestEnemyBase] * 0.25, math.min(400, aiBrain[refiDistanceToNearestEnemyBase] * 0.5))
-        end
-    end
+    local tiMaxTorpBomberRangeByPond = {}
+    local oPondNavalFac
+    local bHaveValidLocation
+    local iHardCapOnTorpRange = 10000
+
     local tAllRecentlySeenCruisers = {}
     local iClosestRecentlySeenCruiser = 10000
     local iRangeReduction = 50
 
 
-    --Add any pond AA recently seen but not currently visible to this
-    if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
-    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
-        for iPond, tEnemyUnits in M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond] do
-            if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
-            if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
-                local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
-                if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
-                if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
-                    for iUnit, oUnit in tEnemyT2PlusNavalAA do
-                        if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
-                        if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
-                            if M27Utilities.GetDistanceBetweenPositions(oUnit[M27UnitInfo.reftLastKnownPosition], oUnit:GetPosition()) <= iRangeReduction then --approximation for human memory
-                                iClosestRecentlySeenCruiser = math.min(iClosestRecentlySeenCruiser, GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit[M27UnitInfo.reftLastKnownPosition]))
+
+    --Do we have a naval factory in the pond? If so then limit torp bomber range
+    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond]) == false then
+        for iPond, iThreat in M27Team.tTeamData[aiBrain.M27Team][M27Team.refiEnemyNavalThreatByPond] do
+            bHaveValidLocation = false
+            if iThreat > 0 then
+                oPondNavalFac = M27Navy.GetPrimaryNavalFactory(aiBrain, iPond)
+                if not(M27UnitInfo.IsUnitValid(oPondNavalFac)) then
+                    --We have lost navy so dont want to cap torp bomber range
+                    tiMaxTorpBomberRangeByPond[iPond] = 10000
+                else
+                    --We have a naval fac so cap range - take hte midpoint between enemy fac and our fac, and then cap range at dist from here to our base
+
+                    if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyBaseLocationByPond][iPond]) == false then
+                        bHaveValidLocation = true
+                        tiMaxTorpBomberRangeByPond[iPond] = M27Utilities.GetDistanceBetweenPositions(M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], M27Utilities.MoveTowardsTarget(oPondNavalFac:GetPosition(), M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyBaseLocationByPond][iPond], M27Utilities.GetDistanceBetweenPositions(oPondNavalFac:GetPosition(), M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyBaseLocationByPond][iPond]), 0))
+                    end
+                    if not(bHaveValidLocation) then
+                        tiMaxTorpBomberRangeByPond[iPond] = 10000
+                    end
+                end
+            end
+
+
+            --Add any pond AA recently seen but not currently visible to this
+            if bDebugMessages == true then LOG(sFunctionRef..': Is table of enemy untis by pond empty='..tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]))) end
+            if M27Utilities.IsTableEmpty(M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond]) == false then
+                local tEnemyUnits = M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond]
+                if bDebugMessages == true then LOG(sFunctionRef..': Considering iPond='..iPond..'; is table of enemy units empty for this='..tostring(M27Utilities.IsTableEmpty(tEnemyUnits))) end
+                if M27Utilities.IsTableEmpty(tEnemyUnits) == false then
+                    local tEnemyT2PlusNavalAA = EntityCategoryFilterDown(M27UnitInfo.refCategoryCruiserCarrier, M27Team.tTeamData[aiBrain.M27Team][M27Team.reftEnemyUnitsByPond][iPond])
+                    if bDebugMessages == true then LOG(sFunctionRef..': Is table of cruisers and carriers empty='..tostring(M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA))) end
+                    if M27Utilities.IsTableEmpty(tEnemyT2PlusNavalAA) == false then
+                        for iUnit, oUnit in tEnemyT2PlusNavalAA do
+                            if bDebugMessages == true then LOG(sFunctionRef..': Considering enemy unit '..oUnit.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnit)..'; Is valid='..tostring(M27UnitInfo.IsUnitValid(oUnit))..'; Is last known position empty='..tostring(M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]))..'; Can see unit='..tostring(M27Utilities.CanSeeUnit(aiBrain, oUnit, true))) end
+                            if M27UnitInfo.IsUnitValid(oUnit) and M27Utilities.IsTableEmpty(oUnit[M27UnitInfo.reftLastKnownPosition]) == false and not(M27Utilities.CanSeeUnit(aiBrain, oUnit, true)) then
+                                if M27Utilities.GetDistanceBetweenPositions(oUnit[M27UnitInfo.reftLastKnownPosition], oUnit:GetPosition()) <= iRangeReduction then --approximation for human memory
+                                    iClosestRecentlySeenCruiser = math.min(iClosestRecentlySeenCruiser, GetDistanceFromStartAdjustedForDistanceFromMid(aiBrain, oUnit[M27UnitInfo.reftLastKnownPosition]))
+                                end
+                                table.insert( tAllRecentlySeenCruisers, oUnit) --Include even if distance is further from last known position as we sitll know they have the unit so want to build more torp bombers, even if we dont want to limit our combat range
                             end
-                            table.insert( tAllRecentlySeenCruisers, oUnit) --Include even if distance is further from last known position as we sitll know they have the unit so want to build more torp bombers, even if we dont want to limit our combat range
                         end
                     end
                 end
             end
+
+
+            if bHaveValidLocation then
+                tiMaxTorpBomberRangeByPond[iPond] = math.min(iClosestRecentlySeenCruiser - iRangeReduction, math.max(tiMaxTorpBomberRangeByPond[iPond], 200, aiBrain[refiDistanceToNearestEnemyBase] * 0.25))
+                --Increase range if ACU needs torp support
+                if bACUNeedsTorpSupport then tiMaxTorpBomberRangeByPond[iPond] = math.max(50 + M27Utilities.GetDistanceBetweenPositions(oACU:GetPosition(), M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]), tiMaxTorpBomberRangeByPond[iPond]) end
+            end
         end
     end
-    iMaxTorpBomberRange = math.min(iMaxTorpBomberRange, iClosestRecentlySeenCruiser - iRangeReduction) --Dont want to attack navy if there are cruisers nearby that we dont have visual of
+
+
+
 
 
     if bDebugMessages == true then
-        LOG(sFunctionRef .. ': bACUNeedsTorpSupport=' .. tostring(bACUNeedsTorpSupport) .. '; Time ACU last took torp damage=' .. GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100)..'; iMaxTorpBomberRange='..iMaxTorpBomberRange)
+        LOG(sFunctionRef .. ': bACUNeedsTorpSupport=' .. tostring(bACUNeedsTorpSupport) .. '; Time ACU last took torp damage=' .. GetGameTimeSeconds() - (oACU[refiACULastTakenUnseenOrTorpedoDamage] or -100)..'; riMaxTorpBomberRangeByPond='..repru(tiMaxTorpBomberRangeByPond))
     end
 
     local bFirstUnassignedNavyThreat = true
@@ -4339,7 +4371,7 @@ function ThreatAssessAndRespond(aiBrain)
                         end
                         if not (bACUNeedsTorpSupport) and (iAvailableThreat >= iThreatNeeded or iAvailableTorpBombers >= 30 or (aiBrain[refbT2NavyNearOurBase] and iAvailableTorpBombers >= 8)) or (bACUNeedsTorpSupport and iAvailableTorpBombers > 1) then
                             --and (not(bACUNeedsTorpSupport) or iAvailableTorpBombers >= 3) then
-                            if tEnemyThreatGroup[refiDistanceFromOurBase] >= iMaxTorpBomberRange then
+                            if tEnemyThreatGroup[refiDistanceFromOurBase] >= (tiMaxTorpBomberRangeByPond[M27MapInfo.GetSegmentGroupOfLocation(M27UnitInfo.refPathingTypeNavy, tEnemyThreatGroup[reftFrontPosition])] or 10000) then
                                 if bDebugMessages == true then LOG(sFunctionRef..': Threat group too far away so wont attack it. tEnemyThreatGroup[refiDistanceFromOurBase]='..tEnemyThreatGroup[refiDistanceFromOurBase]..'; iMaxTorpBomberRange='..iMaxTorpBomberRange) end
                                 iTorpBomberThreatNotUsed = math.max(iTorpBomberThreatNotUsed, iAvailableThreat)
                                 iCumulativeTorpBomberThreatShortfall = iCumulativeTorpBomberThreatShortfall + iThreatNeeded
@@ -4555,6 +4587,11 @@ function ThreatAssessAndRespond(aiBrain)
     iCumulativeTorpBomberThreatShortfall = math.max(0, iCumulativeTorpBomberThreatShortfall - iTorpBomberThreatNotUsed)
     if iCumulativeTorpBomberThreatShortfall > 0 then
         aiBrain[M27AirOverseer.refiTorpBombersWanted] = math.ceil(iCumulativeTorpBomberThreatShortfall / 240)
+        --Cap based on how many torp bombers we already have
+        local iExistingTorpBombers = aiBrain:GetCurrentUnits(M27UnitInfo.refCategoryTorpBomber)
+        if iExistingTorpBombers >= 70 then
+            aiBrain[M27AirOverseer.refiTorpBombersWanted] = math.max(0, math.min(80 - iExistingTorpBombers, aiBrain[M27AirOverseer.refiTorpBombersWanted]))
+        end
     else
         aiBrain[M27AirOverseer.refiTorpBombersWanted] = 0
     end
@@ -7699,6 +7736,7 @@ function RecordAllEnemiesAndAllies(aiBrain)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': Finished waiting 1.5s for brain with armyindex=' .. aiBrain:GetArmyIndex() .. '; will proceed with updating enemy and ally list. GameTime=' .. GetGameTimeSeconds()..'; refbAllEnemiesDead='..tostring(aiBrain[M27Logic.refbAllEnemiesDead] or false))
     end
+
     if not(aiBrain[M27Logic.refbAllEnemiesDead]) then
         local iOurIndex = aiBrain:GetArmyIndex()
         local iEnemyCount = 0
@@ -7708,6 +7746,8 @@ function RecordAllEnemiesAndAllies(aiBrain)
         tAllActiveM27Brains = {}
         if M27Utilities.IsTableEmpty(ArmyBrains) == false then
             if bDebugMessages == true then LOG(sFunctionRef..': Army brains isnt empty so will cycle through all of these brains') end
+            local bUpdateStartOfGameCount = false
+
             aiBrain[toEnemyBrains] = {}
             aiBrain[toAllyBrains] = {}
 
@@ -7760,25 +7800,31 @@ function RecordAllEnemiesAndAllies(aiBrain)
                     LOG(sFunctionRef .. ': Brain is defeated')
                 end
             end
-            iPlayersAtGameStart = iAllyCount + iEnemyCount
+            if not(aiBrain['M27StartOfGameCountDone']) then
+                iPlayersAtGameStart = iAllyCount + iEnemyCount
+                aiBrain['M27StartOfGameCountDone'] = true
+            end
         else
             if bDebugMessages == true then LOG(sFunctionRef..': Will cycle through tAllAIBrainsByArmyIndex brains') end
             for iCurBrain, oBrain in tAllAIBrainsByArmyIndex do
-                if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
-                    iEnemyCount = iEnemyCount + 1
-                    aiBrain[toEnemyBrains][oBrain:GetArmyIndex()] = oBrain
-                    if bDebugMessages == true then
-                        LOG(sFunctionRef .. ': aiBrain Index=' .. aiBrain:GetArmyIndex() .. '; enemy index=' .. iArmyIndex .. '; recording as an enemy; start position number=' .. oBrain.M27StartPositionNumber .. '; start position=' .. repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]))
+                if not (oBrain:IsDefeated()) and not(oBrain.M27IsDefeated) then
+                    if IsEnemy(iOurIndex, oBrain:GetArmyIndex()) then
+                        iEnemyCount = iEnemyCount + 1
+                        aiBrain[toEnemyBrains][oBrain:GetArmyIndex()] = oBrain
+                        if bDebugMessages == true then
+                            LOG(sFunctionRef .. ': aiBrain Index=' .. aiBrain:GetArmyIndex() .. '; enemy index=' .. iArmyIndex .. '; recording as an enemy; start position number=' .. oBrain.M27StartPositionNumber .. '; start position=' .. repru(M27MapInfo.PlayerStartPoints[oBrain.M27StartPositionNumber]))
+                        end
+                    elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not (oBrain == aiBrain) then
+                        iAllyCount = iAllyCount + 1
+                        aiBrain[toAllyBrains][iArmyIndex] = oBrain
                     end
-                elseif IsAlly(iOurIndex, oBrain:GetArmyIndex()) and not (oBrain == aiBrain) then
-                    iAllyCount = iAllyCount + 1
-                    aiBrain[toAllyBrains][iArmyIndex] = oBrain
-                end
-                if oBrain.M27StartPositionNumber then
-                    M27MapInfo.UpdateNewPrimaryBaseLocation(oBrain)
+                    if oBrain.M27StartPositionNumber then
+                        M27MapInfo.UpdateNewPrimaryBaseLocation(oBrain)
+                    end
                 end
             end
         end
+        aiBrain[refiActiveEnemyBrains] = iEnemyCount
         --Do we have a team set?
         if not (aiBrain.M27Team) then
             M27Team.iTotalTeamCount = M27Team.iTotalTeamCount + 1
@@ -8021,6 +8067,8 @@ function RecordAllEnemiesAndAllies(aiBrain)
 
         --Record ponds of interest
         ForkThread(M27Navy.RecordPondToExpandTo, aiBrain)
+    else
+        aiBrain[refiActiveEnemyBrains] = 0
     end
 
 

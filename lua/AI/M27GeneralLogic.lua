@@ -2352,7 +2352,7 @@ function GetAirThreatLevel(aiBrain, tUnits, bMustBeVisibleToIntelOrSight, bInclu
                                 elseif EntityCategoryContains(categories.OVERLAYANTIAIR, sCurUnitBP) == true then
                                     iMassMod = 0.05
                                     if sCurUnitBP == 'ues0401' then iMassMod = 1 end --atlantis misclassifiefd as not anti-air
-                                    if EntityCategoryContains(categories.FRIGATE, sCurUnitBP) then iMassMod = 0.1 end
+                                    if EntityCategoryContains(categories.FRIGATE, sCurUnitBP) then iMassMod = 0.18 end
                                 end
                             end
                         end

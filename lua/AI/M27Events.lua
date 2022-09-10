@@ -954,7 +954,7 @@ function OnMissileBuilt(self, weapon)
                     elseif EntityCategoryContains(M27UnitInfo.refCategoryTML, self.UnitId) then sActionRef = M27EngineerOverseer.refActionAssistTML
                     elseif EntityCategoryContains(M27UnitInfo.refCategorySMD, self.UnitId) then sActionRef = M27EngineerOverseer.refActionAssistSMD
                     end
-                    if sActionRef then
+                    if sActionRef and M27Utilities.IsTableEmpty(aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sActionRef]) == false then
                         for iRef, tSubtable in aiBrain[M27EngineerOverseer.reftEngineerAssignmentsByActionRef][sActionRef] do
                             oEngineer = tSubtable[M27EngineerOverseer.refEngineerAssignmentEngineerRef]
                             --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end

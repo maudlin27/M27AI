@@ -19,7 +19,7 @@ AIBrain = Class(M27AIBrainClass) {
 
     OnCreateAI = function(self, planName)
         local sFunctionRef = 'OnCreateAI'
-        local bDebugMessages = true if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
+        local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end
         if bDebugMessages == false then LOG(sFunctionRef..' M27AI: aibrain.lua: OnCreateAI function - before recorded if m27AI. reprs of AI='..reprs(self)) end
 
         --Set aiBrain attribute on all AIs:
@@ -43,6 +43,7 @@ AIBrain = Class(M27AIBrainClass) {
             if bDebugMessages == true then LOG(sFunctionRef..'* M27AI: personality (' .. personality .. ') is being used by army name: (' .. self.Name .. '); self.M27AI set to true') end
             self.M27AI = true
             M27Utilities.bM27AIInGame = true
+            if bDebugMessages == true then LOG(sFunctionRef..': reprs of ScenarioInfo='..reprs(ScenarioInfo.Options)) end
 
             M27Overseer.tAllActiveM27Brains[self:GetArmyIndex()] = self
             if bDebugMessages == true then LOG(sFunctionRef..': Size of tAllActiveM27Brains='..table.getsize(M27Overseer.tAllActiveM27Brains)) end

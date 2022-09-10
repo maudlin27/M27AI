@@ -295,6 +295,7 @@ function CanBuildAtLocation(aiBrain, sBlueprintToBuild, tTargetLocation, iEngiAc
                                 for iUniqueEngiRef, oEngineer in tSubtable do
                                     --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true else bDebugMessages = false end
                                     --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end
+
                                     if bDebugMessages == true then LOG(sFunctionRef..': About to clear oEngineer='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' which was recorded as having iActionRef='..iActionRef) end
                                     IssueClearCommands({oEngineer})
                                     ClearEngineerActionTrackers(aiBrain, oEngineer, true)
@@ -496,7 +497,7 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
 
     local sFunctionRef = 'ClearEngineerActionTrackers'
     M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
-    --if M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 1 and oEngineer.UnitId=='ual0105' then bDebugMessages = true end
+    --if M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 12 then bDebugMessages = true end
 
     --if oEngineer[refiEngineerCurrentAction] == refActionBuildTMD then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 31 and GetGameTimeSeconds() >= 305 then bDebugMessages = true end
@@ -677,6 +678,8 @@ function ClearEngineerActionTrackers(aiBrain, oEngineer, bDontClearUnitThatAreGu
                             if M27UnitInfo.IsUnitValid(oEngi) and GetEngineerUniqueCount(oEngi) == 3 then bDebugMessages = true break end
                         end--]]
 
+
+
                         if bDebugMessages == true then
                             LOG(sFunctionRef..': About to issue clear commands to '..table.getn(tTempGuardedBy)..'engineers.  Unique ref of each engineer about to be cleared')
                             for iEngi, oEngi in tTempGuardedBy do
@@ -802,7 +805,7 @@ function UpdateEngineerActionTrackers(aiBrain, oEngineer, iActionToAssign, tTarg
 
     --if bAreAssisting and M27Utilities.IsACU(oUnitToAssist) then bDebugMessages = true end
     --if iActionToAssign == refActionBuildTMD then bDebugMessages = true end
-    --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+    --if GetEngineerUniqueCount(oEngineer) == 12 then bDebugMessages = true end
     if not(M27UnitInfo.IsUnitValid(oEngineer)) then M27Utilities.ErrorHandler('oEngineer isnt valid. UnitID='..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..'; iConditionNumber='..iConditionNumber..'; iActionToAssign='..iActionToAssign..'; tTargetLocation='..repru(tTargetLocation or {'nil'})..'; aiBrain index='..aiBrain:GetArmyIndex()) end
 
 
@@ -1185,6 +1188,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
         --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing due to nearby PD') end
         bKeepBuilding = false
         bAreNearbyEnemies = true
+
         UpdateReclaimSegmentsForEngineerDeathOrNearbyEnemy(aiBrain, oEngineer, true)
         --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
         IssueClearCommands({oEngineer})
@@ -1387,6 +1391,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for engi with count='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' and unique ref='..GetEngineerUniqueCount(oEngineer)..' unless it is already t argeting the enemy.  Engineer unit state='..M27Logic.GetUnitState(oEngineer)..'; Distance to target='..M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), oReclaimTarget:GetPosition())..'; bDontClearCOmmands='..tostring(bDontClearCommands)) end
                 if not(bDontClearCommands) then
                     --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                     IssueClearCommands({oEngineer})
                     if bCaptureNotReclaim then
                         IssueCapture({oEngineer}, oReclaimTarget)
@@ -1405,6 +1410,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                     --Nearby enemy but we dont know if its an engineer so we want to run back towards base
                     --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end
                     --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                     if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands for engi with count='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' and unique ref='..GetEngineerUniqueCount(oEngineer)) end
                     IssueClearCommands({oEngineer})
                     IssueMove({oEngineer}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -1445,6 +1451,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                                 else
                                     bKeepBuilding = false
                                     --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                                     IssueClearCommands({oEngineer})
                                     IssueRepair({oEngineer}, oAssistConstruction)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Clearing commands and telling engineer to repair construction to assist it') end
@@ -1464,6 +1471,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                                 --If dont already have a 'nearby enemy' flag then this is the first time so want to clear orders and move towards the shield
                                 if not(oEngineer[refiEngineerCurrentAction] == refActionHasNearbyEnemies) then
                                     --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                                     IssueClearCommands({oEngineer})
                                     local tBuildLocation = BuildStructureAtLocation(aiBrain, oEngineer, M27UnitInfo.refCategoryStructureAA, 20, nil, oNearestShield:GetPosition(), true, false, nil, false, nil, false, nil)
                                     if bDebugMessages == true then LOG(sFunctionRef..': Cleared engieners commands and telling it to build structure at location') end
@@ -1491,6 +1499,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                     bAreNearbyEnemies = true
                     UpdateReclaimSegmentsForEngineerDeathOrNearbyEnemy(aiBrain, oEngineer, true)
                     --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                     IssueClearCommands({oEngineer})
                     if bDebugMessages == true then LOG(sFunctionRef..': Clearing engineer commands and telling it to move to base') end
                     IssueMove({oEngineer}, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber])
@@ -1544,6 +1553,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 if bMobileEnemy then
                     bAreNearbyEnemies = true
                     --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                     IssueClearCommands({oEngineer})
                     --Do we need to move to be in range first?
                     local iDistToEnemy = M27Utilities.GetDistanceBetweenPositions(oNearestEnemy:GetPosition(), oEngineer:GetPosition())
@@ -1607,6 +1617,7 @@ function ProcessingEngineerActionForNearbyEnemies(aiBrain, oEngineer)
                 local oNearestWall = M27Utilities.GetNearestUnit(tNearbyWalls, tEngPosition)
                 if oNearestWall then
                     --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                     IssueClearCommands({oEngineer})
                     IssueReclaim({oEngineer}, oNearestWall)
                     ReissueEngineerOldOrders(aiBrain, oEngineer, false)
@@ -1791,6 +1802,7 @@ function DelayedSpareEngineerClearAction(aiBrain, oEngineer, iDelaySeconds)
             --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
             if oEngineer[refiEngineerCurrentAction] == iOrigAction or oEngineer[refiEngineerCurrentAction] == refActionSpare or oEngineer[refiEngineerCurrentAction] == refActionPlateauSpareAction or oEngineer[refiEngineerCurrentAction] == refActionNavalSpareAction then
                 --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                 if bDebugMessages == true then LOG(sFunctionRef..': About to clear engineer '..GetEngineerUniqueCount(oEngineer)..' actions as it still has a spare action') end
                 IssueClearCommands({oEngineer})
                 ClearEngineerActionTrackers(aiBrain, oEngineer, true)
@@ -1832,6 +1844,7 @@ function IssuePlateauSpareEngineerAction(aiBrain, oEngineer)
 
         if oLandFactory then
             --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
             IssueClearCommands({oEngineer})
             IssueGuard({oEngineer}, oLandFactory)
             if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer commands and issued guard as Have land factory that is building something so will assist it') end
@@ -1864,6 +1877,7 @@ function IssuePlateauSpareEngineerAction(aiBrain, oEngineer)
                 tRandomTargetLocation[2] = GetSurfaceHeight(tRandomTargetLocation[1], tRandomTargetLocation[3])
             end
             --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
             IssueClearCommands({oEngineer})
             IssueAggressiveMove({oEngineer}, tRandomTargetLocation)
             local sLocationRef = M27Utilities.ConvertLocationToReference(tRandomTargetLocation)
@@ -3018,8 +3032,8 @@ function FindRandomPlaceToBuild(aiBrain, oBuilder, tStartPosition, sBlueprintToB
     else
         tTargetLocation = nil
         if iGroupCycleCount >= math.max(5, iMaxCycles) then
-            M27Utilities.ErrorHandler('Failed to find a random place to build that engineer can path to after iGroupCycleCount='..iCycleAbortCount..' with iMaxCycles='..iMaxCycles..';, will check pathing and re-run this function if this is the first time', true)
-            bDebugMessages = true --To help with errors
+            M27Utilities.ErrorHandler('Failed to find a random place to build that engineer can path to after iGroupCycleCount='..iCycleAbortCount..' with iMaxCycles='..iMaxCycles..';, will check pathing and re-run this function if this is the first time', true) bDebugMessages = true --To help with errors
+
         end
 
 
@@ -3949,6 +3963,116 @@ function GetBestBuildLocationForTarget(tablePosTarget, sTargetBuildingBPID, sNew
     end
 
 end
+function CheckIfEngineerLikelyStuck(oEngineer, sBlueprintToBuild, tTargetLocation)
+    local bDebugMessages = false if M27Utilities.bGlobalDebugOverride == true then   bDebugMessages = true end --True if want most log messages to print
+    local sFunctionRef = 'CheckIfEngineerLikelyStuck'
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+
+    --if EntityCategoryContains(categories.TECH3, sBlueprintToBuild) then bDebugMessages = true end
+
+    --Are we dealing with an engineer (not an ACU)?
+    if M27UnitInfo.IsUnitValid(oEngineer) and EntityCategoryContains(refCategoryEngineer, oEngineer.UnitId) then
+        local iActionRef = (oEngineer[refiEngineerCurrentAction] or 0)
+        local aiBrain = oEngineer:GetAIBrain()
+        if not(iActionRef == refActionBuildMex) and not(iActionRef == refActionBuildHydro) and M27Utilities.GetDistanceBetweenPositions(tTargetLocation, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber]) <= 200 then
+
+            local reftLocationAtStart = 'M27EngLocationAtStart'
+            local iOrderRef = (oEngineer[refiEngineerOrderCount] or 0)
+            local iCategoryRef = aiBrain[reftEngineerActionsByEngineerRef][GetEngineerUniqueCount(oEngineer)][1][refiCategoryBuilt]
+
+            local iConditionNumber = (oEngineer[refiEngineerConditionNumber] or 100)
+            local iBuildRange = oEngineer:GetBlueprint().Economy.MaxBuildDistance
+            oEngineer[reftLocationAtStart] = {oEngineer:GetPosition()[1], oEngineer:GetPosition()[2], oEngineer:GetPosition()[3]}
+            local bKeepChecking = true
+            if iOrderRef == 0 or iActionRef == 0 then
+                bKeepChecking = false
+            end
+            local iDistToTarget
+            local iDistFromLastPosition
+            local iCategoryWanted = refCategoryEngineer * M27UnitInfo.ConvertTechLevelToCategory(M27UnitInfo.GetUnitTechLevel(oEngineer))
+            if EntityCategoryContains(categories.UEF, oEngineer.UnitId) then iCategoryWanted = iCategoryWanted * categories.UEF
+            elseif EntityCategoryContains(categories.AEON, oEngineer.UnitId) then iCategoryWanted = iCategoryWanted * categories.AEON
+            elseif EntityCategoryContains(categories.CYBRAN, oEngineer.UnitId) then iCategoryWanted = iCategoryWanted * categories.CYBRAN
+            elseif EntityCategoryContains(categories.SERAPHIM, oEngineer.UnitId) then iCategoryWanted = iCategoryWanted * categories.SERAPHIM
+            end
+
+
+            while bKeepChecking do
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+                WaitSeconds(30)
+                M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerStart)
+                bKeepChecking = false
+                if M27UnitInfo.IsUnitValid(oEngineer) and oEngineer[refiEngineerOrderCount] == iOrderRef and oEngineer[refiEngineerCurrentAction] == iActionRef and not(oEngineer:IsUnitState('Building')) and not(oEngineer:IsUnitState('Repairing')) then
+                    iDistToTarget = M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), tTargetLocation)
+                    if bDebugMessages == true then LOG(sFunctionRef..': It has been 30s since engineer with UC='..GetEngineerUniqueCount(oEngineer)..' was given order with ref '..(iActionRef or 'nil')..' and unique corder count='..iOrderRef..'; was given the build order and we still have the same order. iDistToTarget='..iDistToTarget) end
+                    if iDistToTarget >= math.max(iBuildRange, 12) then
+                        bKeepChecking = true
+                        iDistFromLastPosition = M27Utilities.GetDistanceBetweenPositions(oEngineer:GetPosition(), oEngineer[reftLocationAtStart])
+                        if bDebugMessages == true then LOG(sFunctionRef..': Distance travelled from our position 30s ago='..iDistFromLastPosition) end
+                        if iDistFromLastPosition >= 15 then
+                            --Are still moving, so keep checking
+                        else
+                            --Want to try and give a new engineer the order if there is one of the same faction and tech level that is closer
+                            local tNearbyEngineers = aiBrain:GetUnitsAroundPoint(iCategoryWanted, oEngineer:GetPosition(), iDistToTarget - 5, 'Ally')
+                            if bDebugMessages == true then LOG(sFunctionRef..': Is the table of nearby engineers empty='..tostring(M27Utilities.IsTableEmpty(tNearbyEngineers))) end
+                            if M27Utilities.IsTableEmpty(tNearbyEngineers) == false then
+                                local iClosestEngineer = 10000
+                                local oClosestEngineer
+                                local iCurDist
+                                for iNearbyEngi, oNearbyEngi in tNearbyEngineers do
+                                    if oNearbyEngi:GetAIBrain() == aiBrain and not(oNearbyEngi[refbPrimaryBuilder]) then
+                                        iCurDist = M27Utilities.GetDistanceBetweenPositions(oNearbyEngi:GetPosition(), tTargetLocation)
+                                        if iCurDist < iClosestEngineer then
+                                            iClosestEngineer = iCurDist
+                                            oClosestEngineer = oNearbyEngi
+                                        end
+                                    end
+                                end
+                                if bDebugMessages == true then LOG(sFunctionRef..': iClosestEngineer='..iClosestEngineer) end
+                                if oClosestEngineer then
+                                    --Try getting the nearest engineer to build here instead
+                                    local tEngineersToClear = {oEngineer}
+                                    local oCurEngi
+                                    IssueClearCommands({oEngineer})
+                                    ClearEngineerActionTrackers(aiBrain, oEngineer, true)
+
+                                    if M27Utilities.IsTableEmpty(aiBrain[reftEngineerAssignmentsByActionRef][iActionRef]) == false then
+                                        if bDebugMessages == true then LOG(sFunctionRef..': Have engineers with this action, will clear if they arent primary builders') end
+                                        for iRef, tSubtable in aiBrain[reftEngineerAssignmentsByActionRef][iActionRef] do
+                                            oCurEngi = tSubtable[refEngineerAssignmentEngineerRef]
+                                            if not(oCurEngi[refbPrimaryBuilder]) then
+                                                --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end
+                                                --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+                                                IssueClearCommands({oCurEngi})
+                                                ClearEngineerActionTrackers(aiBrain, oCurEngi, true)
+                                                table.insert(tEngineersToClear, oCurEngi)
+                                                if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oCurEngi)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oCurEngi)) end
+                                            end
+                                        end
+                                    end
+                                    ForkThread(DelayedEngiReassignment, aiBrain, true, tEngineersToClear)
+
+                                    --Give order to the closest engineer
+                                    IssueClearCommands({oClosestEngineer})
+                                    ClearEngineerActionTrackers(aiBrain, oClosestEngineer, true)
+                                    UpdateEngineerActionTrackers(aiBrain, oClosestEngineer, iActionRef, tTargetLocation, false, iConditionNumber, nil, true, nil, iCategoryRef)
+                                    IssueBuildMobile({oClosestEngineer}, tTargetLocation, sBlueprintToBuild, {})
+
+                                    if bDebugMessages == true then
+                                        LOG(sFunctionRef..': Been 30s and engineer with UC='..GetEngineerUniqueCount(oEngineer)..' not built so have cleared and told a closer engineer '..oClosestEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oClosestEngineer)..' with UC='..GetEngineerUniqueCount(oClosestEngineer)..' to be the primar ybuilder instead and build '..sBlueprintToBuild..' and '..repru(tTargetLocation)..'; will draw target location')
+                                        M27Utilities.DrawLocation(tTargetLocation)
+
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    M27Utilities.FunctionProfiler(sFunctionRef, M27Utilities.refProfilerEnd)
+end
 
 function TrackWhenEngineerInBuildRange(oEngineer, tMoveNearTargetLocation, sBuildingBlueprint, tTargetLocation, oPartCompleteBuilding)
     --Checks every 1+ second to see if engineer should be in build range and can start building; called when engineer given an order to move near the target
@@ -4413,6 +4537,10 @@ function BuildStructureAtLocation(aiBrain, oEngineer, iCategoryToBuild, iMaxArea
                 if M27Utilities.IsTableEmpty(tMoveNearTargetLocation) == false then
                     if bDebugMessages == true then LOG(sFunctionRef..': About to start thread checking for when the engineer is in build range') end
                     ForkThread(TrackWhenEngineerInBuildRange, oEngineer, tMoveNearTargetLocation, (sBlueprintToBuild or oPartCompleteBuilding.UnitId), tTargetLocation, oPartCompleteBuilding)
+                    if sBlueprintToBuild and not(oPartCompleteBuilding) then
+                        ForkThread(CheckIfEngineerLikelyStuck, oEngineer, sBlueprintToBuild, tTargetLocation)
+                    end
+
                 end
             end
         else
@@ -5207,6 +5335,7 @@ function UpgradeBuildingActionCompleteChecker(aiBrain, oEngineer, oBuildingToUpg
         if oBuildingToUpgrade and not(oBuildingToUpgrade.Dead) and oBuildingToUpgrade.IsUnitState and (oBuildingToUpgrade:IsUnitState('Upgrading') or oBuildingToUpgrade:IsUnitState('BeingBuilt')) then bContinue = true end
     end
     --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
     if bDebugMessages == true then LOG(sFunctionRef..': About to clear engineer with ref '..GetEngineerUniqueCount(oEngineer)..' actions') end
     IssueClearCommands({oEngineer})
     ClearEngineerActionTrackers(aiBrain, oEngineer, true)
@@ -5223,6 +5352,7 @@ function ReissueEngineerOldOrders(aiBrain, oEngineer, bClearActionsFirst)
 
     if bClearActionsFirst then
         --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
         IssueClearCommands({oEngineer})
         if bDebugMessages == true then LOG(sFunctionRef..': CLeared engineer commands ahead of reissuing its old orders') end
     end
@@ -5547,6 +5677,7 @@ function CheckifMexStillAvailable(aiBrain, oEngineer)
             end
             if bAllyBuilding then
                 --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                 if bDebugMessages == true then LOG(sFunctionRef..': Engineer '..oEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oEngineer)..' UC='..GetEngineerUniqueCount(oEngineer)..' will stop its actions and be cleared as its target location has a teammate building on it') end
                 IssueClearCommands({oEngineer})
                 ClearEngineerActionTrackers(aiBrain, oEngineer, true)
@@ -5709,10 +5840,16 @@ function GetLikelySMLTarget(aiBrain, oSML)
 end
 
 function RecordNearbyTMD(oUnit)
-    local tNearbyTMD = oUnit:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, oUnit:GetPosition(), iTMDNearbyRange, 'Ally')
-    oUnit[M27UnitInfo.refiNearbyTMD] = 0
-    if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
-        oUnit[M27UnitInfo.refiNearbyTMD] = table.getn(tNearbyTMD)
+    --Should have alreayd called isunitvalid before calling this
+    if oUnit.GetAIBrain then
+        local aiBrain = oUnit:GetAIBrain()
+        if aiBrain then
+            local tNearbyTMD = oUnit:GetAIBrain():GetUnitsAroundPoint(M27UnitInfo.refCategoryTMD, oUnit:GetPosition(), iTMDNearbyRange, 'Ally')
+            oUnit[M27UnitInfo.refiNearbyTMD] = 0
+            if M27Utilities.IsTableEmpty(tNearbyTMD) == false then
+                oUnit[M27UnitInfo.refiNearbyTMD] = table.getn(tNearbyTMD)
+            end
+        end
     end
 end
 
@@ -6066,6 +6203,7 @@ function CheckForEnemySMD(aiBrain, oSML)
                                 --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
                                 oEngineer = tSubtable[refEngineerAssignmentEngineerRef]
                                 --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
+
                                 IssueClearCommands({oEngineer})
                                 ClearEngineerActionTrackers(aiBrain, oEngineer, true)
                                 if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oEngineer)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
@@ -6079,6 +6217,7 @@ function CheckForEnemySMD(aiBrain, oSML)
                             oEngineer = tSubtable[refEngineerAssignmentEngineerRef]
                             --if oEngineer:IsUnitState('Building') or oEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end
                             --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                             IssueClearCommands({oEngineer})
                             ClearEngineerActionTrackers(aiBrain, oEngineer, true)
                             if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oEngineer)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngineer)) end
@@ -6132,7 +6271,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
 
     local sFunctionRef = 'AssignActionToEngineer'
     M27Utilities.FunctionProfiler(sFunctionRef..iActionToAssign, M27Utilities.refProfilerStart)
-    --if GetEngineerUniqueCount(oEngineer) == 169 and GetGameTimeSeconds() >= 2300 then bDebugMessages = true end
+    --if GetEngineerUniqueCount(oEngineer) == 12 then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 61 and GetGameTimeSeconds() >= 660 then bDebugMessages = true end
     --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
     --if aiBrain:GetArmyIndex() == 5 and GetGameTimeSeconds() >= 2160 and (iActionToAssign == refActionBuildShield or iActionToAssign == refActionBuildSecondShield) then bDebugMessages = true end
@@ -6141,11 +6280,13 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
     if oEngineer then
         if M27UnitInfo.IsUnitValid(oEngineer) then
             --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
             if bDebugMessages == true then
                 LOG(sFunctionRef..': Issuing clear commands to engineer with unique ref '..GetEngineerUniqueCount(oEngineer)..'; iActionToAssign='..iActionToAssign..'; tActionTargetLocation='..repru(tActionTargetLocation or {'nil'}))
                 if oActionTargetObject then LOG('oActionTargetObject='..oActionTargetObject.UnitId..M27UnitInfo.GetUnitLifetimeCount(oActionTargetObject))
                 else LOG('oActionTargetObject is nil') end
             end
+
             IssueClearCommands{oEngineer}
             oEngineer[M27Logic.refiIdleCount] = 0
 
@@ -6726,6 +6867,7 @@ function AssignActionToEngineer(aiBrain, oEngineer, iActionToAssign, tActionTarg
                                     elseif iActionToAssign == refActionBuildT3ArtiPower then
                                         --Special logic - base the locations on the Arti unit itself
                                         --if GetEngineerUniqueCount(oEngineer) == 3 then bDebugMessages = true end
+
                                         if bDebugMessages == true then
                                             LOG(sFunctionRef .. ': Clearing engineer ' .. GetEngineerUniqueCount(oEngineer) .. 'LC=' .. M27UnitInfo.GetUnitLifetimeCount(oEngineer) .. ' actions and will then loop through every power that want and tell it to build')
                                         end
@@ -8839,6 +8981,7 @@ function ReleaseEngineerIfHaveEmergency(aiBrain)
                 end
                 if oHighestConditionEngineer then
                     --if GetEngineerUniqueCount(oHighestConditionEngineer) == 3 then bDebugMessages = true end
+
                     IssueClearCommands({oHighestConditionEngineer})
                     ClearEngineerActionTrackers(aiBrain, oHighestConditionEngineer, true)
                     if bDebugMessages == true then LOG(sFunctionRef..': Clearing orders for engineer with highest condition') end
@@ -8904,7 +9047,7 @@ function ReassignEngineers(aiBrain, bOnlyReassignIdle, tEngineersToReassign)
         if M27Utilities.IsTableEmpty(tEngineers) == false then
             local iHighestTechLevel = aiBrain[M27Overseer.refiOurHighestFactoryTechLevel]
             for iEngineer, oEngineer in tEngineers do
-                --if GetEngineerUniqueCount(oEngineer) == 21 and GetGameTimeSeconds() >= 720 then bDebugMessages = true else bDebugMessages = false end
+                --if GetEngineerUniqueCount(oEngineer) == 12 then bDebugMessages = true else bDebugMessages = false end
                 --if oEngineer.UnitId == 'xsl0105' and M27UnitInfo.GetUnitLifetimeCount(oEngineer) == 4 and aiBrain:GetArmyIndex() == 3 and GetGameTimeSeconds() >= 1326 and GetGameTimeSeconds() <= 1327 then bDebugMessages = true else bDebugMessages = false end
                 --if GetEngineerUniqueCount(oEngineer) == 58 and GetGameTimeSeconds() >= 2040 then bDebugMessages = true else bDebugMessages = false end
                 if M27UnitInfo.IsUnitValid(oEngineer) and oEngineer:GetFractionComplete() >= 1 and not(oEngineer:IsUnitState('Attached')) then
@@ -9436,6 +9579,7 @@ end--]]
                                         tiAvailableEngineersByTech[iCurEngiTechLevel] = tiAvailableEngineersByTech[iCurEngiTechLevel] + 1
                                         table.insert(tIdleEngineers, tSubtable[refEngineerAssignmentEngineerRef])
                                         --if GetEngineerUniqueCount(tSubtable[refEngineerAssignmentEngineerRef]) == 3 then bDebugMessages = true end
+
                                         if bDebugMessages == true then LOG(sFunctionRef..': Will add engineer '..tSubtable[refEngineerAssignmentEngineerRef].UnitId..M27UnitInfo.GetUnitLifetimeCount(tSubtable[refEngineerAssignmentEngineerRef])..' with UC='..GetEngineerUniqueCount(tSubtable[refEngineerAssignmentEngineerRef])..' to the list of engineers that are available as have better alternative so will clear its commands') end
                                         IssueClearCommands({tSubtable[refEngineerAssignmentEngineerRef]})
                                         ClearEngineerActionTrackers(aiBrain, tSubtable[refEngineerAssignmentEngineerRef], true)
@@ -9521,6 +9665,7 @@ end--]]
                                             --[[for iAltEngi, oAltEngi in tEngisAvailableToClear do
                                             if GetEngineerUniqueCount(oAltEngi) == 3 then bDebugMessages = true end
                                         end--]]
+
                                             IssueClearCommands(tEngisAvailableToClear)
                                             if bDebugMessages == true then LOG(sFunctionRef..': Clearing all engineers noted as available to clear') end
                                             for iAltEngi, oAltEngi in tEngisAvailableToClear do
@@ -9545,6 +9690,7 @@ end--]]
                                                 end
                                                 --if GetEngineerUniqueCount(oNearestEngineer) == 3 then bDebugMessages = true end
                                                 --if oNearestEngineer:IsUnitState('Building') or oNearestEngineer:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end
+
                                                 if bDebugMessages == true then LOG(sFunctionRef..': About to clear nearest engineer='..oNearestEngineer.UnitId..M27UnitInfo.GetUnitLifetimeCount(oNearestEngineer)..'; UC='..GetEngineerUniqueCount(oNearestEngineer)) end
                                                 IssueClearCommands({oNearestEngineer})
                                                 ClearEngineerActionTrackers(aiBrain, oNearestEngineer, true)
@@ -10301,6 +10447,7 @@ end--]]
                                         if M27UnitInfo.IsUnitValid(tSubtable[refEngineerAssignmentEngineerRef]) then
                                             --if GetEngineerUniqueCount(tSubtable[refEngineerAssignmentEngineerRef]) == 3 then bDebugMessages = true end
                                             --if tSubtable[refEngineerAssignmentEngineerRef]:IsUnitState('Building') or tSubtable[refEngineerAssignmentEngineerRef]:IsUnitState('Repairing') then bDebugMessages = true M27Utilities.ErrorHandler('Clearing an engineer whose unit state is building or repairing') end
+
                                             if bDebugMessages == true then LOG(sFunctionRef..': Engineer is assigned the action so will clear it') end
                                             IssueClearCommands({tSubtable[refEngineerAssignmentEngineerRef]})
                                             ClearEngineerActionTrackers(aiBrain, tSubtable[refEngineerAssignmentEngineerRef], true)
@@ -11685,6 +11832,7 @@ end--]]
                                     local oEngi = tSubtable[refEngineerAssignmentEngineerRef]
                                     if M27UnitInfo.IsUnitValid(oEngi) then
                                         --if GetEngineerUniqueCount(oEngi) == 3 then bDebugMessages = true end
+
                                         IssueClearCommands({oEngi})
                                         ClearEngineerActionTrackers(aiBrain, oEngi, true)
                                         if bDebugMessages == true then LOG(sFunctionRef..': Cleared engineer UC='..GetEngineerUniqueCount(oEngi)..' with LC='..M27UnitInfo.GetUnitLifetimeCount(oEngi)) end
@@ -12026,7 +12174,7 @@ end--]]
                         end
                     end
                 end
-                M27Utilities.FunctionProfiler(sFunctionRef..': Condition'..iCurrentConditionToTry..'Strat'..aiBrain[M27Overseer.refiAIBrainCurrentStrategy], M27Utilities.refProfilerEnd)
+                M27Utilities.FunctionProfiler(sFunctionRef..': Condition'..(iCurrentConditionToTry or 'nil')..'Strat'..(aiBrain[M27Overseer.refiAIBrainCurrentStrategy] or 'nil'), M27Utilities.refProfilerEnd)
                 M27Utilities.FunctionProfiler(sFunctionRef..': EngiConditions', M27Utilities.refProfilerEnd)
 
                 iLoopCount = iLoopCount + 1

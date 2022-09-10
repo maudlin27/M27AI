@@ -3181,6 +3181,7 @@ function ManageEnergyStalls(aiBrain)
                         iEngineerSubtableCount = iEngineerSubtableCount + 1
                         tEngineerActionSubtable = tEngineerActionsByPriority[iEngineerSubtableCount]
                     end
+
                     for iUnit = iTotalUnits, 1, -1 do
                         oUnit = tRelevantUnits[iUnit]
                         --for iUnit, oUnit in tRelevantUnits do
@@ -3312,6 +3313,45 @@ function ManageEnergyStalls(aiBrain)
                                         if iCategoryRef == categories.COMMAND and oUnit[M27UnitInfo.refsUpgradeRef] then
                                             --Determine energy cost per BP
                                             iEnergyPerBP = M27UnitInfo.GetUpgradeEnergyCost(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) / (M27UnitInfo.GetUpgradeBuildTime(oUnit, oUnit[M27UnitInfo.refsUpgradeRef]) or 1)
+                                        else
+                                            --Engineer - adjust energy consumption based on what are building
+                                            if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] and EntityCategoryContains(M27UnitInfo.refCategoryEngineer, oUnit.UnitId) then
+                                                if oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionAssistAirFactory then
+                                                    iEnergyPerBP = 13
+                                                elseif oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildSMD then
+                                                    iEnergyPerBP = 17.9
+                                                elseif oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildExperimental then
+                                                    if aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalAir then
+                                                        iEnergyPerBP = 12 --approximation, aeon is higher, cybran much lower, sera around this
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalArti then
+                                                        if EntityCategoryContains(categories.UEF, oUnit.UnitId) then iEnergyPerBP = 20
+                                                        elseif EntityCategoryContains(categories.CYBRAN, oUnit.UnitId) then iEnergyPerBP = 16.7
+                                                        elseif EntityCategoryContains(categories.AEON, oUnit.UnitId) then iEnergyPerBP = 54
+                                                        else
+                                                            iEnergyPerBP = 15
+                                                        end
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalYolona then
+                                                        iEnergyPerBP = 40
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastExperimentalReference] == M27EngineerOverseer.refiExperimentalParagon then
+                                                        iEnergyPerBP = 23
+                                                    end
+                                                elseif oUnit[M27EngineerOverseer.refiEngineerCurrentAction] == M27EngineerOverseer.refActionBuildSecondExperimental then
+                                                    if aiBrain[M27EngineerOverseer.refiLastSecondExperimentalRef] == M27EngineerOverseer.refiExperimentalAir then
+                                                        iEnergyPerBP = 12 --approximation, aeon is higher, cybran much lower, sera around this
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastSecondExperimentalRef] == M27EngineerOverseer.refiExperimentalArti then
+                                                        if EntityCategoryContains(categories.UEF, oUnit.UnitId) then iEnergyPerBP = 20
+                                                        elseif EntityCategoryContains(categories.CYBRAN, oUnit.UnitId) then iEnergyPerBP = 16.7
+                                                        elseif EntityCategoryContains(categories.AEON, oUnit.UnitId) then iEnergyPerBP = 54
+                                                        else
+                                                            iEnergyPerBP = 15
+                                                        end
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastSecondExperimentalRef] == M27EngineerOverseer.refiExperimentalYolona then
+                                                        iEnergyPerBP = 40
+                                                    elseif aiBrain[M27EngineerOverseer.refiLastSecondExperimentalRef] == M27EngineerOverseer.refiExperimentalParagon then
+                                                        iEnergyPerBP = 23
+                                                    end
+                                                end
+                                            end
                                         end
                                         if oBP.Economy.BuildRate then
                                             iCurUnitEnergyUsage = oBP.Economy.BuildRate * iEnergyPerBP

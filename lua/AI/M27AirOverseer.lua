@@ -5799,9 +5799,9 @@ function AirBomberManager(aiBrain)
                         local iFriendlySearchRange = iAOE * 1.5
 
 
-                        --Is the enemy ACU vulnerable and we are in assassination mode? If so then target this
+                        --Is the enemy ACU vulnerable and we are in assassination mode and it's either the last ACU or full share isnt on? If so then target this
                         iCurPriority = 1
-                        if ScenarioInfo.Options.Victory == "demoralization" and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 10 and (not (M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) or not (M27MapInfo.IsUnderwater({ aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[1], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[2] + 18, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[3] }, false))) then
+                        if ScenarioInfo.Options.Victory == "demoralization" and not(aiBrain[M27Overseer.refiActiveEnemyBrains] > 1 and ScenarioInfo.Options.Share == 'FullShare') and M27UnitInfo.IsUnitValid(aiBrain[M27Overseer.refoLastNearestACU]) and M27Utilities.GetDistanceBetweenPositions(aiBrain[M27Overseer.reftLastNearestACU], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()) <= 10 and (not (M27UnitInfo.IsUnitUnderwater(aiBrain[M27Overseer.refoLastNearestACU])) or not (M27MapInfo.IsUnderwater({ aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[1], aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[2] + 18, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition()[3] }, false))) then
                             tNearbyFriendlies = aiBrain:GetUnitsAroundPoint(iNearbyFriendlyCategories, aiBrain[M27Overseer.refoLastNearestACU]:GetPosition(), iFriendlySearchRange, 'Ally')
                             if M27Utilities.IsTableEmpty(tNearbyFriendlies) then
                                 iEnemyAANearTarget = IsTargetCoveredByAA(aiBrain[M27Overseer.refoLastNearestACU], tEnemyAAAndCruisers, 3, tStartPoint, true)
