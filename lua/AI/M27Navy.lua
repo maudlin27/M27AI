@@ -2414,7 +2414,7 @@ function ManageNavyMainLoop(aiBrain)
     if bDebugMessages == true then
         LOG(sFunctionRef .. ': iTeam=' .. (iTeam or 'nil') .. '; Is tTeamData empty=' .. tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData)) .. '; Do we have active naval manager=' .. tostring(M27Team.tTeamData[iTeam][M27Team.refbActiveNavalManager] or false))
     end
-    if not (M27Team.tTeamData[iTeam][M27Team.refbActiveNavalManager]) then
+    if false and not (M27Team.tTeamData[iTeam][M27Team.refbActiveNavalManager]) then
         local iTotalTicksWaited = 0
         if bDebugMessages == true then
             LOG(sFunctionRef .. ': Is the table of friendly units by pond empty=' .. tostring(M27Utilities.IsTableEmpty(M27Team.tTeamData[iTeam][M27Team.reftFriendlyUnitsByPond])))

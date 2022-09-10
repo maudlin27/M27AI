@@ -144,18 +144,20 @@ function UpdateTeamDataForEnemyUnits(aiBrain)
 
 
         --Record enemy naval units
-        local tEnemyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAmphibiousAndNavy, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
-        tTeamData[aiBrain.M27Team][refiTimeOfLastNavalUnitCheckByPond] = GetGameTimeSeconds()
-        if M27Utilities.IsTableEmpty(tEnemyNavy) == false then
-            --local iCurPond
-            --local sPathing = M27UnitInfo.refPathingTypeNavy
-            for iUnit, oUnit in tEnemyNavy do
-                M27Navy.UpdateUnitPond(oUnit, aiBrain.M27Team, true)
-            end
-            if bDebugMessages == true then
-                LOG(sFunctionRef..': Finished recording all enemy naval units. Will list out number of enemy naval units in each pond')
-                for iPond, tUnits in tTeamData[aiBrain.M27Team][reftEnemyUnitsByPond] do
-                    LOG(sFunctionRef..': Pond='..iPond..'; Table size='..table.getn(tUnits))
+        if false then
+            local tEnemyNavy = aiBrain:GetUnitsAroundPoint(M27UnitInfo.refCategoryAllAmphibiousAndNavy, M27MapInfo.PlayerStartPoints[aiBrain.M27StartPositionNumber], 10000, 'Enemy')
+            tTeamData[aiBrain.M27Team][refiTimeOfLastNavalUnitCheckByPond] = GetGameTimeSeconds()
+            if M27Utilities.IsTableEmpty(tEnemyNavy) == false then
+                --local iCurPond
+                --local sPathing = M27UnitInfo.refPathingTypeNavy
+                for iUnit, oUnit in tEnemyNavy do
+                    M27Navy.UpdateUnitPond(oUnit, aiBrain.M27Team, true)
+                end
+                if bDebugMessages == true then
+                    LOG(sFunctionRef..': Finished recording all enemy naval units. Will list out number of enemy naval units in each pond')
+                    for iPond, tUnits in tTeamData[aiBrain.M27Team][reftEnemyUnitsByPond] do
+                        LOG(sFunctionRef..': Pond='..iPond..'; Table size='..table.getn(tUnits))
+                    end
                 end
             end
         end

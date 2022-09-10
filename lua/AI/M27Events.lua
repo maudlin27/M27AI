@@ -1507,7 +1507,7 @@ function OnDetectedBy(oUnitDetected, iBrainIndex)
     --Appears to be called when iBrainIndex detects oUnitDetected
 
     --For now used to make sure we have up to date naval info
-    if M27Utilities.bM27AIInGame then
+    if M27Utilities.bM27AIInGame and false then
         local aiBrain = ArmyBrains[iBrainIndex]
         --LOG('OnDetectedBy: UnitID='..oUnitDetected.UnitId..M27UnitInfo.GetUnitLifetimeCount(oUnitDetected)..'; tAllAIBrainsByArmyIndex[iBrainIndex] name='..M27Overseer.tAllAIBrainsByArmyIndex[iBrainIndex].Nickname..'; ArmyBrains nickname='..ArmyBrains[iBrainIndex].Nickname..'; Does entity contain navy='..tostring(EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId))..'; aiBrain.M27AI='..tostring((aiBrain.M27AI or false)))
         if aiBrain.M27AI and not(oUnitDetected[M27UnitInfo.reftLastKnownPosition]) and M27UnitInfo.IsUnitValid(oUnitDetected) and EntityCategoryContains(M27UnitInfo.refCategoryAllAmphibiousAndNavy, oUnitDetected.UnitId) and aiBrain.M27Team then
